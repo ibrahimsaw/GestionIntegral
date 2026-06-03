@@ -1,0 +1,176 @@
+{% extends 'base.html' %}
+{% block title %}{{ client.nom }} — Integral{% endblock %}
+{% block topbar_title %}<i class="bi bi-person-circle me-2" style="color:var(--color-primary)"></i>{{ client.nom }}{% endblock %}
+{% block topbar_actions %}
+  {% if user.is_staff_regie_role %}
+    <div class="d-flex gap-2">
+      <a href="{% url 'client_edit' client.pk %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil me-2"></i>Modifier</a>
+      <a href="{% url 'client_delete' client.pk %}" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash me-2"></i>Supprimer</a>
+      <a href="{% url 'campagne_create' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus me-1"></i>Nouvelle Campagne</a>
+      <div class="btn-group" role="group">
+        <button type="button" class="btn btn-soft-success btn-sm dropdown-toggle" data-bs-toggle="dropdown">
+          <i class="bi bi-download me-1"></i>Exporter
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <li><a class="dropdown-item" href="{% url 'preview_client_pdf' client.pk %}"><i class="bi bi-eye me-2"></i>Prévisualiser</a></li>
+          <li><a class="dropdown-item" href="{% url 'export_client_pdf' client.pk %}"><i class="bi bi-file-earmark-pdf me-2"></i>PDF</a></li>
+        </ul>
+      </div>
+    </div>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+  <div class="col-md-4">
+    <div class="card mb-3">
+      <div class="card-body text-center py-4">
+        {% if client.logo %}<img src="{{ client.logo.url }}" style="width:80px;height:80px;object-fit:contain;border-radius:12px;margin-bottom:12px">{% else %}
+        <div style="width:70px;height:70px;background:var(--bg-card2);border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px"><i class="bi bi-building" style="font-size:2rem;color:var(--text-muted)"></i></div>{% endif %}
+        <div style="font-size:1.1rem;font-weight:800">{{ client.nom }}</div>
+        <div style="font-size:.75rem;color:var(--text-muted)">{{ client.get_type_contrat_display }}</div>
+      </div>
+    </div>
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-info-circle me-2"></i>Coordonnées</div>
+      <div class="card-body p-0">
+        {% if client.contact_nom %}<div style="padding:9px 14px;border-bottom:1px solid var(--border);font-size:.83rem"><i class="bi bi-person me-2" style="color:var(--text-muted)"></i>{{ client.contact_nom }}</div>{% endif %}
+        {% if client.telephone %}<div style="padding:9px 14px;border-bottom:1px solid var(--border);font-size:.83rem"><i class="bi bi-telephone me-2" style="color:var(--text-muted)"></i>{{ client.telephone }}</div>{% endif %}
+        {% if client.email %}<div style="padding:9px 14px;border-bottom:1px solid var(--border);font-size:.83rem"><i class="bi bi-envelope me-2" style="color:var(--text-muted)"></i>{{ client.email }}</div>{% endif %}
+        {% if client.adresse %}<div style="padding:9px 14px;font-size:.83rem;color:var(--text-muted)">{{ client.adresse }}</div>{% endif %}
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><i class="bi bi-graph-up me-3"></i>Statistiques Actives<div class="foat-end" >{{ client.campagnes_stats.total }} - {{ client.spots_stats.total }} </div></div>
+      <div class="card-body p-0">
+        <div style="padding:9px 14px;border-bottom:1px solid var(--border);font-size:.83rem">
+          <i class="bi bi-patch-check me-2" style="color:var(--text-muted)"></i>
+          <span>Panneau:</span>
+          <span class="ms-2">{{ client.campagnes_stats.panneau }} - {{ client.spots_stats.panneau }}</span>
+        </div>
+        <div style="padding:9px 14px;border-bottom:1px solid var(--border);font-size:.83rem">
+          <i class="bi bi-display me-2" style="color:var(--text-muted)"></i>
+          <span>Écran:</span>
+          <span class="ms-2">{{ client.campagnes_stats.ecran }} - {{ client.spots_stats.ecran }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col-md-8">
+    <div class="card mb-3">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-file-earmark-text me-2"></i>Contrats ({{ contrats|length }})</span>
+        {% if user.is_staff_regie_role %}
+        <a href="{% url 'contrat_create_for_client' client.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-plus"></i></a>
+        {% endif %}
+      </div>
+      <div class="card-body p-0">
+        <table class="table mb-0">
+          <thead><tr><th>Type</th>
+            <th>Nom</th>
+            {% if user.is_admin %}
+              <th>Archivée</th>
+              {% endif %}
+            <th>Période</th>
+            <th>Spots</th>
+            <th>Utilisés</th>
+            <th>Restants</th>
+            <th>Statut</th>
+            {% if user.is_staff_regie_role %}<th>Actions</th>{% endif %}</tr>
+          </thead>
+          <tbody>
+            {% for c in contrats %}
+            <tr>
+              <td style="font-weight:600">{{ c.get_type_contrat_display }}</td>
+              <td style="font-weight:600">{{ c.nom }}</td>
+              {% if user.is_admin %}
+              <td>{{ c.archive|yesno:"Oui,Non" }}</td>
+              {% endif %}
+              <td class="mono" style="font-size:.75rem">{{ c.date_debut|date:"d/m/Y" }}<br>{{ c.date_fin|date:"d/m/Y" }}</td>
+              <td class="mono">{{ c.nb_spots }}</td>
+              <td class="mono">{{ c.spots_utilises }}</td>
+              <td class="mono">{{ c.spots_restants }}</td>
+              <td>
+                {% if c.is_actif %}
+                <span class="badge bg-success">Actif</span>
+                {% else %}
+                <span class="badge bg-secondary">Inactif</span>
+                {% endif %}
+              </td>
+              {% if user.is_staff_regie_role %}
+              <td>
+                <a href="{% url 'contrat_edit' c.pk %}" class="btn btn-sm btn-outline-secondary me-1"><i class="bi bi-pencil"></i></a>
+                <a href="{% url 'contrat_delete' c.pk %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></a>
+              </td>
+              {% endif %}
+            </tr>
+            {% empty %}
+            <tr><td colspan="5" class="text-center py-3" style="color:var(--text-muted);font-size:.84rem">Aucun contrat</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <div class="card-header"><i class="bi bi-megaphone me-2"></i>Historique des Campagnes ({{ campagnes|length }}) </div>
+      <div class="card-body p-0">
+        <table class="table mb-0">
+          <thead><tr><th>type</th><th>Référence</th><th>Campagne</th><th>Période</th><th>Supports</th><th>Spots</th></tr></thead>
+          <tbody>
+            {% for c in campagnes %}
+            {% comment %} <tr class="bs-{{ c.statut }} bs-border border-{{ c.statut }}"> {% endcomment %}
+            <tr class="bs-border border-{{ c.statut }}">
+              <td style="text-align: center; vertical-align: middle;">
+                <a href="{% url 'campagne_detail' c.pk %}">
+                {% if c.type_support == 'panneau' %}
+                  <i class="bi bi-sign-merge-right support-panneau" title="Panneau"></i>
+                {% else %}
+                  <i class="bi bi-display support-ecran" title="Écran"></i>
+                {% endif %}
+                </a>
+              </td>
+              <td class="mono" style="font-size:.72rem;color:var(--text-muted)">{{ c.reference }}</td>
+              <td style="font-weight:600">{{ c.nom }}</td>
+              <td class="mono" style="font-size:.75rem">{{ c.date_debut|date:"d/m/Y" }}<br>{{ c.date_fin|date:"d/m/Y" }}</td>
+              <td class="mono">{{ c.nb_supports }}</td>
+              <td class="mono">{{ c.calculer_nombre_spots }}</td>
+            </tr>
+            {% empty %}
+            <tr><td colspan="6" class="text-center py-3" style="color:var(--text-muted);font-size:.84rem">Aucune campagne</td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+  <div class="card border-0 shadow-sm rounded-4 p-4 text-center bg-white">
+    <h6 class="fw-bold mb-3"><i class="bi bi-file-earmark-arrow-down me-2"></i>Générer les documents de campagne</h6>
+    <div class="d-flex gap-3 justify-content-center flex-wrap">
+      <a href="{% url 'preview_client_pdf' client.pk %}" class="btn btn-soft-success px-4 rounded-pill">
+        <i class="bi bi-eye me-2"></i>Voir le Rapport
+      </a>
+      <a href="{% url 'export_client_pdf' client.pk %}" class="btn btn-soft-danger px-4 rounded-pill">
+        <i class="bi bi-file-earmark-pdf-fill me-2"></i>Rapport PDF
+      </a>
+      <a href="{% url 'export_client_excel' client.pk %}" class="btn btn-soft-success px-4 rounded-pill">
+        <i class="bi bi-file-earmark-spreadsheet-fill me-2"></i>Rapport Excel
+      </a>
+    </div>
+  </div>
+</div>
+<style>
+  /* Couleurs Soft (Bootstrap Extensions) */
+  .btn-soft-success { background: rgba(25, 135, 84, 0.1); color: #198754; border: 1px solid rgba(25, 135, 84, 0.2); }
+  .btn-soft-danger { background: rgba(220, 53, 69, 0.1); color: #dc3545; border: 1px solid rgba(220, 53, 69, 0.2); }
+  .bg-light-subtle { background-color: #f8f9fa; }
+  
+  .support-card { transition: transform 0.2s ease, shadow 0.2s ease; border: 1px solid transparent !important; }
+  .support-card:hover { transform: translateY(-3px); box-shadow: 0 10px 20px rgba(0,0,0,0.08) !important; border-color: var(--color-primary) !important; }
+  
+  /* Badges de statut personnalisés */
+  .bg-brouillon { background-color: #6c757d !important; }
+  .bg-en_cours { background-color: #198754 !important; }
+  .bg-a_venir { background-color: #0dcaf0 !important; }
+  .bg-terminee { background-color: #212529 !important; }
+</style>
+{% endblock %}

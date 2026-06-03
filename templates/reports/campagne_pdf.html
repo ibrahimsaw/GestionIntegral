@@ -1,0 +1,512 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        :root {
+            --color-primary:   {{ DESIGN.COLOR_PRIMARY }};
+            --color-secondary: {{ DESIGN.COLOR_SECONDARY }};
+            --color-noir:      {{ DESIGN.COLOR_NOIR }};
+            --bg:        #f1f5f9;
+            --bg-card:   #ffffff;
+            --bg-card2:  #f8fafc;
+            --border:    #e2e8f0;
+            --text:      #1e293b;
+            --text-muted:#64748b;
+        }
+
+        @page {
+            size: A4 portrait;
+            margin: 1.5cm 1.2cm;
+            @bottom-center {
+                content: "Document généré le {{ today }} — Page " counter(page) " / " counter(pages);
+                font-family: Arial, sans-serif;
+                font-size: 7pt;
+                color: #64748b;
+            }
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 8.5pt;
+            color: var(--text);
+            background: #fff;
+        }
+
+        /* ── Filigrane ── */
+        .watermarked::before {
+            content: "";
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-45deg);
+            width: 400px;
+            height: 400px;
+            background-image: url("{% static 'img/logo.png' %}");
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            opacity: 0.4;
+            z-index: 1000;
+            pointer-events: none;
+        }
+
+        /* ══════════════════════════════════
+           EN-TÊTE
+        ══════════════════════════════════ */
+        .doc-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 16px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid var(--color-primary);
+        }
+        .doc-header-logo {
+            margin-right: 14px;
+            display: flex;
+            align-items: center;
+        }
+        .doc-logo {
+            height: 55px;
+            width: auto;
+            object-fit: contain;
+        }
+        .doc-header-center {
+            flex: 1;
+            text-align: center;
+        }
+        .doc-brand {
+            font-size: 7pt;
+            font-weight: bold;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 3px;
+        }
+        .doc-title {
+            font-size: 14pt;
+            font-weight: bold;
+            color: var(--color-primary);
+            text-transform: uppercase;
+            line-height: 1.2;
+        }
+        .doc-subtitle {
+            font-size: 9pt;
+            color: var(--text-muted);
+            margin-top: 3px;
+        }
+        .doc-header-right {
+            text-align: right;
+            font-size: 7.5pt;
+            color: var(--text-muted);
+            line-height: 1.7;
+        }
+
+        /* ══════════════════════════════════
+           BANDEAU SECTION
+        ══════════════════════════════════ */
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 14px 0 8px 0;
+            background: var(--color-primary);
+            border-radius: 4px;
+            padding: 6px 14px;
+            page-break-inside: avoid;
+        }
+        .section-header::before,
+        .section-header::after {
+            content: "◆";
+            color: var(--color-secondary);
+            font-size: 8pt;
+            margin: 0 10px;
+        }
+        .section-title {
+            font-size: 9pt;
+            font-weight: bold;
+            color: #fff;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        /* ══════════════════════════════════
+           FICHE INFOS GÉNÉRALES
+        ══════════════════════════════════ */
+        .fiche {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            margin-bottom: 4px;
+        }
+        .fiche-bloc {
+            flex: 1;
+            min-width: 45%;
+            background: var(--bg-card2);
+            border: 0.5px solid var(--border);
+            border-radius: 4px;
+            padding: 8px 10px;
+        }
+        .fiche-bloc.full {
+            min-width: 100%;
+            flex: none;
+            width: 100%;
+        }
+        .fiche-label {
+            font-size: 6.5pt;
+            font-weight: bold;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 2px;
+        }
+        .fiche-value {
+            font-size: 8.5pt;
+            color: var(--text);
+            font-weight: bold;
+        }
+        .fiche-value.muted {
+            font-weight: normal;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        /* Badges statut */
+        .badge {
+            display: inline-block;
+            font-size: 7pt;
+            font-weight: bold;
+            border-radius: 3px;
+            padding: 2px 7px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        .badge-en_cours  { background: #dcfce7; color: #166534; }
+        .badge-a_venir   { background: #dbeafe; color: #1e40af; }
+        .badge-terminee  { background: #f1f5f9; color: #475569; }
+        .badge-annulee   { background: #fee2e2; color: #991b1b; }
+        .badge-brouillon { background: #fef9c3; color: #854d0e; }
+        .badge-panneau   { background: #f0fdf4; color: #15803d; }
+        .badge-ecran     { background: #eff6ff; color: #1d4ed8; }
+
+        /* ══════════════════════════════════
+           TABLEAUX
+        ══════════════════════════════════ */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+            font-size: 8pt;
+        }
+
+        thead tr th {
+            background-color: var(--color-primary);
+            color: #fff;
+            font-size: 7.5pt;
+            font-weight: bold;
+            text-align: center;
+            padding: 6px 4px;
+            border: 0.5px solid rgba(255,255,255,0.15);
+        }
+        thead tr th.left { text-align: left; padding-left: 6px; }
+        thead { display: table-header-group; }
+
+        tbody tr td {
+            padding: 5px 4px;
+            border: 0.5px solid var(--border);
+            vertical-align: middle;
+            text-align: center;
+        }
+        tbody tr td.left { text-align: left; padding-left: 6px; }
+
+        tbody tr:nth-child(even) { background-color: var(--bg-card2); }
+        tbody tr:nth-child(odd)  { background-color: #ffffff; }
+
+        tr.row-total td {
+            background-color: var(--bg);
+            color: var(--color-primary);
+            font-weight: bold;
+            font-size: 8.5pt;
+            border-top: 2px solid var(--color-primary);
+        }
+
+        /* Face tag */
+        .face-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 2px 0;
+            border-bottom: 0.5px solid var(--border);
+        }
+        .face-row:last-child { border-bottom: none; }
+        .face-nom {
+            font-size: 7.5pt;
+            color: var(--text);
+            flex: 1;
+        }
+        .face-label {
+            font-size: 7pt;
+            font-weight: bold;
+            color: #fff;
+            background-color: var(--color-primary);
+            border-radius: 3px;
+            padding: 1px 5px;
+            white-space: nowrap;
+        }
+
+        /* Colonne spots par mois */
+        col.m-mois   { width: 5cm;  }
+        col.m-spots  { width: 3cm;  }
+        col.m-ecran  { width: 3cm;  }
+        col.m-nb     { width: 2cm;  }
+
+        /* Colonne supports */
+        col.s-code   { width: 2cm;  }
+        col.s-nom    { width: auto; }
+        col.s-ville   { width: 2cm;  }
+        col.s-quartier   { width: 2cm;  }
+        col.s-adresse  { width: 6cm;  }
+        col.s-face   { width: 2cm;  }
+        
+
+        /* Note de bas de section */
+        .section-note {
+            font-size: 7pt;
+            color: var(--text-muted);
+            font-style: italic;
+            margin-top: 4px;
+            text-align: right;
+        }
+    </style>
+</head>
+<body class="watermarked">
+
+<!-- ══════════════════════════════════════════
+     EN-TÊTE
+════════════════════════════════════════════ -->
+<div class="doc-header">
+    <div class="doc-header-logo">
+        <img src="{% static 'img/logo.png' %}" alt="Logo" class="doc-logo">
+    </div>
+    <div class="doc-header-center">
+        <div class="doc-title">Fiche Campagne</div>
+        <div class="doc-subtitle">{{ infos.nom }}</div>
+    </div>
+    <div class="doc-header-right">
+        Généré le {{ today|date:"d/m/Y" }}<br>
+        Réf. : <strong>{{ infos.reference }}</strong><br>
+        {% if client.telephone %}Tél. : {{ client.telephone }}<br>{% endif %}
+        {% if client.email %}{{ client.email }}{% endif %}
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SECTION 1 — INFOS GÉNÉRALES
+════════════════════════════════════════════ -->
+<div class="section-header">
+    <span class="section-title">Informations générales</span>
+</div>
+
+<div class="fiche">
+
+    <div class="fiche-bloc">
+        <div class="fiche-label">Client</div>
+        <div class="fiche-value">{{ client.nom }}</div>
+    </div>
+
+    <div class="fiche-bloc">
+        <div class="fiche-label">Référence</div>
+        <div class="fiche-value">{{ infos.reference }}</div>
+    </div>
+
+    <div class="fiche-bloc">
+        <div class="fiche-label">Statut</div>
+        <div class="fiche-value">
+            <span class="badge badge-{{ campagne.statut }}">{{ infos.statut }}</span>
+        </div>
+    </div>
+
+    <div class="fiche-bloc">
+        <div class="fiche-label">Type de support</div>
+        <div class="fiche-value">
+            <span class="badge badge-{{ campagne.type_support }}">{{ infos.type_support }}</span>
+        </div>
+    </div>
+
+    <div class="fiche-bloc">
+        <div class="fiche-label">Date de début</div>
+        <div class="fiche-value">{{ infos.date_debut|date:"d/m/Y" }}</div>
+    </div>
+
+    <div class="fiche-bloc">
+        <div class="fiche-label">Date de fin</div>
+        <div class="fiche-value">{{ infos.date_fin|date:"d/m/Y" }}</div>
+    </div>
+
+    <div class="fiche-bloc">
+        <div class="fiche-label">Durée totale</div>
+        <div class="fiche-value">{{ infos.duree_jours }} jour{{ infos.duree_jours|pluralize }}</div>
+    </div>
+
+    <div class="fiche-bloc">
+        <div class="fiche-label">Contrat associé</div>
+        <div class="fiche-value">
+            {% if infos.contrat %}
+                {{ infos.contrat.get_nom }}
+            {% else %}
+                <span class="muted">Aucun contrat</span>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if campagne.type_support == "ecran" %}
+    <div class="fiche-bloc">
+        <div class="fiche-label">Fréquence de diffusion</div>
+        <div class="fiche-value">{{ infos.freq_display }}</div>
+    </div>
+
+    <div class="fiche-bloc">
+        <div class="fiche-label">Durée du spot</div>
+        <div class="fiche-value">
+            {% if infos.duree_passage %}{{ infos.duree_passage }} secondes{% else %}—{% endif %}
+        </div>
+    </div>
+
+    <div class="fiche-bloc full">
+        <div class="fiche-label">Tranches horaires</div>
+        <div class="fiche-value">{{ infos.tranches }}</div>
+    </div>
+    {% endif %}
+
+    {% if infos.notes %}
+    <div class="fiche-bloc full">
+        <div class="fiche-label">Notes</div>
+        <div class="fiche-value" style="font-weight:normal;">{{ infos.notes }}</div>
+    </div>
+    {% endif %}
+    
+    {% if campagne.visuels.exists %}
+        <div class="fiche-bloc full">
+            <div class="fiche-label">Visuels / Affiches</div>
+            <div style="display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px;">
+                {% for visuel in campagne.visuels.all %}
+                    {% with visuel_name=visuel.fichier.name|lower %}
+                        {% if "mp4" in visuel_name or "webm" in visuel_name %}
+                            <video controls playsinline 
+                                style="height: 120px; width: auto; border-radius: 4px; border: 0.5px solid var(--border);">
+                                <source src="{{ visuel.fichier.url }}">
+                            </video>
+                        {% else %}
+                            <img src="{{ visuel.fichier.url }}" 
+                                style="height: 120px; width: auto; object-fit: cover; border-radius: 4px; border: 0.5px solid var(--border);">
+                        {% endif %}
+                    {% endwith %}
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+</div>
+
+<!-- ══════════════════════════════════════════
+     SECTION 2 — SUPPORTS
+════════════════════════════════════════════ -->
+<div class="section-header">
+    <span class="section-title">
+        {% if campagne.type_support == "ecran" %}Écrans{% else %}Panneaux & Faces{% endif %}
+    </span>
+</div>
+
+<table>
+    <colgroup>
+        <col class="s-code">
+        <col class="s-nom">
+        <col class="s-ville">
+        <col class="s-quartier">
+        <col class="s-adresse">
+        {% if campagne.type_support == "panneau" %}<col class="s-face">{% endif %}
+    </colgroup>
+    <thead>
+        <tr>
+            <th>CODE</th>
+            <th class="left">NOM DU SUPPORT</th>
+            <th>Ville</th>
+            <th>Quartier</th>
+            <th>Adresse</th>
+            {% if campagne.type_support == "panneau" %}<th>FACES</th>{% endif %}
+        </tr>
+    </thead>
+    <tbody>
+        {% for s in supports %}
+        <tr>
+            <td>{{ s.code }}</td>
+            <td class="left">{{ s.nom }}</td>
+            <td>{{ s.ville }}</td>
+            <td>{{ s.quartier }}</td>
+            <td>{{ s.adresse }}</td>
+            {% if campagne.type_support == "panneau" %}
+            <td>
+                {% if s.face and s.face != "—" %}
+                    <span class="face-label">{{ s.face }}</span>
+                {% else %}—{% endif %}
+            </td>
+            {% endif %}
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="5" style="text-align:center; color:var(--text-muted); padding:14px; font-style:italic;">
+                Aucun support associé.
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+<p class="section-note">Nombre de supports : {{ supports|length }}</p>
+
+<!-- ══════════════════════════════════════════
+     SECTION 3 — SPOTS PAR MOIS (écran uniquement)
+════════════════════════════════════════════ -->
+{% if spots_par_mois %}
+<div class="section-header">
+    <span class="section-title">Spots par mois</span>
+</div>
+
+<table>
+    <colgroup>
+        <col class="m-mois">
+        <col class="m-spots">
+        <col class="m-ecran">
+        <col class="m-nb">
+    </colgroup>
+    <thead>
+        <tr>
+            <th class="left">MOIS</th>
+            <th>SPOTS TOTAL</th>
+            <th>SPOTS / ÉCRAN</th>
+            <th>NB ÉCRANS</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for mois in spots_par_mois %}
+        <tr {% if mois.is_total %}class="row-total"{% endif %}>
+            <td class="left">
+                {% if mois.is_total %}<strong>{{ mois.label }}</strong>
+                {% else %}{{ mois.label }}{% endif %}
+            </td>
+            <td>{{ mois.spots|floatformat:0 }}</td>
+            <td>{{ mois.spots_ecran|floatformat:0 }}</td>
+            <td>{{ mois.nb_ecrans }}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+<p class="section-note">
+    Calcul proratisé selon le nombre de jours de diffusion par mois.
+</p>
+{% endif %}
+
+</body>
+</html>

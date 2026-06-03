@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Visualiseur de Spots - Régie Ad</title>
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body class="bg-light py-4">
+<div class="container-xl">
+  <div class="card shadow-sm border-0 rounded-4 p-4">
+
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+      <h2 class="fw-bold mb-0">Planning de Diffusion</h2>
+      <div class="btn-group" role="group">
+        <button type="button" class="btn btn-dark active" onclick="setZoom('hour',this)">1 Heure</button>
+        <button type="button" class="btn btn-outline-dark" onclick="setZoom('day',this)">1 Jour</button>
+      </div>
+    </div>
+
+    <div class="table-responsive mb-3">
+      <table class="table table-bordered table-sm align-middle">
+        <thead class="table-light">
+          <tr>
+            <th>Couleur</th>
+            <th>Nom</th>
+            <th>Durée</th>
+            <th>Fréquence</th>
+            <th>Tranche horaire</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="spotBody"></tbody>
+      </table>
+    </div>
+
+    <div class="d-flex gap-2 mb-4">
+      <button class="btn btn-primary btn-sm" onclick="addSpot()">+ Ajouter un spot</button>
+      <button class="btn btn-dark btn-sm" onclick="applyAndDraw()">▶ Appliquer</button>
+    </div>
+
+    <div id="collisionAlert" class="alert alert-warning d-none mb-3" role="alert"></div>
+
+    <div style="position:relative;width:100%;overflow:hidden;">
+      <canvas id="chart"></canvas>
+    </div>
+
+    <div id="legend" class="d-flex flex-wrap gap-3 mt-3 mb-3"></div>
+    <div id="infoBox" class="alert alert-secondary py-2 px-3 mb-0" role="alert"></div>
+  </div>
+</div>
+
+<div id="tooltip" style="position:fixed;background:rgba(20,20,20,0.88);color:white;padding:6px 12px;border-radius:7px;font-size:0.82rem;pointer-events:none;display:none;z-index:999;white-space:nowrap;"></div>
+
+<script>
+const DUR_OPTIONS  = [5, 10, 15, 20]; // secondes
+const FREQ_MINUTES = [1,2,3,4,5,6,7,8,9,10,20];
+
+// heures disponibles pour tranches (0..23)
+const HOURS = Array.from({length:24}, (_,i) => i);
+
+let SPOTS = [
+  { label:'Spot A', color:'#3498db', dur:20, freq:120, hStart:8,  hEnd:12 },
+  { label:'Spot B', color:'#2ecc71', dur:20, freq:180, hStart:10, hEnd:18 },
+  { label:'Spot C', color:'#e74c3c', dur:20, freq:90,  hStart:14, hEnd:20 },
+];
+
+const ZOOM_WINDOWS = { hour:3600*1000, day:86400*1000 };
+let currentZoom = 'hour';
+let SEGS = [];
+
+// ── calcul des options valides pour un spot donné ────────────────────────────
+// Un paramètre est "invalide" si, dans la tranche commune avec AU MOINS un autre spot,
+// la fréquence est inférieure ou égale à la durée combinée → collision garantie à chaque cycle.
+function getDisabledOptions(spotIdx) {
+  const s = SPOTS[spotIdx];
+  const disabledDurs  = new Set();
+  const disabledFreqs = new Set();
+
+  SPOTS.forEach((other, j) => {
+    if (j === spotIdx) return;
+    // chevauchement de tranches ?
+    const overlapStart = Math.max(s.hStart, other.hStart);
+    const overlapEnd   = Math.min(s.hEnd,   other.hEnd);
+    if (overlapEnd <= overlapStart) return; // pas de chevauchement
+
+    // Dans la zone commune : si freq_s <= dur_s + dur_other → collision certaine
+    DUR_OPTIONS.forEach(d => {
+      if (s.freq <= d + other.dur) disabledDurs.add(d);
+    });
+    FREQ_MINUTES.forEach(fm => {
+      const freqSec = fm * 60;
+      if (freqSec <= s.dur + other.dur) disabledFreqs.add(fm);
+    });
+  });
+
+  return { disabledDurs, disabledFreqs };
+}
+
+// ── rendu tableau ────────────────────────────────────────────────────────────
+function renderTable() {
+  const tbody = document.getElementById('spotBody');
+  tbody.innerHTML = '';
+
+  SPOTS.forEach((s, i) => {
+    const { disabledDurs, disabledFreqs } = getDisabledOptions(i);
+
+    const durOpts = DUR_OPTIONS.map(v => {
+      const dis = disabledDurs.has(v);
+      return `<option value="${v}" ${s.dur===v?'selected':''} ${dis?'disabled':''}>
+        ${v}s${dis?' ⛔':''}</option>`;
+    }).join('');
+
+    const freqOpts = FREQ_MINUTES.map(m => {
+      const dis = disabledFreqs.has(m);
+      return `<option value="${m*60}" ${s.freq===m*60?'selected':''} ${dis?'disabled':''}>
+        1/${m}min${dis?' ⛔':''}</option>`;
+    }).join('');
+
+    // options heures début/fin
+    const hStartOpts = HOURS.map(h =>
+      `<option value="${h}" ${s.hStart===h?'selected':''}>${String(h).padStart(2,'0')}h</option>`
+    ).join('');
+    const hEndOpts = HOURS.map(h =>
+      `<option value="${h}" ${s.hEnd===h?'selected':''}>${String(h).padStart(2,'0')}h</option>`
+    ).join('');
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>
+        <input type="color" value="${s.color}"
+          onchange="SPOTS[${i}].color=this.value;renderTable()"
+          class="form-control form-control-color p-0 border-0" style="width:36px;height:28px;cursor:pointer;">
+      </td>
+      <td><input type="text" value="${s.label}" onchange="SPOTS[${i}].label=this.value"
+            class="form-control form-control-sm" style="width:110px;"></td>
+      <td>
+        <select class="form-select form-select-sm" style="width:85px;"
+          onchange="SPOTS[${i}].dur=+this.value;renderTable()">${durOpts}</select>
+      </td>
+      <td>
+        <select class="form-select form-select-sm" style="width:130px;"
+          onchange="SPOTS[${i}].freq=+this.value;renderTable()">${freqOpts}</select>
+      </td>
+      <td>
+        <div class="d-flex align-items-center gap-1">
+          <select class="form-select form-select-sm" style="width:70px;"
+            onchange="SPOTS[${i}].hStart=+this.value;renderTable()">${hStartOpts}</select>
+          <span class="small text-muted">→</span>
+          <select class="form-select form-select-sm" style="width:70px;"
+            onchange="SPOTS[${i}].hEnd=+this.value;renderTable()">${hEndOpts}</select>
+        </div>
+      </td>
+      <td>${SPOTS.length>1
+        ? `<button class="btn btn-danger btn-sm" onclick="removeSpot(${i})">✕</button>`
+        : ''}</td>`;
+    tbody.appendChild(tr);
+  });
+}
+
+function addSpot() {
+  const colors = ['#9b59b6','#f39c12','#1abc9c','#e67e22','#2980b9'];
+  SPOTS.push({ label:'Spot '+String.fromCharCode(65+SPOTS.length),
+    color:colors[SPOTS.length%colors.length], dur:20, freq:120, hStart:8, hEnd:18 });
+  renderTable();
+}
+function removeSpot(i) { SPOTS.splice(i,1); renderTable(); }
+
+// ── génération segments avec tranches horaires ───────────────────────────────
+function todayMs(h, m=0) {
+  const d = new Date(); d.setHours(h, m, 0, 0); return d.getTime();
+}
+
+function generateSegments() {
+  const segs = [];
+  const collisions = [];
+
+  // Pour chaque jour (on génère sur 1 jour complet pour la vue "Jour")
+  for (let day = 0; day < 2; day++) {
+    const dayOffset = day * 86400000;
+
+    // Construire une liste d'événements souhaitables : pour chaque spot,
+    // toutes les occurrences dans sa tranche horaire
+    const wanted = [];
+    SPOTS.forEach(s => {
+      if (s.hStart >= s.hEnd) return;
+      const trancheMs = (s.hEnd - s.hStart) * 3600000;
+      const count = Math.ceil(trancheMs / (s.freq * 1000)) + 1;
+      for (let k = 0; k < count; k++) {
+        const t = todayMs(s.hStart) + dayOffset + k * s.freq * 1000;
+        if (t >= todayMs(s.hEnd) + dayOffset) break;
+        wanted.push({ idealStart: t, spot: s });
+      }
+    });
+
+    // Trier par heure idéale souhaitée
+    wanted.sort((a, b) => a.idealStart - b.idealStart);
+
+    // File unique : on place chaque événement en respectant la fin du précédent
+    // MAIS seulement dans la tranche horaire du spot concerné
+    let screenFreeAt = 0;
+
+    wanted.forEach(ev => {
+      const s = ev.spot;
+      const trancheEnd = todayMs(s.hEnd) + dayOffset;
+      const start = Math.max(screenFreeAt, ev.idealStart);
+      const end   = start + s.dur * 1000;
+
+      // Le spot déborde-t-il hors de sa tranche ? On l'ignore
+      if (end > trancheEnd) return;
+
+      const delay = start - ev.idealStart;
+      const hasCollision = delay > 0;
+      if (hasCollision) collisions.push({ label: s.label, delay: Math.round(delay/1000) });
+
+      segs.push({ start, end, label:s.label, color:s.color, dur:s.dur, freq:s.freq, hasCollision, delay });
+      screenFreeAt = end;
+    });
+  }
+
+  segs.sort((a,b) => a.start - b.start);
+  return { segs, collisions };
+}
+
+// ── formatage axe ────────────────────────────────────────────────────────────
+function formatTick(ms, zoom) {
+  const d = new Date(ms);
+  const pad = n => String(n).padStart(2,'0');
+  if (zoom==='day') return pad(d.getHours())+'h'+pad(d.getMinutes());
+  return pad(d.getHours())+':'+pad(d.getMinutes())+':'+pad(d.getSeconds());
+}
+
+// ── dessin ───────────────────────────────────────────────────────────────────
+const canvas  = document.getElementById('chart');
+const tooltip = document.getElementById('tooltip');
+
+function draw() {
+  const W = canvas.parentElement.clientWidth;
+  const H = 130;
+  canvas.width = W; canvas.height = H;
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,W,H);
+
+  const PAD_L=8, PAD_R=8, PAD_TOP=10, PAD_BOT=28;
+  const drawW = W-PAD_L-PAD_R;
+  const barH  = H-PAD_TOP-PAD_BOT-8;
+  const barY  = PAD_TOP+4;
+
+  // fenêtre : on part du début de la journée courante
+  const dayStart = new Date(); dayStart.setHours(0,0,0,0);
+  const viewStart = currentZoom==='hour'
+    ? (SEGS.length ? SEGS[0].start : Date.now())
+    : dayStart.getTime();
+  const viewEnd = viewStart + ZOOM_WINDOWS[currentZoom];
+
+  // zones de tranches horaires (fond coloré léger)
+  SPOTS.forEach(s => {
+    const x1 = PAD_L + Math.max(0,(todayMs(s.hStart)-viewStart)/(viewEnd-viewStart))*drawW;
+    const x2 = PAD_L + Math.min(1,(todayMs(s.hEnd)  -viewStart)/(viewEnd-viewStart))*drawW;
+    if (x2<=x1) return;
+    ctx.fillStyle = s.color + '18';
+    ctx.fillRect(x1, barY-4, x2-x1, barH+8);
+  });
+
+  // grille
+  const tickCount = currentZoom==='hour' ? 6 : 8;
+  ctx.font='11px Segoe UI,sans-serif'; ctx.fillStyle='#999';
+  ctx.strokeStyle='#ddd'; ctx.lineWidth=1;
+  for (let t=0; t<=tickCount; t++) {
+    const ms = viewStart+(viewEnd-viewStart)*t/tickCount;
+    const x  = PAD_L+(ms-viewStart)/(viewEnd-viewStart)*drawW;
+    ctx.beginPath(); ctx.moveTo(x,PAD_TOP); ctx.lineTo(x,H-PAD_BOT+4); ctx.stroke();
+    ctx.textAlign = t===0?'left':t===tickCount?'right':'center';
+    ctx.fillText(formatTick(ms,currentZoom), x, H-PAD_BOT+16);
+  }
+
+  // barres
+  canvas._hitmap = [];
+  SEGS.forEach(seg => {
+    if (seg.end<viewStart || seg.start>viewEnd) return;
+    const x1 = PAD_L+Math.max(0,(seg.start-viewStart)/(viewEnd-viewStart))*drawW;
+    const x2 = PAD_L+Math.min(1,(seg.end  -viewStart)/(viewEnd-viewStart))*drawW;
+    const bw  = Math.max(2, x2-x1);
+
+    ctx.fillStyle = seg.color;
+    rr(ctx,x1,barY,bw,barH,4); ctx.fill();
+
+    if (seg.hasCollision) {
+      ctx.save();
+      rr(ctx,x1,barY,bw,barH,4); ctx.clip();
+      ctx.strokeStyle='rgba(255,140,0,0.7)'; ctx.lineWidth=2;
+      for (let hx=x1-barH; hx<x2+barH; hx+=7) {
+        ctx.beginPath(); ctx.moveTo(hx,barY); ctx.lineTo(hx+barH,barY+barH); ctx.stroke();
+      }
+      ctx.strokeStyle='#ff8c00'; ctx.lineWidth=2;
+      rr(ctx,x1,barY,bw,barH,4); ctx.stroke();
+      ctx.restore();
+    }
+
+    canvas._hitmap.push({x1,x2,y1:barY,y2:barY+barH,seg});
+  });
+}
+
+function rr(ctx,x,y,w,h,r) {
+  r=Math.min(r,w/2,h/2);
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y);
+  ctx.closePath();
+}
+
+// ── tooltip ──────────────────────────────────────────────────────────────────
+canvas.addEventListener('mousemove', e => {
+  const rect=canvas.getBoundingClientRect();
+  const mx=e.clientX-rect.left, my=e.clientY-rect.top;
+  const hit=(canvas._hitmap||[]).find(h=>mx>=h.x1&&mx<=h.x2&&my>=h.y1&&my<=h.y2);
+  if (hit) {
+    tooltip.style.display='block';
+    tooltip.style.left=(e.clientX+12)+'px';
+    tooltip.style.top=(e.clientY-28)+'px';
+    const s=hit.seg;
+    tooltip.textContent=s.label+' — '+s.dur+'s · 1/'+Math.round(s.freq/60)+'min'
+      +(s.hasCollision?' ⚠ décalé +'+s.delay+'s':'');
+    canvas.style.cursor='pointer';
+  } else { tooltip.style.display='none'; canvas.style.cursor='default'; }
+});
+canvas.addEventListener('mouseleave',()=>{tooltip.style.display='none';});
+
+// ── légende ──────────────────────────────────────────────────────────────────
+function renderLegend() {
+  document.getElementById('legend').innerHTML = SPOTS.map(s =>
+    `<div class="d-flex align-items-center gap-2 small">
+       <div style="width:14px;height:12px;border-radius:3px;background:${s.color};flex-shrink:0"></div>
+       <span>${s.label} — ${s.dur}s · 1/${s.freq/60}min · ${String(s.hStart).padStart(2,'0')}h→${String(s.hEnd).padStart(2,'0')}h</span>
+     </div>`).join('');
+}
+
+// ── alerte collisions ────────────────────────────────────────────────────────
+function renderCollisionAlert(collisions) {
+  const el=document.getElementById('collisionAlert');
+  if (!collisions.length) { el.classList.add('d-none'); return; }
+  const map={};
+  collisions.forEach(c=>{ map[c.label]=(map[c.label]||0)+1; });
+  const lines=Object.entries(map).map(([l,n])=>`<strong>${l}</strong> : ${n} décalage${n>1?'s':''}`).join(' · ');
+  el.innerHTML='⚠️ <strong>Collisions dans les tranches communes</strong> — '+lines
+    +'. Les barres rayées indiquent les spots décalés.';
+  el.classList.remove('d-none');
+}
+
+function renderInfo() {
+  document.getElementById('infoBox').innerHTML='<strong>Tranches :</strong> '
+    +SPOTS.map(s=>`<strong>${s.label}</strong> ${String(s.hStart).padStart(2,'0')}h–${String(s.hEnd).padStart(2,'0')}h`).join(' · ');
+}
+
+// ── apply ────────────────────────────────────────────────────────────────────
+function applyAndDraw() {
+  document.querySelectorAll('#spotBody tr').forEach((tr,i)=>{
+    const color=tr.querySelector('input[type=color]');
+    const text =tr.querySelector('input[type=text]');
+    const sels =tr.querySelectorAll('select');
+    if (!color) return;
+    SPOTS[i].color  = color.value;
+    SPOTS[i].label  = text.value;
+    SPOTS[i].dur    = +sels[0].value;
+    SPOTS[i].freq   = +sels[1].value;
+    SPOTS[i].hStart = +sels[2].value;
+    SPOTS[i].hEnd   = +sels[3].value;
+  });
+  const {segs,collisions} = generateSegments();
+  SEGS = segs;
+  renderLegend();
+  renderInfo();
+  renderCollisionAlert(collisions);
+  draw();
+}
+
+function setZoom(z,btn) {
+  currentZoom=z;
+  document.querySelectorAll('.btn-group .btn').forEach(b=>{
+    b.classList.remove('btn-dark','active'); b.classList.add('btn-outline-dark');
+  });
+  btn.classList.remove('btn-outline-dark'); btn.classList.add('btn-dark','active');
+  draw();
+}
+
+renderTable();
+applyAndDraw();
+window.addEventListener('resize', draw);
+</script>
+</body>
+</html>

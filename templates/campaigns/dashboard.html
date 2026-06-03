@@ -1,0 +1,417 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}Dashboard — Integral{% endblock %}
+{% block topbar_title %}<i class="bi bi-speedometer2 me-2" style="color:var(--color-primary)"></i>Tableau de Bord{% endblock %}
+{% block topbar_actions %}
+  <a href="{% url 'campagne_create' %}" class="btn btn-primary btn-sm">
+    <i class="bi bi-plus-lg me-1"></i>Nouvelle Campagne
+  </a>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+  .m-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 16px 18px;
+    height: 100%;
+  }
+  .m-card .m-lbl {
+    font-size: .7rem; font-weight: 700; letter-spacing: .07em;
+    text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px;
+  }
+  .m-card .m-val { font-size: 2rem; font-weight: 800; line-height: 1; }
+  .m-card .m-sub { font-size: .72rem; color: var(--text-muted); margin-top: 5px; }
+  .m-bar { height: 3px; border-radius: 2px; background: var(--border); margin-top: 12px; overflow: hidden; }
+  .m-bar-fill { height: 100%; border-radius: 2px; }
+
+  .alerte-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 11px 16px; border-radius: var(--radius); border: 1px solid;
+    margin-bottom: 8px; font-size: .84rem; text-decoration: none; transition: opacity .15s;
+  }
+  .alerte-item:hover { opacity: .85; }
+  .alerte-item.warning { background:#fffbeb; border-color:#fcd34d; color:#92400e; }
+  .alerte-item.danger  { background:#fef2f2; border-color:#fca5a5; color:#991b1b; }
+  .alerte-item.info    { background:#eff6ff; border-color:#93c5fd; color:#1e40af; }
+  .alerte-item.success { background:#f0fdf4; border-color:#86efac; color:#166534; }
+
+  .sec-lbl {
+    font-size: .7rem; font-weight: 700; letter-spacing: .08em;
+    text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px;
+  }
+
+  .chart-card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 18px; height: 100%;
+  }
+  .ch-title {
+    font-size: .82rem; font-weight: 700; color: var(--text-muted);
+    margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;
+  }
+  .legend-row { display: flex; flex-wrap: wrap; gap: 12px; margin-bottom: 10px; font-size: .75rem; color: var(--text-muted); }
+  .legend-sq  { width:10px; height:10px; border-radius:2px; display:inline-block; margin-right:4px; vertical-align:middle; }
+
+  .kpi-row { display:flex; align-items:center; gap:8px; padding:7px 0; border-bottom:1px solid var(--border); font-size:.8rem; }
+  .kpi-row:last-child { border-bottom:none; }
+  .kpi-dot  { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+  .kpi-name { flex:1; color:var(--text-primary); }
+  .kpi-bar-w { width:80px; height:4px; background:var(--border); border-radius:2px; overflow:hidden; }
+  .kpi-bar-i { height:100%; border-radius:2px; }
+  .kpi-count { width:36px; text-align:right; color:var(--text-muted); font-weight:700; }
+
+  .dash-table { width:100%; border-collapse:collapse; font-size:.83rem; }
+  .dash-table th {
+    font-size:.7rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase;
+    color:var(--text-muted); padding:0 12px 10px; border-bottom:1px solid var(--border); text-align:left;
+  }
+  .dash-table td { padding:10px 12px; border-bottom:1px solid var(--border); vertical-align:middle; }
+  .dash-table tr:last-child td { border-bottom:none; }
+  .dash-table tr:hover td { background:var(--bg-card2, rgba(0,0,0,.02)); }
+
+  .pill { font-size:.68rem; font-weight:700; padding:3px 9px; border-radius:20px; display:inline-block; }
+  .pill-cours   { background:#d1fae5; color:#065f46; }
+  .pill-venir   { background:#dbeafe; color:#1e40af; }
+  .pill-termine { background:#f3f4f6; color:#6b7280; }
+  .pill-pause   { background:#fef3c7; color:#92400e; }
+
+  .qa-card {
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    gap:8px; padding:18px; background:var(--bg-card); border:1px solid var(--border);
+    border-radius:var(--radius); text-decoration:none; color:var(--text-primary);
+    transition:border-color .15s, background .15s; min-height:90px; height:100%;
+  }
+  .qa-card:hover { border-color:var(--color-primary); background:rgba(99,102,241,.04); color:var(--color-primary); }
+  .qa-card i    { font-size:1.6rem; }
+  .qa-card span { font-size:.78rem; font-weight:700; text-align:center; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- En-tête -->
+<div class="d-flex align-items-end justify-content-between mb-4">
+  <div>
+    <h1 style="font-size:1.4rem;font-weight:800;margin:0">Vue d'ensemble</h1>
+    <p style="color:var(--text-muted);font-size:.8rem;margin-top:3px">Situation du parc en temps réel</p>
+  </div>
+  <span style="font-size:.75rem;color:var(--text-muted)"><i class="bi bi-clock me-1"></i>Aujourd'hui</span>
+</div>
+
+
+<!-- Métriques parc -->
+<p class="sec-lbl">Parc publicitaire</p>
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="m-card">
+      <div class="m-lbl">Supports total</div>
+      <div class="m-val" style="color:var(--color-primary)">{{ total_supports }}</div>
+      <div class="m-bar"><div class="m-bar-fill" style="width:100%;background:var(--color-primary)"></div></div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4">
+    <div class="m-card">
+      <div class="m-lbl">Opérationnels</div>
+      <div class="m-val" style="color:var(--color-disponible)">{{ supports_bon }}</div>
+      <div class="m-sub">{% if total_supports %}{% widthratio supports_bon total_supports 100 %}%{% else %}—{% endif %} du parc</div>
+      <div class="m-bar"><div class="m-bar-fill" style="width:{% if total_supports %}{% widthratio supports_bon total_supports 100 %}{% else %}0{% endif %}%;background:var(--color-disponible)"></div></div>
+    </div>
+  </div>
+  <div class="col-6 col-md-4">
+    <div class="m-card">
+      <div class="m-lbl">En panne</div>
+      <div class="m-val" style="color:#ef4444">{{ supports_panne }}</div>
+      <div class="m-sub">{% if total_supports %}{% widthratio supports_panne total_supports 100 %}%{% else %}—{% endif %} du parc</div>
+      <div class="m-bar"><div class="m-bar-fill" style="width:{% if total_supports %}{% widthratio supports_panne total_supports 100 %}{% else %}0{% endif %}%;background:#ef4444"></div></div>
+    </div>
+  </div>
+  <!--
+  <div class="col-6 col-md-3">
+    <div class="m-card">
+      <div class="m-lbl">En maintenance</div>
+      <div class="m-val" style="color:#f59e0b">{{ supports_maintenance }}</div>
+      <div class="m-sub">{% if total_supports %}{% widthratio supports_maintenance total_supports 100 %}%{% else %}—{% endif %} du parc</div>
+      <div class="m-bar"><div class="m-bar-fill" style="width:{% if total_supports %}{% widthratio supports_maintenance total_supports 100 %}{% else %}0{% endif %}%;background:#f59e0b"></div></div>
+    </div>
+  </div>
+  -->
+</div>
+
+<!-- Métriques commerciales -->
+<p class="sec-lbl">Activité commerciale</p>
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="m-card">
+      <div class="m-lbl">Clients actifs</div>
+      <div class="m-val" style="color:#a78bfa">{{ total_clients }}</div>
+      <div class="m-bar"><div class="m-bar-fill" style="width:100%;background:#a78bfa"></div></div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="m-card">
+      <div class="m-lbl">Campagnes en cours</div>
+      <div class="m-val" style="color:var(--color-disponible)">{{ campagnes_actives }}</div>
+      <div class="m-sub">actives maintenant</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="m-card">
+      <div class="m-lbl">À venir</div>
+      <div class="m-val" style="color:#60a5fa">{{ campagnes_a_venir }}</div>
+      <div class="m-sub">dans les 30 jours</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="row g-2 h-100">
+      <div class="col-6">
+        <a href="{% url 'planning_calendrier' %}" class="qa-card">
+          <i class="bi bi-calendar3" style="color:var(--color-primary)"></i>
+          <span>Planning</span>
+        </a>
+      </div>
+      <div class="col-6">
+        <a href="{% url 'reports_index' %}" class="qa-card">
+          <i class="bi bi-file-earmark-excel" style="color:#34d399"></i>
+          <span>Rapports</span>
+        </a>
+      </div>
+      <div class="col-6">
+        <a href="{% url 'simulation_ecran' %}" class="qa-card">
+          <i class="bi bi-calculator-fill" style="color:#f59e0b"></i>
+          <span>Simulateur</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Graphiques -->
+<div class="row g-3 mb-4">
+
+  <div class="col-lg-7">
+    <div class="chart-card">
+      <div class="ch-title">
+        <span><i class="bi bi-bar-chart me-2" style="color:var(--color-primary)"></i>Occupation par format</span>
+        <span style="font-size:.7rem">% occupé / disponible</span>
+      </div>
+      <div class="legend-row">
+        <span><span class="legend-sq" style="background:var(--color-primary)"></span>Occupé</span>
+        <span><span class="legend-sq" style="background:#e5e7eb"></span>Disponible</span>
+      </div>
+      <div style="position:relative;height:220px;">
+        <canvas id="chartOccupation" role="img" aria-label="Taux d'occupation par format"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-lg-5">
+    <div class="chart-card">
+      <div class="ch-title">
+        <span><i class="bi bi-pie-chart me-2" style="color:var(--color-primary)"></i>Répartition du parc</span>
+        <span style="font-size:.7rem">{{ total_supports }} supports</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:16px;margin-bottom:16px;">
+        <div style="width:110px;height:110px;flex-shrink:0;">
+          <canvas id="chartTypes" width="110" height="110" role="img" aria-label="Panneaux vs écrans"></canvas>
+        </div>
+        <div style="flex:1;font-size:.8rem;">
+          <div style="display:flex;align-items:center;gap:6px;margin-bottom:8px;">
+            <span style="width:10px;height:10px;border-radius:50%;background:var(--color-primary);flex-shrink:0;"></span>
+            Panneaux statiques
+            <strong class="ms-auto">{{ nb_panneaux|default:"—" }}</strong>
+          </div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <span style="width:10px;height:10px;border-radius:50%;background:#06b6d4;flex-shrink:0;"></span>
+            Écrans numériques
+            <strong class="ms-auto">{{ nb_ecrans|default:"—" }}</strong>
+          </div>
+        </div>
+      </div>
+      <div class="kpi-row">
+        <span class="kpi-dot" style="background:#10b981"></span>
+        <span class="kpi-name">Standard (4×3, 7×3…)</span>
+        <div class="kpi-bar-w"><div class="kpi-bar-i" style="width:{% if total_supports %}{% widthratio nb_standard total_supports 100 %}{% else %}0{% endif %}%;background:#10b981"></div></div>
+        <span class="kpi-count">{{ nb_standard|default:"—" }}</span>
+      </div>
+      <div class="kpi-row">
+        <span class="kpi-dot" style="background:#f59e0b"></span>
+        <span class="kpi-name">Géants</span>
+        <div class="kpi-bar-w"><div class="kpi-bar-i" style="width:{% if total_supports %}{% widthratio nb_geants total_supports 100 %}{% else %}0{% endif %}%;background:#f59e0b"></div></div>
+        <span class="kpi-count">{{ nb_geants|default:"—" }}</span>
+      </div>
+      <div class="kpi-row">
+        <span class="kpi-dot" style="background:#a78bfa"></span>
+        <span class="kpi-name">Sucettes</span>
+        <div class="kpi-bar-w"><div class="kpi-bar-i" style="width:{% if total_supports %}{% widthratio nb_sucettes total_supports 100 %}{% else %}0{% endif %}%;background:#a78bfa"></div></div>
+        <span class="kpi-count">{{ nb_sucettes|default:"—" }}</span>
+      </div>
+      <div class="kpi-row">
+        <span class="kpi-dot" style="background:#f97316"></span>
+        <span class="kpi-name">Grand Marché</span>
+        <div class="kpi-bar-w"><div class="kpi-bar-i" style="width:{% if total_supports %}{% widthratio nb_gm total_supports 100 %}{% else %}0{% endif %}%;background:#f97316"></div></div>
+        <span class="kpi-count">{{ nb_gm|default:"—" }}</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Tableau campagnes -->
+<div class="chart-card">
+  <div class="ch-title">
+    <span><i class="bi bi-megaphone me-2" style="color:var(--color-primary)"></i>Campagnes récentes</span>
+    <a href="{% url 'campagne_list' %}" class="btn btn-sm btn-outline-secondary">Voir tout</a>
+  </div>
+  <div style="overflow-x:auto;">
+    <table class="dash-table">
+      <thead>
+        <tr>
+          <th>Référence</th><th>Client</th><th>Campagne</th>
+          <th>Début</th><th>Fin</th><th>Supports</th><th>Statut</th><th></th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in campagnes_recentes %}
+        <tr>
+          <td style="font-family:var(--mono);font-size:.72rem;color:var(--text-muted)">{{ c.reference }}</td>
+          <td style="font-weight:700">{{ c.client.nom }}</td>
+          <td>{{ c.nom }}</td>
+          <td style="font-family:var(--mono);font-size:.78rem">{{ c.date_debut|date:"d/m/Y" }}</td>
+          <td style="font-family:var(--mono);font-size:.78rem">{{ c.date_fin|date:"d/m/Y" }}</td>
+          <td style="font-family:var(--mono);font-weight:700">{{ c.nb_supports }}</td>
+          <td>
+            {% if c.statut == 'en_cours' %}<span class="pill pill-cours">En cours</span>
+            {% elif c.statut == 'a_venir' %}<span class="pill pill-venir">À venir</span>
+            {% elif c.statut == 'termine' %}<span class="pill pill-termine">Terminée</span>
+            {% else %}<span class="pill pill-pause">{{ c.get_statut_display }}</span>
+            {% endif %}
+          </td>
+          <td>
+            <a href="{% url 'campagne_detail' c.pk %}" class="btn btn-sm btn-outline-secondary">
+              <i class="bi bi-eye"></i>
+            </a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="8" class="text-center py-5" style="color:var(--text-muted)">
+            <i class="bi bi-megaphone d-block mb-2" style="font-size:1.8rem"></i>
+            Aucune campagne. <a href="{% url 'campagne_create' %}">Créer la première</a>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+{{ format_stats_json|json_script:"format-stats" }}
+{{ types_stats_json|json_script:"types-stats" }}
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+
+<script>
+(function () {
+    // 1. Récupération de la couleur primaire depuis le CSS ou valeur par défaut
+    const primary = getComputedStyle(document.documentElement)
+        .getPropertyValue('--color-primary').trim() || '#6366f1';
+
+    /**
+     * Fonction utilitaire pour parser le JSON en toute sécurité
+     * (Gère le cas où Django double-encode les données)
+     */
+    function safeParseJSON(elementId) {
+        const element = document.getElementById(elementId);
+        if (!element) return [];
+        
+        try {
+            let data = JSON.parse(element.textContent || '[]');
+            // Si le résultat est encore une chaîne de caractères, on re-parse
+            if (typeof data === 'string') {
+                data = JSON.parse(data);
+            }
+            return data;
+        } catch (e) {
+            console.error("Erreur de parsing pour #" + elementId, e);
+            return [];
+        }
+    }
+
+    // 2. Préparation des données
+    const fStats = safeParseJSON('format-stats');
+    const tStats = safeParseJSON('types-stats');
+
+    // --- Graphique 1 : Occupation par format (Barres empilées) ---
+    const ctxOccupation = document.getElementById('chartOccupation');
+    if (ctxOccupation && fStats.length > 0) {
+        new Chart(ctxOccupation, {
+            type: 'bar',
+            data: {
+                labels: fStats.map(f => f.label),
+                datasets: [
+                    { 
+                        label: 'Occupé (%)', 
+                        data: fStats.map(f => f.occupe), 
+                        backgroundColor: primary, 
+                        borderRadius: 3 
+                    },
+                    { 
+                        label: 'Disponible (%)', 
+                        data: fStats.map(f => f.disponible), 
+                        backgroundColor: '#e5e7eb', 
+                        borderRadius: 3 
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { 
+                        stacked: true, 
+                        ticks: { color: '#9ca3af', font: { size: 11 } }, 
+                        grid: { display: false } 
+                    },
+                    y: { 
+                        stacked: true, 
+                        max: 100, 
+                        ticks: { 
+                            color: '#9ca3af', 
+                            font: { size: 11 }, 
+                            callback: v => v + '%' 
+                        }, 
+                        grid: { color: '#f3f4f6' } 
+                    }
+                }
+            }
+        });
+    }
+
+    // --- Graphique 2 : Donut (Panneaux vs Écrans) ---
+    const ctxTypes = document.getElementById('chartTypes');
+    if (ctxTypes && tStats.length > 0) {
+        new Chart(ctxTypes, {
+            type: 'doughnut',
+            data: {
+                labels: tStats.map(t => t.label),
+                datasets: [{
+                    data: tStats.map(t => t.count),
+                    backgroundColor: [primary, '#06b6d4'],
+                    borderWidth: 0,
+                    hoverOffset: 4
+                }]
+            },
+            options: {
+                responsive: false,
+                cutout: '72%',
+                plugins: { legend: { display: false } }
+            }
+        });
+    }
+})();
+</script>
+{% endblock %}

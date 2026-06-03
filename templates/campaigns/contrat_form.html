@@ -1,0 +1,104 @@
+{% extends 'base.html' %}
+{% block title %}{{ title }} — Integral{% endblock %}
+{% block topbar_title %}<i class="bi bi-file-earmark-text me-2" style="color:var(--color-primary)"></i>{{ title }}{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-12">
+    <div class="d-flex align-items-center gap-3 mb-4">
+      {% if client %}
+      <a href="{% url 'client_detail' client.pk %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i></a>
+      {% else %}
+      <a href="{% url 'client_list' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i></a>
+      {% endif %}
+      <h1 style="font-size:1.4rem;font-weight:800;margin:0">{{ title }}</h1>
+    </div>
+    <form method="post">
+      {% csrf_token %}
+      <div class="card">
+        <div class="card-header"><i class="bi bi-file-earmark-text me-2"></i>Détails du Contrat</div>
+        <div class="card-body">
+          <div class="row g-3">
+            {% if form.client.field.widget.input_type != 'hidden' %}
+            <div class="col-12"><label class="form-label">Client *</label>{{ form.client }}</div>
+            {% else %}
+            {{ form.client }}
+            {% endif %}
+            <div class="col-md-6"><label class="form-label">Type de contrat *</label>{{ form.type_contrat }}</div>
+            <div class="col-md-6"><label class="form-label">Nombre de spots</label>{{ form.nb_spots }}</div>
+            <div class="col-md-6"><label class="form-label">Nom du contrat</label>{{ form.nom }}</div>
+            <div class="col-md-6">
+                <label class="form-label">Date de début *</label>
+                <input type="date" name="date_debut" class="form-control" 
+                      value="{{ form.date_debut.value|date:'Y-m-d' }}">
+                {{ form.date_debut.errors }}
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Date de fin *</label>
+                <input type="date" name="date_fin" class="form-control" 
+                      value="{{ form.date_fin.value|date:'Y-m-d' }}">
+                {{ form.date_fin.errors }}
+            </div>
+            <div class="col-12"><label class="form-label">Notes</label>{{ form.notes }}</div>
+            <div class="col-12">
+              <div class="form-check">
+                {{ form.actif }}
+                <label class="form-check-label" for="{{ form.actif.id_for_label }}">Contrat actif</label>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card-body pt-0 d-flex justify-content-end gap-2">
+          {% if client %}
+          <a href="{% url 'client_detail' client.pk %}" class="btn btn-outline-secondary">Annuler</a>
+          {% else %}
+          <a href="{% url 'client_list' %}" class="btn btn-outline-secondary">Annuler</a>
+          {% endif %}
+          <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>{% if obj %}Enregistrer{% else %}Créer{% endif %}</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const typeSelect = document.getElementById('id_type_contrat');
+    const dateDebutInput = document.getElementById('id_date_debut');
+    const dateFinInput = document.getElementById('id_date_fin');
+
+    function calculateDateFin() {
+        const type = typeSelect.value;
+        const dateDebut = new Date(dateDebutInput.value);
+
+        if (!dateDebutInput.value || !type) return;
+
+        let dateFin = new Date(dateDebut);
+
+        switch(type) {
+            case 'annuel':
+                dateFin.setFullYear(dateFin.getFullYear() + 1);
+                dateFin.setDate(dateFin.getDate() - 1); // -1 jour pour finir le dernier jour
+                break;
+            case 'mensuel':
+                dateFin.setMonth(dateFin.getMonth() + 1);
+                dateFin.setDate(dateFin.getDate() - 1);
+                break;
+            case 'ponctuel':
+                // Pour ponctuel, on ne calcule pas automatiquement
+                return;
+        }
+
+        // Formater en YYYY-MM-DD
+        const year = dateFin.getFullYear();
+        const month = String(dateFin.getMonth() + 1).padStart(2, '0');
+        const day = String(dateFin.getDate()).padStart(2, '0');
+        dateFinInput.value = `${year}-${month}-${day}`;
+    }
+
+    typeSelect.addEventListener('change', calculateDateFin);
+    dateDebutInput.addEventListener('change', calculateDateFin);
+});
+</script>
+{% endblock %}

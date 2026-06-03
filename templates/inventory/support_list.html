@@ -1,0 +1,153 @@
+{% extends 'base.html' %}
+{% block title %}Supports — Integral{% endblock %}
+{% block topbar_title %}<i class="bi bi-geo-alt me-2" style="color:var(--color-primary)"></i>Inventaire des Supports{% endblock %}
+{% block topbar_actions %}
+  {% if user.is_staff_regie_role %}
+  <a href="{% url 'support_create' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Ajouter</a>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+<!-- Search & filters -->
+<div class="card mb-4">
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-2">
+        <label class="form-label">Recherche</label>
+        <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Code, nom, adresse...">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Type</label>
+        <select name="type" class="form-select">
+          <option value="">Tous les types</option>
+          <option value="panneau" {% if type_f == 'panneau' %}selected{% endif %}>Panneaux</option>
+          <option value="ecran"   {% if type_f == 'ecran'   %}selected{% endif %}>Écrans</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">État</label>
+        <select name="etat" class="form-select">
+          <option value="">Tous les états</option>
+          <option value="bon"         {% if etat_f == 'bon'         %}selected{% endif %}>Bon état</option>
+          <option value="maintenance" {% if etat_f == 'maintenance' %}selected{% endif %}>En maintenance</option>
+          <option value="panne"       {% if etat_f == 'panne'       %}selected{% endif %}>En panne</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Occupation</label>
+        <select name="occupation" class="form-select">
+          <option value="">Tous les états</option>
+          <option value="occupe" {% if occupation_f == 'occupe' %}selected{% endif %}>Occupé</option>
+          <option value="libre"  {% if occupation_f == 'libre'  %}selected{% endif %}>Libre</option>
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Type de Panneau</label>
+        <select name="type_panneau" class="form-select">
+          <option value="">Tous les types</option>
+          {% for choice in type_panneau_choices %}
+            <option value="{{ choice }}" {% if type_panneau_f == choice %}selected{% endif %}>
+              {{ choice }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2 d-flex gap-2">
+        <button type="submit" class="btn btn-primary flex-fill"><i class="bi bi-search"></i></button>
+        <a href="{% url 'support_list' %}" class="btn btn-outline-secondary"><i class="bi bi-x-lg"></i></a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-header">
+    {{ supports|length }} support(s) trouvé(s)
+    <a href="{% url 'carte' %}" class="btn btn-sm btn-outline-secondary ms-auto"><i class="bi bi-map me-1"></i>Voir carte</a>
+  </div>
+  <div class="card-body p-0">
+    <table class="table mb-0">
+      <thead>
+        <tr><th>Code</th><th>Nom</th><th>Type</th><th>Localisation</th><th>État</th><th>Occupation</th><th>Actions</th></tr>
+      </thead>
+      <tbody>
+        {% for s in supports %}
+        <tr>
+          <td class="mono" style="font-size:.8rem;color:var(--color-primary)">{{ s.code }}</td>
+          <td style="font-weight:600">
+            <a href="{% url 'support_detail' s.pk %}" style="color:var(--text);text-decoration:none">{{ s.nom }}</a>
+          </td>
+          <td>
+            <span class="badge-status {% if s.type_support == 'panneau' %}bs-bientot{% else %}bs-en_cours{% endif %}">
+              {% if s.type_support == 'panneau' %}<i class="bi bi-sign-merge-right me-1"> {{ s.type_panneau }}</i>{% else %}<i class="bi bi-display me-1"></i>{% endif %}
+              {{ s.get_type_support_display }}
+            </span>
+          </td>
+          <td style="font-size:.8rem;color:var(--text-muted)">{{ s.adresse|default:"—"|truncatechars:35 }}</td>
+          <td>
+            <span class="badge-status {% if s.etat == 'bon' %}bs-disponible{% elif s.etat == 'maintenance' %}bs-occupe{% else %}bs-maintenance{% endif %}">
+              {{ s.get_etat_display }}
+            </span>
+          </td>
+          <td>
+            {% if s.type_support == 'ecran' %}
+              {% if s.is_occupe %}
+              <span class="badge-status bs-occupe"><i class="bi bi-broadcast me-1"></i>Occupé {{s.taux_occupation_pourcentage}}%</span>
+              {% else %}
+              <span class="badge-status bs-disponible"><i class="bi bi-check2 me-1"></i>Libre</span>
+              {% endif %}
+            {% else %}
+              {% for face in s.faces.all %}
+                {% if face.is_disponible %}
+                  <span class="badge-status bs-disponible"><i class="bi bi-check2 me-1"></i>Libre {{face.label}}</span>
+                {% else %}
+                  <span class="badge-status bs-occupe"><i class="bi bi-broadcast me-1"></i>Occupé {{face.label}}</span>
+                {% endif %}
+              {% endfor %}
+            {% endif %}
+          </td>
+          <td>
+            <div class="d-flex gap-1">
+              {% if user.is_staff_regie_role %}
+              <a href="{% url 'support_detail' s.pk %}" class="btn btn-sm btn-outline-secondary" title="Détail"><i class="bi bi-eye"></i></a>
+              
+              <a href="{% url 'support_edit' s.pk %}" class="btn btn-sm btn-outline-secondary" title="Modifier"><i class="bi bi-pencil"></i></a>
+              {% endif %}
+              {% if user.is_technicien_role or user.is_staff_regie_role %}
+              <a href="{% url 'maintenance_create' s.pk %}" class="btn btn-sm btn-outline-secondary" title="Maintenance" style="color:#fbbf24;border-color:#fbbf2444"><i class="bi bi-tools"></i></a>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="7" class="text-center py-5" style="color:var(--text-muted)">
+          <i class="bi bi-geo-alt d-block mb-2" style="font-size:2rem"></i>
+          Aucun support. <a href="{% url 'support_create' %}">Créer le premier</a>
+        </td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+      {% if is_paginated %}
+      <nav class="mt-4">
+        <ul class="pagination justify-content-center">
+          {% if page_obj.has_previous %}
+            <li class="page-item">
+              <a class="page-item btn btn-sm btn-outline-primary me-2" href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if type_f %}&type={{ type_f }}{% endif %}{% if etat_f %}&etat={{ etat_f }}{% endif %}{% if occupation_f %}&occupation={{ occupation_f }}{% endif %}">Précédent</a>
+            </li>
+          {% endif %}
+
+          <li class="page-item disabled">
+            <span class="page-link">Page {{ page_obj.number }}/{{ paginator.num_pages }}</span>
+          </li>
+
+          {% if page_obj.has_next %}
+            <li class="page-item">
+              <a class="page-item btn btn-sm btn-outline-primary ms-2" href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if type_f %}&type={{ type_f }}{% endif %}{% if etat_f %}&etat={{ etat_f }}{% endif %}{% if occupation_f %}&occupation={{ occupation_f }}{% endif %}">Suivant</a>
+            </li>
+          {% endif %}
+        </ul>
+      </nav>
+      {% endif %}
+  </div>
+</div>
+{% endblock %}

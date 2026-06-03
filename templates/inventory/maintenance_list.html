@@ -1,0 +1,190 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Liste des Maintenances{% endblock %}
+{% block topbar_title %}
+  <i class="bi bi-tools me-2" style="color:#fbbf24"></i>Maintenances
+{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+  <div>
+    <h1 style="font-size:1.3rem;font-weight:800;margin:0">Interventions de maintenance</h1>
+    <p style="color:var(--text-muted);font-size:.8rem;margin:0">{{ page_obj.paginator.count }} intervention(s) au total</p>
+  </div>
+  <a href="{% url 'maintenance_create' %}" class="btn btn-primary btn-sm">
+    <i class="bi bi-plus-lg me-1"></i>Nouvelle maintenance
+  </a>
+</div>
+
+<!-- Filtres -->
+<div class="card mb-4">
+  <div class="card-body py-2">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label" style="font-size:.75rem;color:var(--text-muted)">Support</label>
+        <select name="support" class="form-select form-select-sm">
+          <option value="">Tous les supports</option>
+          {% for s in supports %}
+            <option value="{{ s.pk }}" {% if request.GET.support == s.pk|stringformat:"s" %}selected{% endif %}>
+              {{ s.code }} — {{ s.nom }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label" style="font-size:.75rem;color:var(--text-muted)">État</label>
+        <select name="etat" class="form-select form-select-sm">
+          <option value="">Tous les états</option>
+          {% for val, label in etat_choices %}
+            <option value="{{ val }}" {% if request.GET.etat == val %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      {% if not request.user.is_technicien %}
+      <div class="col-md-3">
+        <label class="form-label" style="font-size:.75rem;color:var(--text-muted)">Technicien</label>
+        <select name="technicien" class="form-select form-select-sm">
+          <option value="">Tous les techniciens</option>
+          {% for t in techniciens %}
+            <option value="{{ t.pk }}" {% if request.GET.technicien == t.pk|stringformat:"s" %}selected{% endif %}>
+              {{ t.get_full_name|default:t.username }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      {% endif %}
+      <div class="col-md-2 d-flex gap-2">
+        <button type="submit" class="btn btn-primary flex-fill"><i class="bi bi-search"></i></button>
+        <a href="{% url 'support_list' %}" class="btn btn-outline-secondary"><i class="bi bi-x-lg"></i></a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Liste -->
+{% if maintenances %}
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0" style="font-size:.85rem">
+        <thead style="background:var(--bg-card);border-bottom:2px solid var(--border)">
+          <tr>
+            <th style="font-size:.7rem;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);font-weight:700;padding:.75rem 1rem">Support</th>
+            <th style="font-size:.7rem;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);font-weight:700">Date</th>
+            <th style="font-size:.7rem;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);font-weight:700">Technicien</th>
+            <th style="font-size:.7rem;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);font-weight:700">État enregistré</th>
+            <th style="font-size:.7rem;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);font-weight:700">Description</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for m in maintenances %}
+          <tr>
+            <!-- Support -->
+            <td style="padding:.75rem 1rem">
+              <a href="{% url 'support_detail' m.support.pk %}" style="font-weight:700;color:var(--color-primary);text-decoration:none">
+                {{ m.support.code }}
+              </a>
+              <div style="font-size:.72rem;color:var(--text-muted)">{{ m.support.nom }}</div>
+            </td>
+
+            <!-- Date -->
+            <td>
+              <div style="font-weight:600">{{ m.date_intervention|date:"d/m/Y" }}</div>
+              <div style="font-size:.72rem;color:var(--text-muted)">{{ m.date_intervention|date:"H:i" }}</div>
+            </td>
+
+            <!-- Technicien -->
+            <td>
+              {% if m.effectue_par %}
+                <div style="font-weight:600">{{ m.effectue_par.get_full_name|default:m.effectue_par.username }}</div>
+                <div style="font-size:.72rem;color:var(--text-muted)">{{ m.effectue_par.get_role_display }}</div>
+              {% else %}
+                <span style="color:var(--text-muted);font-size:.8rem">—</span>
+              {% endif %}
+            </td>
+
+            <!-- État -->
+            <td>
+              {% if m.etat_apres == 'bon' %}
+                <span class="badge" style="background:#22c55e22;color:#16a34a;font-size:.72rem">
+                  <i class="bi bi-circle-fill me-1" style="font-size:.5rem"></i>Opérationnel
+                </span>
+              {% elif m.etat_apres == 'maintenance' %}
+                <span class="badge" style="background:#f9731622;color:#ea580c;font-size:.72rem">
+                  <i class="bi bi-circle-fill me-1" style="font-size:.5rem"></i>Maintenance
+                </span>
+              {% elif m.etat_apres == 'panne' %}
+                <span class="badge" style="background:#ef444422;color:#dc2626;font-size:.72rem">
+                  <i class="bi bi-circle-fill me-1" style="font-size:.5rem"></i>En panne
+                </span>
+              {% else %}
+                <span style="color:var(--text-muted);font-size:.8rem">—</span>
+              {% endif %}
+            </td>
+
+            <!-- Description -->
+            <td style="max-width:200px">
+              <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text-secondary)">
+                {{ m.description|default:"—" }}
+              </div>
+            </td>
+
+            <!-- Actions -->
+            <td class="text-end" style="padding-right:1rem">
+              <div class="d-flex gap-1 justify-content-end">
+                <a href="{% url 'maintenance_detail' m.pk %}" class="btn btn-outline-secondary btn-sm" title="Détail">
+                  <i class="bi bi-eye"></i>
+                </a>
+                <a href="{% url 'maintenance_update' m.pk %}" class="btn btn-outline-primary btn-sm" title="Modifier">
+                  <i class="bi bi-pencil"></i>
+                </a>
+              </div>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Pagination -->
+  {% if page_obj.has_other_pages %}
+  <nav class="mt-3">
+    <ul class="pagination pagination-sm justify-content-center">
+      {% if page_obj.has_previous %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.support %}&support={{ request.GET.support }}{% endif %}{% if request.GET.etat %}&etat={{ request.GET.etat }}{% endif %}">
+            <i class="bi bi-chevron-left"></i>
+          </a>
+        </li>
+      {% endif %}
+      {% for num in page_obj.paginator.page_range %}
+        <li class="page-item {% if page_obj.number == num %}active{% endif %}">
+          <a class="page-link" href="?page={{ num }}{% if request.GET.support %}&support={{ request.GET.support }}{% endif %}{% if request.GET.etat %}&etat={{ request.GET.etat }}{% endif %}">{{ num }}</a>
+        </li>
+      {% endfor %}
+      {% if page_obj.has_next %}
+        <li class="page-item">
+          <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.support %}&support={{ request.GET.support }}{% endif %}{% if request.GET.etat %}&etat={{ request.GET.etat }}{% endif %}">
+            <i class="bi bi-chevron-right"></i>
+          </a>
+        </li>
+      {% endif %}
+    </ul>
+  </nav>
+  {% endif %}
+
+{% else %}
+  <div class="card">
+    <div class="card-body text-center py-5" style="color:var(--text-muted)">
+      <i class="bi bi-tools" style="font-size:2.5rem;opacity:.3"></i>
+      <p class="mt-3 mb-0">Aucune maintenance enregistrée</p>
+      <a href="{% url 'maintenance_create' %}" class="btn btn-primary btn-sm mt-3">
+        <i class="bi bi-plus-lg me-1"></i>Ajouter une maintenance
+      </a>
+    </div>
+  </div>
+{% endif %}
+
+{% endblock %}

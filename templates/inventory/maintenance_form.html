@@ -1,0 +1,154 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block topbar_title %}
+  <i class="bi bi-tools me-2" style="color:#fbbf24"></i>{{ title }}
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-12">
+
+    <div class="d-flex align-items-center gap-3 mb-4">
+      <a href="{% url 'maintenance_list' %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left"></i>
+      </a>
+      <div>
+        <h1 style="font-size:1.3rem;font-weight:800;margin:0">{{ title }}</h1>
+        {% if form.instance.pk %}
+          <p style="color:var(--text-muted);font-size:.8rem;margin:0">
+            {{ form.instance.support.code }} — {{ form.instance.support.nom }}
+          </p>
+        {% endif %}
+      </div>
+    </div>
+
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+
+      {# ✅ Champs cachés pour les valeurs disabled #}
+      <input type="hidden" name="effectue_par" value="{{ request.user.pk }}">
+      {% if support_pk %}
+        <input type="hidden" name="support" value="{{ support_pk }}">
+      {% endif %}
+
+      <div class="card">
+        <div class="card-header" style="color:#fbbf24">
+          <i class="bi bi-tools me-2"></i>Rapport d'Intervention
+        </div>
+        <div class="card-body">
+          <div class="row g-3">
+
+            <!-- Support -->
+            <div class="col-md-6">
+              <label class="form-label"><i class="bi bi-geo-alt me-1"></i>Support *</label>
+              {{ form.support }}
+              {% if form.support.errors %}
+                <div class="text-danger" style="font-size:.75rem">{{ form.support.errors }}</div>
+              {% endif %}
+            </div>
+
+            <!-- Technicien -->
+            <div class="col-md-6">
+              <label class="form-label"><i class="bi bi-person-fill me-1"></i>Technicien</label>
+              {{ form.effectue_par }}
+              {% if form.effectue_par.errors %}
+                <div class="text-danger" style="font-size:.75rem">{{ form.effectue_par.errors }}</div>
+              {% endif %}
+            </div>
+
+            <!-- Date intervention -->
+            <div class="col-md-6">
+              <label class="form-label"><i class="bi bi-calendar3 me-1"></i>Date d'intervention *</label>
+              {{ form.date_intervention }}
+              {% if form.date_intervention.errors %}
+                <div class="text-danger" style="font-size:.75rem">{{ form.date_intervention.errors }}</div>
+              {% endif %}
+            </div>
+
+            <!-- État -->
+            <div class="col-md-6">
+              <label class="form-label"><i class="bi bi-circle-fill me-1"></i>État enregistré *</label>
+              {{ form.etat_apres }}
+              <div style="font-size:.72rem;color:var(--text-muted);margin-top:4px">
+                <i class="bi bi-info-circle me-1"></i>L'état du support sera mis à jour automatiquement
+              </div>
+              {% if form.etat_apres.errors %}
+                <div class="text-danger" style="font-size:.75rem">{{ form.etat_apres.errors }}</div>
+              {% endif %}
+            </div>
+
+            <!-- Description -->
+            <div class="col-12">
+              <label class="form-label"><i class="bi bi-card-text me-1"></i>Description</label>
+              {{ form.description }}
+              {% if form.description.errors %}
+                <div class="text-danger" style="font-size:.75rem">{{ form.description.errors }}</div>
+              {% endif %}
+            </div>
+
+            <!-- Photo -->
+            <div class="col-12">
+              <label class="form-label"><i class="bi bi-camera me-1"></i>Photo de preuve</label>
+              <div class="mb-2">
+                <img id="image-preview"
+                     src="{% if form.instance.photo %}{{ form.instance.photo.url }}{% else %}{% static 'img/logo.png' %}{% endif %}"
+                     alt="Aperçu"
+                     class="img-thumbnail {% if not form.instance.photo %}d-none{% endif %}"
+                     style="height:120px;width:180px;object-fit:cover;border-radius:8px;border:2px solid var(--color-primary);">
+              </div>
+              {{ form.photo }}
+              <div style="font-size:.72rem;color:var(--text-muted);margin-top:4px">
+                Photo du site après intervention
+              </div>
+              {% if form.photo.errors %}
+                <div class="text-danger" style="font-size:.75rem">{{ form.photo.errors }}</div>
+              {% endif %}
+            </div>
+
+          </div>
+        </div>
+
+        {% if form.non_field_errors %}
+          <div class="card-body pt-0">
+            <div class="alert alert-danger py-2" style="font-size:.8rem">
+              {{ form.non_field_errors }}
+            </div>
+          </div>
+        {% endif %}
+
+        <div class="card-body pt-0 d-flex justify-content-end gap-2">
+          <a href="{% url 'maintenance_list' %}" class="btn btn-outline-secondary">
+            Annuler
+          </a>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-lg me-1"></i>
+            {% if form.instance.pk %}Mettre à jour{% else %}Enregistrer{% endif %}
+          </button>
+        </div>
+      </div>
+    </form>
+
+  </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const photoInput = document.querySelector('input[type="file"][name="photo"]');
+    const previewImg = document.getElementById('image-preview');
+    if (!photoInput || !previewImg) return;
+    photoInput.addEventListener('change', function () {
+        const file = this.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                previewImg.src = e.target.result;
+                previewImg.classList.remove('d-none');
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+});
+</script>
+{% endblock %}

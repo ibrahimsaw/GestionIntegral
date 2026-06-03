@@ -1,0 +1,166 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Maintenance — {{ maintenance.support.code }}{% endblock %}
+{% block topbar_title %}
+  <i class="bi bi-tools me-2" style="color:#fbbf24"></i>Détail Maintenance — {{ maintenance.support.code }}
+{% endblock %}
+
+{% block content %}
+<div class="row">
+  <div class="col-md-12">
+
+    <!-- Header -->
+    <div class="d-flex align-items-center gap-3 mb-4">
+      <a href="{% url 'maintenance_list' %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left"></i>
+      </a>
+      <div style="flex:1">
+        <h1 style="font-size:1.3rem;font-weight:800;margin:0">
+          Maintenance — {{ maintenance.support.code }}
+        </h1>
+        <p style="color:var(--text-muted);font-size:.8rem;margin:0">
+          {{ maintenance.date_intervention|date:"d/m/Y à H:i" }}
+        </p>
+      </div>
+      <a href="{% url 'maintenance_update' maintenance.pk %}" class="btn btn-outline-primary btn-sm">
+        <i class="bi bi-pencil me-1"></i>Modifier
+      </a>
+    </div>
+
+    <div class="row g-4">
+
+      <!-- Colonne gauche -->
+      <div class="col-md-8">
+
+        <!-- Infos principales -->
+        <div class="card mb-4">
+          <div class="card-header" style="color:#fbbf24">
+            <i class="bi bi-info-circle me-2"></i>Informations
+          </div>
+          <div class="card-body">
+            <div class="row g-3">
+
+              <!-- Support -->
+              <div class="col-md-6">
+                <div style="font-size:.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-family:var(--mono)">Support</div>
+                <a href="{% url 'support_detail' maintenance.support.pk %}"
+                   style="font-weight:700;color:var(--color-primary);text-decoration:none;font-size:.95rem">
+                  {{ maintenance.support.code }}
+                </a>
+                <div style="font-size:.8rem;color:var(--text-secondary)">{{ maintenance.support.nom }}</div>
+                <div style="font-size:.75rem;color:var(--text-muted)">{{ maintenance.support.adresse }}</div>
+              </div>
+
+              <!-- Technicien -->
+              <div class="col-md-6">
+                <div style="font-size:.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-family:var(--mono)">Technicien</div>
+                {% if maintenance.effectue_par %}
+                  <div style="font-weight:700;font-size:.95rem">
+                    {{ maintenance.effectue_par.get_full_name|default:maintenance.effectue_par.username }}
+                  </div>
+                  <div style="font-size:.75rem;color:var(--text-muted)">{{ maintenance.effectue_par.get_role_display }}</div>
+                {% else %}
+                  <span style="color:var(--text-muted)">—</span>
+                {% endif %}
+              </div>
+
+              <!-- Date -->
+              <div class="col-md-6">
+                <div style="font-size:.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-family:var(--mono)">Date d'intervention</div>
+                <div style="font-weight:700;font-size:.95rem">{{ maintenance.date_intervention|date:"d/m/Y" }}</div>
+                <div style="font-size:.75rem;color:var(--text-muted)">{{ maintenance.date_intervention|date:"H:i" }}</div>
+              </div>
+
+              <!-- État -->
+              <div class="col-md-6">
+                <div style="font-size:.7rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px;font-family:var(--mono)">État enregistré</div>
+                {% if maintenance.etat_apres == 'bon' %}
+                  <span class="badge" style="background:#22c55e22;color:#16a34a;font-size:.82rem;padding:.4rem .8rem">
+                    <i class="bi bi-circle-fill me-1" style="font-size:.55rem"></i>Opérationnel
+                  </span>
+                {% elif maintenance.etat_apres == 'maintenance' %}
+                  <span class="badge" style="background:#f9731622;color:#ea580c;font-size:.82rem;padding:.4rem .8rem">
+                    <i class="bi bi-circle-fill me-1" style="font-size:.55rem"></i>Maintenance
+                  </span>
+                {% elif maintenance.etat_apres == 'panne' %}
+                  <span class="badge" style="background:#ef444422;color:#dc2626;font-size:.82rem;padding:.4rem .8rem">
+                    <i class="bi bi-circle-fill me-1" style="font-size:.55rem"></i>En panne
+                  </span>
+                {% else %}
+                  <span style="color:var(--text-muted)">—</span>
+                {% endif %}
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        <!-- Description -->
+        <div class="card mb-4">
+          <div class="card-header" style="color:#fbbf24">
+            <i class="bi bi-card-text me-2"></i>Description
+          </div>
+          <div class="card-body">
+            {% if maintenance.description %}
+              <p style="margin:0;line-height:1.7;color:var(--text-secondary)">{{ maintenance.description }}</p>
+            {% else %}
+              <p style="margin:0;color:var(--text-muted);font-style:italic">Aucune description renseignée.</p>
+            {% endif %}
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Colonne droite -->
+      <div class="col-md-4">
+
+        <!-- Photo -->
+        <div class="card mb-4">
+          <div class="card-header" style="color:#fbbf24">
+            <i class="bi bi-camera me-2"></i>Photo de preuve
+          </div>
+          <div class="card-body p-0">
+            {% if maintenance.photo %}
+              <img src="{{ maintenance.photo.url }}"
+                   alt="Photo maintenance"
+                   style="width:100%;height:220px;object-fit:cover;border-radius:0 0 8px 8px;cursor:pointer"
+                   onclick="openLightboxUrl('{{ maintenance.photo.url }}', '{{ maintenance.support.code }} — {{ maintenance.date_intervention|date:"d/m/Y" }}')">
+              <div class="p-2 text-center">
+                <a href="{{ maintenance.photo.url }}" target="_blank" class="btn btn-outline-secondary btn-sm">
+                  <i class="bi bi-download me-1"></i>Télécharger
+                </a>
+              </div>
+            {% else %}
+              <div class="text-center py-5" style="color:var(--text-muted)">
+                <i class="bi bi-image" style="font-size:2rem;opacity:.3"></i>
+                <p class="mt-2 mb-0" style="font-size:.8rem">Aucune photo</p>
+              </div>
+            {% endif %}
+          </div>
+        </div>
+
+        <!-- État actuel du support -->
+        <div class="card">
+          <div class="card-header" style="color:#fbbf24">
+            <i class="bi bi-display me-2"></i>État actuel du support
+          </div>
+          <div class="card-body d-flex align-items-center gap-3">
+            <i class="bi bi-circle-fill"
+               style="font-size:1.2rem;color:{% if maintenance.support.etat == 'bon' %}var(--color-disponible){% elif maintenance.support.etat == 'maintenance' %}var(--color-occupe){% else %}var(--color-maintenance){% endif %}"></i>
+            <div>
+              <div style="font-weight:700">{{ maintenance.support.get_etat_display }}</div>
+              <a href="{% url 'support_detail' maintenance.support.pk %}"
+                 style="font-size:.75rem;color:var(--color-primary)">
+                Voir le support →
+              </a>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}

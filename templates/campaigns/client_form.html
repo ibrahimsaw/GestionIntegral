@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}{{ title }} — Integral{% endblock %}
+{% block topbar_title %}<i class="bi bi-person me-2" style="color:var(--color-primary)"></i>{{ title }}{% endblock %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-12">
+    <div class="d-flex align-items-center gap-3 mb-4">
+      <a href="{% url 'client_list' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i></a>
+      <h1 style="font-size:1.4rem;font-weight:800;margin:0">{{ title }}</h1>
+    </div>
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+      <div class="card">
+        <div class="card-header"><i class="bi bi-person me-2"></i>Informations Client</div>
+        <div class="card-body">
+          <div class="row g-3">
+            <div class="col-12"><label class="form-label">Raison sociale / Nom *</label>{{ form.nom }}</div>
+            <div class="col-md-6"><label class="form-label">Contact principal</label>{{ form.contact_nom }}</div>
+            <div class="col-md-6"><label class="form-label">Téléphone</label>{{ form.telephone }}</div>
+            <div class="col-md-6"><label class="form-label">Email</label>{{ form.email }}</div>
+            <div class="col-12"><label class="form-label">Adresse</label>{{ form.adresse }}</div>
+            <div class="col-md-12">
+                <label class="form-label">Logo</label>
+                <div class="mb-2">
+                    <img id="image-preview" 
+                        src="{% if form.instance.logo %}{{ form.instance.logo.url }}{% else %}{% static 'img/logo.png' %}{% endif %}" 
+                        alt="Aperçu" 
+                        class="img-thumbnail {% if not form.instance.logo %}d-none{% endif %}" 
+                        style="height: 120px; width: 180px; object-fit: cover; border-radius: 8px; border: 2px solid var(--color-primary);">
+                </div>
+                <div>
+                    {{ form.logo }}
+                </div>
+            </div>
+            <div class="col-12"><label class="form-label">Notes</label>{{ form.notes }}</div>
+          </div>
+        </div>
+        <div class="card-body pt-0 d-flex justify-content-end gap-2">
+          <a href="{% url 'client_list' %}" class="btn btn-outline-secondary">Annuler</a>
+          <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>{% if obj %}Enregistrer{% else %}Créer{% endif %}</button>
+        </div>
+      </div>
+    </form>
+  </div>
+</div>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const photoInput = document.querySelector('input[type="file"][name="logo"]');
+    const previewImg = document.getElementById('image-preview');
+    if (!photoInput || !previewImg) return;
+    photoInput.addEventListener('change', function () {
+        const file = this.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function (e) {
+                previewImg.src = e.target.result;
+                previewImg.classList.remove('d-none');
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+});
+</script>
+{% endblock %}

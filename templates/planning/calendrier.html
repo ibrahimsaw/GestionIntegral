@@ -1,0 +1,599 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Planning — {{ mois_nom }} {{ annee }}{% endblock %}
+{% block topbar_title %}
+  <i class="bi bi-calendar3" style="color:var(--color-primary)"></i>Planning — {{ mois_nom }} {{ annee }}
+{% endblock %}
+{% block extra_head %}
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">
+<style>
+    /* ── Tokens ────────────────────────────────────────────────────────────────── */
+    :root {
+      --pl-bg:        #f6f7fb;
+      --pl-surface:   #ffffff;
+      --pl-surface2:  #f0f2f8;
+      --pl-border:    #e4e7f0;
+      --pl-text:      #111827;
+      --pl-muted:     #6b7280;
+      --pl-accent:    {{ DESIGN.COLOR_PRIMARY }};
+      --pl-accent2:   {{ DESIGN.COLOR_SECONDARY }};
+      --pl-success:   #059669;
+      --pl-warning:   #d97706;
+      --pl-danger:    #dc2626;
+      --pl-radius:    12px;
+      --pl-font:      'Outfit', sans-serif;
+      --pl-mono:      'JetBrains Mono', monospace;
+      --pl-shadow:    0 1px 3px rgba(0,0,0,.07), 0 4px 16px rgba(0,0,0,.04);
+      --pl-shadow-md: 0 4px 20px rgba(79,70,229,.12);
+    }
+
+    /* ── Reset & base ──────────────────────────────────────────────────────────── */
+    .pl-page { font-family: var(--pl-font); background: var(--pl-bg); padding: 0; }
+    *, *::before, *::after { box-sizing: border-box; }
+
+    /* ── Layout ────────────────────────────────────────────────────────────────── */
+    .pl-wrap {
+      display: grid;
+      grid-template-rows: auto auto 1fr;
+      grid-template-columns: 1fr 300px;
+      grid-template-areas:
+        "header header"
+        "kpis   kpis"
+        "cal    side";
+      gap: 18px;
+      max-width: 1440px;
+      margin: 0 auto;
+    }
+
+    /* ── Header ────────────────────────────────────────────────────────────────── */
+    .pl-header {
+      grid-area: header;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 12px;
+      padding-bottom: 4px;
+    }
+    .pl-title {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 1.35rem; font-weight: 700;
+      color: var(--pl-text); margin: 0;
+      letter-spacing: -.4px;
+    }
+    .pl-title-icon {
+      width: 38px; height: 38px;
+      background: var(--pl-accent);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      box-shadow: 0 4px 12px rgba(79,70,229,.3);
+    }
+    .pl-subtitle { font-size: .82rem; color: var(--pl-muted); margin: 3px 0 0 48px; }
+
+    /* ── Nav mois ──────────────────────────────────────────────────────────────── */
+    .pl-nav {
+      display: flex; align-items: center; gap: 6px;
+      background: var(--pl-surface);
+      border: 1.5px solid var(--pl-border);
+      border-radius: 999px;
+      padding: 5px 6px;
+      box-shadow: var(--pl-shadow);
+    }
+    .pl-nav-arrow {
+      width: 32px; height: 32px; border-radius: 50%;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--pl-muted); text-decoration: none;
+      transition: background .15s, color .15s;
+      border: none; background: transparent;
+    }
+    .pl-nav-arrow:hover { background: var(--pl-surface2); color: var(--pl-text); }
+    .pl-nav-label {
+      font-size: .9rem; font-weight: 600;
+      min-width: 148px; text-align: center;
+      color: var(--pl-text);
+      font-family: var(--pl-font);
+    }
+    .pl-today-btn {
+      display: inline-flex; align-items: center;
+      padding: 0 14px; height: 32px; border-radius: 999px;
+      background: var(--pl-accent); color: #fff;
+      text-decoration: none; font-size: .78rem; font-weight: 600;
+      transition: opacity .15s; letter-spacing: .01em;
+    }
+    .pl-today-btn:hover { opacity: .88; color: #fff; }
+
+    /* ── KPIs ──────────────────────────────────────────────────────────────────── */
+    .pl-kpis {
+      grid-area: kpis;
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 14px;
+    }
+    .pl-kpi {
+      background: var(--pl-surface);
+      border: 1.5px solid var(--pl-border);
+      border-radius: var(--pl-radius);
+      padding: 16px 18px;
+      box-shadow: var(--pl-shadow);
+      display: flex; align-items: center; gap: 14px;
+      transition: box-shadow .2s, transform .15s;
+    }
+    .pl-kpi:hover { box-shadow: var(--pl-shadow-md); transform: translateY(-1px); }
+    .pl-kpi-icon {
+      width: 42px; height: 42px; border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      flex-shrink: 0; font-size: 1.15rem;
+    }
+    .pl-kpi-icon.indigo { background: rgba(79,70,229,.1);  color: var(--pl-accent); }
+    .pl-kpi-icon.green  { background: rgba(5,150,105,.1);  color: var(--pl-success); }
+    .pl-kpi-icon.amber  { background: rgba(217,119,6,.1);  color: var(--pl-warning); }
+    .pl-kpi-icon.violet { background: rgba(124,58,237,.1); color: var(--pl-accent2); }
+    .pl-kpi-val  { font-size: 1.6rem; font-weight: 700; color: var(--pl-text); line-height: 1; }
+    .pl-kpi-lbl  { font-size: .72rem; color: var(--pl-muted); margin-top: 3px; text-transform: uppercase; letter-spacing: .06em; font-weight: 500; }
+
+    /* ── Calendrier ────────────────────────────────────────────────────────────── */
+    .pl-cal-wrap {
+      grid-area: cal;
+      background: var(--pl-surface);
+      border: 1.5px solid var(--pl-border);
+      border-radius: var(--pl-radius);
+      box-shadow: var(--pl-shadow);
+      overflow: hidden;
+      display: flex; flex-direction: column;
+    }
+    .pl-card-header {
+      padding: 14px 20px;
+      border-bottom: 1.5px solid var(--pl-border);
+      display: flex; align-items: center; gap: 8px;
+      font-size: .78rem; font-weight: 600;
+      text-transform: uppercase; letter-spacing: .08em;
+      color: var(--pl-muted);
+      background: var(--pl-surface2);
+    }
+    .pl-card-header span.pill {
+      margin-left: auto;
+      background: var(--pl-accent);
+      color: #fff;
+      font-size: .7rem; font-weight: 600;
+      padding: 2px 9px; border-radius: 999px;
+    }
+
+    .fc-wrap { padding: 16px; flex: 1; }
+    .fc {
+      --fc-border-color:    var(--pl-border);
+      --fc-today-bg-color:  rgba(79,70,229,.06);
+      --fc-page-bg-color:   transparent;
+    }
+    .fc .fc-button {
+      background: var(--pl-surface2) !important;
+      border-color: var(--pl-border) !important;
+      color: var(--pl-text) !important;
+      font-size: .8rem; border-radius: 7px !important;
+      box-shadow: none !important; font-family: var(--pl-font) !important;
+    }
+    .fc .fc-button:hover { background: var(--pl-border) !important; }
+    .fc-day-today { background: rgba(79,70,229,.05) !important; }
+    .fc-day-today .fc-daygrid-day-number {
+      color: var(--pl-accent) !important; font-weight: 700;
+      background: rgba(79,70,229,.12); border-radius: 6px;
+      padding: 1px 6px !important;
+    }
+    .fc-col-header-cell { background: var(--pl-surface2); }
+    .fc-col-header-cell-cushion {
+      color: var(--pl-muted) !important; font-size: .72rem;
+      font-family: var(--pl-mono) !important; text-transform: uppercase;
+      letter-spacing: .08em; text-decoration: none !important; font-weight: 500;
+    }
+    .fc-daygrid-day-number {
+      color: var(--pl-muted) !important; font-family: var(--pl-mono) !important;
+      font-size: .75rem; text-decoration: none !important; padding: 5px 7px !important;
+    }
+    .fc-event {
+      border-radius: 5px !important; border: none !important;
+      font-size: .72rem !important; font-weight: 500;
+      padding: 2px 6px !important; cursor: pointer;
+      font-family: var(--pl-font) !important;
+      transition: filter .1s, transform .1s !important;
+    }
+    .fc-event:hover { filter: brightness(1.1); transform: translateY(-1px); }
+    .fc-daygrid-event-dot { display: none; }
+    .fc-more-link { color: var(--pl-accent) !important; font-size: .72rem !important; font-weight: 600 !important; }
+    .fc-popover {
+      background: var(--pl-surface) !important;
+      border: 1.5px solid var(--pl-border) !important;
+      border-radius: var(--pl-radius) !important;
+      box-shadow: var(--pl-shadow-md) !important;
+    }
+    .fc-popover-header {
+      background: var(--pl-surface2) !important;
+      color: var(--pl-text) !important;
+      font-family: var(--pl-font) !important; font-size: .8rem !important;
+    }
+
+    /* ── Légende ───────────────────────────────────────────────────────────────── */
+    .pl-legend {
+      padding: 12px 20px;
+      border-top: 1.5px solid var(--pl-border);
+      background: var(--pl-surface2);
+      display: flex; flex-wrap: wrap; gap: 10px;
+      min-height: 42px;
+    }
+    .pl-legend-chip {
+      display: flex; align-items: center; gap: 6px;
+      font-size: .73rem; color: var(--pl-muted);
+      max-width: 180px;
+    }
+    .pl-legend-dot { width: 8px; height: 8px; border-radius: 3px; flex-shrink: 0; }
+
+    /* ── Sidebar ───────────────────────────────────────────────────────────────── */
+    .pl-side {
+      grid-area: side;
+      display: flex; flex-direction: column; gap: 14px;
+      position: sticky; top: 24px; align-self: start;
+    }
+
+    .pl-card {
+      background: var(--pl-surface);
+      border: 1.5px solid var(--pl-border);
+      border-radius: var(--pl-radius);
+      box-shadow: var(--pl-shadow);
+      overflow: hidden;
+    }
+
+    /* ── Mini heatmap ──────────────────────────────────────────────────────────── */
+    .pl-heatmap {
+      padding: 14px 16px;
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      gap: 4px;
+    }
+    .pl-hm-label {
+      text-align: center; font-size: .62rem; font-weight: 600;
+      color: var(--pl-muted); text-transform: uppercase;
+      letter-spacing: .06em; padding-bottom: 4px;
+      font-family: var(--pl-mono);
+    }
+    .pl-hm-day {
+      aspect-ratio: 1;
+      border-radius: 4px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: .62rem; font-weight: 500; font-family: var(--pl-mono);
+      cursor: default; transition: transform .1s;
+      position: relative;
+    }
+    .pl-hm-day:hover { transform: scale(1.15); z-index: 2; }
+    .pl-hm-day.empty { background: transparent; color: transparent; }
+    .pl-hm-day.zero  { background: var(--pl-surface2); color: var(--pl-muted); }
+    .pl-hm-day.low   { background: rgba(79,70,229,.15); color: var(--pl-accent); }
+    .pl-hm-day.mid   { background: rgba(79,70,229,.35); color: var(--pl-accent); }
+    .pl-hm-day.high  { background: var(--pl-accent);    color: #fff; }
+
+    /* ── Supports list ─────────────────────────────────────────────────────────── */
+    .pl-supports { max-height: 400px; overflow-y: auto; }
+    .pl-supports::-webkit-scrollbar { width: 4px; }
+    .pl-supports::-webkit-scrollbar-thumb { background: var(--pl-border); border-radius: 4px; }
+
+    .pl-sup-item {
+      padding: 11px 16px;
+      border-bottom: 1px solid var(--pl-border);
+      transition: background .12s;
+      cursor: default;
+    }
+    .pl-sup-item:last-child { border-bottom: none; }
+    .pl-sup-item:hover { background: var(--pl-surface2); }
+    .pl-sup-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+    .pl-sup-type {
+      width: 20px; height: 20px; border-radius: 5px; flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center;
+      font-size: .65rem;
+    }
+    .pl-sup-type.panneau { background: rgba(124,58,237,.12); color: var(--pl-accent2); }
+    .pl-sup-type.ecran   { background: rgba(14,165,233,.12); color: #0ea5e9; }
+    .pl-sup-code { font-family: var(--pl-mono); font-size: .73rem; color: var(--pl-accent); font-weight: 500; }
+    .pl-sup-nom  { font-size: .8rem; color: var(--pl-text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .pl-sup-pct  {
+      font-family: var(--pl-mono); font-size: .72rem; font-weight: 600;
+      padding: 2px 7px; border-radius: 5px; white-space: nowrap; flex-shrink: 0;
+    }
+    .pl-sup-pct.high { background: rgba(220,38,38,.1);  color: var(--pl-danger); }
+    .pl-sup-pct.mid  { background: rgba(217,119,6,.1);  color: var(--pl-warning); }
+    .pl-sup-pct.low  { background: rgba(5,150,105,.1);  color: var(--pl-success); }
+    .pl-sup-pct.zero { background: var(--pl-surface2);  color: var(--pl-muted); }
+
+    .pl-bar-bg   { height: 3px; background: var(--pl-border); border-radius: 2px; overflow: hidden; }
+    .pl-bar-fill { height: 100%; border-radius: 2px; transition: width .4s ease; }
+
+    /* ── Tooltip ───────────────────────────────────────────────────────────────── */
+    .pl-tooltip {
+      position: fixed; z-index: 9999;
+      background: var(--pl-text); color: #fff;
+      padding: 8px 12px; border-radius: 8px;
+      font-size: .75rem; font-family: var(--pl-font);
+      box-shadow: 0 8px 24px rgba(0,0,0,.18);
+      pointer-events: none; opacity: 0;
+      transition: opacity .15s;
+      max-width: 220px; line-height: 1.5;
+    }
+
+    /* ── Responsive ────────────────────────────────────────────────────────────── */
+    @media (max-width: 960px) {
+      .pl-wrap {
+        grid-template-columns: 1fr;
+        grid-template-areas: "header" "kpis" "cal" "side";
+        padding: 14px 16px 24px;
+      }
+      .pl-kpis { grid-template-columns: repeat(2, 1fr); }
+      .pl-side { position: static; }
+    }
+    @media (max-width: 480px) {
+      .pl-kpis { grid-template-columns: 1fr 1fr; }
+      .pl-nav-label { min-width: 110px; font-size: .82rem; }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="pl-wrap">
+
+  {# ── HEADER ── #}
+  <header class="pl-header">
+    <div>
+      <h1 class="pl-title">
+        <span class="pl-title-icon">
+          <i class="bi bi-calendar3" style="color:#fff;font-size:1rem;"></i>
+        </span>
+        Planning Publicitaire
+      </h1>
+      <p class="pl-subtitle">Campagnes actives et taux d'occupation des supports</p>
+    </div>
+
+    <nav class="pl-nav" aria-label="Navigation mensuelle">
+      <a class="pl-nav-arrow" href="?mois={{ prev.mois }}&annee={{ prev.annee }}" aria-label="Mois précédent">
+        <i class="bi bi-chevron-left" style="font-size:.8rem;"></i>
+      </a>
+      <span class="pl-nav-label">{{ mois_nom }} {{ annee }}</span>
+      <a class="pl-nav-arrow" href="?mois={{ next.mois }}&annee={{ next.annee }}" aria-label="Mois suivant">
+        <i class="bi bi-chevron-right" style="font-size:.8rem;"></i>
+      </a>
+      <a class="pl-today-btn" href="?mois={{ today.month }}&annee={{ today.year }}">Aujourd'hui</a>
+    </nav>
+  </header>
+
+  {# ── KPIs ── #}
+  <div class="pl-kpis">
+    <div class="pl-kpi">
+      <div class="pl-kpi-icon indigo"><i class="bi bi-megaphone-fill"></i></div>
+      <div>
+        <div class="pl-kpi-val">{{ campagnes_count }}</div>
+        <div class="pl-kpi-lbl">Campagnes actives</div>
+      </div>
+    </div>
+    <div class="pl-kpi">
+      <div class="pl-kpi-icon green"><i class="bi bi-sign-merge-right"></i></div>
+      <div>
+        <div class="pl-kpi-val">{{ nb_panneaux_occupe }}</div>
+        <div class="pl-kpi-lbl">Panneaux occupés</div>
+      </div>
+    </div>
+    <div class="pl-kpi">
+      <div class="pl-kpi-icon amber"><i class="bi bi-display"></i></div>
+      <div>
+        <div class="pl-kpi-val">{{ nb_ecrans_occupe }}</div>
+        <div class="pl-kpi-lbl">Écrans occupés</div>
+      </div>
+    </div>
+    <div class="pl-kpi">
+      <div class="pl-kpi-icon violet"><i class="bi bi-bar-chart-fill"></i></div>
+      <div>
+        <div class="pl-kpi-val">{{ taux_moyen }}%</div>
+        <div class="pl-kpi-lbl">Taux moy. occupation</div>
+      </div>
+    </div>
+  </div>
+
+  {# ── CALENDRIER ── #}
+  <div class="pl-cal-wrap">
+    <div class="pl-card-header">
+      <i class="bi bi-calendar3"></i>
+      Calendrier des campagnes
+      <span class="pill">{{ campagnes_count }} campagne{{ campagnes_count|pluralize }}</span>
+    </div>
+    <div class="fc-wrap">
+      <div id="calendar"></div>
+    </div>
+    <div class="pl-legend" id="pl-legend"></div>
+  </div>
+
+  {# ── SIDEBAR ── #}
+  <aside class="pl-side">
+
+    {# Mini heatmap #}
+    <div class="pl-card">
+      <div class="pl-card-header">
+        <i class="bi bi-grid-3x3-gap-fill"></i>
+        Densité — {{ mois_nom }}
+      </div>
+      <div class="pl-heatmap" id="pl-heatmap">
+        {% for d in "LMMJVSD" %}
+        <div class="pl-hm-label">{{ d }}</div>
+        {% endfor %}
+        {# rempli par JS #}
+      </div>
+    </div>
+
+    {# Occupation supports #}
+    <div class="pl-card">
+      <div class="pl-card-header">
+        <i class="bi bi-bar-chart-line-fill"></i>
+        Occupation supports
+        <span style="margin-left:auto;font-size:.7rem;color:var(--pl-muted);">{{ mois_nom }}</span>
+      </div>
+      {% if supports_stats %}
+      <div class="pl-supports">
+        {% for item in supports_stats %}
+        {% with t=item.taux %}
+        <div class="pl-sup-item"
+             data-campagnes="{{ item.campagnes|join:', ' }}"
+             data-jours="{{ item.jours }}">
+          <div class="pl-sup-row">
+            <span class="pl-sup-type {{ item.support.type_support }}">
+              {% if item.support.type_support == 'ecran' %}
+                <i class="bi bi-display"></i>
+              {% else %}
+                <i class="bi bi-sign-merge-right"></i>
+              {% endif %}
+            </span>
+            <span class="pl-sup-code">{{ item.support.code }}</span>
+            <span class="pl-sup-nom" title="{{ item.support.nom }}">{{ item.support.nom|truncatechars:20 }}</span>
+            <span class="pl-sup-pct {% if t >= 80 %}high{% elif t >= 40 %}mid{% elif t > 0 %}low{% else %}zero{% endif %}">
+              {{ t }}%
+            </span>
+          </div>
+          <div class="pl-bar-bg">
+            <div class="pl-bar-fill" style="
+              width:{{ t }}%;
+              background:{% if t >= 80 %}var(--pl-danger){% elif t >= 40 %}var(--pl-warning){% elif t > 0 %}var(--pl-success){% else %}var(--pl-border){% endif %};">
+            </div>
+          </div>
+        </div>
+        {% endwith %}
+        {% endfor %}
+      </div>
+      {% else %}
+      <div style="padding:32px;text-align:center;color:var(--pl-muted);font-size:.85rem;">
+        <i class="bi bi-inbox" style="font-size:2rem;opacity:.3;display:block;margin-bottom:8px;"></i>
+        Aucun support actif ce mois-ci.
+      </div>
+      {% endif %}
+    </div>
+  </aside>
+
+</div>
+
+
+{# Tooltip #}
+<div class="pl-tooltip" id="pl-tooltip"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const events   = {{ events_json|safe }};
+  const heatmap  = {{ heatmap_json|safe }};
+  const premierJour = '{{ premier_jour|date:"Y-m-d" }}';
+  const tooltip  = document.getElementById('pl-tooltip');
+
+  // ── FullCalendar ──────────────────────────────────────────────────────────
+  const cal = new FullCalendar.Calendar(document.getElementById('calendar'), {
+    initialView:   'dayGridMonth',
+    locale:        'fr',
+    initialDate:   premierJour,
+    headerToolbar: false,
+    events:        events,
+    height:        'auto',
+    dayMaxEvents:  3,
+    eventClick: function (info) {
+      info.jsEvent.preventDefault();
+      if (info.event.url) window.location.href = info.event.url;
+    },
+    eventDidMount: function (info) {
+      const p = info.event.extendedProps;
+      info.el.title = `${p.client} — ${p.nb_supports} support(s) — ${p.statut}`;
+    },
+    eventMouseEnter: function (info) {
+      const p   = info.event.extendedProps;
+      const ev  = info.event;
+      const fin = new Date(ev.end);
+      fin.setDate(fin.getDate() - 1);
+      tooltip.innerHTML =
+        `<strong>${ev.title}</strong><br>` +
+        `<span style="opacity:.7">${p.client}</span><br>` +
+        `${ev.start.toLocaleDateString('fr')} → ${fin.toLocaleDateString('fr')}<br>` +
+        `${p.nb_supports} ${p.type === 'ecran' ? 'support(s)' : 'face(s)'} · ${p.statut}` +
+        (p.reference ? `<br><span style="opacity:.6;font-size:.7rem">${p.reference}</span>` : '');
+      tooltip.style.opacity = '1';
+    },
+    eventMouseLeave: function () {
+      tooltip.style.opacity = '0';
+    },
+    eventContent: function (arg) {
+      const p = arg.event.extendedProps;
+      return {
+        html: `<span style="display:flex;align-items:center;gap:4px;overflow:hidden;">
+          <span style="opacity:.8;font-size:.65rem;">${p.type === 'ecran' ? '▣' : '▪'}</span>
+          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${arg.event.title}</span>
+        </span>`
+      };
+    },
+  });
+  cal.render();
+
+  // Déplacement tooltip avec la souris
+  document.addEventListener('mousemove', function (e) {
+    tooltip.style.left = (e.clientX + 14) + 'px';
+    tooltip.style.top  = (e.clientY - 10) + 'px';
+  });
+
+  // ── Légende ───────────────────────────────────────────────────────────────
+  const legendEl = document.getElementById('pl-legend');
+  const seen = new Set();
+  events.forEach(ev => {
+    if (seen.has(ev.id)) return;
+    seen.add(ev.id);
+    const chip = document.createElement('span');
+    chip.className = 'pl-legend-chip';
+    chip.title = ev.extendedProps.client;
+    chip.innerHTML =
+      `<span class="pl-legend-dot" style="background:${ev.color}"></span>` +
+      `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${ev.title}</span>`;
+    legendEl.appendChild(chip);
+  });
+
+  // ── Mini heatmap ──────────────────────────────────────────────────────────
+  const hmEl = document.getElementById('pl-heatmap');
+  const [y, m] = premierJour.split('-').map(Number);
+  const daysInMonth = new Date(y, m, 0).getDate();
+  const firstDow = new Date(y, m - 1, 1).getDay(); // 0=dim
+  // Convertir dimanche=0 → lundi=0
+  const offset = (firstDow + 6) % 7;
+
+  // Cases vides avant le 1er
+  for (let i = 0; i < offset; i++) {
+    const blank = document.createElement('div');
+    blank.className = 'pl-hm-day empty';
+    hmEl.appendChild(blank);
+  }
+
+  const maxVal = Math.max(...Object.values(heatmap), 1);
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const iso  = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const val  = heatmap[iso] || 0;
+    const cell = document.createElement('div');
+    cell.className = 'pl-hm-day ' + (val === 0 ? 'zero' : val / maxVal < .4 ? 'low' : val / maxVal < .75 ? 'mid' : 'high');
+    cell.textContent = d;
+    cell.title = val > 0 ? `${d} — ${val} campagne${val > 1 ? 's' : ''}` : String(d);
+    hmEl.appendChild(cell);
+  }
+
+  // ── Tooltip supports ──────────────────────────────────────────────────────
+  document.querySelectorAll('.pl-sup-item').forEach(el => {
+    el.addEventListener('mouseenter', function (e) {
+      const camps = el.dataset.campagnes;
+      const jours = el.dataset.jours;
+      if (!camps && jours === '0') return;
+      tooltip.innerHTML =
+        `<strong>${jours} jour${jours > 1 ? 's' : ''} occupé${jours > 1 ? 's' : ''}</strong>` +
+        (camps ? `<br><span style="opacity:.75">${camps}</span>` : '');
+      tooltip.style.opacity = '1';
+    });
+    el.addEventListener('mouseleave', function () {
+      tooltip.style.opacity = '0';
+    });
+  });
+});
+</script>
+{% endblock %}

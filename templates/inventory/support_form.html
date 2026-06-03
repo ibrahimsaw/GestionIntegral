@@ -1,0 +1,363 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ title }} — Integral{% endblock %}
+
+{% block topbar_title %}
+    <i class="bi bi-pencil-square me-2" style="color:var(--color-primary)"></i>{{ title }}
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    .form-section { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:20px; overflow:hidden; }
+    .form-section-hd { padding:13px 18px; border-bottom:1px solid var(--border); font-size:.84rem; font-weight:700; display:flex; align-items:center; gap:8px; }
+    .form-section-bd { padding:18px; }
+    #gps-map { height:300px; border-radius:8px; overflow:hidden; border:1px solid var(--border); margin-bottom:10px; }
+    .coord-box { display:flex; gap:8px; align-items:center; padding:8px 12px; background:var(--bg-card2); border:1px solid rgba(0,212,255,.3); border-radius:8px; font-family:var(--mono); font-size:.8rem; color:var(--color-primary); }
+    .type-card { flex:1; padding:14px; border-radius:10px; border:2px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; transition:all .15s; text-align:center; font-weight:700; font-family:var(--font); font-size:.84rem; }
+    .type-card.sel-panneau { border-color:var(--color-primary);; background:rgba(167,139,250,.08); color:var(--color-primary); }
+    .type-card.sel-ecran   { border-color:var(--color-primary); background:rgba(0,212,255,.08); color:var(--color-primary); }
+    .type-card i { display:block; font-size:1.5rem; margin-bottom:5px; }
+    .panel { display:none; }
+    .panel.show { display:block; }
+    .errorlist { color: #ef4444; font-size: 0.75rem; list-style: none; padding: 0; margin-top: 4px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-xl-12">
+        <div class="d-flex align-items-center gap-3 mb-4">
+            <a href="{% url 'support_list' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i></a>
+            <h1 style="font-size:1.4rem;font-weight:800;margin:0">{{ title }}</h1>
+        </div>
+
+        <form method="post" enctype="multipart/form-data" id="mainSupportForm">
+            {% csrf_token %}
+            <div class="row g-3">
+
+                <div class="col-lg-5">
+                    <div class="form-section">
+                        <div class="form-section-hd"><i class="bi bi-crosshair" style="color:var(--color-primary)"></i>Positionnement GPS</div>
+                        <div class="form-section-bd">
+                            <p style="font-size:.78rem;color:var(--text-muted);margin-bottom:8px"><i class="bi bi-cursor me-1"></i>Cliquez sur la carte ou déplacez le curseur</p>
+                            <div id="gps-map"></div>
+                            <div class="coord-box"><i class="bi bi-geo-alt"></i><span id="coord-txt">{{ form.latitude.value|default:"—" }}, {{ form.longitude.value|default:"—" }}</span></div>
+                            <div class="row g-2 mt-2">
+                                <div class="col-6">
+                                    <label class="form-label">Latitude</label>
+                                    {{ form.latitude }}
+                                    {{ form.latitude.errors }}
+                                </div>
+                                <div class="col-6">
+                                    <label class="form-label">Longitude</label>
+                                    {{ form.longitude }}
+                                    {{ form.longitude.errors }}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-lg-7">
+                    <div class="form-section">
+                        <div class="form-section-hd"><i class="bi bi-grid-1x2" style="color:var(--color-primary)"></i>Type de Support</div>
+                        <div class="form-section-bd">
+                            <div class="d-flex gap-3 mb-3">
+                                <button type="button" 
+                                        class="type-card {% if object %}pe-none opacity-75{% endif %}" 
+                                        id="btn-panneau" 
+                                        {% if not object %}onclick="selectType('panneau')"{% endif %}>
+                                    <i class="bi bi-sign-merge-right"></i>Panneau Statique
+                                </button>
+                                
+                                <button type="button" 
+                                        class="type-card {% if object %}pe-none opacity-75{% endif %}" 
+                                        id="btn-ecran" 
+                                        {% if not object %}onclick="selectType('ecran')"{% endif %}>
+                                    <i class="bi bi-display"></i>Écran Numérique
+                                </button>
+                            </div>
+                            <div style="display:none">{{ form.type_support }}</div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <div class="form-section-hd"><i class="bi bi-info-circle" style="color:var(--color-primary)"></i>Informations Générales</div>
+                        <div class="form-section-bd">
+                            <div class="row g-3">
+                                <div class="col-md-4">
+                                    <label class="form-label" >Code *</label>
+                                    {{ form.code }}
+                                    {{ form.code.errors }}
+                                </div>
+                                <div class="col-md-8">
+                                    <label class="form-label">Nom du support *</label>
+                                    {{ form.nom }}
+                                    {{ form.nom.errors }}
+                                </div>
+                                <div class="col-md-12">
+                                    <label class="form-label">Adresse physique</label>
+                                    {{ form.adresse }}
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Ville</label>
+                                    {{ form.ville }}
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Quartier</label>
+                                    {{ form.quartier }}
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">État de marche</label>
+                                    {{ form.etat }}
+                                </div>
+                                <div class="col-md-6">
+                                  <label class="form-label">Photo du support</label>
+                                  
+                                  <div class="mb-2">
+                                      <img id="image-preview" 
+                                          src="{% if form.instance.photo_principale %}{{ form.instance.photo_principale.url }}{% else %}{% static 'img/logo.png' %}{% endif %}" 
+                                          alt="Aperçu" 
+                                          class="img-thumbnail {% if not form.instance.photo_principale %}d-none{% endif %}" 
+                                          style="height: 120px; width: 180px; object-fit: cover; border-radius: 8px; border: 2px solid var(--color-primary);">
+                                  </div>
+                                  <div>
+                                      {{ form.photo_principale }}
+                                  </div>
+                              </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="form-section panel" id="panel-panneau">
+                        <div class="form-section-hd"><i class="bi bi-layers" style="color:#a78bfa"></i>Configuration des Faces</div>
+                        <div class="form-section-bd">
+                            <div class="row g-3 align-items-end mb-3">
+                                <div class="col-md-6">
+                                    <label class="form-label">Nombre de faces</label>
+                                    {{ form.nb_faces }}
+                                </div>
+                                <div class="col-md-6 small text-muted pb-2 italic">
+                                    <i class="bi bi-info-circle me-1"></i>Les faces seront nommées A, B, C...
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label">Format</label>
+                                    {{ form.format }}
+                                </div>
+                            </div>
+                            <div id="faces-container"></div>
+                        </div>
+                    </div>
+
+                    <div class="form-section panel" id="panel-ecran">
+                        <div class="form-section-hd"><i class="bi bi-cpu" style="color:var(--color-primary)"></i>Spécifications Techniques Écran</div>
+                        <div class="form-section-bd">
+                            <div class="row g-3">
+                                {% for field in ecran_form %}
+                                <div class="col-md-6">
+                                    <label class="form-label">{{ field.label }}</label>
+                                    {{ field }}
+                                    {{ field.errors }}
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex gap-3 justify-content-end mt-4">
+                        <a href="{% url 'support_list' %}" class="btn btn-outline-secondary">Annuler</a>
+                        <button type="submit" class="btn btn-primary px-5 shadow-sm">
+                            <i class="bi bi-cloud-arrow-up me-2"></i>{% if object %}Mettre à jour{% else %}Créer le support{% endif %}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+{{ face_form.format.field.choices|json_script:"format-choices" }}
+{{ face_form.eclairage.field.choices|json_script:"eclairage-choices" }}
+{% if existing_faces %}
+    <script id="existing-faces" type="application/json">
+        [
+            {% for f in existing_faces %}
+            {"label": "{{ f.label }}", "format": "{{ f.format }}", "eclairage": "{{ f.eclairage }}", "notes": "{{ f.notes|escapejs }}"}{% if not forloop.last %},{% endif %}
+            {% endfor %}
+        ]
+    </script>
+{% endif %}
+
+<script>
+    // ── CONFIG & CHOIX (Récupérés depuis les balises json_script de Django) ──
+    const FORMAT_CHOICES = JSON.parse(document.getElementById('format-choices').textContent);
+    const ECLAIRAGE_CHOICES = JSON.parse(document.getElementById('eclairage-choices').textContent);
+    const EXISTING_FACES = document.getElementById('existing-faces') ? JSON.parse(document.getElementById('existing-faces').textContent) : null;
+
+    const typeField = document.getElementById('id_type_support');
+    const codeInput = document.getElementById('id_code');
+    const nbFacesInput = document.getElementById('id_nb_faces');
+    const facesContainer = document.getElementById('faces-container');
+
+    // ── CARTE GPS (Leaflet) ──────────────────────────────────────
+    const latInput = document.getElementById('id_latitude');
+    const lngInput = document.getElementById('id_longitude');
+    const coordTxt = document.getElementById('coord-txt');
+    const initLat = parseFloat(latInput.value) || 12.3714;
+    const initLng = parseFloat(lngInput.value) || -1.5197;
+
+    const gmap = L.map('gps-map');
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(gmap);
+
+    let gmarker = null;
+
+    function placeMarker(lat, lng) {
+        if (gmarker) gmap.removeLayer(gmarker);
+        const customIcon = L.divIcon({
+            html:`<div style="width:16px;height:16px;background:var(--color-primary);border-radius:50%;border:3px solid white;box-shadow:0 0 10px rgba(0,0,0,0.2)"></div>`,
+            iconSize:[16,16], iconAnchor:[8,8], className:''
+        });
+        gmarker = L.marker([lat, lng], {icon: customIcon, draggable: true}).addTo(gmap);
+        gmarker.on('dragend', e => updateCoords(e.target.getLatLng().lat, e.target.getLatLng().lng));
+        updateCoords(lat, lng);
+    }
+
+    function updateCoords(lat, lng) {
+        latInput.value = lat.toFixed(7);
+        lngInput.value = lng.toFixed(7);
+        coordTxt.textContent = `${lat.toFixed(5)}, ${lng.toFixed(5)}`;
+    }
+
+    gmap.on('click', e => placeMarker(e.latlng.lat, e.latlng.lng));
+    gmap.setView([initLat, initLng], latInput.value ? 16 : 13);
+    if (latInput.value && lngInput.value) placeMarker(initLat, initLng);
+
+    // ── GÉNÉRATION AUTO DU CODE ─────────────────────────────────
+    function generateAutoCode() {
+        // RÈGLE : On ne régénère pas de code si on est en mode MODIFICATION
+        const isEdit = {% if object %}true{% else %}false{% endif %};
+        if (isEdit) return;
+
+        const type = typeField.value;
+        
+        // Si le code a été modifié manuellement (dataset.isAuto supprimé), on ne touche à rien
+        if (codeInput.value && !codeInput.dataset.isAuto) return;
+
+        const prefix = (type === 'ecran') ? 'ECR' : 'PAN';
+        const now = new Date();
+        const suffix = now.getDate().toString().padStart(2, '0') + 
+                    (now.getMonth() + 1).toString().padStart(2, '0') +
+                    now.getFullYear().toString().slice(-2) + '-' +
+                    now.getHours().toString().padStart(2, '0') + 
+                    now.getMinutes().toString().padStart(2, '0') + 
+                    now.getSeconds().toString().padStart(2, '0');
+
+        codeInput.value = `${prefix}-${suffix}`;
+        codeInput.dataset.isAuto = "true";
+        codeInput.readOnly = true; 
+    }
+
+    // ── SÉLECTEUR DE TYPE ────────────────────────────────────────
+    function selectType(t) {
+        typeField.value = t;
+        
+        // UI : Mise à jour des boutons
+        document.getElementById('btn-panneau').className = 'type-card' + (t === 'panneau' ? ' sel-panneau' : '');
+        document.getElementById('btn-ecran').className   = 'type-card' + (t === 'ecran'   ? ' sel-ecran'   : '');
+        
+        // UI : Affichage des panels correspondants
+        document.getElementById('panel-panneau').classList.toggle('show', t === 'panneau');
+        document.getElementById('panel-ecran').classList.toggle('show', t === 'ecran');
+        
+        // Logique métier
+        generateAutoCode();
+        if (t === 'panneau') updateFaces();
+    }
+
+    // ── GESTION DYNAMIQUE DES FACES ──────────────────────────────
+    function createFaceHTML(index, data = null) {
+        const label = String.fromCharCode(65 + index);
+        const fVal = data ? data.format : '4x3';
+        const eVal = data ? data.eclairage : 'non';
+        const nVal = data ? data.notes : '';
+
+
+        const eOpts = ECLAIRAGE_CHOICES.map(c => `<option value="${c[0]}" ${c[0]===eVal?'selected':''}>${c[1]}</option>`).join('');
+
+        return `
+        <div class="face-section p-3 mb-3" style="background:#dbeafe; border-radius:8px; border-left:3px solid var(--color-primary); border-right:3px solid var(--color-primary);">
+            <h6 class="fw-bold mb-3" style="color:var(--color-primary);">Face ${label}</h6>
+            <div class="row g-2">
+                <div class="col-md-6">
+                    <label class="small fw-bold">Éclairage</label>
+                    <select name="face_${index}_eclairage" class="form-select form-select-sm">${eOpts}</select>
+                </div>
+                <div class="col-12 mt-2">
+                    <textarea name="face_${index}_notes" class="form-control form-control-sm" placeholder="Notes spécifiques..." rows="1">${nVal}</textarea>
+                </div>
+            </div>
+        </div>`;
+    }
+
+    function updateFaces() {
+        const count = parseInt(nbFacesInput.value) || 0;
+        facesContainer.innerHTML = '';
+        for (let i = 0; i < count; i++) {
+            const existing = (EXISTING_FACES && EXISTING_FACES[i]) ? EXISTING_FACES[i] : null;
+            facesContainer.insertAdjacentHTML('beforeend', createFaceHTML(i, existing));
+        }
+    }
+
+    // ── APERÇU D'IMAGE EN TEMPS RÉEL ─────────────────────────────
+    const photoInput = document.querySelector('input[type="file"][name="photo_principale"]');
+    if (photoInput) {
+        photoInput.addEventListener('change', function() {
+            const file = this.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const previewImg = document.getElementById('image-preview');
+                    previewImg.src = e.target.result;
+                    previewImg.classList.remove('d-none');
+                }
+                reader.readAsDataURL(file);
+            }
+        });
+    }
+
+    // ── INITIALISATION AU CHARGEMENT (LE COEUR DU FIX) ────────────
+    document.addEventListener('DOMContentLoaded', function() {
+        const isEdit = {% if object %}true{% else %}false{% endif %};
+        const savedType = typeField.value || 'panneau';
+
+        // DEBUG : afficher la valeur du champ type_support
+        console.log('DEBUG: typeField.value =', typeField.value);
+        console.log('DEBUG: savedType =', savedType);
+        console.log('DEBUG: isEdit =', isEdit);
+
+        if (isEdit) {
+            // En modification : on applique le style visuel sans écraser le code
+            document.getElementById('btn-panneau').className = 'type-card' + (savedType === 'panneau' ? ' sel-panneau' : '');
+            document.getElementById('btn-ecran').className   = 'type-card' + (savedType === 'ecran'   ? ' sel-ecran'   : '');
+            document.getElementById('panel-panneau').classList.toggle('show', savedType === 'panneau');
+            document.getElementById('panel-ecran').classList.toggle('show', savedType === 'ecran');
+            
+            // On sécurise le code existant
+            delete codeInput.dataset.isAuto;
+            codeInput.readOnly = true;
+
+            if (savedType === 'panneau') updateFaces();
+        } else {
+            // En création : comportement dynamique standard
+            selectType(savedType);
+        }
+    });
+
+    // Écouteur pour le changement manuel du nombre de faces
+    nbFacesInput.addEventListener('input', updateFaces);
+
+</script>
+{% endblock %}

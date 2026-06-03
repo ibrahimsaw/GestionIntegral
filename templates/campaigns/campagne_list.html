@@ -1,0 +1,198 @@
+{% extends 'base.html' %}
+{% block title %}Campagnes — Integral{% endblock %}
+{% block topbar_title %}<i class="bi bi-megaphone me-2" style="color:var(--color-primary)"></i>Campagnes{% endblock %}
+{% block topbar_actions %}
+  {% if user.is_staff_regie_role %}
+  <a href="{% url 'simulation_ecran' %}" class="btn btn-outline-warning btn-sm me-2">
+    <i class="bi bi-calculator-fill me-1"></i>Simulateur
+  </a>
+  <a href="{% url 'campagne_create' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Nouvelle</a>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="card mb-4">
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-4">
+        <label class="form-label">Recherche</label>
+        <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Client, nom, référence...">
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Statut</label>
+        <select name="statut" class="form-select">
+          <option value="">Tous les statuts</option>
+          {% for k, v in statut_choices %}
+          <option value="{{ k }}" {% if statut == k %}selected{% endif %}>{{ v }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Type de Campagne</label>
+        <select name="type_support" class="form-select">
+          <option value="">Tous les types</option>
+          {% for k, v in type_support_choices %}
+          <option value="{{ k }}" {% if type_support == k %}selected{% endif %}>{{ v }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2 d-flex gap-2">
+        <button type="submit" class="btn btn-primary flex-fill"><i class="bi bi-search"></i></button>
+        <a href="{% url 'campagne_list' %}" class="btn btn-outline-secondary"><i class="bi bi-x-lg"></i></a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<form method="post" id="form-actions">
+  {% csrf_token %}
+  <input type="hidden" name="action" id="action-input">
+
+  <div class="card">
+    <div class="card-header d-flex align-items-center justify-content-between gap-2">
+
+      <div class="d-flex align-items-center gap-2">
+        <input type="checkbox" id="select-all" class="form-check-input mt-0" title="Tout sélectionner">
+        <span id="selection-count" style="font-size:.85rem; color:var(--text-muted)">
+          {{ campagnes|length }} campagne(s)
+        </span>
+      </div>
+
+      <!-- Actions (visibles seulement si sélection) -->
+      <div id="actions-bar" class="d-flex align-items-center gap-2" style="display:none !important;">
+        {% if user.is_staff_regie_role %}
+        <select id="action-select" class="form-select form-select-sm" style="width:auto;">
+          <option value="">Sélectionner une action</option>
+          <option value="archiver">Archiver</option>
+          <option value="supprimer">Supprimer</option>
+        </select>
+        <button type="button" class="btn btn-sm btn-primary" onclick="confirmerAction()">
+          <i class="bi bi-check-lg"></i> Appliquer
+        </button>
+        {% endif %}
+      </div>
+
+    </div>
+
+    <div class="card-body p-0">
+      <table class="table mb-0">
+        <thead>
+          <tr>
+            <th style="width:2rem"></th>
+            <th>#</th>
+            <th>Réf.</th>
+            <th>Client</th>
+            <th>Campagne</th>
+              {% if user.is_admin %}
+              <th>Archivée</th>
+              {% endif %}
+            <th>Période</th>
+            <th>Supports</th>
+            <th>Type</th>
+            <th>Spots</th>
+            <th>Statut</th><th></th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in campagnes %}
+          <tr style="font-size:.9rem ;{% if user.is_admin %} {% if c.actif %}background-color: transparent{% else %}background-color:#00000029{% endif %}{% endif %};" class="row-selectable">
+            <td>
+              <input type="checkbox" name="selected_ids" value="{{ c.pk }}"
+              class="form-check-input mt-0 row-checkbox">
+            </td>
+            <td>{{ forloop.counter }}</td>
+            <td class="mono" style="font-size:.72rem;color:var(--text-muted)">{{ c.reference }}</td>
+            <td style="font-weight:600">{{ c.client.nom }}</td>
+            <td>
+              <a href="{% url 'campagne_detail' c.pk %}" style="color:var(--text);text-decoration:none">
+                {{ c.nom }}
+              </a>
+            </td>
+            {% if user.is_admin %}
+            <td>
+              {% if c.actif %}
+              <span class="badge-status bs-success">Active</span>
+              {% else %}
+              <span class="badge-status bs-danger">Archivée</span>
+              {% endif %}
+            </td>
+            {% endif %}
+            <td class="mono" style="font-size:.75rem">
+              {{ c.date_debut|date:"d/m/Y" }}<br>{{ c.date_fin|date:"d/m/Y" }}
+            </td>
+            <td class="mono">{{ c.nb_supports }}</td>
+            <td style="text-align:center;vertical-align:middle;">
+              <a href="{% url 'campagne_detail' c.pk %}">
+                {% if c.type_support == 'panneau' %}
+                  <i class="bi bi-sign-merge-right support-panneau" title="Panneau"></i>
+                {% else %}
+                  <i class="bi bi-display support-ecran" title="Écran"></i>
+                {% endif %}
+              </a>
+            </td>
+            <td class="font-monospace fw-bold">{{ c.calculer_nombre_spots }}</td>
+            <td><span class="badge-status bs-{{ c.statut }}">{{ c.get_statut_display }}</span></td>
+            <td>
+              <div class="d-flex gap-1">
+                <a href="{% url 'campagne_detail' c.pk %}" class="btn btn-sm btn-outline-secondary">
+                  <i class="bi bi-eye"></i>
+                </a>
+                {% if user.is_staff_regie_role %}
+                <a href="{% url 'campagne_edit' c.pk %}" class="btn btn-sm btn-outline-secondary">
+                  <i class="bi bi-pencil"></i>
+                </a>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="11" class="text-center py-4" style="color:var(--text-muted)">
+              Aucune campagne
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</form>
+
+<script>
+const selectAll  = document.getElementById('select-all');
+const actionsBar = document.getElementById('actions-bar');
+const countLabel = document.getElementById('selection-count');
+const checkboxes = document.querySelectorAll('.row-checkbox');
+const total      = {{ campagnes|length }};
+
+function majSelection() {
+  const checked = document.querySelectorAll('.row-checkbox:checked').length;
+  if (checked > 0) {
+    actionsBar.style.display = 'flex';
+    countLabel.textContent = checked + ' sélectionné(s)';
+  } else {
+    actionsBar.style.display = 'none';
+    countLabel.textContent = total + ' campagne(s)';
+  }
+  selectAll.indeterminate = checked > 0 && checked < total;
+  selectAll.checked = checked === total;
+}
+
+selectAll.addEventListener('change', () => {
+  checkboxes.forEach(cb => cb.checked = selectAll.checked);
+  majSelection();
+});
+
+checkboxes.forEach(cb => cb.addEventListener('change', majSelection));
+
+function confirmerAction() {
+  const action  = document.getElementById('action-select').value;
+  const checked = document.querySelectorAll('.row-checkbox:checked').length;
+  if (!action) { alert('Veuillez sélectionner une action.'); return; }
+  if (checked === 0) { alert('Veuillez sélectionner au moins une campagne.'); return; }
+  if (!confirm(`Confirmer "${action}" sur ${checked} campagne(s) ?`)) return;
+  document.getElementById('action-input').value = action;
+  document.getElementById('form-actions').submit();
+}
+</script>
+{% endblock %}

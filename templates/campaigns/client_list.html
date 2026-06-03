@@ -1,0 +1,68 @@
+{% extends 'base.html' %}
+{% block title %}Clients — Integral{% endblock %}
+{% block topbar_title %}<i class="bi bi-people me-2" style="color:var(--color-primary)"></i>Clients{% endblock %}
+{% block topbar_actions %}
+  {% if user.is_staff_regie_role %}
+  <a href="{% url 'client_create' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Nouveau Client</a>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="card mb-4">
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-6">
+        <label class="form-label">Recherche</label>
+        <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Nom, contact...">
+      </div>
+      <div class="col-md-2 d-flex gap-2">
+        <button type="submit" class="btn btn-primary flex-fill"><i class="bi bi-search"></i></button>
+        <a href="{% url 'client_list' %}" class="btn btn-outline-secondary"><i class="bi bi-x-lg"></i></a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="row g-3">
+  {% for c in clients %}
+  <div class="col-md-6 col-lg-4" >
+    <div class="card h-100" style="{% if c.actif %}background-color: #00000029;{% endif %}">
+      <div class="card-body">
+        <div class="d-flex align-items-start gap-3 mb-3">
+          {% if c.logo %}
+          <img src="{{ c.logo.url }}" style="width:44px;height:44px;object-fit:contain;border-radius:8px;background:var(--bg-card2);padding:4px;flex-shrink:0">
+          {% else %}
+          <div style="width:44px;height:44px;background:var(--bg-card2);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+            <i class="bi bi-building" style="font-size:1.2rem;color:var(--text-muted)"></i>
+          </div>
+          {% endif %}
+          <div class="flex-grow-1 overflow-hidden">
+            <div style="font-weight:700;font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.nom }}</div>
+            <div style="font-size:.75rem;color:var(--text-muted)">{{ c.contact_nom }}</div>
+          </div>
+          <div>
+            <p class="btn btn-sm btn-outline-secondary"><i class="bi bi-graph-up"></i> {{ c.spots_stats.total }}</p>
+          </div>
+        </div>
+        <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:6px">
+          <div><i class="bi bi-telephone me-1"></i>{% if c.telephone %}{{ c.telephone }}{% else %}Téléphone non renseigné{% endif %}</div>
+          <div><i class="bi bi-envelope me-1"></i>{% if c.email %}{{ c.email }}{% else %}Email non renseigné{% endif %}</div>
+        </div>
+        <div class="d-flex justify-content-between align-items-center mt-2">
+          <span style="font-size:.68rem;font-family:var(--mono);color:var(--text-muted);text-transform:uppercase">{{ c.get_type_contrat_display }}</span>
+          <div class="d-flex gap-1">
+            <a href="{% url 'client_detail' c.pk %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-eye"></i></a>
+            {% if user.is_staff_regie_role %}
+            <a href="{% url 'client_edit' c.pk %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil"></i></a>
+            <a href="{% url 'client_delete' c.pk %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></a>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  {% empty %}
+  <div class="col-12"><div class="card"><div class="card-body text-center py-4" style="color:var(--text-muted)">Aucun client.</div></div></div>
+  {% endfor %}
+</div>
+{% endblock %}

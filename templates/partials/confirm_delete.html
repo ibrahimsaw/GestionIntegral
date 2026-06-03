@@ -1,0 +1,189 @@
+{% extends 'base.html' %}
+{% block title %}{{ title|default:'Confirmer la suppression' }} — Integral{% endblock %}
+
+{% block topbar_title %}
+  <i class="bi bi-trash me-2 text-danger"></i>{{ title|default:'Confirmer la suppression' }}
+{% endblock %}
+
+{% block content %}
+<style>
+  .del-wrap {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 2.5rem 1rem;
+    min-height: 60vh;
+    background: var(--bs-body-bg, #f8f8f6);
+  }
+  .del-card {
+    background: #fff;
+    border: 0.5px solid #e5e3de;
+    border-radius: 16px;
+    width: 100%;
+    max-width: 480px;
+    overflow: hidden;
+    box-shadow: 0 1px 3px rgba(0,0,0,.06);
+  }
+  .del-header {
+    background: #FCEBEB;
+    padding: 1.1rem 1.5rem;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-bottom: 0.5px solid #F7C1C1;
+  }
+  .del-header-icon {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    background: #FCEBEB;
+    border: 1.5px solid #F7C1C1;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
+  .del-header-icon i { font-size: 16px; color: #E24B4A; }
+  .del-header-title { font-size: 15px; font-weight: 600; color: #501313; margin: 0; }
+  .del-header-sub   { font-size: 12px; color: #A32D2D; margin: 0; margin-top: 2px; }
+  .del-body {
+    padding: 2rem 1.75rem 1.5rem;
+    display: flex; flex-direction: column; align-items: center; gap: 1.25rem;
+  }
+  .del-icon-ring {
+    width: 60px; height: 60px; border-radius: 50%;
+    background: #FCEBEB;
+    border: 1.5px solid #F7C1C1;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .del-icon-ring i { font-size: 24px; color: #E24B4A; }
+  .del-headline {
+    font-size: 17px; font-weight: 600; color: #1a1a1a;
+    text-align: center; margin: 0;
+  }
+  .del-body-text {
+    font-size: 13.5px; color: #666; text-align: center; line-height: 1.65; margin: 0;
+  }
+  .del-body-text strong { color: #1a1a1a; }
+  .del-campaign-list {
+    width: 100%;
+    border: 0.5px solid #e5e3de;
+    border-radius: 10px;
+    overflow: hidden;
+  }
+  .del-campaign-list-label {
+    padding: .55rem 1rem;
+    background: #f8f8f6;
+    border-bottom: 0.5px solid #e5e3de;
+    font-size: 11px; font-weight: 600; letter-spacing: .08em;
+    text-transform: uppercase; color: #999;
+  }
+  .del-campaign-item {
+    display: flex; align-items: center; gap: 8px;
+    padding: .6rem 1rem;
+    border-bottom: 0.5px solid #f0ede8;
+    font-size: 13px; color: #333;
+  }
+  .del-campaign-item:last-child { border-bottom: none; }
+  .del-campaign-item i { font-size: 13px; color: #E24B4A; flex-shrink: 0; }
+  .del-campaign-ref { color: #999; font-size: 12px; }
+  .del-divider { width: 100%; height: 0.5px; background: #eeebe6; }
+  .del-actions {
+    display: flex; align-items: center; justify-content: space-between;
+    width: 100%; gap: 10px;
+  }
+  .del-btn-cancel {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-size: 13px; color: #999; background: none;
+    border: none; text-decoration: none; cursor: pointer;
+    padding: 8px 0; transition: color .15s;
+  }
+  .del-btn-cancel:hover { color: #444; }
+  .del-btn-submit {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 13px; font-weight: 600;
+    color: #fff; background: #E24B4A;
+    border: none; cursor: pointer; padding: 10px 20px;
+    border-radius: 10px; transition: background .15s, transform .1s;
+  }
+  .del-btn-submit:hover  { background: #c0392b; }
+  .del-btn-submit:active { transform: scale(.98); }
+</style>
+
+<div class="del-wrap">
+  <div class="del-card">
+
+    <div class="del-header">
+      <div class="del-header-icon">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+      </div>
+      <div>
+        <p class="del-header-title">{{ header|default:'Action irréversible' }}</p>
+        <p class="del-header-sub">Cette opération ne peut pas être annulée</p>
+      </div>
+    </div>
+
+    <div class="del-body">
+
+      <div class="del-icon-ring">
+        <i class="bi bi-trash3"></i>
+      </div>
+
+      <p class="del-headline">{{ message_title|default:'Supprimer définitivement ?' }}</p>
+
+      <p class="del-body-text">
+        {% if show_force_delete %}
+          Ce client a <strong>{{ protected_count }} campagne{% if protected_count > 1 %}s{% endif %} associée{% if protected_count > 1 %}s{% endif %}</strong>.
+          La suppression est définitive et affectera toutes les données liées.
+        {% else %}
+          {{ message_body|default:'Vous êtes sur le point de supprimer' }}
+          <strong>{{ obj|default:'cet élément' }}</strong>.<br>
+          {{ hint|default:'Cette action est définitive et ne peut pas être annulée.' }}
+        {% endif %}
+      </p>
+
+      {% if show_force_delete and associated_campaigns %}
+        <div class="del-campaign-list">
+          <div class="del-campaign-list-label">Campagnes associées</div>
+          {% for campagne in associated_campaigns %}
+            <div class="del-campaign-item">
+              <i class="bi bi-record-fill"></i>
+              <span>{{ campagne.nom }}</span>
+              {% if campagne.reference %}
+                <span class="del-campaign-ref">— {{ campagne.reference }}</span>
+              {% endif %}
+            </div>
+          {% endfor %}
+        </div>
+      {% endif %}
+
+      <div class="del-divider"></div>
+
+      <div class="del-actions">
+        {% if cancel_url %}
+          <a href="{{ cancel_url }}" class="del-btn-cancel">
+            <i class="bi bi-arrow-left"></i>Annuler
+          </a>
+        {% else %}
+          <a href="javascript:history.back()" class="del-btn-cancel">
+            <i class="bi bi-arrow-left"></i>Annuler
+          </a>
+        {% endif %}
+
+        <form method="post" class="m-0">
+          {% csrf_token %}
+          {% if show_force_delete %}
+            <input type="hidden" name="force_delete" value="1" />
+          {% endif %}
+          <button type="submit" class="del-btn-submit">
+            <i class="bi bi-trash"></i>
+            {% if show_force_delete %}
+              Supprimer le client et toutes ses campagnes
+            {% else %}
+              {{ confirm_label|default:'Supprimer' }}
+            {% endif %}
+          </button>
+        </form>
+      </div>
+
+    </div>
+  </div>
+</div>
+{% endblock %}

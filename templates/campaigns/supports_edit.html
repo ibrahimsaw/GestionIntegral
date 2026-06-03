@@ -1,0 +1,114 @@
+{% extends 'base.html' %}
+{% block title %}Modifier supports — {{ campagne.nom }} — Integral{% endblock %}
+{% block topbar_title %}
+  <i class="bi bi-pencil me-2" style="color:var(--color-primary)"></i>
+  Modifier supports de la campagne
+{% endblock %}
+
+{% block content %}
+<div class="row g-3 mb-4">
+  <div class="col-md-8">
+    <div class="card">
+      <div class="card-header">
+        <div class="d-flex justify-content-between align-items-center">
+          <span>
+            <i class="bi bi-geo-alt me-2"></i>
+            {{ campagne.nom }}
+          </span>
+          <span class="badge" style="background:rgba(59,130,246,.1);color:#3b82f6">
+            {% if campagne.type_support == 'panneau' %}
+              <i class="bi bi-sign-merge-right me-1"></i>Panneaux
+            {% else %}
+              <i class="bi bi-display me-1"></i>Écrans
+            {% endif %}
+          </span>
+        </div>
+      </div>
+      <div class="card-body">
+        <form method="post">
+          {% csrf_token %}
+          
+          <div class="mb-3">
+            <label style="display:block;margin-bottom:12px;font-weight:600;font-size:.95rem">
+              Sélectionner les {{ campagne.get_type_support_display|lower }}
+            </label>
+            
+            <div style="display:grid;gap:8px;grid-template-columns:repeat(auto-fill,minmax(250px,1fr))">
+              {% for support in all_supports %}
+              <label style="display:flex;align-items:center;gap:10px;padding:12px;background:var(--bg-card2);border-radius:8px;cursor:pointer;border:1px solid var(--border);transition:all 0.2s">
+                <input type="checkbox" name="supports" value="{{ support.id }}" 
+                  {% if support.id in selected_support_ids %}checked{% endif %}
+                  style="cursor:pointer;width:18px;height:18px">
+                <div style="flex:1">
+                  <div style="font-weight:600;font-size:.9rem">{{ support.code }}</div>
+                  <div style="font-size:.8rem;color:var(--text-muted)">{{ support.nom }}</div>
+                  {% if support.adresse %}
+                  <div style="font-size:.75rem;color:var(--text-muted);margin-top:2px">📍 {{ support.adresse }}</div>
+                  {% endif %}
+                </div>
+              </label>
+              {% empty %}
+              <div style="grid-column:1/-1;padding:20px;text-align:center;color:var(--text-muted)">
+                Aucun support {% if campagne.type_support == 'panneau' %}panneau{% else %}écran{% endif %} disponible
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+
+          <div style="background:rgba(59,130,246,.05);padding:12px;border-radius:8px;margin:20px 0;font-size:.85rem;color:var(--text-muted);border-left:3px solid #3b82f6">
+            <strong>Actuellement sélectionnés :</strong> 
+            <span id="selected_count">{{ selected_support_ids|length }}</span> support(s)
+          </div>
+
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-check-lg me-1"></i>Enregistrer la sélection
+            </button>
+            <a href="{% url 'campagne_detail' campagne.pk %}" class="btn btn-outline-secondary">
+              Annuler
+            </a>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-md-4">
+    <div class="card">
+      <div class="card-header"><i class="bi bi-info-circle me-2"></i>À propos</div>
+      <div class="card-body" style="font-size:.85rem;color:var(--text-muted)">
+        <p>Cochez ou décochez les supports que tu veux ajouter ou retirer de cette campagne.</p>
+        
+        {% if campagne.type_support == 'ecran' %}
+        <hr style="margin:12px 0;border:none;border-top:1px solid var(--border)">
+        <div>
+          <strong style="color:var(--text)">Paramètres de la campagne :</strong>
+          <ul style="margin:8px 0;padding-left:20px">
+            <li><strong>Durée :</strong> {{ campagne.get_duree_passage_display }}</li>
+            <li><strong>Fréquence :</strong> {{ campagne.get_frequence_display }}</li>
+            <li><strong>Horaires :</strong> {{ campagne.tranches_horaires }}</li>
+          </ul>
+          <p style="font-size:.8rem;margin-top:8px">Ces paramètres seront appliqués à chaque écran sélectionné.</p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const checkboxes = document.querySelectorAll('input[name="supports"]');
+  const countSpan = document.getElementById('selected_count');
+
+  function updateCount() {
+    const checked = document.querySelectorAll('input[name="supports"]:checked').length;
+    countSpan.textContent = checked;
+  }
+
+  checkboxes.forEach(checkbox => {
+    checkbox.addEventListener('change', updateCount);
+  });
+});
+</script>
+{% endblock %}

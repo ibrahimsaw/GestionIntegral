@@ -1,0 +1,271 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ mode_title }} — Integral{% endblock %}
+
+{% block topbar_title %}
+  <i class="bi bi-megaphone me-2" style="color:var(--color-primary)"></i>
+  {{ mode_title }} — {{ campagne.nom }}
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="row justify-content-center">
+    <div class="col-12">
+      
+      <div class="d-flex align-items-center gap-3 mb-4">
+        <a href="{% url 'campagne_detail' campagne.pk %}" class="btn btn-outline-secondary btn-sm shadow-sm">
+          <i class="bi bi-arrow-left"></i>
+        </a>
+        <h1 class="h4 fw-bold mb-0">{{ mode_title }}</h1>
+      </div>
+
+      <div class="card shadow-sm border-0 mb-4" style="border-radius: 12px;">
+        <div class="card-header bg-transparent border-bottom py-3">
+          <h6 class="mb-0 fw-bold"><i class="bi bi-info-circle me-2 text-primary"></i>Informations de la campagne</h6>
+        </div>
+        <div class="card-body p-4">
+          
+          <div class="d-flex align-items-center gap-3 mb-4 flex-wrap">
+            <div class="bg-light rounded-3 p-2 border" style="width: 64px; height: 64px;">
+              {% if campagne.client.logo %}
+                <img src="{{ campagne.client.logo.url }}" class="w-100 h-100 object-fit-contain rounded">
+              {% else %}
+                <div class="w-100 h-100 d-flex align-items-center justify-content-center text-muted">
+                  <i class="bi bi-building fs-3"></i>
+                </div>
+              {% endif %}
+            </div>
+
+            <div class="flex-grow-1 min-width-0">
+              <h4 class="fw-bold mb-1 text-truncate text-dark">{{ campagne.nom }}</h4>
+              <div class="d-flex align-items-center gap-2 flex-wrap small">
+                <a href="{% url 'client_detail' campagne.client.pk %}" class="text-primary text-decoration-none fw-bold">
+                  <i class="bi bi-person-fill me-1"></i>{{ campagne.client.nom }}
+                </a>
+                <span class="text-muted">•</span>
+                <span class="badge bg-light text-dark border font-monospace px-2 py-1">
+                  {{ campagne.reference }}
+                </span>
+              </div>
+            </div>
+
+            <span class="badge rounded-pill bg-{{ campagne.statut }} px-3 py-2" style="font-size: 0.75rem;">
+              {{ campagne.get_statut_display }}
+            </span>
+          </div>
+
+          <hr class="opacity-10 mb-4">
+
+          <div class="row g-3 mb-4 text-center">
+            <div class="col-6 col-sm-4 col-md-3">
+              <div class="p-3 border rounded-3 bg-light-subtle h-100">
+                <small class="text-uppercase text-muted d-block font-monospace mb-1" style="font-size: 0.6rem;">Dates</small>
+                <div class="fw-bold small">{{ campagne.date_debut|date:"d/m/Y" }}</div>
+                <div class="fw-bold small text-primary">{{ campagne.date_fin|date:"d/m/Y" }}</div>
+              </div>
+            </div>
+            <div class="col-6 col-sm-4 col-md-3">
+              <div class="p-3 border rounded-3 bg-light-subtle h-100">
+                <small class="text-uppercase text-muted d-block font-monospace mb-1" style="font-size: 0.6rem;">Support</small>
+                <div class="fw-bold small">
+                  {% if campagne.type_support == 'panneau' %}
+                    <i class="bi bi-sign-merge-right text-warning me-1"></i>Panneaux
+                  {% else %}
+                    <i class="bi bi-display text-primary me-1"></i>Écrans
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+            {% comment %} 
+            <div class="col-6 col-sm-4 col-md-3">
+              <div class="p-3 border rounded-3 bg-light-subtle h-100">
+                <small class="text-uppercase text-muted d-block font-monospace mb-1" style="font-size: 0.6rem;">Total</small>
+                <div class="fw-bold h5 mb-0 font-monospace">{{ lignes|length }}</div>
+                <small class="text-muted">Supports</small>
+              </div>
+            </div> 
+            {% endcomment %}
+            {% if campagne.type_support == 'ecran' %}
+            <div class="col-6 col-sm-4 col-md-3">
+              <div class="p-3 border rounded-3 bg-primary-subtle border-primary-subtle text-primary h-100">
+                <small class="text-uppercase opacity-75 d-block font-monospace mb-1" style="font-size: 0.6rem;">Fréquence</small>
+                <div class="fw-bold small">{{ campagne.get_frequence_display }}</div>
+              </div>
+            </div>
+            <div class="col-6 col-sm-4 col-md-3">
+              <div class="p-3 border rounded-3 bg-primary-subtle border-primary-subtle text-primary h-100">
+                <small class="text-uppercase opacity-75 d-block font-monospace mb-1" style="font-size: 0.6rem;">Durée Spot</small>
+                <div class="fw-bold small">{{ campagne.get_duree_passage_display }}s</div>
+              </div>
+            </div>
+            <div class="col-6 col-sm-4 col-md-3">
+              <div class="p-3 border rounded-3 bg-primary-subtle border-primary-subtle text-primary h-100">
+                <small class="text-uppercase opacity-75 d-block font-monospace mb-1" style="font-size: 0.6rem;">Horaires</small>
+                <div class="fw-bold small">{{ campagne.tranches_horaires|truncatechars:30 }}s</div>
+              </div>
+            </div>
+            {% comment %} 
+            <div class="col-6 col-sm-4 col-md-3">
+              <div class="p-3 border rounded-3 bg-primary-subtle border-primary-subtle text-primary h-100">
+                <small class="text-uppercase opacity-75 d-block font-monospace mb-1" style="font-size: 0.6rem;">Nombre de Spots</small>
+                <div class="fw-bold h5 mb-0 font-monospace">{{ campagne.calculer_nombre_spots }}</div>
+                <small class="text-muted">Total campagne</small>
+              </div>
+            </div> 
+            {% endcomment %}
+            {% endif %}
+          </div>
+
+          {% if campagne.visuel %}
+          <div class="rounded-4 overflow-hidden border shadow-sm mb-3 position-relative">
+            {% with visuel_name=campagne.visuel.name|lower %}
+              {% if "mp4" in visuel_name or "webm" in visuel_name %}
+                <video controls playsinline class="w-100 d-block" style="max-height: 400px;">
+                  <source src="{{ campagne.visuel.url }}">
+                </video>
+              {% else %}
+                <img src="{{ campagne.visuel.url }}" class="w-100 h-auto d-block object-fit-cover" style="max-height: 400px;">
+              {% endif %}
+            {% endwith %}
+          </div>
+          {% endif %}
+
+          {% if campagne.notes %}
+          <div class="p-3 bg-light rounded-3 border-start border-4 border-primary">
+            <div class="d-flex gap-2">
+              <i class="bi bi-chat-left-dots text-primary"></i>
+              <p class="mb-0 small text-muted lh-sm italic">{{ campagne.notes }}</p>
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <form method="post" class="card shadow-sm border-0" style="border-radius: 12px;">
+        {% csrf_token %}
+        <div class="card-header bg-transparent border-bottom py-3 d-flex justify-content-between align-items-center">
+          <div class="fw-bold">
+            <i class="bi bi-check2-square me-2 text-success"></i>Sélectionner les supports 
+            <span class="badge bg-light text-dark border ms-2 fw-normal">{{ supports|length }} disponible(s)</span>
+          </div>
+        </div>
+        {% if supports %}
+          <div class="card-footer bg-light p-3 d-flex justify-content-end gap-2">
+            <a href="{% url 'campagne_detail' campagne.pk %}" class="btn btn-light border px-4">Annuler</a>
+            <button type="submit" class="btn btn-primary px-4 shadow-sm">
+              <i class="bi bi-check-lg me-1"></i>
+              {% if is_modification %}Enregistrer les modifications{% else %}Confirmer la sélection{% endif %}
+            </button>
+          </div>
+        {% endif %}
+
+        <div class="card-body">
+          {% if supports %}
+            <div class="row g-4">
+              {% for support in supports %}
+                <div class="col-md-6 col-xl-4">
+                  <div class="card h-100 border rounded-3 overflow-hidden shadow-sm">
+                    <div class="card-header bg-light border-bottom p-3">
+                      <div class="d-flex justify-content-between align-items-start">
+                        <div class="text-truncate">
+                          <h6 class="fw-bold mb-1 text-truncate">{{ support.code }} — {{ support.nom }}</h6>
+                          <div class="small text-muted"><i class="bi bi-geo-alt me-1"></i>{{ support.adresse|default:"Ouagadougou" }}</div>
+                        </div>
+                        {% if campagne.type_support == 'ecran' and support.pk in selectionnes %}
+                          <span class="badge bg-primary">Actif</span>
+                        {% endif %}
+                      </div>
+                    </div>
+
+                    <div class="card-body p-3">
+                      {% if campagne.type_support == 'panneau' %}
+                        <p class="text-uppercase text-muted fw-bold mb-3" style="font-size: .65rem;">Faces du panneau</p>
+                        <div class="row g-2">
+                          {% for face in support.faces.all %}
+                            <div class="col-12">
+                              {% if face.is_disponible or face.pk in selectionnes %}
+                                <div class="position-relative">
+                                  <input type="checkbox" name="faces" value="{{ face.pk }}" id="face_{{ face.pk }}" class="btn-check" autocomplete="off" {% if face.pk in selectionnes %}checked{% endif %}>
+                                  <label class="btn btn-outline-primary w-100 text-start p-3 d-flex justify-content-between align-items-center rounded-3" for="face_{{ face.pk }}">
+                                    <span class="d-flex align-items-center">
+                                      <i class="bi {% if face.pk in selectionnes %}bi-check-circle-fill{% else %}bi-circle{% endif %} fs-5 me-2"></i>
+                                      <span>
+                                        <strong class="d-block">Face {{ face.label }}</strong>
+                                        <small class="opacity-75">{{ face.get_format_display }} • {{ face.get_eclairage_display }}</small>
+                                      </span>
+                                    </span>
+                                    {% if face.pk in selectionnes %}
+                                      <span class="badge bg-primary-subtle text-primary border border-primary-subtle">Sélectionnée</span>
+                                    {% else %}
+                                      <span class="badge bg-success-subtle text-success border border-success-subtle">Libre</span>
+                                    {% endif %}
+                                  </label>
+                                </div>
+                              {% else %}
+                                <div class="d-flex justify-content-between align-items-center p-3 border rounded-3 bg-occupe opacity-50" style="cursor: not-allowed;">
+                                  <span class="small fw-bold"><i class="bi bi-lock-fill me-2"></i>Face {{ face.label }}</span>
+                                  <span class="badge bg-secondary">Occupée</span>
+                                </div>
+                              {% endif %}
+                            </div>
+                          {% endfor %}
+                        </div>
+
+                      {% else %}
+                        <div class="mb-3">
+                          <input type="checkbox" name="supports" value="{{ support.pk }}" id="support_{{ support.pk }}" class="btn-check" autocomplete="off" {% if support.pk in selectionnes %}checked{% endif %}>
+                          <label class="btn btn-outline-primary w-100 py-3 rounded-3 text-start shadow-sm" for="support_{{ support.pk }}">
+                            <i class="bi {% if support.pk in selectionnes %}bi-check-square-fill{% else %}bi-square{% endif %} me-2"></i>
+                            <span class="fw-bold">{% if support.pk in selectionnes %}Écran sélectionné{% else %}Sélectionner cet écran{% endif %}</span>
+                          </label>
+                        </div>
+                        
+                        <div class="row g-2">
+                          <div class="col-6">
+                            <div class="p-2 border rounded text-center bg-light">
+                              <small class="d-block text-muted text-uppercase" style="font-size: .6rem;">Résolution</small>
+                              <div class="fw-bold small text-truncate">{{ support.ecran.get_resolution_display|default:"HD" }}</div>
+                            </div>
+                          </div>
+                          <div class="col-6">
+                            <div class="p-2 border rounded text-center bg-light">
+                              <small class="d-block text-muted text-uppercase" style="font-size: .6rem;">Taille</small>
+                              <div class="fw-bold small">{{ support.ecran.taille_pouces|default:"55" }}"</div>
+                            </div>
+                          </div>
+                          <div class="col-12 text-center py-1 mt-2">
+                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill">
+                              <i class="bi bi-clock me-1"></i>{{ support.ecran.heure_debut }}h – {{ support.ecran.heure_fin }}h
+                            </span>
+                          </div>
+                        </div>
+                      {% endif %}
+                    </div>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+
+          {% else %}
+            <div class="text-center py-5">
+              <i class="bi bi-inbox text-muted" style="font-size: 3rem; opacity: 0.3;"></i>
+              <h5 class="mt-3 fw-bold text-muted">Aucun support disponible</h5>
+              <p class="text-muted small">Tous les supports correspondants sont déjà assignés à cette campagne.</p>
+            </div>
+          {% endif %}
+        </div>
+
+        {% if supports %}
+          <div class="card-footer bg-light p-3 d-flex justify-content-end gap-2">
+            <a href="{% url 'campagne_detail' campagne.pk %}" class="btn btn-light border px-4">Annuler</a>
+            <button type="submit" class="btn btn-primary px-4 shadow-sm">
+              <i class="bi bi-check-lg me-1"></i>
+              {% if is_modification %}Enregistrer les modifications{% else %}Confirmer la sélection{% endif %}
+            </button>
+          </div>
+        {% endif %}
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}

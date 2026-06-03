@@ -1,0 +1,445 @@
+{% extends 'base.html' %}
+{% load static %}
+{% block title %}{{ support.code }} — Integral{% endblock %}
+{% block topbar_title %}
+  <i class="bi {% if support.type_support == 'panneau' %}bi-sign-merge-right{% else %}bi-display{% endif %} me-2" style="color:var(--color-primary)"></i>
+  {{ support.code }} — {{ support.nom }}
+{% endblock %}
+{% block topbar_actions %}
+  {% if user.is_staff_regie_role %}
+  <a href="{% url 'support_edit' support.pk %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil me-1"></i>Modifier</a>
+  {% endif %}
+  {% if user.is_technicien_role or user.is_staff_regie_role %}
+  <a href="{% url 'maintenance_create' support.pk %}" class="btn btn-sm" style="background:rgba(251,191,36,.1);color:#fbbf24;border:1px solid #fbbf2444">
+    <i class="bi bi-tools me-1"></i>Maintenance
+  </a>
+  {% endif %}
+  {% if user.is_admin %}
+  <a href="{% url 'support_delete' support.pk %}" class="btn btn-sm" style="background:rgba(239,68,68,.1);color:#f87171;border:1px solid #ef444444">
+    <i class="bi bi-trash me-1"></i>
+  </a>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+  <!-- Col gauche -->
+  <div class="col-md-4">
+    <!-- Photo principale -->
+    {% if support.photo_principale %}
+    <div class="card mb-3">
+      <div class="card-body p-0">
+        <img src="{{ support.photo_principale.url }}" alt="Photo principale du support {{ support.code }}" loading="lazy" style="width:100%;height:220px;object-fit:cover;border-radius:var(--radius)">
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Infos -->
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-info-circle me-2"></i>Fiche Technique</div>
+      <div class="card-body p-0">
+        {% for label, value in info_rows %}
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);font-size:.84rem">
+          <span style="color:var(--text-muted);font-size:.72rem;font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px">{{ label }}</span>
+          <span style="font-weight:600;text-align:right">{{ value }}</span>
+        </div>
+        {% endfor %}
+        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);font-size:.84rem">
+          <span style="color:var(--text-muted);font-size:.72rem;font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px">État</span>
+          <span class="badge-status {% if support.etat == 'bon' %}bs-disponible{% elif support.etat == 'maintenance' %}bs-occupe{% else %}bs-maintenance{% endif %}">{{ support.get_etat_display }}</span>
+        </div>
+        {% if support.type_support == 'ecran' %}
+          <div style="padding:10px 16px;font-size:.84rem">
+            <span style="color:var(--text-muted);font-size:.72rem;font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:3px">Occupation</span>
+            {% if support.is_occupe %}
+            <span class="badge-status bs-occupe"><i class="bi bi-broadcast me-1"></i>Occupé</span>
+            {% else %}
+            <span class="badge-status bs-disponible"><i class="bi bi-check2 me-1"></i>Disponible</span>
+            {% endif %}
+          </div>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Mini carte -->
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-pin-map me-2"></i>Localisation</div>
+      <div class="card-body p-0">
+        <div id="mini-map" style="height:200px;border-radius:0 0 var(--radius) var(--radius);overflow:hidden;cursor:pointer"></div>
+      </div>
+      <div class="card-footer" style="font-size:.85rem;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:8px">
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;font-family:var(--mono);margin-bottom:4px">Adresse</div>
+          <div style="font-weight:600;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ support.adresse|default:'Adresse non renseignée' }}</div>
+        </div>
+        <a href="{% url 'carte' %}?support={{ support.pk }}" class="btn btn-sm btn-outline-secondary" style="white-space:nowrap">Voir sur carte</a>
+      </div>
+    </div>
+    <!-- Tableau des maintenances -->
+    <div class="card">
+      <div class="card-header"><i class="bi bi-tools me-2" style="color:#fbbf24"></i>Historique des Maintenances</div>
+      <div class="card-body p-0">
+        {% for m in maintenances %}
+        <div style="padding:10px 16px;border-bottom:1px solid var(--border);font-size:.84rem">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+            <span style="font-weight:600">{{ m.get_etat_apres_display }}</span>
+            <span style="color:var(--text-muted);font-size:.72rem;font-family:var(--mono)">{{ m.date_intervention|date:"d/m/Y H:i" }} par {{ m.effectue_par.get_full_name|default:m.effectue_par.username }}</span>
+          </div>
+          <div style="color:var(--text-muted)">{{ m.description }}</div>
+        </div>
+        {% empty %}
+        <p style="margin:0;color:var(--text-muted);padding:12px 16px">Aucune maintenance enregistrée pour ce support.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+  
+
+  <!-- Col droite -->
+  <div class="col-md-8">
+    <!-- Faces panneau -->
+    {% if support.type_support == 'panneau' %}
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-sign-merge-right me-2" style="color:#a78bfa"></i>Faces du Panneau</div>
+      <div class="card-body">
+        <div class="row g-3">
+          {% for face in support.faces.all %}
+          <div class="col-md-6">
+            <div style="background:var(--bg-card2);border:1px solid {% if face.is_disponible %}#22c55e44{% else %}#f9731644{% endif %};border-radius:8px;overflow:hidden">
+              {% with camp=face.get_campagne_active %}
+                {% if camp and camp.visuel %}
+                  {% with visuel_name=camp.visuel.name|lower %}
+                    {% if "mp4" in visuel_name %}
+                      <video controls playsinline style="width:100%;height:160px;object-fit:cover;display:block;background:#000">
+                        <source src="{{ camp.visuel.url }}" type="video/mp4">
+                        Votre navigateur ne peut pas lire cette vidéo.
+                      </video>
+                    {% elif "webm" in visuel_name %}
+                      <video controls playsinline style="width:100%;height:160px;object-fit:cover;display:block;background:#000">
+                        <source src="{{ camp.visuel.url }}" type="video/webm">
+                        Votre navigateur ne peut pas lire cette vidéo.
+                      </video>
+                    {% elif "ogg" in visuel_name or "ogv" in visuel_name %}
+                      <video controls playsinline style="width:100%;height:160px;object-fit:cover;display:block;background:#000">
+                        <source src="{{ camp.visuel.url }}" type="video/ogg">
+                        Votre navigateur ne peut pas lire cette vidéo.
+                      </video>
+                    {% else %}
+                      <img src="{{ camp.visuel.url }}" style="width:100%;height:160px;object-fit:cover;display:block">
+                    {% endif %}
+                  {% endwith %}
+                {% elif face.photo %}
+                  <img src="{{ face.photo.url }}" alt="Photo de la face {{ face.label }}" loading="lazy" style="width:100%;height:120px;object-fit:cover;display:block">
+                {% else %}
+                  <img src="{% static 'img/logo.png' %}" alt="Logo" loading="lazy" style="width:100%;height:160px;object-fit:cover;display:block">
+                {% endif %}
+              {% endwith %}
+              <div style="padding:10px 12px">
+                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                  <span style="font-weight:700;font-size:.9rem">Face {{ face.label }}</span>
+                  <span style="color:{% if face.is_disponible %}var(--color-disponible){% else %}var(--color-occupe){% endif %};font-size:.68rem;font-weight:700;font-family:var(--mono)">
+                    {% if face.is_disponible %}LIBRE{% else %}OCCUPÉE{% endif %}
+                  </span>
+                </div>
+                <div style="font-size:.75rem;color:var(--text-muted)">{{ face.get_format_display }} — {{ face.get_eclairage_display }}</div>
+                {% with camp=face.get_campagne_active %}
+                {% if camp %}
+                <div style="margin-top:6px;padding:6px 8px;background:rgba(249,115,22,.1);border-radius:6px;font-size:.75rem">
+                  <i class="bi bi-person me-1" style="color:var(--color-occupe)"></i>
+                  <strong>{{ camp.client.nom }}</strong> — {{ camp.nom }}
+                </div>
+                {% endif %}
+                {% endwith %}
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Écran numérique -->
+    {% if ecran %}
+      <div class="card mb-3">
+
+        <div class="card-body">
+
+          <!-- Métriques clés -->
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
+            {% for label, icon, value, color in ecran_stats %}
+            <div style="background:var(--bg-card2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:6px">
+              <div style="display:flex;align-items:center;gap:6px">
+                <i class="bi {{ icon }}" style="color:{{ color|default:'var(--text-muted)' }};font-size:.85rem"></i>
+                <span style="font-size:.62rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px;font-family:var(--mono)">{{ label }}</span>
+              </div>
+              <div style="font-size:1rem;font-weight:700;color:{{ color|default:'var(--text)' }}">{{ value }}</div>
+            </div>
+            {% endfor %}
+          </div>
+
+          <!-- Bloc frise -->
+          <div style="background:var(--bg-card2);border:1px solid var(--border);border-radius:10px;padding:16px">
+
+            <!-- Header frise -->
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
+              <div style="display:flex;align-items:center;gap:8px">
+                <i class="bi bi-activity" style="color:var(--color-primary);font-size:.9rem"></i>
+                <span style="font-size:.8rem;font-weight:600;text-transform:uppercase;letter-spacing:.6px;font-family:var(--mono)">Frise de continuité</span>
+              </div>
+              <div style="display:flex;align-items:center;gap:8px">
+                <label style="font-size:.72rem;color:var(--text-muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px">Échelle</label>
+                <select id="viewdur" style="font-size:.78rem;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg-card);color:var(--text);cursor:pointer">
+                  <option value="3600">1 heure</option>
+                  <option value="86400" selected>1 jour</option>
+                  <option value="604800">1 semaine</option>
+                  <option value="2592000">1 mois</option>
+                </select>
+              </div>
+            </div>
+
+            <!-- Métriques dynamiques JS -->
+            <div id="metrics" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px"></div>
+
+            <!-- Canvas -->
+            <div id="frise-container" style="width:100%;overflow-x:auto;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);padding:10px">
+              <canvas id="frise-canvas" style="display:block"></canvas>
+            </div>
+            <p id="frise-note" style="font-size:.72rem;color:var(--text-muted);margin-top:8px;margin-bottom:0;font-family:var(--mono)"></p>
+
+          </div>
+        </div>
+      </div>
+    {% endif %}
+
+    <!-- Campagnes actives -->
+    {% if lignes_actives %}
+    <div class="card mb-3">
+      <div class="card-header" style="color:var(--color-disponible)"><i class="bi bi-broadcast me-2"></i>Campagnes Actives</div>
+      <div class="card-body p-0">
+        {% for l in lignes_actives %}
+        <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px">
+          <i class="bi bi-broadcast-pin" style="color:var(--color-disponible);font-size:1.1rem"></i>
+          <div class="flex-grow-1">
+            <div style="font-weight:700;font-size:.84rem">
+              <a href="{% url 'campagne_detail' l.campagne.pk %}" style="color:var(--text);text-decoration:none">{{ l.campagne.nom }}</a>
+            </div>
+            <div style="font-size:.75rem;color:var(--text-muted)">{{ l.campagne.client.nom }} · {{ l.campagne.date_debut|date:"d/m/Y" }} → {{ l.campagne.date_fin|date:"d/m/Y" }}
+              | {{ l.campagne.duree_passage }} | {{ l.campagne.frequence }} | {{ l.campagne.tranches_horaires }} | {{ l.campagne.calculer_nombre_spots }} spots | {{ l.campagne.calculer_nombre_spotsjour }} spots/jour | {{ l.campagne.calculer_nombre_spotsjourecran }} spots/jour/écran
+            </div>
+          </div>
+          <span class="badge-status bs-en_cours">En cours</span><a href="{% url 'campagne_detail' l.campagne.pk %}" class="btn btn-sm btn-outline-secondary" title="Détail"><i class="bi bi-eye"></i></a>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Historique -->
+    {% if historique %}
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-clock-history me-2"></i>Historique des Campagnes</div>
+      <div class="card-body p-0">
+        {% for l in historique %}
+        <div style="padding:10px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;font-size:.82rem">
+          <i class="bi bi-check-circle" style="color:var(--text-muted)"></i>
+          {% if l.campagne.visuel %}
+          <img src="{{ l.campagne.visuel.url }}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:4px">
+          {% else %}
+          <img src="{% static 'img/logo.png' %}" alt="Logo" loading="lazy" style="width:40px;height:40px;object-fit:cover;border-radius:4px">
+          {% endif %}
+          <div class="flex-grow-1">
+            <span style="font-weight:600">{{ l.campagne.client.nom }}</span>
+            <span style="color:var(--text-muted)"> — {{ l.campagne.nom }}</span>
+          </div>
+          <span class="mono" style="font-size:.72rem;color:var(--text-muted)">{{ l.campagne.date_debut|date:"d/m/Y" }} → {{ l.campagne.date_fin|date:"d/m/Y" }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Photos maintenance -->
+    {% if photos %}
+    <div class="card">
+      <div class="card-header"><i class="bi bi-camera me-2" style="color:#fbbf24"></i>Photos de Maintenance</div>
+      <div class="card-body">
+        <div class="row g-2">
+          {% for p in photos %}
+          <div class="col-6 col-md-4">
+            <div style="position:relative;border-radius:8px;overflow:hidden;border:1px solid var(--border)">
+              <img src="{{ p.photo.url }}" alt="Photo de maintenance" loading="lazy" style="width:100%;height:100px;object-fit:cover">
+              <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.6);padding:4px 8px">
+                <div style="font-size:.65rem;color:white;font-family:var(--mono)">{{ p.date_intervention|date:"d/m H:i" }} {{ p.effectue_par.get_full_name|default:p.effectue_par.username }}</div>
+                <div style="font-size:.65rem;color:#94a3b8"><span class="badge {% if p.etat_apres == 'bon' %}bg-success{% elif p.etat_apres == 'maintenance' %}bg-warning{% else %}bg-danger{% endif %}">{{ p.get_etat_apres_display }}</span></div>
+              </div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+  const mapEl = document.getElementById('mini-map');
+  if (!mapEl) return;
+  mapEl.style.width = '100%';
+  mapEl.style.height = '200px';
+  if (typeof L === 'undefined') {
+    console.error("Leaflet n'est pas chargé.");
+    return;
+  }
+  const miniMap = L.map('mini-map', { zoomControl: false, dragging: false, scrollWheelZoom: false });
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '© CARTO', subdomains: 'abcd'
+  }).addTo(miniMap);
+  const lat = parseFloat('{{ support.latitude }}'.replace(',', '.'));
+  const lng = parseFloat('{{ support.longitude }}'.replace(',', '.'));
+  const color = '{{ support.get_etat_color }}' || 'var(--color-primary)';
+  const icon = L.divIcon({
+    html: `<div style="width:16px;height:16px;background:${color};border-radius:50%;border:3px solid white;box-shadow:0 0 0 4px ${color}44"></div>`,
+    iconSize: [16, 16], iconAnchor: [8, 8], className: ''
+  });
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+    miniMap.setView([12.3714, -1.5197], 3);
+  } else {
+    L.marker([lat, lng], { icon }).addTo(miniMap);
+    miniMap.setView([lat, lng], 15);
+  }
+  miniMap.invalidateSize(true);
+  setTimeout(() => miniMap.invalidateSize(true), 250);
+  miniMap.on('click', () => {
+    window.location.href = `{% url 'carte' %}?support={{ support.pk }}`;
+  });
+});
+
+const COLORS = ['#378ADD', '#D85A30', '#1D9E75', '#7F77DD', '#BA7517', '#D4537E'];
+const spots = {{ spots_data|safe }};
+
+function vd() { return parseInt(document.getElementById('viewdur').value); }
+
+function fmtRuler(t, viewDur) {
+  if (viewDur <= 3600) { const m = Math.floor(t / 60); return m === 0 ? '0' : m + 'min'; }
+  if (viewDur <= 86400) { return Math.floor(t / 3600) + 'h'; }
+  if (viewDur <= 604800) { const d = Math.floor(t / 86400); return d === 0 ? 'J1' : ('J' + (d + 1)); }
+  const w = Math.floor(t / 604800); return w === 0 ? 'S1' : ('S' + (w + 1));
+}
+
+function viewLabel(v) { return v <= 3600 ? 'heure' : v <= 86400 ? 'jour' : v <= 604800 ? 'semaine' : 'mois'; }
+
+function getCC() {
+  const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  return {
+    text: dark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.42)',
+    textPri: dark ? 'rgba(255,255,255,0.82)' : 'rgba(0,0,0,0.82)',
+    rowBg: dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+    grid: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)',
+    gridMaj: dark ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.12)',
+  };
+}
+
+function renderMetrics() {
+  const view = vd(); const vl = viewLabel(view);
+  const pubH = spots.reduce((a, sp) => a + (sp.dur / sp.interval) * 3600, 0);
+  const pubView = pubH / 3600 * view;
+  const pct = Math.round(pubView / view * 100);
+  document.getElementById('metrics').innerHTML = `
+    <div class="mc"><div class="ml">Spots actifs</div><div class="mv">${spots.length}</div></div>
+    <div class="mc"><div class="ml">Pub totale / heure</div><div class="mv">${Math.round(pubH / 60)}<span class="mu">min</span></div></div>
+    <div class="mc"><div class="ml">Pub totale / ${vl}</div><div class="mv">${Math.round(pubView / 60)}<span class="mu">min</span></div></div>
+    <div class="mc"><div class="ml">% antenne / ${vl}</div><div class="mv">${pct}<span class="mu">%</span></div></div>
+  `;
+}
+
+function renderFrise() {
+  if (!spots.length) {
+    document.getElementById('frise-note').textContent = 'Aucun spot actif sur ce support.';
+    const canvas = document.getElementById('frise-canvas');
+    canvas.width = 0; canvas.height = 0;
+    return;
+  }
+  const canvas = document.getElementById('frise-canvas');
+  const container = document.getElementById('frise-container');
+  const viewDur = vd();
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const W = Math.max(container.clientWidth || 700, 300);
+  const LPAD = 74; const chartW = W - LPAD;
+  const ROW_H = 26; const RULER_H = 22; const GAP = 5;
+  const H = RULER_H + GAP + spots.length * (ROW_H + GAP);
+
+  canvas.width = W * dpr; canvas.height = H * dpr;
+  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
+  const ctx = canvas.getContext('2d');
+  ctx.scale(dpr, dpr); ctx.clearRect(0, 0, W, H);
+
+  const cc = getCC();
+  const pxPerSec = chartW / viewDur;
+
+  let tickStep, subTick;
+  if (viewDur <= 3600) { tickStep = 600; subTick = 120; }
+  else if (viewDur <= 86400) { tickStep = 3600; subTick = 1800; }
+  else if (viewDur <= 604800) { tickStep = 86400; subTick = 43200; }
+  else { tickStep = 604800; subTick = 86400; }
+
+  ctx.lineWidth = 0.5;
+  for (let t = subTick; t < viewDur; t += subTick) {
+    const x = LPAD + t * pxPerSec;
+    ctx.strokeStyle = cc.grid;
+    ctx.beginPath(); ctx.moveTo(x, RULER_H); ctx.lineTo(x, H); ctx.stroke();
+  }
+  for (let t = 0; t <= viewDur; t += tickStep) {
+    const x = LPAD + t * pxPerSec;
+    ctx.strokeStyle = cc.gridMaj;
+    ctx.beginPath(); ctx.moveTo(x, 16); ctx.lineTo(x, H); ctx.stroke();
+    ctx.fillStyle = cc.text;
+    ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
+    ctx.fillText(fmtRuler(t, viewDur), x, 12);
+  }
+
+  let hasDense = false;
+  spots.forEach((sp, i) => {
+    const col = COLORS[i % COLORS.length];
+    const y = RULER_H + GAP + i * (ROW_H + GAP);
+    ctx.fillStyle = cc.rowBg;
+    ctx.fillRect(LPAD, y, chartW, ROW_H);
+    ctx.fillStyle = cc.textPri;
+    ctx.font = '11px sans-serif'; ctx.textAlign = 'right';
+    const lbl = sp.name.length > 9 ? sp.name.slice(0, 8) + '…' : sp.name;
+    ctx.fillText(lbl, LPAD - 6, y + ROW_H / 2 + 4);
+    ctx.fillStyle = col;
+    const segW = Math.max(1.5, sp.dur * pxPerSec);
+    const spacing = sp.interval * pxPerSec;
+    if (spacing < 2) {
+      hasDense = true;
+      ctx.globalAlpha = 0.7;
+      ctx.fillRect(LPAD, y + 3, chartW, ROW_H - 6);
+      ctx.globalAlpha = 1;
+    } else {
+      for (let t = 0; t < viewDur; t += sp.interval) {
+        const x = LPAD + t * pxPerSec;
+        const w = Math.min(segW, LPAD + chartW - x);
+        if (w > 0) ctx.fillRect(x, y + 3, w, ROW_H - 6);
+      }
+    }
+  });
+
+  ctx.strokeStyle = cc.gridMaj; ctx.lineWidth = 0.5;
+  ctx.strokeRect(LPAD, RULER_H, chartW, H - RULER_H);
+
+  document.getElementById('frise-note').textContent =
+    hasDense ? "Barre pleine = diffusions si denses qu'elles se confondent à cette échelle." : '';
+}
+
+function render() { renderMetrics(); renderFrise(); }
+
+document.getElementById('viewdur').addEventListener('change', render);
+window.addEventListener('load', render);
+window.addEventListener('resize', renderFrise);
+</script>
+{% endblock %}

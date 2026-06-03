@@ -1,0 +1,640 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        :root {
+            --color-disponible:  {{ DESIGN.COLOR_DISPONIBLE }};
+            --color-occupe:      {{ DESIGN.COLOR_OCCUPE }};
+            --color-maintenance: {{ DESIGN.COLOR_MAINTENANCE }};
+            --color-primary:     {{ DESIGN.COLOR_PRIMARY }};
+            --color-secondary:   {{ DESIGN.COLOR_SECONDARY }};
+            --color-noir:        {{ DESIGN.COLOR_NOIR }};
+            --bg:       #f1f5f9;
+            --bg-card:  #ffffff;
+            --bg-card2: #f8fafc;
+            --border:   #e2e8f0;
+            --text:     #1e293b;
+            --text-muted: #64748b;
+            --radius:    8px;
+        }
+
+        @page {
+            size: A4 landscape;
+            margin: 1.5cm 1cm;
+            @bottom-center {
+                content: "Document généré le {{ today }} — Page " counter(page) " / " counter(pages);
+                font-family: Arial, sans-serif;
+                font-size: 7pt;
+                color: #64748b;
+            }
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 8pt;
+            color: var(--text);
+            background: #fff;
+        }
+
+        /* ── Filigrane ── */
+        .watermarked-card::before {
+            content: "";
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-15deg);
+            width: 500px;
+            height: 500px;
+            background-image: url("{% static 'img/logo.png' %}");
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            opacity: 0.4;
+            z-index: 1000;
+            pointer-events: none;
+        }
+
+        /* ── En-tête document ── */
+        .doc-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 14px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid var(--color-primary);
+            position: relative;
+            z-index: 10;
+        }
+        .doc-header-center { flex: 1; text-align: center;}
+        .doc-header-right {
+            text-align: right;
+            font-size: 7.5pt;
+            color: var(--text-muted);
+            line-height: 1.6;
+        }
+        .doc-brand {
+            font-size: 7pt;
+            font-weight: bold;
+            color: var(--text-muted);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 3px;
+        }
+        .doc-title {
+            font-size: 15pt;
+            font-weight: bold;
+            color: var(--color-primary);
+            text-transform: uppercase;
+            line-height: 1.2;
+        }
+        .doc-meta {
+            font-size: 7.5pt;
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+        .doc-meta strong {
+            color: var(--color-primary);
+        }
+
+        /* ── Bandeau section (Écran / Panneaux) ── */
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin: 16px 0 8px 0;
+            background: var(--color-primary);
+            border-radius: 4px;
+            padding: 7px 14px;
+            position: relative;
+            z-index: 10;
+            page-break-inside: avoid;
+        }
+        .section-header::before,
+        .section-header::after {
+            content: "◆";
+            color: var(--color-secondary);
+            font-size: 9pt;
+            margin: 0 10px;
+        }
+        .section-title {
+            font-size: 11pt;
+            font-weight: bold;
+            color: #fff;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+
+        /* ── Tableaux ── */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+            position: relative;
+            z-index: 10;
+        }
+
+        /* Colonnes écrans */
+        col.c-num     { width: 0.9cm;  }
+        col.c-camp    { width: 4.2cm;  }
+        col.c-diff    { width: 2.1cm;  }
+        col.c-debut   { width: 1.7cm;  }
+        col.c-fin     { width: 1.7cm;  }
+        col.c-plage   { width: 2cm;    }
+        col.c-led     { width: 0.9cm;  }
+        col.c-spots   { width: 1.8cm;  }
+        col.c-reste   { width: 1.8cm;  }
+        col.c-ecrans  { width: 9.9cm;  }
+
+        /* Colonnes panneaux */
+        col.p-num     { width: 0.9cm;  }
+        col.p-camp    { width: 5cm;    }
+        col.p-debut   { width: 2.2cm;  }
+        col.p-fin     { width: 2.2cm;  }
+        col.p-duree   { width: 1.6cm;  }
+        col.p-nb      { width: 1.6cm;  }
+        col.p-faces   { width: auto;   }
+
+        thead tr th {
+            background-color: var(--color-primary);
+            color: #fff;
+            font-size: 7.5pt;
+            font-weight: bold;
+            text-align: center;
+            padding: 6px 4px;
+            border: 0.5px solid rgba(255,255,255,0.15);
+        }
+        thead tr th.left { text-align: left; padding-left: 6px; }
+        thead { display: table-header-group; }
+
+        tbody tr td {
+            padding: 4px 3px;
+            border: 0.5px solid var(--border);
+            vertical-align: middle;
+            text-align: center;
+        }
+        tbody tr td.left   { text-align: left; padding-left: 6px; }
+        tbody tr td.ecrans {
+            text-align: left;
+            padding-left: 6px;
+            font-size: 7pt;
+            line-height: 1.5;
+            word-wrap: break-word;
+        }
+
+        /* Alternance lignes */
+        tbody tr.row-data:nth-child(even) { background-color: var(--bg-card2); }
+        tbody tr.row-data:nth-child(odd)  { background-color: #ffffff; }
+
+        /* Reste négatif */
+        td.reste-negatif { color: #c0392b; font-weight: bold; }
+
+        /* Bandeau CONTRAT */
+        tr.row-contrat td {
+            background-color: var(--color-primary);
+            color: #fff;
+            font-weight: bold;
+            font-size: 8pt;
+            text-align: center;
+            padding: 6px 5px;
+            border: none;
+            page-break-after: avoid;
+        }
+
+        /* Bandeau SANS CONTRAT */
+        tr.row-no-contrat td {
+            background-color: rgba(241,245,249,0.9);
+            color: var(--color-noir);
+            font-weight: bold;
+            font-size: 8pt;
+            text-align: center;
+            padding: 6px 5px;
+            border: 0.5px solid var(--border);
+            page-break-after: avoid;
+        }
+
+        /* Bandeau MOIS */
+        tr.row-mois td {
+            background-color: var(--bg-card2);
+            color: var(--color-primary);
+            font-weight: bold;
+            font-size: 7.5pt;
+            text-align: left;
+            padding: 5px 8px;
+            border: 0.5px solid var(--border);
+            page-break-after: avoid;
+            letter-spacing: 0.5px;
+        }
+
+        /* Sous-total MOIS */
+        tr.row-total-mois td {
+            background-color: var(--bg);
+            color: var(--text);
+            font-weight: bold;
+            font-size: 7.5pt;
+            border-top: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
+            page-break-before: avoid;
+        }
+
+        /* Sous-total CONTRAT */
+        tr.row-total-contrat td {
+            background-color: var(--bg-card2);
+            color: var(--color-primary);
+            font-weight: bold;
+            font-size: 8pt;
+            border-top: 2px solid var(--color-primary);
+            border-bottom: 2px solid var(--color-primary);
+            page-break-before: avoid;
+        }
+
+        /* Total panneaux */
+        tr.row-total-panneau td {
+            background-color: var(--bg-card2);
+            color: var(--color-primary);
+            font-weight: bold;
+            font-size: 8pt;
+            border-top: 2px solid var(--color-primary);
+            border-bottom: 2px solid var(--color-primary);
+            page-break-before: avoid;
+        }
+
+        /* Tags faces/écrans */
+        .face-tag {
+            display: inline-block;
+            font-size: 7.5pt;
+            color: var(--color-primary);
+            background-color: #eef2ff;
+            border: 0.5px solid var(--color-primary);
+            border-radius: 3px;
+            padding: 1px 5px;
+            margin: 1px 0;
+        }
+
+        /* Badge statut panneau */
+        .badge-statut {
+            display: inline-block;
+            font-size: 6.5pt;
+            font-weight: bold;
+            border-radius: 3px;
+            padding: 1px 5px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        .badge-en_cours  { background: #dcfce7; color: #166534; }
+        .badge-a_venir   { background: #dbeafe; color: #1e40af; }
+        .badge-terminee  { background: #f1f5f9; color: #475569; }
+        .badge-annulee   { background: #fee2e2; color: #991b1b; }
+        .badge-brouillon { background: #fef9c3; color: #854d0e; }
+
+        /* Séparateur de section */
+        .section-spacer {
+            height: 8px;
+            display: block;
+        }
+
+        /* Vide */
+        .empty-row td {
+            text-align: center;
+            padding: 20px;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+        .doc-header-logo-left {
+            margin-right: 14px;
+            display: flex;
+            align-items: center;
+        }
+        .doc-logo {
+            height: 55px;
+            width: auto;
+            object-fit: contain;
+        }
+        .face-row {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 2px 0;
+            border-bottom: 0.5px solid var(--border);
+        }
+        .face-row:last-child {
+            border-bottom: none;
+        }
+        .face-nom {
+            font-size: 7pt;
+            color: var(--text);
+            flex: 1;
+        }
+        .face-label {
+            font-size: 7pt;
+            font-weight: bold;
+            color: #fff;
+            background-color: var(--color-primary);
+            border-radius: 3px;
+            padding: 1px 5px;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body class="watermarked-card">
+
+<!-- ══════════════════════════════════════════
+     EN-TÊTE
+════════════════════════════════════════════ -->
+<div class="doc-header">
+
+    <!-- Logo -->
+    <div class="doc-header-logo-left">
+        <img src="{% static 'img/logo.png' %}" alt="Logo" class="doc-logo">
+    </div>
+
+    <div class="doc-header-center">
+        <div class="doc-title">Rapport de diffusion : {{ client.nom }}</div>
+        <div class="doc-meta">
+            {% with contrat=client.get_contrat_actif %}
+            {% if contrat %}
+                Contrat actif :&nbsp;
+                <strong>{{ contrat.get_type_contrat_display }}</strong> —
+                <strong>{{ contrat.nb_spots|floatformat:0 }} spots</strong> —
+                du {{ contrat.date_debut|date:"d/m/Y" }} au {{ contrat.date_fin|date:"d/m/Y" }}
+            {% else %}
+                Aucun contrat actif
+            {% endif %}
+            {% endwith %}
+        </div>
+    </div>
+
+    <div class="doc-header-right">
+        Généré le {{ today|date:"d/m/Y" }}<br>
+        Réf. : <strong>{{ client.code }}</strong><br>
+        {% if client.telephone %}Tél. : {{ client.telephone }}<br>{% endif %}
+        {% if client.email %}{{ client.email }}{% endif %}
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SECTION ÉCRANS
+════════════════════════════════════════════ -->
+{% if blocs_ecran %}
+<div class="section-ecran">
+    <div class="section-header">
+        <span class="section-title">Campagnes Écrans</span>
+    </div>
+    <table>
+        <colgroup>
+            <col class="c-num">
+            <col class="c-camp">
+            <col class="c-diff">
+            <col class="c-debut">
+            <col class="c-fin">
+            <col class="c-plage">
+            <col class="c-led">
+            <col class="c-spots">
+            <col class="c-reste">
+            <col class="c-ecrans">
+        </colgroup>
+        <thead>
+            <tr>
+                <th>N°</th>
+                <th class="left">CAMPAGNE</th>
+                <th>DIFFUSION</th>
+                <th>DÉBUT</th>
+                <th>FIN</th>
+                <th>PLAGE</th>
+                <th>LED</th>
+                <th>SPOTS/MOIS</th>
+                <th>RESTE</th>
+                <th class="left">ÉCRANS</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for bloc in blocs_ecran %}
+
+            {# ── Bandeau contrat ── #}
+            {% if bloc.contrat %}
+            <tr class="row-contrat">
+                <td colspan="10">
+                    ◆&nbsp; {{ bloc.contrat.get_type_contrat_display|upper }}
+                    {% if bloc.contrat.nom %}&nbsp;— {{ bloc.contrat.nom }}{% endif %}
+                    &nbsp;|&nbsp; {{ bloc.contrat.nb_spots|floatformat:0 }} spots
+                    &nbsp;|&nbsp; {{ bloc.contrat.date_debut|date:"d/m/Y" }} → {{ bloc.contrat.date_fin|date:"d/m/Y" }}
+                </td>
+            </tr>
+            {% else %}
+            <tr class="row-no-contrat">
+                <td colspan="10">◆&nbsp; CAMPAGNES SANS CONTRAT</td>
+            </tr>
+            {% endif %}
+
+            {# ── Mois ── #}
+            {% for mois in bloc.mois %}
+                <tr class="row-mois">
+                    <td colspan="10">◈ &nbsp; {{ mois.label }}</td>
+                </tr>
+
+                {% for ligne in mois.lignes %}
+                <tr class="row-data">
+                    <td>{{ ligne.num }}</td>
+                    <td class="left">{{ ligne.campagne.nom }}</td>
+                    <td>{{ ligne.freq_display }}</td>
+                    <td>{{ ligne.campagne.date_debut|date:"d/m/y" }}</td>
+                    <td>{{ ligne.campagne.date_fin|date:"d/m/y" }}</td>
+                    <td>{{ ligne.campagne.tranches_horaires|default:"06:00-22:00" }}</td>
+                    <td>{{ ligne.nb_ecrans }}</td>
+                    <td>{{ ligne.spots|floatformat:0 }}</td>
+                    <td {% if ligne.reste < 0 %}class="reste-negatif"{% endif %}>
+                        {% if ligne.reste_display %}{{ ligne.reste_display }}{% else %}—{% endif %}
+                    </td>
+                    <td class="ecrans">
+                        {% for ecran in ligne.ecrans_str %}
+                            <div class="face-row">
+                                <span class="face-nom"> {{ forloop.counter }} <i class="bi bi-display"></i> {{ ecran.support.nom }}</span>
+                                {% if ligne.campagne.calculer_nombre_spots_ecran %}
+                                    <span class="face-label">{{ligne.campagne.calculer_nombre_spots_ecran}}</span>
+                                {% endif %}
+                            </div>
+                        {% empty %}
+                            <span style="color:var(--text-muted);">—</span>
+                        {% endfor %}
+                    </td>
+                </tr>
+                {% endfor %}
+                <tr class="row-total-mois">
+                    <td colspan="2" class="left">&nbsp;&nbsp;Total {{ mois.label }}</td>
+                    <td></td><td></td><td></td><td></td><td></td>
+                    <td>{{ mois.total_spots|floatformat:0 }}</td>
+                    <td>
+                        {% if mois.reste_fin is not None %}{{ mois.reste_fin|floatformat:0 }}
+                        {% else %}—{% endif %}
+                    </td>
+                    <td></td>
+                </tr>
+            {% endfor %}
+
+            <tr class="row-total-contrat">
+                <td colspan="2" class="left" style="font-size: 10pt; !important;">&nbsp;&nbsp;TOTAL — {{ bloc.label_total }}</td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td></td>
+                <td style="font-size: 10pt; !important; color: green;">
+                    {{ bloc.total_spots|floatformat:0 }}
+                </td>
+                <td style="font-size: 10pt; !important;">
+                    {% if bloc.reste_final is not None %}{{ bloc.reste_final|floatformat:0 }}
+                    {% else %}—{% endif %}
+                </td>
+                <td></td>
+            </tr>
+
+        {% empty %}
+            <tr class="empty-row">
+                <td colspan="10">Aucune campagne écran pour ce client.</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+
+<!-- ══════════════════════════════════════════
+     SECTION PANNEAUX
+════════════════════════════════════════════ -->
+{% if blocs_panneaux %}
+<span class="section-spacer"></span>
+<div class="section-panneaux">
+
+    <div class="section-header">
+        <span class="section-title">Campagnes Panneaux</span>
+    </div>
+
+    <table>
+        <colgroup>
+            <col class="p-num">
+            <col class="p-camp">
+            <col class="p-debut">
+            <col class="p-fin">
+            <col class="p-duree">
+            <col class="p-nb">
+            <col class="p-faces">
+        </colgroup>
+        <thead>
+            <tr>
+                <th>N°</th>
+                <th class="left">CAMPAGNE</th>
+                <th>DÉBUT</th>
+                <th>FIN</th>
+                <th>DURÉE</th>
+                <th>NB FACES</th>
+                <th class="left">PANNEAUX / FACES</th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for bloc in blocs_panneaux %}
+
+            {% for ligne in bloc.lignes %}
+            <tr class="row-data">
+                <td>{{ ligne.num }}</td>
+                <td class="left">
+                    {{ ligne.campagne.nom }}<br>
+                    <span style="font-size:6.5pt; color:var(--text-muted);">{{ ligne.reference }}</span>
+                </td>
+                <td>{{ ligne.date_debut|date:"d/m/Y" }}</td>
+                <td>{{ ligne.date_fin|date:"d/m/Y" }}</td>
+                <td>{{ ligne.duree_jours }}&nbsp;j</td>
+                <td>{{ ligne.nb_faces }}</td>
+                <td class="ecrans">
+                    {% for face in ligne.faces %}
+                        <div class="face-row">
+                            <span class="face-nom">{{ face.support_nom }}</span>
+                            {% if face.face_label != "-" %}
+                                <span class="face-label">{{ face.face_label }}</span>
+                            {% endif %}
+                        </div>
+                    {% empty %}
+                        <span style="color:var(--text-muted);">—</span>
+                    {% endfor %}
+                </td>
+            </tr>
+            {% endfor %}
+
+            {# ── Total panneaux ── #}
+            <tr class="row-total-panneau">
+                <td colspan="5" class="left">&nbsp;&nbsp;TOTAL PANNEAUX</td>
+                <td>{{ bloc.total_faces }}</td>
+                <td></td>
+            </tr>
+
+        {% empty %}
+            <tr class="empty-row">
+                <td colspan="7">Aucune campagne panneau pour ce client.</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endif %}
+<!-- ══════════════════════════════════════════
+     CONCLUSION
+════════════════════════════════════════════ -->
+<!-- ══════════════════════════════════════════
+     CONCLUSION — KPI
+════════════════════════════════════════════ -->
+<span class="section-spacer"></span>
+
+<div class="section-header">
+    <span class="section-title">Récapitulatif Global</span>
+</div>
+
+<div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; position: relative; z-index: 10;">
+
+    <!-- Nb Contrats -->
+    <div style="flex: 1; min-width: 3cm; background: var(--bg-card2); border: 1px solid var(--border); border: 3px solid var(--color-primary); border-radius: var(--radius); padding: 10px 12px; text-align: center;">
+        <div style="font-size: 7pt; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Contrats</div>
+        <div style="font-size: 18pt; font-weight: bold; color: var(--color-primary);">{{ blocs_ecran|length }}</div>
+    </div>
+
+    <!-- Nb Campagnes Écrans -->
+    <div style="flex: 1; min-width: 3cm; background: var(--bg-card2); border: 1px solid var(--border); border: 3px solid var(--color-primary); border-radius: var(--radius); padding: 10px 12px; text-align: center;">
+        <div style="font-size: 7pt; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Campagnes Écrans</div>
+        <div style="font-size: 18pt; font-weight: bold; color: var(--color-primary);">{{ total_campagnes_ecran }}</div>
+    </div>
+
+    <!-- Total Spots -->
+    <div style="flex: 1; min-width: 3cm; background: var(--bg-card2); border: 1px solid var(--border); border: 3px solid #16a34a; border-radius: var(--radius); padding: 10px 12px; text-align: center;">
+        <div style="font-size: 7pt; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Total Spots</div>
+        <div style="font-size: 18pt; font-weight: bold; color: #16a34a;">{{ total_spots_global|floatformat:0 }}</div>
+    </div>
+
+    <!-- Reste Spots -->
+    <div style="flex: 1; min-width: 3cm; background: var(--bg-card2); border: 1px solid var(--border); border: 3px solid #f59e0b; border-radius: var(--radius); padding: 10px 12px; text-align: center;">
+        <div style="font-size: 7pt; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Reste Spots</div>
+        <div style="font-size: 18pt; font-weight: bold; color: #f59e0b;">{{ reste_spots_global|floatformat:0 }}</div>
+    </div>
+
+    <!-- Campagnes Panneaux -->
+    {% if blocs_panneaux %}
+    <div style="flex: 1; min-width: 3cm; background: var(--bg-card2); border: 1px solid var(--border); border: 3px solid var(--color-secondary); border-radius: var(--radius); padding: 10px 12px; text-align: center;">
+        <div style="font-size: 7pt; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Campagnes Panneaux</div>
+        <div style="font-size: 18pt; font-weight: bold; color: var(--color-secondary);">{{ total_campagnes_panneaux }}</div>
+    </div>
+
+    <!-- Total Faces -->
+    <div style="flex: 1; min-width: 3cm; background: var(--bg-card2); border: 1px solid var(--border); border: 3px solid var(--color-secondary); border-radius: var(--radius); padding: 10px 12px; text-align: center;">
+        <div style="font-size: 7pt; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Total Faces</div>
+        <div style="font-size: 18pt; font-weight: bold; color: var(--color-secondary);">{{ total_faces_global }}</div>
+    </div>
+    {% endif %}
+
+</div>
+
+<!-- Note bas -->
+<div style="margin-top: 12px; text-align: center; font-size: 7pt; color: var(--text-muted); position: relative; z-index: 10;">
+    Document confidentiel — {{ client.nom }} (Réf. {{ client.code }}) — Généré le {{ today|date:"d/m/Y" }}
+</div>
+</body>
+</html>

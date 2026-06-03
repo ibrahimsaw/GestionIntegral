@@ -1,0 +1,165 @@
+{% extends 'base.html' %} {% block title %}Utilisateurs — Integral{% endblock %}
+{% block topbar_title %}<i
+  class="bi bi-shield-lock me-2"
+  style="color: var(--color-primary)"
+></i
+>Gestion des Utilisateurs{% endblock %} {% block topbar_actions %}
+<a href="{% url 'user_create' %}" class="btn btn-primary btn-sm"
+  ><i class="bi bi-plus-lg me-1"></i>Nouvel Utilisateur</a
+>
+{% endblock %} {% block content %}
+<div class="card mb-3">
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-5">
+        <label class="form-label">Recherche</label>
+        <input
+          type="text"
+          name="q"
+          value="{{ q }}"
+          class="form-control"
+          placeholder="Nom, email..."
+        />
+      </div>
+      <div class="col-md-2 d-flex gap-2">
+        <button type="submit" class="btn btn-primary flex-fill">
+          <i class="bi bi-search"></i>
+        </button>
+        <a href="{% url 'user_list' %}" class="btn btn-outline-secondary"
+          ><i class="bi bi-x-lg"></i
+        ></a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-body p-0">
+    <table class="table mb-0">
+      <thead>
+        <tr>
+          <th>Utilisateur</th>
+          <th>Email</th>
+          <th>Rôle</th>
+          <th>Profil Client</th>
+          <th>Statut</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for u in users %}
+        <tr>
+          <td>
+            <div style="display: flex; align-items: center; gap: 10px">
+              {% if u.avatar %}
+              <img
+                src="{{ u.avatar.url }}"
+                style="
+                  width: 32px;
+                  height: 32px;
+                  border-radius: 50%;
+                  object-fit: cover;
+                "
+              />
+              {% else %}
+              <div
+                style="
+                  width: 32px;
+                  height: 32px;
+                  background: var(--bg-card2);
+                  border-radius: 50%;
+                  display: flex;
+                  align-items: center;
+                  justify-content: center;
+                "
+              >
+                <i class="bi bi-person" style="color: var(--text-muted)"></i>
+              </div>
+              {% endif %}
+              <div>
+                <div style="font-weight: 700; font-size: 0.84rem">
+                  {{ u.get_full_name|default:u.username }}
+                </div>
+                <div
+                  style="
+                    font-size: 0.72rem;
+                    color: var(--text-muted);
+                    font-family: var(--mono);
+                  "
+                >
+                  {{ u.username }}
+                </div>
+              </div>
+            </div>
+          </td>
+          <td style="font-size: 0.82rem; color: var(--text-muted)">
+            {{ u.email|default:"—" }}
+          </td>
+          <td>
+            <span class="role-pill role-{{ u.role }}"
+              >{{ u.role }}</span
+            >
+          </td>
+          <td>
+            {% if u.client_profile %}
+              <a href="{% url 'client_detail' u.client_profile.pk %}" class="text-decoration-none">
+                <span class="badge bg-secondary">{{ u.client_profile.nom }}</span>
+              </a>
+            {% else %}
+              <span class="badge bg-light text-muted">Aucun</span>
+            {% endif %}
+          </td>
+          <td>
+            {% if u.is_active %}
+            <span class="badge-status bs-disponible">Actif</span>
+            {% else %}
+            <span class="badge-status bs-maintenance">Inactif</span>
+            {% endif %}
+          </td>
+          <td>
+            <div class="d-flex gap-1">
+              <a
+                href="{% url 'user_detail' u.pk %}"
+                class="btn btn-sm btn-outline-primary"
+                title="Voir le détail"
+                ><i class="bi bi-eye"></i
+              ></a>
+              <a
+                href="{% url 'user_edit' u.pk %}"
+                class="btn btn-sm btn-outline-secondary"
+                title="Modifier"
+                ><i class="bi bi-pencil"></i
+              ></a>
+              {% if u.pk != request.user.pk %}
+              <a
+                href="{% url 'user_delete' u.pk %}"
+                class="btn btn-sm"
+                style="
+                  color: var(--color-maintenance);
+                  border: 1px solid #ef444444;
+                  border-radius: 6px;
+                  padding: 4px 8px;
+                "
+                title="Supprimer"
+                ><i class="bi bi-trash"></i
+              ></a>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td
+            colspan="5"
+            class="text-center py-4"
+            style="color: var(--text-muted)"
+          >
+            Aucun utilisateur
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

@@ -1,0 +1,291 @@
+{% extends 'base.html' %}
+{% block title %}Journal d'audit — Integral{% endblock %}
+{% block topbar_title %}
+  <i class="bi bi-journal-text me-2" style="color:var(--color-primary)"></i>Journal d'audit
+{% endblock %}
+
+{% block extra_head %}
+<style>
+  .filter-bar {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    margin-bottom: 16px;
+  }
+  .audit-table { width: 100%; border-collapse: collapse; font-size: .82rem; }
+  .audit-table th {
+    font-size: .68rem; font-weight: 700; letter-spacing: .06em;
+    text-transform: uppercase; color: var(--text-muted);
+    padding: 0 12px 10px; border-bottom: 1px solid var(--border); text-align: left;
+  }
+  .audit-table td {
+    padding: 9px 12px; border-bottom: 1px solid var(--border); vertical-align: middle;
+  }
+  .audit-table tr:last-child td { border-bottom: none; }
+  .audit-table tr:hover td { background: var(--bg-card2, rgba(0,0,0,.02)); }
+
+  .pill {
+    font-size: .66rem; font-weight: 700; padding: 2px 8px;
+    border-radius: 20px; display: inline-block; color: white;
+  }
+  .pill-success   { background: #198754; }
+  .pill-secondary { background: #6c757d; }
+  .pill-primary   { background: #932E2B; }
+  .pill-warning   { background: #c77c00; }
+  .pill-danger    { background: #dc3545; }
+  .pill-info      { background: #0a7d8c; }
+  .pill-dark      { background: #343a40; }
+
+  .changes-wrap {
+    font-size: .75rem; font-family: var(--mono);
+    background: var(--bg-card2, #f8f9fa);
+    border-radius: 6px; padding: 6px 10px; margin-top: 4px;
+  }
+  .change-before { color: #dc3545; text-decoration: line-through; }
+  .change-after  { color: #198754; }
+
+  .empty-state {
+    text-align: center; padding: 60px 20px; color: var(--text-muted);
+  }
+  .empty-state i { font-size: 2.5rem; display: block; margin-bottom: 10px; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- En-tête -->
+<div class="d-flex align-items-center justify-content-between mb-4">
+  <div>
+    <h1 style="font-size:1.4rem;font-weight:800;margin:0">Journal d'audit</h1>
+    <p style="color:var(--text-muted);font-size:.8rem;margin-top:3px">
+      {{ total }} entrée{{ total|pluralize }} au total
+    </p>
+  </div>
+</div>
+
+<!-- Filtres -->
+<form method="get" class="filter-bar">
+  <div class="row g-2 align-items-end">
+
+    <div class="col-md-3">
+      <label class="form-label" style="font-size:.72rem;font-weight:700">Recherche</label>
+      <input type="text" name="q" value="{{ q }}" class="form-control form-control-sm"
+             placeholder="utilisateur, objet, IP…">
+    </div>
+
+    <div class="col-md-2">
+      <label class="form-label" style="font-size:.72rem;font-weight:700">Action</label>
+      <select name="action" class="form-select form-select-sm">
+        <option value="">Toutes</option>
+        {% for code, label in action_choices %}
+        <option value="{{ code }}" {% if filter_action == code %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="col-md-2">
+      <label class="form-label" style="font-size:.72rem;font-weight:700">Module</label>
+      <select name="module" class="form-select form-select-sm">
+        <option value="">Tous</option>
+        {% for code, label in module_choices %}
+        <option value="{{ code }}" {% if filter_module == code %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="col-md-1">
+      <label class="form-label" style="font-size:.72rem;font-weight:700">Niveau</label>
+      <select name="level" class="form-select form-select-sm">
+        <option value="">Tous</option>
+        {% for code, label in level_choices %}
+        <option value="{{ code }}" {% if filter_level == code %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="col-md-2">
+      <label class="form-label" style="font-size:.72rem;font-weight:700">Utilisateur</label>
+      <select name="user" class="form-select form-select-sm">
+        <option value="">Tous</option>
+        {% for u in users_list %}
+        <option value="{{ u.pk }}" {% if filter_user == u.pk|stringformat:"s" %}selected{% endif %}>
+          {{ u.get_full_name|default:u.username }}
+        </option>
+        {% endfor %}
+      </select>
+    </div>
+
+    <div class="col-md-1">
+      <label class="form-label" style="font-size:.72rem;font-weight:700">Du</label>
+      <input type="date" name="date_from" value="{{ filter_date_from }}" class="form-control form-control-sm">
+    </div>
+
+    <div class="col-md-1">
+      <label class="form-label" style="font-size:.72rem;font-weight:700">Au</label>
+      <input type="date" name="date_to" value="{{ filter_date_to }}" class="form-control form-control-sm">
+    </div>
+
+    <div class="col-auto d-flex gap-2">
+      <button type="submit" class="btn btn-primary btn-sm">
+        <i class="bi bi-search"></i>
+      </button>
+      <a href="{% url 'audit_log' %}" class="btn btn-outline-secondary btn-sm" title="Réinitialiser">
+        <i class="bi bi-x-lg"></i>
+      </a>
+    </div>
+
+  </div>
+</form>
+
+<!-- Tableau -->
+<div style="background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;">
+  <div style="overflow-x:auto;">
+    <table class="audit-table">
+      <thead>
+        <tr>
+          <th>Date / Heure</th>
+          <th>Utilisateur</th>
+          <th>Action</th>
+          <th>Niveau</th>
+          <th>Module</th>
+          <th>Objet</th>
+          <th>Détail / Modifications</th>
+          <th>IP</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for log in logs %}
+        <tr>
+
+          <!-- Date -->
+          <td style="font-family:var(--mono);font-size:.75rem;white-space:nowrap;color:var(--text-muted)">
+            {{ log.created_at|date:"d/m/Y" }}<br>
+            <span style="font-size:.7rem">{{ log.created_at|date:"H:i:s" }}</span>
+          </td>
+
+          <!-- Utilisateur -->
+          <td>
+            {% if log.user %}
+              <span style="font-weight:600">{{ log.user.get_full_name|default:log.user.username }}</span><br>
+              <span style="font-size:.7rem;color:var(--text-muted)">{{ log.user.get_role_display }}</span>
+            {% else %}
+              <span style="color:var(--text-muted)">—</span>
+            {% endif %}
+          </td>
+
+          <!-- Action -->
+          <td>
+            <span class="pill pill-{{ log.get_action_badge }}">
+              {{ log.get_action_display }}
+            </span>
+          </td>
+
+          <!-- Niveau -->
+          <td>
+            {% if log.level == 'critical' %}
+              <span class="pill pill-danger">Critique</span>
+            {% elif log.level == 'warning' %}
+              <span class="pill pill-warning">Attention</span>
+            {% else %}
+              <span style="font-size:.75rem;color:var(--text-muted)">Info</span>
+            {% endif %}
+          </td>
+
+          <!-- Module -->
+          <td>
+            <span style="font-size:.75rem;color:var(--text-muted)">{{ log.module }}</span>
+          </td>
+
+          <!-- Objet -->
+          <td style="max-width:180px;">
+            {% if log.object_repr %}
+              {% if log.object_url %}
+                <a href="{{ log.object_url }}" style="font-size:.78rem;font-weight:600">
+                  {{ log.object_repr|truncatechars:40 }}
+                </a>
+              {% else %}
+                <span style="font-size:.78rem;font-weight:600">{{ log.object_repr|truncatechars:40 }}</span>
+              {% endif %}
+            {% else %}
+              <span style="color:var(--text-muted)">—</span>
+            {% endif %}
+          </td>
+
+          <!-- Détail + modifications -->
+          <td style="max-width:260px;">
+            {% if log.detail %}
+              <span style="font-size:.78rem">{{ log.detail }}</span>
+            {% endif %}
+            {% if log.changes %}
+              <div class="changes-wrap">
+                {% for field, vals in log.changes.items %}
+                <div>
+                  <strong>{{ field }}</strong> :
+                  <span class="change-before">{{ vals.avant }}</span>
+                  → <span class="change-after">{{ vals.apres }}</span>
+                </div>
+                {% endfor %}
+              </div>
+            {% endif %}
+            {% if not log.detail and not log.changes %}
+              <span style="color:var(--text-muted)">—</span>
+            {% endif %}
+          </td>
+
+          <!-- IP -->
+          <td style="font-family:var(--mono);font-size:.72rem;color:var(--text-muted);white-space:nowrap">
+            {{ log.ip_address|default:"—" }}
+          </td>
+
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="8">
+            <div class="empty-state">
+              <i class="bi bi-journal-x"></i>
+              Aucune entrée dans le journal.
+              {% if q or filter_action or filter_module or filter_level %}
+                <br><a href="{% url 'audit_log' %}" style="font-size:.82rem">Effacer les filtres</a>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Pagination -->
+  {% if logs.has_other_pages %}
+  <div style="padding:12px 16px;border-top:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;">
+    <span style="font-size:.78rem;color:var(--text-muted)">
+      Page {{ logs.number }} sur {{ logs.paginator.num_pages }}
+    </span>
+    <div class="d-flex gap-1">
+      {% if logs.has_previous %}
+        <a href="?{% if q %}q={{ q }}&{% endif %}{% if filter_action %}action={{ filter_action }}&{% endif %}{% if filter_module %}module={{ filter_module }}&{% endif %}{% if filter_level %}level={{ filter_level }}&{% endif %}page={{ logs.previous_page_number }}"
+           class="btn btn-sm btn-outline-secondary">
+          <i class="bi bi-chevron-left"></i>
+        </a>
+      {% endif %}
+      {% for num in logs.paginator.page_range %}
+        {% if logs.number == num %}
+          <button class="btn btn-sm btn-primary" disabled>{{ num }}</button>
+        {% elif num > logs.number|add:'-3' and num < logs.number|add:'3' %}
+          <a href="?{% if q %}q={{ q }}&{% endif %}{% if filter_action %}action={{ filter_action }}&{% endif %}{% if filter_module %}module={{ filter_module }}&{% endif %}{% if filter_level %}level={{ filter_level }}&{% endif %}page={{ num }}"
+             class="btn btn-sm btn-outline-secondary">{{ num }}</a>
+        {% endif %}
+      {% endfor %}
+      {% if logs.has_next %}
+        <a href="?{% if q %}q={{ q }}&{% endif %}{% if filter_action %}action={{ filter_action }}&{% endif %}{% if filter_module %}module={{ filter_module }}&{% endif %}{% if filter_level %}level={{ filter_level }}&{% endif %}page={{ logs.next_page_number }}"
+           class="btn btn-sm btn-outline-secondary">
+          <i class="bi bi-chevron-right"></i>
+        </a>
+      {% endif %}
+    </div>
+  </div>
+  {% endif %}
+
+</div>
+{% endblock %}

@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% block title %}Rapports — Integral{% endblock %}
+{% block topbar_title %}<i class="bi bi-file-earmark-bar-graph me-2" style="color:var(--color-primary)"></i>Exportations{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+  <h1 style="font-size:1.4rem;font-weight:800">Rapports & Exports</h1>
+  <p style="color:var(--text-muted);font-size:.83rem">Générez des preuves d'exécution en PDF ou Excel pour vos clients</p>
+</div>
+
+<div class="card">
+  <div class="card-header"><i class="bi bi-table me-2"></i>Toutes les Campagnes</div>
+  <div class="card-body p-0">
+    <table class="table mb-0">
+      <thead>
+        <tr><th>Référence</th><th>Client</th><th>Campagne</th><th>Période</th><th>Statut</th><th>Exports</th></tr>
+      </thead>
+      <tbody>
+        {% for c in campagnes %}
+        <tr>
+          <td class="mono" style="font-size:.75rem;color:var(--text-muted)">{{ c.reference }} {{ c.get_type_support_display }}</td>
+          <td style="font-weight:600">{{ c.client.nom }}</td>
+          <td><a href="{% url 'campagne_detail' c.pk %}" style="color:var(--text);text-decoration:none">{{ c.nom }}</a></td>
+          <td class="mono" style="font-size:.78rem">{{ c.date_debut|date:"d/m/Y" }} → {{ c.date_fin|date:"d/m/Y" }}</td>
+          <td><span class="badge-status bs-{{ c.statut }}">{{ c.get_statut_display }}</span></td>
+          <td>
+            <div class="d-flex gap-2">
+              <a href="{% url 'export_campagne_pdf' c.pk %}" class="btn btn-sm" style="background-color: var(--color-secondary);color: var(--color-primary);">
+                <i class="bi bi-file-pdf me-1"></i>PDF
+              </a>
+              <a href="{% url 'campagne_preview' c.pk %}" class="btn btn-sm" style="background-color: var(--color-primary);color: var(--color-secondary);">
+                <i class="bi bi-eye me-1"></i>Voir
+              </a>
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr><td colspan="6" class="text-center py-4" style="color:var(--text-muted)">Aucune campagne disponible.</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- Main courante section -->
+<div class="card mt-4">
+  <div class="card-header"><i class="bi bi-clock-history me-2"></i>Export Main Courante</div>
+  <div class="card-body">
+    <p style="color:var(--text-muted);font-size:.84rem">Exportez la timeline complète d'un écran pour une date donnée.</p>
+    <a href="{% url 'main_courante' %}" class="btn btn-outline-secondary">
+      <i class="bi bi-arrow-right me-1"></i>Aller à la Main Courante
+    </a>
+  </div>
+</div>
+{% endblock %}

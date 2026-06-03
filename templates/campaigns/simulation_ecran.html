@@ -1,0 +1,268 @@
+{% extends 'base.html' %}
+{% load duree_filters %}
+{% block title %}Simulation Campagne Écran — Integral{% endblock %}
+
+{% block topbar_title %}
+  <i class="bi bi-calculator me-2 text-primary"></i>Simulation de campagne écran
+{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+
+  {# ── FORMULAIRE ─────────────────────────────────────────────────────────── #}
+  <div class="col-12 col-lg-4">
+    <div class="card sticky-top" style="top:80px;">
+      <div class="card-header"><i class="bi bi-sliders me-2"></i>Paramètres</div>
+      <div class="card-body">
+        <form method="get" id="sim-form">
+
+          <div class="mb-3">
+            <label class="form-label">Durée du spot</label>
+            {{ form.duree_passage }}
+          </div>
+
+          <hr>
+          <p class="nav-label mb-2">Période <small class="text-muted fw-normal">(au moins un des trois)</small></p>
+
+          <div class="mb-2">
+            <label class="form-label">Date de début</label>
+            {{ form.date_debut }}
+          </div>
+          <div class="mb-2">
+            <label class="form-label">Date de fin</label>
+            {{ form.date_fin }}
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Nombre de jours</label>
+            {{ form.nb_jours }}
+            <div class="form-text">{{ form.nb_jours.help_text }}</div>
+          </div>
+
+          <hr>
+          <p class="nav-label mb-2">Diffusion <small class="text-muted fw-normal">(laisser vide pour propositions)</small></p>
+
+          <div class="mb-2">
+            <label class="form-label">Fréquence</label>
+            {{ form.frequence }}
+          </div>
+          <div class="mb-3">
+            <label class="form-label">Tranches horaires</label>
+            {{ form.tranches_horaires }}
+            <div class="form-text">{{ form.tranches_horaires.help_text }}</div>
+            {% if form.tranches_horaires.errors %}
+              <div class="text-danger small mt-1">{{ form.tranches_horaires.errors.0 }}</div>
+            {% endif %}
+          </div>
+
+          <hr>
+          <div class="mb-2">
+            <label class="form-label">Écrans ciblés</label>
+            {{ form.ecrans }}
+            <div class="form-text">{{ form.ecrans.help_text }}</div>
+          </div>
+
+          <div class="mb-3">
+            <label class="form-label">Spots souhaités <span class="text-muted fw-normal">(optionnel)</span></label>
+            {{ form.nb_spots_cible }}
+            <div class="form-text">{{ form.nb_spots_cible.help_text }}</div>
+          </div>
+
+          {% if form.non_field_errors %}
+          <div class="alert alert-danger py-2 small">{{ form.non_field_errors }}</div>
+          {% endif %}
+
+          <button type="submit" class="btn btn-primary w-100">
+            <i class="bi bi-play-fill me-1"></i>Simuler
+          </button>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  {# ── RÉSULTATS ───────────────────────────────────────────────────────────── #}
+  <div class="col-12 col-lg-8">
+
+    {# Vide #}
+    {% if not resultats and not propositions and not erreur %}
+    <div class="card">
+      <div class="card-body text-center py-5 text-muted">
+        <i class="bi bi-display" style="font-size:3rem;opacity:.25;"></i>
+        <p class="mt-3 mb-1 fw-semibold">Deux modes disponibles</p>
+        <p class="small mb-0">
+          <strong>Calcul direct</strong> — renseignez fréquence + tranches horaires.<br>
+          <strong>Propositions</strong> — renseignez un nombre de spots cible et laissez fréquence/tranches libres.
+        </p>
+      </div>
+    </div>
+
+    {# Erreur #}
+    {% elif erreur %}
+    <div class="alert alert-danger">
+      <i class="bi bi-exclamation-triangle-fill me-2"></i>{{ erreur }}
+    </div>
+
+    {# ── MODE A : calcul direct ──────────────────────────────────────────── #}
+    {% elif resultats %}
+
+    <div class="row g-3 mb-3">
+      <div class="col-6 col-md-3">
+        <div class="stat-card text-center">
+          <div class="stat-num text-primary">{{ resultats.spots_total_tous|floatformat:0 }}</div>
+          <div class="stat-lbl">Spots total</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-card text-center">
+          <div class="stat-num text-success">{{ resultats.spots_par_jour_ecran }}</div>
+          <div class="stat-lbl">Spots / jour / écran</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-card text-center">
+          <div class="stat-num text-info">{{ resultats.heures_antenne }}</div>
+          <div class="stat-lbl">Heures d'antenne</div>
+        </div>
+      </div>
+      <div class="col-6 col-md-3">
+        <div class="stat-card text-center">
+          <div class="stat-num text-secondary">{{ resultats.nb_jours }}</div>
+          <div class="stat-lbl">Jours</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-info-circle me-2"></i>Paramètres utilisés</div>
+      <div class="card-body">
+        <div class="row g-2" style="font-size:.875rem;">
+          <div class="col-6 col-md-4"><span class="text-muted">Durée spot</span><br><strong>{{ resultats.duree_passage }}s</strong></div>
+          <div class="col-6 col-md-4"><span class="text-muted">Fréquence</span><br><strong>{{ resultats.frequence_label }}</strong></div>
+          <div class="col-6 col-md-4"><span class="text-muted">Tranches</span><br><strong>{{ resultats.heures_tranches }}h/j</strong></div>
+          <div class="col-6 col-md-4"><span class="text-muted">Spots/heure/écran</span><br><strong>{{ resultats.spots_par_heure }}</strong></div>
+          <div class="col-6 col-md-4"><span class="text-muted">Spots/écran (total)</span><br><strong>{{ resultats.spots_total_ecran }}</strong></div>
+          <div class="col-6 col-md-4"><span class="text-muted">Écrans</span><br><strong>{{ resultats.nb_ecrans }}</strong></div>
+        </div>
+      </div>
+    </div>
+
+    {% if resultats.details_ecrans %}
+    <div class="card">
+      <div class="card-header"><i class="bi bi-display me-2"></i>Détail par écran</div>
+      <div class="table-responsive">
+        <table class="table mb-0">
+          <thead>
+            <tr>
+              <th>Code</th><th>Nom</th>
+              <th class="text-end">Spots/j</th><th class="text-end">Total</th>
+              <th>Occ. actuelle</th><th>Occ. après</th><th>Statut</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for d in resultats.details_ecrans %}
+            <tr>
+              <td><code>{{ d.support.code }}</code></td>
+              <td>{{ d.support.nom }}</td>
+              <td class="text-end fw-semibold">{{ d.spots_par_jour }}</td>
+              <td class="text-end fw-semibold">{{ d.spots_total }}</td>
+              <td>
+                {% if d.taux_actuel is not None %}
+                  <div class="taux-bar" style="width:90px;">
+                    <div class="taux-fill {% if d.taux_actuel >= 80 %}bg-danger{% elif d.taux_actuel >= 50 %}bg-warning{% else %}bg-success{% endif %}" style="width:{{ d.taux_actuel }}%;"></div>
+                  </div>
+                  <small class="text-muted">{{ d.taux_actuel }}%</small>
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td>
+                {% if d.taux_apres is not None %}
+                  <div class="taux-bar" style="width:90px;">
+                    <div class="taux-fill {% if d.taux_apres >= 80 %}bg-danger{% elif d.taux_apres >= 50 %}bg-warning{% else %}bg-success{% endif %}" style="width:{{ d.taux_apres }}%;"></div>
+                  </div>
+                  <small class="{% if d.taux_apres >= 100 %}text-danger fw-bold{% else %}text-muted{% endif %}">{{ d.taux_apres }}%</small>
+                {% else %}<span class="text-muted">—</span>{% endif %}
+              </td>
+              <td>
+                {% if d.peut_accueillir is None %}<span class="badge-status bs-brouillon">N/A</span>
+                {% elif d.peut_accueillir %}<span class="badge-status bs-disponible"><i class="bi bi-check-circle-fill me-1"></i>OK</span>
+                {% else %}<span class="badge-status bs-annulee" title="{{ d.message_dispo }}"><i class="bi bi-x-circle-fill me-1"></i>Saturé</span>
+                {% endif %}
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+    {% endif %}
+
+    {# ── MODE B : propositions ───────────────────────────────────────────── #}
+    {% elif propositions %}
+
+    <div class="alert alert-primary d-flex align-items-center gap-2 mb-3">
+      <i class="bi bi-lightbulb-fill"></i>
+      <span>
+        Objectif : <strong>{{ nb_spots_cible|floatformat:0 }} spots</strong> —
+        {{ nb_jours }} jours — {{ nb_ecrans }} écran{{ nb_ecrans|pluralize }} —
+        spot de {{ duree_passage }}s —
+        tolérance ±5 %
+      </span>
+    </div>
+
+    <div class="row g-3">
+      {% for p in propositions %}
+      <div class="col-12">
+        <div class="card border-{% if p.ecart_pct >= 0 %}success{% else %}info{% endif %}">
+          <div class="card-header d-flex align-items-center justify-content-between">
+            <span>
+              <span class="badge bg-primary me-2">#{{ forloop.counter }}</span>
+              <strong>{{ p.frequence_label }}</strong>
+              <span class="text-muted mx-2">—</span>
+              {{ p.tranches_label }}
+            </span>
+            <span class="badge {% if p.abs_ecart <= 1 %}bg-success{% elif p.abs_ecart <= 3 %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
+              {% if p.ecart_pct >= 0 %}+{% endif %}{{ p.ecart_pct }}%
+            </span>
+          </div>
+          <div class="card-body py-3">
+            <div class="row g-3 text-center">
+              <div class="col-4 col-md-2">
+                <div class="stat-num" style="font-size:1.4rem;">{{ p.spots_total|floatformat:0 }}</div>
+                <div class="stat-lbl">Spots total</div>
+              </div>
+              <div class="col-4 col-md-2">
+                <div class="stat-num" style="font-size:1.4rem;color:var(--color-primary);">{{ p.spots_par_jour }}</div>
+                <div class="stat-lbl">Spots/jour</div>
+              </div>
+              <div class="col-4 col-md-2">
+                <div class="stat-num" style="font-size:1.4rem;color:#0891b2;">{{ p.spots_par_jour_ecran }}</div>
+                <div class="stat-lbl">Spots/j/écran</div>
+              </div>
+              <div class="col-4 col-md-2">
+                <div class="stat-num" style="font-size:1.4rem;color:#7c3aed;">{{ p.heures_antenne|format_temps }}</div>
+                <div class="stat-lbl">H. antenne</div>
+              </div>
+              <div class="col-4 col-md-2">
+                <div class="stat-num" style="font-size:1.4rem;color:#059669;">{{ p.heures_tranches|format_temps }}</div>
+                <div class="stat-lbl">Tranches/jour</div>
+              </div>
+              <div class="col-4 col-md-2">
+                <div class="stat-num" style="font-size:1.4rem;color:#d97706;">{% widthratio p.frequence 60 1 %} min</div>
+                <div class="stat-lbl">Fréquence</div>
+              </div>
+            </div>
+            {# Bouton pour appliquer cette proposition dans le formulaire #}
+            <div class="mt-3 text-end">
+              <a href="?duree_passage={{ duree_passage }}&frequence={{ p.frequence }}&tranches_horaires={{ p.tranches_val|urlencode }}&nb_jours={{ nb_jours }}&nb_spots_cible={{ nb_spots_cible }}"
+                 class="btn btn-outline-primary btn-sm">
+                <i class="bi bi-calculator me-1"></i>Calculer en détail
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    {% endif %}
+  </div>
+</div>
+{% endblock %}

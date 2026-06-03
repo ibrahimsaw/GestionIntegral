@@ -1,0 +1,311 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ title }} — Integral{% endblock %}
+
+{% block topbar_title %}
+<i class="bi bi-megaphone me-2" style="color:var(--color-primary)"></i>{{ title }}
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-lg-12">
+
+    <!-- HEADER -->
+    <div class="d-flex align-items-center gap-3 mb-4">
+      <a href="{% url 'campagne_list' %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left"></i>
+      </a>
+      <h1 style="font-size:1.4rem;font-weight:800;margin:0">{{ title }}</h1>
+    </div>
+
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}
+    
+        <!-- BLOC DE DEBUG TEMPORAIRE -->
+        {% if form.errors %}
+        <div class="alert alert-danger">
+            <strong>Le formulaire contient des erreurs :</strong>
+            <ul>
+                {% for field in form %}
+                    {% if field.errors %}
+                        <li>{{ field.label }} : {{ field.errors|striptags }}</li>
+                    {% endif %}
+                {% endfor %}
+                {% if form.non_field_errors %}
+                    <li>{{ form.non_field_errors|striptags }}</li>
+                {% endif %}
+            </ul>
+        </div>
+        {% endif %}
+
+      <div class="card">
+
+        <div class="card-header">
+          <i class="bi bi-megaphone me-2"></i>Informations de la Campagne
+        </div>
+
+        <div class="card-body">
+          <div class="row g-3">
+
+            <!-- CLIENT -->
+            <div class="col-md-6">
+              <label class="form-label">Client *</label>
+              {{ form.client }}
+              {{ form.client.errors }}
+            </div>
+
+            <!-- NOM -->
+            <div class="col-md-6">
+              <label class="form-label">Nom de la campagne *</label>
+              {{ form.nom }}
+            </div>
+
+
+            <div class="col-md-6">
+                <label class="form-label">Date de début *</label>
+                <input type="date" name="date_debut" class="form-control" 
+                      value="{{ form.date_debut.value|date:'Y-m-d' }}">
+                {{ form.date_debut.errors }}
+            </div>
+            <div class="col-md-6">
+                <label class="form-label">Date de fin *</label>
+                <input type="date" name="date_fin" class="form-control" 
+                      value="{{ form.date_fin.value|date:'Y-m-d' }}">
+                {{ form.date_fin.errors }}
+            </div>
+
+            <!-- STATUT -->
+            <div class="col-md-6">
+              <label class="form-label">Statut</label>
+              {{ form.statut }}
+            </div>
+
+            <!-- TYPE SUPPORT -->
+            <div class="col-md-6">
+              <label class="form-label">Type de support</label>
+              {{ form.type_support }}
+            </div>
+              <div class="col-md-12 ecran-fields d-none">
+                  <label class="form-label" style="font-weight: 700; color: var(--color-primary);">Contrat associé *</label>
+                  {{ form.contrat }}
+                  {{ form.contrat.errors }}
+                  <div class="form-text">Seuls les contrats actifs du client sélectionné et couvrant la période s'affichent ici.</div>
+              </div>
+
+            <!-- CHAMPS ÉCRAN -->
+            <div class="col-md-6 ecran-fields d-none">
+              <label class="form-label">Durée de passage (secondes) *</label>
+              {{ form.duree_passage }}
+            </div>
+
+            <div class="col-md-6 ecran-fields d-none">
+              <label class="form-label">Fréquence de diffusion *</label>
+              {{ form.frequence }}
+            </div>
+
+            <div class="col-12 ecran-fields d-none">
+              <label class="form-label">Tranches horaires *</label>
+              {{ form.tranches_horaires }}
+              <div class="form-text">
+                Exemple: 08:00-12:00, 14:00-18:00
+              </div>
+            </div>
+
+            <!-- VISUELS MULTIPLES -->
+            <div class="col-md-12">
+              <label class="form-label">Visuels / Vidéos (Sélectionnez plusieurs fichiers possibles)</label>
+              
+              <!-- Zone de prévisualisation dynamique pour les nouveaux fichiers -->
+              <div id="multi-preview-container" class="d-flex flex-wrap gap-2 mb-2">
+                <!-- Les vignettes apparaîtront ici via JavaScript -->
+              </div>
+
+              <!-- Affichage des visuels existants en mode édition -->
+              {% if obj.visuels.all %}
+                <div class="mb-3">
+                  <p class="small text-muted mb-2">Visuels déjà enregistrés :</p>
+                  <div class="d-flex flex-wrap gap-2">
+                    {% for v in obj.visuels.all %}
+                      <div class="position-relative">
+                        {% if v.fichier.url|lower|slice:"-4:" == ".mp4" %}
+                          <video src="{{ v.fichier.url }}" style="height:80px;width:100px;object-fit:cover;border-radius:6px;border:1px solid #ddd;"></video>
+                        {% else %}
+                          <img src="{{ v.fichier.url }}" style="height:80px;width:100px;object-fit:cover;border-radius:6px;border:1px solid #ddd;">
+                        {% endif %}
+                      </div>
+                    {% endfor %}
+                  </div>
+                </div>
+              {% endif %}
+
+              <!-- Utilisation du nouveau nom de champ défini dans CampagneForm -->
+              {{ form.visuels_multiples }}
+              <div class="form-text">Images ou vidéos (Sélectionnez plusieurs fichiers avec Ctrl ou Maj)</div>
+              {{ form.visuels_multiples.errors }}
+            </div>
+
+            <!-- NOTES -->
+            <div class="col-12">
+              <label class="form-label">Notes</label>
+              {{ form.notes }}
+            </div>
+
+            <!-- ERREURS GLOBALES -->
+            {% for error in form.non_field_errors %}
+              <div class="col-12">
+                <div class="alert alert-danger">{{ error }}</div>
+              </div>
+            {% endfor %}
+
+          </div>
+        </div>
+
+        <!-- ACTIONS -->
+        <div class="card-body pt-0 d-flex justify-content-end gap-2">
+          <a href="{% url 'campagne_list' %}" class="btn btn-outline-secondary">Annuler</a>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-lg me-1"></i>
+            {% if obj %}Enregistrer{% else %}Créer{% endif %}
+          </button>
+        </div>
+
+      </div>
+    </form>
+
+  </div>
+</div>
+{% endblock %}
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+
+    const typeSupport = document.getElementById('id_type_support');
+    const clientSelect = document.getElementById('id_client');
+    const contratSelect = document.getElementById('id_contrat');
+    const ecranFields = document.querySelectorAll('.ecran-fields');
+
+    /* =========================
+       TOGGLE CHAMPS ECRAN
+    ========================= */
+    function toggleFields() {
+        const isEcran = typeSupport.value === 'ecran';
+        ecranFields.forEach(el => {
+            el.classList.toggle('d-none', !isEcran);
+            el.querySelectorAll('input, select, textarea').forEach(input => {
+                // On ne rend "required" que si c'est affiché
+                if(isEcran) input.setAttribute('required', 'required');
+                else input.removeAttribute('required');
+            });
+        });
+    }
+
+    if (typeSupport) {
+        typeSupport.addEventListener('change', toggleFields);
+        toggleFields();
+    }
+
+    /* =========================
+       CHARGEMENT DYNAMIQUE DES CONTRATS
+    ========================= */
+    if (clientSelect && contratSelect) {
+
+        function chargerContrats(clientId, contratActuelId = null) {
+            if (!clientId) {
+                contratSelect.innerHTML = '<option value="">--- Choisir un client d\'abord ---</option>';
+                return;
+            }
+            const dateDebut = document.querySelector('input[name="date_debut"]').value;
+            const dateFin   = document.querySelector('input[name="date_fin"]').value;
+
+            let url = `/campaigns/api/contrats-client/${clientId}/`;
+            if (dateDebut && dateFin) {
+                url += `?date_debut=${dateDebut}&date_fin=${dateFin}`;
+            }
+
+            contratSelect.innerHTML = '<option value="">Chargement...</option>';
+            contratSelect.disabled = true;
+
+            fetch(url)
+                .then(r => r.json())
+                .then(data => {
+                    contratSelect.disabled = false;
+                    if (data.length === 0) {
+                        contratSelect.innerHTML = '<option value="">--- Sélectionner le contrat ---</option>';
+                        contratSelect.innerHTML += '<option value="">Aucun contrat actif disponible</option>';
+                        return;
+                    }
+                    contratSelect.innerHTML = '<option value="">--- Sélectionner le contrat ---</option>';
+                    contratSelect.innerHTML += '<option value="">Aucun contrat</option>';
+                    data.forEach(c => {
+                        const selected = contratActuelId && c.id == contratActuelId ? 'selected' : '';
+                        contratSelect.innerHTML += `<option value="${c.id}" ${selected}>${c.nom} (${c.dates})</option>`;
+                    });
+                })
+                .catch(() => {
+                    contratSelect.disabled = false;
+                    contratSelect.innerHTML = '<option value="">Erreur de chargement</option>';
+                });
+        }
+
+        // Quand le client change
+        clientSelect.addEventListener('change', function() {
+            chargerContrats(this.value);
+        });
+
+        // Au chargement initial (mode édition — recharger le contrat déjà sélectionné)
+        const contratActuelId = contratSelect.value;
+        const clientInitialId = clientSelect.value;
+        if (clientInitialId) {
+            chargerContrats(clientInitialId, contratActuelId);
+        }
+
+        // Recharger si les dates changent
+        document.querySelector('input[name="date_debut"]').addEventListener('change', function() {
+            if (clientSelect.value) chargerContrats(clientSelect.value, contratSelect.value);
+        });
+        document.querySelector('input[name="date_fin"]').addEventListener('change', function() {
+            if (clientSelect.value) chargerContrats(clientSelect.value, contratSelect.value);
+        });
+    }
+
+/* =========================
+    PREVIEW MULTI-VISUELS
+========================= */
+const inputMulti = document.querySelector('input[name="visuels_multiples"]');
+const previewContainer = document.getElementById('multi-preview-container');
+
+if (inputMulti) {
+    inputMulti.addEventListener('change', function () {
+        previewContainer.innerHTML = ''; // On vide la preview précédente
+        
+        const files = Array.from(this.files);
+        
+        files.forEach(file => {
+            const reader = new FileReader();
+            const col = document.createElement('div');
+            col.className = "position-relative";
+            
+            reader.onload = function (e) {
+                let media;
+                if (file.type.startsWith('image/')) {
+                    media = document.createElement('img');
+                } else if (file.type.startsWith('video/')) {
+                    media = document.createElement('video');
+                    media.setAttribute('muted', 'true'); // Vidéo muette en preview
+                }
+                
+                if (media) {
+                    media.src = e.target.result;
+                    media.style = "height:100px;width:130px;object-fit:cover;border-radius:8px;border:2px solid var(--color-primary);";
+                    col.appendChild(media);
+                    previewContainer.appendChild(col);
+                }
+            }
+            reader.readAsDataURL(file);
+        });
+    });
+}
+});
+</script>
+{% endblock %}

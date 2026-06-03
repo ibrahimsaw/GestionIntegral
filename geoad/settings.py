@@ -12,11 +12,14 @@ DEBUG = True  # <--- CRITIQUE : Toujours désactiver le mode debug en production
 
 if not DEBUG:
     SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
-    # En production, spécifiez les vrais domaines ou IP de votre serveur (ex: ['geoad.votre-regie.bf'])
-    ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', '').split(',')
-    
-    # Sécurité HTTPS / SSL
-    SECURE_SSL_REDIRECT = True
+    ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'integralcarte.regies.tech').split(',')
+    CSRF_TRUSTED_ORIGINS = os.environ.get(
+        'CSRF_TRUSTED_ORIGINS',
+        'https://integralcarte.regies.tech'
+    ).split(',')
+
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+    SECURE_SSL_REDIRECT = False  # Nginx Proxy Manager gère le SSL
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
@@ -24,7 +27,12 @@ if not DEBUG:
     CSRF_COOKIE_SECURE = True
 else:
     SECRET_KEY = 'Integral-secret-key-change-in-production-2024'
-    ALLOWED_HOSTS = ['*']  # Autorise tout uniquement en développement local
+    ALLOWED_HOSTS = ['*', 'localhost', '127.0.0.1', '187.124.54.132']
+    CSRF_TRUSTED_ORIGINS = [
+        'https://integralcarte.regies.tech',
+        'http://integralcarte.regies.tech',
+        'http://187.124.54.132:8086',
+    ]
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CONFIGURATION DES APPLICATIONS
@@ -51,6 +59,7 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',

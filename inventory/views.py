@@ -34,17 +34,14 @@ class ApiGeojsonView(LoginRequiredMixin, View):
         
         if type_filtre:
             qs = qs.filter(type_support=type_filtre)  # ✅ corrigé : 'type' au lieu de 'type_support'
-            print(f"DEBUG API GeoJSON - Filtres appliqués: type={type_filtre} → {qs.count()} supports restants")
         if etat_filtre:
             qs = qs.filter(etat=etat_filtre)
-            print(f"DEBUG API GeoJSON - Filtres appliqués: etat={etat_filtre} → {qs.count()} supports restants")
         if type_panneau_filtre:
             codes_valides = [
                 code for code, label in Support.FORMAT_CHOICES 
                 if ' — ' in label and label.split(' — ')[1] == type_panneau_filtre
             ]
             qs = qs.filter(format__in=codes_valides)
-            print(f"DEBUG API GeoJSON - Filtres appliqués: type_panneau={type_panneau_filtre} → codes: {codes_valides} → {qs.count()} supports restants")
         features = []
         for s in qs:
             d = s.disponibilite_json()
@@ -131,11 +128,22 @@ class ApiSupportPopupView(LoginRequiredMixin, View):
                 ).select_related('campagne__client').first()
 
                 visuel_url = None
+                visuels_urls = []
                 if lc:
                     if lc.visuel:
                         visuel_url = lc.visuel.url
-                    elif lc.campagne.visuel:
-                        visuel_url = lc.campagne.visuel.url
+                        visuels_urls.append(lc.visuel.url)
+                    else:
+                        premier_visuel = lc.campagne.visuels.first()
+                        if premier_visuel:
+                            visuel_url = premier_visuel.fichier.url
+                    
+                    for v in lc.campagne.visuels.all():
+                        if v.fichier.url not in visuels_urls:
+                            visuels_urls.append(v.fichier.url)
+                print(f"DEBUG: Face {face.label} - Visuel URL: {visuel_url}")  # --- IGNORE ---
+                # visuel_urls
+                print(f"DEBUG: Face {face.label} - Visuels URLs: {visuels_urls}") 
 
                 faces_data.append({
                     'label':           face.label,
@@ -149,6 +157,7 @@ class ApiSupportPopupView(LoginRequiredMixin, View):
                     'date_debut':      lc.campagne.date_debut.strftime('%d/%m/%Y') if lc else None,
                     'date_fin':        lc.campagne.date_fin.strftime('%d/%m/%Y')   if lc else None,
                     'visuel_url':      visuel_url,
+                    'visuels_urls':    visuels_urls,
                 })
             data['faces'] = faces_data
 
@@ -303,7 +312,6 @@ class SupportListView(TechnicienStaffRequiredMixin, ListView):
                 if ' — ' in label and label.split(' — ')[1] == type_panneau_f
             ]
             queryset = queryset.filter(format__in=codes_valides)
-            print(f"DEBUG: Filtres SQL appliqués - type_panneau: {type_panneau_f} → codes: {codes_valides} → {queryset.count()} supports restants")
 
         if q:
             queryset = queryset.filter(
@@ -540,8 +548,6 @@ class SupportUpdateView(StaffRequiredMixin, UpdateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         support = self.object  # UpdateView définit déjà self.object
-        print(f"DEBUG: SupportUpdateView get_context_data for support {support.code} (type: {support.type_support})")
-        
         # Récupération de l'instance écran si elle existe
         ecran_instance = getattr(support, 'ecran_info', None)
         
@@ -567,11 +573,6 @@ class SupportUpdateView(StaffRequiredMixin, UpdateView):
         ecran_form = context['ecran_form']
         support = self.object
 
-        print(f"DEBUG form_valid: support.type_support = {support.type_support}")
-        print(f"DEBUG form_valid: ecran_form.is_valid() = {ecran_form.is_valid()}")
-        print(f"DEBUG form_valid: ecran_form.errors = {ecran_form.errors}")
-        print(f"DEBUG form_valid: POST data = {self.request.POST}")
-
         with transaction.atomic():
             # 1. Sauvegarde du support principal
             support = form.save()
@@ -584,7 +585,6 @@ class SupportUpdateView(StaffRequiredMixin, UpdateView):
                     e.save()
                 else:
                     # Si le formulaire écran a des erreurs, on renvoie vers form_invalid
-                    print(f"DEBUG: Écran form errors: {ecran_form.errors}")
                     return self.form_invalid(form)
             
             # 3. Cas PANNEAU : Gestion dynamique des faces
@@ -623,10 +623,7 @@ class SupportUpdateView(StaffRequiredMixin, UpdateView):
     def form_invalid(self, form):
         # On s'assure que les messages d'erreur apparaissent bien
         messages.error(self.request, "Veuillez corriger les erreurs dans le formulaire.")
-        print(f"DEBUG form_invalid: form.errors = {form.errors}")
         context = self.get_context_data()
-        if 'ecran_form' in context:
-            print(f"DEBUG form_invalid: ecran_form.errors = {context['ecran_form'].errors}")
         return super().form_invalid(form)
 
     
@@ -694,7 +691,6 @@ class MaintenanceListView(LoginRequiredMixin, ListView):
         if support_id: qs = qs.filter(support_id=support_id)
         if etat_apres: qs = qs.filter(etat_apres=etat_apres)
         if technicien:
-            print(f"DEBUG MaintenanceListView - Filtre technicien: {technicien}")
             qs = qs.filter(effectue_par_id=technicien)
 
         return qs
@@ -708,10 +704,8 @@ class MaintenanceListView(LoginRequiredMixin, ListView):
             context['techniciens'] = User.objects.filter(
                 maintenances__effectue_par=self.request.user
             ).distinct()
-            print(f"DEBUG MaintenanceListView - Technicien connecté: {self.request.user.username} → techniciens dans le filtre: {[t.username for t in context['techniciens']]}")
         else:
             context['techniciens'] = User.objects.filter(maintenances__isnull=False).distinct()
-            print(f"DEBUG MaintenanceListView - Admin connecté: {self.request.user.username} → techniciens dans le filtre: {[t for t in context['techniciens']]}")
         return context
 
 
@@ -743,14 +737,12 @@ class MaintenanceCreateView(LoginRequiredMixin, CreateView):
         initial = super().get_initial()
         # ✅ Pré-remplit le support si passé en GET (?support=9427)
         support_id = self.kwargs.get('pk')
-        print(f"DEBUG MaintenanceCreateView get_initial: support_pk={support_id}")
         if support_id:
             initial['support'] = support_id
         return initial
 
     def form_valid(self, form):
         # ✅ Si technicien → force effectue_par
-        print(f"DEBUG MaintenanceCreateView form_valid: user={self.request.user} is_technicien={self.request.user.is_technicien}")
         if self.request.user.is_technicien:
             form.instance.effectue_par = self.request.user
         response = super().form_valid(form)
@@ -758,11 +750,6 @@ class MaintenanceCreateView(LoginRequiredMixin, CreateView):
         return response
     
     def form_invalid(self, form):
-        # errors
-        print(f"DEBUG MaintenanceCreateView form_invalid: form.errors = {form.errors}")
-        # data
-        print(f"DEBUG MaintenanceCreateView form_invalid: POST data = {self.request.POST}")
-        print(f"DEBUG form_invalid data: {form.data}")
         messages.error(self.request, "Veuillez corriger les erreurs dans le formulaire.")
         return super().form_invalid(form)
 

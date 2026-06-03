@@ -224,7 +224,6 @@ def _generer_propositions(
         if tranches_fixe
         else TRANCHES_TYPIQUES
     )
-    print(f"DEBUG TRANCHES_TYPIQUES: {TRANCHES_TYPIQUES}")
 
     borne_min = nb_spots_cible * (1 - TOLERANCE)
     borne_max = nb_spots_cible * (1 + TOLERANCE)

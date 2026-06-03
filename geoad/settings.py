@@ -130,8 +130,8 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # ─────────────────────────────────────────────────────────────────────────────
 DESIGN_CONFIG = {
     # Couleurs des marqueurs carte (utilisées par Leaflet JS)
-    'COLOR_DISPONIBLE':  '#16a34a',   # Vert — support libre
-    'COLOR_OCCUPE':      '#FDDD48',   # Jaune — support sous contrat
+    'COLOR_DISPONIBLE':  "#6c757d",   # gris — support libre
+    'COLOR_OCCUPE':      '#16a34a',   # Vert — support sous contrat
     'COLOR_MAINTENANCE': '#dc2626',   # Rouge — support en panne
     'COLOR_BIENTOT':     '#7c3aed',   # Violet — campagne à venir
     # Identité visuelle de l'application (Charte Promo Pub Integral)

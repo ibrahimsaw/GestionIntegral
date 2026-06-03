@@ -246,7 +246,6 @@ class Support(models.Model):
             faces_occupees = sum(1 for face in toutes_les_faces if not face.is_disponible(date_test, date_test))
             pourcentage = (faces_occupees / total_faces) * 100
             
-            # print(f"Support {self.code} : {faces_occupees} faces occupées sur {total_faces} → taux {pourcentage}%")
             return round(pourcentage, 2)
             
         return None

@@ -144,14 +144,12 @@ class Contrat(models.Model):
     def spots_utilises(self):
         # On suppose que chaque campagne associée consomme un certain nombre de spots, à calculer
         spots_utilises = sum(c.calculer_nombre_spots() for c in self.campagnes.filter(statut__in=['en_cours', 'terminee']))
-        print(f"Spots utilisés pour le contrat {self.get_nom()} : {spots_utilises}")
         return spots_utilises
     
     # la fonction pour savoir le nombre de spots restants pourrait être ajoutée ici, en fonction des campagnes associées et de leur consommation de spots
     def spots_restants(self):
         spots_utilises = self.spots_utilises()
         spots_restants = max(self.nb_spots - spots_utilises, 0)
-        print(f"Spots restants pour le contrat {self.get_nom()} : {spots_restants}")
         return spots_restants
     
     def get_detail(self):

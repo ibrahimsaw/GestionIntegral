@@ -41,8 +41,6 @@ class GetClientContratsView(StaffRequiredMixin, View):
             }
             for c in qs
         ]
-        print(f"API GetClientContratsView: client_id={client_id}, date_debut={d1}, date_fin={d2}, contrats_found={len(data)}")
-        print(f"Contrats: {data}")
         return JsonResponse(data, safe=False)
 
 
@@ -69,7 +67,11 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
         supports = Support.objects.prefetch_related('faces').select_related('ecran_info').all()
         nb_panneaux = supports.filter(type_support=Support.TYPE_PANNEAU).count()
+        nb_panneaux_bon = supports.filter(type_support=Support.TYPE_PANNEAU, etat=Support.ETAT_BON).count()
         nb_ecrans = supports.filter(type_support=Support.TYPE_ECRAN).count()
+        nb_ecrans_bon = supports.filter(type_support=Support.TYPE_ECRAN, etat=Support.ETAT_BON).count()
+        nb_supports_panne = supports.filter(etat=Support.ETAT_PANNE).count()
+        nb_supports_bon = supports.filter(etat=Support.ETAT_BON).count()
         nb_standard = supports.filter(format__in=codes_standard).count()
         nb_geants = supports.filter(format__in=codes_geants).count()
         nb_sucettes = supports.filter(format__in=codes_sucettes).count()
@@ -102,20 +104,23 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             {'label': 'Grand Marché', 'occupe': o_gm, 'disponible': d_gm},
         ])
         types_stats_json = json.dumps([
-            {'label': 'Panneaux', 'count': nb_panneaux},
-            {'label': 'Écrans', 'count': nb_ecrans},
+            {'label': 'Panneaux', 'count': nb_panneaux_bon},
+            {'label': 'Écrans', 'count': nb_ecrans_bon},
+            {'label': 'Supports en Panne', 'count': nb_supports_panne}
         ])
 
         context.update({
             'total_supports': Support.objects.count(),
-            'supports_bon': supports.filter(etat=Support.ETAT_BON).count(),
-            'supports_panne': supports.filter(etat=Support.ETAT_PANNE).count(),
+            'supports_bon': nb_supports_bon,
+            'supports_panne': nb_supports_panne,
             'total_clients': Client.objects.filter(actif=True).count(),
             'campagnes_actives': Campagne.objects.filter(statut='en_cours').count(),
             'campagnes_a_venir': Campagne.objects.filter(statut='a_venir').count(),
             'campagnes_recentes': Campagne.objects.select_related('client').order_by('-created_at')[:8],
             'alertes': get_cached_alertes(),
             'nb_panneaux': nb_panneaux,
+            'nb_panneaux_bon': nb_panneaux_bon,
+            'nb_ecrans_bon': nb_ecrans_bon,
             'nb_ecrans': nb_ecrans,
             'nb_standard': nb_standard,
             'nb_geants': nb_geants,
@@ -537,14 +542,12 @@ class CampagneListView(ClientStaffRequiredMixin, ListView):
             #count = qs.count()
             #qs.delete()
             #messages.success(request, f"{count} campagne(s) supprimée(s).")
-            print(f"Action: {action}, Campagnes à supprimer: {qs.values_list('pk', flat=True)}")
             # fonction (Class) de suppression à implémenter (avec confirmation côté client)
             request.session['selected_campagne_ids'] = selected_ids
             return redirect('campagne_selected_delete')
         elif action == 'archiver':
             count = qs.update(actif=False)
             messages.success(request, f"{count} campagne(s) archivée(s).")
-            print(f"Action: {action}, Campagnes à archiver: {qs.values_list('pk', flat=True)}")
             pass
         else:
             messages.error(request, f"Action inconnue : {action}")

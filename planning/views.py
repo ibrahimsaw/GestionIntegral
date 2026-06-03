@@ -180,7 +180,6 @@ class PlanningCalendrierView(LoginRequiredMixin, View):
         events = []
         for c in campagnes:
             if c.client_id not in client_colors:
-                print(f"Assigning color for client {c.client_id} ({c.client.nom}) → {COLORS[color_idx % len(COLORS)]}")
                 client_colors[c.client_id] = COLORS[color_idx % len(COLORS)]
                 color_idx += 1
             color = client_colors[c.client_id]

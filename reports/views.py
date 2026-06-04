@@ -9,7 +9,6 @@ from calendar import monthrange
 from django.template.loader import render_to_string
 from dateutil.relativedelta import relativedelta
 from weasyprint import HTML
-import datetime
 import io
 from django.views import View
 
@@ -708,47 +707,8 @@ class ExportClientExcelView(ClientStaffRequiredMixin, View):
     
 # je veux construire un rapport pour tous les panneaux de leur etat actuel en fonction de leur statut et de leur ville, quartier, adresse, etc. et leur nombre de faces ocupées et libres, et les campagnes associées à chaque panneau. Je veux aussi pouvoir filtrer par ville, quartier, statut, etc.
 
-def _build_report_panneaux(client, filters):
-    panneaux = (
-        client.supports
-        .filter(type_support="panneau")
-        .select_related("ville", "quartier")
-        .prefetch_related("lignes__campagne")
-    )
 
-    if filters.get("ville"):
-        panneaux = panneaux.filter(ville__nom__icontains=filters["ville"])
-    if filters.get("quartier"):
-        panneaux = panneaux.filter(quartier__nom__icontains=filters["quartier"])
-    if filters.get("statut"):
-        panneaux = panneaux.filter(statut=filters["statut"])
 
-    report_data = []
-    for panneau in panneaux:
-        faces_occupees = sum(1 for l in panneau.lignes.all() if l.campagne and l.campagne.statut == "en_cours")
-        faces_libres   = sum(1 for l in panneau.lignes.all() if not (l.campagne and l.campagne.statut == "en_cours"))
-        campagnes_associees = {l.campagne for l in panneau.lignes.all() if l.campagne}
 
-        report_data.append({
-            "code": panneau.code,
-            "nom": panneau.nom,
-            "ville": panneau.ville.nom if panneau.ville else "",
-            "quartier": panneau.quartier.nom if panneau.quartier else "",
-            "adresse": panneau.adresse,
-            "statut": panneau.get_statut_display(),
-            "faces_occupees": faces_occupees,
-            "faces_libres": faces_libres,
-            "campagnes_associees": campagnes_associees,
-        })
 
-    return report_data
 
-class ReportPanneauxView(ClientStaffRequiredMixin, View):
-    def get(self, request):
-        filters = {
-            "ville": request.GET.get("ville", ""),
-            "quartier": request.GET.get("quartier", ""),
-            "statut": request.GET.get("statut", ""),
-        }
-        report_data = _build_report_panneaux(request.user.client_profile, filters)
-        return render(request, "reports/report_panneaux.html", {"report_data": report_data, "filters": filters})

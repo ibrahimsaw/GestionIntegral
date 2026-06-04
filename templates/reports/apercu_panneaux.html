@@ -1,0 +1,108 @@
+{% extends 'base.html' %}
+{% block title %}État des Panneaux — Integral{% endblock %}
+
+{% block topbar_title %}
+    <i class="bi bi-layout-three-columns me-2" style="color:var(--color-primary)"></i>Exportations
+{% endblock %}
+
+{% block topbar_actions %}
+<div class="btn-group" role="group">
+    <a href="{% url 'panneaux_export_pdf' %}?{{ request.GET.urlencode }}"
+       class="btn btn-primary btn-sm">
+        <i class="bi bi-file-earmark-pdf me-2"></i>PDF
+    </a>
+    <a href="{% url 'panneaux_export_excel' %}?{{ request.GET.urlencode }}"
+       class="btn btn-success btn-sm">
+        <i class="bi bi-file-earmark-spreadsheet me-2"></i>Excel
+    </a>
+</div>
+{% endblock %}
+
+{% block content %}
+{% comment %} 
+{# ══════════════════════════════════════════
+   FILTRES — uniquement dans l'aperçu web
+════════════════════════════════════════════ #} {% endcomment %}
+<div class="card shadow-sm mb-4">
+    <div class="card-header fw-semibold d-flex align-items-center gap-2">
+        <i class="bi bi-funnel" style="color:var(--color-primary)"></i>Filtres
+    </div>
+    <div class="card-body">
+        <form method="get" class="row g-3 align-items-end">
+
+            <div class="col-12 col-sm-6 col-md-4 col-lg-2">
+                <label class="form-label small fw-semibold mb-1">Ville</label>
+                <select name="ville" class="form-select form-select-sm">
+                    <option value="">— Toutes —</option>
+                    {% for v in villes %}
+                    <option value="{{ v }}" {% if filters.ville == v %}selected{% endif %}>{{ v }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-12 col-sm-6 col-md-4 col-lg-2">
+                <label class="form-label small fw-semibold mb-1">Quartier</label>
+                <select name="quartier" class="form-select form-select-sm">
+                    <option value="">— Tous —</option>
+                    {% for q in quartiers %}
+                    <option value="{{ q }}" {% if filters.quartier == q %}selected{% endif %}>{{ q }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-12 col-sm-6 col-md-4 col-lg-1">
+                <label class="form-label small fw-semibold mb-1">Statut</label>
+                <select name="statut" class="form-select form-select-sm">
+                    <option value="">— Tous —</option>
+                    {% for s in statuts %}
+                    <option value="{{ s }}" {% if filters.statut == s %}selected{% endif %}>{{ s }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-12 col-sm-6 col-md-4 col-lg-1">
+                <label class="form-label small fw-semibold mb-1">Occupation</label>
+                <select name="occupation" class="form-select form-select-sm">
+                    <option value="">— Toutes —</option>
+                    {% for key, label in occupation_choices.items %}
+                    <option value="{{ key }}" {% if filters.occupation == key %}selected{% endif %}>{{ label }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-12 col-sm-6 col-md-4 col-lg-2">
+                <label class="form-label small fw-semibold mb-1">Client</label>
+                <select name="client_pk" class="form-select form-select-sm">
+                    <option value="">— Tous —</option>
+                    {% for c in clients %}
+                    <option value="{{ c.pk }}" {% if filters.client_pk == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.nom }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="col-12 col-sm-6 col-md-4 col-lg-2">
+                <label class="form-label small fw-semibold mb-1">Recherche</label>
+                <input type="text" name="q" value="{{ filters.q }}"
+                       class="form-control form-control-sm"
+                       placeholder="Nom, code, adresse…">
+            </div>
+
+            <div class="col-12 col-sm-6 col-md-4 col-lg-2 d-flex gap-2">
+                <button type="submit" class="btn btn-primary btn-sm">
+                    <i class="bi bi-search me-1"></i>Filtrer
+                </button>
+                <a href="{% url 'panneaux_report' %}" class="btn btn-outline-secondary btn-sm">
+                    <i class="bi bi-x-circle me-1"></i>Réinitialiser
+                </a>
+            </div>
+
+        </form>
+    </div>
+</div>
+
+{% comment %} {# ══════════════════════════════════════════
+   CONTENU — même rendu que le PDF
+════════════════════════════════════════════ #} {% endcomment %}
+{% include 'reports/panneaux_report_pdf.html' %}
+
+{% endblock %}

@@ -1,0 +1,370 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <style>
+        :root {
+            --color-disponible:  {{ DESIGN.COLOR_DISPONIBLE }};
+            --color-occupe:      {{ DESIGN.COLOR_OCCUPE }};
+            --color-maintenance: {{ DESIGN.COLOR_MAINTENANCE }};
+            --color-primary:     {{ DESIGN.COLOR_PRIMARY }};
+            --color-secondary:   {{ DESIGN.COLOR_SECONDARY }};
+            --color-noir:        {{ DESIGN.COLOR_NOIR }};
+            --bg:       #f1f5f9;
+            --bg-card:  #ffffff;
+            --bg-card2: #f8fafc;
+            --border:   #e2e8f0;
+            --text:     #1e293b;
+            --text-muted: #64748b;
+            --radius:    8px;
+        }
+
+        @page {
+            size: A4 landscape;
+            margin: 1.5cm 1cm;
+            @bottom-center {
+                content: "Document généré le {{ today }} — Page " counter(page) " / " counter(pages);
+                font-family: Arial, sans-serif;
+                font-size: 7pt;
+                color: #64748b;
+            }
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: Arial, sans-serif;
+            font-size: 8pt;
+            color: var(--text);
+            background: #fff;
+        }
+
+        /* ── Filigrane ── */
+        .watermarked-card::before {
+            content: "";
+            position: fixed;
+            top: 50%; left: 50%;
+            transform: translate(-50%, -50%) rotate(-15deg);
+            width: 500px; height: 500px;
+            background-image: url("{% static 'img/logo.png' %}");
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            opacity: 0.4;
+            z-index: 1000;
+            pointer-events: none;
+        }
+
+        /* ── En-tête ── */
+        .doc-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 14px;
+            padding-bottom: 10px;
+            border-bottom: 3px solid var(--color-primary);
+            position: relative; z-index: 10;
+        }
+        .doc-header-logo { margin-right: 14px; display: flex; align-items: center; }
+        .doc-logo        { height: 55px; width: auto; object-fit: contain; }
+        .doc-header-center { flex: 1; text-align: center; }
+        .doc-brand {
+            font-size: 7pt; font-weight: bold; color: var(--text-muted);
+            letter-spacing: 1px; text-transform: uppercase; margin-bottom: 3px;
+        }
+        .doc-title {
+            font-size: 15pt; font-weight: bold;
+            color: var(--color-primary); text-transform: uppercase; line-height: 1.2;
+        }
+        .doc-meta { font-size: 7.5pt; color: var(--text-muted); margin-top: 4px; }
+        .doc-meta strong { color: var(--color-primary); }
+        .doc-header-right {
+            text-align: right; font-size: 7.5pt;
+            color: var(--text-muted); line-height: 1.6;
+        }
+
+        /* ── Filtres actifs ── */
+        .filters-bar {
+            display: flex; flex-wrap: wrap; gap: 5px;
+            margin-bottom: 10px; position: relative; z-index: 10;
+        }
+        .filter-tag {
+            background: var(--bg-card2); border: 0.5px solid var(--border);
+            border-radius: 3px; padding: 2px 7px;
+            font-size: 7pt; color: var(--text-muted);
+        }
+        .filter-tag strong { color: var(--color-primary); }
+
+        /* ── Bandeau section ── */
+        .section-header {
+            display: flex; align-items: center; justify-content: center;
+            margin: 14px 0 8px 0;
+            background: var(--color-primary);
+            border-radius: 4px; padding: 7px 14px;
+            position: relative; z-index: 10;
+            page-break-inside: avoid;
+        }
+        .section-header::before,
+        .section-header::after { content: "◆"; color: var(--color-secondary); font-size: 9pt; margin: 0 10px; }
+        .section-title {
+            font-size: 11pt; font-weight: bold;
+            color: #fff; text-transform: uppercase; letter-spacing: 2px;
+        }
+
+        /* ── KPI ── */
+        .kpi-row {
+            display: flex; gap: 8px; margin-bottom: 12px;
+            position: relative; z-index: 10;
+        }
+        .kpi-box {
+            flex: 1; min-width: 3cm;
+            background: var(--bg-card2); border: 0.5px solid var(--border);
+            border-radius: var(--radius); padding: 8px 10px; text-align: center;
+        }
+        .kpi-box.primary  { border: 3px solid var(--color-primary); }
+        .kpi-box.success  { border: 3px solid #16a34a; }
+        .kpi-box.warning  { border: 3px solid #f59e0b; }
+        .kpi-box.occupe   { border: 3px solid var(--color-occupe); }
+        .kpi-label {
+            font-size: 6.5pt; color: var(--text-muted);
+            text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px;
+        }
+        .kpi-val { font-size: 18pt; font-weight: bold; }
+        .kpi-box.primary .kpi-val { color: var(--color-primary); }
+        .kpi-box.success  .kpi-val { color: #16a34a; }
+        .kpi-box.warning  .kpi-val { color: #f59e0b; }
+        .kpi-box.occupe   .kpi-val { color: var(--color-occupe); }
+
+        /* ── Tableau ── */
+        table {
+            width: 100%; border-collapse: collapse;
+            table-layout: fixed;
+            position: relative; z-index: 10;
+        }
+
+        col.c-code     { width: 1.8cm; }
+        col.c-nom      { width: 10cm; }
+        col.c-ville    { width: 2.2cm; }
+        col.c-quartier { width: 2.2cm; }
+        col.c-adresse  { width: 4cm;   }
+        col.c-statut   { width: 2cm;   }
+        col.c-detail   { width: auto;  }
+
+        thead tr th {
+            background-color: var(--color-primary); color: #fff;
+            font-size: 7.5pt; font-weight: bold;
+            text-align: center; padding: 6px 4px;
+            border: 0.5px solid rgba(255,255,255,0.15);
+        }
+        thead tr th.left { text-align: left; padding-left: 6px; }
+        thead { display: table-header-group; }
+
+        tbody tr td {
+            padding: 4px 3px;
+            border: 0.5px solid var(--border);
+            vertical-align: middle; text-align: center;
+        }
+        tbody tr td.left { text-align: left; padding-left: 6px; }
+
+        tbody tr.row-data:nth-child(even) { background-color: var(--bg-card2); }
+        tbody tr.row-data:nth-child(odd)  { background-color: #ffffff; }
+
+        /* ── Badges ── */
+        .badge {
+            display: inline-block; font-size: 6.5pt; font-weight: bold;
+            border-radius: 3px; padding: 1px 5px;
+            text-transform: uppercase; letter-spacing: 0.3px;
+        }
+        .badge-libre       { background: #dcfce7; color: #166534; }
+        .badge-occupe      { background: #fff3cd; color: #856404; }
+        .badge-complet     { background: #fee2e2; color: #991b1b; }
+        .badge-actif       { background: #dcfce7; color: #166534; }
+        .badge-inactif     { background: #f1f5f9; color: #475569; }
+        .badge-maintenance { background: #fef9c3; color: #854d0e; }
+        .badge-bon         { background: #dcfce7; color: #166534; }
+        .badge-panne       { background: #fee2e2; color: #991b1b; }
+
+        /* ── Faces ── */
+        .faces-list {
+            display: flex;
+            flex-direction: row;
+            gap: 5px;
+        }
+        .face-tag {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 6.5pt;
+            font-weight: bold;
+            border-radius: 3px;
+            padding: 3px 6px;
+            width: 100%;
+        }
+        .face-tag.libre  {
+            background: #dcfce7;
+            color: #166534;
+        }
+        .face-tag.occupe {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .face-tag input[type="checkbox"] {
+            width: 11px;
+            height: 11px;
+            accent-color: #166534;
+            flex-shrink: 0;
+        }
+
+        /* ── Totaux ── */
+        tfoot td {
+            background: var(--bg); font-weight: bold;
+            font-size: 8.5pt; color: var(--color-primary);
+            border-top: 2px solid var(--color-primary);
+            padding: 5px 4px;
+        }
+
+        /* ── Pied de page ── */
+        .doc-footer {
+            margin-top: 12px; text-align: center;
+            font-size: 7pt; color: var(--text-muted);
+            position: relative; z-index: 10;
+        }
+    </style>
+</head>
+<body class="watermarked-card">
+
+<!-- ══════════════════════ EN-TÊTE ══════════════════════ -->
+<div class="doc-header">
+    <div class="doc-header-logo">
+        <img src="{% static 'img/logo.png' %}" alt="Logo" class="doc-logo">
+    </div>
+    <div class="doc-header-center">
+        <div class="doc-brand">Integral — Régie Publicitaire</div>
+        <div class="doc-title">État des Panneaux</div>
+        <div class="doc-meta">Rapport au <strong>{{ today|date:"d/m/Y" }}</strong></div>
+    </div>
+    <div class="doc-header-right">
+        Généré le {{ today|date:"d/m/Y" }}<br>
+        {% if filters.ville %}    <strong>Ville :</strong> {{ filters.ville }}<br>{% endif %}
+        {% if filters.quartier %} <strong>Quartier :</strong> {{ filters.quartier }}<br>{% endif %}
+        {% if filters.statut %}   <strong>Statut :</strong> {{ filters.statut }}<br>{% endif %}
+    </div>
+</div>
+
+<!-- ══════════════════════ FILTRES ACTIFS ══════════════════════ -->
+{% with f=filters %}
+{% if f.ville or f.quartier or f.statut or f.occupation or f.q %}
+<div class="filters-bar">
+    <span class="filter-tag">Filtres actifs :</span>
+    {% if f.ville      %}<span class="filter-tag"><strong>Ville :</strong> {{ f.ville }}</span>{% endif %}
+    {% if f.quartier   %}<span class="filter-tag"><strong>Quartier :</strong> {{ f.quartier }}</span>{% endif %}
+    {% if f.statut     %}<span class="filter-tag"><strong>Statut :</strong> {{ f.statut }}</span>{% endif %}
+    {% if f.occupation %}<span class="filter-tag"><strong>Occupation :</strong> {{ f.occupation }}</span>{% endif %}
+    {% if f.q          %}<span class="filter-tag"><strong>Recherche :</strong> {{ f.q }}</span>{% endif %}
+</div>
+{% endif %}
+{% endwith %}
+
+<!-- ══════════════════════ KPI ══════════════════════ -->
+<div class="kpi-row">
+    <div class="kpi-box primary">
+        <div class="kpi-label">Panneaux</div>
+        <div class="kpi-val">{{ total_panneaux }}</div>
+    </div>
+    <div class="kpi-box primary">
+        <div class="kpi-label">Faces totales</div>
+        <div class="kpi-val">{{ total_faces }}</div>
+    </div>
+    <div class="kpi-box success">
+        <div class="kpi-label">Faces libres</div>
+        <div class="kpi-val">{{ total_libres }}</div>
+    </div>
+    <div class="kpi-box warning">
+        <div class="kpi-label">Faces occupées</div>
+        <div class="kpi-val">{{ total_occupees }}</div>
+    </div>
+</div>
+
+<!-- ══════════════════════ SECTION ══════════════════════ -->
+<div class="section-header">
+    <span class="section-title">Inventaire des Panneaux</span>
+</div>
+
+<!-- ══════════════════════ TABLEAU ══════════════════════ -->
+<table>
+    <colgroup>
+        <col class="c-code">
+        <col class="c-nom">
+        <col class="c-ville">
+        <col class="c-quartier">
+        <col class="c-adresse">
+        <col class="c-statut">
+        <col class="c-detail">
+    </colgroup>
+    <thead>
+        <tr>
+            <th>CODE</th>
+            <th class="left">NOM</th>
+            <th>VILLE</th>
+            <th>QUARTIER</th>
+            <th class="left">ADRESSE</th>
+            <th>STATUT</th>
+            <th class="left">FACES</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for panneau in panneaux %}
+        <tr class="row-data">
+            <td><strong>{{ panneau.code }}</strong></td>
+            <td class="left">{{ panneau.nom }}</td>
+            <td>{{ panneau.ville|default:"—" }}</td>
+            <td>{{ panneau.quartier|default:"—" }}</td>
+            <td class="left" style="font-size:7pt;">{{ panneau.adresse|default:"—" }}</td>
+            <td>
+                <span class="badge badge-{{ panneau.etat_raw|default:'inactif' }}">
+                    {{ panneau.statut|default:"—" }}
+                </span>
+            </td>
+            <td class="left">
+              {% if panneau.statut == "Bon état" %}
+                <div class="faces-list">
+                {% for face_data in panneau.faces %}
+                    {% if face_data.occupee %}
+                        {% for camp in face_data.campagnes %}
+                        <span class="face-tag occupe">
+                            {{ face_data.label }} — {{ camp.client.nom }}
+                        </span>
+                        {% endfor %}
+                    {% else %}
+                        <span class="face-tag libre">
+                            <input type="checkbox">
+                            Face {{ face_data.label }}
+                        </span>
+                    {% endif %}
+                {% empty %}
+                    <span style="color:var(--text-muted);">—</span>
+                {% endfor %}
+                </div>
+              {% else %}
+                <span class="face-tag inactif">Inactif</span>
+              {% endif %}
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="7" style="text-align:center; color:var(--text-muted); padding:14px; font-style:italic;">
+                Aucun panneau trouvé.
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<!-- ══════════════════════ PIED DE PAGE ══════════════════════ -->
+<div class="doc-footer">
+    Document confidentiel — État des panneaux au {{ today|date:"d/m/Y" }}
+</div>
+
+</body>
+</html>

@@ -26,6 +26,21 @@
 
     <form method="post" enctype="multipart/form-data">
       {% csrf_token %}
+              {% if form.errors %}
+        <div class="alert alert-danger">
+            <strong>Le formulaire contient des erreurs :</strong>
+            <ul>
+                {% for field in form %}
+                    {% if field.errors %}
+                        <li>{{ field.label }} : {{ field.errors|striptags }}</li>
+                    {% endif %}
+                {% endfor %}
+                {% if form.non_field_errors %}
+                    <li>{{ form.non_field_errors|striptags }}</li>
+                {% endif %}
+            </ul>
+        </div>
+        {% endif %}
 
       {# ✅ Champs cachés pour les valeurs disabled #}
       <input type="hidden" name="effectue_par" value="{{ request.user.pk }}">
@@ -46,6 +61,18 @@
               {{ form.support }}
               {% if form.support.errors %}
                 <div class="text-danger" style="font-size:.75rem">{{ form.support.errors }}</div>
+              {% endif %}
+            </div>
+
+            <!-- Face -->
+            <div class="col-md-6">
+              <label class="form-label"><i class="bi bi-card-list me-1"></i>Face</label>
+              {{ form.face }}
+              <div style="font-size:.72rem;color:var(--text-muted);margin-top:4px">
+                Choisissez la face du panneau si la maintenance concerne uniquement une face.
+              </div>
+              {% if form.face.errors %}
+                <div class="text-danger" style="font-size:.75rem">{{ form.face.errors }}</div>
               {% endif %}
             </div>
 
@@ -135,20 +162,75 @@
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {
+
+    // ── Prévisualisation photo ────────────────────────────────────────
     const photoInput = document.querySelector('input[type="file"][name="photo"]');
     const previewImg = document.getElementById('image-preview');
-    if (!photoInput || !previewImg) return;
-    photoInput.addEventListener('change', function () {
-        const file = this.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = function (e) {
-                previewImg.src = e.target.result;
-                previewImg.classList.remove('d-none');
-            };
-            reader.readAsDataURL(file);
-        }
+    if (photoInput && previewImg) {
+        photoInput.addEventListener('change', function () {
+            const file = this.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = e => {
+                    previewImg.src = e.target.result;
+                    previewImg.classList.remove('d-none');
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    }
+
+    // ── Chargement dynamique des faces ───────────────────────────────
+    const supportSelect = document.querySelector('select[name="support"]');
+    const faceSelect    = document.querySelector('select[name="face"]');
+
+    if (!supportSelect || !faceSelect) return;
+
+    function chargerFaces(supportId, faceSelectionnee = null) {
+        // Réinitialiser
+        faceSelect.innerHTML = '<option value="">---------</option>';
+        faceSelect.disabled = true;
+
+        if (!supportId) return;
+
+        fetch(`/inventory/api/faces/${supportId}/`)
+            .then(r => r.json())
+            .then(data => {
+                if (data.faces.length === 0) {
+                    // Écran numérique → pas de face
+                    faceSelect.disabled = true;
+                    return;
+                }
+                data.faces.forEach(face => {
+                    const opt = document.createElement('option');
+                    opt.value = face.id;
+                    opt.textContent = `Face ${face.label}`;
+                    if (faceSelectionnee && face.id == faceSelectionnee) {
+                        opt.selected = true;
+                    }
+                    faceSelect.appendChild(opt);
+                });
+                faceSelect.disabled = false;
+            })
+            .catch(() => {
+                faceSelect.disabled = true;
+            });
+    }
+
+    // Au changement de support
+    supportSelect.addEventListener('change', function () {
+        chargerFaces(this.value);
     });
+
+    // Au chargement initial (mode édition — support déjà sélectionné)
+    const supportInitial = supportSelect.value;
+    const faceInitiale   = faceSelect.value;  // valeur déjà sélectionnée en édition
+    if (supportInitial) {
+        chargerFaces(supportInitial, faceInitiale);
+    } else {
+        faceSelect.disabled = true;
+    }
+
 });
 </script>
 {% endblock %}

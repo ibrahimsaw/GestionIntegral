@@ -159,13 +159,13 @@ class EcranNumeriqueForm(forms.ModelForm):
 
 from django import forms
 from django.contrib.auth import get_user_model
-from .models import Maintenance, Support
+from .models import Maintenance, Support, FacePanneau
 
 
 class MaintenanceForm(forms.ModelForm):
     class Meta:
         model  = Maintenance
-        fields = ['support', 'effectue_par', 'date_intervention', 'etat_apres', 'description', 'photo']
+        fields = ['support', 'face', 'effectue_par', 'date_intervention', 'etat_apres', 'description', 'photo']
         widgets = {
             'support'           : forms.Select(attrs={'class': 'form-select'}),
             'effectue_par'      : forms.Select(attrs={'class': 'form-select'}),
@@ -173,11 +173,13 @@ class MaintenanceForm(forms.ModelForm):
                 attrs={'class': 'form-control', 'type': 'datetime-local'},
                 format='%Y-%m-%dT%H:%M'
             ),
+            'face'        : forms.Select(attrs={'class': 'form-select'}),
             'etat_apres'  : forms.Select(attrs={'class': 'form-select'}),
             'description' : forms.Textarea(attrs={'class': 'form-control', 'rows': 4}),
             'photo'       : forms.ClearableFileInput(attrs={'class': 'form-control'}),
         }
         labels = {
+            'face'        : 'Face (panneau)',
             'support'           : 'Support',
             'effectue_par'      : 'Technicien',
             'date_intervention' : "Date d'intervention",
@@ -185,6 +187,29 @@ class MaintenanceForm(forms.ModelForm):
             'description'       : 'Description',
             'photo'             : 'Photo',
         }
+    
+    def clean(self):
+        cleaned_data = super().clean()
+        face    = cleaned_data.get('face')
+        support = cleaned_data.get('support')
+
+        # Support disabled → récupéré depuis le POST caché ou la face
+        if not support:
+            support_id = self.data.get('support') or self.instance.support_id
+            if not support_id and face:
+                support_id = face.support_id
+            if support_id:
+                from inventory.models import Support
+                support = Support.objects.filter(pk=support_id).first()
+                if support:
+                    cleaned_data['support'] = support
+                    self.instance.support_id = support.pk
+
+        if face and support:
+            if face.support_id != support.pk:
+                self.add_error('face', "La face doit appartenir au support sélectionné.")
+
+        return cleaned_data
 
     def __init__(self, *args, **kwargs):
         user       = kwargs.pop('user', None)
@@ -195,20 +220,39 @@ class MaintenanceForm(forms.ModelForm):
             self.initial['date_intervention'] = self.instance.date_intervention.strftime('%Y-%m-%dT%H:%M')
 
         self.fields['support'].queryset = Support.objects.filter(actif=True).order_by('code')
-
         self.fields['effectue_par'].queryset = get_user_model().objects.filter(
             role__in=['technicien', 'admin']
         ).order_by('first_name', 'last_name')
 
-        # ✅ Support pré-sélectionné et grisé
+        # ── Résolution du support_id actif ───────────────────────────────
+        # Priorité : support_pk (URL) > données POST > instance existante
+        active_support_id = None
+
+        if support_pk:
+            active_support_id = support_pk
+        elif self.data.get('support'):          # soumission POST
+            active_support_id = self.data.get('support')
+        elif self.instance.pk and self.instance.support_id:
+            active_support_id = self.instance.support_id
+
+        # ── Queryset faces ────────────────────────────────────────────────
+        if active_support_id:
+            self.fields['face'].queryset = FacePanneau.objects.filter(
+                support_id=active_support_id
+            ).order_by('label')
+        else:
+            self.fields['face'].queryset = FacePanneau.objects.none()
+
+        # ── Support fixe (passé en URL) ───────────────────────────────────
         if support_pk:
             self.initial['support']                         = support_pk
             self.fields['support'].initial                  = support_pk
             self.fields['support'].widget.attrs['class']    = 'form-select bg-light text-muted'
             self.fields['support'].widget.attrs['disabled'] = 'disabled'
             self.fields['support'].required                 = False
+            self.instance.support_id                        = support_pk
 
-        # ✅ Technicien = user connecté, grisé
+        # ── Technicien connecté ───────────────────────────────────────────
         if user:
             self.initial['effectue_par']                         = user
             self.fields['effectue_par'].initial                  = user

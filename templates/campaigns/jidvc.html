@@ -1,0 +1,129 @@
+{% if page == "Modification" %}
+  <!-- Desktop -->
+  <ul class="nav nav-pills mb-3 nav-fill d-none d-sm-flex" role="tablist">
+    <li class="nav-item" style="max-width: 300px; margin: 0 auto;">
+      <p class="nav-link active d-flex justify-content-center align-items-center gap-2">
+        <i class="tf-icons bx bx-book"></i>
+        <span>{{ role_utilisateur }}</span>
+      </p>
+    </li>
+  </ul>
+{% else %}
+  <!-- Liste des utilisateurs (desktop) -->
+  <ul class="nav nav-pills mb-3 nav-fill d-none d-sm-flex" role="tablist">
+    {% if page == "Liste" %}
+      <li class="nav-item">
+        <a class="nav-link {% if role_utilisateur == 'Utilisateur' %}active{% endif %}" href="{% url 'utilisateur:utilisateur_list' 'utilisateur' %}">
+          <i class="tf-icons bx bx-cog"></i> Utilisateurs
+        </a>
+      </li>
+    {% endif %}
+    <li class="nav-item">
+      <a class="nav-link {% if role_utilisateur == 'Administrateur Système' %}active{% endif %}"
+         href="{% if page == 'Liste' %}{% url 'utilisateur:utilisateur_list' 'admin' %}{% else %}{% url 'utilisateur:utilisateur_create' 'admin' %}{% endif %}">
+        <i class="tf-icons bx bx-cog"></i> Administrateur Système
+      </a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if role_utilisateur == "Agent d'Administration" %}active{% endif %}"
+         href="{% if page == 'Liste' %}{% url 'utilisateur:utilisateur_list' 'agent' %}{% else %}{% url 'utilisateur:utilisateur_create' 'agent' %}{% endif %}">
+        <i class="tf-icons bx bx-notepad"></i>&nbsp;Agent Administratif
+      </a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if role_utilisateur == 'Enseignant' %}active{% endif %}"
+         href="{% if page == 'Liste' %}{% url 'utilisateur:utilisateur_list' 'enseignant' %}{% else %}{% url 'utilisateur:utilisateur_create' 'enseignant' %}{% endif %}">
+        <i class="tf-icons bx bx-chalkboard"></i> Enseignant
+      </a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if role_utilisateur == 'Étudiant' %}active{% endif %}"
+         href="{% if page == 'Liste' %}{% url 'utilisateur:utilisateur_list' 'etudiant' %}{% else %}{% url 'utilisateur:utilisateur_create' 'etudiant' %}{% endif %}">
+        <i class="tf-icons bx bx-book"></i> Étudiant
+      </a>
+    </li>
+    <li class="nav-item">
+      <a class="nav-link {% if role_utilisateur == "Parent d'étudiant" %}active{% endif %}"
+         href="{% if page == 'Liste' %}{% url 'utilisateur:utilisateur_list' 'parent' %}{% else %}{% url 'utilisateur:utilisateur_create' 'parent' %}{% endif %}">
+        <i class="tf-icons bx bx-user"></i> Parent
+      </a>
+    </li>
+  </ul>
+<style>
+/* Style du select */
+#roleSelect {
+  color: white;           /* texte blanc pour l'élément sélectionné */
+  background-color: #696cff; /* fond bleu pour l'élément sélectionné */
+  padding-left: 2rem;     /* pour laisser la place à l'icône */
+}
+
+/* Liste déroulante (options) */
+#roleSelect option {
+  color: #000;            /* texte noir dans le menu déroulant */
+  background-color: #fff; /* fond blanc dans le menu déroulant */
+}
+</style>
+
+<div class="d-sm-none mb-3 position-relative">
+  <!-- Icône dynamique -->
+  <i id="roleIcon" class="tf-icons bx bx-user position-absolute"
+     style="left: 10px; top: 50%; transform: translateY(-50%); color: #0d6efd;"></i>
+
+  <select class="form-select ps-5 nav-link active" id="roleSelect" onchange="updateRoleIcon(); location = this.value;">
+    <option value="" disabled {% if not role_utilisateur %}selected{% endif %}>Choisissez un rôle</option>
+    {% if page == "Liste" %}
+      <option value="{% url 'utilisateur:utilisateur_list' 'utilisateur' %}" {% if role_utilisateur == 'Utilisateur' %}selected{% endif %}>Utilisateur</option>
+    {% endif %}
+    <option value="{% if page == 'Liste' %}{% url 'utilisateur:utilisateur_list' 'admin' %}{% else %}{% url 'utilisateur:utilisateur_create' 'admin' %}{% endif %}" {% if role_utilisateur == 'Administrateur Système' %}selected{% endif %}>Administrateur Système</option>
+    <option value="{% if page == 'Liste' %}{% url 'utilisateur:utilisateur_list' 'agent' %}{% else %}{% url 'utilisateur:utilisateur_create' 'agent' %}{% endif %}" {% if role_utilisateur == "Agent d'Administration" %}selected{% endif %}>Agent Administratif</option>
+    <option value="{% if page == 'Liste' %}{% url 'utilisateur:utilisateur_list' 'enseignant' %}{% else %}{% url 'utilisateur:utilisateur_create' 'enseignant' %}{% endif %}" {% if role_utilisateur == 'Enseignant' %}selected{% endif %}>Enseignant</option>
+    <option value="{% if page == 'Liste' %}{% url 'utilisateur:utilisateur_list' 'etudiant' %}{% else %}{% url 'utilisateur:utilisateur_create' 'etudiant' %}{% endif %}" {% if role_utilisateur == 'Étudiant' %}selected{% endif %}>Étudiant</option>
+    <option value="{% if page == 'Liste' %}{% url 'utilisateur:utilisateur_list' 'parent' %}{% else %}{% url 'utilisateur:utilisateur_create' 'parent' %}{% endif %}" {% if role_utilisateur == "Parent d'étudiant" %}selected{% endif %}>Parent</option>
+  </select>
+</div>
+
+<script>
+function updateRoleIcon() {
+  const select = document.getElementById('roleSelect');
+  const icon = document.getElementById('roleIcon');
+  const value = select.options[select.selectedIndex].text;
+
+  // Remise à zéro
+  icon.className = 'tf-icons position-absolute';
+  icon.style.color = '#fff';
+  icon.style.left = '10px';
+  icon.style.top = '50%';
+  icon.style.transform = 'translateY(-50%)';
+
+  // Définir l'icône selon le rôle
+  switch(value) {
+    case 'Utilisateur':
+      icon.classList.add('bx', 'bx-cog');
+      break;
+    case 'Administrateur Système':
+      icon.classList.add('bx', 'bx-cog');
+      break;
+    case 'Agent Administratif':
+      icon.classList.add('bx', 'bx-notepad');
+      break;
+    case 'Enseignant':
+      icon.classList.add('bx', 'bx-chalkboard');
+      break;
+    case 'Étudiant':
+      icon.classList.add('bx', 'bx-book');
+      break;
+    case 'Parent':
+      icon.classList.add('bx', 'bx-user');
+      break;
+    default:
+      icon.classList.add('bx', 'bx-user');
+  }
+}
+
+// Initialisation au chargement
+updateRoleIcon();
+</script>
+
+
+
+{% endif %}

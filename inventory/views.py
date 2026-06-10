@@ -14,7 +14,7 @@ from accounts.decorators import *
 from accounts.models import AuditLog
 from accounts.audit import log_action
 from campaigns.mixins import StaffRequiredMixin
-from campaigns.models import LigneCampagne
+from campaigns.models import *
 from .forms import *
 from .models import *
 from accounts.models import User
@@ -117,50 +117,64 @@ class ApiSupportPopupView(LoginRequiredMixin, View):
         data['photos_maintenance'] = photos_list
 
         if support.type_support == 'panneau':
-            from campaigns.models import LigneCampagne
+            from campaigns.models import LigneCampagne, ReservationPanneau
             faces_data = []
             for face in support.faces.all():
-                lc = LigneCampagne.objects.filter(
-                    face=face,
-                    campagne__date_debut__lte=today,
-                    campagne__date_fin__gte=today,
-                    campagne__statut__in=['en_cours', 'a_venir'],
-                ).select_related('campagne__client').first()
+                # ── Statut consolidé ──────────────────────────────────────
+                statut = face.get_statut()  # 'panne' | 'occupe' | 'reserve' | 'libre'
 
-                visuel_url = None
+                lc = None
+                reservation = None
+                visuel_url  = None
                 visuels_urls = []
-                if lc:
-                    if lc.visuel:
-                        visuel_url = lc.visuel.url
-                        visuels_urls.append(lc.visuel.url)
-                    else:
-                        premier_visuel = lc.campagne.visuels.first()
-                        if premier_visuel:
-                            visuel_url = premier_visuel.fichier.url
-                    
-                    for v in lc.campagne.visuels.all():
-                        if v.fichier.url not in visuels_urls:
-                            visuels_urls.append(v.fichier.url)
-                print(f"DEBUG: Face {face.label} - Visuel URL: {visuel_url}")  # --- IGNORE ---
-                # visuel_urls
-                print(f"DEBUG: Face {face.label} - Visuels URLs: {visuels_urls}") 
+
+                if statut == 'occupe':
+                    lc = LigneCampagne.objects.filter(
+                        face=face,
+                        campagne__date_debut__lte=today,
+                        campagne__date_fin__gte=today,
+                        campagne__statut__in=['en_cours', 'a_venir'],
+                    ).select_related('campagne__client').first()
+
+                    if lc:
+                        if lc.visuel:
+                            visuel_url = lc.visuel.url
+                            visuels_urls.append(lc.visuel.url)
+                        else:
+                            premier_visuel = lc.campagne.visuels.first()
+                            if premier_visuel:
+                                visuel_url = premier_visuel.fichier.url
+                        for v in lc.campagne.visuels.all():
+                            if v.fichier.url not in visuels_urls:
+                                visuels_urls.append(v.fichier.url)
+
+                elif statut == 'reserve':
+                    reservation = ReservationPanneau.objects.filter(
+                        face=face,
+                        date_fin__gte=timezone.now(),
+                    ).select_related('client').first()
 
                 faces_data.append({
-                    'label':           face.label,
-                    'format':          support.format,
-                    'eclairage':       face.get_eclairage_display(),
-                    'disponible':      lc is None,
-                    'client':          lc.campagne.client.nom           if lc else None,
-                    'campagne_nom':    lc.campagne.nom                   if lc else None,
-                    'campagne_ref':    lc.campagne.reference             if lc else None,
-                    'campagne_statut': lc.campagne.get_statut_display()  if lc else None,
-                    'date_debut':      lc.campagne.date_debut.strftime('%d/%m/%Y') if lc else None,
-                    'date_fin':        lc.campagne.date_fin.strftime('%d/%m/%Y')   if lc else None,
-                    'visuel_url':      visuel_url,
-                    'visuels_urls':    visuels_urls,
+                    'label'          : face.label,
+                    'format'         : support.format,
+                    'eclairage'      : face.get_eclairage_display(),
+                    'statut'         : statut,                          # ← nouveau
+                    'disponible'     : statut == 'libre',               # rétrocompat JS
+                    # ── Campagne (si occupée) ──────────────────────────
+                    'client'         : lc.campagne.client.nom                        if lc else None,
+                    'campagne_nom'   : lc.campagne.nom                               if lc else None,
+                    'campagne_ref'   : lc.campagne.reference                         if lc else None,
+                    'campagne_statut': lc.campagne.get_statut_display()              if lc else None,
+                    'date_debut'     : lc.campagne.date_debut.strftime('%d/%m/%Y')   if lc else None,
+                    'date_fin'       : lc.campagne.date_fin.strftime('%d/%m/%Y')     if lc else None,
+                    'visuel_url'     : visuel_url,
+                    'visuels_urls'   : visuels_urls,
+                    # ── Réservation (si réservée) ──────────────────────
+                    'client_reserve' : reservation.client.nom                        if reservation else None,
+                    'date_debut'     : reservation.date_debut.strftime('%d/%m/%Y')   if reservation and statut == 'reserve' else (lc.campagne.date_debut.strftime('%d/%m/%Y') if lc else None),
+                    'date_fin'       : reservation.date_fin.strftime('%d/%m/%Y')     if reservation and statut == 'reserve' else (lc.campagne.date_fin.strftime('%d/%m/%Y') if lc else None),
                 })
             data['faces'] = faces_data
-
         elif support.type_support == 'ecran' and hasattr(support, 'ecran_info'):
             from campaigns.models import LigneCampagne
             ecran = support.ecran_info
@@ -255,6 +269,13 @@ class CarteView(LoginRequiredMixin, TemplateView):
 carte = CarteView.as_view()
 
 
+from django.http import JsonResponse
+
+def get_faces_support(request, support_id):
+    faces = FacePanneau.objects.filter(support_id=support_id).values('id', 'label')
+    data = [{'id': f['id'], 'label': f['label']} for f in faces]
+    return JsonResponse({'faces': data})
+
 # class TechnicienUpdateView(TechnicienRequiredMixin, FormView):
 #     template_name = 'inventory/technicien_update.html'
 #     form_class = MaintenanceForm
@@ -296,6 +317,16 @@ class SupportListView(TechnicienStaffRequiredMixin, ListView):
     template_name = 'inventory/support_list.html'
     context_object_name = 'supports'
     paginate_by = 15
+    
+    occupation = {
+        'occupe': 'Occupé',
+        'libre': 'Libre',
+        'reserve': 'Réservé',
+        'total_occupe': 'Totalement occupé',
+        'total_reserve': 'Totalement réservé',
+        'non_reserve': 'Non réservé',
+        'occupe_ou_reserve': 'Occupé ou réservé',
+    }
 
     def get_queryset(self):
         queryset = Support.objects.prefetch_related('faces').select_related('ecran_info').all()
@@ -324,14 +355,28 @@ class SupportListView(TechnicienStaffRequiredMixin, ListView):
         if etat_f:
             queryset = queryset.filter(etat=etat_f)
 
-        # 3. Filtre Python (Occupation) - On convertit en liste ICI si nécessaire
-        if occupation_f in ['occupe', 'libre']:
-            # On transforme en liste pour pouvoir appeler la méthode is_occupe()
-            # Note: cela rend la pagination "mémoire" (Django gère les listes pour paginer)
+        if occupation_f in ['occupe','total_occupe', 'libre', 'reserve','total_reserve', 'non_reserve', 'occupe_ou_reserve']:
             if occupation_f == 'occupe':
+                # Occupé physiquement (réservé ou non, l'occupation prime)
                 queryset = [s for s in queryset if s.is_occupe()]
-            else:
-                queryset = [s for s in queryset if not s.is_occupe()]
+            elif occupation_f == 'total_occupe':
+                # Totalement occupé = toutes les faces sont occupées (même si certaines sont réservées)
+                queryset = [s for s in queryset if s.is_occupe() and not s.is_libre()]
+            elif occupation_f == 'reserve':
+                # Réservé = non occupé physiquement MAIS a une réservation active/à venir
+                queryset = [s for s in queryset if s.is_reserve()]
+            elif occupation_f == 'total_reserve':
+                # Totalement réservé = aucune face n'est ni libre ni occupée (toutes sont réservées)
+                queryset = [s for s in queryset if s.is_reserve() and not s.is_libre() and not s.is_occupe()]
+            elif occupation_f == 'non_reserve':
+                # Non réservé = ni occupé ni réservé
+                queryset = [s for s in queryset if not s.is_reserve()]
+            elif occupation_f == 'occupe_ou_reserve':
+                # Occupé ou réservé = soit occupé, soit réservé
+                queryset = [s for s in queryset if s.is_occupe() or s.is_reserve()]
+            else:  # libre
+                # Libre = ni occupé ni réservé
+                queryset = [s for s in queryset if not s.is_occupe() and not s.is_reserve()]
         
         return queryset
 
@@ -350,6 +395,7 @@ class SupportListView(TechnicienStaffRequiredMixin, ListView):
             'occupation_f': self.request.GET.get('occupation', ''),
             'type_panneau_f': self.request.GET.get('type_panneau', ''),
             'type_panneau_choices': type_panneau_choices,
+            'occupation_choices': self.occupation
         })
         return context
     
@@ -362,18 +408,24 @@ class SupportDetailView(ClientStaffRequiredMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        # filtre le support en fonction de user client
+
+        # Filtre le support en fonction du user client
         if self.request.user.is_client:
             client = self.request.user.client_profile
             if client is None:
                 raise PermissionDenied
             support = get_object_or_404(
-                Support.objects.filter(lignes_campagne__campagne__client=client).distinct(),  # ✅ corrigé
+                Support.objects.filter(lignes_campagne__campagne__client=client).distinct(),
                 pk=self.kwargs['pk']
             )
         else:
             support = self.get_object()
-        today   = timezone.now().date()
+
+        # Client courant pour get_statut (None si staff)
+        client_courant = getattr(self.request.user, 'client_profile', None)
+
+        today = timezone.now().date()
+        now   = timezone.now()
 
         # ── Campagnes actives et historique ───────────────────────────────
         lignes_actives = LigneCampagne.objects.filter(
@@ -386,8 +438,13 @@ class SupportDetailView(ClientStaffRequiredMixin, DetailView):
             support=support,
             campagne__date_fin__lt=today,
         ).select_related('campagne__client').order_by('-campagne__date_fin')[:10]
+        
+        reservations = ReservationPanneau.objects.filter(
+            support=support,
+            date_fin__gte=timezone.now()
+        ).select_related('client').order_by('date_debut')
 
-        # ── Informations générales (communes à tous les supports) ─────────
+        # ── Informations générales ─────────────────────────────────────────
         info_rows = [
             ('Code',         support.code),
             ('Type',         support.get_type_support_display()),
@@ -396,26 +453,42 @@ class SupportDetailView(ClientStaffRequiredMixin, DetailView):
             ('Installation', support.date_installation.strftime('%d/%m/%Y')),
         ]
 
-        # ── Logique spécifique PANNEAU ────────────────────────────────────
+        # ── Maintenances ──────────────────────────────────────────────────
+        maintenances = support.maintenances.order_by('-date_intervention')[:4]
+
         ecran       = None
         ecran_stats = []
         spots_data  = []
-        # les 4 dernières maintenances (avec ou sans photo) pour l'historique
-        maintenances = support.maintenances.order_by('-date_intervention')[:4]
+
+        # ── Logique spécifique PANNEAU ────────────────────────────────────
         if support.type_support == 'panneau':
-            # Format du panneau (désormais sur Support)
             if support.format:
-                info_rows.append(('Format',    support.get_format_display()))
+                info_rows.append(('Format',     support.get_format_display()))
                 info_rows.append(('Dimensions', support.dimensions))
                 info_rows.append(('Surface',    support.surface_m2))
                 info_rows.append(('Type',       support.type_panneau))
 
-            # Faces
             for face in support.faces.all():
-                disponible    = face.is_disponible()
-                status_icon   = 'bi-check2'      if disponible else 'bi-broadcast'
-                status_class  = 'bs-disponible'  if disponible else 'bs-occupe'
-                status_label  = 'Disponible'     if disponible else 'Occupé'
+                # CORRECTION : datetime + client courant
+                statut = face.get_statut(
+                    date_debut=now,
+                    client=client_courant
+                )
+                status_icon = (
+                    'bi-check2'    if statut == 'libre'   else
+                    'bi-broadcast' if statut == 'reserve' else
+                    'bi-x-circle'
+                )
+                status_class = (
+                    'bs-disponible' if statut == 'libre'   else
+                    'bs-reserve'    if statut == 'reserve' else
+                    'bs-occupe'
+                )
+                status_label = (
+                    'Disponible' if statut == 'libre'   else
+                    'Réservé'    if statut == 'reserve' else
+                    'Occupé'
+                )
 
                 badge = mark_safe(
                     f'<span class="badge-status {status_class}">'
@@ -438,21 +511,20 @@ class SupportDetailView(ClientStaffRequiredMixin, DetailView):
                 taux         = ecran.taux_occupation_pourcentage()
 
                 info_rows += [
-                    ('Résolution',       ecran.get_resolution_display()),
-                    ('Cellule',           f'{ecran.cellule}'),
-                    ('Type écran',       ecran.get_type_ecran_display()),
-                    ('Plage diffusion',  plage_str),
-                    ('Occupation',       f'{taux}%'),
+                    ('Résolution',      ecran.get_resolution_display()),
+                    ('Cellule',         f'{ecran.cellule}'),
+                    ('Type écran',      ecran.get_type_ecran_display()),
+                    ('Plage diffusion', plage_str),
+                    ('Occupation',      f'{taux}%'),
                 ]
 
                 ecran_stats = [
                     ('Résolution', 'bi-aspect-ratio', ecran.get_resolution_display(), 'var(--text)'),
-                    ('Cellule',     'bi-tv',           f'{ecran.cellule}',       'var(--text)'),
-                    ('Occupation', 'bi-pie-chart',    f'{taux}%',                      'var(--color-primary)'),
-                    ('Diffusion',  'bi-clock',        plage_str,                       'var(--color-primary)'),
+                    ('Cellule',    'bi-tv',           f'{ecran.cellule}',             'var(--text)'),
+                    ('Occupation', 'bi-pie-chart',    f'{taux}%',                     'var(--color-primary)'),
+                    ('Diffusion',  'bi-clock',        plage_str,                      'var(--color-primary)'),
                 ]
 
-                # Données pour la frise JS
                 for ligne in lignes_actives:
                     spots_data.append({
                         'id':       ligne.pk,
@@ -470,10 +542,9 @@ class SupportDetailView(ClientStaffRequiredMixin, DetailView):
             'ecran_stats':    ecran_stats,
             'info_rows':      info_rows,
             'spots_data':     spots_data,
+            'reservations':   reservations,
         })
         return context
-
-
 
 from django.views.generic import CreateView
 from django.db import transaction
@@ -677,7 +748,7 @@ class MaintenanceListView(LoginRequiredMixin, ListView):
     paginate_by         = 20
 
     def get_queryset(self):
-        qs = Maintenance.objects.select_related('support', 'effectue_par')
+        qs = Maintenance.objects.select_related('support', 'face', 'effectue_par')
 
         # ✅ Filtre technicien → voit uniquement ses maintenances
         if self.request.user.is_technicien:
@@ -685,7 +756,7 @@ class MaintenanceListView(LoginRequiredMixin, ListView):
 
         # ✅ Filtres GET
         support_id = self.request.GET.get('support')
-        etat_apres = self.request.GET.get('etat_apres')
+        etat_apres = self.request.GET.get('etat')
         technicien = self.request.GET.get('technicien')
 
         if support_id: qs = qs.filter(support_id=support_id)
@@ -715,7 +786,7 @@ class MaintenanceDetailView(LoginRequiredMixin, DetailView):
     context_object_name = 'maintenance'
 
     def get_queryset(self):
-        qs = Maintenance.objects.select_related('support', 'effectue_par')
+        qs = Maintenance.objects.select_related('support', 'face', 'effectue_par')
         # ✅ Technicien → voit uniquement ses maintenances
         if self.request.user.is_technicien:
             qs = qs.filter(effectue_par=self.request.user)
@@ -728,23 +799,31 @@ class MaintenanceCreateView(LoginRequiredMixin, CreateView):
     template_name = 'inventory/maintenance_form.html'
     success_url   = reverse_lazy('maintenance_list')
 
+    # Dans MaintenanceCreateView et MaintenanceUpdateView
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        kwargs['user'] = self.request.user  # ✅ passe le user au form
+        kwargs['user'] = self.request.user
+        support_id = self.kwargs.get('pk') or self.request.GET.get('support')
+        if support_id:
+            kwargs['support_pk'] = support_id
         return kwargs
 
     def get_initial(self):
         initial = super().get_initial()
-        # ✅ Pré-remplit le support si passé en GET (?support=9427)
-        support_id = self.kwargs.get('pk')
+        # ✅ Pré-remplit le support si passé en URL ou GET
+        support_id = self.kwargs.get('pk') or self.request.GET.get('support')
         if support_id:
             initial['support'] = support_id
         return initial
 
     def form_valid(self, form):
-        # ✅ Si technicien → force effectue_par
+        support_id = self.kwargs.get('pk') or self.request.GET.get('support')
+        if support_id and not form.instance.support_id:
+            form.instance.support_id = support_id
+
         if self.request.user.is_technicien:
             form.instance.effectue_par = self.request.user
+
         response = super().form_valid(form)
         messages.success(self.request, f'Maintenance enregistrée pour {self.object.support.code}.')
         return response
@@ -787,3 +866,185 @@ class MaintenanceUpdateView(LoginRequiredMixin, UpdateView):
         context['title'] = f'Modifier maintenance — {self.object.support.code}'
         context['obj']   = self.object
         return context
+    
+
+class SupportPeriodesVanneView(LoginRequiredMixin, View):
+    template_name = 'inventory/support_periodes_panne.html'
+
+    def get(self, request, pk):
+        support  = get_object_or_404(Support, pk=pk)
+        periodes = support.get_periodes_panne()
+
+        # ── Statistiques globales ─────────────────────────────────
+        nb_total    = len(periodes)
+        nb_resolues = sum(1 for p in periodes if p['resolue'])
+        nb_en_cours = nb_total - nb_resolues
+
+        duree_totale = sum(
+            (p['duree'] for p in periodes if p['duree']),
+            timedelta()
+        )
+        duree_moyenne = (
+            duree_totale / nb_total if nb_total > 0 else timedelta()
+        )
+
+        # ── Stats par face (panneaux uniquement) ──────────────────
+        stats_par_face = {}
+        if support.type_support == Support.TYPE_PANNEAU:
+            for face in support.faces.all():
+                periodes_face = [p for p in periodes if p['face'] and p['face'].pk == face.pk]
+                duree_face    = sum(
+                    (p['duree'] for p in periodes_face if p['duree']),
+                    timedelta()
+                )
+                stats_par_face[face.label] = {
+                    'face'        : face,
+                    'nb_pannes'   : len(periodes_face),
+                    'nb_resolues' : sum(1 for p in periodes_face if p['resolue']),
+                    'nb_en_cours' : sum(1 for p in periodes_face if not p['resolue']),
+                    'duree_totale': duree_face,
+                    'periodes'    : periodes_face,
+                }
+
+        context = {
+            'support'       : support,
+            'periodes'      : periodes,
+            'nb_total'      : nb_total,
+            'nb_resolues'   : nb_resolues,
+            'nb_en_cours'   : nb_en_cours,
+            'duree_totale'  : duree_totale,
+            'duree_moyenne' : duree_moyenne,
+            'stats_par_face': stats_par_face,
+            'title'         : f'Périodes de panne — {support.code}',
+        }
+        return render(request, self.template_name, context)
+    
+class PeriodesParVueView(LoginRequiredMixin, View):
+    template_name = 'inventory/periodes_panne_liste.html'
+
+    def get(self, request):
+        # ── Filtres ───────────────────────────────────────────────
+        support_pk  = request.GET.get('support', '')
+        face_label  = request.GET.get('face', '')
+        statut_f    = request.GET.get('statut', '')   # 'resolue' | 'en_cours'
+        date_debut  = request.GET.get('date_debut', '')
+        date_fin    = request.GET.get('date_fin', '')
+
+        # ── Construction des périodes depuis Maintenance ──────────
+        # On part des maintenances groupées par (support, face)
+        maints_qs = (
+            Maintenance.objects
+            .select_related('support', 'face')
+            .order_by('support_id', 'face_id', 'date_intervention')
+        )
+
+        if support_pk:
+            maints_qs = maints_qs.filter(support_id=support_pk)
+        if face_label:
+            maints_qs = maints_qs.filter(face__label=face_label)
+
+        # ── Groupement par (support, face) ────────────────────────
+        from itertools import groupby
+        from operator import attrgetter
+
+        periodes = []
+
+        # Grouper par support puis par face
+        def group_key(m):
+            return (m.support_id, m.face_id)
+
+        for (support_id, face_id), group in groupby(maints_qs, key=group_key):
+            maints_group = list(group)
+            support      = maints_group[0].support
+            face         = maints_group[0].face
+            panne_debut  = None
+            panne_maint  = None
+
+            for maint in maints_group:
+                if maint.etat_apres == ETAT_PANNE and panne_debut is None:
+                    panne_debut = maint.date_intervention
+                    panne_maint = maint
+
+                elif maint.etat_apres == ETAT_BON and panne_debut is not None:
+                    periodes.append({
+                        'support'     : support,
+                        'face'        : face,
+                        'debut'       : panne_debut,
+                        'fin'         : maint.date_intervention,
+                        'duree'       : maint.date_intervention - panne_debut,
+                        'resolue'     : True,
+                        'maint_panne' : panne_maint,
+                        'maint_bon'   : maint,
+                    })
+                    panne_debut = None
+                    panne_maint = None
+
+            # Panne toujours ouverte
+            if panne_debut is not None:
+                periodes.append({
+                    'support'     : support,
+                    'face'        : face,
+                    'debut'       : panne_debut,
+                    'fin'         : None,
+                    'duree'       : timezone.now() - panne_debut,
+                    'resolue'     : False,
+                    'maint_panne' : panne_maint,
+                    'maint_bon'   : None,
+                })
+
+        # ── Filtres post-construction ─────────────────────────────
+        if statut_f == 'resolue':
+            periodes = [p for p in periodes if p['resolue']]
+        elif statut_f == 'en_cours':
+            periodes = [p for p in periodes if not p['resolue']]
+
+        if date_debut:
+            try:
+                dt = datetime.strptime(date_debut, '%Y-%m-%d')
+                periodes = [p for p in periodes if p['debut'].date() >= dt.date()]
+            except ValueError:
+                pass
+
+        if date_fin:
+            try:
+                dt = datetime.strptime(date_fin, '%Y-%m-%d')
+                periodes = [p for p in periodes if p['debut'].date() <= dt.date()]
+            except ValueError:
+                pass
+
+        # ── Tri chronologique décroissant ─────────────────────────
+        periodes.sort(key=lambda p: p['debut'], reverse=True)
+
+        # ── KPI globaux ───────────────────────────────────────────
+        nb_total    = len(periodes)
+        nb_resolues = sum(1 for p in periodes if p['resolue'])
+        nb_en_cours = nb_total - nb_resolues
+        duree_totale = sum(
+            (p['duree'] for p in periodes if p['duree']),
+            timedelta()
+        )
+        duree_moyenne = duree_totale / nb_total if nb_total else timedelta()
+
+        # ── Données pour les filtres ──────────────────────────────
+        supports_liste = Support.objects.filter(
+            maintenances__isnull=False
+        ).distinct().order_by('code')
+
+        context = {
+            'title'         : 'Périodes de panne',
+            'periodes'      : periodes,
+            'nb_total'      : nb_total,
+            'nb_resolues'   : nb_resolues,
+            'nb_en_cours'   : nb_en_cours,
+            'duree_totale'  : duree_totale,
+            'duree_moyenne' : duree_moyenne,
+            'supports_liste': supports_liste,
+            'filters'       : {
+                'support'   : support_pk,
+                'face'      : face_label,
+                'statut'    : statut_f,
+                'date_debut': date_debut,
+                'date_fin'  : date_fin,
+            },
+        }
+        return render(request, self.template_name, context)

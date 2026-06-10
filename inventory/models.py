@@ -53,10 +53,11 @@ TYPE_CHOICES = [
     (TYPE_ECRAN,   'Écran Numérique'),
 ]
 ETAT_BON         = 'bon'
+ETAT_MAINTENANCE = 'maintenance'
 ETAT_PANNE       = 'panne'
-# ETAT_MAINTENANCE = 'maintenance'  # optionnel, peut être géré via un champ "en_maintenance" ou similaire
 ETAT_CHOICES = [
     (ETAT_BON,         'Bon état'),
+    (ETAT_MAINTENANCE, 'En maintenance'),
     (ETAT_PANNE,       'En panne'),
 ]
 
@@ -69,6 +70,7 @@ class Support(models.Model):
     TYPE_ECRAN = TYPE_ECRAN
     TYPE_CHOICES = TYPE_CHOICES
     ETAT_BON = ETAT_BON
+    ETAT_MAINTENANCE = ETAT_MAINTENANCE
     ETAT_PANNE = ETAT_PANNE
     ETAT_CHOICES = ETAT_CHOICES
     
@@ -141,8 +143,14 @@ class Support(models.Model):
 
     def get_etat_color(self):
         cfg = settings.DESIGN_CONFIG
-        if self.etat == self.ETAT_PANNE:
+        if self.type_support == self.TYPE_PANNEAU:
+            # Panneau en panne SEULEMENT si TOUTES les faces sont en panne
+            all_faces = self.faces.all()
+            if all_faces.exists() and all_faces.filter(etat=self.ETAT_PANNE).count() == all_faces.count():
+                return cfg['COLOR_MAINTENANCE']
+        elif self.etat in [self.ETAT_PANNE, self.ETAT_MAINTENANCE]:
             return cfg['COLOR_MAINTENANCE']
+
         # Vérifier si au moins une face/slot est occupé(e)
         if self.is_occupe():
             return cfg['COLOR_OCCUPE']
@@ -174,7 +182,7 @@ class Support(models.Model):
         if self.type_support == self.TYPE_PANNEAU:
             faces = []
             for face in self.faces.all():
-                faces.append({'id': face.pk, 'label': face.get_label_display(), 'dispo': face.is_disponible()})
+                faces.append({'id': face.pk, 'label': face.get_label_display(), 'dispo': face.is_disponible(), 'disponibles': face.is_disponibles()})
             result['faces'] = faces
         return result
 
@@ -227,29 +235,142 @@ class Support(models.Model):
         """'4m × 3m', '12m × 4m', etc."""
         return self.format_detail['dimensions']
     
+    # Sur le modèle Support (ou FacePanneau selon ton archi)
+    def is_reserve(self):
+        """True si au moins une face a une réservation active ou à venir."""
+        from django.utils import timezone
+        now = timezone.now()
+        return self.lignes_client.filter(date_fin__gte=now).exists()
+    
+    def is_libre(self):
+        """True si au moins une face n'est pas occupée ni réservée."""
+        return any(face.is_disponible() for face in self.faces.all())
+
     # comment de la avoir le fonction de taux_occupation_pourcentage DE LE EcranNumerique dans le Support pour les écrans numériques ?
     # on peut faire une méthode dans le Support qui délègue au EcranNumerique si le type est 'ecran' et retourne None ou 0 pour les panneaux. Par exemple :
     def taux_occupation_pourcentage(self, date_test=None):
         """Retourne le pourcentage d'occupation (0 à 100) pour les écrans et les panneaux."""
         if self.type_support == self.TYPE_ECRAN and hasattr(self, 'ecran_info'):
             return self.ecran_info.taux_occupation_pourcentage(date_test)
-        
         if self.type_support == self.TYPE_PANNEAU: 
             # On récupère toutes les faces liées à ce support
             toutes_les_faces = self.faces.all()
             total_faces = toutes_les_faces.count()
-            
             if total_faces == 0:
                 return 0
-                
             # On compte le nombre de faces qui ne sont PAS disponibles
             faces_occupees = sum(1 for face in toutes_les_faces if not face.is_disponible(date_test, date_test))
             pourcentage = (faces_occupees / total_faces) * 100
-            
             return round(pourcentage, 2)
-            
         return None
+    def taux_occupation_pourcentages(self, date_test=None):
+        """Retourne le pourcentage d'occupation (0 à 100) pour les écrans et les panneaux."""
+        if self.type_support == self.TYPE_ECRAN and hasattr(self, 'ecran_info'):
+            return self.ecran_info.taux_occupation_pourcentage(date_test)
+        if self.type_support == self.TYPE_PANNEAU: 
+            # On récupère toutes les faces liées à ce support
+            toutes_les_faces = self.faces.all()
+            total_faces = toutes_les_faces.count()
+            if total_faces == 0:
+                return 0
+            # On compte le nombre de faces qui ne sont PAS disponibles
+            faces_occupees = sum(1 for face in toutes_les_faces if not face.is_disponibles(date_test, date_test))
+            pourcentage = (faces_occupees / total_faces) * 100
+            return round(pourcentage, 2)
+        return None
+    
+    def get_periodes_panne(self):
+        """
+        Retourne la liste des périodes de panne pour ce support.
+        Une période = intervalle entre un état 'panne' et le prochain état 'bon'.
+        
+        Pour un panneau : analyse les maintenances par face.
+        Pour un écran   : analyse les maintenances du support directement.
+        
+        Retourne une liste de dicts :
+        [
+            {
+                'debut'   : datetime,   # date de la mise en panne
+                'fin'     : datetime,   # date du retour en bon état (None si toujours en panne)
+                'duree'   : timedelta,  # durée de la panne (None si toujours en panne)
+                'face'    : FacePanneau | None,
+                'resolue' : bool,
+            },
+            ...
+        ]
+        """
+        periodes = []
 
+        if self.type_support == self.TYPE_PANNEAU:
+            # ── Analyse par face ──────────────────────────────────────
+            for face in self.faces.all():
+                maints = (
+                    Maintenance.objects
+                    .filter(face=face)
+                    .order_by('date_intervention')
+                )
+                panne_debut = None
+
+                for maint in maints:
+                    if maint.etat_apres == ETAT_PANNE and panne_debut is None:
+                        # Début d'une période de panne
+                        panne_debut = maint.date_intervention
+
+                    elif maint.etat_apres == ETAT_BON and panne_debut is not None:
+                        # Fin de la période de panne
+                        periodes.append({
+                            'debut'   : panne_debut,
+                            'fin'     : maint.date_intervention,
+                            'duree'   : maint.date_intervention - panne_debut,
+                            'face'    : face,
+                            'resolue' : True,
+                        })
+                        panne_debut = None
+
+                # Panne toujours ouverte (pas encore résolue)
+                if panne_debut is not None:
+                    periodes.append({
+                        'debut'   : panne_debut,
+                        'fin'     : None,
+                        'duree'   : timezone.now() - panne_debut,
+                        'face'    : face,
+                        'resolue' : False,
+                    })
+
+        else:
+            # ── Analyse directe sur le support (écran) ────────────────
+            maints = (
+                Maintenance.objects
+                .filter(support=self, face__isnull=True)
+                .order_by('date_intervention')
+            )
+            panne_debut = None
+
+            for maint in maints:
+                if maint.etat_apres == ETAT_PANNE and panne_debut is None:
+                    panne_debut = maint.date_intervention
+
+                elif maint.etat_apres == ETAT_BON and panne_debut is not None:
+                    periodes.append({
+                        'debut'   : panne_debut,
+                        'fin'     : maint.date_intervention,
+                        'duree'   : maint.date_intervention - panne_debut,
+                        'face'    : None,
+                        'resolue' : True,
+                    })
+                    panne_debut = None
+
+            if panne_debut is not None:
+                periodes.append({
+                    'debut'   : panne_debut,
+                    'fin'     : None,
+                    'duree'   : timezone.now() - panne_debut,
+                    'face'    : None,
+                    'resolue' : False,
+                })
+
+        # Tri chronologique
+        return sorted(periodes, key=lambda p: p['debut'])
 
 class FacePanneau(models.Model):
     """Face A ou B d'un panneau statique."""
@@ -270,6 +391,7 @@ class FacePanneau(models.Model):
     label    = models.CharField(max_length=1, choices=LABEL_CHOICES, default=LABEL_A)
 
     eclairage = models.CharField(max_length=10, choices=ECLAIRAGE_CHOICES, default='non')
+    etat      = models.CharField(max_length=20, choices=ETAT_CHOICES, default=ETAT_BON, verbose_name="État de la face")
     notes    = models.TextField(blank=True)
 
     class Meta:
@@ -295,6 +417,33 @@ class FacePanneau(models.Model):
             campagne__date_fin__gte=date_debut,
             campagne__statut__in=['en_cours', 'a_venir'],
         ).exists()
+        
+    def is_disponibles(self, date_debut=None, date_fin=None):
+        """Vérifie si la face est libre sur une période donnée (campagnes + réservations)."""
+        from campaigns.models import LigneCampagne, ReservationPanneau
+        from django.utils import timezone
+
+        if date_debut is None:
+            date_debut = timezone.now()
+        if date_fin is None:
+            date_fin = date_debut
+
+        # 1. Vérification via les LigneCampagne (campagnes actives/à venir)
+        occupee_campagne = LigneCampagne.objects.filter(
+            face=self,
+            campagne__date_debut__lte=date_fin,
+            campagne__date_fin__gte=date_debut,
+            campagne__statut__in=['en_cours', 'a_venir'],
+        ).exists()
+
+        # 2. Vérification via les ReservationPanneau (réservations directes)
+        occupee_reservation = ReservationPanneau.objects.filter(
+            face=self,
+            date_debut__lt=date_fin,
+            date_fin__gt=date_debut,
+        ).exists()
+
+        return not occupee_campagne and not occupee_reservation
 
     def get_campagne_active(self):
         from campaigns.models import LigneCampagne
@@ -305,7 +454,51 @@ class FacePanneau(models.Model):
             campagne__date_fin__gte=today,
         ).select_related('campagne__client').first()
         return lc.campagne if lc else None
+    
+    def get_statut(self, date_debut=None, date_fin=None, client=None):
+        """
+        Retourne le statut consolidé de la face :
+        - 'panne'   : la face est physiquement en panne
+        - 'occupe'  : une campagne est en cours sur cette période
+        - 'reserve' : une réservation existe mais pas de campagne
+        - 'libre'   : ni campagne ni réservation
+        """
+        from campaigns.models import LigneCampagne, ReservationPanneau
+        from django.utils import timezone
 
+        # État physique en priorité absolue
+        if self.etat == ETAT_PANNE:
+            return 'panne'
+
+        if date_debut is None:
+            date_debut = timezone.now()
+        if date_fin is None:
+            date_fin = date_debut
+
+        # Occupé = campagne active/à venir sur la période
+        occupee = LigneCampagne.objects.filter(
+            face=self,
+            campagne__date_debut__lte=date_fin,
+            campagne__date_fin__gte=date_debut,
+            campagne__statut__in=['en_cours', 'a_venir'],
+        ).exists()
+
+        if occupee:
+            return 'occupe'
+
+        # Réservé = réservation directe sur la période
+        qs_reserve = ReservationPanneau.objects.filter(
+            face=self,
+            date_debut__lt=date_fin,
+            date_fin__gt=date_debut,
+        )
+
+        if qs_reserve.exists():
+            if client and qs_reserve.filter(client=client).exists():
+                return 'libre'
+            return 'reserve'
+
+        return 'libre'
 
 
 class EcranNumerique(models.Model):
@@ -474,6 +667,12 @@ class Maintenance(models.Model):
         related_name='maintenances',
         verbose_name="Support"
     )
+    face              = models.ForeignKey(
+        'FacePanneau', on_delete=models.CASCADE,
+        null=True, blank=True,
+        related_name='maintenances_par_face',
+        verbose_name="Face (Panneau)"
+    )
     effectue_par      = models.ForeignKey(
         settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
         null=True, blank=True,
@@ -504,8 +703,32 @@ class Maintenance(models.Model):
         verbose_name_plural = "Maintenances"
 
     def __str__(self):
+        if self.face:
+            return f"Maintenance {self.support.code} {self.face.label} — {self.date_intervention:%d/%m/%Y}"
         return f"Maintenance {self.support.code} — {self.date_intervention:%d/%m/%Y}"
     
+    def clean(self):
+        from django.core.exceptions import ValidationError
+
+        if self.face:
+            # Si support_id non encore assigné, on le déduit depuis la face
+            if not self.support_id:
+                self.support_id = self.face.support_id
+
+            if self.support_id and self.support.type_support != Support.TYPE_PANNEAU:
+                raise ValidationError({'face': "La face ne peut être utilisée que pour un panneau statique."})
+
+            if self.face.support_id != self.support_id:
+                raise ValidationError({'face': "La face doit appartenir au support sélectionné."})
+
+        if (
+            not self.face
+            and self.support_id
+            and self.support.type_support == Support.TYPE_ECRAN
+            and self.etat_apres not in (self.ETAT_BON, self.ETAT_PANNE)
+        ):
+            pass
+
     # un fonction pour connaitre le temps écoulé depuis la dernière maintenance pour un support donné
     @property
     def temps_depuis_derniere_maintenance(self):
@@ -515,31 +738,50 @@ class Maintenance(models.Model):
         return timezone.now() - last_maintenance.date_intervention
     
     def save(self, *args, **kwargs):
-        old_etat = self.support.etat  # sauvegarde avant modification
+        target_obj = self.face if self.face else self.support
+        old_etat = target_obj.etat
 
         super().save(*args, **kwargs)
 
-        # ✅ Met à jour l'état du support via update() uniquement (pas de double save)
         if self.etat_apres:
-            Support.objects.filter(pk=self.support_id).update(etat=self.etat_apres)
-            self.support.etat = self.etat_apres  # sync l'objet en mémoire
+            if self.face:
+                # 1. Mettre à jour l'état de la face
+                FacePanneau.objects.filter(pk=self.face_id).update(etat=self.etat_apres)
+                self.face.etat = self.etat_apres
 
-            # ✅ Log uniquement si l'état a changé
-            if old_etat != self.etat_apres:
+                # 2. Recalculer l'état du support parent (panneau statique)
+                toutes_les_faces = self.support.faces.all()
+                if toutes_les_faces.exists():
+                    toutes_en_panne = all(
+                        f.etat == Support.ETAT_PANNE
+                        for f in toutes_les_faces
+                    )
+                    nouvel_etat_support = Support.ETAT_PANNE if toutes_en_panne else Support.ETAT_BON
+                else:
+                    nouvel_etat_support = self.etat_apres  # fallback si pas de faces
+
+                Support.objects.filter(pk=self.support_id).update(etat=nouvel_etat_support)
+                self.support.etat = nouvel_etat_support
+
+            else:
+                # Écran numérique → mise à jour directe
+                Support.objects.filter(pk=self.support_id).update(etat=self.etat_apres)
+                self.support.etat = self.etat_apres
+
+            # Log uniquement si l'état du support a changé
+            if old_etat != self.support.etat:
                 from accounts.audit import AuditLog
-                from django.contrib.contenttypes.models import ContentType
                 AuditLog.objects.create(
-                user        = self.effectue_par,
-                action      = AuditLog.ACTION_UPDATE,
-                module      = AuditLog.MODULE_INVENTORY,       # ✅ Utilise le choix du module au lieu de content_type
-                object_id   = self.support_id,
-                object_repr = str(self.support),               # ✅ Correction : 'object_repr' au lieu de 'obj_repr'
-                detail      = (
-                    f"Maintenance effectuée : {self.description}. "
-                    f"Changement état : {old_etat} → {self.etat_apres}"
+                    user        = self.effectue_par,
+                    action      = AuditLog.ACTION_UPDATE,
+                    module      = AuditLog.MODULE_INVENTORY,
+                    object_id   = self.support_id,
+                    object_repr = str(self.support),
+                    detail      = (
+                        f"Maintenance effectuée : {self.description}. "
+                        f"Changement état : {old_etat} → {self.support.etat}"
+                    )
                 )
-            )
-
     @classmethod
     def get_last_for_support(cls, support) -> Optional['Maintenance']:
         """Retourne la dernière maintenance enregistrée pour un support donné."""
@@ -609,7 +851,7 @@ class Maintenance(models.Model):
 
     def to_dict(self) -> dict:
         """Sérialisation légère pour API/popups."""
-        return {
+        data = {
             'id': self.pk,
             'support_id': self.support_id,
             'support_code': getattr(self.support, 'code', None),
@@ -619,6 +861,12 @@ class Maintenance(models.Model):
             'effectue_par_id': getattr(self.effectue_par, 'pk', None),
             'photo_url': self.photo.url if self.photo else None,
         }
+        if self.face:
+            data.update({
+                'face_id': self.face_id,
+                'face_label': self.face.label,
+            })
+        return data
 
     def is_overdue(self, threshold_days: int = 180) -> bool:
         """Indique si le support est en retard de maintenance par rapport au seuil (jours)."""
@@ -627,3 +875,40 @@ class Maintenance(models.Model):
             return True
         delta = timezone.now() - last.date_intervention
         return delta.days > threshold_days
+    
+    def delete(self, *args, **kwargs):
+        """
+        Après suppression, recalcule l'état de la face (ou du support)
+        à partir de la maintenance précédente.
+        """
+        face    = self.face
+        support = self.support
+
+        super().delete(*args, **kwargs)  # suppression réelle
+
+        if face:
+            face.recalculate_etat()
+
+            # Recalcule aussi l'état du support parent
+            toutes_les_faces = support.faces.all()
+            if toutes_les_faces.exists():
+                toutes_en_panne = all(f.etat == ETAT_PANNE for f in toutes_les_faces)
+                nouvel_etat_support = ETAT_PANNE if toutes_en_panne else ETAT_BON
+            else:
+                nouvel_etat_support = ETAT_BON
+
+            Support.objects.filter(pk=support.pk).update(etat=nouvel_etat_support)
+        else:
+            # Écran numérique : recalcule depuis la dernière maintenance du support
+            derniere = (
+                Maintenance.objects.filter(support=support)
+                    .order_by('-date_intervention')
+                    .values_list('etat_apres', flat=True)
+                    .first()
+            )
+            nouvel_etat = derniere if derniere else ETAT_BON
+            Support.objects.filter(pk=support.pk).update(etat=nouvel_etat)
+
+
+
+

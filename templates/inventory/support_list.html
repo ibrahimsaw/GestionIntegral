@@ -30,16 +30,16 @@
         <select name="etat" class="form-select">
           <option value="">Tous les états</option>
           <option value="bon"         {% if etat_f == 'bon'         %}selected{% endif %}>Bon état</option>
-          <option value="maintenance" {% if etat_f == 'maintenance' %}selected{% endif %}>En maintenance</option>
           <option value="panne"       {% if etat_f == 'panne'       %}selected{% endif %}>En panne</option>
         </select>
       </div>
       <div class="col-md-2">
         <label class="form-label">Occupation</label>
         <select name="occupation" class="form-select">
-          <option value="">Tous les états</option>
-          <option value="occupe" {% if occupation_f == 'occupe' %}selected{% endif %}>Occupé</option>
-          <option value="libre"  {% if occupation_f == 'libre'  %}selected{% endif %}>Libre</option>
+          <option value="">Tous états</option>
+          {% for value, label in occupation_choices.items %}
+            <option value="{{ value }}" {% if occupation_f == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
         </select>
       </div>
       <div class="col-md-2">
@@ -73,7 +73,7 @@
       </thead>
       <tbody>
         {% for s in supports %}
-        <tr>
+        <tr class="{% if s.etat == 'panne' %}table-danger{% endif %}">
           <td class="mono" style="font-size:.8rem;color:var(--color-primary)">{{ s.code }}</td>
           <td style="font-weight:600">
             <a href="{% url 'support_detail' s.pk %}" style="color:var(--text);text-decoration:none">{{ s.nom }}</a>
@@ -86,7 +86,7 @@
           </td>
           <td style="font-size:.8rem;color:var(--text-muted)">{{ s.adresse|default:"—"|truncatechars:35 }}</td>
           <td>
-            <span class="badge-status {% if s.etat == 'bon' %}bs-disponible{% elif s.etat == 'maintenance' %}bs-occupe{% else %}bs-maintenance{% endif %}">
+            <span class="badge-status {% if s.etat == 'bon' %}bs-disponible{% elif s.etat == 'maintenance' %}bs-occupe{% else %}bs-panne{% endif %}">
               {{ s.get_etat_display }}
             </span>
           </td>
@@ -99,10 +99,14 @@
               {% endif %}
             {% else %}
               {% for face in s.faces.all %}
-                {% if face.is_disponible %}
+                {% if face.get_statut == 'libre' %}
                   <span class="badge-status bs-disponible"><i class="bi bi-check2 me-1"></i>Libre {{face.label}}</span>
-                {% else %}
+                {% elif face.get_statut == 'occupe' %}
                   <span class="badge-status bs-occupe"><i class="bi bi-broadcast me-1"></i>Occupé {{face.label}}</span>
+                {% elif face.get_statut == 'reserve' %}
+                  <span class="badge-status bs-reserve"><i class="bi bi-clock me-1"></i>Réservé {{face.label}}</span>
+                {% else %}
+                  <span class="badge-status bs-panne"><i class="bi bi-clock me-1"></i>En Panne {{face.label}}</span>
                 {% endif %}
               {% endfor %}
             {% endif %}

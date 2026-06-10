@@ -12,6 +12,9 @@
     <h1 style="font-size:1.3rem;font-weight:800;margin:0">Interventions de maintenance</h1>
     <p style="color:var(--text-muted);font-size:.8rem;margin:0">{{ page_obj.paginator.count }} intervention(s) au total</p>
   </div>
+  <a href="{% url 'periodes_panne_liste' %}" class="btn btn-outline-danger btn-sm">
+    <i class="bi bi-exclamation-triangle-fill me-1"></i>Périodes de panne
+  </a>
   <a href="{% url 'maintenance_create' %}" class="btn btn-primary btn-sm">
     <i class="bi bi-plus-lg me-1"></i>Nouvelle maintenance
   </a>
@@ -21,7 +24,7 @@
 <div class="card mb-4">
   <div class="card-body py-2">
     <form method="get" class="row g-2 align-items-end">
-      <div class="col-md-4">
+      <div class="col-md-3">
         <label class="form-label" style="font-size:.75rem;color:var(--text-muted)">Support</label>
         <select name="support" class="form-select form-select-sm">
           <option value="">Tous les supports</option>
@@ -32,7 +35,18 @@
           {% endfor %}
         </select>
       </div>
-      <div class="col-md-3">
+      <div class="col-md-2">
+        <label class="form-label" style="font-size:.75rem;color:var(--text-muted)">Face</label>
+        <select name="face" class="form-select form-select-sm">
+          <option value="">Toutes les faces</option>
+          {% for f in faces %}
+            <option value="{{ f.pk }}" {% if request.GET.face == f.pk|stringformat:"s" %}selected{% endif %}>
+              Face {{ f.label }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
         <label class="form-label" style="font-size:.75rem;color:var(--text-muted)">État</label>
         <select name="etat" class="form-select form-select-sm">
           <option value="">Tous les états</option>
@@ -56,7 +70,7 @@
       {% endif %}
       <div class="col-md-2 d-flex gap-2">
         <button type="submit" class="btn btn-primary flex-fill"><i class="bi bi-search"></i></button>
-        <a href="{% url 'support_list' %}" class="btn btn-outline-secondary"><i class="bi bi-x-lg"></i></a>
+        <a href="{% url 'maintenance_list' %}" class="btn btn-outline-secondary"><i class="bi bi-x-lg"></i></a>
       </div>
     </form>
   </div>
@@ -70,6 +84,7 @@
         <thead style="background:var(--bg-card);border-bottom:2px solid var(--border)">
           <tr>
             <th style="font-size:.7rem;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);font-weight:700;padding:.75rem 1rem">Support</th>
+            <th style="font-size:.7rem;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);font-weight:700">Face</th>
             <th style="font-size:.7rem;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);font-weight:700">Date</th>
             <th style="font-size:.7rem;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);font-weight:700">Technicien</th>
             <th style="font-size:.7rem;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);font-weight:700">État enregistré</th>
@@ -86,6 +101,20 @@
                 {{ m.support.code }}
               </a>
               <div style="font-size:.72rem;color:var(--text-muted)">{{ m.support.nom }}</div>
+            </td>
+
+            <!-- Face (colonne dédiée) -->
+            <td>
+              {% if m.face %}
+                <span class="badge" style="background:var(--bs-primary-bg-subtle,#cfe2ff);color:var(--bs-primary-text-emphasis,#052c65);font-size:.72rem;font-weight:600;letter-spacing:.5px">
+                  {% comment %} <i class="bi bi-grid-1x2 me-1" style="font-size:.65rem"></i> {% endcomment %}Face {{ m.face.label }}
+                </span>
+                {% if m.face.orientation %}
+                  <div style="font-size:.68rem;color:var(--text-muted);margin-top:2px">{{ m.face.orientation }}</div>
+                {% endif %}
+              {% else %}
+                <span style="color:var(--text-muted);font-size:.8rem">—</span>
+              {% endif %}
             </td>
 
             <!-- Date -->
@@ -154,19 +183,19 @@
     <ul class="pagination pagination-sm justify-content-center">
       {% if page_obj.has_previous %}
         <li class="page-item">
-          <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.support %}&support={{ request.GET.support }}{% endif %}{% if request.GET.etat %}&etat={{ request.GET.etat }}{% endif %}">
+          <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.support %}&support={{ request.GET.support }}{% endif %}{% if request.GET.face %}&face={{ request.GET.face }}{% endif %}{% if request.GET.etat %}&etat={{ request.GET.etat }}{% endif %}{% if request.GET.technicien %}&technicien={{ request.GET.technicien }}{% endif %}">
             <i class="bi bi-chevron-left"></i>
           </a>
         </li>
       {% endif %}
       {% for num in page_obj.paginator.page_range %}
         <li class="page-item {% if page_obj.number == num %}active{% endif %}">
-          <a class="page-link" href="?page={{ num }}{% if request.GET.support %}&support={{ request.GET.support }}{% endif %}{% if request.GET.etat %}&etat={{ request.GET.etat }}{% endif %}">{{ num }}</a>
+          <a class="page-link" href="?page={{ num }}{% if request.GET.support %}&support={{ request.GET.support }}{% endif %}{% if request.GET.face %}&face={{ request.GET.face }}{% endif %}{% if request.GET.etat %}&etat={{ request.GET.etat }}{% endif %}{% if request.GET.technicien %}&technicien={{ request.GET.technicien }}{% endif %}">{{ num }}</a>
         </li>
       {% endfor %}
       {% if page_obj.has_next %}
         <li class="page-item">
-          <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.support %}&support={{ request.GET.support }}{% endif %}{% if request.GET.etat %}&etat={{ request.GET.etat }}{% endif %}">
+          <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.support %}&support={{ request.GET.support }}{% endif %}{% if request.GET.face %}&face={{ request.GET.face }}{% endif %}{% if request.GET.etat %}&etat={{ request.GET.etat }}{% endif %}{% if request.GET.technicien %}&technicien={{ request.GET.technicien }}{% endif %}">
             <i class="bi bi-chevron-right"></i>
           </a>
         </li>

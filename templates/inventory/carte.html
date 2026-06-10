@@ -362,8 +362,10 @@
   transition: all .15s;
 }
 .face-card:hover { box-shadow: var(--shadow-sm); }
-.face-card.dispo  { border-color: #6ee7b7; background: #f0fdf4; }
-.face-card.occupe { border-color: #fcd34d; background: #fffbeb; }
+.face-card.dispo  { border-color: var(--color-disponible); background: var(--color-disponible_bg); }
+.face-card.occupe { border-color: var(--color-occupe); background: var(--color-occupe_bg); }
+.face-card.panne { border-color: var(--color-panne); background: var(--color-panne_bg); }
+.face-card.reserve { border-color: var(--color-reserve); background: var(--color-reserve_bg); }
 
 /* ── Occupation bar ──────────────────────────────────────── */
 .occ-bar { height: 6px; background: var(--map-border); border-radius: 4px; overflow: hidden; margin-top: 6px; }
@@ -793,49 +795,109 @@ function renderSidePanel(d) {
   // ── Faces panneau ──
   if (d.faces) {
     html += `<div class="sp-section">Faces du panneau</div>`;
-    d.faces.forEach(face => {
-      html += `<div class="face-card ${face.disponible?'dispo':'occupe'}">
-        <div style="display:flex;justify-content:space-between;align-items:center">
-          <span style="font-weight:700;font-size:.84rem">Face ${face.label}</span>
-          <span style="font-size:.68rem;font-weight:800;color:${face.disponible?'#059669':'#d97706'}">
-            ${face.disponible?'✓ LIBRE':'✗ OCCUPÉE'}
-          </span>
-        </div>
-        <div style="font-size:.73rem;color:var(--map-muted);margin-top:2px">${face.format||''} · ${face.eclairage||''}</div>`;
+      d.faces.forEach(face => {
+        const isPanne   = face.statut === 'panne';
+        const isOccupe  = face.statut === 'occupe';
+        const isReserve = face.statut === 'reserve';
+        const isLibre   = face.statut === 'libre';
 
-      if (!face.disponible) {
-        if (face.visuel_url) {
-          const isVideo = /\.(mp4|webm|mov)$/i.test(face.visuel_url);
-          html += `<div class="campagne-visuel-wrap" onclick="openLightboxUrl('${face.visuel_url}','${face.client||''} — ${face.campagne_nom||''}')">
-            ${isVideo
-              ? `<video src="${face.visuel_url}" muted style="width:100%;height:128px;object-fit:cover;display:block"></video>
-                 <div class="cv-tag"><i class="bi bi-camera-video-fill"></i>Vidéo</div>`
-              : `<img src="${face.visuel_url}" alt="Visuel campagne" loading="lazy">`
-            }
-            <div class="cv-overlay">
-              <span class="cv-client"><i class="bi bi-person-fill me-1"></i>${face.client||''}</span>
-              <span class="cv-zoom"><i class="bi bi-zoom-in"></i></span>
-            </div>
+        // Couleur et label selon statut
+        const statusColor = isPanne   ? '#dc2626'
+                          : isOccupe  ? '#16a34a'
+                          : isReserve ? '#7c3aed'
+                          : '#6c757d';
+        const statusLabel = isPanne   ? '✗ EN PANNE'
+                          : isOccupe  ? '✗ OCCUPÉE'
+                          : isReserve ? '◈ RÉSERVÉE'
+                          : '✓ LIBRE';
+        const cardClass   = isPanne   ? 'panne'
+                          : isOccupe  ? 'occupe'
+                          : isReserve ? 'reserve'
+                          : 'dispo';
+
+        html += `<div class="face-card ${cardClass}">
+          <div style="display:flex;justify-content:space-between;align-items:center">
+            <span style="font-weight:700;font-size:.84rem">Face ${face.label}</span>
+            <span style="font-size:.68rem;font-weight:800;color:${statusColor}">
+              ${statusLabel}
+            </span>
           </div>
-          <div style="font-size:.68rem;color:var(--map-muted);margin-top:4px;display:flex;justify-content:space-between">
-            <span style="font-family:'SF Mono',monospace;color:#94a3b8">${face.campagne_ref||''}</span>
-            <span><i class="bi bi-calendar3 me-1"></i>${face.date_debut||''} → ${face.date_fin||''}</span>
+          <div style="font-size:.73rem;color:var(--map-muted);margin-top:2px">
+            ${face.format||''} · ${face.eclairage||''}
           </div>`;
-        } 
-        
-        else {
-          html += `<div class="campagne-no-visuel">
-            <div class="cnv-icon"><i class="bi bi-image"></i></div>
-            <div class="cnv-info">
-              <div class="cnv-client"><i class="bi bi-person-fill me-1"></i>${face.client||''}</div>
-              <div class="cnv-dates"><i class="bi bi-calendar3 me-1"></i>${face.date_debut||''} → ${face.date_fin||''}</div>
-              <div class="cnv-ref">${face.campagne_ref||''} · ${face.campagne_statut||''}</div>
-            </div>
+
+        // ── Face en panne ─────────────────────────────────────────────
+        if (isPanne) {
+          html += `<div style="
+              margin-top:8px;
+              padding:8px 10px;
+              background:rgba(239,68,68,.08);
+              border:1px solid rgba(239,68,68,.25);
+              border-radius:6px;
+              font-size:.72rem;
+              color:#ef4444;
+              display:flex;
+              align-items:center;
+              gap:6px">
+            <i class="bi bi-exclamation-triangle-fill"></i>
+            Face hors service — en attente de maintenance
           </div>`;
         }
-      }
-      html += `</div>`;
-    });
+
+        // ── Face occupée ──────────────────────────────────────────────
+        else if (isOccupe) {
+          if (face.visuel_url) {
+            const isVideo = /\.(mp4|webm|mov)$/i.test(face.visuel_url);
+            html += `<div class="campagne-visuel-wrap" onclick="openLightboxUrl('${face.visuel_url}','${face.client||''} — ${face.campagne_nom||''}')">
+              ${isVideo
+                ? `<video src="${face.visuel_url}" muted style="width:100%;height:128px;object-fit:cover;display:block"></video>
+                  <div class="cv-tag"><i class="bi bi-camera-video-fill"></i>Vidéo</div>`
+                : `<img src="${face.visuel_url}" alt="Visuel campagne" loading="lazy">`
+              }
+              <div class="cv-overlay">
+                <span class="cv-client"><i class="bi bi-person-fill me-1"></i>${face.client||''}</span>
+                <span class="cv-zoom"><i class="bi bi-zoom-in"></i></span>
+              </div>
+            </div>
+            <div style="font-size:.68rem;color:var(--map-muted);margin-top:4px;display:flex;justify-content:space-between">
+              <span style="font-family:'SF Mono',monospace;color:#94a3b8">${face.campagne_ref||''}</span>
+              <span><i class="bi bi-calendar3 me-1"></i>${face.date_debut||''} → ${face.date_fin||''}</span>
+            </div>`;
+          } else {
+            html += `<div class="campagne-no-visuel">
+              <div class="cnv-icon"><i class="bi bi-image"></i></div>
+              <div class="cnv-info">
+                <div class="cnv-client"><i class="bi bi-person-fill me-1"></i>${face.client||''}</div>
+                <div class="cnv-dates"><i class="bi bi-calendar3 me-1"></i>${face.date_debut||''} → ${face.date_fin||''}</div>
+                <div class="cnv-ref">${face.campagne_ref||''} · ${face.campagne_statut||''}</div>
+              </div>
+            </div>`;
+          }
+        }
+
+        // ── Face réservée ─────────────────────────────────────────────
+        else if (isReserve) {
+          html += `<div style="
+              margin-top:8px;
+              padding:8px 10px;
+              background:rgba(124,58,237,.08);
+              border:1px solid rgba(124,58,237,.25);
+              border-radius:6px;
+              font-size:.72rem;
+              color:#7c3aed;
+              display:flex;
+              align-items:center;
+              gap:6px">
+            <i class="bi bi-bookmark-fill"></i>
+            ${face.client_reserve ? `Réservée par <strong>${face.client_reserve}</strong>` : 'Réservée'}
+            ${face.date_debut ? `<span style="margin-left:auto;color:var(--map-muted)">
+              <i class="bi bi-calendar3 me-1"></i>${face.date_debut} → ${face.date_fin||''}
+            </span>` : ''}
+          </div>`;
+        }
+
+        html += `</div>`;
+      });
   }
 
   // ── Écran ──

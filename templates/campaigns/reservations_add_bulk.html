@@ -1,0 +1,329 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ mode_title }} — Integral{% endblock %}
+
+{% block topbar_title %}
+  <i class="bi bi-calendar-check me-2" style="color:var(--color-primary)"></i>
+  {{ mode_title }} — {{ client.nom }}
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="row justify-content-center">
+    <div class="col-12">
+      
+      <!-- Bouton Retour & Titre -->
+      <div class="d-flex align-items-center gap-3 mb-4">
+        <a href="{% url 'client_detail' client.pk %}" class="btn btn-outline-secondary btn-sm shadow-sm">
+          <i class="bi bi-arrow-left"></i>
+        </a>
+        <h1 class="h4 fw-bold mb-0">{{ mode_title }}</h1>
+      </div>
+      
+      <!-- Fiche Récapitulative Client -->
+      <div class="card shadow-sm border-0 mb-4" style="border-radius: 12px;">
+        <div class="card-header bg-transparent border-bottom py-3">
+          <h6 class="mb-0 fw-bold"><i class="bi bi-info-circle me-2 text-primary"></i>Informations du client</h6>
+        </div>
+        <div class="card-body p-4">
+          <div class="d-flex align-items-center gap-3 flex-wrap">
+            <div class="bg-light rounded-3 p-2 border" style="width: 64px; height: 64px;">
+              {% if client.logo %}
+                <img src="{{ client.logo.url }}" class="w-100 h-100 object-fit-contain rounded" alt="Logo">
+              {% else %}
+                <div class="w-100 h-100 d-flex align-items-center justify-content-center text-muted">
+                  <i class="bi bi-building fs-3"></i>
+                </div>
+              {% endif %}
+            </div>
+
+            <div class="flex-grow-1 min-width-0">
+              <h4 class="fw-bold mb-1 text-truncate text-dark">{{ client.nom }}</h4>
+              <div class="d-flex align-items-center gap-2 flex-wrap small text-muted">
+                {% if client.telephone %}<span><i class="bi bi-telephone me-1"></i>{{ client.telephone }}</span>{% endif %}
+                {% if client.email %}
+                  <span>•</span>
+                  <span><i class="bi bi-envelope me-1"></i>{{ client.email }}</span>
+                {% endif %}
+              </div>
+            </div>
+
+            <div>
+              <span class="badge bg-light text-dark border px-3 py-2">
+                {{ client.get_type_contrat_display }}
+              </span>
+            </div>
+          </div>
+
+          {% if client.notes %}
+            <hr class="opacity-10 my-3">
+            <div class="p-3 bg-light rounded-3 border-start border-4 border-primary">
+              <div class="d-flex gap-2">
+                <i class="bi bi-chat-left-dots text-primary"></i>
+                <p class="mb-0 small text-muted lh-sm fst-italic">{{ client.notes }}</p>
+              </div>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Formulaire Principal de Réservation -->
+      <form method="post" id="bulk-reservation-form" class="card shadow-sm border-0" style="border-radius: 12px;">
+        {% csrf_token %}
+        
+        <div class="card-header bg-transparent border-bottom py-3">
+          <div class="fw-bold text-primary">
+            <i class="bi bi-1-circle-fill me-2"></i>1. Période de la réservation
+          </div>
+        </div>
+        <div class="card-body bg-light-subtle border-bottom p-4">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label for="date_debut" class="form-label small fw-bold text-muted text-uppercase">Date de début</label>
+              <div class="input-group">
+                <span class="input-group-text bg-white"><i class="bi bi-calendar-plus text-success"></i></span>
+                <input type="datetime-local" name="date_debut" id="date_debut" class="form-control date-trigger" value="{{ date_debut }}" required>
+              </div>
+            </div>
+            <div class="col-md-6">
+              <label for="date_fin" class="form-label small fw-bold text-muted text-uppercase">Date de fin</label>
+              <div class="input-group">
+                <span class="input-group-text bg-white"><i class="bi bi-calendar-minus text-danger"></i></span>
+                <input type="datetime-local" name="date_fin" id="date_fin" class="form-control date-trigger" value="{{ date_fin }}" required>
+              </div>
+            </div>
+          </div>
+
+          <!-- CORRECTION #5 : Message d'erreur si dates incohérentes -->
+          <div id="date-error" class="alert alert-warning py-2 small d-none mt-3 mb-0">
+            <i class="bi bi-exclamation-triangle me-1"></i>
+            La date de fin doit être postérieure à la date de début.
+          </div>
+        </div>
+        
+        <div class="card-footer bg-light p-3 d-flex justify-content-end gap-2">
+          <a href="{% url 'client_detail' client.pk %}" class="btn btn-light border px-4">Annuler</a>
+          <button type="submit" id="btn-submit" class="btn btn-primary px-4 shadow-sm" disabled>
+            <i class="bi bi-check-lg me-1"></i> Confirmer la sélection
+          </button>
+        </div>
+
+        <div class="card-header bg-transparent border-bottom py-3 d-flex justify-content-between align-items-center">
+          <div class="fw-bold text-secondary" id="section-faces-title">
+            <i class="bi bi-2-circle-fill me-2"></i>2. Sélectionner les faces disponibles 
+            <span class="badge bg-light text-dark border ms-2 fw-normal">{{ supports|length }} panneau(x) total</span>
+          </div>
+          <div id="loading-spinner" class="spinner-border spinner-border-sm text-primary d-none" role="status"></div>
+        </div>
+
+        <div class="card-body p-4 bg-light-subtle">
+          {% if supports %}
+            <div class="row g-4">
+              {% for support in supports %}
+                <div class="col-md-6 col-xl-4">
+                  <div class="card h-100 border rounded-3 overflow-hidden shadow-sm bg-white">
+                    
+                    <div class="card-header bg-light border-bottom p-3">
+                      <h6 class="fw-bold mb-1 text-truncate">{{ support.code }} — {{ support.nom }}</h6>
+                      <div class="small text-muted"><i class="bi bi-geo-alt me-1"></i>{{ support.adresse|default:"Ouagadougou" }}</div>
+                    </div>
+
+                    <div class="card-body p-3">
+                      <div class="row g-2">
+                        {% for face in support.faces.all %}
+                          <div class="col-12 face-wrapper" data-face-id="{{ face.pk }}">
+                            <div class="position-relative face-container">
+                              <input type="checkbox" name="faces" value="{{ face.pk }}" id="face_{{ face.pk }}" class="btn-check face-checkbox" {% if face.pk in selectionnes %}checked{% endif %} autocomplete="off">
+                              
+                              <label class="btn btn-outline-primary w-100 text-start p-3 d-flex justify-content-between align-items-center rounded-3 face-label-element" for="face_{{ face.pk }}">
+                                <span class="d-flex align-items-center">
+                                  <i class="bi bi-circle check-icon fs-5 me-2"></i>
+                                  <span>
+                                    <strong class="d-block">Face {{ face.label }}</strong>
+                                    <small class="opacity-75">{{ face.get_format_display }} • {{ face.get_eclairage_display }}</small>
+                                  </span>
+                                </span>
+                                <span class="badge status-badge bg-success-subtle text-success border border-success-subtle">Libre</span>
+                              </label>
+                            </div>
+                          </div>
+                        {% endfor %}
+                      </div>
+                    </div>
+
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="text-center py-5">
+              <i class="bi bi-inbox text-muted" style="font-size: 3rem; opacity: 0.3;"></i>
+              <h5 class="mt-3 fw-bold text-muted">Aucun panneau disponible</h5>
+            </div>
+          {% endif %}
+        </div>
+
+        <div class="card-footer bg-light p-3 d-flex justify-content-end gap-2">
+          <a href="{% url 'client_detail' client.pk %}" class="btn btn-light border px-4">Annuler</a>
+          <button type="submit" id="btn-submit" class="btn btn-primary px-4 shadow-sm" disabled>
+            <i class="bi bi-check-lg me-1"></i> Confirmer la sélection
+          </button>
+        </div>
+      </form>
+
+    </div>
+  </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const dateDebutInput = document.getElementById('date_debut');
+    const dateFinInput   = document.getElementById('date_fin');
+    const btnSubmit      = document.getElementById('btn-submit');
+    const spinner        = document.getElementById('loading-spinner');
+    const dateErrorEl    = document.getElementById('date-error');  // CORRECTION #5
+    const faceWrappers   = document.querySelectorAll('.face-wrapper');
+
+    // Empêche de choisir une date passée si les champs sont vides
+    const maintenant = new Date().toISOString().slice(0, 16);
+    if (!dateDebutInput.value) {
+        dateDebutInput.min = maintenant;
+    }
+
+    function verifierDisponibilites() {
+        const dateDebut = dateDebutInput.value;
+        const dateFin   = dateFinInput.value;
+
+        // Synchronise le min de date_fin avec date_debut
+        if (dateDebut) {
+            dateFinInput.min = dateDebut;
+        }
+
+        // CORRECTION #5 : Affiche un message clair si les dates sont incohérentes
+        if (!dateDebut || !dateFin || dateDebut >= dateFin) {
+            btnSubmit.disabled = true;
+            reinitialiserFaces();
+            if (dateDebut && dateFin && dateDebut >= dateFin) {
+                dateErrorEl.classList.remove('d-none');
+            } else {
+                dateErrorEl.classList.add('d-none');
+            }
+            return;
+        }
+        dateErrorEl.classList.add('d-none');
+
+        spinner.classList.remove('d-none');
+        btnSubmit.disabled = true;
+
+        // CORRECTION #4 : L'URL de l'API inclut maintenant le client_pk
+        fetch(`{% url 'api_check_dispo' client.pk %}?date_debut=${dateDebut}&date_fin=${dateFin}`)
+            .then(response => {
+                if (!response.ok) throw new Error("Erreur réponse API");
+                return response.json();
+            })
+            .then(data => {
+                const occupeesIds = data.faces_occupees || [];
+
+                faceWrappers.forEach(wrapper => {
+                    const faceId     = parseInt(wrapper.getAttribute('data-face-id'));
+                    const checkbox   = wrapper.querySelector('.face-checkbox');
+                    const labelEl    = wrapper.querySelector('.face-label-element');
+                    const statusBadge = wrapper.querySelector('.status-badge');
+                    const checkIcon  = wrapper.querySelector('.check-icon');
+
+                    if (occupeesIds.includes(faceId)) {
+                        // Face occupée par un autre client → verrouillée
+                        checkbox.checked = false;
+                        checkbox.disabled = true;
+                        labelEl.style.pointerEvents = 'none';
+                        labelEl.className = "btn btn-light w-100 text-start p-3 d-flex justify-content-between align-items-center rounded-3 opacity-50 face-label-element";
+                        statusBadge.className = "badge bg-danger-subtle text-danger border border-danger-subtle status-badge";
+                        statusBadge.textContent = "Occupée";
+                        checkIcon.className = "bi bi-lock-fill text-muted fs-5 me-2 check-icon";
+                    } else {
+                        // Face libre → on restaure son état selon si elle est cochée ou non
+                        checkbox.disabled = false;
+                        labelEl.style.pointerEvents = 'auto';
+
+                        if (checkbox.checked) {
+                            labelEl.className = "btn btn-primary w-100 text-start p-3 d-flex justify-content-between align-items-center rounded-3 face-label-element";
+                            statusBadge.className = "badge bg-white text-primary border status-badge";
+                            statusBadge.textContent = "Sélectionnée";
+                            checkIcon.className = "bi bi-check-circle-fill fs-5 me-2 check-icon";
+                        } else {
+                            labelEl.className = "btn btn-outline-primary w-100 text-start p-3 d-flex justify-content-between align-items-center rounded-3 face-label-element";
+                            statusBadge.className = "badge bg-success-subtle text-success border border-success-subtle status-badge";
+                            statusBadge.textContent = "Libre";
+                            checkIcon.className = "bi bi-circle fs-5 me-2 check-icon";
+                        }
+                    }
+                });
+
+                btnSubmit.disabled = false;
+                spinner.classList.add('d-none');
+            })
+            .catch(error => {
+                console.error('Erreur API:', error);
+                spinner.classList.add('d-none');
+                // En cas de panne de l'API, on débloque par sécurité
+                faceWrappers.forEach(wrapper => {
+                    const checkbox = wrapper.querySelector('.face-checkbox');
+                    const labelEl  = wrapper.querySelector('.face-label-element');
+                    checkbox.disabled = false;
+                    labelEl.style.pointerEvents = 'auto';
+                });
+                btnSubmit.disabled = false;
+            });
+    }
+
+    function reinitialiserFaces() {
+        faceWrappers.forEach(wrapper => {
+            const checkbox    = wrapper.querySelector('.face-checkbox');
+            const labelEl     = wrapper.querySelector('.face-label-element');
+            const statusBadge = wrapper.querySelector('.status-badge');
+            const checkIcon   = wrapper.querySelector('.check-icon');
+
+            checkbox.disabled = true;
+            labelEl.style.pointerEvents = 'none';
+            labelEl.className = "btn btn-outline-secondary w-100 text-start p-3 d-flex justify-content-between align-items-center rounded-3 opacity-75 face-label-element";
+            statusBadge.className = "badge bg-light text-muted border status-badge";
+            statusBadge.textContent = "En attente de dates";
+            checkIcon.className = "bi bi-calendar-event fs-5 me-2 check-icon";
+        });
+    }
+
+    // Écouteurs sur les champs de dates
+    dateDebutInput.addEventListener('input', verifierDisponibilites);
+    dateFinInput.addEventListener('input', verifierDisponibilites);
+
+    // Gestion du changement d'état des checkboxes (cases cochées manuellement)
+    document.querySelectorAll('.face-checkbox').forEach(checkbox => {
+        checkbox.addEventListener('change', function() {
+            const wrapper     = this.closest('.face-wrapper');
+            const labelEl     = wrapper.querySelector('.face-label-element');
+            const statusBadge = wrapper.querySelector('.status-badge');
+            const checkIcon   = wrapper.querySelector('.check-icon');
+
+            if (this.checked) {
+                labelEl.className = "btn btn-primary w-100 text-start p-3 d-flex justify-content-between align-items-center rounded-3 face-label-element";
+                checkIcon.className = "bi bi-check-circle-fill fs-5 me-2 check-icon";
+                statusBadge.className = "badge bg-white text-primary border status-badge";
+                statusBadge.textContent = "Sélectionnée";
+            } else {
+                labelEl.className = "btn btn-outline-primary w-100 text-start p-3 d-flex justify-content-between align-items-center rounded-3 face-label-element";
+                checkIcon.className = "bi bi-circle fs-5 me-2 check-icon";
+                statusBadge.className = "badge bg-success-subtle text-success border border-success-subtle status-badge";
+                statusBadge.textContent = "Libre";
+            }
+        });
+    });
+
+    // Évaluation initiale au chargement de la page
+    if (dateDebutInput.value && dateFinInput.value) {
+        verifierDisponibilites();
+    } else {
+        reinitialiserFaces();
+    }
+});
+</script>
+{% endblock %}

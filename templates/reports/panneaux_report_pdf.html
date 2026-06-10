@@ -3,368 +3,455 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>État des panneaux — {{ today|date:"d/m/Y" }} — </title>
     <style>
+        /* ── Variables ── */
         :root {
-            --color-disponible:  {{ DESIGN.COLOR_DISPONIBLE }};
-            --color-occupe:      {{ DESIGN.COLOR_OCCUPE }};
-            --color-maintenance: {{ DESIGN.COLOR_MAINTENANCE }};
-            --color-primary:     {{ DESIGN.COLOR_PRIMARY }};
-            --color-secondary:   {{ DESIGN.COLOR_SECONDARY }};
-            --color-noir:        {{ DESIGN.COLOR_NOIR }};
-            --bg:       #f1f5f9;
-            --bg-card:  #ffffff;
-            --bg-card2: #f8fafc;
-            --border:   #e2e8f0;
-            --text:     #1e293b;
-            --text-muted: #64748b;
-            --radius:    8px;
+            --primary:    {{ DESIGN.COLOR_PRIMARY }};
+            --primary-lt: #E2E8F0;
+            --green-bg:   #DCFCE7;
+            --green-tx:   #166534;
+            --indigo-bg:  #EDE9FE;
+            --indigo-tx:  #5B21B6;
+            --gray-bg:    #F1F5F9;
+            --gray-tx:    #64748B;
+            --panne-row:  #FFF7ED;
+            --panne-bord: #FED7AA;
+            --panne-face: #FEE2E2;
+            --panne-tx:   #991B1B;
+            --panne-row-tx: #9A3412;
+            --border:     #E2E8F0;
+            --radius:     4px;
         }
 
-        @page {
-            size: A4 landscape;
-            margin: 1.5cm 1cm;
-            @bottom-center {
-                content: "Document généré le {{ today }} — Page " counter(page) " / " counter(pages);
-                font-family: Arial, sans-serif;
-                font-size: 7pt;
-                color: #64748b;
-            }
-        }
-
+        /* ── Reset ── */
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
             font-family: Arial, sans-serif;
-            font-size: 8pt;
-            color: var(--text);
+            font-size: 9pt;
+            color: #0F172A;
+            background: #f8fafc;
+        }
+
+        /* ══════════════════════════════
+           ÉCRAN : mise en page normale
+        ══════════════════════════════ */
+
+
+        /* ── Barre d'actions (masquée à l'impression) ── */
+        .print-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--primary);
+            color: var(--primary-lt);
+            padding: 10px 16px;
+            border-radius: var(--radius);
+            margin-bottom: 16px;
+            font-size: 9pt;
+        }
+        .print-bar span { opacity: 0.7; }
+        .btn-print {
             background: #fff;
+            color: var(--primary);
+            border: none;
+            padding: 7px 18px;
+            border-radius: var(--radius);
+            font-weight: bold;
+            font-size: 9pt;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
+        .btn-print:hover { background: var(--primary-lt); }
 
-        /* ── Filigrane ── */
-        .watermarked-card::before {
-            content: "";
-            position: fixed;
-            top: 50%; left: 50%;
-            transform: translate(-50%, -50%) rotate(-15deg);
-            width: 500px; height: 500px;
-            background-image: url("{% static 'img/logo.png' %}");
-            background-size: contain;
-            background-repeat: no-repeat;
-            background-position: center;
-            opacity: 0.4;
-            z-index: 1000;
-            pointer-events: none;
-        }
-
-        /* ── En-tête ── */
+        /* ── En-tête document ── */
         .doc-header {
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 14px;
             padding-bottom: 10px;
-            border-bottom: 3px solid var(--color-primary);
-            position: relative; z-index: 10;
+            border-bottom: 3px solid var(--primary);
+            margin-bottom: 14px;
         }
-        .doc-header-logo { margin-right: 14px; display: flex; align-items: center; }
-        .doc-logo        { height: 55px; width: auto; object-fit: contain; }
-        .doc-header-center { flex: 1; text-align: center; }
-        .doc-brand {
-            font-size: 7pt; font-weight: bold; color: var(--text-muted);
-            letter-spacing: 1px; text-transform: uppercase; margin-bottom: 3px;
-        }
-        .doc-title {
-            font-size: 15pt; font-weight: bold;
-            color: var(--color-primary); text-transform: uppercase; line-height: 1.2;
-        }
-        .doc-meta { font-size: 7.5pt; color: var(--text-muted); margin-top: 4px; }
-        .doc-meta strong { color: var(--color-primary); }
-        .doc-header-right {
-            text-align: right; font-size: 7.5pt;
-            color: var(--text-muted); line-height: 1.6;
-        }
-
-        /* ── Filtres actifs ── */
-        .filters-bar {
-            display: flex; flex-wrap: wrap; gap: 5px;
-            margin-bottom: 10px; position: relative; z-index: 10;
-        }
-        .filter-tag {
-            background: var(--bg-card2); border: 0.5px solid var(--border);
-            border-radius: 3px; padding: 2px 7px;
-            font-size: 7pt; color: var(--text-muted);
-        }
-        .filter-tag strong { color: var(--color-primary); }
-
-        /* ── Bandeau section ── */
-        .section-header {
-            display: flex; align-items: center; justify-content: center;
-            margin: 14px 0 8px 0;
-            background: var(--color-primary);
-            border-radius: 4px; padding: 7px 14px;
-            position: relative; z-index: 10;
-            page-break-inside: avoid;
-        }
-        .section-header::before,
-        .section-header::after { content: "◆"; color: var(--color-secondary); font-size: 9pt; margin: 0 10px; }
-        .section-title {
-            font-size: 11pt; font-weight: bold;
-            color: #fff; text-transform: uppercase; letter-spacing: 2px;
-        }
+        .doc-logo       { height: 50px; width: auto; object-fit: contain; }
+        .doc-center     { flex: 1; text-align: center; }
+        .doc-brand      { font-size: 7pt; font-weight: bold; color: var(--gray-tx); letter-spacing: 1px; text-transform: uppercase; }
+        .doc-title      { font-size: 16pt; font-weight: bold; color: var(--primary); text-transform: uppercase; }
+        .doc-meta       { font-size: 8pt; color: var(--gray-tx); margin-top: 3px; }
+        .doc-meta strong { color: var(--primary); }
+        .doc-right      { font-size: 8pt; color: var(--gray-tx); text-align: right; line-height: 1.7; }
 
         /* ── KPI ── */
         .kpi-row {
-            display: flex; gap: 8px; margin-bottom: 12px;
-            position: relative; z-index: 10;
+            display: flex;
+            gap: 8px;
+            margin-bottom: 14px;
         }
         .kpi-box {
-            flex: 1; min-width: 3cm;
-            background: var(--bg-card2); border: 0.5px solid var(--border);
-            border-radius: var(--radius); padding: 8px 10px; text-align: center;
+            flex: 1;
+            background: #fff;
+            border: 0.5px solid var(--border);
+            border-radius: var(--radius);
+            padding: 8px 10px;
+            text-align: center;
         }
-        .kpi-box.primary  { border: 3px solid var(--color-primary); }
-        .kpi-box.success  { border: 3px solid #16a34a; }
-        .kpi-box.warning  { border: 3px solid #f59e0b; }
-        .kpi-box.occupe   { border: 3px solid var(--color-occupe); }
-        .kpi-label {
-            font-size: 6.5pt; color: var(--text-muted);
-            text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px;
+        .kpi-box.k-primary { border-top: 3px solid var(--primary); }
+        .kpi-box.k-green   { border-top: 3px solid var(--green-tx); }
+        .kpi-box.k-indigo  { border-top: 3px solid var(--indigo-tx); }
+        .kpi-box.k-occupe  { border-top: 3px solid #d97706; }
+        .kpi-label { font-size: 6.5pt; color: var(--gray-tx); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 3px; }
+        .kpi-val   { font-size: 18pt; font-weight: bold; }
+        .k-primary .kpi-val { color: var(--primary); }
+        .k-green   .kpi-val { color: var(--green-tx); }
+        .k-indigo  .kpi-val { color: var(--indigo-tx); }
+        .k-occupe  .kpi-val { color: #d97706; }
+
+        /* ── Bandeau section ── */
+        .section-header {
+            background: var(--primary);
+            border-radius: var(--radius);
+            padding: 7px 14px;
+            text-align: center;
+            margin-bottom: 10px;
+            color: #fff;
+            font-size: 10pt;
+            font-weight: bold;
+            text-transform: uppercase;
+            letter-spacing: 2px;
         }
-        .kpi-val { font-size: 18pt; font-weight: bold; }
-        .kpi-box.primary .kpi-val { color: var(--color-primary); }
-        .kpi-box.success  .kpi-val { color: #16a34a; }
-        .kpi-box.warning  .kpi-val { color: #f59e0b; }
-        .kpi-box.occupe   .kpi-val { color: var(--color-occupe); }
 
         /* ── Tableau ── */
         table {
-            width: 100%; border-collapse: collapse;
+            width: 100%;
+            border-collapse: collapse;
             table-layout: fixed;
-            position: relative; z-index: 10;
+            background: #fff;
         }
+        col.c-code     { width: 90px; }
+        col.c-nom      { width: 220px; }
+        col.c-ville    { width: 100px; }
+        col.c-quartier { width: 100px; }
+        col.c-adresse  { width: 160px; }
+        col.c-statut   { width: 80px; }
+        col.c-faces    { width: auto; }
 
-        col.c-code     { width: 1.8cm; }
-        col.c-nom      { width: 10cm; }
-        col.c-ville    { width: 2.2cm; }
-        col.c-quartier { width: 2.2cm; }
-        col.c-adresse  { width: 4cm;   }
-        col.c-statut   { width: 2cm;   }
-        col.c-detail   { width: auto;  }
-
-        thead tr th {
-            background-color: var(--color-primary); color: #fff;
-            font-size: 7.5pt; font-weight: bold;
-            text-align: center; padding: 6px 4px;
+        thead th {
+            background: var(--primary);
+            color: #fff;
+            font-size: 8pt;
+            font-weight: bold;
+            padding: 7px 5px;
+            text-align: center;
             border: 0.5px solid rgba(255,255,255,0.15);
         }
-        thead tr th.left { text-align: left; padding-left: 6px; }
-        thead { display: table-header-group; }
+        thead th.left { text-align: left; padding-left: 8px; }
 
-        tbody tr td {
-            padding: 4px 3px;
+        tbody td {
+            padding: 5px 4px;
             border: 0.5px solid var(--border);
-            vertical-align: middle; text-align: center;
+            vertical-align: middle;
+            font-size: 8pt;
+            text-align: center;
         }
-        tbody tr td.left { text-align: left; padding-left: 6px; }
+        tbody td.left { text-align: left; padding-left: 8px; }
 
-        tbody tr.row-data:nth-child(even) { background-color: var(--bg-card2); }
-        tbody tr.row-data:nth-child(odd)  { background-color: #ffffff; }
+        tbody tr.row-normal:nth-child(even) td { background: #f8fafc; }
+        tbody tr.row-normal:nth-child(odd)  td { background: #ffffff; }
 
-        /* ── Badges ── */
+        tbody tr.row-panne td {
+            background: var(--panne-row) !important;
+            color: var(--panne-row-tx);
+            border-color: var(--panne-bord);
+        }
+
+        /* ── Badge statut ── */
         .badge {
-            display: inline-block; font-size: 6.5pt; font-weight: bold;
-            border-radius: 3px; padding: 1px 5px;
-            text-transform: uppercase; letter-spacing: 0.3px;
+            display: inline-block;
+            font-size: 7pt;
+            font-weight: bold;
+            border-radius: 3px;
+            padding: 2px 6px;
+            text-transform: uppercase;
         }
-        .badge-libre       { background: #dcfce7; color: #166534; }
-        .badge-occupe      { background: #fff3cd; color: #856404; }
-        .badge-complet     { background: #fee2e2; color: #991b1b; }
-        .badge-actif       { background: #dcfce7; color: #166534; }
-        .badge-inactif     { background: #f1f5f9; color: #475569; }
-        .badge-maintenance { background: #fef9c3; color: #854d0e; }
-        .badge-bon         { background: #dcfce7; color: #166534; }
-        .badge-panne       { background: #fee2e2; color: #991b1b; }
+        .badge-bon   { background: var(--green-bg); color: var(--green-tx); }
+        .badge-panne { background: var(--panne-face); color: var(--panne-tx); }
 
         /* ── Faces ── */
-        .faces-list {
-            display: flex;
-            flex-direction: row;
-            gap: 5px;
-        }
+        .faces-list { display: flex; flex-direction: column; gap: 4px; }
+
         .face-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 7.5pt;
+            font-weight: bold;
+            border-radius: 3px;
+            padding: 3px 7px;
+        }
+        .face-tag.occupe  { background: var(--green-bg);   color: var(--green-tx); }
+        .face-tag.reserve { background: var(--indigo-bg);  color: var(--indigo-tx); }
+        .face-tag.panne   { background: var(--panne-face); color: var(--panne-tx); }
+
+        /* ── Champ de saisie face libre ── */
+        .face-input-wrap {
             display: flex;
             align-items: center;
             gap: 5px;
-            font-size: 6.5pt;
+        }
+        .face-input-label {
+            font-size: 7.5pt;
             font-weight: bold;
+            color: var(--gray-tx);
+            white-space: nowrap;
+            min-width: 38px;
+        }
+        .face-input {
+            flex: 1;
+            height: 22px;
+            border: 1px solid #cbd5e1;
             border-radius: 3px;
-            padding: 3px 6px;
-            width: 100%;
+            padding: 0 6px;
+            font-size: 7.5pt;
+            font-family: Arial, sans-serif;
+            color: var(--primary);
+            background: #fff;
+            outline: none;
+            min-width: 80px;
         }
-        .face-tag.libre  {
-            background: #dcfce7;
-            color: #166534;
+        .face-input:focus {
+            border-color: #94a3b8;
+            box-shadow: 0 0 0 2px rgba(148,163,184,0.2);
         }
-        .face-tag.occupe {
-            background: #fff3cd;
-            color: #856404;
-        }
-        .face-tag input[type="checkbox"] {
-            width: 11px;
-            height: 11px;
-            accent-color: #166534;
-            flex-shrink: 0;
-        }
+        .face-input::placeholder { color: #94a3b8; font-style: italic; }
 
-        /* ── Totaux ── */
-        tfoot td {
-            background: var(--bg); font-weight: bold;
-            font-size: 8.5pt; color: var(--color-primary);
-            border-top: 2px solid var(--color-primary);
-            padding: 5px 4px;
+        /* ── Légende ── */
+        .legend {
+            display: flex;
+            gap: 12px;
+            margin-top: 12px;
+            flex-wrap: wrap;
         }
 
         /* ── Pied de page ── */
         .doc-footer {
-            margin-top: 12px; text-align: center;
-            font-size: 7pt; color: var(--text-muted);
-            position: relative; z-index: 10;
+            margin-top: 12px;
+            text-align: center;
+            font-size: 7pt;
+            color: var(--gray-tx);
+        }
+
+        /* ══════════════════════════════
+           IMPRESSION
+        ══════════════════════════════ */
+        @media print {
+            @page {
+                size: A4 landscape;
+                margin: 1.2cm 1cm;
+                @bottom-center {
+                    content: "Document généré le {{ today|date:'d/m/Y' }} — Page " counter(page) " / " counter(pages);
+                    font-size: 7pt;
+                    color: #64748b;
+                    font-family: Arial, sans-serif;
+                }
+            }
+
+            body { background: #fff; font-size: 8pt; }
+
+            .page-wrapper { max-width: 100%; padding: 0; }
+
+            /* Masquer la barre d'actions */
+            .print-bar { display: none !important; }
+
+            /* Pas de saut de page dans les lignes */
+            tbody tr { page-break-inside: avoid; }
+
+            /* Les champs de saisie s'impriment avec leur valeur */
+            .face-input {
+                border: none;
+                border-bottom: 1px solid #94a3b8;
+                border-radius: 0;
+                background: transparent;
+                box-shadow: none;
+                padding: 0 2px;
+                height: auto;
+            }
+
+            /* Filigrane */
+            body::before {
+                content: "";
+                position: fixed;
+                top: 50%; left: 50%;
+                transform: translate(-50%, -50%) rotate(-15deg);
+                width: 400px; height: 400px;
+                background-image: url("{% static 'img/logo.png' %}");
+                background-size: contain;
+                background-repeat: no-repeat;
+                background-position: center;
+                opacity: 0.07;
+                z-index: 1000;
+                pointer-events: none;
+            }
         }
     </style>
 </head>
-<body class="watermarked-card">
+<body>
+<div class="page-wrapper">
 
-<!-- ══════════════════════ EN-TÊTE ══════════════════════ -->
-<div class="doc-header">
-    <div class="doc-header-logo">
+    <!-- ══ BARRE ACTIONS (écran seulement) ══ -->
+    <div class="print-bar">
+        <span>Remplissez les champs des faces libres, puis imprimez ou exportez en PDF.</span>
+        <button class="btn-print">
+            🖨 Imprimer / Exporter PDF
+        </button>
+    </div>
+
+    <!-- ══ EN-TÊTE ══ -->
+    <div class="doc-header">
         <img src="{% static 'img/logo.png' %}" alt="Logo" class="doc-logo">
+        <div class="doc-center">
+            <div class="doc-brand">Integral — Régie Publicitaire</div>
+            <div class="doc-title">État des Panneaux</div>
+            <div class="doc-meta">Rapport au <strong>{{ today|date:"d/m/Y" }}</strong></div>
+        </div>
+        <div class="doc-right">
+            Généré le {{ today|date:"d/m/Y" }}<br>
+            {% if filters.ville %}    <strong>Ville :</strong> {{ filters.ville }}<br>{% endif %}
+            {% if filters.quartier %} <strong>Quartier :</strong> {{ filters.quartier }}<br>{% endif %}
+            {% if filters.statut %}   <strong>Statut :</strong> {{ filters.statut }}<br>{% endif %}
+        </div>
     </div>
-    <div class="doc-header-center">
-        <div class="doc-brand">Integral — Régie Publicitaire</div>
-        <div class="doc-title">État des Panneaux</div>
-        <div class="doc-meta">Rapport au <strong>{{ today|date:"d/m/Y" }}</strong></div>
-    </div>
-    <div class="doc-header-right">
-        Généré le {{ today|date:"d/m/Y" }}<br>
-        {% if filters.ville %}    <strong>Ville :</strong> {{ filters.ville }}<br>{% endif %}
-        {% if filters.quartier %} <strong>Quartier :</strong> {{ filters.quartier }}<br>{% endif %}
-        {% if filters.statut %}   <strong>Statut :</strong> {{ filters.statut }}<br>{% endif %}
-    </div>
-</div>
 
-<!-- ══════════════════════ FILTRES ACTIFS ══════════════════════ -->
-{% with f=filters %}
-{% if f.ville or f.quartier or f.statut or f.occupation or f.q %}
-<div class="filters-bar">
-    <span class="filter-tag">Filtres actifs :</span>
-    {% if f.ville      %}<span class="filter-tag"><strong>Ville :</strong> {{ f.ville }}</span>{% endif %}
-    {% if f.quartier   %}<span class="filter-tag"><strong>Quartier :</strong> {{ f.quartier }}</span>{% endif %}
-    {% if f.statut     %}<span class="filter-tag"><strong>Statut :</strong> {{ f.statut }}</span>{% endif %}
-    {% if f.occupation %}<span class="filter-tag"><strong>Occupation :</strong> {{ f.occupation }}</span>{% endif %}
-    {% if f.q          %}<span class="filter-tag"><strong>Recherche :</strong> {{ f.q }}</span>{% endif %}
-</div>
-{% endif %}
-{% endwith %}
+    <!-- ══ KPI ══ -->
+    <div class="kpi-row">
+        <div class="kpi-box k-primary">
+            <div class="kpi-label">Panneaux</div>
+            <div class="kpi-val">{{ total_panneaux }}</div>
+        </div>
+        <div class="kpi-box k-primary">
+            <div class="kpi-label">Faces totales</div>
+            <div class="kpi-val">{{ total_faces }}</div>
+        </div>
+        <div class="kpi-box k-green">
+            <div class="kpi-label">Faces libres</div>
+            <div class="kpi-val">{{ total_libres }}</div>
+        </div>
+        <div class="kpi-box k-indigo">
+            <div class="kpi-label">Faces réservées</div>
+            <div class="kpi-val">{{ total_reservees }}</div>
+        </div>
+        <div class="kpi-box k-occupe">
+            <div class="kpi-label">Faces occupées</div>
+            <div class="kpi-val">{{ total_occupees }}</div>
+        </div>
+    </div>
 
-<!-- ══════════════════════ KPI ══════════════════════ -->
-<div class="kpi-row">
-    <div class="kpi-box primary">
-        <div class="kpi-label">Panneaux</div>
-        <div class="kpi-val">{{ total_panneaux }}</div>
-    </div>
-    <div class="kpi-box primary">
-        <div class="kpi-label">Faces totales</div>
-        <div class="kpi-val">{{ total_faces }}</div>
-    </div>
-    <div class="kpi-box success">
-        <div class="kpi-label">Faces libres</div>
-        <div class="kpi-val">{{ total_libres }}</div>
-    </div>
-    <div class="kpi-box warning">
-        <div class="kpi-label">Faces occupées</div>
-        <div class="kpi-val">{{ total_occupees }}</div>
-    </div>
-</div>
+    <!-- ══ SECTION ══ -->
+    <div class="section-header">◆ &nbsp; Inventaire des Panneaux &nbsp; ◆</div>
 
-<!-- ══════════════════════ SECTION ══════════════════════ -->
-<div class="section-header">
-    <span class="section-title">Inventaire des Panneaux</span>
-</div>
-
-<!-- ══════════════════════ TABLEAU ══════════════════════ -->
-<table>
-    <colgroup>
-        <col class="c-code">
-        <col class="c-nom">
-        <col class="c-ville">
-        <col class="c-quartier">
-        <col class="c-adresse">
-        <col class="c-statut">
-        <col class="c-detail">
-    </colgroup>
-    <thead>
-        <tr>
-            <th>CODE</th>
-            <th class="left">NOM</th>
-            <th>VILLE</th>
-            <th>QUARTIER</th>
-            <th class="left">ADRESSE</th>
-            <th>STATUT</th>
-            <th class="left">FACES</th>
-        </tr>
-    </thead>
-    <tbody>
-        {% for panneau in panneaux %}
-        <tr class="row-data">
-            <td><strong>{{ panneau.code }}</strong></td>
-            <td class="left">{{ panneau.nom }}</td>
-            <td>{{ panneau.ville|default:"—" }}</td>
-            <td>{{ panneau.quartier|default:"—" }}</td>
-            <td class="left" style="font-size:7pt;">{{ panneau.adresse|default:"—" }}</td>
-            <td>
-                <span class="badge badge-{{ panneau.etat_raw|default:'inactif' }}">
-                    {{ panneau.statut|default:"—" }}
-                </span>
-            </td>
-            <td class="left">
-              {% if panneau.statut == "Bon état" %}
-                <div class="faces-list">
-                {% for face_data in panneau.faces %}
-                    {% if face_data.occupee %}
-                        {% for camp in face_data.campagnes %}
-                        <span class="face-tag occupe">
-                            {{ face_data.label }} — {{ camp.client.nom }}
-                        </span>
-                        {% endfor %}
+    <!-- ══ TABLEAU ══ -->
+    <table>
+        <colgroup>
+            <col class="c-code">
+            <col class="c-nom">
+            <col class="c-ville">
+            <col class="c-quartier">
+            <col class="c-adresse">
+            <col class="c-statut">
+            <col class="c-faces">
+        </colgroup>
+        <thead>
+            <tr>
+                <th>CODE</th>
+                <th class="left">NOM</th>
+                <th>VILLE</th>
+                <th>QUARTIER</th>
+                <th class="left">ADRESSE</th>
+                <th>ÉTAT</th>
+                <th class="left">FACES</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for panneau in panneaux %}
+            <tr class="{% if panneau.etat_raw == 'panne' %}row-panne{% else %}row-normal{% endif %}">
+                <td><strong>{{ panneau.code }}</strong></td>
+                <td class="left">{{ panneau.nom }}</td>
+                <td>{{ panneau.ville|default:"—" }}</td>
+                <td>{{ panneau.quartier|default:"—" }}</td>
+                <td class="left" style="font-size:7pt;">{{ panneau.adresse|default:"—" }}</td>
+                <td>
+                    {% if panneau.etat_raw == 'panne' %}
+                        <span class="badge badge-panne">En panne</span>
                     {% else %}
-                        <span class="face-tag libre">
-                            <input type="checkbox">
-                            Face {{ face_data.label }}
-                        </span>
+                        <span class="badge badge-bon">Bon état</span>
                     {% endif %}
-                {% empty %}
-                    <span style="color:var(--text-muted);">—</span>
-                {% endfor %}
-                </div>
-              {% else %}
-                <span class="face-tag inactif">Inactif</span>
-              {% endif %}
-            </td>
-        </tr>
-        {% empty %}
-        <tr>
-            <td colspan="7" style="text-align:center; color:var(--text-muted); padding:14px; font-style:italic;">
-                Aucun panneau trouvé.
-            </td>
-        </tr>
-        {% endfor %}
-    </tbody>
-</table>
+                </td>
+                <td class="left">
+                    <div class="faces-list">
+                        {% if panneau.etat_raw == 'panne' %}
+                            <span class="face-tag panne">⚠ Inactif</span>
+                        {% else %}
+                            {% for face in panneau.faces %}
+                                {% if face.statut == 'occupe' %}
+                                    {% for camp in face.campagnes %}
+                                    <span class="face-tag occupe">
+                                        ● Face {{ face.label }} — {{ camp.client.nom }} — occupée
+                                    </span>
+                                    {% endfor %}
+                                {% elif face.statut == 'reserve' %}
+                                    <span class="face-tag reserve">
+                                        ◷ Face {{ face.label }} — {{ face.face.lignes_client.first.client.nom }} — Réservée
+                                    </span>
+                                {% elif face.statut == 'panne' %}
+                                    <span class="face-tag panne">
+                                        Face {{ face.label }} — En Panne
+                                    </span>
+                                {% else %}
+                                    {# Face libre : champ de saisie #}
+                                    <div class="face-input-wrap">
+                                        <span class="face-input-label">○ Face {{ face.label }}</span>
+                                        <input
+                                            type="text"
+                                            class="face-input"
+                                            name="face_{{ panneau.code }}_{{ face.label }}"
+                                            placeholder="Saisir le client..."
+                                            autocomplete="off"
+                                        >
+                                    </div>
+                                {% endif %}
+                            {% empty %}
+                                <span style="color:var(--gray-tx);">—</span>
+                            {% endfor %}
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7" style="text-align:center; color:var(--gray-tx); padding:20px; font-style:italic;">
+                    Aucun panneau trouvé.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
 
-<!-- ══════════════════════ PIED DE PAGE ══════════════════════ -->
-<div class="doc-footer">
-    Document confidentiel — État des panneaux au {{ today|date:"d/m/Y" }}
+    <!-- ══ LÉGENDE ══ -->
+    <div class="legend">
+        <span class="face-tag" style="background:var(--gray-bg); color:var(--gray-tx);">○ Libre (saisissable)</span>
+        <span class="face-tag reserve">◷ Réservée</span>
+        <span class="face-tag occupe">● Occupée</span>
+        <span class="face-tag panne">⚠ En panne</span>
+    </div>
+
+    <!-- ══ PIED DE PAGE ══ -->
+    <div class="doc-footer">
+        Document confidentiel — État des panneaux au {{ today|date:"d/m/Y" }}
+    </div>
+
 </div>
-
 </body>
 </html>

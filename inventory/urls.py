@@ -6,6 +6,7 @@ urlpatterns = [
     path('api/geojson/', api_geojson, name='api_geojson'),
     path('api/support/<int:pk>/popup/', api_support_popup, name='api_support_popup'),
     path('api/support/<int:pk>/faces/', api_faces_support, name='api_faces_support'),
+    path('api/faces/<int:support_id>/', get_faces_support, name='api_faces_support'),
 
     # CRUD
     path('', SupportListView.as_view(), name='support_list'),
@@ -18,4 +19,6 @@ urlpatterns = [
     path('maintenances/creer/',              MaintenanceCreateView.as_view(), name='maintenance_create'),
     path('maintenances/creer/<int:pk>/',     MaintenanceCreateView.as_view(), name='maintenance_create'),
     path('maintenances/<int:pk>/modifier/',  MaintenanceUpdateView.as_view(), name='maintenance_update'),
+    path('<int:pk>/periodes-panne/', SupportPeriodesVanneView.as_view(), name='support_periodes_panne'),
+    path('maintenances/periodes-panne/', PeriodesParVueView.as_view(), name='periodes_panne_liste'),
 ]

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Client, Contrat, Campagne, LigneCampagne, CampagneVisuel # N'oublie pas l'import
+from .models import Client, Contrat, Campagne, LigneCampagne, CampagneVisuel ,ReservationPanneau# N'oublie pas l'import
 
 # 1. Créer l'interface "en ligne" pour les visuels
 class CampagneVisuelInline(admin.TabularInline):
@@ -29,3 +29,8 @@ class CampagneAdmin(admin.ModelAdmin):
     inlines = [CampagneVisuelInline]
 
 admin.site.register(LigneCampagne)
+
+@admin.register(ReservationPanneau)
+class ReservationPanneauAdmin(admin.ModelAdmin):
+    list_display = [ 'id','client','support','face','date_debut','date_fin',]
+    search_fields = ['client__nom', 'panneau__reference']

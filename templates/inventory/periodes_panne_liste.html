@@ -1,0 +1,242 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+{% block topbar_title %}
+  <i class="bi bi-exclamation-triangle-fill me-2" style="color:#ef4444"></i>{{ title }}
+{% endblock %}
+
+{% block content %}
+
+{# ── En-tête ── #}
+<div class="d-flex align-items-center gap-3 mb-4">
+  <a href="{% url 'maintenance_list' %}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-arrow-left"></i>
+  </a>
+  <div>
+    <h1 style="font-size:1.3rem;font-weight:800;margin:0">{{ title }}</h1>
+    <p style="color:var(--text-muted);font-size:.8rem;margin:0">
+      Historique des périodes de panne reconstituées depuis les maintenances
+    </p>
+  </div>
+</div>
+
+{# ── KPI ── #}
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card text-center p-3">
+      <div style="font-size:1.8rem;font-weight:800">{{ nb_total }}</div>
+      <div style="font-size:.75rem;color:var(--text-muted)">Pannes totales</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center p-3">
+      <div style="font-size:1.8rem;font-weight:800;color:#059669">{{ nb_resolues }}</div>
+      <div style="font-size:.75rem;color:var(--text-muted)">Résolues</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center p-3">
+      <div style="font-size:1.8rem;font-weight:800;color:#ef4444">{{ nb_en_cours }}</div>
+      <div style="font-size:.75rem;color:var(--text-muted)">En cours</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center p-3">
+      <div style="font-size:1.8rem;font-weight:800;color:#d97706">{{ duree_moyenne.days }}j</div>
+      <div style="font-size:.75rem;color:var(--text-muted)">Durée moyenne</div>
+    </div>
+  </div>
+</div>
+
+{# ── Filtres ── #}
+<div class="card mb-4">
+  <div class="card-body py-2">
+    <form method="get" class="row g-2 align-items-end">
+
+      <div class="col-md-3">
+        <label class="form-label mb-1" style="font-size:.75rem;font-weight:600">Support</label>
+        <select name="support" class="form-select form-select-sm">
+          <option value="">— Tous les supports —</option>
+          {% for s in supports_liste %}
+            <option value="{{ s.pk }}" {% if filters.support == s.pk|stringformat:"s" %}selected{% endif %}>
+              {{ s.code }} — {{ s.nom }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-md-2">
+        <label class="form-label mb-1" style="font-size:.75rem;font-weight:600">Face</label>
+        <select name="face" class="form-select form-select-sm">
+          <option value="">— Toutes —</option>
+          <option value="A" {% if filters.face == 'A' %}selected{% endif %}>Face A</option>
+          <option value="B" {% if filters.face == 'B' %}selected{% endif %}>Face B</option>
+        </select>
+      </div>
+
+      <div class="col-md-2">
+        <label class="form-label mb-1" style="font-size:.75rem;font-weight:600">Statut</label>
+        <select name="statut" class="form-select form-select-sm">
+          <option value="">— Tous —</option>
+          <option value="resolue"  {% if filters.statut == 'resolue'  %}selected{% endif %}>Résolues</option>
+          <option value="en_cours" {% if filters.statut == 'en_cours' %}selected{% endif %}>En cours</option>
+        </select>
+      </div>
+
+      <div class="col-md-2">
+        <label class="form-label mb-1" style="font-size:.75rem;font-weight:600">Depuis</label>
+        <input type="date" name="date_debut" class="form-control form-control-sm"
+               value="{{ filters.date_debut }}">
+      </div>
+
+      <div class="col-md-2">
+        <label class="form-label mb-1" style="font-size:.75rem;font-weight:600">Jusqu'au</label>
+        <input type="date" name="date_fin" class="form-control form-control-sm"
+               value="{{ filters.date_fin }}">
+      </div>
+
+      <div class="col-md-1 d-flex gap-1">
+        <button type="submit" class="btn btn-primary btn-sm w-100">
+          <i class="bi bi-funnel-fill"></i>
+        </button>
+        <a href="{% url 'periodes_panne_liste' %}" class="btn btn-outline-secondary btn-sm">
+          <i class="bi bi-x"></i>
+        </a>
+      </div>
+
+    </form>
+  </div>
+</div>
+
+{# ── Tableau ── #}
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span style="font-weight:700">
+      <i class="bi bi-clock-history me-2"></i>
+      {{ nb_total }} période{% if nb_total > 1 %}s{% endif %} trouvée{% if nb_total > 1 %}s{% endif %}
+    </span>
+    <span style="font-size:.75rem;color:var(--text-muted)">
+      Durée totale cumulée : <strong>{{ duree_totale.days }} jours</strong>
+    </span>
+  </div>
+
+  <div class="card-body p-0">
+    {% if periodes %}
+    <div class="table-responsive">
+      <table class="table table-hover mb-0" style="font-size:.82rem">
+        <thead style="background:var(--bg-subtle)">
+          <tr>
+            <th>Support</th>
+            <th>Face</th>
+            <th>Début panne</th>
+            <th>Fin panne</th>
+            <th>Durée</th>
+            <th>Description panne</th>
+            <th>Description résolution</th>
+            <th>Statut</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in periodes %}
+          <tr>
+
+            {# Support #}
+            <td>
+              <a href="{% url 'support_detail' p.support.pk %}"
+                 style="font-weight:700;color:var(--color-primary);text-decoration:none">
+                {{ p.support.code }}
+              </a>
+              <div style="font-size:.72rem;color:var(--text-muted)">{{ p.support.nom }}</div>
+            </td>
+
+            {# Face #}
+            <td>
+              {% if p.face %}
+                <span class="badge bg-secondary">Face {{ p.face.label }}</span>
+              {% else %}
+                <span style="color:var(--text-muted);font-size:.75rem">—</span>
+              {% endif %}
+            </td>
+
+            {# Début panne #}
+            <td>
+              <span style="color:#ef4444;font-weight:600">
+                {{ p.debut|date:"d/m/Y" }}
+              </span>
+              <div style="font-size:.72rem;color:var(--text-muted)">{{ p.debut|date:"H:i" }}</div>
+            </td>
+
+            {# Fin panne #}
+            <td>
+              {% if p.fin %}
+                <span style="color:#059669;font-weight:600">{{ p.fin|date:"d/m/Y" }}</span>
+                <div style="font-size:.72rem;color:var(--text-muted)">{{ p.fin|date:"H:i" }}</div>
+              {% else %}
+                <span class="badge bg-danger">En cours</span>
+              {% endif %}
+            </td>
+
+            {# Durée #}
+            <td>
+              <span style="font-family:'SF Mono',monospace;font-weight:700;
+                           color:{% if p.duree.days > 30 %}#ef4444{% elif p.duree.days > 7 %}#d97706{% else %}#6b7280{% endif %}">
+                {{ p.duree.days }}j
+              </span>
+            </td>
+
+            {# Description panne #}
+            <td style="max-width:200px">
+              {% if p.maint_panne.description %}
+                <span title="{{ p.maint_panne.description }}"
+                      style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">
+                  {{ p.maint_panne.description }}
+                </span>
+              {% else %}
+                <span style="color:var(--text-muted)">—</span>
+              {% endif %}
+            </td>
+
+            {# Description résolution #}
+            <td style="max-width:200px">
+              {% if p.maint_bon.description %}
+                <span title="{{ p.maint_bon.description }}"
+                      style="display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden">
+                  {{ p.maint_bon.description }}
+                </span>
+              {% else %}
+                <span style="color:var(--text-muted)">—</span>
+              {% endif %}
+            </td>
+
+            {# Statut #}
+            <td>
+              {% if p.resolue %}
+                <span class="badge bg-success">
+                  <i class="bi bi-check-circle me-1"></i>Résolue
+                </span>
+              {% else %}
+                <span class="badge bg-danger">
+                  <i class="bi bi-exclamation-triangle me-1"></i>En cours
+                </span>
+              {% endif %}
+            </td>
+
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+
+    {% else %}
+    <div class="text-center py-5" style="color:var(--text-muted)">
+      <i class="bi bi-check-circle" style="font-size:2.5rem;color:#059669;display:block;margin-bottom:12px"></i>
+      <p class="mb-0" style="font-weight:600">Aucune période de panne trouvée</p>
+      <p style="font-size:.8rem">Modifiez les filtres ou vérifiez les données de maintenance.</p>
+    </div>
+    {% endif %}
+
+  </div>
+</div>
+
+{% endblock %}

@@ -19,9 +19,9 @@ class SupportAdmin(admin.ModelAdmin):
 
 @admin.register(Maintenance)
 class MaintenanceAdmin(admin.ModelAdmin):
-    list_display = ['support', 'effectue_par', 'date_intervention', 'etat_apres'] 
-    list_filter = ['etat_apres', 'effectue_par', 'date_intervention'] 
-    search_fields = ['support__code', 'description']
+    list_display = ['support', 'face', 'effectue_par', 'date_intervention', 'etat_apres']
+    list_filter = ['etat_apres', 'face', 'effectue_par', 'date_intervention']
+    search_fields = ['support__code', 'face__label', 'description']
     
     
     

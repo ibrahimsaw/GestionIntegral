@@ -133,7 +133,15 @@ DESIGN_CONFIG = {
     # Couleurs des marqueurs carte (utilisées par Leaflet JS)
     'COLOR_DISPONIBLE':  "#6c757d",   # gris — support libre
     'COLOR_OCCUPE':      '#16a34a',   # Vert — support sous contrat
-    'COLOR_MAINTENANCE': '#dc2626',   # Rouge — support en panne
+    'COLOR_RESERVE':     "#7c3aed",   # Orange — support réservé (en négociation) #6a8068
+    'COLOR_PANNE': '#dc2626',   # Rouge — support en panne
+    
+    'COLOR_DISPONIBLE_BG':  "#e2f1ff",   
+    'COLOR_OCCUPE_BG':      "#d8ffe6",   
+    'COLOR_RESERVE_BG':     "#f2eaff",   
+    'COLOR_PANNE_BG': '#ffe6e6',  
+    
+    'COLOR_MAINTENANCE': '#dc2626',
     'COLOR_BIENTOT':     '#7c3aed',   # Violet — campagne à venir
     # Identité visuelle de l'application (Charte Promo Pub Integral)
     'COLOR_PRIMARY':     '#932E2B',   # Marron / Rouge bordeaux — couleur principale UI

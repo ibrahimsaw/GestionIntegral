@@ -139,6 +139,25 @@
 </div> {% endcomment %}
 
 <!-- Métriques commerciales -->
+
+{# ── Filtre villes ── #}
+<ul class="nav nav-pills mb-3 nav-fill d-none d-sm-flex" role="tablist" id="filtre-villes">
+    <li class="nav-item">
+        <a class="nav-link {% if not ville_active %}active{% endif %}"
+           href="?">
+            <i class="bi bi-globe2 me-1"></i>Toutes les villes
+        </a>
+    </li>
+    {% for ville in villes %}
+    <li class="nav-item">
+        <a class="nav-link {% if ville_active == ville %}active{% endif %}"
+           href="?ville={{ ville }}">
+            <i class="bi bi-geo-alt me-1"></i>{{ ville }}
+        </a>
+    </li>
+    {% endfor %}
+</ul>
+
 <p class="sec-lbl">Activité commerciale</p>
 <div class="row g-3 mb-4">
   <div class="col-6 col-md-3">
@@ -193,11 +212,13 @@
     <div class="chart-card">
       <div class="ch-title">
         <span><i class="bi bi-bar-chart me-2" style="color:var(--color-primary)"></i>Occupation par format</span>
-        <span style="font-size:.7rem">% occupé / disponible</span>
+        <span style="font-size:.7rem">% occupé / réservé / disponible</span>
       </div>
       <div class="legend-row">
-        <span><span class="legend-sq" style="background:var(--color-primary)"></span>Occupé</span>
-        <span><span class="legend-sq" style="background:#e5e7eb"></span>Disponible</span>
+        <span><span class="legend-sq" style="background:var(--color-occupe)"></span>{{ total_faces_occupe }} faces Occupé</span>
+        <span><span class="legend-sq" style="background:var(--color-reserve)"></span>{{ total_faces_reserve }} faces Réservé</span>
+        <span><span class="legend-sq" style="background:var(--color-disponible)"></span>{{ total_faces_libre }} faces Disponible</span>
+        <span><span class="legend-sq" style="background:var(--color-panne)"></span>{{ total_faces_panne }} faces En Panne</span>
       </div>
       <div style="position:relative;height:220px;">
         <canvas id="chartOccupation" role="img" aria-label="Taux d'occupation par format"></canvas>
@@ -237,25 +258,29 @@
         <span class="kpi-dot" style="background:#10b981"></span>
         <span class="kpi-name">Standard (4×3, 7×3…)</span>
         <div class="kpi-bar-w"><div class="kpi-bar-i" style="width:{% if total_supports %}{% widthratio nb_standard total_supports 100 %}{% else %}0{% endif %}%;background:#10b981"></div></div>
-        <span class="kpi-count">{{ nb_standard|default:"—" }}</span>
+        <span class="kpi-count">{{ face_standard|default:"—" }}/{{ nb_standard|default:"—" }}</span>
       </div>
       <div class="kpi-row">
         <span class="kpi-dot" style="background:#f59e0b"></span>
         <span class="kpi-name">Géants</span>
         <div class="kpi-bar-w"><div class="kpi-bar-i" style="width:{% if total_supports %}{% widthratio nb_geants total_supports 100 %}{% else %}0{% endif %}%;background:#f59e0b"></div></div>
-        <span class="kpi-count">{{ nb_geants|default:"—" }}</span>
+        <span class="kpi-count">{{ face_geants|default:"—" }}/{{ nb_geants|default:"—" }}</span>
       </div>
       <div class="kpi-row">
         <span class="kpi-dot" style="background:#a78bfa"></span>
         <span class="kpi-name">Sucettes</span>
         <div class="kpi-bar-w"><div class="kpi-bar-i" style="width:{% if total_supports %}{% widthratio nb_sucettes total_supports 100 %}{% else %}0{% endif %}%;background:#a78bfa"></div></div>
-        <span class="kpi-count">{{ nb_sucettes|default:"—" }}</span>
+        <span class="kpi-count">{{ face_sucettes|default:"—" }}/{{ nb_sucettes|default:"—" }}</span>
       </div>
       <div class="kpi-row">
         <span class="kpi-dot" style="background:#f97316"></span>
         <span class="kpi-name">Grand Marché</span>
         <div class="kpi-bar-w"><div class="kpi-bar-i" style="width:{% if total_supports %}{% widthratio nb_gm total_supports 100 %}{% else %}0{% endif %}%;background:#f97316"></div></div>
-        <span class="kpi-count">{{ nb_gm|default:"—" }}</span>
+        <span class="kpi-count">{{ face_gm|default:"—" }}/{{ nb_gm|default:"—" }}</span>
+      </div>
+      <div class="kpi-row">
+        <span class="kpi-name">Totale</span>
+        <span class="kpi-count">{{ total_faces|default:"—" }}/{{ nb_panneaux_bon|default:"—" }}</span>
       </div>
     </div>
   </div>
@@ -321,8 +346,19 @@
 <script>
 (function () {
     // 1. Récupération de la couleur primaire depuis le CSS ou valeur par défaut
-    const primary = getComputedStyle(document.documentElement)
-        .getPropertyValue('--color-primary').trim() || '#6366f1';
+    const primary  = getComputedStyle(document.documentElement)
+    .getPropertyValue('--color-primary').trim() || '#6366f1';
+
+    // Ajoute les mêmes lignes pour les autres couleurs
+    const occupe  = getComputedStyle(document.documentElement)
+    .getPropertyValue('--color-occupe').trim() || '#6366f1';
+    const reserve   = getComputedStyle(document.documentElement)
+        .getPropertyValue('--color-reserve').trim() || '#a78bfa';
+
+    const disponible = getComputedStyle(document.documentElement)
+        .getPropertyValue('--color-disponible').trim() || '#e5e7eb';
+    const panne = getComputedStyle(document.documentElement)
+        .getPropertyValue('--color-panne').trim() || '#e67460';
 
     /**
      * Fonction utilitaire pour parser le JSON en toute sécurité
@@ -351,50 +387,78 @@
 
     // --- Graphique 1 : Occupation par format (Barres empilées) ---
     const ctxOccupation = document.getElementById('chartOccupation');
-    if (ctxOccupation && fStats.length > 0) {
-        new Chart(ctxOccupation, {
-            type: 'bar',
-            data: {
-                labels: fStats.map(f => f.label),
-                datasets: [
-                    { 
-                        label: 'Occupé (%)', 
-                        data: fStats.map(f => f.occupe), 
-                        backgroundColor: primary, 
-                        borderRadius: 3 
-                    },
-                    { 
-                        label: 'Disponible (%)', 
-                        data: fStats.map(f => f.disponible), 
-                        backgroundColor: '#e5e7eb', 
-                        borderRadius: 3 
-                    }
-                ]
-            },
-            options: {
-                responsive: true,
-                maintainAspectRatio: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    x: { 
-                        stacked: true, 
-                        ticks: { color: '#9ca3af', font: { size: 11 } }, 
-                        grid: { display: false } 
-                    },
-                    y: { 
-                        stacked: true, 
-                        max: 100, 
-                        ticks: { 
-                            color: '#9ca3af', 
-                            font: { size: 11 }, 
-                            callback: v => v + '%' 
-                        }, 
-                        grid: { color: '#f3f4f6' } 
-                    }
-                }
-            }
-        });
-    }
+      if (ctxOccupation && fStats.length > 0) {
+          new Chart(ctxOccupation, {
+              type: 'bar',
+              data: {
+                  labels: fStats.map(f => f.label),
+                  datasets: [
+                      {
+                          label: 'Panne (%)',
+                          data: fStats.map(f => f.panne),
+                          backgroundColor: panne,
+                          borderRadius: 4,
+                      },
+                      {
+                          label: 'Occupé (%)',
+                          data: fStats.map(f => f.occupe),
+                          backgroundColor: occupe,
+                          borderRadius: 4,
+                      },
+                      {
+                          label: 'Réservé (%)',
+                          data: fStats.map(f => f.reserve),
+                          backgroundColor: reserve,
+                          borderRadius: 4,
+                      },
+                      {
+                          label: 'Disponible (%)',
+                          data: fStats.map(f => f.disponible),
+                          backgroundColor: disponible,
+                          borderRadius: 4,
+                      },
+                  ]
+              },
+              options: {
+                  responsive: true,
+                  maintainAspectRatio: false,
+                  plugins: {
+                      legend: { display: false },
+                      tooltip: {
+                          callbacks: {
+                              label: ctx => {
+                                  const f = fStats[ctx.dataIndex];
+                                  const map = {
+                                      'Occupé (%)':     `Occupé : ${f.nb_occupe} faces (${ctx.parsed.y}%)`,
+                                      'Réservé (%)':    `Réservé : ${f.nb_reserve} faces (${ctx.parsed.y}%)`,
+                                      'Disponible (%)': `Disponible : ${f.nb_libre} faces (${ctx.parsed.y}%)`,
+                                      'Panne (%)':      `Panne : ${f.nb_panne} faces (${ctx.parsed.y}%)`,
+                                  };
+                                  return map[ctx.dataset.label] || ctx.dataset.label;
+                              }
+                          }
+                      }
+                  },
+                  scales: {
+                      x: {
+                          stacked: true,
+                          ticks: { color: '#9ca3af', font: { size: 11 } },
+                          grid: { display: false }
+                      },
+                      y: {
+                          stacked: true,
+                          max: 100,
+                          ticks: {
+                              color: '#9ca3af',
+                              font: { size: 11 },
+                              callback: v => v + '%'
+                          },
+                          grid: { color: '#f3f4f6' }
+                      }
+                  }
+              }
+          });
+      }
 
     // --- Graphique 2 : Donut (Panneaux vs Écrans vs Supports en Panne) ---
     const ctxTypes = document.getElementById('chartTypes');

@@ -396,7 +396,7 @@ class ApiTauxOccupationView(LoginRequiredMixin, View):
                 ]
                 taux = round(sum(taux_values) / len(taux_values), 1) if taux_values else 0.0
             else:
-                dispo = all(face.is_disponible(d1, d2) for face in s.faces.all())
+                dispo = all(face.is_disponibles(d1, d2) for face in s.faces.all())
                 taux  = 0 if dispo else 100
 
             result.append({'id': s.pk, 'code': s.code, 'taux': taux})

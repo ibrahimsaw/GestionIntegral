@@ -166,6 +166,76 @@ class Contrat(models.Model):
         today = timezone.now().date()
         return self.actif and self.date_debut <= today <= self.date_fin
 
+# UNE class pour faire la reservation des Panneau A un client
+class ReservationPanneau(models.Model):
+    client = models.ForeignKey(
+        'Client', 
+        on_delete=models.CASCADE, 
+        related_name='reservations'
+    )
+    support = models.ForeignKey(
+        'inventory.Support', 
+        on_delete=models.PROTECT, 
+        related_name='lignes_client'
+    )
+    # Spécifique aux Panneaux Statiques
+    face = models.ForeignKey(
+        'inventory.FacePanneau', 
+        on_delete=models.SET_NULL,
+        null=True, blank=True, 
+        related_name='lignes_client',
+        verbose_name="Face (Panneau)"
+    )
+    date_debut = models.DateTimeField()
+    date_fin = models.DateTimeField()
+
+    def __str__(self):
+        return f"Réservation de {self.face} du panneau {self.support} pour {self.client}"
+    
+    def clean(self):
+        """Validation métier avant l'enregistrement."""
+        if self.support.type_support != 'panneau':
+            raise ValidationError(_("La réservation est uniquement applicable aux panneaux statiques."))
+        if not self.face:
+            raise ValidationError(_("Vous devez sélectionner une face pour un panneau statique."))
+        if self.date_debut >= self.date_fin:
+            raise ValidationError(_("La date de début doit être antérieure à la date de fin."))
+        
+        # Vérification de la disponibilité du panneau pour les dates données
+        conflits = ReservationPanneau.objects.filter(
+            support=self.support,
+            face=self.face,
+            date_debut__lt=self.date_fin,
+            date_fin__gt=self.date_debut
+        ).exclude(id=self.id)
+        
+        if conflits.exists():
+            raise ValidationError(_("Ce panneau est déjà réservé pour les dates sélectionnées."))
+    
+    def save(self, *args, **kwargs):
+        # Force l'exécution du clean() lors du save (hors admin)
+        self.full_clean()
+        super().save(*args, **kwargs)
+    
+    def est_reservee(self, date_debut=None, date_fin=None):
+        """
+        Retourne True si la face est réservée sur la période donnée.
+        Sans dates → vérifie si elle est réservée maintenant.
+        """
+        from campaigns.models import ReservationPanneau
+        from django.utils import timezone
+
+        qs = ReservationPanneau.objects.filter(face=self)
+
+        if date_debut and date_fin:
+            # Chevauchement sur une période
+            qs = qs.filter(date_debut__lt=date_fin, date_fin__gt=date_debut)
+        else:
+            # Réservation active en ce moment
+            now = timezone.now()
+            qs = qs.filter(date_debut__lte=now, date_fin__gte=now)
+
+        return qs.exists()
 
 class Campagne(models.Model):
     """Campagne publicitaire avec ses supports et visuels."""

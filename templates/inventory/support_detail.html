@@ -6,6 +6,9 @@
   {{ support.code }} — {{ support.nom }}
 {% endblock %}
 {% block topbar_actions %}
+  <a href="{% url 'support_periodes_panne' support.pk %}" class="btn btn-outline-danger btn-sm">
+  <i class="bi bi-clock-history me-1"></i>Périodes de panne
+</a>
   {% if user.is_staff_regie_role %}
   <a href="{% url 'support_edit' support.pk %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil me-1"></i>Modifier</a>
   {% endif %}
@@ -75,6 +78,7 @@
         <a href="{% url 'carte' %}?support={{ support.pk }}" class="btn btn-sm btn-outline-secondary" style="white-space:nowrap">Voir sur carte</a>
       </div>
     </div>
+
     <!-- Tableau des maintenances -->
     <div class="card">
       <div class="card-header"><i class="bi bi-tools me-2" style="color:#fbbf24"></i>Historique des Maintenances</div>
@@ -93,10 +97,10 @@
       </div>
     </div>
   </div>
-  
 
   <!-- Col droite -->
   <div class="col-md-8">
+
     <!-- Faces panneau -->
     {% if support.type_support == 'panneau' %}
     <div class="card mb-3">
@@ -104,55 +108,86 @@
       <div class="card-body">
         <div class="row g-3">
           {% for face in support.faces.all %}
-          <div class="col-md-6">
-            <div style="background:var(--bg-card2);border:1px solid {% if face.is_disponible %}#22c55e44{% else %}#f9731644{% endif %};border-radius:8px;overflow:hidden">
-              {% with camp=face.get_campagne_active %}
-                {% if camp and camp.visuel %}
-                  {% with visuel_name=camp.visuel.name|lower %}
-                    {% if "mp4" in visuel_name %}
-                      <video controls playsinline style="width:100%;height:160px;object-fit:cover;display:block;background:#000">
-                        <source src="{{ camp.visuel.url }}" type="video/mp4">
-                        Votre navigateur ne peut pas lire cette vidéo.
-                      </video>
-                    {% elif "webm" in visuel_name %}
-                      <video controls playsinline style="width:100%;height:160px;object-fit:cover;display:block;background:#000">
-                        <source src="{{ camp.visuel.url }}" type="video/webm">
-                        Votre navigateur ne peut pas lire cette vidéo.
-                      </video>
-                    {% elif "ogg" in visuel_name or "ogv" in visuel_name %}
-                      <video controls playsinline style="width:100%;height:160px;object-fit:cover;display:block;background:#000">
-                        <source src="{{ camp.visuel.url }}" type="video/ogg">
-                        Votre navigateur ne peut pas lire cette vidéo.
-                      </video>
-                    {% else %}
-                      <img src="{{ camp.visuel.url }}" style="width:100%;height:160px;object-fit:cover;display:block">
-                    {% endif %}
-                  {% endwith %}
-                {% elif face.photo %}
-                  <img src="{{ face.photo.url }}" alt="Photo de la face {{ face.label }}" loading="lazy" style="width:100%;height:120px;object-fit:cover;display:block">
-                {% else %}
-                  <img src="{% static 'img/logo.png' %}" alt="Logo" loading="lazy" style="width:100%;height:160px;object-fit:cover;display:block">
-                {% endif %}
-              {% endwith %}
-              <div style="padding:10px 12px">
-                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-                  <span style="font-weight:700;font-size:.9rem">Face {{ face.label }}</span>
-                  <span style="color:{% if face.is_disponible %}var(--color-disponible){% else %}var(--color-occupe){% endif %};font-size:.68rem;font-weight:700;font-family:var(--mono)">
-                    {% if face.is_disponible %}LIBRE{% else %}OCCUPÉE{% endif %}
-                  </span>
-                </div>
-                <div style="font-size:.75rem;color:var(--text-muted)">{{ face.get_format_display }} — {{ face.get_eclairage_display }}</div>
+            {% with statut=face.get_statut %}
+
+            <div class="col-md-6">
+              <div class="{% if statut == 'libre' %}card-libre{% elif statut == 'reserve' %}card-reserve{% else %}card-occupe{% endif %}">
+
                 {% with camp=face.get_campagne_active %}
-                {% if camp %}
-                <div style="margin-top:6px;padding:6px 8px;background:rgba(249,115,22,.1);border-radius:6px;font-size:.75rem">
-                  <i class="bi bi-person me-1" style="color:var(--color-occupe)"></i>
-                  <strong>{{ camp.client.nom }}</strong> — {{ camp.nom }}
-                </div>
-                {% endif %}
+                  {% if camp %}
+                    {% with visuel=camp.visuels.first %}
+                      {% if visuel %}
+                        {% with visuel_name=visuel.fichier.name|lower %}
+                          {% if "mp4" in visuel_name %}
+                            <video controls playsinline style="width:100%;height:160px;object-fit:cover;display:block;background:#000">
+                              <source src="{{ visuel.fichier.url }}" type="video/mp4">
+                              Votre navigateur ne peut pas lire cette vidéo.
+                            </video>
+                          {% elif "webm" in visuel_name %}
+                            <video controls playsinline style="width:100%;height:160px;object-fit:cover;display:block;background:#000">
+                              <source src="{{ visuel.fichier.url }}" type="video/webm">
+                              Votre navigateur ne peut pas lire cette vidéo.
+                            </video>
+                          {% elif "ogg" in visuel_name or "ogv" in visuel_name %}
+                            <video controls playsinline style="width:100%;height:160px;object-fit:cover;display:block;background:#000">
+                              <source src="{{ visuel.fichier.url }}" type="video/ogg">
+                              Votre navigateur ne peut pas lire cette vidéo.
+                            </video>
+                          {% else %}
+                            <img src="{{ visuel.fichier.url }}" style="width:100%;height:160px;object-fit:cover;display:block">
+                          {% endif %}
+                        {% endwith %}
+                      {% elif face.photo %}
+                        <img src="{{ face.photo.url }}" alt="Photo de la face {{ face.label }}" loading="lazy" style="width:100%;height:120px;object-fit:cover;display:block">
+                      {% else %}
+                        <img src="{% static 'img/logo.png' %}" alt="Logo" loading="lazy" style="width:100%;height:160px;object-fit:cover;display:block">
+                      {% endif %}
+                    {% endwith %}
+                  {% elif face.photo %}
+                    <img src="{{ face.photo.url }}" alt="Photo de la face {{ face.label }}" loading="lazy" style="width:100%;height:120px;object-fit:cover;display:block">
+                  {% else %}
+                    <img src="{% static 'img/logo.png' %}" alt="Logo" loading="lazy" style="width:100%;height:160px;object-fit:cover;display:block">
+                  {% endif %}
                 {% endwith %}
+
+                <div style="padding:10px 12px">
+                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
+                    <span style="font-weight:700;font-size:.9rem">Face {{ face.label }}</span>
+
+                    {# CORRECTION : 3 états au lieu de 2 #}
+                    {% if statut == 'libre' %}
+                      <span style="color:var(--color-disponible);font-size:.68rem;font-weight:700;font-family:var(--mono)">LIBRE</span>
+                    {% elif statut == 'reserve' %}
+                      <span style="color:var(--color-reserve);font-size:.68rem;font-weight:700;font-family:var(--mono)">RÉSERVÉE</span>
+                    {% else %}
+                      <span style="color:var(--color-occupe);font-size:.68rem;font-weight:700;font-family:var(--mono)">OCCUPÉE</span>
+                    {% endif %}
+                  </div>
+
+                  {# CORRECTION : format est sur support, pas sur face #}
+                  <div style="font-size:.75rem;color:var(--text-muted)">{{ support.get_format_display }} — {{ face.get_eclairage_display }}</div>
+
+                  {% with camp=face.get_campagne_active %}
+                  {% if camp %}
+                  <div style="margin-top:6px;padding:6px 8px;background:rgba(249,115,22,.1);border-radius:6px;font-size:.75rem">
+                    <i class="bi bi-person me-1" style="color:var(--color-occupe)"></i>
+                    <strong>{{ camp.client.nom }}</strong> — {{ camp.nom }}
+                  </div>
+                  {% elif statut == 'reserve' %}
+                  {# Affiche le client qui a réservé #}
+                    {% with resa=face.lignes_client.filter %}
+                    <div style="margin-top:6px;padding:6px 8px;background:rgba(245,158,11,.1);border-radius:6px;font-size:.75rem">
+                      <i class="bi bi-broadcast me-1" style="color:var(--color-reserve)"></i>
+                      <strong>Réservée</strong>
+                    </div>
+                    {% endwith %}
+                  {% endif %}
+                  {% endwith %}
+                </div>
               </div>
             </div>
-          </div>
+
+            {% endwith %}
           {% endfor %}
         </div>
       </div>
@@ -162,7 +197,6 @@
     <!-- Écran numérique -->
     {% if ecran %}
       <div class="card mb-3">
-
         <div class="card-body">
 
           <!-- Métriques clés -->
@@ -180,8 +214,6 @@
 
           <!-- Bloc frise -->
           <div style="background:var(--bg-card2);border:1px solid var(--border);border-radius:10px;padding:16px">
-
-            <!-- Header frise -->
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
               <div style="display:flex;align-items:center;gap:8px">
                 <i class="bi bi-activity" style="color:var(--color-primary);font-size:.9rem"></i>
@@ -197,16 +229,11 @@
                 </select>
               </div>
             </div>
-
-            <!-- Métriques dynamiques JS -->
             <div id="metrics" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px"></div>
-
-            <!-- Canvas -->
             <div id="frise-container" style="width:100%;overflow-x:auto;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);padding:10px">
               <canvas id="frise-canvas" style="display:block"></canvas>
             </div>
             <p id="frise-note" style="font-size:.72rem;color:var(--text-muted);margin-top:8px;margin-bottom:0;font-family:var(--mono)"></p>
-
           </div>
         </div>
       </div>
@@ -224,11 +251,16 @@
             <div style="font-weight:700;font-size:.84rem">
               <a href="{% url 'campagne_detail' l.campagne.pk %}" style="color:var(--text);text-decoration:none">{{ l.campagne.nom }}</a>
             </div>
-            <div style="font-size:.75rem;color:var(--text-muted)">{{ l.campagne.client.nom }} · {{ l.campagne.date_debut|date:"d/m/Y" }} → {{ l.campagne.date_fin|date:"d/m/Y" }}
-              | {{ l.campagne.duree_passage }} | {{ l.campagne.frequence }} | {{ l.campagne.tranches_horaires }} | {{ l.campagne.calculer_nombre_spots }} spots | {{ l.campagne.calculer_nombre_spotsjour }} spots/jour | {{ l.campagne.calculer_nombre_spotsjourecran }} spots/jour/écran
+            <div style="font-size:.75rem;color:var(--text-muted)">
+              {{ l.campagne.client.nom }} · {{ l.campagne.date_debut|date:"d/m/Y" }} → {{ l.campagne.date_fin|date:"d/m/Y" }}
+              | {{ l.campagne.duree_passage }} | {{ l.campagne.frequence }} | {{ l.campagne.tranches_horaires }}
+              | {{ l.campagne.calculer_nombre_spots }} spots
+              | {{ l.campagne.calculer_nombre_spotsjour }} spots/jour
+              | {{ l.campagne.calculer_nombre_spotsjourecran }} spots/jour/écran
             </div>
           </div>
-          <span class="badge-status bs-en_cours">En cours</span><a href="{% url 'campagne_detail' l.campagne.pk %}" class="btn btn-sm btn-outline-secondary" title="Détail"><i class="bi bi-eye"></i></a>
+          <span class="badge-status bs-en_cours">En cours</span>
+          <a href="{% url 'campagne_detail' l.campagne.pk %}" class="btn btn-sm btn-outline-secondary" title="Détail"><i class="bi bi-eye"></i></a>
         </div>
         {% endfor %}
       </div>
@@ -243,11 +275,16 @@
         {% for l in historique %}
         <div style="padding:10px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;font-size:.82rem">
           <i class="bi bi-check-circle" style="color:var(--text-muted)"></i>
-          {% if l.campagne.visuel %}
-          <img src="{{ l.campagne.visuel.url }}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:4px">
+
+          {# CORRECTION : campagne.visuel → campagne.visuels.first #}
+          {% with visuel=l.campagne.visuels.first %}
+          {% if visuel %}
+            <img src="{{ visuel.fichier.url }}" alt="" style="width:40px;height:40px;object-fit:cover;border-radius:4px">
           {% else %}
-          <img src="{% static 'img/logo.png' %}" alt="Logo" loading="lazy" style="width:40px;height:40px;object-fit:cover;border-radius:4px">
+            <img src="{% static 'img/logo.png' %}" alt="Logo" loading="lazy" style="width:40px;height:40px;object-fit:cover;border-radius:4px">
           {% endif %}
+          {% endwith %}
+
           <div class="flex-grow-1">
             <span style="font-weight:600">{{ l.campagne.client.nom }}</span>
             <span style="color:var(--text-muted)"> — {{ l.campagne.nom }}</span>
@@ -271,7 +308,9 @@
               <img src="{{ p.photo.url }}" alt="Photo de maintenance" loading="lazy" style="width:100%;height:100px;object-fit:cover">
               <div style="position:absolute;bottom:0;left:0;right:0;background:rgba(0,0,0,.6);padding:4px 8px">
                 <div style="font-size:.65rem;color:white;font-family:var(--mono)">{{ p.date_intervention|date:"d/m H:i" }} {{ p.effectue_par.get_full_name|default:p.effectue_par.username }}</div>
-                <div style="font-size:.65rem;color:#94a3b8"><span class="badge {% if p.etat_apres == 'bon' %}bg-success{% elif p.etat_apres == 'maintenance' %}bg-warning{% else %}bg-danger{% endif %}">{{ p.get_etat_apres_display }}</span></div>
+                <div style="font-size:.65rem;color:#94a3b8">
+                  <span class="badge {% if p.etat_apres == 'bon' %}bg-success{% elif p.etat_apres == 'maintenance' %}bg-warning{% else %}bg-danger{% endif %}">{{ p.get_etat_apres_display }}</span>
+                </div>
               </div>
             </div>
           </div>
@@ -280,6 +319,28 @@
       </div>
     </div>
     {% endif %}
+
+    {% if reservations %}
+      <div class="card mb-3">
+        <div class="card-header"><i class="bi bi-calendar-check me-2" style="color:var(--color-reserve)"></i>Réservations à venir</div>
+        <div class="card-body p-0">
+          {% for resa in reservations %}
+          <div style="padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px">
+            <i class="bi bi-calendar-event" style="color:var(--color-reserve);font-size:1.1rem"></i>
+            <div class="flex-grow-1">
+              <div style="font-weight:700;font-size:.84rem">{{ resa.client.nom }}</div>
+              <div style="font-size:.75rem;color:var(--text-muted)">{{ resa.date_debut|date:"d/m/Y H:i" }} → {{ resa.date_fin|date:"d/m/Y H:i" }}</div>
+            </div>
+            <span class="badge-status bs-reserve">Réservé</span>
+          </div>
+          {% empty %}
+          <p style="margin:0;color:var(--text-muted);padding:12px 16px">Aucune réservation à venir pour ce support.</p>
+          {% endfor %}
+        </div>
+      </div>
+    {% endif %}
+
+
   </div>
 </div>
 {% endblock %}
@@ -336,11 +397,11 @@ function viewLabel(v) { return v <= 3600 ? 'heure' : v <= 86400 ? 'jour' : v <= 
 function getCC() {
   const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
   return {
-    text: dark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.42)',
-    textPri: dark ? 'rgba(255,255,255,0.82)' : 'rgba(0,0,0,0.82)',
-    rowBg: dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-    grid: dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)',
-    gridMaj: dark ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.12)',
+    text:     dark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.42)',
+    textPri:  dark ? 'rgba(255,255,255,0.82)' : 'rgba(0,0,0,0.82)',
+    rowBg:    dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
+    grid:     dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)',
+    gridMaj:  dark ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.12)',
   };
 }
 
@@ -382,10 +443,10 @@ function renderFrise() {
   const pxPerSec = chartW / viewDur;
 
   let tickStep, subTick;
-  if (viewDur <= 3600) { tickStep = 600; subTick = 120; }
-  else if (viewDur <= 86400) { tickStep = 3600; subTick = 1800; }
-  else if (viewDur <= 604800) { tickStep = 86400; subTick = 43200; }
-  else { tickStep = 604800; subTick = 86400; }
+  if (viewDur <= 3600)       { tickStep = 600;    subTick = 120; }
+  else if (viewDur <= 86400) { tickStep = 3600;   subTick = 1800; }
+  else if (viewDur <= 604800){ tickStep = 86400;  subTick = 43200; }
+  else                       { tickStep = 604800; subTick = 86400; }
 
   ctx.lineWidth = 0.5;
   for (let t = subTick; t < viewDur; t += subTick) {

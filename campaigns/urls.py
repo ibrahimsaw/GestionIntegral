@@ -13,7 +13,12 @@ urlpatterns = [
     path('clients/<int:pk>/', views.ClientDetailView.as_view(), name='client_detail'),
     path('clients/<int:pk>/modifier/', views.ClientUpdateView.as_view(), name='client_edit'),
     path('clients/<int:pk>/supprimer/', views.ClientDeleteView.as_view(), name='client_delete'),
-
+    path('clients/<int:client_pk>/reservations/bulk/', views.ReservationPanneauBulkActionView.as_view(), name='reservations_bulk_action'),
+    # Avant
+    path('api/check-dispo/', views.verifier_dispo_faces_api, name='api_check_dispo'),
+    # Après
+    path('api/check-dispo/<int:client_pk>/', views.verifier_dispo_faces_api, name='api_check_dispo'),
+    
     # Contrats
     path('contrats/creer/', views.ContratCreateView.as_view(), name='contrat_create'),
     path('contrats/creer/<int:client_pk>/', views.ContratCreateView.as_view(), name='contrat_create_for_client'),
@@ -39,4 +44,5 @@ urlpatterns = [
     path('api/disponibilite/', views.ApiCheckDisponibiliteView.as_view(), name='api_disponibilite'),
     path('api/contrats-client/<int:client_id>/', views.GetClientContratsView.as_view(), name='get_client_contrats'),
     path('campagnes/simulation-ecran/', SimulationCampagneEcranView.as_view(), name='simulation_ecran'),
+    
 ]

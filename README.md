@@ -196,6 +196,7 @@ Tout le design est piloté depuis `geoad/settings.py` :
 DESIGN_CONFIG = {
     'COLOR_DISPONIBLE':  '#22c55e',  # → Changer ici affecte : marqueurs carte + badges + barres
     'COLOR_OCCUPE':      '#f97316',  # → Supports sous contrat
+    'COLOR_RESEVE':      "#6a8068"
     'COLOR_MAINTENANCE': '#ef4444',  # → Supports en panne
     'COLOR_PRIMARY':     '#00d4ff',  # → Sidebar, boutons, accents
     'COLOR_BG_DARK':     '#0a0d12',  # → Fond général

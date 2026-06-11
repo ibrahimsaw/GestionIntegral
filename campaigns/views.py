@@ -766,13 +766,24 @@ class CampagneDetailView(ClientStaffRequiredMixin, DetailView):
     template_name = 'campaigns/campagne_detail.html'
     context_object_name = 'campagne'
 
-    def get_object(self):
-        campagne = super().get_object()
-        return campagne  # ← retourner l'objet, pas un dict
-
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['lignes'] = self.object.lignes.select_related('support', 'face')
+        campagne = self.object
+
+        lignes = campagne.lignes.select_related(
+            'support__ecran_info', 'face__support'
+        ).all()
+
+        # Enrichissement des lignes avec spots calculés
+        for ligne in lignes:
+            if campagne.type_support == 'ecran' and hasattr(ligne.support, 'ecran_info'):
+                ligne.spots_calcules = ligne.support.ecran_info.calculer_nombre_spots_campagne(campagne)
+            elif campagne.type_support == 'panneau' and ligne.face:
+                ligne.spots_calcules = ligne.face.calculer_nombre_spots_campagne(campagne)
+            else:
+                ligne.spots_calcules = 0
+
+        context['lignes'] = lignes
         return context
 
 

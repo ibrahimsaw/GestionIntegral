@@ -327,26 +327,72 @@ class Campagne(models.Model):
     
     # Calcul du nombre total de spots pour la campagne par ecran
 
+    # def calculer_nombre_spots_ecran(self):
+    #     """
+    #     Calcule le nombre total de spots pour la campagne.
+
+    #     Panneau : nombre de faces
+    #     Écran : (3600 / fréquence_en_secondes) × heures_tranches × durée_jours × nb_écrans
+    #     """
+    #     if self.type_support == 'panneau':
+    #         # Pour les panneaux, on compte le nombre de faces affectées
+    #         total = 0
+    #         for ligne in self.lignes.select_related('face').all():
+    #             if ligne.face:
+    #                 total += 1
+    #         return total
+
+    #     elif self.type_support == 'ecran':
+    #         if not self.frequence:
+    #             return 0
+    #         return int(self.nombre_spots_jour() * self.duree_jours())
+    #     return 0
+    
     def calculer_nombre_spots_ecran(self):
         """
-        Calcule le nombre total de spots pour la campagne.
+        Calcule le nombre total de spots pour la campagne en tenant compte des pannes.
 
-        Panneau : nombre de faces
-        Écran : (3600 / fréquence_en_secondes) × heures_tranches × durée_jours × nb_écrans
+        Panneau : 1 spot = 1 face disponible (prorata jours dispo / jours total)
+        Écran   : spots/jour × jours dispo par écran
         """
+        total_jours = self.duree_jours()
+        if total_jours == 0:
+            return 0
+
         if self.type_support == 'panneau':
-            # Pour les panneaux, on compte le nombre de faces affectées
             total = 0
-            for ligne in self.lignes.select_related('face').all():
-                if ligne.face:
-                    total += 1
-            return total
+            for ligne in self.lignes.select_related('face__support').all():
+                if not ligne.face:
+                    continue
+                support     = ligne.face.support
+                jours_dispo = support.jours_disponibles_sur_periode(
+                    self.date_debut, self.date_fin
+                )
+                # Prorata : face dispo 15j sur 30j = 0.5 spot
+                total += jours_dispo / total_jours
+            return round(total, 2)
 
         elif self.type_support == 'ecran':
-            if not self.frequence:
+            if not self.frequence or not self.duree_passage:
                 return 0
-            return int(self.nombre_spots_jour() * self.duree_jours())
+
+            spots_par_heure = 3600 / self.frequence
+            heures_tranches = calculer_duree_tranches(self.tranches_horaires)
+            spots_par_jour  = spots_par_heure * heures_tranches
+
+            total = 0
+            for ligne in self.lignes.select_related('support').all():
+                support     = ligne.support
+                jours_dispo = support.jours_disponibles_sur_periode(
+                    self.date_debut, self.date_fin
+                )
+                # spots réels = spots/jour × jours où l'écran est opérationnel
+                total += spots_par_jour * jours_dispo
+
+            return round(total)
+
         return 0
+
     def diffusions_par_heure(self):
         if self.type_support == 'ecran' and self.frequence:
             return 3600 / self.frequence
@@ -363,18 +409,72 @@ class Campagne(models.Model):
     def calculer_duree_tranches(self):
         return calculer_duree_tranches(self.tranches_horaires)
     
-    def calculer_nombre_spots(self): 
+    # def calculer_nombre_spots(self): 
+    #     if self.type_support == 'panneau':
+    #         # Pour les panneaux, on compte le nombre de faces affectées
+    #         total = 0
+    #         for ligne in self.lignes.select_related('face').all():
+    #             if ligne.face:
+    #                 total += 1
+    #         return total
+    #     elif self.type_support == 'ecran':
+    #         if not self.frequence:
+    #             return 0
+    #         return self.calculer_nombre_spots_ecran() * self.lignes.count()
+    #     return 0
+
+    def calculer_nombre_spots(self):
+        """
+        Calcule le nombre de spots réels en tenant compte des pannes.
+        
+        Panneau : nombre de faces × jours dispo / jours total
+        Écran   : spots/jour × jours dispo sur chaque écran
+        """
         if self.type_support == 'panneau':
-            # Pour les panneaux, on compte le nombre de faces affectées
-            total = 0
-            for ligne in self.lignes.select_related('face').all():
-                if ligne.face:
-                    total += 1
-            return total
-        elif self.type_support == 'ecran':
-            if not self.frequence:
+            total_jours = self.duree_jours()
+            if total_jours == 0:
                 return 0
-            return self.calculer_nombre_spots_ecran() * self.lignes.count()
+
+            total = 0
+            for ligne in self.lignes.select_related('face__support').all():
+                if not ligne.face:
+                    continue
+                support = ligne.face.support
+
+                # Jours réellement disponibles (hors pannes)
+                jours_dispo = support.jours_disponibles_sur_periode(
+                    self.date_debut, self.date_fin
+                )
+                # 1 spot plein = face dispo toute la période
+                # spot partiel = prorata
+                total += jours_dispo / total_jours
+
+            return round(total, 2)
+
+        elif self.type_support == 'ecran':
+            if not self.frequence or not self.duree_passage:
+                return 0
+
+            total = 0
+            for ligne in self.lignes.select_related('support__ecran_info').all():
+                support     = ligne.support
+                total_jours = self.duree_jours()
+                if total_jours == 0:
+                    continue
+                print(ligne)
+                print(total_jours)
+
+                jours_dispo = support.jours_disponibles_sur_periode(
+                    self.date_debut, self.date_fin
+                )
+                print(jours_dispo)
+
+                # Spots/jour sur cet écran
+                spots_jour = self.nombre_spots_jour()
+                total += spots_jour * jours_dispo
+
+            return round(total)
+
         return 0
     
     def calculer_nombre_spotsjour(self):

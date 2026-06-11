@@ -371,6 +371,61 @@ class Support(models.Model):
 
         # Tri chronologique
         return sorted(periodes, key=lambda p: p['debut'])
+    def est_en_panne_sur_periode(self, date_debut, date_fin):
+        """
+        Retourne True si ce support (ou au moins une face) était/est en panne
+        sur tout ou partie de la période donnée.
+        """
+        periodes = self.get_periodes_panne()
+        for p in periodes:
+            p_debut = p['debut'].date() if hasattr(p['debut'], 'date') else p['debut']
+            p_fin   = p['fin'].date()   if p['fin'] and hasattr(p['fin'], 'date') else p['fin']
+
+            # Panne toujours ouverte → p_fin = None → on considère jusqu'à aujourd'hui
+            if p_fin is None:
+                p_fin = date_fin  # s'étend jusqu'à la fin de la période testée
+
+            # Chevauchement ?
+            if p_debut <= date_fin and p_fin >= date_debut:
+                return True
+        return False
+
+
+    def taux_disponibilite_sur_periode(self, date_debut, date_fin):
+        """Retourne le % de disponibilité sur la période (0 à 100)."""
+        total = (date_fin - date_debut).days + 1
+        if total <= 0:
+            return 0
+        dispo = self.jours_disponibles_sur_periode(date_debut, date_fin)
+        return round(dispo / total * 100, 2)
+    
+    def jours_disponibles_sur_periode(self, date_debut, date_fin):
+        """
+        Retourne le nombre de jours où ce support est opérationnel
+        sur la période [date_debut, date_fin].
+        Soustrait les jours de panne.
+        """
+        from datetime import timedelta
+        total_jours = (date_fin - date_debut).days + 1
+        jours_panne = 0
+
+        periodes = self.get_periodes_panne()
+        print(f"periodes panne", periodes)
+        for p in periodes:
+            p_debut = p['debut'].date() if hasattr(p['debut'], 'date') else p['debut']
+            p_fin   = p['fin'].date()   if p['fin'] and hasattr(p['fin'], 'date') else p['fin']
+
+            if p_fin is None:
+                p_fin = date_fin  # panne ouverte → jusqu'à fin période
+
+            # Intersection avec la période demandée
+            overlap_debut = max(p_debut, date_debut)
+            overlap_fin   = min(p_fin,   date_fin)
+
+            if overlap_debut <= overlap_fin:
+                jours_panne += (overlap_fin - overlap_debut).days + 1
+
+        return max(0, total_jours - jours_panne)
 
 class FacePanneau(models.Model):
     """Face A ou B d'un panneau statique."""
@@ -497,8 +552,29 @@ class FacePanneau(models.Model):
             if client and qs_reserve.filter(client=client).exists():
                 return 'libre'
             return 'reserve'
-
         return 'libre'
+    
+    # Sur le modèle FacePanneau
+    def calculer_nombre_spots_campagne(self, campagne):
+        """
+        Calcule le nombre de spots réels pour UNE campagne sur CETTE face,
+        en tenant compte des pannes de cette face spécifiquement.
+        
+        Retourne un prorata : 1.0 = dispo toute la période, 0.5 = dispo la moitié
+        """
+        total_jours = campagne.duree_jours()
+        if total_jours == 0:
+            return 0
+
+        # Jours dispo propres à CETTE face
+        jours_dispo = self.jours_disponibles_sur_periode(
+            campagne.date_debut, campagne.date_fin
+        )
+
+        return round(jours_dispo / total_jours, 2)
+    
+
+
 
 
 class EcranNumerique(models.Model):
@@ -645,6 +721,31 @@ class EcranNumerique(models.Model):
             return False, "L'écran est saturé pour cette période."
         
         return True, "Disponible"
+    # Sur le modèle EcranNumerique
+    def calculer_nombre_spots_campagne(self, campagne):
+        """
+        Calcule le nombre de spots réels pour UNE campagne sur CET écran,
+        en tenant compte des pannes du support.
+        
+        Formule : spots/heure × heures_tranches × jours_dispo
+        """
+        if not campagne.frequence or not campagne.duree_passage:
+            return 0
+
+        total_jours = campagne.duree_jours()
+        if total_jours == 0:
+            return 0
+
+        # Jours dispo = total - jours en panne pour CET écran
+        jours_dispo = self.support.jours_disponibles_sur_periode(
+            campagne.date_debut, campagne.date_fin
+        )
+
+        spots_par_heure = 3600 / campagne.frequence
+        heures_tranches = calculer_duree_tranches(campagne.tranches_horaires)
+        spots_par_jour  = spots_par_heure * heures_tranches
+
+        return round(spots_par_jour * jours_dispo)
 
 
 

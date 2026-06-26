@@ -17,7 +17,7 @@ from django.urls import reverse_lazy
 from accounts.models import AuditLog
 from accounts.decorators import *
 from accounts.audit import log_action
-from .models import Client, Contrat, Campagne, LigneCampagne, CampagneVisuel,ReservationPanneau
+from .models import *
 from inventory.models import Support, FacePanneau, EcranNumerique
 from .forms import ClientForm, ContratForm, CampagneForm, LigneCampagneForm
 # from .mixins import *
@@ -68,7 +68,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         codes_standard = codes_par_type('Standard', etat=Support.ETAT_BON)
         codes_geants   = codes_par_type('Géant',    etat=Support.ETAT_BON)
         codes_sucettes = codes_par_type('Sucette',  etat=Support.ETAT_BON)
-        codes_gm       = codes_par_type('Grand Marché', etat=Support.ETAT_BON)
+        codes_gm       = codes_par_type('Marché', etat=Support.ETAT_BON)
 
         # ── Queryset de base filtré par ville ─────────────────────
         supports = Support.objects.prefetch_related('faces').select_related('ecran_info').all()
@@ -92,6 +92,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         nb_panneaux_bon = supports.filter(type_support=Support.TYPE_PANNEAU, etat=Support.ETAT_BON).count()
         nb_ecrans       = supports.filter(type_support=Support.TYPE_ECRAN).count()
         nb_ecrans_bon   = supports.filter(type_support=Support.TYPE_ECRAN, etat=Support.ETAT_BON).count()
+        nb_ecrans_panne   = supports.filter(type_support=Support.TYPE_ECRAN, etat=Support.ETAT_PANNE).count()
         nb_supports_panne = supports.filter(etat=Support.ETAT_PANNE).count()
         nb_supports_bon   = supports.filter(etat=Support.ETAT_BON).count()
         nb_standard = supports.filter(format__in=codes_standard, etat=Support.ETAT_BON).count()
@@ -118,8 +119,10 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
         # ── IDs des faces réservées ───────────────────────────────
         faces_reservees_ids = set(
-            ReservationPanneau.objects.filter(
-                date_fin__gte=today,
+            # ✅
+            ReservationLigne.objects.filter(
+                reservation__date_fin__gte=today,
+                reservation__statut__in=[STATUT_EN_ATTENTE, STATUT_CONFIRMEE],
             ).values_list('face_id', flat=True)
         )
 
@@ -200,7 +203,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 'nb_panne'  : npt_suc,
             },
             {
-                'label'     : f'Grand Marché ({nbt_gm} faces)',
+                'label'     : f'Marché ({nbt_gm} faces)',
                 'occupe'    : o_gm,
                 'reserve'   : r_gm,
                 'disponible': d_gm,
@@ -244,6 +247,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             'nb_panneaux'    : nb_panneaux,
             'nb_panneaux_bon': nb_panneaux_bon,
             'nb_ecrans_bon'  : nb_ecrans_bon,
+            'nb_ecrans_panne': nb_ecrans_panne,
             'nb_ecrans'      : nb_ecrans,
             'nb_standard'    : nb_standard,
             'face_standard'  : nbt_std,
@@ -259,7 +263,11 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             'total_faces_libre'   : total_faces_libre,
             'total_faces_panne'   : total_faces_panne,
             
-
+            # Détail par type
+            'nbl_std': nbl_std, 'nbo_std': nbo_std, 'nbr_std': nbr_std, 'npt_std': npt_std, 'nbt_std': nbt_std, 'o_std': o_std,
+            'nbl_geo': nbl_geo, 'nbo_geo': nbo_geo, 'nbr_geo': nbr_geo, 'npt_geo': npt_geo, 'nbt_geo': nbt_geo, 'o_geo': o_geo,
+            'nbl_suc': nbl_suc, 'nbo_suc': nbo_suc, 'nbr_suc': nbr_suc, 'npt_suc': npt_suc, 'nbt_suc': nbt_suc, 'o_suc': o_suc,
+            'nbl_gm':  nbl_gm,  'nbo_gm':  nbo_gm,  'nbr_gm':  nbr_gm,  'npt_gm':  npt_gm,  'nbt_gm':  nbt_gm,  'o_gm':  o_gm,
             # Graphiques
             'format_stats_json': format_stats_json,
             'types_stats_json' : types_stats_json,
@@ -276,7 +284,7 @@ def _build_alertes():
         alertes.append({
             'type': 'danger',
             'msg': f'Support {s.code} en panne',
-            'url': reverse('support_detail', args=[s.pk])
+            'url': reverse('support_detail', args=[s.uuid])
         })
 
     bientot = Campagne.objects.filter(
@@ -371,48 +379,39 @@ class ClientDetailView(ClientStaffRequiredMixin, DetailView):
         return client
 
     def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        client = self.object
         if self.request.user.is_admin:
-            context = super().get_context_data(**kwargs)
-            client = self.object
             campagnes = client.campagnes.all().order_by('-date_debut')
             contrats = client.contrats.all().order_by('-date_debut')
-            reservations = client.reservations.all().order_by('-date_debut')
-            campagnes_actives = [c for c in client.campagnes.all() if c.statut == 'en_cours']
-            client.campagnes_stats = {
-                'panneau': len([c for c in campagnes_actives if c.type_support == 'panneau']),
-                'ecran': len([c for c in campagnes_actives if c.type_support == 'ecran']),
-                'total': len(campagnes_actives),
-            }
-            client.spots_stats = {
-                'panneau': sum(c.calculer_nombre_spots() for c in campagnes_actives if c.type_support == 'panneau'),
-                'ecran': sum(c.calculer_nombre_spots() for c in campagnes_actives if c.type_support == 'ecran'),
-                'total': sum(c.calculer_nombre_spots() for c in campagnes_actives),
-            }
-            context.update({
-                'campagnes': campagnes,
-                'contrats': contrats,
-                'reservations': reservations,
-            })
         else:
-            context = super().get_context_data(**kwargs)
-            client = self.object
             campagnes = client.campagnes.filter(actif=True).order_by('-date_debut')
             contrats = client.contrats.filter(archive=True).order_by('-date_debut')
-            campagnes_actives = [c for c in campagnes if c.statut == 'en_cours' and c.actif]
-            client.campagnes_stats = {
-                'panneau': len([c for c in campagnes_actives if c.type_support == 'panneau']),
-                'ecran': len([c for c in campagnes_actives if c.type_support == 'ecran']),
-                'total': len(campagnes_actives),
-            }
-            client.spots_stats = {
-                'panneau': sum(c.calculer_nombre_spots() for c in campagnes_actives if c.type_support == 'panneau'),
-                'ecran': sum(c.calculer_nombre_spots() for c in campagnes_actives if c.type_support == 'ecran'),
-                'total': sum(c.calculer_nombre_spots() for c in campagnes_actives),
-            }
-            context.update({
-                'campagnes': campagnes,
-                'contrats': contrats,
-            })
+
+        campagnes_actives = [c for c in campagnes if c.statut == 'en_cours' and (self.request.user.is_admin or c.actif)]
+        client.campagnes_stats = {
+            'panneau': len([c for c in campagnes_actives if c.type_support == 'panneau']),
+            'ecran': len([c for c in campagnes_actives if c.type_support == 'ecran']),
+            'total': len(campagnes_actives),
+        }
+        client.spots_stats = {
+            'panneau': sum(c.calculer_nombre_spots() for c in campagnes_actives if c.type_support == 'panneau'),
+            'ecran': sum(c.calculer_nombre_spots() for c in campagnes_actives if c.type_support == 'ecran'),
+            'total': sum(c.calculer_nombre_spots() for c in campagnes_actives),
+        }
+
+        reservations = (
+            client.reservations_globales
+            .filter(statut__in=[STATUT_EN_ATTENTE, STATUT_CONFIRMEE], date_fin__gte=timezone.now())
+            .prefetch_related('lignes__face', 'lignes__support')
+            .order_by('date_debut')
+        )
+
+        context.update({
+            'campagnes': campagnes,
+            'contrats': contrats,
+            'reservations': reservations,
+        })
         return context
 
 
@@ -921,7 +920,7 @@ class SupportBulkActionView(StaffRequiredMixin, View):
     def get(self, request, campagne_pk):
         campagne = self.get_campagne(campagne_pk)
         type_support = campagne.type_support
-        
+
         is_modification = campagne.lignes.exists()
         mode_title = "Modifier la sélection" if is_modification else "Ajouter des supports"
         supports_enrichis = []
@@ -941,9 +940,24 @@ class SupportBulkActionView(StaffRequiredMixin, View):
                     'support': support,
                     'faces': faces_enrichies,
                 })
+
         else:
             supports_qs = Support.objects.filter(type_support='ecran', etat='bon')
             selectionnes = list(campagne.lignes.values_list('support_id', flat=True))
+
+            # ✅ Récupérer les paramètres existants par écran pour pré-remplir le formulaire
+            lignes_par_support = {
+                str(ligne.support_id): ligne
+                for ligne in campagne.lignes.filter(face__isnull=True)
+            }
+
+            supports_enrichis = []
+            for support in supports_qs:
+                ligne_existante = lignes_par_support.get(str(support.pk))
+                supports_enrichis.append({
+                    'support': support,
+                    'ligne': ligne_existante,  # None si pas encore sélectionné
+                })
 
         return render(request, self.template_name, {
             'campagne': campagne,
@@ -952,15 +966,19 @@ class SupportBulkActionView(StaffRequiredMixin, View):
             'mode_title': mode_title,
             'is_modification': is_modification,
             'supports_enrichis': supports_enrichis,
+            # ✅ Choix pour les selects dans le template
+            'duree_choices': DUREE_CHOICES,
+            'frequence_choices': FREQUENCE_CHOICES,
         })
+
     def post(self, request, campagne_pk):
         campagne = self.get_campagne(campagne_pk)
         type_support = campagne.type_support
 
         if type_support == 'panneau':
             face_ids = request.POST.getlist('faces')
-            
-            # Synchronisation : on retire les faces décochées
+
+            # Synchronisation : retirer les faces décochées
             campagne.lignes.filter(face__isnull=False).exclude(face_id__in=face_ids).delete()
 
             for face_id in face_ids:
@@ -971,17 +989,68 @@ class SupportBulkActionView(StaffRequiredMixin, View):
                     face=face,
                 )
                 if created:
-                    log_action(request, AuditLog.ACTION_UPDATE, 'campaign', obj=campagne, 
+                    log_action(request, AuditLog.ACTION_UPDATE, 'campaign', obj=campagne,
                                detail=f"Ajout panneau {face.support.code} face {face.label}")
+
         else:
             support_ids = request.POST.getlist('supports')
-            # Synchronisation pour écrans
+
+            # Synchronisation : retirer les écrans décochés
             campagne.lignes.filter(face__isnull=True).exclude(support_id__in=support_ids).delete()
+
             for support_id in support_ids:
                 support = get_object_or_404(Support, pk=support_id, type_support='ecran')
-                LigneCampagne.objects.update_or_create(
-                    campagne=campagne, support=support, defaults={'ordre_dans_boucle': 0}
+
+                # ✅ Récupérer les paramètres spécifiques à cet écran depuis le POST
+                # Les champs sont nommés : date_debut_{support_id}, frequence_{support_id}, etc.
+                date_debut_str      = request.POST.get(f'date_debut_{support_id}', '').strip()
+                date_fin_str        = request.POST.get(f'date_fin_{support_id}', '').strip()
+                duree_passage_str   = request.POST.get(f'duree_passage_{support_id}', '').strip()
+                frequence_str       = request.POST.get(f'frequence_{support_id}', '').strip()
+                tranches_horaires   = request.POST.get(f'tranches_horaires_{support_id}', '').strip()
+
+                # Conversion des valeurs (None si vide → héritera de la campagne)
+                date_debut    = None
+                date_fin      = None
+                duree_passage = None
+                frequence     = None
+
+                try:
+                    from datetime import date
+                    if date_debut_str:
+                        date_debut = date.fromisoformat(date_debut_str)
+                    if date_fin_str:
+                        date_fin = date.fromisoformat(date_fin_str)
+                    if duree_passage_str:
+                        duree_passage = int(duree_passage_str)
+                    if frequence_str:
+                        frequence = int(frequence_str)
+                except (ValueError, TypeError):
+                    messages.warning(
+                        request,
+                        f"Paramètres invalides pour l'écran {support.code}, valeurs par défaut utilisées."
+                    )
+
+                ligne, created = LigneCampagne.objects.update_or_create(
+                    campagne=campagne,
+                    support=support,
+                    defaults={
+                        'ordre_dans_boucle': 0,
+                        # ✅ Enregistrer les paramètres spécifiques (None = héritage campagne)
+                        'date_debut':       date_debut,
+                        'date_fin':         date_fin,
+                        'duree_passage':    duree_passage,
+                        'frequence':        frequence,
+                        'tranches_horaires': tranches_horaires or '',
+                    }
                 )
+
+                if created:
+                    log_action(request, AuditLog.ACTION_UPDATE, 'campaign', obj=campagne,
+                               detail=f"Ajout écran {support.code}")
+                else:
+                    log_action(request, AuditLog.ACTION_UPDATE, 'campaign', obj=campagne,
+                               detail=f"Mise à jour écran {support.code}")
 
         messages.success(request, "Mise à jour des supports effectuée.")
         return redirect('campagne_detail', pk=campagne_pk)
@@ -1063,163 +1132,1369 @@ class ApiCheckDisponibiliteView(LoginRequiredMixin, View):
     
     
 
-class ReservationPanneauBulkActionView(StaffRequiredMixin, View):
-    template_name = 'campaigns/reservations_add_bulk.html'
+
+
+from django.shortcuts import render, redirect, get_object_or_404
+from django.views import View
+from django.contrib import messages
+from django.db import transaction
+from django.utils import timezone
+from django.core.exceptions import ValidationError
+
+
+
+
+
+def _parse_aware_datetime(value: str):
+    """
+    Parse une chaîne ISO (ex: "2025-08-01T08:00") en datetime aware.
+    Gère les cas naive et already-aware (avec offset).
+    Lève ValueError si le format est invalide.
+    """
+    dt = timezone.datetime.fromisoformat(value)
+    return dt if timezone.is_aware(dt) else timezone.make_aware(dt)
+
+
+def _parse_dates(date_debut_str: str, date_fin_str: str):
+    """
+    Valide et convertit les deux chaînes de date.
+    Retourne (date_debut, date_fin) ou lève ValidationError.
+    """
+    if not date_debut_str or not date_fin_str:
+        raise ValidationError("Les dates de début et de fin sont obligatoires.")
+    try:
+        date_debut = _parse_aware_datetime(date_debut_str)
+        date_fin   = _parse_aware_datetime(date_fin_str)
+    except ValueError:
+        raise ValidationError("Format de date invalide. Attendu : YYYY-MM-DDTHH:MM.")
+    if date_fin <= date_debut:
+        raise ValidationError("La date de fin doit être strictement postérieure à la date de début.")
+    if (date_fin - date_debut).days > 366:
+        raise ValidationError("La période de réservation ne peut pas dépasser 1 an.")
+    return date_debut, date_fin
+
+
+def _get_supports():
+    """Retourne les panneaux en bon état avec leurs faces."""
+    return (
+        Support.objects
+        .filter(type_support='panneau', etat='bon')
+        .prefetch_related('faces')
+        .order_by('code')
+    )
+
+
+# ── Vue Création ──────────────────────────────────────────────────────────────
+
+class ReservationCreateView(StaffRequiredMixin, View):
+    """
+    Crée une nouvelle réservation (Reservation + ReservationLigne) pour un client.
+
+    URL : /clients/<client_pk>/reservations/create/
+    Name: reservation_create
+    """
+    template_name = 'campaigns/reservations_add_bulk_final.html'
 
     def get_client(self, client_pk):
         return get_object_or_404(Client, pk=client_pk)
 
     def get(self, request, client_pk):
-        client = self.get_client(client_pk)
-        
-        # Détection du mode (si le client a déjà des réservations en cours ou à venir)
-        now = timezone.now()
-        reservations_actives = client.reservations.filter(date_fin__gte=now).order_by('date_debut')
-        is_modification = reservations_actives.exists()
-        
-        mode_title = "Modifier les réservations" if is_modification else "Réserver des panneaux"
+        client   = self.get_client(client_pk)
+        now      = timezone.now()
+        supports = _get_supports()
 
-        # Initialisation des variables de dates pour le template
-        date_debut_iso = ""
-        date_fin_iso = ""
+        # Formats présents parmi les supports disponibles uniquement
+        format_choices_map = dict(Support.FORMAT_CHOICES)
+        codes_uniques = (
+            Support.objects
+            .exclude(format__isnull=True)
+            .exclude(format='')
+            .values_list('format', flat=True)
+            .distinct()
+        )
+        type_panneau_choices = list(dict.fromkeys(
+            (code, format_choices_map[code])
+            for code in codes_uniques
+            if code in format_choices_map
+        ))
+        print("type_panneau_choices:", type_panneau_choices)
 
-        if is_modification:
-            # On récupère la date de début de la première réservation et la date de fin de la plus lointaine
-            premiere_resa = reservations_actives.first()
-            derniere_resa = client.reservations.filter(date_fin__gte=now).order_by('-date_fin').first()
-            
-            # Formatage indispensable pour l'input HTML5 datetime-local (YYYY-MM-DDTHH:MM)
-            if premiere_resa and premiere_resa.date_debut:
-                date_debut_iso = premiere_resa.date_debut.strftime('%Y-%m-%dT%H:%M')
-            if derniere_resa and derniere_resa.date_fin:
-                date_fin_iso = derniere_resa.date_fin.strftime('%Y-%m-%dT%H:%M')
-
-        # On ne récupère que les panneaux physiques en bon état
-        supports = Support.objects.filter(type_support='panneau', etat='bon').prefetch_related('faces')
-        
-        # Liste des IDs de faces déjà réservées par ce client
-        selectionnes = list(reservations_actives.values_list('face_id', flat=True))
-        
-        # Les clients associés aux faces réservées
-        clt = Client.objects.filter(reservations__face_id__in=selectionnes).distinct()
-        
         return render(request, self.template_name, {
-            'client': client,
-            'supports': supports,
-            'selectionnes': selectionnes,
-            'clt': clt,
-            'mode_title': mode_title,
-            'is_modification': is_modification,
-            'date_debut': date_debut_iso,  # <-- Transmis proprement au format HTML5
-            'date_fin': date_fin_iso,      # <-- Transfinancé proprement au format HTML5
+            'client':               client,
+            'supports':             supports,
+            'selectionnes':         [],
+            'clt':                  Client.objects.none(),
+            'mode_title':           'Créer une réservation',
+            'is_modification':      False,
+            'date_debut':           '',
+            'date_fin':             '',
+            'today_iso':            now.strftime('%Y-%m-%dT%H:%M'),
+            'type_panneau_choices': type_panneau_choices,
         })
 
     def post(self, request, client_pk):
         client = self.get_client(client_pk)
-        
-        # Récupération des IDs des faces cochées et des dates depuis le formulaire
-        face_ids = [int(fid) for fid in request.POST.getlist('faces') if fid.isdigit()]
-        date_debut_str = request.POST.get('date_debut')
-        date_fin_str = request.POST.get('date_fin')
 
-        if not date_debut_str or not date_fin_str:
-            messages.error(request, "Les dates de début et de fin sont obligatoires.")
-            return redirect(request.path)
+        # ── Lecture des données formulaire ────────────────────────────────────
+        face_ids        = [int(fid) for fid in request.POST.getlist('faces') if fid.isdigit()]
+        date_debut_str  = request.POST.get('date_debut', '').strip()
+        date_fin_str    = request.POST.get('date_fin',   '').strip()
+        nom_reservation = request.POST.get('nom_reservation', '').strip() or \
+                          f"Réservation {timezone.now():%d/%m/%Y}"
 
-        # Conversion des dates du formulaire (Format attendu HTML5: YYYY-MM-DDTHH:MM)
+        # ── Validation ────────────────────────────────────────────────────────
         try:
-            date_debut = timezone.make_aware(timezone.datetime.fromisoformat(date_debut_str))
-            date_fin = timezone.make_aware(timezone.datetime.fromisoformat(date_fin_str))
-        except ValueError:
-            messages.error(request, "Format de date invalide.")
+            date_debut, date_fin = _parse_dates(date_debut_str, date_fin_str)
+        except ValidationError as e:
+            messages.error(request, e.message)
             return redirect(request.path)
 
-        # Utilisation d'une transaction atomique pour éviter les états inconsistants en BDD
-        with transaction.atomic():
-            # 1. NETTOYAGE : Supprime les réservations de faces qui ont été décochées
-            client.reservations.filter(face__isnull=False).exclude(face_id__in=face_ids).delete()
+        if not face_ids:
+            messages.error(request, "Veuillez sélectionner au moins une face.")
+            return redirect(request.path)
 
-            # 2. OPTIMISATION : Trouver quelles faces parmi celles cochées existent déjà pour ce client
-            faces_deja_reservees = set(
-                client.reservations.filter(face_id__in=face_ids).values_list('face_id', flat=True)
+        # ── Validation de toutes les faces AVANT toute écriture ───────────────
+        # NOTE : on ne peut pas appeler full_clean() sur ReservationLigne avec une
+        # Reservation non sauvegardée (le clean() fait un .exclude(reservation=self.reservation)
+        # qui échoue si l'objet n'a pas de PK). On duplique donc la logique ici.
+        faces_objects = (
+            FacePanneau.objects
+            .filter(id__in=face_ids)
+            .select_related('support')
+        )
+        nouvelles_lignes = []
+        erreurs = []
+
+        for face in faces_objects:
+            # 1. Type de support
+            if face.support.type_support != 'panneau':
+                erreurs.append(
+                    f"Panneau {face.support.code} — Face {face.label} : "
+                    f"les réservations sont uniquement applicables aux panneaux statiques."
+                )
+                continue
+
+            # 2. Cohérence face / support
+            if face.support_id != face.support.pk:
+                erreurs.append(
+                    f"Panneau {face.support.code} — Face {face.label} : "
+                    f"la face n'appartient pas au support choisi."
+                )
+                continue
+
+            # 3. Chevauchement avec une réservation existante
+            conflit_resa = (
+                ReservationLigne.objects.filter(
+                    face=face,
+                    reservation__date_debut__lt=date_fin,
+                    reservation__date_fin__gt=date_debut,
+                    reservation__statut__in=[STATUT_EN_ATTENTE, STATUT_CONFIRMEE],
+                )
+                .select_related('reservation__client')
+                .first()
             )
+            if conflit_resa:
+                r = conflit_resa.reservation
+                erreurs.append(
+                    f"Panneau {face.support.code} — Face {face.label} : "
+                    f"déjà réservée du {r.date_debut:%d/%m/%Y} au {r.date_fin:%d/%m/%Y} "
+                    f"(client : {r.client.nom})."
+                )
+                continue
 
-            # Id des faces réellement nouvelles à créer
-            faces_a_creer_ids = set(face_ids) - faces_deja_reservees
+            # 4. Chevauchement avec une campagne active
+            from campaigns.models import LigneCampagne
+            conflit_camp = (
+                LigneCampagne.objects.filter(
+                    face=face,
+                    campagne__date_debut__lte=date_fin.date(),
+                    campagne__date_fin__gte=date_debut.date(),
+                )
+                .select_related('campagne__client')
+                .first()
+            )
+            if conflit_camp:
+                c = conflit_camp.campagne
+                erreurs.append(
+                    f"Panneau {face.support.code} — Face {face.label} : "
+                    f"occupée par la campagne « {c.nom} » "
+                    f"(client : {c.client.nom})."
+                )
+                continue
 
-            if faces_a_creer_ids:
-                # Récupération de toutes les faces d'un coup (1 seule requête SQL au lieu d'une boucle)
-                faces_objects = FacePanneau.objects.filter(id__in=faces_a_creer_ids).select_related('support')
-                
-                nouvelles_reservations = []
-                for face in faces_objects:
-                    instance_reservation = ReservationPanneau(
-                        client=client,
-                        support=face.support,
-                        face=face,
-                        date_debut=date_debut,
-                        date_fin=date_fin
-                    )
-                    
-                    # Déclenche la validation clean() du modèle (gestion des conflits de date)
-                    try:
-                        instance_reservation.full_clean()
-                        nouvelles_reservations.append(instance_reservation)
-                    except ValidationError as e:
-                        messages.error(request, f"Erreur pour le panneau {face.support.code} - Face {face.label} : {e.messages[0]}")
-                        return redirect(request.path)
+            nouvelles_lignes.append(ReservationLigne(
+                support = face.support,
+                face    = face,
+                # reservation sera assignée après création en BDD
+            ))
 
-                # 3. ENREGISTREMENT EN MASSE : Insertion ultra-rapide en BDD
-                if nouvelles_reservations:
-                    ReservationPanneau.objects.bulk_create(nouvelles_reservations)
-                    
-                    # Log global (optionnel, selon votre système d'audit log)
-                    # log_action(request, AuditLog.ACTION_UPDATE, 'client', obj=client, detail=f"Réservation de {len(nouvelles_reservations)} panneaux")
+        if erreurs:
+            for err in erreurs:
+                messages.error(request, err)
+            return redirect(request.path)
 
-        messages.success(request, "Les réservations de panneaux ont été mises à jour avec succès.")
+        # ── Écriture atomique ─────────────────────────────────────────────────
+        try:
+            with transaction.atomic():
+                reservation = Reservation.objects.create(
+                    client     = client,
+                    nom        = nom_reservation,
+                    date_debut = date_debut,
+                    date_fin   = date_fin,
+                    statut     = STATUT_EN_ATTENTE,
+                    created_by = request.user if request.user.is_authenticated else None,
+                )
+                for ligne in nouvelles_lignes:
+                    ligne.reservation = reservation
+
+                ReservationLigne.objects.bulk_create(nouvelles_lignes)
+
+        except Exception as e:
+            messages.error(request, f"Erreur lors de la création : {str(e)}")
+            return redirect(request.path)
+
+        messages.success(
+            request,
+            f"Réservation « {nom_reservation} » créée avec {len(nouvelles_lignes)} face(s)."
+        )
         return redirect('client_detail', pk=client_pk)
-    
+
+
+# ── Vue Modification ──────────────────────────────────────────────────────────
+
+class ReservationUpdateView(StaffRequiredMixin, View):
+    """
+    Modifie une réservation existante (dates + faces sélectionnées).
+
+    URL : /clients/<client_pk>/reservations/<resa_pk>/update/
+    Name: reservation_update
+    """
+    template_name = 'campaigns/reservations_add_bulk_final.html'
+
+    def get_client(self, client_pk):
+        return get_object_or_404(Client, pk=client_pk)
+
+    def get_reservation(self, client, resa_pk):
+        return get_object_or_404(
+            Reservation,
+            pk     = resa_pk,
+            client = client,
+            statut__in = [STATUT_EN_ATTENTE, STATUT_CONFIRMEE],
+        )
+
+    def get(self, request, client_pk, resa_pk):
+        client      = self.get_client(client_pk)
+        reservation = self.get_reservation(client, resa_pk)
+        now         = timezone.now()
+        supports    = _get_supports()
+        # Formats présents parmi les supports disponibles uniquement
+        format_choices_map = dict(Support.FORMAT_CHOICES)
+        codes_uniques = (
+            Support.objects
+            .exclude(format__isnull=True)
+            .exclude(format='')
+            .values_list('format', flat=True)
+            .distinct()
+        )
+        type_panneau_choices = list(dict.fromkeys(
+            (code, format_choices_map[code])
+            for code in codes_uniques
+            if code in format_choices_map
+        ))
+        print("type_panneau_choices:", type_panneau_choices)
+        # Faces déjà dans cette réservation
+        selectionnes = list(
+            reservation.lignes.values_list('face_id', flat=True)
+        )
+
+        # Clients avec des faces qui chevauchent
+        clt = Client.objects.filter(
+            reservations_globales__lignes__face_id__in=selectionnes,
+            reservations_globales__statut__in=[STATUT_EN_ATTENTE, STATUT_CONFIRMEE],
+        ).exclude(pk=client.pk).distinct()
+
+        return render(request, self.template_name, {
+            'client':          client,
+            'reservation':     reservation,
+            'supports':        supports,
+            'selectionnes':    selectionnes,
+            'clt':             clt,
+            'mode_title':      f'Modifier — {reservation.nom}',
+            'is_modification': True,
+            'date_debut':      reservation.date_debut.strftime('%Y-%m-%dT%H:%M'),
+            'date_fin':        reservation.date_fin.strftime('%Y-%m-%dT%H:%M'),
+            'today_iso':       now.strftime('%Y-%m-%dT%H:%M'),
+            'type_panneau_choices': type_panneau_choices,
+        })
+
+    def post(self, request, client_pk, resa_pk):
+        client      = self.get_client(client_pk)
+        reservation = self.get_reservation(client, resa_pk)
+
+        # ── Lecture des données formulaire ────────────────────────────────────
+        face_ids       = [int(fid) for fid in request.POST.getlist('faces') if fid.isdigit()]
+        date_debut_str = request.POST.get('date_debut', '').strip()
+        date_fin_str   = request.POST.get('date_fin',   '').strip()
+
+        # ── Validation des dates ──────────────────────────────────────────────
+        try:
+            date_debut, date_fin = _parse_dates(date_debut_str, date_fin_str)
+        except ValidationError as e:
+            messages.error(request, e.message)
+            return redirect(request.path)
+
+        if not face_ids:
+            messages.error(request, "Veuillez sélectionner au moins une face.")
+            return redirect(request.path)
+
+        # ── Calcul des différences ────────────────────────────────────────────
+        faces_actuelles = set(reservation.lignes.values_list('face_id', flat=True))
+        faces_selectionnees = set(face_ids)
+        faces_a_ajouter  = faces_selectionnees - faces_actuelles
+        faces_a_supprimer = faces_actuelles - faces_selectionnees
+
+        # ── Validation des nouvelles faces AVANT toute écriture ───────────────
+        nouvelles_lignes = []
+        erreurs = []
+
+        if faces_a_ajouter:
+            faces_objects = (
+                FacePanneau.objects
+                .filter(id__in=faces_a_ajouter)
+                .select_related('support')
+            )
+            for face in faces_objects:
+                ligne = ReservationLigne(
+                    reservation = reservation,
+                    support     = face.support,
+                    face        = face,
+                )
+                try:
+                    ligne.full_clean()
+                    nouvelles_lignes.append(ligne)
+                except ValidationError as e:
+                    erreurs.append(
+                        f"Panneau {face.support.code} — Face {face.label} : {e.messages[0]}"
+                    )
+
+        if erreurs:
+            for err in erreurs:
+                messages.error(request, err)
+            return redirect(request.path)
+
+        # ── Écriture atomique ─────────────────────────────────────────────────
+        try:
+            with transaction.atomic():
+                # Mise à jour des dates de la réservation
+                reservation.date_debut = date_debut
+                reservation.date_fin   = date_fin
+                reservation.save(update_fields=['date_debut', 'date_fin', 'updated_at'])
+
+                # Suppression des faces décochées
+                nb_supprimees = 0
+                if faces_a_supprimer:
+                    deleted, _ = reservation.lignes.filter(
+                        face_id__in=faces_a_supprimer
+                    ).delete()
+                    nb_supprimees = deleted
+
+                # Ajout des nouvelles faces
+                if nouvelles_lignes:
+                    ReservationLigne.objects.bulk_create(nouvelles_lignes)
+
+        except Exception as e:
+            messages.error(request, f"Erreur lors de la mise à jour : {str(e)}")
+            return redirect(request.path)
+
+        # ── Message récapitulatif ─────────────────────────────────────────────
+        parties = []
+        if nouvelles_lignes:
+            parties.append(f"{len(nouvelles_lignes)} ajoutée(s)")
+        if nb_supprimees:
+            parties.append(f"{nb_supprimees} supprimée(s)")
+        if not parties:
+            parties.append("dates mises à jour")
+
+        messages.success(
+            request,
+            f"Réservation « {reservation.nom} » modifiée — {' · '.join(parties)}."
+        )
+        return redirect('client_detail', pk=client_pk)
+
+
+class ReservationDeleteView(StaffRequiredMixin, DeleteView):
+    model = Reservation
+    pk_url_kwarg = 'resa_pk'
+    template_name = 'partials/confirm_delete.html'
+    context_object_name = 'reservation'
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        return qs.filter(client_id=self.kwargs.get('client_pk'))
+
+    def get_success_url(self):
+        return reverse('client_detail', kwargs={'pk': self.object.client.pk})
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'title': f'Supprimer la réservation {self.object.reference}',
+            'message_title': f'Supprimer la réservation « {self.object.nom} » ?', 
+            'message_body': 'Cette action supprimera la réservation et toutes ses lignes.',
+            'confirm_label': 'Supprimer la réservation',
+            'cancel_url': reverse('client_detail', kwargs={'pk': self.object.client.pk}),
+            'obj': self.object,
+        })
+        return context
+
+
+class ReservationDetailView(ClientStaffRequiredMixin, DetailView):
+    model = Reservation
+    pk_url_kwarg = 'resa_pk'
+    template_name = 'campaigns/reservation_detail.html'
+    context_object_name = 'reservation'
+
+    def get_queryset(self):
+        qs = super().get_queryset().select_related('client', 'created_by').prefetch_related('lignes__support', 'lignes__face')
+        return qs.filter(client_id=self.kwargs.get('client_pk'))
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        reservation = self.object
+        context['page_title'] = f'Détail réservation — {reservation.nom}'
+        context['can_edit'] = self.request.user.is_staff_regie_role
+        context['can_delete'] = self.request.user.is_staff_regie_role
+        return context
+
+
+class ReservationListView(StaffRequiredMixin, ListView):
+    model = Reservation
+    template_name = 'campaigns/reservation_list.html'
+    context_object_name = 'reservations'
+    paginate_by = 20
+
+    def get_queryset(self):
+        qs = Reservation.objects.select_related('client', 'created_by').prefetch_related('lignes__face__support')
+
+        q        = self.request.GET.get('q', '').strip()
+        statut_f = self.request.GET.get('statut', '')
+        client_f = self.request.GET.get('client', '')
+        date_f   = self.request.GET.get('date', '')
+
+        if q:
+            qs = qs.filter(
+                Q(nom__icontains=q) |
+                Q(client__nom__icontains=q)
+            )
+        if statut_f:
+            qs = qs.filter(statut=statut_f)
+        if client_f:
+            qs = qs.filter(client__pk=client_f)
+        if date_f:
+            qs = qs.filter(date_debut__date=date_f)
+
+        return qs.order_by('-date_debut')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        context.update({
+            'q':        self.request.GET.get('q', ''),
+            'statut_f': self.request.GET.get('statut', ''),
+            'client_f': self.request.GET.get('client', ''),
+            'date_f':   self.request.GET.get('date', ''),
+            'statut_choices': [
+                (STATUT_EN_ATTENTE, 'En attente'),
+                (STATUT_CONFIRMEE,  'Confirmée'),
+                (STATUT_ANNULEE,    'Annulée'),
+            ],
+            'clients': Client.objects.order_by('nom'),
+        })
+        return context
+
+
+class ReservationSelectClientView(StaffRequiredMixin, View):
+    """
+    Petite vue pour sélectionner un client (utilisée dans un modal).
+    GET: rend un fragment contenant un formulaire de sélection de client.
+    POST: redirige vers la création de réservation pour le client choisi.
+    URL: /reservations/select-client/
+    Name: reservation_select_client
+    """
+    template_name = 'campaigns/reservation_select_client.html'
+
+    def get(self, request):
+        clients = Client.objects.filter(actif=False).order_by('nom')
+        print(clients)
+        return render(request, self.template_name, {'clients': clients})
+
+    def post(self, request):
+        client_pk = request.POST.get('client_pk')
+        if not client_pk:
+            messages.error(request, 'Veuillez sélectionner un client.')
+            return redirect('reservation_select_client')
+        return redirect('reservation_create', client_pk=client_pk)
+
+
+
+
 
 from django.http import JsonResponse
 from django.utils.dateparse import parse_datetime
 from django.utils import timezone
-from .models import ReservationPanneau
 
-# 1. Corriger __str__ dans ReservationPanneau
 def __str__(self):
     return f"Réservation de {self.support} pour {self.client}"  # self.panneau → self.support
 
 # 2. Passer client_pk à l'API de dispo
 def verifier_dispo_faces_api(request, client_pk=None):
     date_debut_str = request.GET.get('date_debut')
-    date_fin_str = request.GET.get('date_fin')
-    
+    date_fin_str   = request.GET.get('date_fin')
+
     if not date_debut_str or not date_fin_str:
         return JsonResponse({'faces_occupees': [], 'message': 'Dates manquantes'}, status=200)
-        
+
     try:
         date_debut = parse_datetime(date_debut_str)
-        date_fin = parse_datetime(date_fin_str)
-        
+        date_fin   = parse_datetime(date_fin_str)
         if date_debut and timezone.is_naive(date_debut):
             date_debut = timezone.make_aware(date_debut)
         if date_fin and timezone.is_naive(date_fin):
             date_fin = timezone.make_aware(date_fin)
-            
     except (ValueError, TypeError):
         return JsonResponse({'faces_occupees': [], 'error': 'Format de date invalide'}, status=400)
-        
+
     if not date_debut or not date_fin:
         return JsonResponse({'faces_occupees': [], 'error': 'Impossible de parser les dates'}, status=400)
 
-    # On exclut les réservations du client courant (pour le mode modification)
-    qs = ReservationPanneau.objects.filter(
-        date_debut__lt=date_fin,
-        date_fin__gt=date_debut
+    # ── Conflits via ReservationLigne (nouveau modèle) ────────────────────
+    qs_resa = ReservationLigne.objects.filter(
+        reservation__date_debut__lt=date_fin,
+        reservation__date_fin__gt=date_debut,
+        reservation__statut__in=[STATUT_EN_ATTENTE, STATUT_CONFIRMEE],
     )
     if client_pk:
-        qs = qs.exclude(client_id=client_pk)
-    
-    conflits = qs.values_list('face_id', flat=True)
-    return JsonResponse({'faces_occupees': list(set(conflits))})
+        qs_resa = qs_resa.exclude(reservation__client_id=client_pk)
 
+    faces_reservees = set(qs_resa.values_list('face_id', flat=True))
+
+    # ── Conflits via LigneCampagne (campagnes actives) ────────────────────
+    qs_camp = LigneCampagne.objects.filter(
+        campagne__date_debut__lte=date_fin.date(),
+        campagne__date_fin__gte=date_debut.date(),
+        campagne__statut__in=['en_cours', 'a_venir'],
+        face__isnull=False,
+    )
+    faces_campagnes = set(qs_camp.values_list('face_id', flat=True))
+
+    faces_occupees = faces_reservees | faces_campagnes
+
+    return JsonResponse({'faces_occupees': list(faces_occupees)})
+
+
+
+
+
+
+def api_check_dispo(request, client_pk):
+    """
+    Retourne le statut de chaque face sur une période donnée.
+    
+    GET /campaigns/api/check-dispo/<client_pk>/?date_debut=...&date_fin=...
+    
+    Réponse :
+    {
+      "faces": {
+        "42": { "statut": "libre",   "info": "" },
+        "43": { "statut": "occupe",  "info": "ABC Corp · jusqu'au 31/01/2026" },
+        "44": { "statut": "reserve", "info": "Client XYZ" },
+        "45": { "statut": "panne",   "info": "" },
+        "46": { "statut": "moi",     "info": "Déjà réservé par ce client" }
+      }
+    }
+    """
+    from django.utils.timezone import make_aware, datetime as dt
+    from django.core.exceptions import ValidationError
+
+    date_debut_str = request.GET.get('date_debut', '').strip()
+    date_fin_str   = request.GET.get('date_fin',   '').strip()
+
+    if not date_debut_str or not date_fin_str:
+        return JsonResponse({'error': 'Dates manquantes.'}, status=400)
+
+    try:
+        date_debut = make_aware(dt.fromisoformat(date_debut_str))
+        date_fin   = make_aware(dt.fromisoformat(date_fin_str))
+    except ValueError:
+        return JsonResponse({'error': 'Format de date invalide.'}, status=400)
+
+    if date_fin <= date_debut:
+        return JsonResponse({'error': 'date_fin doit être > date_debut.'}, status=400)
+
+    # ── Récupération de toutes les faces de panneaux actifs ────────────────
+    faces = (
+        FacePanneau.objects
+        .filter(support__type_support='panneau', support__actif=True)
+        .select_related('support')
+    )
+
+    # ── Faces réservées par CE client sur cette période ────────────────────
+    mes_faces = set(
+        ReservationLigne.objects
+        .filter(
+            reservation__client_id=client_pk,
+            reservation__date_debut__lt=date_fin,
+            reservation__date_fin__gt=date_debut,
+            reservation__statut__in=['en_attente', 'confirmee'],
+        )
+        .values_list('face_id', flat=True)
+    )
+
+    # ── Faces occupées par une campagne ────────────────────────────────────
+    faces_campagne = {
+        lc['face_id']: lc
+        for lc in LigneCampagne.objects
+        .filter(
+            campagne__date_debut__lte=date_fin.date(),
+            campagne__date_fin__gte=date_debut.date(),
+            campagne__statut__in=['en_cours', 'a_venir'],
+        )
+        .select_related('campagne__client')
+        .values(
+            'face_id',
+            'campagne__client__nom',
+            'campagne__date_fin',
+            'campagne__nom',
+        )
+    }
+
+    # ── Faces réservées par UN AUTRE client ───────────────────────────────
+    faces_reservation = {
+        rl['face_id']: rl
+        for rl in ReservationLigne.objects
+        .filter(
+            reservation__date_debut__lt=date_fin,
+            reservation__date_fin__gt=date_debut,
+            reservation__statut__in=['en_attente', 'confirmee'],
+        )
+        .exclude(reservation__client_id=client_pk)
+        .values(
+            'face_id',
+            'reservation__client__nom',
+        )
+    }
+
+    # ── Construction de la réponse ─────────────────────────────────────────
+    result = {}
+    for face in faces:
+        fid = face.pk
+
+        if face.etat == 'panne':
+            result[fid] = {'statut': 'panne', 'info': ''}
+
+        elif fid in mes_faces:
+            result[fid] = {'statut': 'moi', 'info': 'Déjà réservé par ce client'}
+
+        elif fid in faces_campagne:
+            lc = faces_campagne[fid]
+            result[fid] = {
+                'statut': 'occupe',
+                'info': f"{lc['campagne__client__nom']} · jusqu'au {lc['campagne__date_fin'].strftime('%d/%m/%Y')}",
+            }
+
+        elif fid in faces_reservation:
+            rl = faces_reservation[fid]
+            result[fid] = {
+                'statut': 'reserve',
+                'info': rl['reservation__client__nom'],
+            }
+
+        else:
+            result[fid] = {'statut': 'libre', 'info': ''}
+
+    return JsonResponse({'faces': result})
+
+
+
+
+
+
+
+from django.contrib import messages
+from django.core.exceptions import ValidationError
+from django.db import transaction
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
+from django.views import View
+
+from campaigns.models import Client
+from inventory.models import FacePanneau, Support
+
+
+# ── Utilitaire ────────────────────────────────────────────────────────────────
+
+def _parse_aware_datetime(value: str):
+    """
+    Parse une chaîne ISO (ex: "2025-08-01T08:00") en datetime aware.
+    Gère les deux cas : naive et already-aware (avec offset).
+    Lève ValueError si le format est invalide.
+    """
+    dt = timezone.datetime.fromisoformat(value)
+    return dt if timezone.is_aware(dt) else timezone.make_aware(dt)
+
+
+# staff/views.py
+"""
+Vues du back-office staff pour traiter les demandes de réservation.
+Accès réservé au staff (LoginRequired + UserPassesTestMixin).
+"""
+
+import logging
+from datetime import datetime as datetime_type, date as date_type
+from decimal import Decimal
+
+from django.conf import settings
+from django.contrib import messages
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.core.mail import send_mail
+from django.core.paginator import Paginator
+from django.db import transaction
+from django.db.models import Count, Q, Prefetch
+from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
+from django.views import View
+
+from campaigns.models import (
+    Client,
+    DemandeReservation,
+    LigneCampagne,
+    Reservation,
+    ReservationLigne,
+    STATUT_EN_ATTENTE,
+    STATUT_CONFIRMEE,
+)
+from inventory.models import FacePanneau, Support
+
+logger = logging.getLogger(__name__)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Mixin de sécurité
+# ══════════════════════════════════════════════════════════════════════════════
+
+class StaffOnlyMixin(LoginRequiredMixin, UserPassesTestMixin):
+    """
+    Mixin pour restreindre l'accès aux staff uniquement.
+    """
+    login_url = 'admin:login'
+    
+    def test_func(self):
+        return self.request.user.is_staff
+    
+    def handle_no_permission(self):
+        messages.error(self.request, "Accès réservé au staff.")
+        return redirect('admin:login')
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Dashboard Staff
+# ══════════════════════════════════════════════════════════════════════════════
+
+class DashboardView(StaffOnlyMixin, View):
+    """
+    Page d'accueil du staff avec statistiques et actions rapides.
+    """
+    template_name = 'staff/dashboard.html'
+
+    def get(self, request):
+        now = timezone.now()
+        
+        # ── Statistiques demandes ─────────────────────────────────────────
+        demandes_nouvelles = DemandeReservation.objects.filter(
+            statut=DemandeReservation.STATUT_NOUVELLE
+        ).count()
+        
+        demandes_en_cours = DemandeReservation.objects.filter(
+            statut=DemandeReservation.STATUT_EN_COURS
+        ).count()
+        
+        demandes_validees_mois = DemandeReservation.objects.filter(
+            statut=DemandeReservation.STATUT_VALIDEE,
+            created_at__year=now.year,
+            created_at__month=now.month,
+        ).count()
+        
+        # ── Demandes en attente depuis plus de 24h ────────────────────────
+        demandes_urgentes = (
+            DemandeReservation.objects
+            .filter(
+                statut__in=[
+                    DemandeReservation.STATUT_NOUVELLE,
+                    DemandeReservation.STATUT_EN_COURS,
+                ]
+            )
+            .filter(created_at__lte=now - timezone.timedelta(hours=24))
+            .count()
+        )
+        
+        # ── Réservations actives ──────────────────────────────────────────
+        reservations_actives = Reservation.objects.filter(
+            date_debut__lte=now,
+            date_fin__gte=now,
+            statut=STATUT_CONFIRMEE,
+        ).count()
+        
+        # ── Dernières demandes (non traitées) ──────────────────────────────
+        dernieres_demandes = (
+            DemandeReservation.objects
+            .filter(
+                statut__in=[
+                    DemandeReservation.STATUT_NOUVELLE,
+                    DemandeReservation.STATUT_EN_COURS,
+                ]
+            )
+            .select_related('traite_par')
+            .order_by('-created_at')[:5]
+        )
+        
+        return render(request, self.template_name, {
+            'demandes_nouvelles':  demandes_nouvelles,
+            'demandes_en_cours':   demandes_en_cours,
+            'demandes_validees_mois': demandes_validees_mois,
+            'demandes_urgentes':   demandes_urgentes,
+            'reservations_actives': reservations_actives,
+            'dernieres_demandes':  dernieres_demandes,
+        })
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Liste des demandes
+# ══════════════════════════════════════════════════════════════════════════════
+
+class DemandeListView(StaffOnlyMixin, View):
+    """
+    Affiche la liste des demandes avec filtres et recherche.
+    """
+    template_name = 'staff/demandes_liste.html'
+
+    def get(self, request):
+        qs = (
+            DemandeReservation.objects
+            .select_related('client', 'traite_par')
+            .prefetch_related('faces_souhaitees__support', 'supports_souhaites')
+        )
+
+        # ── Filtres ───────────────────────────────────────────────────────
+        statut = request.GET.get('statut', '').strip()
+        q      = request.GET.get('q', '').strip()
+        tri    = request.GET.get('tri', '-created_at').strip()
+
+        if statut and statut in dict(DemandeReservation.STATUT_CHOICES):
+            qs = qs.filter(statut=statut)
+        
+        if q:
+            qs = qs.filter(
+                Q(reference__icontains=q) |
+                Q(nom_contact__icontains=q) |
+                Q(email__icontains=q) |
+                Q(societe__icontains=q) |
+                Q(nom_campagne__icontains=q)
+            )
+
+        # ── Tri ───────────────────────────────────────────────────────────
+        if tri in ['-created_at', 'created_at', '-date_debut_souhaitee', 'date_debut_souhaitee']:
+            qs = qs.order_by(tri)
+        else:
+            qs = qs.order_by('-created_at')
+
+        # ── Pagination ────────────────────────────────────────────────────
+        paginator = Paginator(qs, 20)
+        page_obj  = paginator.get_page(request.GET.get('page', 1))
+
+        # ── Compteurs ─────────────────────────────────────────────────────
+        nb_nouvelles = DemandeReservation.objects.filter(
+            statut=DemandeReservation.STATUT_NOUVELLE
+        ).count()
+        
+        nb_en_cours = DemandeReservation.objects.filter(
+            statut=DemandeReservation.STATUT_EN_COURS
+        ).count()
+
+        return render(request, self.template_name, {
+            'page_obj':          page_obj,
+            'statut':            statut,
+            'q':                 q,
+            'tri':               tri,
+            'statut_choices':    DemandeReservation.STATUT_CHOICES,
+            'nb_nouvelles':      nb_nouvelles,
+            'nb_en_cours':       nb_en_cours,
+        })
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Détail d'une demande
+# ══════════════════════════════════════════════════════════════════════════════
+
+class DemandeDetailView(StaffOnlyMixin, View):
+    """
+    Affiche le détail complet d'une demande et permet le traitement.
+    """
+    template_name = 'staff/demande_detail.html'
+
+    def get(self, request, uuid):
+        demande = get_object_or_404(
+            DemandeReservation.objects
+            .select_related('client', 'reservation', 'traite_par')
+            .prefetch_related(
+                'faces_souhaitees__support',
+                'supports_souhaites',
+            ),
+            uuid=uuid
+        )
+
+        # ── Marquer en cours si nouvelle ──────────────────────────────────
+        if demande.statut == DemandeReservation.STATUT_NOUVELLE:
+            demande.marquer_en_cours(request.user)
+
+        # ── Vérifier disponibilité des faces sur la période ────────────────
+        faces_avec_statut = self._get_faces_avec_statut(demande)
+
+        # ── Clients existants pour le formulaire ──────────────────────────
+        clients = Client.objects.filter(actif=True).order_by('nom')
+
+        # ── Supports écrans (si demande écrans) ───────────────────────────
+        supports_ecrans = demande.supports_souhaites.all()
+
+        return render(request, self.template_name, {
+            'demande':            demande,
+            'faces_avec_statut':  faces_avec_statut,
+            'clients':            clients,
+            'supports_ecrans':    supports_ecrans,
+            'duree_jours':        demande.duree_jours(),
+        })
+
+    def _get_faces_avec_statut(self, demande):
+        """
+        Retourne une liste de dicts avec chaque face et son statut
+        + détails des conflits éventuels.
+        """
+        faces_avec_statut = []
+        
+        date_debut_dt = timezone.make_aware(
+            datetime_type.combine(demande.date_debut_souhaitee, datetime_type.min.time())
+        )
+        date_fin_dt = timezone.make_aware(
+            datetime_type.combine(demande.date_fin_souhaitee, datetime_type.max.time())
+        )
+
+        for face in demande.faces_souhaitees.all().select_related('support'):
+            statut = face.get_statut(
+                date_debut=date_debut_dt,
+                date_fin=date_fin_dt,
+            )
+            
+            # ── Détails du conflit ────────────────────────────────────────
+            conflit = None
+            if statut in ('occupe', 'reserve'):
+                # Chercher conflit campagne
+                lc = (
+                    LigneCampagne.objects
+                    .filter(
+                        face=face,
+                        campagne__date_debut__lte=demande.date_fin_souhaitee,
+                        campagne__date_fin__gte=demande.date_debut_souhaitee,
+                        campagne__statut__in=['en_cours', 'a_venir'],
+                    )
+                    .select_related('campagne__client')
+                    .first()
+                )
+                if lc:
+                    conflit = {
+                        'type':  'campagne',
+                        'label': f"{lc.campagne.nom}",
+                        'client_nom': lc.campagne.client.nom,
+                        'debut': lc.campagne.date_debut,
+                        'fin':   lc.campagne.date_fin,
+                    }
+                else:
+                    # Chercher conflit réservation
+                    rl = (
+                        ReservationLigne.objects
+                        .filter(
+                            face=face,
+                            reservation__date_debut__lte=date_fin_dt,
+                            reservation__date_fin__gte=date_debut_dt,
+                            reservation__statut__in=[STATUT_EN_ATTENTE, STATUT_CONFIRMEE],
+                        )
+                        .exclude(reservation__demandes=demande)  # Exclure la demande actuelle
+                        .select_related('reservation__client')
+                        .first()
+                    )
+                    if rl:
+                        conflit = {
+                            'type':  'reservation',
+                            'label': rl.reservation.nom,
+                            'client_nom': rl.reservation.client.nom,
+                            'debut': rl.reservation.date_debut,
+                            'fin':   rl.reservation.date_fin,
+                        }
+
+            faces_avec_statut.append({
+                'face':    face,
+                'statut':  statut,
+                'conflit': conflit,
+            })
+
+        return faces_avec_statut
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Traitement (validation) d'une demande
+# ══════════════════════════════════════════════════════════════════════════════
+
+class DemandeTraiterView(StaffOnlyMixin, View):
+    """
+    POST : crée le Client (si nouveau) + Reservation + ReservationLigne
+           puis valide la demande et envoie les emails.
+    """
+    template_name = 'staff/demande_detail.html'
+
+    def post(self, request, uuid):
+        demande = get_object_or_404(DemandeReservation, uuid=uuid)
+
+        if demande.est_traitee:
+            messages.warning(request, "Cette demande a déjà été traitée.")
+            return redirect('staff:demande_detail', uuid=uuid)
+
+        # ── Récupération des données ──────────────────────────────────────
+        client_pk       = request.POST.get('client_pk', '').strip()
+        nouveau_client  = request.POST.get('nouveau_client') == '1'
+        face_ids        = request.POST.getlist('faces')
+        nom_reservation = request.POST.get(
+            'nom_reservation',
+            demande.nom_campagne or f"Réservation {demande.reference}"
+        ).strip()
+
+        # ── Dates ─────────────────────────────────────────────────────────
+        try:
+            date_debut_str = request.POST.get('date_debut', str(demande.date_debut_souhaitee))
+            date_fin_str   = request.POST.get('date_fin', str(demande.date_fin_souhaitee))
+            
+            date_debut_d = date_type.fromisoformat(date_debut_str)
+            date_fin_d   = date_type.fromisoformat(date_fin_str)
+            
+            date_debut = timezone.make_aware(
+                datetime_type.combine(date_debut_d, datetime_type.min.time())
+            )
+            date_fin = timezone.make_aware(
+                datetime_type.combine(date_fin_d, datetime_type.max.time())
+            )
+        except (ValueError, TypeError) as e:
+            messages.error(request, f"Dates invalides : {e}")
+            return redirect('staff:demande_detail', uuid=uuid)
+
+        if not face_ids:
+            messages.error(request, "Sélectionnez au moins une face.")
+            return redirect('staff:demande_detail', uuid=uuid)
+
+        try:
+            with transaction.atomic():
+                # 1. ── Récupérer ou créer le client ──────────────────────
+                if nouveau_client:
+                    client = Client.objects.create(
+                        nom       = demande.societe or demande.nom_contact,
+                        email     = demande.email,
+                        telephone = demande.telephone,
+                        actif     = True,
+                    )
+                    logger.info(f"[Demande {demande.reference}] Client créé : {client.nom}")
+                elif client_pk:
+                    client = get_object_or_404(Client, pk=client_pk)
+                else:
+                    messages.error(request, "Sélectionnez un client ou créez-en un nouveau.")
+                    return redirect('staff:demande_detail', uuid=uuid)
+
+                # 2. ── Créer la Reservation ──────────────────────────────
+                reservation = Reservation.objects.create(
+                    client      = client,
+                    nom         = nom_reservation,
+                    date_debut  = date_debut,
+                    date_fin    = date_fin,
+                    statut      = STATUT_CONFIRMEE,
+                    created_by  = request.user,
+                )
+                logger.info(f"[Demande {demande.reference}] Réservation créée : {reservation.reference}")
+
+                # 3. ── Créer les ReservationLigne avec validation ────────
+                faces = FacePanneau.objects.filter(
+                    pk__in=face_ids
+                ).select_related('support')
+                
+                erreurs = []
+                lignes  = []
+                
+                for face in faces:
+                    ligne = ReservationLigne(
+                        reservation=reservation,
+                        support=face.support,
+                        face=face,
+                    )
+                    
+                    # Vérifier les conflits
+                    conflit = ReservationLigne.objects.filter(
+                        face=face,
+                        reservation__date_debut__lt=date_fin,
+                        reservation__date_fin__gt=date_debut,
+                        reservation__statut__in=[STATUT_EN_ATTENTE, STATUT_CONFIRMEE],
+                    ).exclude(reservation=reservation).first()
+                    
+                    if conflit:
+                        erreurs.append(
+                            f"Face {face.support.code}-{face.label} : "
+                            f"conflit avec {conflit.reservation.client.nom}"
+                        )
+                    else:
+                        lignes.append(ligne)
+
+                if erreurs:
+                    messages.error(request, f"Conflits détectés : {', '.join(erreurs)}")
+                    return redirect('staff:demande_detail', uuid=uuid)
+
+                if lignes:
+                    ReservationLigne.objects.bulk_create(lignes)
+                    logger.info(f"[Demande {demande.reference}] {len(lignes)} lignes créées")
+
+                # 4. ── Valider la demande ────────────────────────────────
+                demande.valider(request.user, reservation, client)
+
+                # 5. ── Envoyer les emails ────────────────────────────────
+                self._send_confirmation_emails(demande, reservation, date_debut_d, date_fin_d)
+
+        except Exception as exc:
+            logger.error(f"Erreur traitement demande {uuid} : {exc}", exc_info=True)
+            messages.error(request, f"Erreur : {exc}")
+            return redirect('staff:demande_detail', uuid=uuid)
+
+        messages.success(
+            request,
+            f"✅ Demande {demande.reference} validée — Réservation {reservation.reference} créée."
+        )
+        return redirect('staff:demande_detail', uuid=uuid)
+
+    def _send_confirmation_emails(self, demande, reservation, date_debut_d, date_fin_d):
+        """Envoie les emails de confirmation au visiteur."""
+        try:
+            # Email au visiteur
+            send_mail(
+                subject=f"Confirmation de réservation — {demande.reference} | Régie INTEGRAL",
+                message=(
+                    f"Bonjour {demande.nom_contact},\n\n"
+                    f"Votre demande de réservation {demande.reference} a été validée ✅\n\n"
+                    f"Détails de votre réservation :\n"
+                    f"  Référence : {reservation.reference}\n"
+                    f"  Période : {date_debut_d:%d/%m/%Y} → {date_fin_d:%d/%m/%Y} "
+                    f"({demande.duree_jours()} jours)\n"
+                    f"  Campagne : {demande.nom_campagne or 'Non spécifiée'}\n\n"
+                    f"Notre équipe vous contactera bientôt pour les détails de la mise en place.\n\n"
+                    f"Cordialement,\n"
+                    f"Équipe Régie INTEGRAL\n"
+                    f"📞 +226 XX XX XX XX\n"
+                    f"✉️ contact@integral.bf"
+                ),
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[demande.email],
+                fail_silently=False,
+            )
+            logger.info(f"Email confirmation envoyé à {demande.email}")
+        except Exception as e:
+            logger.warning(f"Erreur envoi email confirmation : {e}")
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Refus d'une demande
+# ══════════════════════════════════════════════════════════════════════════════
+
+class DemandeRefuserView(StaffOnlyMixin, View):
+    """
+    POST : refuse la demande et envoie un email au visiteur.
+    """
+
+    def post(self, request, uuid):
+        demande = get_object_or_404(DemandeReservation, uuid=uuid)
+
+        if demande.est_traitee:
+            messages.warning(request, "Cette demande a déjà été traitée.")
+            return redirect('staff:demande_detail', uuid=uuid)
+
+        notes = request.POST.get('notes_staff', '').strip()
+        demande.refuser(request.user, notes)
+
+        logger.info(f"Demande {demande.reference} refusée par {request.user.username}")
+
+        # Email de refus au visiteur
+        try:
+            send_mail(
+                subject=f"Demande de réservation — {demande.reference} | Régie INTEGRAL",
+                message=(
+                    f"Bonjour {demande.nom_contact},\n\n"
+                    f"Nous avons examiné votre demande {demande.reference} "
+                    f"pour la période {demande.date_debut_souhaitee:%d/%m/%Y} → "
+                    f"{demande.date_fin_souhaitee:%d/%m/%Y}.\n\n"
+                    f"Malheureusement, nous ne sommes pas en mesure de la satisfaire "
+                    f"pour le moment.\n\n"
+                    + (f"Raison : {notes}\n\n" if notes else "")
+                    + f"N'hésitez pas à nous recontacter pour une autre période.\n\n"
+                    f"Cordialement,\n"
+                    f"Équipe Régie INTEGRAL\n"
+                    f"📞 +226 XX XX XX XX"
+                ),
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[demande.email],
+                fail_silently=False,
+            )
+            logger.info(f"Email refus envoyé à {demande.email}")
+        except Exception as e:
+            logger.warning(f"Erreur envoi email refus : {e}")
+
+        messages.success(request, f"❌ Demande {demande.reference} refusée et email envoyé.")
+        return redirect('staff:demande_detail', uuid=uuid)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# APIs AJAX
+# ══════════════════════════════════════════════════════════════════════════════
+
+class AjaxSearchClientView(StaffOnlyMixin, View):
+    """
+    AJAX : POST /staff/api/search-client/?q=jean
+    Retourne max 10 clients correspondant à la recherche.
+    """
+
+    def get(self, request):
+        q = request.GET.get('q', '').strip()
+        
+        if len(q) < 2:
+            return JsonResponse([], safe=False)
+
+        clients = Client.objects.filter(
+            Q(nom__icontains=q) |
+            Q(email__icontains=q) |
+            Q(telephone__icontains=q),
+            actif=True,
+        ).values('id', 'nom', 'email', 'telephone')[:10]
+
+        return JsonResponse(list(clients), safe=False)
+
+
+class AjaxCheckFacesDispoView(StaffOnlyMixin, View):
+    """
+    AJAX : POST /staff/api/check-faces-dispo/
+    Vérifie la disponibilité de faces sur une période modifiée.
+    
+    Body JSON:
+    {
+        "face_ids": [1, 2, 3],
+        "date_debut": "2026-03-01",
+        "date_fin": "2026-03-31"
+    }
+    
+    Réponse JSON:
+    {
+        "resultats": [
+            {
+                "face_id": 1,
+                "face_label": "A",
+                "support_code": "OUA-001",
+                "disponible": true,
+                "conflits": []
+            },
+            {
+                "face_id": 2,
+                "face_label": "B",
+                "support_code": "OUA-045",
+                "disponible": false,
+                "conflits": [
+                    {"type": "campagne", "label": "Campaign XYZ", "debut": "2026-03-10", "fin": "2026-03-20"}
+                ]
+            }
+        ]
+    }
+    """
+
+    def post(self, request):
+        import json
+        
+        try:
+            data = json.loads(request.body)
+        except json.JSONDecodeError:
+            return JsonResponse({'error': 'JSON invalide'}, status=400)
+
+        face_ids = data.get('face_ids', [])
+        date_debut_str = data.get('date_debut', '')
+        date_fin_str = data.get('date_fin', '')
+
+        if not all([face_ids, date_debut_str, date_fin_str]):
+            return JsonResponse({'error': 'Données manquantes'}, status=400)
+
+        try:
+            date_debut_d = date_type.fromisoformat(date_debut_str)
+            date_fin_d = date_type.fromisoformat(date_fin_str)
+            date_debut = timezone.make_aware(
+                datetime_type.combine(date_debut_d, datetime_type.min.time())
+            )
+            date_fin = timezone.make_aware(
+                datetime_type.combine(date_fin_d, datetime_type.max.time())
+            )
+        except ValueError:
+            return JsonResponse({'error': 'Dates invalides'}, status=400)
+
+        # Vérifier chaque face
+        resultats = []
+        faces = FacePanneau.objects.filter(pk__in=face_ids).select_related('support')
+
+        for face in faces:
+            statut = face.get_statut(date_debut=date_debut, date_fin=date_fin)
+            disponible = statut == 'libre'
+            conflits = []
+
+            if not disponible:
+                # Chercher les conflits
+                if statut == 'occupe':
+                    lc = LigneCampagne.objects.filter(
+                        face=face,
+                        campagne__date_debut__lte=date_fin_d,
+                        campagne__date_fin__gte=date_debut_d,
+                        campagne__statut__in=['en_cours', 'a_venir'],
+                    ).select_related('campagne').first()
+                    if lc:
+                        conflits.append({
+                            'type': 'campagne',
+                            'label': lc.campagne.nom,
+                            'debut': str(lc.campagne.date_debut),
+                            'fin': str(lc.campagne.date_fin),
+                        })
+                elif statut == 'reserve':
+                    rl = ReservationLigne.objects.filter(
+                        face=face,
+                        reservation__date_debut__lt=date_fin,
+                        reservation__date_fin__gt=date_debut,
+                        reservation__statut__in=[STATUT_EN_ATTENTE, STATUT_CONFIRMEE],
+                    ).select_related('reservation').first()
+                    if rl:
+                        conflits.append({
+                            'type': 'reservation',
+                            'label': rl.reservation.nom,
+                            'debut': rl.reservation.date_debut.isoformat(),
+                            'fin': rl.reservation.date_fin.isoformat(),
+                        })
+
+            resultats.append({
+                'face_id': face.id,
+                'face_label': face.label,
+                'support_code': face.support.code,
+                'disponible': disponible,
+                'conflits': conflits,
+            })
+
+        return JsonResponse({'resultats': resultats})

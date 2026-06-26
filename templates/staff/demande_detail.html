@@ -1,0 +1,547 @@
+{% extends 'staff/base_staff.html' %}
+{% load static %}
+
+{% block title %}{{ demande.reference }} - Staff GeoAd ERP{% endblock %}
+{% block page_title %}
+    📋 {{ demande.reference }} 
+    <span class="badge badge-{{ demande.statut }}">{{ demande.get_statut_display }}</span>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+    .info-box {
+        background-color: #e7f3ff;
+        border-left: 4px solid #0d6efd;
+        padding: 1rem;
+        border-radius: 0.375rem;
+        margin-bottom: 1rem;
+    }
+
+    .face-item {
+        padding: 1rem;
+        border: 1px solid #dee2e6;
+        border-radius: 0.375rem;
+        margin-bottom: 0.75rem;
+        transition: all 0.2s ease;
+    }
+
+    .face-item.disponible {
+        background-color: #d1e7dd;
+        border-color: #198754;
+    }
+
+    .face-item.conflit {
+        background-color: #f8d7da;
+        border-color: #dc3545;
+    }
+
+    .face-item label {
+        margin-bottom: 0.5rem;
+        cursor: pointer;
+    }
+
+    .face-item input[type="checkbox"] {
+        margin-right: 0.5rem;
+        cursor: pointer;
+        width: 1.25rem;
+        height: 1.25rem;
+    }
+
+    .conflict-info {
+        background-color: #fff3cd;
+        border-left: 3px solid #ffc107;
+        padding: 0.75rem;
+        margin-top: 0.5rem;
+        border-radius: 0.25rem;
+        font-size: 0.875rem;
+    }
+
+    .section-title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        color: #212529;
+        margin-top: 1.5rem;
+        margin-bottom: 1rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid #dee2e6;
+    }
+
+    .timeline {
+        position: relative;
+        padding-left: 2rem;
+    }
+
+    .timeline::before {
+        content: '';
+        position: absolute;
+        left: 0;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background-color: #dee2e6;
+    }
+
+    .timeline-item {
+        position: relative;
+        margin-bottom: 1.5rem;
+        padding-bottom: 1rem;
+    }
+
+    .timeline-item::before {
+        content: '';
+        position: absolute;
+        left: -2.25rem;
+        top: 0;
+        width: 12px;
+        height: 12px;
+        border-radius: 50%;
+        background-color: #0d6efd;
+        border: 2px solid white;
+    }
+
+    .tab-content {
+        margin-top: 1.5rem;
+    }
+
+    .tab-content .active {
+        display: block;
+    }
+
+    .tab-pane {
+        display: none;
+    }
+
+    .form-section {
+        background-color: #f8f9fa;
+        padding: 1.5rem;
+        border-radius: 0.375rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .btn-action {
+        min-width: 120px;
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<div class="container-fluid">
+
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- BREADCRUMB                                                          -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <nav aria-label="breadcrumb" class="mb-3">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{% url 'staff:dashboard' %}">Dashboard</a></li>
+            <li class="breadcrumb-item"><a href="{% url 'staff:demande_list' %}">Demandes</a></li>
+            <li class="breadcrumb-item active">{{ demande.reference }}</li>
+        </ol>
+    </nav>
+
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- STATUT ET INFOS RAPIDES                                             -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <div class="row mb-4">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">📧 Informations du contact</h5>
+                    <dl class="row mb-0">
+                        <dt class="col-sm-3">Nom</dt>
+                        <dd class="col-sm-9"><strong>{{ demande.nom_contact }}</strong></dd>
+
+                        <dt class="col-sm-3">Email</dt>
+                        <dd class="col-sm-9">
+                            <a href="mailto:{{ demande.email }}">{{ demande.email }}</a>
+                        </dd>
+
+                        <dt class="col-sm-3">Téléphone</dt>
+                        <dd class="col-sm-9">
+                            <a href="tel:{{ demande.telephone }}">{{ demande.telephone }}</a>
+                        </dd>
+
+                        <dt class="col-sm-3">Société</dt>
+                        <dd class="col-sm-9">
+                            {% if demande.societe %}
+                                {{ demande.societe }}
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </dd>
+
+                        <dt class="col-sm-3">Contact autorisé</dt>
+                        <dd class="col-sm-9">
+                            {% if demande.accepte_contact %}
+                                <span class="badge bg-success">✓ Oui</span>
+                            {% else %}
+                                <span class="badge bg-secondary">✗ Non</span>
+                            {% endif %}
+                        </dd>
+                    </dl>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">📋 Statut</h5>
+                    <div class="mb-3">
+                        <span class="badge" style="padding: 0.5rem 1rem; font-size: 1rem;"
+                              class="badge-{{ demande.statut }}">
+                            {{ demande.get_statut_display }}
+                        </span>
+                    </div>
+
+                    <dl class="mb-0">
+                        <dt class="text-muted" style="font-size: 0.875rem;">Créée</dt>
+                        <dd style="font-size: 0.875rem;">{{ demande.created_at|date:"d/m/Y H:i" }}</dd>
+
+                        {% if demande.traite_par %}
+                            <dt class="text-muted" style="font-size: 0.875rem;">Traitée par</dt>
+                            <dd style="font-size: 0.875rem;">
+                                {{ demande.traite_par.get_full_name|default:demande.traite_par.username }}
+                            </dd>
+
+                            <dt class="text-muted" style="font-size: 0.875rem;">Le</dt>
+                            <dd style="font-size: 0.875rem;">{{ demande.traite_le|date:"d/m/Y H:i" }}</dd>
+                        {% endif %}
+                    </dl>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- PÉRIODE ET CAMPAGNE                                                 -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">📅 Période souhaitée</h5>
+            <div class="row">
+                <div class="col-md-3">
+                    <label class="form-label text-muted">Début</label>
+                    <div class="h5">{{ demande.date_debut_souhaitee|date:"d/m/Y" }}</div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label text-muted">Fin</label>
+                    <div class="h5">{{ demande.date_fin_souhaitee|date:"d/m/Y" }}</div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label text-muted">Durée</label>
+                    <div class="h5">{{ duree_jours }} jours</div>
+                </div>
+                <div class="col-md-3">
+                    <label class="form-label text-muted">Campagne</label>
+                    <div>
+                        {% if demande.nom_campagne %}
+                            <strong>{{ demande.nom_campagne }}</strong>
+                        {% else %}
+                            <span class="text-muted">—</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            {% if demande.message %}
+                <hr class="my-3">
+                <h6 class="text-muted">Message du demandeur</h6>
+                <p class="mb-0" style="padding: 1rem; background-color: #f8f9fa; border-radius: 0.375rem;">
+                    {{ demande.message|linebreaks }}
+                </p>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- EMPLACEMENTS DEMANDÉS                                               -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <h5 class="card-title">🗺️ Emplacements demandés</h5>
+
+            {% if demande.nb_faces > 0 %}
+                <div class="info-box">
+                    <strong>{{ demande.nb_faces }}</strong> face(s) demandée(s) — 
+                    Vérifiez la disponibilité réelle avant de valider
+                </div>
+
+                <div id="faces-list">
+                    {% for item in faces_avec_statut %}
+                        <div class="face-item {% if item.statut == 'libre' %}disponible{% elif item.conflit %}conflit{% endif %}">
+                            <label class="form-check-label">
+                                <input type="checkbox" name="faces" value="{{ item.face.id }}" 
+                                       class="face-checkbox" 
+                                       {% if item.statut == 'libre' %}checked{% endif %}
+                                       {% if item.statut != 'libre' %}disabled{% endif %}>
+                                <strong>{{ item.face.support.code }} - Face {{ item.face.label }}</strong>
+                            </label>
+
+                            <div class="ms-4 mt-2">
+                                <small>
+                                    <strong>Éclairage :</strong> {{ item.face.get_eclairage_display }}<br>
+                                    <strong>État :</strong> 
+                                    {% if item.statut == 'panne' %}
+                                        <span class="text-danger">🔴 En panne</span>
+                                    {% elif item.statut == 'libre' %}
+                                        <span class="text-success">✅ Libre</span>
+                                    {% elif item.statut == 'occupe' %}
+                                        <span class="text-danger">❌ Occupée (campagne)</span>
+                                    {% elif item.statut == 'reserve' %}
+                                        <span class="text-warning">⚠️ Réservée</span>
+                                    {% endif %}
+                                </small>
+                            </div>
+
+                            {% if item.conflit %}
+                                <div class="conflict-info">
+                                    <strong>⚠️ Conflit détecté :</strong><br>
+                                    {{ item.conflit.label }}<br>
+                                    du {{ item.conflit.debut|date:"d/m/Y" }} au {{ item.conflit.fin|date:"d/m/Y" }}
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle"></i> Aucune face spécifique demandée (demande écrans)
+                </div>
+            {% endif %}
+
+            {% if supports_ecrans %}
+                <hr class="my-3">
+                <h6>Écrans demandés</h6>
+                <div class="row">
+                    {% for support in supports_ecrans %}
+                        <div class="col-md-6 mb-2">
+                            <div class="badge bg-info" style="padding: 0.5rem;">
+                                {{ support.code }} — {{ support.nom }}
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- FORMULAIRE DE TRAITEMENT                                            -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    {% if not demande.est_traitee %}
+        <div class="row">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header">
+                        <i class="fas fa-check-circle"></i> Valider et créer la réservation
+                    </div>
+                    <form method="post" action="{% url 'staff:demande_traiter' demande.uuid %}" id="traitement-form">
+                        {% csrf_token %}
+                        <div class="card-body">
+
+                            <!-- Client -->
+                            <div class="form-section">
+                                <h6 class="section-title">👤 Client</h6>
+                                
+                                <div class="form-check mb-2">
+                                    <input type="radio" class="form-check-input" id="client-existant" 
+                                           name="nouveau_client" value="0" checked>
+                                    <label class="form-check-label" for="client-existant">
+                                        Utiliser un client existant
+                                    </label>
+                                </div>
+
+                                <div id="client-select-group">
+                                    <label class="form-label">Client</label>
+                                    <select class="form-select" name="client_pk" id="client-select">
+                                        <option value="">— Sélectionner un client —</option>
+                                        {% for client in clients %}
+                                            <option value="{{ client.id }}">{{ client.nom }}</option>
+                                        {% endfor %}
+                                    </select>
+                                    <small class="form-text text-muted">
+                                        Ou chercher : 
+                                        <input type="text" class="form-control form-control-sm mt-2" 
+                                               id="client-search" placeholder="Nom, email...">
+                                    </small>
+                                </div>
+
+                                <hr class="my-3">
+
+                                <div class="form-check mb-2">
+                                    <input type="radio" class="form-check-input" id="client-nouveau" 
+                                           name="nouveau_client" value="1">
+                                    <label class="form-check-label" for="client-nouveau">
+                                        Créer un nouveau client
+                                    </label>
+                                </div>
+
+                                <div id="client-new-group" style="display: none;">
+                                    <p class="text-muted mb-2">
+                                        <small>Les données suivantes seront pré-remplies avec les informations du demandeur :</small>
+                                    </p>
+                                    <ul class="list-unstyled text-muted small">
+                                        <li>✓ Nom : <strong>{{ demande.societe|default:demande.nom_contact }}</strong></li>
+                                        <li>✓ Email : <strong>{{ demande.email }}</strong></li>
+                                        <li>✓ Téléphone : <strong>{{ demande.telephone }}</strong></li>
+                                    </ul>
+                                </div>
+                            </div>
+
+                            <!-- Dates et réservation -->
+                            <div class="form-section">
+                                <h6 class="section-title">📅 Période de la réservation</h6>
+                                
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Date de début</label>
+                                        <input type="date" class="form-control" name="date_debut" 
+                                               value="{{ demande.date_debut_souhaitee|date:'Y-m-d' }}" required>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Date de fin</label>
+                                        <input type="date" class="form-control" name="date_fin" 
+                                               value="{{ demande.date_fin_souhaitee|date:'Y-m-d' }}" required>
+                                    </div>
+                                </div>
+
+                                <label class="form-label mt-3">Nom de la réservation</label>
+                                <input type="text" class="form-control" name="nom_reservation" 
+                                       value="{{ demande.nom_campagne|default:'Réservation '|add:demande.reference }}" required>
+                            </div>
+
+                            <!-- Faces à réserver -->
+                            <div class="form-section">
+                                <h6 class="section-title">🗺️ Faces à réserver</h6>
+                                <small class="text-muted">Les faces cochées ci-dessus seront réservées</small>
+                                <div id="faces-count" class="mt-2 alert alert-info" style="display: none;">
+                                    <strong id="faces-count-num">0</strong> face(s) sélectionnée(s)
+                                </div>
+                            </div>
+
+                        </div>
+                        <div class="card-footer">
+                            <button type="submit" class="btn btn-success btn-action">
+                                <i class="fas fa-check-circle"></i> Valider et créer
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <div class="col-md-4">
+                <div class="card border-danger">
+                    <div class="card-header bg-danger text-white">
+                        <i class="fas fa-times-circle"></i> Refuser la demande
+                    </div>
+                    <form method="post" action="{% url 'staff:demande_refuser' demande.uuid %}">
+                        {% csrf_token %}
+                        <div class="card-body">
+                            <label class="form-label">Motif du refus (optionnel)</label>
+                            <textarea class="form-control" name="notes_staff" rows="4" 
+                                      placeholder="Ex: Indisponibilité de la période, budget limité..."></textarea>
+                        </div>
+                        <div class="card-footer">
+                            <button type="submit" class="btn btn-danger w-100 btn-action">
+                                <i class="fas fa-times"></i> Refuser
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    {% else %}
+        <div class="alert alert-info">
+            <i class="fas fa-check-circle"></i> <strong>Demande déjà traitée</strong>
+            <br>
+            Statut : {{ demande.get_statut_display }}
+            {% if demande.reservation %}
+                <br>Réservation créée : <strong>{{ demande.reservation.reference }}</strong>
+            {% endif %}
+        </div>
+    {% endif %}
+
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    
+    // ── Radio buttons pour client ─────────────────────────────────
+    const radioExistant = document.getElementById('client-existant');
+    const radioNouveau = document.getElementById('client-nouveau');
+    const clientSelectGroup = document.getElementById('client-select-group');
+    const clientNewGroup = document.getElementById('client-new-group');
+    const clientPkInput = document.querySelector('select[name="client_pk"]');
+
+    function updateClientDisplay() {
+        if (radioNouveau.checked) {
+            clientSelectGroup.style.display = 'none';
+            clientNewGroup.style.display = 'block';
+            clientPkInput.removeAttribute('required');
+        } else {
+            clientSelectGroup.style.display = 'block';
+            clientNewGroup.style.display = 'none';
+            clientPkInput.setAttribute('required', 'required');
+        }
+    }
+
+    radioExistant.addEventListener('change', updateClientDisplay);
+    radioNouveau.addEventListener('change', updateClientDisplay);
+
+    // ── Search client (AJAX) ──────────────────────────────────────
+    const clientSearch = document.getElementById('client-search');
+    const clientSelect = document.getElementById('client-select');
+
+    clientSearch?.addEventListener('input', function(e) {
+        const q = e.target.value;
+        if (q.length < 2) return;
+
+        fetch(`{% url 'staff:ajax_search_client' %}?q=${encodeURIComponent(q)}`)
+            .then(r => r.json())
+            .then(clients => {
+                // Clear existing options
+                clientSelect.innerHTML = '<option value="">— Sélectionner un client —</option>';
+                // Add search results
+                clients.forEach(client => {
+                    const option = document.createElement('option');
+                    option.value = client.id;
+                    option.text = `${client.nom} (${client.email})`;
+                    clientSelect.appendChild(option);
+                });
+            })
+            .catch(err => console.error('Erreur recherche client:', err));
+    });
+
+    // ── Compteur faces ────────────────────────────────────────────
+    const faceCheckboxes = document.querySelectorAll('.face-checkbox');
+    const facesCountDiv = document.getElementById('faces-count');
+    const facesCountNum = document.getElementById('faces-count-num');
+
+    function updateFacesCount() {
+        const checked = document.querySelectorAll('.face-checkbox:checked').length;
+        facesCountNum.textContent = checked;
+        facesCountDiv.style.display = checked > 0 ? 'block' : 'none';
+    }
+
+    faceCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', updateFacesCount);
+    });
+
+    // Validation avant submit
+    const form = document.getElementById('traitement-form');
+    form?.addEventListener('submit', function(e) {
+        const checked = document.querySelectorAll('.face-checkbox:checked').length;
+        if (checked === 0) {
+            e.preventDefault();
+            alert('Sélectionnez au moins une face !');
+            return false;
+        }
+        // OK
+    });
+});
+</script>
+{% endblock %}

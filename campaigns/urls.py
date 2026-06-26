@@ -13,11 +13,30 @@ urlpatterns = [
     path('clients/<int:pk>/', views.ClientDetailView.as_view(), name='client_detail'),
     path('clients/<int:pk>/modifier/', views.ClientUpdateView.as_view(), name='client_edit'),
     path('clients/<int:pk>/supprimer/', views.ClientDeleteView.as_view(), name='client_delete'),
-    path('clients/<int:client_pk>/reservations/bulk/', views.ReservationPanneauBulkActionView.as_view(), name='reservations_bulk_action'),
+
+
+    path('clients/<int:client_pk>/reservations/create/',
+        views.ReservationCreateView.as_view(),
+        name='reservation_create'),
+
+    path('clients/<int:client_pk>/reservations/<int:resa_pk>/update/',
+        views.ReservationUpdateView.as_view(),
+        name='reservation_update'),
+    path('clients/<int:client_pk>/reservations/<int:resa_pk>/delete/',
+        views.ReservationDeleteView.as_view(),
+        name='reservation_delete'),
+    path('clients/<int:client_pk>/reservations/<int:resa_pk>/',
+        views.ReservationDetailView.as_view(),
+        name='reservation_detail'),
+    path('reservations/select-client/', views.ReservationSelectClientView.as_view(), name='reservation_select_client'),
+    path('reservations/', views.ReservationListView.as_view(), name='reservation_list'),
+    
     # Avant
-    path('api/check-dispo/', views.verifier_dispo_faces_api, name='api_check_dispo'),
+    path('api/check-dispos/', views.verifier_dispo_faces_api, name='api_check_dispo'),
     # Après
-    path('api/check-dispo/<int:client_pk>/', views.verifier_dispo_faces_api, name='api_check_dispo'),
+    path('api/check-dispos/<int:client_pk>/', views.verifier_dispo_faces_api, name='api_check_dispo'),
+    # urls.py
+    path('api/check-dispo/<int:client_pk>/', views.api_check_dispo, name='api_check_dispo'),
     
     # Contrats
     path('contrats/creer/', views.ContratCreateView.as_view(), name='contrat_create'),
@@ -45,4 +64,35 @@ urlpatterns = [
     path('api/contrats-client/<int:client_id>/', views.GetClientContratsView.as_view(), name='get_client_contrats'),
     path('campagnes/simulation-ecran/', SimulationCampagneEcranView.as_view(), name='simulation_ecran'),
     
+
+    # ── Dashboard staff ───────────────────────────────────────────────────────
+    path('',
+         views.DashboardView.as_view(),
+         name='dashboard'),
+
+    # ── Gestion des demandes ──────────────────────────────────────────────────
+    path('demandes/',
+         views.DemandeListView.as_view(),
+         name='demande_list'),
+
+    path('demandes/<uuid:uuid>/',
+         views.DemandeDetailView.as_view(),
+         name='demande_detail'),
+
+    path('demandes/<uuid:uuid>/valider/',
+         views.DemandeTraiterView.as_view(),
+         name='demande_traiter'),
+
+    path('demandes/<uuid:uuid>/refuser/',
+         views.DemandeRefuserView.as_view(),
+         name='demande_refuser'),
+
+    # ── AJAX ──────────────────────────────────────────────────────────────────
+    path('api/search-client/',
+         views.AjaxSearchClientView.as_view(),
+         name='ajax_search_client'),
+
+    path('api/check-faces-dispo/',
+         views.AjaxCheckFacesDispoView.as_view(),
+         name='ajax_check_faces_dispo'),
 ]

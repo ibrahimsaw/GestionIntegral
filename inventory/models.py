@@ -5,6 +5,7 @@ from django.core.exceptions import ValidationError
 from datetime import datetime, timedelta
 from datetime import datetime
 from typing import Optional
+import uuid
 
 def calculer_duree_tranches(tranches: str) -> float:
     total_heures = 0.0
@@ -24,9 +25,9 @@ def calculer_duree_tranches(tranches: str) -> float:
 FORMAT_CHOICES = [
     # ── Standard ────────────────────────────────────────────
     ('4x3',    '4m × 3m (12m²) — Standard'),        # 458 supports
-    ('4x5',    '4m × 5m (20m²) — Standard'),        #   4 supports
-    ('7x3',    '7m × 3m (21m²) — Standard'),        #  14 supports
-    # ── Géants ──────────────────────────────────────────────
+        # ── Géants ──────────────────────────────────────────────
+    ('4x5',    '4m × 5m (20m²) — Géant'),        #   4 supports
+    ('7x3',    '7m × 3m (21m²) — Géant'),        #  14 supports
     ('6x4',    '6m × 4m (24m²) — Géant'),          #  28 supports
     ('8x4',    '8m × 4m (32m²) — Géant'),          #  19 supports
     ('10x4',   '10m × 4m (40m²) — Géant'),          #  15 supports
@@ -36,11 +37,11 @@ FORMAT_CHOICES = [
     ('9x5',    '9m × 5m (45m²) — Géant'),           #   1 support
     # ── Sucettes ────────────────────────────────────────────
     ('1x2',    '1,20m × 1,80m (2,16m²) — Sucette'), #  64 supports
-    # ── Grand Marché ─────────────────────────────────────────
-    ('gm-4x3', '4m × 3m (12m²) — Grand Marché'),    #   8 supports
-    ('gm-4x4', '4m × 4m (16m²) — Grand Marché'),    #  12 supports
-    ('gm-5x4', '5m × 4m (20m²) — Grand Marché'),    #  47 supports
-    ('gm-12x3','12m × 3m (36m²) — Grand Marché'),   #   1 support
+    # ── Marché ─────────────────────────────────────────
+    ('gm-4x3', '4m × 3m (12m²) — Marché'),    #   8 supports
+    ('gm-4x4', '4m × 4m (16m²) — Marché'),    #  12 supports
+    ('gm-5x4', '5m × 4m (20m²) — Marché'),    #  47 supports
+    ('gm-12x3','12m × 3m (36m²) — Marché'),   #   1 support
     # ── Personnalisé ─────────────────────────────────────────
     ('custom', 'Personnalisé (voir notes)'),
 ]
@@ -77,7 +78,18 @@ class Support(models.Model):
         # Identité
 
     # Identité
+    uuid = models.UUIDField(
+        default=uuid.uuid4,
+        editable=False,
+        db_index=True,
+        null=True  # Permet à Django de créer le champ pour l'existant
+    )
     code        = models.CharField(max_length=30, unique=True, verbose_name="Code interne")
+    code_ext = models.CharField(
+            max_length=50, # ou votre longueur actuelle
+            null=True,     # Permet de laisser la colonne vide en base pour l'instant
+            blank=True     # Permet de laisser le champ vide dans les formulaires admin/front
+        )
     nom         = models.CharField(max_length=200, verbose_name="Nom / Libellé")
     type_support = models.CharField(max_length=10, choices=TYPE_CHOICES, verbose_name="Type")
     actif        = models.BooleanField(default=True)
@@ -147,9 +159,9 @@ class Support(models.Model):
             # Panneau en panne SEULEMENT si TOUTES les faces sont en panne
             all_faces = self.faces.all()
             if all_faces.exists() and all_faces.filter(etat=self.ETAT_PANNE).count() == all_faces.count():
-                return cfg['COLOR_MAINTENANCE']
+                return cfg['COLOR_PANNE']
         elif self.etat in [self.ETAT_PANNE, self.ETAT_MAINTENANCE]:
-            return cfg['COLOR_MAINTENANCE']
+            return cfg['COLOR_PANNE']
 
         # Vérifier si au moins une face/slot est occupé(e)
         if self.is_occupe():
@@ -222,7 +234,7 @@ class Support(models.Model):
     
     @property
     def type_panneau(self) -> str:
-        """'Standard', 'Géant', 'Sucette', 'Grand Marché', etc."""
+        """'Standard', 'Géant', 'Sucette', 'Marché', etc."""
         return self.format_detail['type']
  
     @property
@@ -410,7 +422,7 @@ class Support(models.Model):
         jours_panne = 0
 
         periodes = self.get_periodes_panne()
-        print(f"periodes panne", periodes)
+        #print(f"periodes panne", periodes)
         for p in periodes:
             p_debut = p['debut'].date() if hasattr(p['debut'], 'date') else p['debut']
             p_fin   = p['fin'].date()   if p['fin'] and hasattr(p['fin'], 'date') else p['fin']
@@ -475,14 +487,14 @@ class FacePanneau(models.Model):
         
     def is_disponibles(self, date_debut=None, date_fin=None):
         """Vérifie si la face est libre sur une période donnée (campagnes + réservations)."""
-        from campaigns.models import LigneCampagne, ReservationPanneau
+        from campaigns.models import LigneCampagne, ReservationLigne
         from django.utils import timezone
-
+ 
         if date_debut is None:
             date_debut = timezone.now()
         if date_fin is None:
             date_fin = date_debut
-
+ 
         # 1. Vérification via les LigneCampagne (campagnes actives/à venir)
         occupee_campagne = LigneCampagne.objects.filter(
             face=self,
@@ -490,16 +502,17 @@ class FacePanneau(models.Model):
             campagne__date_fin__gte=date_debut,
             campagne__statut__in=['en_cours', 'a_venir'],
         ).exists()
-
-        # 2. Vérification via les ReservationPanneau (réservations directes)
-        occupee_reservation = ReservationPanneau.objects.filter(
+ 
+        # 2. Vérification via ReservationLigne (nouveau modèle)
+        occupee_reservation = ReservationLigne.objects.filter(
             face=self,
-            date_debut__lt=date_fin,
-            date_fin__gt=date_debut,
+            reservation__date_debut__lt=date_fin,
+            reservation__date_fin__gt=date_debut,
+            reservation__statut__in=['en_attente', 'confirmee'],
         ).exists()
-
+ 
         return not occupee_campagne and not occupee_reservation
-
+ 
     def get_campagne_active(self):
         from campaigns.models import LigneCampagne
         today = timezone.now().date()
@@ -515,21 +528,21 @@ class FacePanneau(models.Model):
         Retourne le statut consolidé de la face :
         - 'panne'   : la face est physiquement en panne
         - 'occupe'  : une campagne est en cours sur cette période
-        - 'reserve' : une réservation existe mais pas de campagne
+        - 'reserve' : une réservation existe (ReservationLigne) mais pas de campagne
         - 'libre'   : ni campagne ni réservation
         """
-        from campaigns.models import LigneCampagne, ReservationPanneau
+        from campaigns.models import LigneCampagne, ReservationLigne
         from django.utils import timezone
-
+ 
         # État physique en priorité absolue
         if self.etat == ETAT_PANNE:
             return 'panne'
-
+ 
         if date_debut is None:
             date_debut = timezone.now()
         if date_fin is None:
             date_fin = date_debut
-
+ 
         # Occupé = campagne active/à venir sur la période
         occupee = LigneCampagne.objects.filter(
             face=self,
@@ -537,24 +550,74 @@ class FacePanneau(models.Model):
             campagne__date_fin__gte=date_debut,
             campagne__statut__in=['en_cours', 'a_venir'],
         ).exists()
-
+ 
         if occupee:
             return 'occupe'
-
-        # Réservé = réservation directe sur la période
-        qs_reserve = ReservationPanneau.objects.filter(
+ 
+        # Réservé = ReservationLigne active sur la période
+        qs_reserve = ReservationLigne.objects.filter(
             face=self,
-            date_debut__lt=date_fin,
-            date_fin__gt=date_debut,
+            reservation__date_debut__lt=date_fin,
+            reservation__date_fin__gt=date_debut,
+            reservation__statut__in=['en_attente', 'confirmee'],
         )
-
+ 
         if qs_reserve.exists():
-            if client and qs_reserve.filter(client=client).exists():
-                return 'libre'
+            # Si c'est le client courant qui a réservé → libre pour lui (mode modif)
+            if client:
+                qs_client = qs_reserve.filter(reservation__client=client)
+                if qs_client.exists():
+                    return 'libre'
             return 'reserve'
+ 
         return 'libre'
-    
     # Sur le modèle FacePanneau
+    def jours_disponibles_sur_periode(self, date_debut, date_fin):
+        """
+        Retourne le nombre de jours où cette face est opérationnelle
+        sur la période [date_debut, date_fin].
+        Soustrait les jours de panne spécifiques à cette face.
+        """
+        from datetime import timedelta
+        total_jours = (date_fin - date_debut).days + 1
+        jours_panne = 0
+
+        # Récupérer toutes les maintenances de cette face, triées par date
+        maintenances = self.maintenances_par_face.order_by('date_intervention')
+        panne_debut = None
+
+        for maint in maintenances:
+            if maint.etat_apres == ETAT_PANNE and panne_debut is None:
+                # Début d'une période de panne
+                panne_debut = maint.date_intervention
+
+            elif maint.etat_apres == ETAT_BON and panne_debut is not None:
+                # Fin de la période de panne
+                p_debut = panne_debut.date() if hasattr(panne_debut, 'date') else panne_debut
+                p_fin = maint.date_intervention.date() if hasattr(maint.date_intervention, 'date') else maint.date_intervention
+
+                # Intersection avec la période demandée
+                overlap_debut = max(p_debut, date_debut)
+                overlap_fin = min(p_fin, date_fin)
+
+                if overlap_debut <= overlap_fin:
+                    jours_panne += (overlap_fin - overlap_debut).days + 1
+
+                panne_debut = None
+
+        # Panne toujours ouverte (pas encore résolue)
+        if panne_debut is not None:
+            p_debut = panne_debut.date() if hasattr(panne_debut, 'date') else panne_debut
+            p_fin = date_fin
+
+            overlap_debut = max(p_debut, date_debut)
+            overlap_fin = min(p_fin, date_fin)
+
+            if overlap_debut <= overlap_fin:
+                jours_panne += (overlap_fin - overlap_debut).days + 1
+
+        return max(0, total_jours - jours_panne)
+
     def calculer_nombre_spots_campagne(self, campagne):
         """
         Calcule le nombre de spots réels pour UNE campagne sur CETTE face,

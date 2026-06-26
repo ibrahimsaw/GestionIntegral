@@ -10,5 +10,6 @@ urlpatterns = [
     path('campaigns/', include('campaigns.urls')),
     path('planning/', include('planning.urls')),
     path('reports/', include('reports.urls')),
+    path('info', include('portail.urls')),
     path('', include('inventory.urls_map')),   # carte = page principale
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)

@@ -26,6 +26,15 @@
         </select>
       </div>
       <div class="col-md-2">
+        <label class="form-label">Ville</label>
+        <select name="ville" class="form-select">
+          <option value="">Toutes les villes</option>
+          {% for ville in villes %}
+            <option value="{{ ville }}" {% if ville_f == ville %}selected{% endif %}>{{ ville }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
         <label class="form-label">État</label>
         <select name="etat" class="form-select">
           <option value="">Tous les états</option>
@@ -69,22 +78,25 @@
   <div class="card-body p-0">
     <table class="table mb-0">
       <thead>
-        <tr><th>Code</th><th>Nom</th><th>Type</th><th>Localisation</th><th>État</th><th>Occupation</th><th>Actions</th></tr>
+        <tr><th>Code</th><th>Code Mairie</th><th>Nom</th>
+          <th>Type</th>
+          {% comment %} <th>Localisation</th> {% endcomment %}
+          <th>État</th><th>Occupation</th><th>Actions</th></tr>
       </thead>
       <tbody>
         {% for s in supports %}
         <tr class="{% if s.etat == 'panne' %}table-danger{% endif %}">
           <td class="mono" style="font-size:.8rem;color:var(--color-primary)">{{ s.code }}</td>
+          <td class="mono" style="font-size:1rem;color:var(--color-primary);">{{ s.code_ext|default:"--" }}</td>
           <td style="font-weight:600">
-            <a href="{% url 'support_detail' s.pk %}" style="color:var(--text);text-decoration:none">{{ s.nom }}</a>
+            <a href="{% url 'support_detail' s.uuid %}" style="color:var(--text);text-decoration:none">{{ s.nom }}</a>
           </td>
           <td>
             <span class="badge-status {% if s.type_support == 'panneau' %}bs-bientot{% else %}bs-en_cours{% endif %}">
-              {% if s.type_support == 'panneau' %}<i class="bi bi-sign-merge-right me-1"> {{ s.type_panneau }}</i>{% else %}<i class="bi bi-display me-1"></i>{% endif %}
-              {{ s.get_type_support_display }}
+              {% if s.type_support == 'panneau' %}<i class="bi bi-sign-merge-right me-1"> {{ s.type_panneau }}</i>{% else %}<i class="bi bi-display me-1"></i>{{ s.get_type_support_display }}{% endif %}
             </span>
           </td>
-          <td style="font-size:.8rem;color:var(--text-muted)">{{ s.adresse|default:"—"|truncatechars:35 }}</td>
+          {% comment %} <td style="font-size:.8rem;color:var(--text-muted)">{{ s.adresse|default:"—"|truncatechars:35 }}</td> {% endcomment %}
           <td>
             <span class="badge-status {% if s.etat == 'bon' %}bs-disponible{% elif s.etat == 'maintenance' %}bs-occupe{% else %}bs-panne{% endif %}">
               {{ s.get_etat_display }}
@@ -114,9 +126,9 @@
           <td>
             <div class="d-flex gap-1">
               {% if user.is_staff_regie_role %}
-              <a href="{% url 'support_detail' s.pk %}" class="btn btn-sm btn-outline-secondary" title="Détail"><i class="bi bi-eye"></i></a>
+              <a href="{% url 'support_detail' s.uuid %}" class="btn btn-sm btn-outline-secondary" title="Détail"><i class="bi bi-eye"></i></a>
               
-              <a href="{% url 'support_edit' s.pk %}" class="btn btn-sm btn-outline-secondary" title="Modifier"><i class="bi bi-pencil"></i></a>
+              <a href="{% url 'support_edit' s.uuid %}" class="btn btn-sm btn-outline-secondary" title="Modifier"><i class="bi bi-pencil"></i></a>
               {% endif %}
               {% if user.is_technicien_role or user.is_staff_regie_role %}
               <a href="{% url 'maintenance_create' s.pk %}" class="btn btn-sm btn-outline-secondary" title="Maintenance" style="color:#fbbf24;border-color:#fbbf2444"><i class="bi bi-tools"></i></a>

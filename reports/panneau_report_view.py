@@ -17,7 +17,7 @@ from openpyxl.utils import get_column_letter
 from weasyprint import HTML
 
 from accounts.decorators import ClientStaffRequiredMixin
-from campaigns.models import Campagne, Client, ReservationPanneau
+from campaigns.models import Campagne, Client, ReservationLigne,STATUT_EN_ATTENTE, STATUT_CONFIRMEE
 from inventory.models import *
 from django.utils import timezone
 from django.db.models import Q
@@ -122,13 +122,16 @@ def _build_context_panneaux(filters: dict) -> dict:
     if client_pk:
         qs = qs.filter(
             Q(lignes_campagne__campagne__client_id=client_pk) |  # faces avec campagne active
-            Q(faces__lignes_client__client_id=client_pk)         # faces réservées directement
+            Q(faces__lignes_reservation__reservation__client_id=client_pk)       # faces réservées directement
         ).distinct()
 
     # ── Pré-chargement des faces réservées (1 seule requête SQL) ─
     faces_reservees_ids = set(
-        ReservationPanneau.objects
-        .filter(date_fin__gte=now)
+        ReservationLigne.objects
+        .filter(
+            reservation__date_fin__gte=now,
+            reservation__statut__in=[STATUT_EN_ATTENTE, STATUT_CONFIRMEE],
+        )
         .values_list('face_id', flat=True)
     )
 

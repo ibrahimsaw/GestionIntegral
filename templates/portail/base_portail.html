@@ -1,0 +1,408 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}GeoAd ERP - Régie Publicitaire INTEGRAL{% endblock %}</title>
+    
+    <!-- Bootstrap 5 CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Leaflet Maps -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+    
+    <!-- Custom CSS -->
+    <style>
+        :root {
+            --primary: #0d6efd;
+            --primary-dark: #0b5ed7;
+            --secondary: #6c757d;
+            --success: #198754;
+            --danger: #dc3545;
+            --warning: #ffc107;
+            --info: #0dcaf0;
+            --light: #f8f9fa;
+            --dark: #212529;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+        }
+
+        /* ── Navbar ────────────────────────────────────────────────────── */
+        .navbar {
+            background: white !important;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+            padding: 1rem 0;
+        }
+
+        .navbar-brand {
+            font-weight: 700;
+            font-size: 1.5rem;
+            color: var(--primary) !important;
+        }
+
+        .navbar-nav .nav-link {
+            margin-left: 1.5rem;
+            color: #333 !important;
+            font-weight: 500;
+            transition: color 0.3s ease;
+        }
+
+        .navbar-nav .nav-link:hover {
+            color: var(--primary) !important;
+        }
+
+        .btn-reserver {
+            background-color: var(--danger);
+            color: white;
+            margin-left: 1.5rem;
+            padding: 0.5rem 1.5rem;
+            border-radius: 0.375rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+
+        .btn-reserver:hover {
+            background-color: #c82333;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
+        }
+
+        /* ── Hero Section ──────────────────────────────────────────────── */
+        .hero-section {
+            background: linear-gradient(135deg, #1a3c6b 0%, #0d2847 100%);
+            color: white;
+            padding: 3rem 0;
+        }
+
+        .hero-title {
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+            line-height: 1.2;
+        }
+
+        .hero-subtitle {
+            font-size: 1.3rem;
+            margin-bottom: 2rem;
+            opacity: 0.95;
+        }
+
+        /* ── Cards ─────────────────────────────────────────────────────── */
+        .card {
+            border: 1px solid #dee2e6;
+            border-radius: 0.5rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+            transition: all 0.3s ease;
+        }
+
+        .card:hover {
+            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+            transform: translateY(-4px);
+        }
+
+        /* ── Sections ──────────────────────────────────────────────────── */
+        .section {
+            padding: 4rem 0;
+        }
+
+        .section-title {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+            color: var(--dark);
+        }
+
+        .section-subtitle {
+            font-size: 1.1rem;
+            color: var(--secondary);
+            margin-bottom: 3rem;
+        }
+
+        /* ── Badges ────────────────────────────────────────────────────── */
+        .badge-custom {
+            padding: 0.5rem 1rem;
+            border-radius: 9999px;
+            font-weight: 600;
+            display: inline-block;
+        }
+
+        .badge-libre {
+            background-color: #d1e7dd;
+            color: #0f5132;
+        }
+
+        .badge-occupe {
+            background-color: #f8d7da;
+            color: #842029;
+        }
+
+        .badge-reserve {
+            background-color: #fff3cd;
+            color: #664d03;
+        }
+
+        .badge-panne {
+            background-color: #e2e3e5;
+            color: #383d41;
+        }
+
+        /* ── Footer ────────────────────────────────────────────────────── */
+        footer {
+            background-color: var(--dark);
+            color: white;
+            padding: 3rem 0 1rem;
+            margin-top: 4rem;
+        }
+
+        footer a {
+            color: #adb5bd;
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+
+        footer a:hover {
+            color: white;
+        }
+
+        .footer-title {
+            font-weight: 700;
+            margin-bottom: 1rem;
+            color: white;
+        }
+
+        /* ── Responsive ────────────────────────────────────────────────── */
+        @media (max-width: 768px) {
+            .hero-title {
+                font-size: 2rem;
+            }
+
+            .hero-subtitle {
+                font-size: 1rem;
+            }
+
+            .btn-reserver {
+                margin-left: 0;
+                margin-top: 1rem;
+                width: 100%;
+            }
+
+            .section {
+                padding: 2rem 0;
+            }
+        }
+
+        /* ── Animations ────────────────────────────────────────────────── */
+        .fade-in {
+            animation: fadeIn 0.6s ease-in;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .slide-up {
+            animation: slideUp 0.6s ease-out;
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* ── Custom ────────────────────────────────────────────────────– */
+        .text-primary-dark {
+            color: var(--primary-dark) !important;
+        }
+
+        .btn-outline-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
+        }
+
+        .info-box {
+            background-color: #e7f3ff;
+            border-left: 4px solid var(--primary);
+            padding: 1.5rem;
+            border-radius: 0.375rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .stat-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .stat-label {
+            color: var(--secondary);
+            font-size: 0.95rem;
+        }
+    </style>
+
+    {% block extra_css %}{% endblock %}
+</head>
+
+<body>
+
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- NAVBAR                                                              -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <nav class="navbar navbar-expand-lg sticky-top">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{% url 'portail:accueil' %}">
+                🎯 INTEGRAL Régie
+            </a>
+            
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'portail:catalogue' %}">
+                            <i class="fas fa-th"></i> Catalogue
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'portail:services' %}">
+                            <i class="fas fa-cogs"></i> Services
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="{% url 'portail:contact' %}">
+                            <i class="fas fa-envelope"></i> Contact
+                        </a>
+                    </li>
+                </ul>
+
+                <a href="{% url 'portail:reserver_etape1' %}" class="btn-reserver">
+                    ➕ Faire une demande
+                </a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- MESSAGES                                                            -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    {% if messages %}
+        <div class="container-fluid mt-3">
+            {% for message in messages %}
+                <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
+                    {% if message.tags == 'error' %}
+                        <i class="fas fa-exclamation-circle"></i>
+                    {% elif message.tags == 'success' %}
+                        <i class="fas fa-check-circle"></i>
+                    {% endif %}
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- MAIN CONTENT                                                        -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    {% block content %}{% endblock %}
+
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- FOOTER                                                              -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <footer>
+        <div class="container">
+            <div class="row mb-4">
+                <div class="col-md-4">
+                    <div class="footer-title">📍 Régie INTEGRAL</div>
+                    <p class="small">
+                        Ouagadougou & Bobo-Dioulasso<br>
+                        Burkina Faso
+                    </p>
+                </div>
+
+                <div class="col-md-4">
+                    <div class="footer-title">📞 Contact</div>
+                    <p class="small">
+                        <a href="tel:+22670000000">+226 70 00 00 00</a><br>
+                        <a href="mailto:contact@integral.bf">contact@integral.bf</a>
+                    </p>
+                </div>
+
+                <div class="col-md-4">
+                    <div class="footer-title">🔗 Liens</div>
+                    <p class="small">
+                        <a href="{% url 'portail:catalogue' %}">Catalogue</a><br>
+                        <a href="{% url 'portail:contact' %}">Contact</a><br>
+                        <a href="{% url 'portail:reserver_etape1' %}">Réserver</a>
+                    </p>
+                </div>
+            </div>
+
+            <hr style="border-color: #495057;">
+
+            <div class="row">
+                <div class="col-12 text-center">
+                    <p class="small mb-0">
+                        © 2026 Régie INTEGRAL. Tous droits réservés.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Leaflet JS -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+
+    <!-- Custom JS -->
+    <script>
+        // CSRF Token pour AJAX
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        const csrftoken = getCookie('csrftoken');
+
+        // Auto-dismiss alerts après 6 secondes
+        document.querySelectorAll('.alert').forEach(function(alert) {
+            setTimeout(function() {
+                const bsAlert = new bootstrap.Alert(alert);
+                bsAlert.close();
+            }, 6000);
+        });
+    </script>
+
+    {% block extra_js %}{% endblock %}
+
+</body>
+</html>

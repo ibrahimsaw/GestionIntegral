@@ -146,7 +146,7 @@ class CampagneForm(forms.ModelForm):
 
 class LigneCampagneForm(forms.ModelForm):
     TYPE_SUPPORT_CHOICES = [
-        ('', '--- Sélectionner un type ---'), # Ajout d'un choix vide
+        ('', '--- Sélectionner un type ---'),
         (Support.TYPE_PANNEAU, 'Panneau Statique'),
         (Support.TYPE_ECRAN, 'Écran Numérique'),
     ]
@@ -161,24 +161,33 @@ class LigneCampagneForm(forms.ModelForm):
     class Meta:
         model = LigneCampagne
         fields = [
-            'type_support', 'support', 'face', 
-            'ordre_dans_boucle', 'visuel', 'notes'
+            'type_support', 'support', 'face',
+            'ordre_dans_boucle', 'visuel', 'notes',
+            # ✅ NOUVEAU — champs spécifiques par écran
+            'date_debut', 'date_fin',
+            'duree_passage', 'frequence', 'tranches_horaires',
         ]
         widgets = {
-            'support': forms.Select(attrs={**S, 'id': 'id_support'}),
-            'face': forms.Select(attrs={**S, 'id': 'id_face'}),
+            'support':           forms.Select(attrs={**S, 'id': 'id_support'}),
+            'face':              forms.Select(attrs={**S, 'id': 'id_face'}),
             'ordre_dans_boucle': forms.NumberInput(attrs={**W, 'min': 0}),
-            'visuel': forms.FileInput(attrs={'class': 'form-control'}),
-            'notes': forms.Textarea(attrs={**W, 'rows': 2}),
+            'visuel':            forms.FileInput(attrs={'class': 'form-control'}),
+            'notes':             forms.Textarea(attrs={**W, 'rows': 2}),
+            # ✅ NOUVEAU
+            'date_debut':        forms.DateInput(attrs={**W, 'type': 'date'}),
+            'date_fin':          forms.DateInput(attrs={**W, 'type': 'date'}),
+            'duree_passage':     forms.Select(attrs=S),
+            'frequence':         forms.Select(attrs=S),
+            'tranches_horaires': forms.TextInput(attrs={**W, 'placeholder': 'Ex: 08:00-12:00, 14:00-18:00'}),
         }
 
     def __init__(self, *args, campagne=None, **kwargs):
         super().__init__(*args, **kwargs)
         self.campagne = campagne
-        
+
         # Filtrage initial des supports en bon état
         supports_qs = Support.objects.filter(etat='bon').order_by('code')
-        
+
         # Gestion du type sélectionné (via POST ou instance existante)
         selected_type = self.data.get('type_support')
         if not selected_type and self.instance.pk:
@@ -192,43 +201,94 @@ class LigneCampagneForm(forms.ModelForm):
         # Gestion dynamique des faces pour les panneaux
         self.fields['face'].queryset = FacePanneau.objects.none()
         support_id = self.data.get('support') or (self.instance.support_id if self.instance.pk else None)
-        
         if support_id:
             try:
                 self.fields['face'].queryset = FacePanneau.objects.filter(support_id=support_id)
             except (ValueError, TypeError):
                 pass
 
+        # ✅ Les champs écran sont optionnels (ils héritent de la campagne si vides)
+        for field in ['date_debut', 'date_fin', 'duree_passage', 'frequence', 'tranches_horaires']:
+            self.fields[field].required = False
+
+        # ✅ Afficher les valeurs par défaut de la campagne en placeholder/help_text
+        if campagne:
+            self.fields['date_debut'].widget.attrs['placeholder'] = str(campagne.date_debut)
+            self.fields['date_fin'].widget.attrs['placeholder'] = str(campagne.date_fin)
+            self.fields['tranches_horaires'].widget.attrs['placeholder'] = (
+                f"Par défaut : {campagne.tranches_horaires or 'non défini'}"
+            )
+            self.fields['duree_passage'].help_text = (
+                f"Laisser vide pour hériter de la campagne ({campagne.get_duree_passage_display() if campagne.duree_passage else 'non défini'})"
+            )
+            self.fields['frequence'].help_text = (
+                f"Laisser vide pour hériter de la campagne ({campagne.get_frequence_display() if campagne.frequence else 'non défini'})"
+            )
+
+        # ✅ Masquer les champs écran si type panneau sélectionné (via CSS/JS côté template)
+        if selected_type == Support.TYPE_PANNEAU:
+            for field in ['duree_passage', 'frequence', 'tranches_horaires', 'date_debut', 'date_fin']:
+                self.fields[field].widget.attrs['class'] = self.fields[field].widget.attrs.get('class', '') + ' d-none'
+
     def clean(self):
         cleaned = super().clean()
-        type_support = cleaned.get('type_support')
-        support = cleaned.get('support')
-        face = cleaned.get('face')
-        duree = self.campagne.duree_passage if self.campagne else None
-        frequence = self.campagne.frequence if self.campagne else None
+        type_support    = cleaned.get('type_support')
+        support         = cleaned.get('support')
+        face            = cleaned.get('face')
+        date_debut      = cleaned.get('date_debut')
+        date_fin        = cleaned.get('date_fin')
+        duree           = cleaned.get('duree_passage') or (self.campagne.duree_passage if self.campagne else None)
+        frequence       = cleaned.get('frequence') or (self.campagne.frequence if self.campagne else None)
+        tranches        = cleaned.get('tranches_horaires') or (self.campagne.tranches_horaires if self.campagne else None)
+
+        # Dates effectives (ligne ou campagne)
+        date_debut_eff  = date_debut or (self.campagne.date_debut if self.campagne else None)
+        date_fin_eff    = date_fin or (self.campagne.date_fin if self.campagne else None)
+
         # 1. Cohérence Type vs Support
         if support and type_support and support.type_support != type_support:
             raise forms.ValidationError("Le support sélectionné ne correspond pas au type choisi.")
 
-        # 2. Validation Panneau
+        # 2. Validation des dates si fournies sur la ligne
+        if date_debut and date_fin:
+            if date_debut >= date_fin:
+                raise forms.ValidationError("La date de début doit être antérieure à la date de fin.")
+            # Vérifier que les dates de la ligne sont dans la période de la campagne
+            if self.campagne:
+                if date_debut < self.campagne.date_debut:
+                    self.add_error('date_debut', "La date ne peut pas être avant le début de la campagne.")
+                if date_fin > self.campagne.date_fin:
+                    self.add_error('date_fin', "La date ne peut pas dépasser la fin de la campagne.")
+
+        # 3. Validation Panneau
         if support and support.type_support == Support.TYPE_PANNEAU:
             if not face:
                 self.add_error('face', "Veuillez choisir une face pour ce panneau.")
 
-        # 3. Validation Écran (Disponibilité réelle)
+        # 4. Validation Écran
         if support and support.type_support == Support.TYPE_ECRAN:
             if not duree or not frequence:
-                raise forms.ValidationError("Durée et fréquence sont obligatoires pour un écran.")
-            
-            # Utilisation de la logique du modèle EcranNumerique
-            if hasattr(support, 'ecran_info') and self.campagne:
+                raise forms.ValidationError(
+                    "Durée et fréquence sont obligatoires pour un écran "
+                    "(définissez-les sur la ligne ou sur la campagne)."
+                )
+            if not tranches:
+                raise forms.ValidationError(
+                    "Les tranches horaires sont obligatoires pour un écran."
+                )
+            if not date_debut_eff or not date_fin_eff:
+                raise forms.ValidationError(
+                    "Les dates de diffusion sont obligatoires pour un écran."
+                )
+
+            # Disponibilité réelle sur l'écran
+            if hasattr(support, 'ecran_info'):
                 ecran = support.ecran_info
-                # Conversion sec -> min pour la méthode peut_accueillir_spot
                 is_ok, message = ecran.peut_accueillir_spot(
                     duree_sec=duree,
                     frequence_min=(frequence / 60),
-                    date_debut=self.campagne.date_debut,
-                    date_fin=self.campagne.date_fin
+                    date_debut=date_debut_eff,
+                    date_fin=date_fin_eff
                 )
                 if not is_ok:
                     raise forms.ValidationError(f"Disponibilité insuffisante : {message}")

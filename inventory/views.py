@@ -20,6 +20,15 @@ from .models import *
 from accounts.models import User
 from django.db.models import Q
 from django.utils.safestring import mark_safe
+from django.core.exceptions import PermissionDenied
+from django.db import transaction
+from django.shortcuts import redirect, get_object_or_404
+from django.contrib import messages
+from django.views.generic import UpdateView
+from django.views.generic.edit import UpdateView, DeleteView
+from django.db import transaction
+from typing import cast
+
 
 # ── API GeoJSON pour Leaflet ──────────────────────────────────────────────────
 
@@ -94,8 +103,8 @@ class ApiSupportPopupView(LoginRequiredMixin, View):
             'ville':             support.ville,
             'quartier':          support.quartier,
             'date_installation': support.date_installation.strftime('%d/%m/%Y') if support.date_installation else None,
-            'url_detail':        f'/inventory/{support.pk}/',
-            'url_edit':          f'/inventory/{support.pk}/modifier/',
+            'url_detail':        f'/inventory/{support.uuid}/',
+            'url_edit':          f'/inventory/{support.uuid}/modifier/',
             'photo':             support.photo_principale.url if support.photo_principale else None,
             'photos_maintenance': [],
         }
@@ -117,7 +126,7 @@ class ApiSupportPopupView(LoginRequiredMixin, View):
         data['photos_maintenance'] = photos_list
 
         if support.type_support == 'panneau':
-            from campaigns.models import LigneCampagne, ReservationPanneau
+            from campaigns.models import LigneCampagne, ReservationLigne
             faces_data = []
             for face in support.faces.all():
                 # ── Statut consolidé ──────────────────────────────────────
@@ -149,10 +158,13 @@ class ApiSupportPopupView(LoginRequiredMixin, View):
                                 visuels_urls.append(v.fichier.url)
 
                 elif statut == 'reserve':
-                    reservation = ReservationPanneau.objects.filter(
+                    from campaigns.models import ReservationLigne
+                    rl = ReservationLigne.objects.filter(
                         face=face,
-                        date_fin__gte=timezone.now(),
-                    ).select_related('client').first()
+                        reservation__date_fin__gte=timezone.now(),
+                        reservation__statut__in=['en_attente', 'confirmee'],
+                    ).select_related('reservation__client').first()
+                    reservation = rl.reservation if rl else None
 
                 faces_data.append({
                     'label'          : face.label,
@@ -249,6 +261,37 @@ api_faces_support = ApiFacesSupportView.as_view()
 
 # ── Carte principale ──────────────────────────────────────────────────────────
 
+
+
+# views.py
+from django.http import JsonResponse
+from .models import Support
+import re
+
+def support_next_code(request):
+    prefix = request.GET.get('prefix', 'PAN').upper()[:3]
+    
+    # Récupérer tous les codes qui commencent par ce préfixe
+    existing = Support.objects.filter(
+        code__startswith=f"{prefix}-"
+    ).values_list('code', flat=True)
+
+    # Extraire les numéros existants (ex: "OUA-007" → 7)
+    nums = []
+    pattern = re.compile(rf'^{re.escape(prefix)}-(\d+)$')
+    for code in existing:
+        m = pattern.match(code)
+        if m:
+            nums.append(int(m.group(1)))
+
+    next_num = (max(nums) + 1) if nums else 1
+    code = f"{prefix}-{str(next_num).zfill(3)}"  # ex: OUA-001, BOB-042
+
+    return JsonResponse({'code': code})
+
+
+
+
 class CarteView(LoginRequiredMixin, TemplateView):
     template_name = 'inventory/carte.html'
 
@@ -333,6 +376,7 @@ class SupportListView(TechnicienStaffRequiredMixin, ListView):
         q = self.request.GET.get('q', '')
         type_f = self.request.GET.get('type', '')
         etat_f = self.request.GET.get('etat', '')
+        ville_f = self.request.GET.get('ville', '')
         occupation_f = self.request.GET.get('occupation', '')
         type_panneau_f = self.request.GET.get('type_panneau', '')
 
@@ -354,6 +398,9 @@ class SupportListView(TechnicienStaffRequiredMixin, ListView):
             
         if etat_f:
             queryset = queryset.filter(etat=etat_f)
+
+        if ville_f:
+            queryset = queryset.filter(ville__iexact=ville_f)
 
         if occupation_f in ['occupe','total_occupe', 'libre', 'reserve','total_reserve', 'non_reserve', 'occupe_ou_reserve']:
             if occupation_f == 'occupe':
@@ -388,38 +435,58 @@ class SupportListView(TechnicienStaffRequiredMixin, ListView):
         )))
 
         # On renvoie les variables pour que le formulaire de filtre reste rempli
+        villes = sorted({v.strip() for v in Support.objects.values_list('ville', flat=True) if v and v.strip()})
+
         context.update({
             'q': self.request.GET.get('q', ''),
             'type_f': self.request.GET.get('type', ''),
             'etat_f': self.request.GET.get('etat', ''),
+            'ville_f': self.request.GET.get('ville', ''),
             'occupation_f': self.request.GET.get('occupation', ''),
             'type_panneau_f': self.request.GET.get('type_panneau', ''),
             'type_panneau_choices': type_panneau_choices,
-            'occupation_choices': self.occupation
+            'occupation_choices': self.occupation,
+            'villes': villes,
         })
         return context
     
+
 
 
 class SupportDetailView(ClientStaffRequiredMixin, DetailView):
     model = Support
     template_name = 'inventory/support_detail.html'
     context_object_name = 'support'
+    pk_url_kwarg = 'uuid'
+
+    def get_object(self, queryset=None):
+        """
+        On centralise la récupération de l'objet ici pour éviter les conflits 
+        et intercepter la 404 avant le chargement du contexte.
+        """
+        uuid_val = self.kwargs.get(self.pk_url_kwarg)
+        
+        # Si l'utilisateur est un client, on restreint la recherche à ses campagnes
+        if self.request.user.is_authenticated and getattr(self.request.user, 'is_client', False):
+            client = getattr(self.request.user, 'client_profile', None)
+            if client is None:
+                raise PermissionDenied
+            
+            # NOTE : Si vous voulez qu'un client puisse voir TOUS les panneaux pour réserver,
+            # supprimez le filtre .filter(...) ci-dessous et mettez juste Support.objects.all()
+            return get_object_or_404(
+                Support.objects.filter(lignes_campagne__campagne__client=client).distinct(),
+                uuid=uuid_val
+            )
+        
+        # Sinon (Staff / Admin), on récupère le support normalement par son UUID
+        return get_object_or_404(Support, uuid=uuid_val)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-
-        # Filtre le support en fonction du user client
-        if self.request.user.is_client:
-            client = self.request.user.client_profile
-            if client is None:
-                raise PermissionDenied
-            support = get_object_or_404(
-                Support.objects.filter(lignes_campagne__campagne__client=client).distinct(),
-                pk=self.kwargs['pk']
-            )
-        else:
-            support = self.get_object()
+        
+        # On récupère l'objet déjà validé par get_object()
+        support = self.object
 
         # Client courant pour get_statut (None si staff)
         client_courant = getattr(self.request.user, 'client_profile', None)
@@ -439,10 +506,11 @@ class SupportDetailView(ClientStaffRequiredMixin, DetailView):
             campagne__date_fin__lt=today,
         ).select_related('campagne__client').order_by('-campagne__date_fin')[:10]
         
-        reservations = ReservationPanneau.objects.filter(
+        reservations = ReservationLigne.objects.filter(
             support=support,
-            date_fin__gte=timezone.now()
-        ).select_related('client').order_by('date_debut')
+            reservation__date_fin__gte=timezone.now(),
+            reservation__statut__in=['en_attente', 'confirmee'],
+        ).select_related('reservation__client').order_by('reservation__date_debut')
 
         # ── Informations générales ─────────────────────────────────────────
         info_rows = [
@@ -450,7 +518,7 @@ class SupportDetailView(ClientStaffRequiredMixin, DetailView):
             ('Type',         support.get_type_support_display()),
             ('Ville',        support.ville or '—'),
             ('Quartier',     support.quartier or '—'),
-            ('Installation', support.date_installation.strftime('%d/%m/%Y')),
+            ('Installation', support.date_installation.strftime('%d/%m/%Y') if support.date_installation else '—'),
         ]
 
         # ── Maintenances ──────────────────────────────────────────────────
@@ -469,7 +537,6 @@ class SupportDetailView(ClientStaffRequiredMixin, DetailView):
                 info_rows.append(('Type',       support.type_panneau))
 
             for face in support.faces.all():
-                # CORRECTION : datetime + client courant
                 statut = face.get_statut(
                     date_debut=now,
                     client=client_courant
@@ -505,8 +572,8 @@ class SupportDetailView(ClientStaffRequiredMixin, DetailView):
             ecran = getattr(support, 'ecran_info', None)
 
             if ecran:
-                h_allumage   = ecran.heure_allumage.strftime('%H:%M')
-                h_extinction = ecran.heure_extinction.strftime('%H:%M')
+                h_allumage   = ecran.heure_allumage.strftime('%H:%M') if ecran.heure_allumage else '00:00'
+                h_extinction = ecran.heure_extinction.strftime('%H:%M') if ecran.heure_extinction else '00:00'
                 plage_str    = f'{h_allumage} – {h_extinction}'
                 taux         = ecran.taux_occupation_pourcentage()
 
@@ -520,9 +587,9 @@ class SupportDetailView(ClientStaffRequiredMixin, DetailView):
 
                 ecran_stats = [
                     ('Résolution', 'bi-aspect-ratio', ecran.get_resolution_display(), 'var(--text)'),
-                    ('Cellule',    'bi-tv',           f'{ecran.cellule}',             'var(--text)'),
-                    ('Occupation', 'bi-pie-chart',    f'{taux}%',                     'var(--color-primary)'),
-                    ('Diffusion',  'bi-clock',        plage_str,                      'var(--color-primary)'),
+                    ('Cellule',    'bi-tv',           f'{ecran.cellule}',              'var(--text)'),
+                    ('Occupation', 'bi-pie-chart',    f'{taux}%',                      'var(--color-primary)'),
+                    ('Diffusion',  'bi-clock',        plage_str,                       'var(--color-primary)'),
                 ]
 
                 for ligne in lignes_actives:
@@ -535,6 +602,7 @@ class SupportDetailView(ClientStaffRequiredMixin, DetailView):
 
         # ── Contexte final ────────────────────────────────────────────────
         context.update({
+            'support':        support,
             'lignes_actives': lignes_actives,
             'historique':     historique,
             'maintenances':   maintenances,
@@ -545,7 +613,7 @@ class SupportDetailView(ClientStaffRequiredMixin, DetailView):
             'reservations':   reservations,
         })
         return context
-
+    
 from django.views.generic import CreateView
 from django.db import transaction
 
@@ -603,26 +671,31 @@ class SupportCreateView(StaffRequiredMixin, CreateView):
 
         log_action(self.request, AuditLog.ACTION_CREATE, 'inventory', obj=self.object, detail=f"Création support: {self.object.code}")
         messages.success(self.request, f'Support {self.object.code} créé.')
-        return redirect('support_detail', pk=self.object.pk)
+        return redirect('support_detail', uuid=self.object.uuid)
     
-from django.db import transaction
-from django.shortcuts import redirect, get_object_or_404
-from django.contrib import messages
-from django.views.generic import UpdateView
 
 
+# --- VUE DE MODIFICATION ---
 class SupportUpdateView(StaffRequiredMixin, UpdateView):
     model = Support
     form_class = SupportForm
     template_name = 'inventory/support_form.html'
+    pk_url_kwarg = 'uuid'
+    
+    def get_object(self, queryset=None):
+        """
+        Force Django à récupérer l'objet en filtrant explicitement 
+        le champ 'uuid' du modèle avec la valeur reçue dans l'URL.
+        """
+        uuid_val = self.kwargs.get(self.pk_url_kwarg)
+        return get_object_or_404(Support, uuid=uuid_val)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         support = self.object  # UpdateView définit déjà self.object
-        # Récupération de l'instance écran si elle existe
         ecran_instance = getattr(support, 'ecran_info', None)
         
-        # Initialisation du formulaire écran avec préfixe pour le template
+        # Initialisation du formulaire écran avec préfixe
         if self.request.POST:
             context['ecran_form'] = EcranNumeriqueForm(
                 self.request.POST, 
@@ -633,40 +706,43 @@ class SupportUpdateView(StaffRequiredMixin, UpdateView):
         else:
             context['ecran_form'] = EcranNumeriqueForm(prefix='ecran', instance=ecran_instance)
         
-        # Pour le rendu JS des faces dans le template
         context['face_form'] = FacePanneauForm()
         context['title'] = f'Modifier — {support.code}'
         context['existing_faces'] = support.faces.all()
         return context
 
     def form_valid(self, form):
-        context = self.get_context_data()
-        ecran_form = context['ecran_form']
         support = self.object
+        ecran_instance = getattr(support, 'ecran_info', None)
+        
+        # Récupération/Validation directe du formulaire écran sans réévaluer tout le contexte
+        if support.type_support == 'ecran':
+            ecran_form = EcranNumeriqueForm(self.request.POST, self.request.FILES, prefix='ecran', instance=ecran_instance)
+        else:
+            ecran_form = None
 
         with transaction.atomic():
             # 1. Sauvegarde du support principal
             support = form.save()
 
             # 2. Cas ÉCRAN : Validation et sauvegarde
-            if support.type_support == 'ecran':
+            if support.type_support == 'ecran' and ecran_form:
                 if ecran_form.is_valid():
                     e = ecran_form.save(commit=False)
                     e.support = support
                     e.save()
                 else:
-                    # Si le formulaire écran a des erreurs, on renvoie vers form_invalid
+                    # En cas d'erreur, on repeuple le contexte pour afficher les erreurs du formulaire écran
                     return self.form_invalid(form)
             
             # 3. Cas PANNEAU : Gestion dynamique des faces
             elif support.type_support == 'panneau':
                 nb_faces = form.cleaned_data.get('nb_faces', 1)
                 
-                # Création/Mise à jour des faces basées sur les champs dynamiques du JS
                 for i in range(nb_faces):
                     label = chr(65 + i)  # A, B, C...
                     data = {
-                        'format': self.request.POST.get(f'face_{i}_format', '4x3'),
+                        #'format': self.request.POST.get(f'face_{i}_format', '4x3'),
                         'eclairage': self.request.POST.get(f'face_{i}_eclairage', 'non'),
                         'notes': self.request.POST.get(f'face_{i}_notes', '')
                     }
@@ -676,7 +752,7 @@ class SupportUpdateView(StaffRequiredMixin, UpdateView):
                         defaults=data
                     )
                 
-                # Nettoyage : supprimer les faces qui n'existent plus si on a réduit le nombre
+                # Nettoyage des faces obsolètes
                 support.faces.filter(label__gt=chr(64 + nb_faces)).delete()
 
             # 4. Journalisation (Audit Log)
@@ -689,25 +765,31 @@ class SupportUpdateView(StaffRequiredMixin, UpdateView):
             )
 
         messages.success(self.request, f'Le support {support.code} a été mis à jour.')
-        return redirect('support_detail', pk=support.pk)
+        return redirect('support_detail', uuid=support.uuid)
 
     def form_invalid(self, form):
-        # On s'assure que les messages d'erreur apparaissent bien
         messages.error(self.request, "Veuillez corriger les erreurs dans le formulaire.")
-        context = self.get_context_data()
-        return super().form_invalid(form)
+        return self.render_to_response(self.get_context_data(form=form))
 
-    
 
-    
+# --- VUE DE SUPPRESSION ---
 class SupportDeleteView(StaffRequiredMixin, DeleteView):
     model = Support
     template_name = 'partials/confirm_delete.html'
     context_object_name = 'obj'
     success_url = reverse_lazy('support_list')
+    pk_url_kwarg = 'uuid'
+    
+    def get_object(self, queryset=None):
+        """
+        Force Django à récupérer l'objet en filtrant explicitement 
+        le champ 'uuid' du modèle avec la valeur reçue dans l'URL.
+        """
+        uuid_val = self.kwargs.get(self.pk_url_kwarg)
+        return get_object_or_404(Support, uuid=uuid_val)
 
     def delete(self, request, *args, **kwargs):
-        # 1. On récupère l'objet avant la suppression pour le log
+        # 1. On récupère proprement l'objet par get_object()
         support = cast(Support, self.get_object())
         code = support.code
         
@@ -727,18 +809,19 @@ class SupportDeleteView(StaffRequiredMixin, DeleteView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        support = self.get_object()  # Utilisation sécurisée de get_object()
+        
         context.update({
             'title': 'Supprimer le support',
             'header': 'Suppression de support',
             'message_title': 'Supprimer ce support ?',
-            'message_body': 'Vous êtes sur le point de supprimer le support',
+            'message_body': f"Vous êtes sur le point de supprimer le support {support.code}",
             'hint': 'Cette opération supprimera définitivement le support et ses données associées.',
             'confirm_label': 'Supprimer le support',
-            'cancel_url': reverse_lazy('support_detail', kwargs={'pk': self.object.pk}),
+            # CORRECTION DU CANCEL_URL : Utilisation d'une URL absolue ou dynamique basée sur l'UUID actuel
+            'cancel_url': reverse('support_detail', kwargs={'uuid': support.uuid}),
         })
         return context
-
-
 
 
 class MaintenanceListView(LoginRequiredMixin, ListView):

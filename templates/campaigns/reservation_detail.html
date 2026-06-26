@@ -1,0 +1,112 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ page_title }} — Integral{% endblock %}
+
+{% block topbar_title %}
+  <i class="bi bi-calendar-event me-2" style="color:var(--color-primary)"></i>{{ reservation.nom }}
+{% endblock %}
+
+{% block topbar_actions %}
+  {% if can_edit %}
+    <div class="d-flex gap-2">
+      <a href="{% url 'reservation_update' reservation.client.pk reservation.pk %}" class="btn btn-outline-secondary btn-sm shadow-sm">
+        <i class="bi bi-pencil me-1"></i>Modifier
+      </a>
+      <a href="{% url 'reservation_delete' reservation.client.pk reservation.pk %}" class="btn btn-outline-danger btn-sm shadow-sm">
+        <i class="bi bi-trash me-1"></i>Supprimer
+      </a>
+    </div>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="row g-4">
+    <div class="col-lg-8">
+      <div class="card shadow-sm border-0 rounded-4">
+        <div class="card-body p-4">
+          <div class="mb-4">
+            <h4 class="fw-bold mb-2">Détails de la réservation</h4>
+            <p class="text-muted mb-0">{{ reservation.client.nom }} • {{ reservation.reference }}</p>
+          </div>
+
+          <div class="row g-3 mb-4">
+            <div class="col-sm-6">
+              <div class="border rounded-3 p-3 bg-light-subtle">
+                <div class="text-uppercase text-muted small mb-2">Période</div>
+                <div class="fw-semibold">{{ reservation.date_debut|date:"d/m/Y H:i" }}</div>
+                <div class="fw-semibold">→ {{ reservation.date_fin|date:"d/m/Y H:i" }}</div>
+              </div>
+            </div>
+            <div class="col-sm-6">
+              <div class="border rounded-3 p-3 bg-light-subtle">
+                <div class="text-uppercase text-muted small mb-2">Statut</div>
+                <span class="badge bg-{{ reservation.get_statut_badge }} text-white">{{ reservation.get_statut_display }}</span>
+              </div>
+            </div>
+          </div>
+
+          <div class="mb-4">
+            <h5 class="fw-bold mb-3">Lignes de réservation</h5>
+            <div class="table-responsive">
+              <table class="table table-borderless align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th>Support</th>
+                    <th>Face</th>
+                    <th>Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for ligne in reservation.lignes.all %}
+                  <tr>
+                    <td>{{ ligne.support.code }}</td>
+                    <td>{% if ligne.face %}Face {{ ligne.face.label }}{% else %}—{% endif %}</td>
+                    <td class="text-muted small">{{ ligne.notes|default:'—' }}</td>
+                  </tr>
+                  {% empty %}
+                  <tr>
+                    <td colspan="3" class="text-center text-muted py-4">Aucune ligne de réservation.</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {% if reservation.notes %}
+          <div class="card border-0 bg-light-subtle rounded-4 p-4">
+            <h6 class="fw-semibold mb-2">Notes internes</h6>
+            <p class="mb-0 text-muted">{{ reservation.notes }}</p>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="col-lg-4">
+      <div class="card shadow-sm border-0 rounded-4 p-4 bg-white">
+        <div class="mb-4">
+          <h6 class="fw-bold mb-2">Informations client</h6>
+          <p class="mb-1"><strong>{{ reservation.client.nom }}</strong></p>
+          {% if reservation.client.email %}<p class="mb-1 text-muted">{{ reservation.client.email }}</p>{% endif %}
+          {% if reservation.client.telephone %}<p class="mb-0 text-muted">{{ reservation.client.telephone }}</p>{% endif %}
+        </div>
+
+        <div class="mb-4">
+          <h6 class="fw-bold mb-2">Créé par</h6>
+          <p class="mb-0 text-muted">{{ reservation.created_by|default:'Système' }}</p>
+          <small class="text-muted">Le {{ reservation.created_at|date:"d/m/Y H:i" }}</small>
+        </div>
+
+        <div>
+          <a href="{% url 'client_detail' reservation.client.pk %}" class="btn btn-outline-secondary w-100 mb-2">Retour au client</a>
+          {% if can_edit %}
+          <a href="{% url 'reservation_update' reservation.client.pk reservation.pk %}" class="btn btn-primary w-100">Modifier la réservation</a>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

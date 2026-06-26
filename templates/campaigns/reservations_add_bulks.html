@@ -1,0 +1,404 @@
+{# templates/campaigns/reservations_add_bulk.html #}
+{% extends 'base.html' %}
+
+{% block title %}{{ mode_title }} — Integral{% endblock %}
+
+{% block topbar_title %}
+  <i class="bi bi-calendar-check me-2" style="color:var(--color-primary)"></i>
+  {{ mode_title }} — {{ client.nom }}
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="row justify-content-center">
+    <div class="col-12">
+
+      <!-- Bouton Retour & Titre -->
+      <div class="d-flex align-items-center gap-3 mb-4">
+        <a href="{% url 'client_detail' pk=client.pk %}" class="btn btn-outline-secondary btn-sm shadow-sm">
+          <i class="bi bi-arrow-left"></i>
+        </a>
+        <h1 class="h4 fw-bold mb-0">{{ mode_title }}</h1>
+      </div>
+
+      {% for message in messages %}
+      <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show py-2 shadow-sm" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+      </div>
+      {% endfor %}
+
+      <form method="post" id="bulk-form">
+        {% csrf_token %}
+
+        <div class="row g-4">
+
+          <!-- ═══════════════════════════════════════════════
+               COLONNE GAUCHE — Filtres + Grille des panneaux
+               ═══════════════════════════════════════════════ -->
+          <div class="col-lg-8">
+
+            <!-- Barre de filtres -->
+            <div class="card shadow-sm border-0 mb-4" style="border-radius: 12px;">
+              <div class="card-body p-3">
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                  <div class="input-group flex-grow-1" style="min-width: 200px;">
+                    <span class="input-group-text bg-white"><i class="bi bi-search"></i></span>
+                    <input type="search" id="search-panneau" class="form-control" placeholder="Rechercher un code ou un quartier…">
+                  </div>
+                  <select id="filter-dispo" class="form-select" style="max-width: 170px;">
+                    <option value="">Tous les états</option>
+                    <option value="libre">Libre uniquement</option>
+                    <option value="occupe">Occupés</option>
+                  </select>
+                  <select id="filter-format" class="form-select" style="max-width: 170px;">
+                    <option value="">Tous formats</option>
+                    {% for support in supports %}
+                      {% if support.format %}
+                        <option value="{{ support.format }}">{{ support.get_format_display }}</option>
+                      {% endif %}
+                    {% endfor %}
+                  </select>
+                  <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-tout-cocher">
+                    <i class="bi bi-check2-square me-1"></i>Tout cocher
+                  </button>
+                  <button type="button" class="btn btn-outline-secondary btn-sm" id="btn-tout-decocher">
+                    <i class="bi bi-square me-1"></i>Tout décocher
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Grille des panneaux -->
+            <div class="row g-3" id="panneau-grid">
+              {% for support in supports %}
+              <div class="col-md-6 col-xl-6 panneau-item"
+                   data-code="{{ support.code|lower }}"
+                   data-quartier="{{ support.quartier|lower }}"
+                   data-format="{{ support.format }}">
+                <div class="card h-100 border rounded-3 overflow-hidden shadow-sm bg-white panneau-card">
+
+                  <div class="card-header bg-light border-bottom p-3">
+                    <h6 class="fw-bold mb-1 text-truncate">{{ support.code }}</h6>
+                    <div class="small text-muted text-capitalize">
+                      <i class="bi bi-geo-alt me-1"></i>{{ support.quartier|default:"—" }}
+                    </div>
+                    <div class="small text-muted">
+                      {{ support.get_format_display|default:"—" }} <br>
+                      {% if support.adresse %} • {{ support.adresse|truncatechars:40 }}{% endif %}
+                    </div>
+                  </div>
+
+                  <div class="card-body p-3">
+                    <div class="row g-2">
+                      {% for face in support.faces.all %}
+                        {% with statut=face.get_statut %}
+                        <div class="col-12 face-wrapper" data-face-id="{{ face.pk }}" data-face-statut="{{ statut }}">
+                          <div class="position-relative face-container">
+                            <input type="checkbox" name="faces" value="{{ face.pk }}" id="face_{{ face.pk }}"
+                                   class="btn-check face-checkbox"
+                                   {% if face.pk in selectionnes %}checked{% endif %}
+                                   {% if statut == 'occupe' and face.pk not in selectionnes %}disabled{% endif %}
+                                   {% if statut == 'panne' %}disabled{% endif %}
+                                   {% if statut == 'reserve' %}disabled{% endif %}
+                                   autocomplete="off">
+
+                            {% if statut == 'panne' %}
+                              <label class="btn btn-secondary w-100 text-start p-3 d-flex justify-content-between align-items-center rounded-3 opacity-50 face-label-element" for="face_{{ face.pk }}">
+                                <span class="d-flex align-items-center">
+                                  <i class="bi bi-tools fs-5 me-2 check-icon"></i>
+                                  <span><strong class="d-block">Face {{ face.label }}</strong></span>
+                                </span>
+                                <span class="badge btn-panne">Panne</span>
+                              </label>
+                            {% elif face.pk in selectionnes %}
+                              <label class="btn btn-disponible w-100 text-start p-3 d-flex justify-content-between align-items-center rounded-3 face-label-element" for="face_{{ face.pk }}">
+                                <span class="d-flex align-items-center">
+                                  <i class="bi bi-check-circle-fill fs-5 me-2 check-icon"></i>
+                                  <span><strong class="d-block">Face {{ face.label }}</strong></span>
+                                </span>
+                                <span class="badge status-badge bg-white text-primary border">Vous</span>
+                              </label>
+                            {% elif statut == 'occupe' %}
+                              <label class="btn btn-secondary w-100 text-start p-3 d-flex justify-content-between align-items-center rounded-3 opacity-75 face-label-element" for="face_{{ face.pk }}">
+                                <span class="d-flex align-items-center">
+                                  <i class="bi bi-lock-fill fs-5 me-2 check-icon text-muted"></i>
+                                  <span><strong class="d-block">Face {{ face.label }}</strong></span>
+                                </span>
+                                <span class="badge btn-occupe">Occupée</span>
+                              </label>
+                            {% elif statut == 'reserve' %}
+                              <label class="btn btn-secondary w-100 text-start p-3 d-flex justify-content-between align-items-center rounded-3 opacity-75 face-label-element" for="face_{{ face.pk }}">
+                                <span class="d-flex align-items-center">
+                                  <i class="bi bi-lock-fill fs-5 me-2 check-icon text-muted"></i>
+                                  <span><strong class="d-block">Face {{ face.label }}</strong></span>
+                                </span>
+                                <span class="badge btn-reserve">Réservée</span>
+                              </label>
+                            {% else %}
+                              <label class="btn btn-disponible w-100 text-start p-3 d-flex justify-content-between align-items-center rounded-3 face-label-element" for="face_{{ face.pk }}">
+                                <span class="d-flex align-items-center">
+                                  <i class="bi bi-circle fs-5 me-2 check-icon"></i>
+                                  <span><strong class="d-block">Face {{ face.label }}</strong></span>
+                                </span>
+                                <span class="badge status-badge bg-success-subtle text-success border border-success-subtle">Libre</span>
+                              </label>
+                            {% endif %}
+
+                            {% with camp=face.get_campagne_active %}
+                            {% if camp and face.pk not in selectionnes %}
+                              <small class="text-muted d-block ps-2 mt-1" style="font-size:.72rem;">
+                                {{ camp.client.nom }} · jusqu'au {{ camp.date_fin|date:"d/m/Y" }}
+                              </small>
+                            {% endif %}
+                            {% endwith %}
+                          </div>
+                        </div>
+                        {% endwith %}
+                      {% empty %}
+                        <div class="text-muted fst-italic small px-2">Aucune face configurée.</div>
+                      {% endfor %}
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+              {% empty %}
+              <div class="col-12">
+                <div class="text-center py-5">
+                  <i class="bi bi-inbox text-muted" style="font-size: 3rem; opacity: 0.3;"></i>
+                  <h5 class="mt-3 fw-bold text-muted">Aucun panneau disponible en bon état</h5>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+
+          </div>
+          <!-- /COLONNE GAUCHE -->
+
+          <!-- ═══════════════════════════════════════════════
+               COLONNE DROITE — Dates, Récapitulatif, Actions
+               ═══════════════════════════════════════════════ -->
+          <div class="col-lg-4">
+            <div class="sidebar-sticky" style=" top: 5rem;">
+
+              <!-- Période -->
+              <div class="card shadow-sm border-0 mb-4" style="border-radius: 12px;">
+                <div class="card-header bg-transparent border-bottom py-3">
+                  <div class="fw-bold text-primary">
+                    <i class="bi bi-calendar-week me-2"></i>Période de réservation
+                  </div>
+                </div>
+                <div class="card-body p-4">
+                  <div class="mb-3">
+                    <label for="id_date_debut" class="form-label small fw-bold text-muted text-uppercase">Date de début</label>
+                    <div class="input-group">
+                      <span class="input-group-text bg-white"><i class="bi bi-calendar-plus text-success"></i></span>
+                      <input type="datetime-local" id="id_date_debut" name="date_debut" class="form-control" value="{{ date_debut }}" min="{{ today_iso }}" required>
+                    </div>
+                  </div>
+                  <div class="mb-0">
+                    <label for="id_date_fin" class="form-label small fw-bold text-muted text-uppercase">Date de fin</label>
+                    <div class="input-group">
+                      <span class="input-group-text bg-white"><i class="bi bi-calendar-minus text-danger"></i></span>
+                      <input type="datetime-local" id="id_date_fin" name="date_fin" class="form-control" value="{{ date_fin }}" min="{{ today_iso }}" required>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Récapitulatif -->
+              <div class="card shadow-sm border-0 mb-4" style="border-radius: 12px;">
+                <div class="card-header bg-transparent border-bottom py-3">
+                  <div class="fw-bold text-secondary">
+                    <i class="bi bi-clipboard-data me-2"></i>Récapitulatif
+                  </div>
+                </div>
+                <div class="card-body p-0">
+                  <ul class="list-group list-group-flush" id="recap-list">
+                    <li class="list-group-item d-flex justify-content-between align-items-center py-3">
+                      <span class="text-muted small">Faces sélectionnées</span>
+                      <strong id="recap-count">0</strong>
+                    </li>
+                    <li class="list-group-item d-flex justify-content-between align-items-center py-3">
+                      <span class="text-muted small">Durée</span>
+                      <strong id="recap-duree">—</strong>
+                    </li>
+                  </ul>
+                </div>
+              </div>
+
+              {% if clients_concurrents %}
+              <div class="card shadow-sm border-0 mb-4" style="border-radius: 12px;">
+                <div class="card-header bg-transparent border-bottom py-3">
+                  <div class="fw-bold text-warning">
+                    <i class="bi bi-exclamation-triangle me-2"></i>Autres clients sur ces faces
+                  </div>
+                </div>
+                <ul class="list-group list-group-flush">
+                  {% for clt in clients_concurrents %}
+                  <li class="list-group-item py-2 small">{{ clt.nom }}</li>
+                  {% endfor %}
+                </ul>
+              </div>
+              {% endif %}
+
+              <!-- Actions -->
+              <div class="card shadow-sm border-0" style="border-radius: 12px;">
+                <div class="card-footer bg-light p-3 d-flex flex-column gap-2">
+                  <button type="submit" id="btn-submit" class="btn btn-primary px-4 shadow-sm">
+                    <i class="bi bi-check-lg me-1"></i> Enregistrer les réservations
+                  </button>
+                  <a href="{% url 'client_detail' pk=client.pk %}" class="btn btn-light border">Annuler</a>
+                </div>
+              </div>
+
+            </div>
+          </div>
+          <!-- /COLONNE DROITE -->
+
+        </div>
+      </form>
+
+    </div>
+  </div>
+</div>
+
+<!-- Compteur flottant -->
+<div id="compteur-badge" class="position-fixed bottom-0 end-0 m-4 d-flex align-items-center gap-2 px-3 py-2 rounded-pill shadow-sm bg-primary text-white" style="z-index:1050;">
+  <i class="bi bi-images"></i>
+  <span id="compteur-label" class="fw-semibold small">0 face sélectionnée</span>
+</div>
+
+<style>
+  .panneau-card:has(.face-checkbox:checked) {
+    border-color: var(--color-primary, #0d6efd) !important;
+    box-shadow: 0 0 0 3px rgba(13, 110, 253, .12);
+  }
+  @media (min-width: 992px) {
+    .sidebar-sticky { position: sticky; top: 1rem; }
+  }
+</style>
+
+
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const grid          = document.getElementById('panneau-grid');
+    const searchInput   = document.getElementById('search-panneau');
+    const filterDispo   = document.getElementById('filter-dispo');
+    const filterFormat  = document.getElementById('filter-format');
+    const compteurLbl   = document.getElementById('compteur-label');
+    const recapCount    = document.getElementById('recap-count');
+    const recapDuree    = document.getElementById('recap-duree');
+    const dateDebut     = document.getElementById('id_date_debut');
+    const dateFin       = document.getElementById('id_date_fin');
+    const btnSubmit     = document.getElementById('btn-submit');
+
+    // ── Compteur de faces sélectionnées ──────────────────────────────────
+    function updateCompteur() {
+        const checked = document.querySelectorAll('.face-checkbox:checked').length;
+        const label = checked === 0 ? 'Aucune face sélectionnée'
+                    : checked === 1 ? '1 face sélectionnée'
+                    : `${checked} faces sélectionnées`;
+        compteurLbl.textContent = label;
+        recapCount.textContent  = checked;
+    }
+
+    // ── Durée entre les deux dates ───────────────────────────────────────
+    function updateDuree() {
+        const d1 = dateDebut.value ? new Date(dateDebut.value) : null;
+        const d2 = dateFin.value   ? new Date(dateFin.value)   : null;
+        if (!d1 || !d2 || d2 <= d1) {
+            recapDuree.textContent = '—';
+            recapDuree.classList.toggle('text-danger', !!(d1 && d2 && d2 <= d1));
+            return;
+        }
+        recapDuree.classList.remove('text-danger');
+        const diff = Math.round((d2 - d1) / 86400000);
+        recapDuree.textContent = diff === 1 ? '1 jour' : `${diff} jours`;
+    }
+
+    dateDebut.addEventListener('change', function () {
+        if (dateDebut.value) dateFin.min = dateDebut.value;
+        updateDuree();
+    });
+    dateFin.addEventListener('change', updateDuree);
+
+    // ── Filtrage des panneaux ────────────────────────────────────────────
+    function applyFilters() {
+        const q     = searchInput.value.toLowerCase().trim();
+        const dispo = filterDispo.value;
+        const fmt   = filterFormat.value;
+
+        document.querySelectorAll('.panneau-item').forEach(item => {
+            const matchText   = !q || item.dataset.code.includes(q) || item.dataset.quartier.includes(q);
+            const matchFormat = !fmt || item.dataset.format === fmt;
+
+            let matchDispo = true;
+            if (dispo === 'libre') {
+                matchDispo = !!item.querySelector('[data-face-statut="libre"]');
+            } else if (dispo === 'occupe') {
+                matchDispo = !!item.querySelector('[data-face-statut="occupe"]');
+            }
+
+            item.style.display = (matchText && matchFormat && matchDispo) ? '' : 'none';
+        });
+    }
+
+    searchInput.addEventListener('input', applyFilters);
+    filterDispo.addEventListener('change', applyFilters);
+    filterFormat.addEventListener('change', applyFilters);
+
+    // ── Sélection en masse ────────────────────────────────────────────────
+    document.getElementById('btn-tout-cocher').addEventListener('click', function () {
+        document.querySelectorAll('.face-checkbox:not(:disabled)').forEach(cb => {
+            cb.checked = true;
+            cb.dispatchEvent(new Event('change'));
+        });
+    });
+    document.getElementById('btn-tout-decocher').addEventListener('click', function () {
+        document.querySelectorAll('.face-checkbox:not(:disabled)').forEach(cb => {
+            cb.checked = false;
+            cb.dispatchEvent(new Event('change'));
+        });
+    });
+
+    // ── Écoute globale sur les checkboxes ────────────────────────────────
+    grid.addEventListener('change', function (e) {
+        if (e.target.classList.contains('face-checkbox')) updateCompteur();
+    });
+
+    // ── Validation côté client avant soumission ──────────────────────────
+    document.getElementById('bulk-form').addEventListener('submit', function (e) {
+        const d1 = dateDebut.value ? new Date(dateDebut.value) : null;
+        const d2 = dateFin.value   ? new Date(dateFin.value)   : null;
+
+        if (!d1 || !d2) {
+            e.preventDefault();
+            alert('Veuillez renseigner les dates de début et de fin.');
+            return;
+        }
+        if (d2 <= d1) {
+            e.preventDefault();
+            alert('La date de fin doit être postérieure à la date de début.');
+            return;
+        }
+
+        const nbFaces = document.querySelectorAll('.face-checkbox:checked').length;
+        if (nbFaces === 0) {
+            e.preventDefault();
+            alert('Veuillez sélectionner au moins une face.');
+            return;
+        }
+
+        btnSubmit.disabled  = true;
+        btnSubmit.innerHTML = '<i class="bi bi-hourglass-split me-1"></i> Enregistrement en cours…';
+    });
+
+    // ── Init ───────────────────────────────────────────────────────────
+    updateCompteur();
+    updateDuree();
+});
+</script>
+{% endblock %}

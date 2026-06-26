@@ -81,6 +81,7 @@ TEMPLATES = [
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 'geoad.context_processors.design_config',
+                'geoad.context_processors.inventory_villes',
                 'campaigns.context_processors.alerts_data'
             ],
         },
@@ -131,10 +132,10 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # ─────────────────────────────────────────────────────────────────────────────
 DESIGN_CONFIG = {
     # Couleurs des marqueurs carte (utilisées par Leaflet JS)
-    'COLOR_DISPONIBLE':  "#6c757d",   # gris — support libre
-    'COLOR_OCCUPE':      '#16a34a',   # Vert — support sous contrat
+    'COLOR_DISPONIBLE':  "#16a34a",   # gris — support libre
+    'COLOR_OCCUPE':      '#dc2626',   # Vert — support sous contrat
     'COLOR_RESERVE':     "#7c3aed",   # Orange — support réservé (en négociation) #6a8068
-    'COLOR_PANNE': '#dc2626',   # Rouge — support en panne
+    'COLOR_PANNE': '#6c757d',   # Rouge — support en panne
     
     'COLOR_DISPONIBLE_BG':  "#e2f1ff",   
     'COLOR_OCCUPE_BG':      "#d8ffe6",   

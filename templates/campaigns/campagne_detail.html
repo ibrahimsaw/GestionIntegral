@@ -143,11 +143,28 @@
               {% for visuel in campagne.visuels.all %}
               <div class="{% if campagne.visuels.count == 1 %}col-12{% else %}col-6 col-md-4{% endif %}">
                 <div class="rounded-4 overflow-hidden border shadow-sm position-relative">
+                  <span style="position: absolute; top: 6px; left: 6px;">
+                      {% if visuel_name|slice:"-5:-4" == "." %}
+                          {# Gère les extensions à 4 lettres : jpeg, webp #}
+                          {{ visuel_name|slice:"-4:"|upper }}
+                      {% else %}
+                          {# Gère les extensions à 3 lettres : pdf, png, mp4 #}
+                          {{ visuel_name|slice:"-3:"|upper }}
+                      {% endif %}
+                  </span>
                   {% with visuel_name=visuel.fichier.name|lower %}
                     {% if "mp4" in visuel_name or "webm" in visuel_name %}
                       <video controls playsinline class="w-100 d-block" style="max-height: 300px;">
                         <source src="{{ visuel.fichier.url }}">
                       </video>
+                    {% elif "pdf" in visuel_name %}
+                      {% if campagne.client.logo %}
+                          <img src="{{ campagne.client.logo.url }}" class="w-100 h-100 object-fit-contain rounded">
+                        {% else %}
+                          <div class="w-100 h-100 d-flex align-items-center justify-content-center text-muted">
+                            <i class="bi bi-building fs-3"></i>
+                          </div>
+                        {% endif %}
                     {% else %}
                       <img src="{{ visuel.fichier.url }}" class="w-100 h-auto d-block object-fit-cover" style="max-height: 300px;">
                     {% endif %}
@@ -279,7 +296,7 @@
                 </div>
                 <div class="min-width-0">
                   <h6 class="fw-bold mb-0">
-                    <a href="{% url 'support_detail' support.pk %}" class="text-dark text-decoration-none stretched-link">
+                    <a href="{% url 'support_detail' support.uuid %}" class="text-dark text-decoration-none stretched-link">
                       {{ support.code }} — {{ support.nom }}
                     </a>
                   </h6>
@@ -295,12 +312,33 @@
                     </span>
                   {% endif %}
 
-                  {% if support.type_support == 'ecran' and ligne.campagne.duree_passage %}
-                    <div class="mt-2 p-2 rounded visible border-start border-end border-3 border-primary small">
-                      <i class="bi bi-clock-history text-primary me-1"></i>
-                      <strong>{{ ligne.campagne.duree_passage }}s</strong>
-                      <span class="mx-1">•</span>
-                      {{ ligne.spots_calcules }} spot(s)
+                  {% if support.type_support == 'ecran' %}
+                    <div class="mt-2 p-2 rounded bg-light-subtle border-start border-end border-3 border-primary small">
+                      <div class="d-flex align-items-center justify-content-between mb-1 flex-wrap gap-1">
+                        <span>
+                          <i class="bi bi-clock-history text-primary me-1"></i>
+                          <strong>{{ ligne.get_duree_passage }}s</strong>
+                          <span class="mx-1">•</span>
+                          {{ ligne.get_frequence_display_effective }}
+                        </span>
+                        {% if ligne.est_personnalisee %}
+                          <span class="badge bg-warning-subtle text-warning border border-warning-subtle rounded-pill" style="font-size: 0.6rem;">
+                            <i class="bi bi-pencil-fill me-1"></i>Personnalisé
+                          </span>
+                        {% endif %}
+                      </div>
+
+                      <div class="text-muted" style="font-size: 0.7rem;">
+                        <i class="bi bi-calendar3 me-1"></i>{{ ligne.get_date_debut|date:"d/m/Y" }} → {{ ligne.get_date_fin|date:"d/m/Y" }}
+                        <span class="mx-1">•</span>
+                        <i class="bi bi-clock me-1"></i>{{ ligne.get_tranches_horaires|truncatechars:20 }}
+                      </div>
+
+                      <div class="mt-1">
+                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill font-monospace">
+                          {{ ligne.calculer_spots }} spot(s)
+                        </span>
+                      </div>
                     </div>
                   {% endif %}
                 {% endfor %}

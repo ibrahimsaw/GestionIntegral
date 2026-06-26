@@ -86,17 +86,22 @@
                         <div class="form-section-hd"><i class="bi bi-info-circle" style="color:var(--color-primary)"></i>Informations Générales</div>
                         <div class="form-section-bd">
                             <div class="row g-3">
-                                <div class="col-md-4">
+                                <div class="col-md-6">
                                     <label class="form-label" >Code *</label>
                                     {{ form.code }}
                                     {{ form.code.errors }}
                                 </div>
-                                <div class="col-md-8">
+                                <div class="col-md-6">
+                                    <label class="form-label" >Code externe</label>
+                                    {{ form.code_ext }}
+                                    {{ form.code_ext.errors }}
+                                </div>
+                                <div class="col-md-6">
                                     <label class="form-label">Nom du support *</label>
                                     {{ form.nom }}
                                     {{ form.nom.errors }}
                                 </div>
-                                <div class="col-md-12">
+                                <div class="col-md-6">
                                     <label class="form-label">Adresse physique</label>
                                     {{ form.adresse }}
                                 </div>
@@ -113,19 +118,19 @@
                                     {{ form.etat }}
                                 </div>
                                 <div class="col-md-6">
-                                  <label class="form-label">Photo du support</label>
-                                  
-                                  <div class="mb-2">
-                                      <img id="image-preview" 
-                                          src="{% if form.instance.photo_principale %}{{ form.instance.photo_principale.url }}{% else %}{% static 'img/logo.png' %}{% endif %}" 
-                                          alt="Aperçu" 
-                                          class="img-thumbnail {% if not form.instance.photo_principale %}d-none{% endif %}" 
-                                          style="height: 120px; width: 180px; object-fit: cover; border-radius: 8px; border: 2px solid var(--color-primary);">
-                                  </div>
-                                  <div>
-                                      {{ form.photo_principale }}
-                                  </div>
-                              </div>
+                                    <label class="form-label">Photo du support</label>
+                                    
+                                    <div class="mb-2">
+                                        <img id="image-preview" 
+                                            src="{% if form.instance.photo_principale %}{{ form.instance.photo_principale.url }}{% else %}{% static 'img/logo.png' %}{% endif %}" 
+                                            alt="Aperçu" 
+                                            class="img-thumbnail {% if not form.instance.photo_principale %}d-none{% endif %}" 
+                                            style="height: 120px; width: 180px; object-fit: cover; border-radius: 8px; border: 2px solid var(--color-primary);">
+                                    </div>
+                                    <div>
+                                        {{ form.photo_principale }}
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -237,30 +242,63 @@
 
     // ── GÉNÉRATION AUTO DU CODE ─────────────────────────────────
     function generateAutoCode() {
-        // RÈGLE : On ne régénère pas de code si on est en mode MODIFICATION
         const isEdit = {% if object %}true{% else %}false{% endif %};
         if (isEdit) return;
 
         const type = typeField.value;
-        
-        // Si le code a été modifié manuellement (dataset.isAuto supprimé), on ne touche à rien
+
         if (codeInput.value && !codeInput.dataset.isAuto) return;
 
-        const prefix = (type === 'ecran') ? 'ECR' : 'PAN';
-        const now = new Date();
-        const suffix = now.getDate().toString().padStart(2, '0') + 
-                    (now.getMonth() + 1).toString().padStart(2, '0') +
-                    now.getFullYear().toString().slice(-2) + '-' +
-                    now.getHours().toString().padStart(2, '0') + 
-                    now.getMinutes().toString().padStart(2, '0') + 
-                    now.getSeconds().toString().padStart(2, '0');
+        const prefix = (type === 'ecran') ? 'ECR' : null;
 
-        codeInput.value = `${prefix}-${suffix}`;
-        codeInput.dataset.isAuto = "true";
-        codeInput.readOnly = true; 
+        if (prefix) {
+            // Écran : ancien comportement horodaté
+            const now = new Date();
+            const suffix = now.getDate().toString().padStart(2, '0') +
+                        (now.getMonth() + 1).toString().padStart(2, '0') +
+                        now.getFullYear().toString().slice(-2) + '-' +
+                        now.getHours().toString().padStart(2, '0') +
+                        now.getMinutes().toString().padStart(2, '0') +
+                        now.getSeconds().toString().padStart(2, '0');
+            codeInput.value = `${prefix}-${suffix}`;
+            codeInput.dataset.isAuto = "true";
+            codeInput.readOnly = true;
+        } else {
+            // Panneau : préfixe = 3 premières lettres de la ville (en majuscules)
+            const villeInput = document.getElementById('id_ville');
+            const villeVal = villeInput ? villeInput.value.trim() : '';
+            const villePrefix = villeVal.length >= 3
+                ? villeVal.substring(0, 3).toUpperCase()
+                : (villeVal.toUpperCase().padEnd(3, 'X'));  // fallback si ville trop courte
+
+            // Appel AJAX pour récupérer le prochain numéro
+            fetch(`{% url 'support_next_code' %}?prefix=${encodeURIComponent(villePrefix)}`)
+                .then(r => r.json())
+                .then(data => {
+                    codeInput.value = data.code;  // ex: "OUA-001"
+                    //codeInput.dataset.isAuto = "true";
+                    codeInput.readOnly = true;
+                })
+                .catch(() => {
+                    // Fallback local si le fetch échoue
+                    codeInput.value = `${villePrefix}-001`;
+                    //codeInput.dataset.isAuto = "true";
+                    codeInput.readOnly = true;
+                });
+        }
     }
 
-    // ── SÉLECTEUR DE TYPE ────────────────────────────────────────
+    const villeInput = document.getElementById('id_ville');
+    if (villeInput) {
+        villeInput.addEventListener('input', () => {
+            // Réinitialiser pour permettre la régénération
+            if (codeInput.dataset.isAuto) {
+                codeInput.value = '';
+            }
+            generateAutoCode();
+        });
+    }
+        // ── SÉLECTEUR DE TYPE ────────────────────────────────────────
     function selectType(t) {
         typeField.value = t;
         

@@ -1,0 +1,151 @@
+{% extends 'base.html' %}
+{% block title %}Réservations — Integral{% endblock %}
+{% block topbar_title %}<i class="bx bx-calendar-check me-2" style="color:var(--color-primary)"></i>Réservations{% endblock %}
+{% block topbar_actions %}
+  {% if user.is_staff_regie_role %}
+  <a href="{% url 'reservation_select_client' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus me-1"></i>Nouvelle réservation</a>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+
+<!-- Filtres -->
+<div class="card mb-4">
+  <div class="card-body">
+    <form method="get" class="row g-2 align-items-end">
+      <div class="col-md-3">
+        <label class="form-label">Recherche</label>
+        <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Nom, client…">
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Statut</label>
+        <select name="statut" class="form-select">
+          <option value="">Tous les statuts</option>
+          {% for value, label in statut_choices %}
+            <option value="{{ value }}" {% if statut_f == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label">Client</label>
+        <select name="client" class="form-select">
+          <option value="">Tous les clients</option>
+          {% for c in clients %}
+            <option value="{{ c.pk }}" {% if client_f == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.nom }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-2">
+        <label class="form-label">Date début</label>
+        <input type="date" name="date" value="{{ date_f }}" class="form-control">
+      </div>
+      <div class="col-md-2 d-flex gap-2">
+        <button type="submit" class="btn btn-primary flex-fill"><i class="bi bi-search"></i></button>
+        <a href="{% url 'reservation_list' %}" class="btn btn-outline-secondary"><i class="bi bi-x"></i></a>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Tableau -->
+<div class="card">
+  <div class="card-header d-flex align-items-center justify-content-between">
+    <span>{{ reservations|length }} réservation(s) trouvée(s)</span>
+  </div>
+  <div class="card-body p-0">
+    <table class="table mb-0">
+      <thead>
+        <tr>
+          <th>Nom</th>
+          <th>Client</th>
+          <th>Période</th>
+          <th>Faces</th>
+          <th>Statut</th>
+          <th>Créée par</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in reservations %}
+        <tr>
+          <td style="font-weight:600">{{ r.nom }}</td>
+          <td style="font-size:.85rem">
+            <a href="{% url 'client_detail' r.client.pk %}" style="color:var(--color-primary);text-decoration:none">
+              {{ r.client.nom }}
+            </a>
+          </td>
+          <td style="font-size:.8rem;color:var(--text-muted)">
+            <i class="bx bx-calendar me-1"></i>{{ r.date_debut|date:"d/m/Y" }}
+            <span class="mx-1">→</span>
+            {{ r.date_fin|date:"d/m/Y" }}
+          </td>
+          <td>
+            <span class="badge bg-light text-dark border">
+              <i class="bx bx-image me-1"></i>{{ r.lignes.count }} face(s)
+            </span>
+          </td>
+          <td>
+            {% if r.statut == 'en_attente' %}
+              <span class="badge-status bs-bientot"><i class="bx bx-time me-1"></i>En attente</span>
+            {% elif r.statut == 'confirmee' %}
+              <span class="badge-status bs-disponible"><i class="bx bx-check me-1"></i>Confirmée</span>
+            {% elif r.statut == 'annulee' %}
+              <span class="badge-status bs-panne"><i class="bx bx-x me-1"></i>Annulée</span>
+            {% else %}
+              <span class="badge-status bs-occupe">{{ r.get_statut_display }}</span>
+            {% endif %}
+          </td>
+          <td style="font-size:.8rem;color:var(--text-muted)">
+            {{ r.created_by|default:"—" }}
+          </td>
+          <td>
+            <div class="d-flex gap-1">
+              {% if user.is_staff_regie_role %}
+                <a href="{% url 'reservation_detail' r.client.pk r.pk %}" class="btn btn-sm btn-outline-primary me-1"><i class="bi bi-eye"></i></a>
+                <a href="{% url 'reservation_update' r.client.pk r.pk %}" class="btn btn-sm btn-outline-secondary me-1"><i class="bi bi-pencil"></i></a>
+                <a href="{% url 'reservation_delete' r.client.pk r.pk %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></a>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7" class="text-center py-5" style="color:var(--text-muted)">
+            <i class="bx bx-calendar-x d-block mb-2" style="font-size:2rem"></i>
+            Aucune réservation trouvée.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+
+    {% if is_paginated %}
+    <nav class="mt-4">
+      <ul class="pagination justify-content-center">
+        {% if page_obj.has_previous %}
+          <li class="page-item">
+            <a class="page-item btn btn-sm btn-outline-primary me-2"
+               href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if statut_f %}&statut={{ statut_f }}{% endif %}{% if client_f %}&client={{ client_f }}{% endif %}{% if date_f %}&date={{ date_f }}{% endif %}">
+              Précédent
+            </a>
+          </li>
+        {% endif %}
+        <li class="page-item disabled">
+          <span class="page-link">Page {{ page_obj.number }}/{{ paginator.num_pages }}</span>
+        </li>
+        {% if page_obj.has_next %}
+          <li class="page-item">
+            <a class="page-item btn btn-sm btn-outline-primary ms-2"
+               href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if statut_f %}&statut={{ statut_f }}{% endif %}{% if client_f %}&client={{ client_f }}{% endif %}{% if date_f %}&date={{ date_f }}{% endif %}">
+              Suivant
+            </a>
+          </li>
+        {% endif %}
+      </ul>
+    </nav>
+    {% endif %}
+
+  </div>
+</div>
+
+{% endblock %}

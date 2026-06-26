@@ -1,0 +1,159 @@
+{% extends 'staff/base_staff.html' %}
+{% load static %}
+
+{% block title %}Dashboard - Staff GeoAd ERP{% endblock %}
+{% block page_title %}📊 Dashboard{% endblock %}
+
+{% block content %}
+
+<div class="container-fluid">
+    
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- STATISTIQUES                                                        -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <div class="row mb-4">
+        <div class="col-md-3 col-sm-6">
+            <div class="stat-box">
+                <div class="stat-box-value text-warning">{{ demandes_nouvelles }}</div>
+                <div class="stat-box-label">Demandes nouvelles</div>
+            </div>
+        </div>
+
+        <div class="col-md-3 col-sm-6">
+            <div class="stat-box info">
+                <div class="stat-box-value">{{ demandes_en_cours }}</div>
+                <div class="stat-box-label">En cours de traitement</div>
+            </div>
+        </div>
+
+        <div class="col-md-3 col-sm-6">
+            <div class="stat-box success">
+                <div class="stat-box-value">{{ demandes_validees_mois }}</div>
+                <div class="stat-box-label">Validées ce mois</div>
+            </div>
+        </div>
+
+        <div class="col-md-3 col-sm-6">
+            <div class="stat-box danger">
+                <div class="stat-box-value">{{ demandes_urgentes }}</div>
+                <div class="stat-box-label">En attente > 24h</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-check-circle text-success"></i> Réservations actives
+                </div>
+                <div class="card-body text-center">
+                    <div style="font-size: 3rem; font-weight: 700; color: #198754;">
+                        {{ reservations_actives }}
+                    </div>
+                    <small class="text-muted">Réservations confirmées en cours</small>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <i class="fas fa-exclamation-circle text-warning"></i> Actions rapides
+                </div>
+                <div class="card-body">
+                    <a href="{% url 'staff:demande_list' %}?statut=nouvelle" class="btn btn-sm btn-warning">
+                        <i class="fas fa-inbox"></i> Voir demandes nouvelles
+                    </a>
+                    <a href="{% url 'staff:demande_list' %}?statut=en_cours" class="btn btn-sm btn-info">
+                        <i class="fas fa-hourglass-half"></i> Voir en cours
+                    </a>
+                    <a href="{% url 'admin:campaigns_demandeservation_add' %}" class="btn btn-sm btn-primary">
+                        <i class="fas fa-plus"></i> Admin Django
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- DERNIERES DEMANDES                                                  -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <div class="card">
+        <div class="card-header">
+            <i class="fas fa-history"></i> Dernières demandes (non traitées)
+        </div>
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Référence</th>
+                        <th>Contact</th>
+                        <th>Société</th>
+                        <th>Période souhaitée</th>
+                        <th>Statut</th>
+                        <th>Créée le</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if dernieres_demandes %}
+                        {% for demande in dernieres_demandes %}
+                            <tr>
+                                <td>
+                                    <strong>{{ demande.reference }}</strong>
+                                </td>
+                                <td>{{ demande.nom_contact }}</td>
+                                <td>
+                                    {% if demande.societe %}
+                                        <small>{{ demande.societe }}</small>
+                                    {% else %}
+                                        <small class="text-muted">—</small>
+                                    {% endif %}
+                                </td>
+                                <td>
+                                    <small>
+                                        {{ demande.date_debut_souhaitee|date:"d/m/y" }} →
+                                        {{ demande.date_fin_souhaitee|date:"d/m/y" }}
+                                    </small>
+                                </td>
+                                <td>
+                                    <span class="badge badge-{{ demande.statut }}">
+                                        {{ demande.get_statut_display }}
+                                    </span>
+                                </td>
+                                <td>
+                                    <small class="text-muted">
+                                        {{ demande.created_at|date:"d/m H:i" }}
+                                    </small>
+                                </td>
+                                <td>
+                                    <a href="{% url 'staff:demande_detail' demande.uuid %}" 
+                                       class="btn btn-sm btn-primary">
+                                        <i class="fas fa-arrow-right"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="7" class="text-center py-4">
+                                <i class="fas fa-inbox text-muted" style="font-size: 2rem;"></i>
+                                <br>
+                                <small class="text-muted">Aucune demande en attente</small>
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+        <div class="card-footer text-end">
+            <a href="{% url 'staff:demande_list' %}" class="btn btn-sm btn-outline-primary">
+                Voir toutes les demandes →
+            </a>
+        </div>
+    </div>
+
+</div>
+
+{% endblock %}

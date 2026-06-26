@@ -20,7 +20,7 @@ class SupportForm(forms.ModelForm):
     class Meta:
         model  = Support
         fields = [
-            'code', 'nom', 'type_support',
+            'code','code_ext','nom', 'type_support',
             # ← format ici, affiché uniquement pour les panneaux via JS
             'format',
             'latitude', 'longitude',
@@ -33,6 +33,10 @@ class SupportForm(forms.ModelForm):
                 'placeholder': 'Généré automatiquement',
                 'readonly': True,
                 'data-isauto': 'true',
+            }),
+            'code_ext': forms.TextInput(attrs={
+                **W, 
+                'placeholder': 'XXXXX',
             }),
             'nom':          forms.TextInput(attrs=W),
             'type_support': forms.Select(attrs={**S, 'id': 'id_type_support'}),

@@ -11,7 +11,7 @@ class EcranInline(admin.StackedInline):
 
 @admin.register(Support)
 class SupportAdmin(admin.ModelAdmin):
-    list_display = ['code', 'nom', 'type_support', 'etat', 'ville', 'quartier', 'actif']
+    list_display = ['code', 'nom','code_ext', 'type_support', 'etat', 'ville', 'quartier', 'actif']
     list_filter = ['type_support', 'etat', 'ville']
     search_fields = ['code', 'nom', 'adresse']
     inlines = [FaceInline, EcranInline]

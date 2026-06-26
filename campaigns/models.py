@@ -1,12 +1,14 @@
-from typing import Any
-
-from django.db import models
-from django.utils import timezone
+import datetime
+import uuid
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.db import models
+from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
-import datetime
-from datetime import datetime
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Fonctions utilitaires
+# ══════════════════════════════════════════════════════════════════════════════
 
 def calculer_duree_tranches(tranches: str) -> float:
     total_heures = 0.0
@@ -14,22 +16,28 @@ def calculer_duree_tranches(tranches: str) -> float:
         return total_heures
     plages = tranches.split(",")
     for plage in plages:
-        debut_str, fin_str = plage.split("-")
-        debut = datetime.strptime(debut_str.strip(), "%H:%M")
-        fin = datetime.strptime(fin_str.strip(), "%H:%M")
-        duree = (fin - debut).total_seconds() / 3600
-        total_heures += duree
+        try:
+            debut_str, fin_str = plage.split("-")
+            debut = datetime.datetime.strptime(debut_str.strip(), "%H:%M")
+            fin = datetime.datetime.strptime(fin_str.strip(), "%H:%M")
+            duree = (fin - debut).total_seconds() / 3600
+            total_heures += duree
+        except ValueError:
+            continue
     return total_heures
 
-# On suppose que ces constantes sont définies dans votre fichier ou importées
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Constantes & Choix
+# ══════════════════════════════════════════════════════════════════════════════
+
 DUREE_CHOICES = [
     (5, '5 secondes'),
     (10, '10 secondes'),
     (15, '15 secondes'),
     (20, '20 secondes'),
 ]
-# Fréquences typiques pour les campagnes écran (en secondes)
-# 
+
 FREQUENCE_CHOICES = [
     (60, 'Toutes les 1 min'),
     (120, 'Toutes les 2 min'),
@@ -67,9 +75,24 @@ TYPE_SUPPORT_CHOICES = [
     ('ecran', 'Écran'),
 ]
 
+STATUT_EN_ATTENTE = 'en_attente'
+STATUT_CONFIRMEE  = 'confirmee'
+STATUT_EXPIREE    = 'expiree'
+
+STATUT_RESERVATION_CHOICES = [
+    (STATUT_EN_ATTENTE, 'En attente'),
+    (STATUT_CONFIRMEE,  'Confirmée'),
+    (STATUT_ANNULEE,    'Annulée'),
+    (STATUT_EXPIREE,    'Expirée'),
+]
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Modèles de Base (Clients & Contrats)
+# ══════════════════════════════════════════════════════════════════════════════
+
 class Client(models.Model):
     """Client de la régie publicitaire."""
-
     nom           = models.CharField(max_length=200, verbose_name="Raison sociale / Nom")
     contact_nom   = models.CharField(max_length=150, blank=True, verbose_name="Nom du Contact principal")
     telephone     = models.CharField(max_length=30, blank=True)
@@ -108,8 +131,7 @@ class Client(models.Model):
 
 
 class Contrat(models.Model):
-    """Contrat signé par un client, avec période et nombre de spots."""
-
+    """Contrat signé par un client."""
     client       = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='contrats')
     type_contrat = models.CharField(max_length=20, choices=TYPE_CONTRAT_CHOICES, default='ponctuel')
     nom          = models.CharField(max_length=200, blank=True, verbose_name="Nom du contrat (optionnel)")
@@ -118,7 +140,6 @@ class Contrat(models.Model):
     nb_spots     = models.PositiveIntegerField(default=0, verbose_name="Nombre de spots")
     actif        = models.BooleanField(default=True)
     archive      = models.BooleanField(default=True)
-
     notes        = models.TextField(blank=True)
     created_at   = models.DateTimeField(auto_now_add=True)
 
@@ -140,17 +161,11 @@ class Contrat(models.Model):
             return (self.date_fin - self.date_debut).days + 1
         return 0
 
-    # la fonction du spot utilisé pourrait être ajoutée ici, en fonction des campagnes associées et de leur consommation de spots
     def spots_utilises(self):
-        # On suppose que chaque campagne associée consomme un certain nombre de spots, à calculer
-        spots_utilises = sum(c.calculer_nombre_spots() for c in self.campagnes.filter(statut__in=['en_cours', 'terminee']))
-        return spots_utilises
+        return sum(c.calculer_nombre_spots() for c in self.campagnes.filter(statut__in=['en_cours', 'terminee']))
     
-    # la fonction pour savoir le nombre de spots restants pourrait être ajoutée ici, en fonction des campagnes associées et de leur consommation de spots
     def spots_restants(self):
-        spots_utilises = self.spots_utilises()
-        spots_restants = max(self.nb_spots - spots_utilises, 0)
-        return spots_restants
+        return max(self.nb_spots - self.spots_utilises(), 0)
     
     def get_detail(self):
         if self.nom:
@@ -166,86 +181,507 @@ class Contrat(models.Model):
         today = timezone.now().date()
         return self.actif and self.date_debut <= today <= self.date_fin
 
-# UNE class pour faire la reservation des Panneau A un client
-class ReservationPanneau(models.Model):
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Modèles de Réservations (Ordre de dépendance strict : 1. Reservation -> 2. Lignes)
+# ══════════════════════════════════════════════════════════════════════════════
+
+class Reservation(models.Model):
+    """Groupe de réservation globale pour un client."""
+    uuid = models.UUIDField(
+        default=uuid.uuid4,
+        editable=False,
+        unique=True,
+        db_index=True,
+        verbose_name="Identifiant public (UUID)",
+    )
+    reference = models.CharField(
+        max_length=50,
+        unique=True,
+        blank=True,
+        verbose_name="Référence",
+    )
+    nom = models.CharField(
+        max_length=200,
+        verbose_name="Nom de la réservation",
+    )
     client = models.ForeignKey(
-        'Client', 
-        on_delete=models.CASCADE, 
-        related_name='reservations'
+        Client,
+        on_delete=models.CASCADE,
+        related_name='reservations_globales',
+        verbose_name="Client",
     )
-    support = models.ForeignKey(
-        'inventory.Support', 
-        on_delete=models.PROTECT, 
-        related_name='lignes_client'
-    )
-    # Spécifique aux Panneaux Statiques
-    face = models.ForeignKey(
-        'inventory.FacePanneau', 
+    contrat = models.ForeignKey(
+        Contrat,
         on_delete=models.SET_NULL,
-        null=True, blank=True, 
-        related_name='lignes_client',
-        verbose_name="Face (Panneau)"
+        null=True, blank=True,
+        related_name='reservations',
+        verbose_name="Contrat associé (optionnel)",
     )
-    date_debut = models.DateTimeField()
-    date_fin = models.DateTimeField()
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='reservations_creees',
+        verbose_name="Créé par",
+    )
+    date_debut = models.DateTimeField(verbose_name="Date de début")
+    date_fin   = models.DateTimeField(verbose_name="Date de fin")
+    statut = models.CharField(
+        max_length=20,
+        choices=STATUT_RESERVATION_CHOICES,
+        default=STATUT_EN_ATTENTE,
+        verbose_name="Statut",
+    )
+    notes      = models.TextField(blank=True, verbose_name="Notes internes")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name          = "Réservation"
+        verbose_name_plural   = "Réservations"
+        ordering              = ['-date_debut']
 
     def __str__(self):
-        return f"Réservation de {self.face} du panneau {self.support} pour {self.client}"
-    
+        return f"{self.reference} — {self.client.nom} ({self.date_debut:%d/%m/%Y} → {self.date_fin:%d/%m/%Y})"
+
+    def save(self, *args, **kwargs):
+        if not self.reference:
+            self.reference = f"RES-{timezone.now().year}-{str(uuid.uuid4())[:6].upper()}"
+        super().save(*args, **kwargs)
+
     def clean(self):
-        """Validation métier avant l'enregistrement."""
+        super().clean()
+        if self.date_debut and self.date_fin:
+            if self.date_fin <= self.date_debut:
+                raise ValidationError({
+                    'date_fin': _("La date de fin doit être postérieure à la date de début.")
+                })
+            if (self.date_fin - self.date_debut).days > 366:
+                raise ValidationError(_("La durée d'une réservation ne peut pas dépasser 1 an."))
+
+    def duree_jours(self) -> int:
+        if self.date_debut and self.date_fin:
+            return (self.date_fin.date() - self.date_debut.date()).days + 1
+        return 0
+
+    def nb_faces(self) -> int:
+        return self.lignes.count()
+
+    def is_active(self) -> bool:
+        now = timezone.now()
+        return self.statut in (STATUT_EN_ATTENTE, STATUT_CONFIRMEE) and self.date_debut <= now <= self.date_fin
+
+    def is_a_venir(self) -> bool:
+        return self.statut in (STATUT_EN_ATTENTE, STATUT_CONFIRMEE) and timezone.now() < self.date_debut
+
+    def is_expiree(self) -> bool:
+        return timezone.now() > self.date_fin
+
+    def get_statut_badge(self) -> str:
+        return {
+            STATUT_EN_ATTENTE: 'warning',
+            STATUT_CONFIRMEE:  'success',
+            STATUT_ANNULEE:    'danger',
+            STATUT_EXPIREE:    'secondary',
+        }.get(self.statut, 'secondary')
+
+    def auto_update_statut(self):
+        if self.statut in (STATUT_ANNULEE,):
+            return
+        if self.is_expiree():
+            self.statut = STATUT_EXPIREE
+            self.save(update_fields=['statut'])
+
+
+class ReservationLigne(models.Model):
+    """Une face réservée liée à un groupe de Réservation parent (Désormais défini APRÈS Reservation)."""
+    reservation = models.ForeignKey(Reservation, on_delete=models.CASCADE, related_name='lignes', verbose_name="Réservation")
+    support = models.ForeignKey('inventory.Support', on_delete=models.PROTECT, related_name='lignes_reservation', verbose_name="Support")
+    face = models.ForeignKey('inventory.FacePanneau', on_delete=models.SET_NULL, null=True, blank=True, related_name='lignes_reservation', verbose_name="Face")
+    notes      = models.TextField(blank=True, verbose_name="Notes")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name        = "Ligne de réservation"
+        verbose_name_plural = "Lignes de réservation"
+        ordering            = ['support__code', 'face__label']
+        unique_together     = [('reservation', 'face')]
+
+    def __str__(self):
+        face_label = f"Face {self.face.label}" if self.face else "—"
+        return f"{self.reservation.reference} | {self.support.code} ({face_label})"
+
+    def clean(self):
+        super().clean()
         if self.support.type_support != 'panneau':
-            raise ValidationError(_("La réservation est uniquement applicable aux panneaux statiques."))
+            raise ValidationError(_("Les réservations sont uniquement applicables aux panneaux statiques."))
         if not self.face:
             raise ValidationError(_("Vous devez sélectionner une face pour un panneau statique."))
-        if self.date_debut >= self.date_fin:
-            raise ValidationError(_("La date de début doit être antérieure à la date de fin."))
-        
-        # Vérification de la disponibilité du panneau pour les dates données
-        conflits = ReservationPanneau.objects.filter(
-            support=self.support,
+        if self.face.support_id != self.support_id:
+            raise ValidationError(_("La face sélectionnée n'appartient pas au support choisi."))
+
+        date_debut = self.reservation.date_debut
+        date_fin   = self.reservation.date_fin
+
+        conflit_resa = (
+            ReservationLigne.objects.filter(
+                face=self.face,
+                reservation__date_debut__lt=date_fin,
+                reservation__date_fin__gt=date_debut,
+                reservation__statut__in=[STATUT_EN_ATTENTE, STATUT_CONFIRMEE],
+            )
+            .exclude(reservation=self.reservation)
+            .select_related('reservation__client')
+        )
+        if conflit_resa.exists():
+            conflit = conflit_resa.first()
+            raise ValidationError(_(f"La face {self.face} est déjà réservée du {conflit.reservation.date_debut:%d/%m/%Y} au {conflit.reservation.date_fin:%d/%m/%Y} (client : {conflit.reservation.client.nom})."))
+
+        from campaigns.models import LigneCampagne
+        conflit_camp = LigneCampagne.objects.filter(
             face=self.face,
-            date_debut__lt=self.date_fin,
-            date_fin__gt=self.date_debut
-        ).exclude(id=self.id)
-        
-        if conflits.exists():
-            raise ValidationError(_("Ce panneau est déjà réservé pour les dates sélectionnées."))
-    
+            campagne__date_debut__lte=date_fin.date(),
+            campagne__date_fin__gte=date_debut.date(),
+            campagne__statut__in=['en_cours', 'a_venir'],
+        ).select_related('campagne__client')
+
+        if conflit_camp.exists():
+            conflit = conflit_camp.first()
+            raise ValidationError(_(f"La face {self.face} est occupée par la campagne « {conflit.campagne.nom} » (client : {conflit.campagne.client.nom}) du {conflit.campagne.date_debut:%d/%m/%Y} au {conflit.campagne.date_fin:%d/%m/%Y}."))
+
     def save(self, *args, **kwargs):
-        # Force l'exécution du clean() lors du save (hors admin)
         self.full_clean()
         super().save(*args, **kwargs)
-    
-    def est_reservee(self, date_debut=None, date_fin=None):
+
+    @property
+    def est_active(self) -> bool:
+        return self.reservation.is_active()
+
+    @property
+    def date_debut(self):
+        return self.reservation.date_debut
+
+    @property
+    def date_fin(self):
+        return self.reservation.date_fin
+
+
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# À AJOUTER À LA FIN DE campaigns/models.py
+# (après la classe LigneCampagne existante)
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DemandeReservation — Demande publique (visiteur non connecté)
+# ══════════════════════════════════════════════════════════════════════════════
+
+class DemandeReservation(models.Model):
+    """
+    Demande de réservation soumise depuis le portail public par un visiteur
+    non authentifié.
+
+    Workflow :
+        Visiteur soumet → statut='nouvelle'
+        Staff traite   → statut='en_cours'
+        Staff valide   → crée Client + Reservation → statut='validee'
+        Staff refuse   → statut='refusee'
+
+    IMPORTANT : Ce modèle ne crée PAS automatiquement de Client ni de
+    Reservation. C'est le staff qui effectue ces opérations manuellement
+    depuis la vue de traitement (/staff/demandes/<uuid>/).
+    """
+
+    # ── Statuts ───────────────────────────────────────────────────────────────
+    STATUT_NOUVELLE  = 'nouvelle'
+    STATUT_EN_COURS  = 'en_cours'
+    STATUT_VALIDEE   = 'validee'
+    STATUT_REFUSEE   = 'refusee'
+
+    STATUT_CHOICES = [
+        (STATUT_NOUVELLE,  'Nouvelle'),
+        (STATUT_EN_COURS,  'En cours de traitement'),
+        (STATUT_VALIDEE,   'Validée — Réservation créée'),
+        (STATUT_REFUSEE,   'Refusée'),
+    ]
+
+    # ── Identité ──────────────────────────────────────────────────────────────
+    uuid = models.UUIDField(
+        default=uuid.uuid4,
+        editable=False,
+        unique=True,
+        db_index=True,
+        verbose_name="Identifiant public",
+    )
+    reference = models.CharField(
+        max_length=50,
+        unique=True,
+        blank=True,
+        verbose_name="Référence",
+        help_text="Générée automatiquement. Ex: DEM-2026-A3F9K2",
+    )
+
+    # ── Coordonnées du visiteur ───────────────────────────────────────────────
+    nom_contact = models.CharField(
+        max_length=200,
+        verbose_name="Nom complet",
+    )
+    societe = models.CharField(
+        max_length=200,
+        blank=True,
+        verbose_name="Société / Organisation",
+    )
+    email = models.EmailField(
+        verbose_name="Email",
+    )
+    telephone = models.CharField(
+        max_length=30,
+        verbose_name="Téléphone",
+    )
+    accepte_contact = models.BooleanField(
+        default=False,
+        verbose_name="Accepte d'être recontacté",
+        help_text="Le visiteur a coché la case d'acceptation de contact commercial.",
+    )
+
+    # ── Supports souhaités ────────────────────────────────────────────────────
+    # ManyToMany vers FacePanneau : les faces sélectionnées sur la carte
+    faces_souhaitees = models.ManyToManyField(
+        'inventory.FacePanneau',
+        blank=True,
+        related_name='demandes_reservation',
+        verbose_name="Faces souhaitées",
+    )
+    # ManyToMany vers Support : pour les écrans (pas de face)
+    supports_souhaites = models.ManyToManyField(
+        'inventory.Support',
+        blank=True,
+        related_name='demandes_reservation',
+        verbose_name="Supports souhaités (écrans)",
+    )
+
+    # ── Période et projet ─────────────────────────────────────────────────────
+    date_debut_souhaitee = models.DateField(
+        verbose_name="Date de début souhaitée",
+    )
+    date_fin_souhaitee = models.DateField(
+        verbose_name="Date de fin souhaitée",
+    )
+    nom_campagne = models.CharField(
+        max_length=200,
+        blank=True,
+        verbose_name="Nom de la campagne / projet",
+    )
+    message = models.TextField(
+        blank=True,
+        verbose_name="Message libre",
+    )
+
+    # ── Traitement staff ──────────────────────────────────────────────────────
+    statut = models.CharField(
+        max_length=20,
+        choices=STATUT_CHOICES,
+        default=STATUT_NOUVELLE,
+        verbose_name="Statut",
+        db_index=True,
+    )
+    notes_staff = models.TextField(
+        blank=True,
+        verbose_name="Notes internes staff",
+        help_text="Visible uniquement par le staff. Motif de refus, remarques…",
+    )
+    traite_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='demandes_traitees',
+        verbose_name="Traité par",
+    )
+    traite_le = models.DateTimeField(
+        null=True, blank=True,
+        verbose_name="Traité le",
+    )
+
+    # ── Associations créées après validation ──────────────────────────────────
+    # Remplies par le staff depuis la vue de traitement
+    client = models.ForeignKey(
+        Client,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='demandes_reservation',
+        verbose_name="Client associé",
+        help_text="Renseigné par le staff après validation.",
+    )
+    reservation = models.ForeignKey(
+        Reservation,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='demande_origine',
+        verbose_name="Réservation créée",
+        help_text="Réservation officielle créée par le staff après validation.",
+    )
+
+    # ── Horodatage ────────────────────────────────────────────────────────────
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Créée le",
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name="Mise à jour le",
+    )
+
+    # ── Meta ──────────────────────────────────────────────────────────────────
+    class Meta:
+        verbose_name          = "Demande de réservation"
+        verbose_name_plural   = "Demandes de réservation"
+        ordering              = ['-created_at']
+        indexes               = [
+            models.Index(fields=['statut', '-created_at']),
+            models.Index(fields=['email']),
+        ]
+
+    def __str__(self):
+        return f"{self.reference} — {self.nom_contact} ({self.get_statut_display()})"
+
+    # ── Sauvegarde ────────────────────────────────────────────────────────────
+
+    def save(self, *args, **kwargs):
+        if not self.reference:
+            self.reference = f"DEM-{timezone.now().year}-{str(uuid.uuid4())[:6].upper()}"
+        super().save(*args, **kwargs)
+
+    # ── Validation ────────────────────────────────────────────────────────────
+
+    def clean(self):
+        super().clean()
+        if self.date_debut_souhaitee and self.date_fin_souhaitee:
+            if self.date_fin_souhaitee <= self.date_debut_souhaitee:
+                raise ValidationError({
+                    'date_fin_souhaitee': _(
+                        "La date de fin doit être postérieure à la date de début."
+                    )
+                })
+            duree = (self.date_fin_souhaitee - self.date_debut_souhaitee).days
+            if duree > 366:
+                raise ValidationError(
+                    _("La durée souhaitée ne peut pas dépasser 1 an.")
+                )
+
+    # ── Propriétés ────────────────────────────────────────────────────────────
+
+    @property
+    def duree_jours(self) -> int:
+        if self.date_debut_souhaitee and self.date_fin_souhaitee:
+            return (self.date_fin_souhaitee - self.date_debut_souhaitee).days + 1
+        return 0
+
+    @property
+    def est_nouvelle(self) -> bool:
+        return self.statut == self.STATUT_NOUVELLE
+
+    @property
+    def est_en_cours(self) -> bool:
+        return self.statut == self.STATUT_EN_COURS
+
+    @property
+    def est_validee(self) -> bool:
+        return self.statut == self.STATUT_VALIDEE
+
+    @property
+    def est_refusee(self) -> bool:
+        return self.statut == self.STATUT_REFUSEE
+
+    @property
+    def peut_etre_traitee(self) -> bool:
+        """True si la demande peut encore être validée ou refusée."""
+        return self.statut in (self.STATUT_NOUVELLE, self.STATUT_EN_COURS)
+
+    def get_statut_badge(self) -> str:
+        """Retourne la classe Bootstrap pour le badge de statut."""
+        return {
+            self.STATUT_NOUVELLE:  'warning',
+            self.STATUT_EN_COURS:  'info',
+            self.STATUT_VALIDEE:   'success',
+            self.STATUT_REFUSEE:   'danger',
+        }.get(self.statut, 'secondary')
+
+    def get_statut_icon(self) -> str:
+        """Retourne l'icône Bootstrap Icons pour le statut."""
+        return {
+            self.STATUT_NOUVELLE:  'bi-clock',
+            self.STATUT_EN_COURS:  'bi-hourglass-split',
+            self.STATUT_VALIDEE:   'bi-check-circle-fill',
+            self.STATUT_REFUSEE:   'bi-x-circle-fill',
+        }.get(self.statut, 'bi-question-circle')
+
+    def marquer_en_cours(self, user=None):
+        """Passe la demande en statut 'en_cours'."""
+        self.statut = self.STATUT_EN_COURS
+        if user:
+            self.traite_par = user
+        self.save(update_fields=['statut', 'traite_par', 'updated_at'])
+
+    def marquer_validee(self, client, reservation, user):
         """
-        Retourne True si la face est réservée sur la période donnée.
-        Sans dates → vérifie si elle est réservée maintenant.
+        Marque la demande comme validée et associe le client et la réservation.
+        À appeler APRÈS la création atomique de Client + Reservation.
         """
-        from campaigns.models import ReservationPanneau
-        from django.utils import timezone
+        self.statut      = self.STATUT_VALIDEE
+        self.client      = client
+        self.reservation = reservation
+        self.traite_par  = user
+        self.traite_le   = timezone.now()
+        self.save(update_fields=[
+            'statut', 'client', 'reservation',
+            'traite_par', 'traite_le', 'updated_at',
+        ])
 
-        qs = ReservationPanneau.objects.filter(face=self)
+    def marquer_refusee(self, user, notes: str = ''):
+        """Marque la demande comme refusée."""
+        self.statut     = self.STATUT_REFUSEE
+        self.traite_par = user
+        self.traite_le  = timezone.now()
+        if notes:
+            self.notes_staff = notes
+        self.save(update_fields=[
+            'statut', 'traite_par', 'traite_le',
+            'notes_staff', 'updated_at',
+        ])
 
-        if date_debut and date_fin:
-            # Chevauchement sur une période
-            qs = qs.filter(date_debut__lt=date_fin, date_fin__gt=date_debut)
-        else:
-            # Réservation active en ce moment
-            now = timezone.now()
-            qs = qs.filter(date_debut__lte=now, date_fin__gte=now)
+    def get_resume_emplacements(self) -> str:
+        """
+        Retourne un résumé textuel des emplacements demandés.
+        Ex: "OUA-001 Face A, BOB-012 Face B"
+        Utilisé dans les emails et la liste staff.
+        """
+        parties = []
+        for face in self.faces_souhaitees.select_related('support').all():
+            parties.append(f"{face.support.code} Face {face.label}")
+        for support in self.supports_souhaites.all():
+            parties.append(f"{support.code} (Écran)")
+        return ", ".join(parties) if parties else "Aucun emplacement"
 
-        return qs.exists()
+    def nb_emplacements(self) -> int:
+        """Nombre total d'emplacements demandés (faces + écrans)."""
+        return self.faces_souhaitees.count() + self.supports_souhaites.count()
+
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Modèles de Campagnes (Écrans & Panneaux)
+# ══════════════════════════════════════════════════════════════════════════════
 
 class Campagne(models.Model):
-    """Campagne publicitaire avec ses supports et visuels."""
+    """Campagne publicitaire globale."""
     STATUT_BROUILLON = STATUT_BROUILLON
     STATUT_A_VENIR   = STATUT_A_VENIR
     STATUT_EN_COURS  = STATUT_EN_COURS
     STATUT_TERMINEE  = STATUT_TERMINEE
     STATUT_ANNULEE   = STATUT_ANNULEE
-    STATUT_CHOICES = STATUT_CHOICES
-    
+    STATUT_CHOICES   = STATUT_CHOICES
     TYPE_SUPPORT_CHOICES = TYPE_SUPPORT_CHOICES
     
     client       = models.ForeignKey(Client, on_delete=models.PROTECT, related_name='campagnes')
@@ -256,47 +692,16 @@ class Campagne(models.Model):
     statut       = models.CharField(max_length=20, choices=STATUT_CHOICES, default=STATUT_EN_COURS)
     type_support = models.CharField(max_length=10, choices=TYPE_SUPPORT_CHOICES, default='panneau', verbose_name="Type de support")
     actif        = models.BooleanField(default=True)
-    # Plusieurs visuels possibles pour une campagne, gérés via les lignes de campagne (LigneCampagne.visuel)
-    # Mettre plusieurs visuels
-    # visuel       = models.FileField(upload_to='visuels/', blank=True, null=True, verbose_name="Visuel / Affiche (photo ou vidéo)")
     
-    # Champs spécifiques aux campagnes écran
-    duree_passage = models.PositiveIntegerField(
-        choices=DUREE_CHOICES, 
-        null=True, blank=True, 
-        verbose_name="Durée de passage (secondes)",
-        help_text="Durée d'affichage du spot sur les écrans"
-    )
-    frequence = models.PositiveIntegerField(
-        choices=FREQUENCE_CHOICES,
-        default=120,
-        null=True, blank=True, 
-        verbose_name="Fréquence de diffusion",
-        help_text="Intervalle entre deux diffusions du spot"
-    )
-    tranches_horaires = models.CharField(
-        max_length=500, 
-        default = '08:00-12:00',
-        blank=True, 
-        verbose_name="Tranches horaires de diffusion",
-        help_text="Ex: 08:00-12:00, 14:00-18:00 (séparées par des virgules)"
-    )
+    duree_passage = models.PositiveIntegerField(choices=DUREE_CHOICES, null=True, blank=True, verbose_name="Durée de passage (secondes)")
+    frequence = models.PositiveIntegerField(choices=FREQUENCE_CHOICES, default=120, null=True, blank=True, verbose_name="Fréquence de diffusion")
+    tranches_horaires = models.CharField(max_length=500, default='08:00-12:00', blank=True, verbose_name="Tranches horaires de diffusion")
     
     notes        = models.TextField(blank=True)
-    created_by   = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True
-    )
+    created_by   = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
     created_at   = models.DateTimeField(auto_now_add=True)
     updated_at   = models.DateTimeField(auto_now=True)
-    # Ajouter un champ contrat dans le modèle Campagne (foreignKey vers Contrat, nullable)
-    contrat = models.ForeignKey(
-        'Contrat', 
-        on_delete=models.SET_NULL, 
-        null=True, 
-        blank=True, 
-        related_name='campagnes',
-        help_text="Contrat associé à cette diffusion sur écran"
-    )
+    contrat      = models.ForeignKey(Contrat, on_delete=models.SET_NULL, null=True, blank=True, related_name='campagnes')
 
     class Meta:
         verbose_name = "Campagne"
@@ -308,7 +713,6 @@ class Campagne(models.Model):
 
     def save(self, *args, **kwargs):
         if not self.reference:
-            import uuid
             self.reference = f"CAM-{timezone.now().year}-{str(uuid.uuid4())[:6].upper()}"
         super().save(*args, **kwargs)
 
@@ -325,36 +729,7 @@ class Campagne(models.Model):
     def nb_supports(self):
         return self.lignes.count()
     
-    # Calcul du nombre total de spots pour la campagne par ecran
-
-    # def calculer_nombre_spots_ecran(self):
-    #     """
-    #     Calcule le nombre total de spots pour la campagne.
-
-    #     Panneau : nombre de faces
-    #     Écran : (3600 / fréquence_en_secondes) × heures_tranches × durée_jours × nb_écrans
-    #     """
-    #     if self.type_support == 'panneau':
-    #         # Pour les panneaux, on compte le nombre de faces affectées
-    #         total = 0
-    #         for ligne in self.lignes.select_related('face').all():
-    #             if ligne.face:
-    #                 total += 1
-    #         return total
-
-    #     elif self.type_support == 'ecran':
-    #         if not self.frequence:
-    #             return 0
-    #         return int(self.nombre_spots_jour() * self.duree_jours())
-    #     return 0
-    
     def calculer_nombre_spots_ecran(self):
-        """
-        Calcule le nombre total de spots pour la campagne en tenant compte des pannes.
-
-        Panneau : 1 spot = 1 face disponible (prorata jours dispo / jours total)
-        Écran   : spots/jour × jours dispo par écran
-        """
         total_jours = self.duree_jours()
         if total_jours == 0:
             return 0
@@ -365,10 +740,7 @@ class Campagne(models.Model):
                 if not ligne.face:
                     continue
                 support     = ligne.face.support
-                jours_dispo = support.jours_disponibles_sur_periode(
-                    self.date_debut, self.date_fin
-                )
-                # Prorata : face dispo 15j sur 30j = 0.5 spot
+                jours_dispo = support.jours_disponibles_sur_periode(self.date_debut, self.date_fin)
                 total += jours_dispo / total_jours
             return round(total, 2)
 
@@ -383,14 +755,9 @@ class Campagne(models.Model):
             total = 0
             for ligne in self.lignes.select_related('support').all():
                 support     = ligne.support
-                jours_dispo = support.jours_disponibles_sur_periode(
-                    self.date_debut, self.date_fin
-                )
-                # spots réels = spots/jour × jours où l'écran est opérationnel
+                jours_dispo = support.jours_disponibles_sur_periode(self.date_debut, self.date_fin)
                 total += spots_par_jour * jours_dispo
-
             return round(total)
-
         return 0
 
     def diffusions_par_heure(self):
@@ -409,87 +776,31 @@ class Campagne(models.Model):
     def calculer_duree_tranches(self):
         return calculer_duree_tranches(self.tranches_horaires)
     
-    # def calculer_nombre_spots(self): 
-    #     if self.type_support == 'panneau':
-    #         # Pour les panneaux, on compte le nombre de faces affectées
-    #         total = 0
-    #         for ligne in self.lignes.select_related('face').all():
-    #             if ligne.face:
-    #                 total += 1
-    #         return total
-    #     elif self.type_support == 'ecran':
-    #         if not self.frequence:
-    #             return 0
-    #         return self.calculer_nombre_spots_ecran() * self.lignes.count()
-    #     return 0
-
     def calculer_nombre_spots(self):
-        """
-        Calcule le nombre de spots réels en tenant compte des pannes.
-        
-        Panneau : nombre de faces × jours dispo / jours total
-        Écran   : spots/jour × jours dispo sur chaque écran
-        """
         if self.type_support == 'panneau':
             total_jours = self.duree_jours()
             if total_jours == 0:
                 return 0
-
             total = 0
             for ligne in self.lignes.select_related('face__support').all():
                 if not ligne.face:
                     continue
                 support = ligne.face.support
-
-                # Jours réellement disponibles (hors pannes)
-                jours_dispo = support.jours_disponibles_sur_periode(
-                    self.date_debut, self.date_fin
-                )
-                # 1 spot plein = face dispo toute la période
-                # spot partiel = prorata
+                jours_dispo = support.jours_disponibles_sur_periode(self.date_debut, self.date_fin)
                 total += jours_dispo / total_jours
-
             return round(total, 2)
 
         elif self.type_support == 'ecran':
-            if not self.frequence or not self.duree_passage:
-                return 0
-
-            total = 0
-            for ligne in self.lignes.select_related('support__ecran_info').all():
-                support     = ligne.support
-                total_jours = self.duree_jours()
-                if total_jours == 0:
-                    continue
-                print(ligne)
-                print(total_jours)
-
-                jours_dispo = support.jours_disponibles_sur_periode(
-                    self.date_debut, self.date_fin
-                )
-                print(jours_dispo)
-
-                # Spots/jour sur cet écran
-                spots_jour = self.nombre_spots_jour()
-                total += spots_jour * jours_dispo
-
-            return round(total)
-
+            return sum(getattr(ligne, 'calculer_spots', lambda: 0)() for ligne in self.lignes.all())
         return 0
     
-    def calculer_nombre_spotsjour(self):
-        """
-        Calcule le nombre de spots pour une journée de la campagne.
-        """
+    def calculer_nombre_spots24(self):
         if self.type_support == 'ecran':
             return self.calculer_nombre_spots() // max(self.duree_jours(), 1)
         return 0
     
     def calculer_nombre_spotsjourecran(self):
-        """
-        Calcule le nombre de spots pour une journée de la campagne sur un écran.
-        """
-        if self.type_support == 'ecran':
+        if self.type_support == 'ecran' and self.lignes.count() > 0:
             return (self.calculer_nombre_spots() // max(self.duree_jours(), 1)) // self.lignes.count()
         return 0
 
@@ -517,15 +828,9 @@ class Campagne(models.Model):
 
 
 class CampagneVisuel(models.Model):
-    campagne = models.ForeignKey(
-        Campagne, 
-        related_name='visuels', 
-        on_delete=models.CASCADE
-    )
-    fichier = models.FileField(
-        upload_to='visuels/', 
-        verbose_name="Visuel / Affiche (photo ou vidéo)"
-    )
+    campagne = models.ForeignKey(Campagne, related_name='visuels', on_delete=models.CASCADE)
+    fichier = models.FileField(upload_to='visuels/', verbose_name="Visuel / Affiche (photo ou vidéo)")
+
     class Meta:
         verbose_name = "Visuel de campagne"
         verbose_name_plural = "Visuels de campagne"
@@ -534,93 +839,24 @@ class CampagneVisuel(models.Model):
         return f"Visuel pour {self.campagne.nom}"
 
 
-
 class LigneCampagne(models.Model):
-    """Lien entre une campagne et un support (Panneau ou Écran) avec ses paramètres."""
-
-    # Liens fondamentaux
-    campagne = models.ForeignKey(
-        'Campagne', 
-        on_delete=models.CASCADE, 
-        related_name='lignes'
-    )
-    support = models.ForeignKey(
-        'inventory.Support', 
-        on_delete=models.PROTECT, 
-        related_name='lignes_campagne'
-    )
-    # Spécifique aux Panneaux Statiques
-    face = models.ForeignKey(
-        'inventory.FacePanneau', 
-        on_delete=models.SET_NULL,
-        null=True, blank=True, 
-        related_name='lignes_campagne',
-        verbose_name="Face (Panneau)"
-    )
-    # Média et Organisation
-    visuel = models.FileField(
-        upload_to='visuels/', 
-        blank=True, null=True,
-        verbose_name="Visuel / Média"
-    )
-    ordre_dans_boucle = models.PositiveIntegerField(
-        default=0, 
-        verbose_name="Priorité/Ordre"
-    )
+    """Lien entre une campagne et un support avec ses surcharges spécifiques."""
+    campagne = models.ForeignKey(Campagne, on_delete=models.CASCADE, related_name='lignes')
+    support = models.ForeignKey('inventory.Support', on_delete=models.PROTECT, related_name='lignes_campagne')
+    face = models.ForeignKey('inventory.FacePanneau', on_delete=models.SET_NULL, null=True, blank=True, related_name='lignes_campagne', verbose_name="Face (Panneau)")
+    visuel = models.FileField(upload_to='visuels/', blank=True, null=True, verbose_name="Visuel / Média")
+    ordre_dans_boucle = models.PositiveIntegerField(default=0, verbose_name="Priorité/Ordre")
     notes = models.TextField(blank=True, verbose_name="Notes internes")
 
+    date_debut = models.DateField(null=True, blank=True, verbose_name="Date de début (écran)")
+    date_fin = models.DateField(null=True, blank=True, verbose_name="Date de fin (écran)")
+    duree_passage = models.PositiveIntegerField(choices=DUREE_CHOICES, null=True, blank=True, verbose_name="Durée de passage (secondes)")
+    frequence = models.PositiveIntegerField(choices=FREQUENCE_CHOICES, null=True, blank=True, verbose_name="Fréquence de diffusion")
+    tranches_horaires = models.CharField(max_length=500, blank=True, verbose_name="Tranches horaires spécifiques")
+
     class Meta:
-        verbose_name = "Ligne de Campagne"
-        verbose_name_plural = "Lignes de Campagne"
-        ordering = ['support__code']
+        verbose_name = "Ligne de campagne"
+        verbose_name_plural = "Lignes de campagne"
 
     def __str__(self):
-        type_label = "Face " + self.face.label if self.face else "Écran"
-        return f"{self.campagne.reference} | {self.support.code} ({type_label})"
-
-    def clean(self):
-        duree_spot_sec = self.campagne.duree_passage if self.campagne else None
-        frequence_toutes = self.campagne.frequence if self.campagne else None
-        """Validation métier avant l'enregistrement."""
-        # 1. Validation pour les PANNEAUX
-        if self.support.type_support == 'panneau' and not self.face:
-            raise ValidationError(_("Vous devez sélectionner une face pour un panneau statique."))
-
-        # 2. Validation pour les ÉCRANS
-        if self.support.type_support == 'ecran':
-            if not duree_spot_sec or not frequence_toutes:
-                raise ValidationError(_("La durée et la fréquence sont obligatoires pour un écran."))
-            
-            # Vérification de la disponibilité réelle sur l'écran
-            if hasattr(self.support, 'ecran_info'):
-                ecran = self.support.ecran_info
-                # On convertit frequence_toutes en minutes pour correspondre à la méthode de l'écran
-                disponible, message = ecran.peut_accueillir_spot(
-                    duree_sec=duree_spot_sec,
-                    frequence_min=(frequence_toutes / 60),
-                    date_debut=self.campagne.date_debut,
-                    date_fin=self.campagne.date_fin
-                )
-                if not disponible:
-                    raise ValidationError(message)
-
-    def save(self, *args, **kwargs):
-        # Force l'exécution du clean() lors du save (hors admin)
-        self.full_clean()
-        super().save(*args, **kwargs)
-
-    @property
-    def taux_occupation_individuel(self):
-        """Calcule la part de temps consommée par ce spot unique sur l'écran."""
-        if self.support.type_support == 'ecran' and self.frequence_toutes:
-            return round((self.campagne.duree_passage / self.frequence_toutes) * 100, 2)
-        return 0
-
-    @property
-    def passages_estimes_par_jour(self):
-        """Estime le nombre de passages quotidiens selon la plage de l'écran."""
-        if self.support.type_support == 'ecran' and self.frequence_toutes:
-            if hasattr(self.support, 'ecran_info'):
-                sec_jour = self.support.ecran_info.secondes_totales_disponibles_jour
-                return int(sec_jour // self.frequence_toutes)
-        return 0
+        return f"{self.campagne.nom} -> {self.support.code}"

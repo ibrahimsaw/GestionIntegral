@@ -198,6 +198,46 @@
       .border-panneau     { border-left-color: #6d28d9; }
       .border-ecran       { border-left-color: #1d4ed8; }
 
+      /* 1. On applique d'abord une règle commune pour activer la bordure sur tous ces boutons */
+      .btn-disponible, .btn-occupe, .btn-reserve, .btn-maintenance, 
+      .btn-panne, .btn-bientot, .btn-brouillon, .btn-en_cours, 
+      .btn-a_venir, .btn-terminee, .btn-annulee, .btn-panneau, 
+      .btn-ecran, .btn-secondary {
+          border-width: 1px;  /* Épaisseur de la bordure (ajustez à 2px si nécessaire) */
+          border-style: solid; /* Type de bordure obligatoire pour qu'elle soit visible */
+      }
+
+      /* 2. Vos classes avec les couleurs spécifiques */
+      .btn-disponible  { border-color: var(--color-disponible); background: var(--color-disponible_bg); color: var(--color-disponible); }
+      .btn-occupe      { border-color: var(--color-occupe); background: var(--color-occupe_bg); color: var(--color-occupe); }
+      .btn-reserve     { border-color: var(--color-reserve); background: var(--color-reserve_bg); color: var(--color-reserve); }
+      .btn-maintenance { border-color: #b91c1c; background: #fee2e2; color: #b91c1c; }
+      .btn-panne       { border-color: var(--color-panne); background: var(--color-panne_bg); color: var(--color-panne); } /* Corrigé ici */
+      .btn-bientot     { border-color: #6d28d9; background: #ede9fe; color: #6d28d9; }
+      .btn-brouillon   { border-color: #475569; background: #f1f5f9; color: #475569; }
+      .btn-en_cours    { border-color: #15803d; background: #dcfce7; color: #15803d; }
+      .btn-a_venir     { border-color: #1d4ed8; background: #dbeafe; color: #1d4ed8; }
+      .btn-terminee    { border-color: #475569; background: #f1f5f9; color: #475569; }
+      .btn-annulee     { border-color: #b91c1c; background: #fee2e2; color: #b91c1c; }
+      .btn-panneau     { border-color: #6d28d9; background: #ede9fe; color: #6d28d9; }
+      .btn-ecran       { border-color: #1d4ed8; background: #dbeafe; color: #1d4ed8; }
+      .btn-secondary   { border-color: #6c757d; background: #6c757d2f; color: #6c757d; }
+
+      .text-disponible  { color: var(--color-disponible) }
+      .text-occupe      { color: var(--color-occupe) }
+      .text-reserve     { color: var(--color-reserve) }
+      .text-maintenance { color: #b91c1c; }
+      .text-panne       { color: var(--color-panne); }
+      .text-bientot     { color: #6d28d9; }
+      .text-brouillon   { color: #475569; }
+      .text-en_cours    { color: #15803d; }
+      .text-a_venir     { color: #1d4ed8; }
+      .text-terminee    { color: #475569; }
+      .text-annulee     { color: #b91c1c; }
+      .text-panneau     { color: #6d28d9; }
+      .text-ecran       { color: #1d4ed8; }
+      .text-secondary   { color: #6c757d;}
+
       .nav-pills .nav-link.active, .nav-pills .show>.nav-link {
             color: var(--color-primary);
             background: #dbeafe;
@@ -410,9 +450,17 @@
             <a href="{% url 'support_list' %}" class="nav-link {% if 'support' in request.resolver_match.url_name and not request.GET.type %}active{% endif %}">
               <i class="bi bi-collection"></i>Tous les Supports
             </a>
-            <a href="{% url 'support_list' %}?type=panneau" class="nav-link {% if request.GET.type == 'panneau' %}active{% endif %}">
+            <a href="{% url 'support_list' %}?type=panneau" class="nav-link {% if request.GET.type == 'panneau' and not request.GET.ville %}active{% endif %}">
               <i class="bi bi-sign-merge-right"></i>Panneaux
             </a>
+            {% if inventory_villes %}
+              <div class="nav-label">Panneaux par ville</div>
+              {% for ville in inventory_villes %}
+                <a href="{% url 'support_list' %}?type=panneau&ville={{ ville|urlencode }}" class="nav-link {% if request.GET.type == 'panneau' and request.GET.ville == ville %}active{% endif %}">
+                  <i class="bi bi-geo-alt"></i>{{ ville }}
+                </a>
+              {% endfor %}
+            {% endif %}
             <a href="{% url 'support_list' %}?type=ecran" class="nav-link {% if request.GET.type == 'ecran' %}active{% endif %}">
               <i class="bi bi-display"></i>Écrans
             </a>
@@ -421,6 +469,9 @@
             </a>
             <a href="{% url 'maintenance_list' %}" class="nav-link {% if 'maintenance' in request.resolver_match.url_name %}active{% endif %}">
               <i class="bi bi-tools"></i>Maintenances
+            </a>
+            <a href="{% url 'reservation_list' %}" class="nav-link {% if request.resolver_match.url_name == 'reservation_list' %}active{% endif %}">
+              <i class="bi bi-calendar-event"></i>Reservation
             </a>
             {% if not user.is_technicien %}
               <div class="nav-label">Campagnes</div>

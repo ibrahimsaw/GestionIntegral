@@ -1,0 +1,159 @@
+{% extends 'base.html' %}
+{% block title %}Nouvelle réservation — Integral{% endblock %}
+
+{% block topbar_title %}
+  <i class="bx bx-calendar-plus me-2" style="color:var(--color-primary)"></i>Nouvelle réservation
+{% endblock %}
+
+{% block topbar_actions %}
+  {% if user.is_staff_regie_role %}
+  <a href="{% url 'reservation_list' %}" class="btn btn-outline-secondary btn-sm">
+    <i class="bx bx-arrow-back me-1"></i>Retour aux réservations
+  </a>
+  {% endif %}
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="row justify-content-center">
+    <div class="col-12 col-md-8 col-lg-6 col-xl-5">
+
+      <div class="card shadow-sm border-0" style="border-radius: 14px;">
+        <div class="card-header bg-transparent border-bottom py-3 px-4">
+          <h6 class="mb-0 fw-bold">
+            <i class="bx bx-user-check me-2 text-primary"></i>Sélectionner un client
+          </h6>
+          <p class="text-muted small mb-0 mt-1">Choisissez le client pour lequel créer la réservation.</p>
+        </div>
+
+        <div class="card-body p-4">
+          <form method="post" id="reservation-select-client-form">
+            {% csrf_token %}
+            <input type="hidden" name="client_pk" id="clientPkInput" value="">
+
+            <!-- Recherche -->
+            <div class="mb-3">
+              <div class="input-group">
+                <span class="input-group-text bg-white border-end-0">
+                  <i class="bx bx-search text-muted"></i>
+                </span>
+                <input id="clientSearch" type="text"
+                       class="form-control border-start-0 ps-0"
+                       placeholder="Rechercher un client…"
+                       autocomplete="off">
+              </div>
+            </div>
+
+            <!-- Liste clients -->
+            <div class="mb-3 border rounded-3 overflow-hidden" style="max-height: 320px; overflow-y: auto;">
+              <div id="clientList">
+                {% for c in clients %}
+                  <button type="button"
+                          class="client-item w-100 text-start px-3 py-2 border-0 border-bottom bg-white d-flex align-items-center gap-2"
+                          data-pk="{{ c.pk }}"
+                          data-nom="{{ c.nom|lower }}">
+                    <span class="rounded-circle bg-light border d-flex align-items-center justify-content-center flex-shrink-0"
+                        style="width:32px;height:32px;">
+                    {% if c.logo %}
+                        <img src="{{ c.logo.url }}" class="w-100 h-100 object-fit-contain rounded-circle" alt="Logo">
+                    {% else %}
+                        <i class="bx bx-building small text-muted"></i>
+                    {% endif %}
+                    </span>
+                    <span class="fw-semibold" style="font-size:.9rem;">{{ c.nom }}</span>
+                  </button>
+                {% empty %}
+                  <div class="text-center py-4 text-muted small">
+                    <i class="bx bx-user-x d-block mb-1" style="font-size:1.5rem;"></i>
+                    Aucun client actif trouvé.
+                  </div>
+                {% endfor %}
+              </div>
+            </div>
+
+            <!-- Info sélection -->
+            <div id="selectionInfo" class="alert alert-primary py-2 small d-none mb-3">
+              <i class="bx bx-check-circle me-1"></i>
+              Client sélectionné : <strong id="selectionNom"></strong>
+            </div>
+
+            <!-- Actions -->
+            <div class="d-flex gap-2">
+              <button type="submit" class="btn btn-primary flex-fill" id="reservationSelectSubmit" disabled>
+                <i class="bx bx-calendar-plus me-1"></i>Créer la réservation
+              </button>
+              <a href="{% url 'reservation_list' %}" class="btn btn-light border">Annuler</a>
+            </div>
+
+          </form>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<style>
+  .client-item {
+    transition: background-color 0.12s ease;
+    cursor: pointer;
+  }
+  .client-item:hover {
+    background-color: #f0f5ff !important;
+  }
+  .client-item.active {
+    background-color: #e7f0ff !important;
+    border-left: 3px solid var(--color-primary, #0d6efd) !important;
+  }
+  .client-item.active .bx-building {
+    color: var(--color-primary, #0d6efd) !important;
+  }
+  #clientList .client-item:last-child {
+    border-bottom: none !important;
+  }
+</style>
+
+<script>
+(function () {
+  const search  = document.getElementById('clientSearch');
+  const list    = document.getElementById('clientList');
+  const input   = document.getElementById('clientPkInput');
+  const submit  = document.getElementById('reservationSelectSubmit');
+  const info    = document.getElementById('selectionInfo');
+  const infoNom = document.getElementById('selectionNom');
+
+  if (!list) return;
+
+  // ── Filtre ────────────────────────────────────────────────────────────
+  search.addEventListener('input', function () {
+    const q = this.value.trim().toLowerCase();
+    Array.from(list.querySelectorAll('.client-item')).forEach(function (item) {
+      item.style.display = item.dataset.nom.includes(q) ? '' : 'none';
+    });
+  });
+
+  // ── Sélection ─────────────────────────────────────────────────────────
+  list.addEventListener('click', function (e) {
+    const btn = e.target.closest('.client-item');
+    if (!btn) return;
+
+    Array.from(list.querySelectorAll('.client-item')).forEach(it => it.classList.remove('active'));
+    btn.classList.add('active');
+
+    input.value      = btn.dataset.pk;
+    submit.disabled  = false;
+    infoNom.textContent = btn.querySelector('.fw-semibold').textContent.trim();
+    info.classList.remove('d-none');
+  });
+
+  // ── Enter → sélection auto si un seul résultat visible ───────────────
+  search.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter') return;
+    e.preventDefault();
+    const visible = Array.from(list.querySelectorAll('.client-item')).filter(it => it.style.display !== 'none');
+    if (visible.length === 1) visible[0].click();
+  });
+})();
+</script>
+
+{% endblock %}

@@ -7,13 +7,14 @@ urlpatterns = [
     path('api/support/<int:pk>/popup/', api_support_popup, name='api_support_popup'),
     path('api/support/<int:pk>/faces/', api_faces_support, name='api_faces_support'),
     path('api/faces/<int:support_id>/', get_faces_support, name='api_faces_support'),
+    path('supports/next-code/', support_next_code, name='support_next_code'),
 
     # CRUD
     path('', SupportListView.as_view(), name='support_list'),
     path('ajouter/', SupportCreateView.as_view(), name='support_create'),
-    path('<int:pk>/', SupportDetailView.as_view(), name='support_detail'),
-    path('<int:pk>/modifier/', SupportUpdateView.as_view(), name='support_edit'),
-    path('<int:pk>/supprimer/', SupportDeleteView.as_view(), name='support_delete'),
+    path('<uuid:uuid>/', SupportDetailView.as_view(), name='support_detail'),
+    path('<uuid:uuid>/modifier/', SupportUpdateView.as_view(), name='support_edit'),
+    path('<uuid:uuid>/supprimer/', SupportDeleteView.as_view(), name='support_delete'),
     path('maintenances/',                    MaintenanceListView.as_view(),   name='maintenance_list'),
     path('maintenances/<int:pk>/',           MaintenanceDetailView.as_view(), name='maintenance_detail'),
     path('maintenances/creer/',              MaintenanceCreateView.as_view(), name='maintenance_create'),

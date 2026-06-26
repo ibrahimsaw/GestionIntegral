@@ -19,6 +19,7 @@
         <h1 class="h4 fw-bold mb-0">{{ mode_title }}</h1>
       </div>
 
+      {# ── Infos campagne ── #}
       <div class="card shadow-sm border-0 mb-4" style="border-radius: 12px;">
         <div class="card-header bg-transparent border-bottom py-3">
           <h6 class="mb-0 fw-bold"><i class="bi bi-info-circle me-2 text-primary"></i>Informations de la campagne</h6>
@@ -35,7 +36,6 @@
                 </div>
               {% endif %}
             </div>
-
             <div class="flex-grow-1 min-width-0">
               <h4 class="fw-bold mb-1 text-truncate text-dark">{{ campagne.nom }}</h4>
               <div class="d-flex align-items-center gap-2 flex-wrap small">
@@ -43,12 +43,9 @@
                   <i class="bi bi-person-fill me-1"></i>{{ campagne.client.nom }}
                 </a>
                 <span class="text-muted">•</span>
-                <span class="badge bg-light text-dark border font-monospace px-2 py-1">
-                  {{ campagne.reference }}
-                </span>
+                <span class="badge bg-light text-dark border font-monospace px-2 py-1">{{ campagne.reference }}</span>
               </div>
             </div>
-
             <span class="badge rounded-pill bg-{{ campagne.statut }} px-3 py-2" style="font-size: 0.75rem;">
               {{ campagne.get_statut_display }}
             </span>
@@ -76,79 +73,49 @@
                 </div>
               </div>
             </div>
-            {% comment %} 
-            <div class="col-6 col-sm-4 col-md-3">
-              <div class="p-3 border rounded-3 bg-light-subtle h-100">
-                <small class="text-uppercase text-muted d-block font-monospace mb-1" style="font-size: 0.6rem;">Total</small>
-                <div class="fw-bold h5 mb-0 font-monospace">{{ lignes|length }}</div>
-                <small class="text-muted">Supports</small>
-              </div>
-            </div> 
-            {% endcomment %}
             {% if campagne.type_support == 'ecran' %}
             <div class="col-6 col-sm-4 col-md-3">
               <div class="p-3 border rounded-3 bg-primary-subtle border-primary-subtle text-primary h-100">
-                <small class="text-uppercase opacity-75 d-block font-monospace mb-1" style="font-size: 0.6rem;">Fréquence</small>
+                <small class="text-uppercase opacity-75 d-block font-monospace mb-1" style="font-size: 0.6rem;">Fréquence (défaut)</small>
                 <div class="fw-bold small">{{ campagne.get_frequence_display }}</div>
               </div>
             </div>
             <div class="col-6 col-sm-4 col-md-3">
               <div class="p-3 border rounded-3 bg-primary-subtle border-primary-subtle text-primary h-100">
-                <small class="text-uppercase opacity-75 d-block font-monospace mb-1" style="font-size: 0.6rem;">Durée Spot</small>
-                <div class="fw-bold small">{{ campagne.get_duree_passage_display }}s</div>
+                <small class="text-uppercase opacity-75 d-block font-monospace mb-1" style="font-size: 0.6rem;">Durée Spot (défaut)</small>
+                <div class="fw-bold small">{{ campagne.get_duree_passage_display }}</div>
               </div>
             </div>
             <div class="col-6 col-sm-4 col-md-3">
               <div class="p-3 border rounded-3 bg-primary-subtle border-primary-subtle text-primary h-100">
-                <small class="text-uppercase opacity-75 d-block font-monospace mb-1" style="font-size: 0.6rem;">Horaires</small>
-                <div class="fw-bold small">{{ campagne.tranches_horaires|truncatechars:30 }}s</div>
+                <small class="text-uppercase opacity-75 d-block font-monospace mb-1" style="font-size: 0.6rem;">Horaires (défaut)</small>
+                <div class="fw-bold small">{{ campagne.tranches_horaires|truncatechars:30 }}</div>
               </div>
             </div>
-            {% comment %} 
-            <div class="col-6 col-sm-4 col-md-3">
-              <div class="p-3 border rounded-3 bg-primary-subtle border-primary-subtle text-primary h-100">
-                <small class="text-uppercase opacity-75 d-block font-monospace mb-1" style="font-size: 0.6rem;">Nombre de Spots</small>
-                <div class="fw-bold h5 mb-0 font-monospace">{{ campagne.calculer_nombre_spots }}</div>
-                <small class="text-muted">Total campagne</small>
-              </div>
-            </div> 
-            {% endcomment %}
             {% endif %}
           </div>
-
-          {% if campagne.visuel %}
-          <div class="rounded-4 overflow-hidden border shadow-sm mb-3 position-relative">
-            {% with visuel_name=campagne.visuel.name|lower %}
-              {% if "mp4" in visuel_name or "webm" in visuel_name %}
-                <video controls playsinline class="w-100 d-block" style="max-height: 400px;">
-                  <source src="{{ campagne.visuel.url }}">
-                </video>
-              {% else %}
-                <img src="{{ campagne.visuel.url }}" class="w-100 h-auto d-block object-fit-cover" style="max-height: 400px;">
-              {% endif %}
-            {% endwith %}
-          </div>
-          {% endif %}
 
           {% if campagne.notes %}
           <div class="p-3 bg-light rounded-3 border-start border-4 border-primary">
             <div class="d-flex gap-2">
               <i class="bi bi-chat-left-dots text-primary"></i>
-              <p class="mb-0 small text-muted lh-sm italic">{{ campagne.notes }}</p>
+              <p class="mb-0 small text-muted lh-sm">{{ campagne.notes }}</p>
             </div>
           </div>
           {% endif %}
         </div>
       </div>
 
+      {# ── Formulaire supports ── #}
       <form method="post" class="card shadow-sm border-0" style="border-radius: 12px;">
         {% csrf_token %}
         <div class="card-header bg-transparent border-bottom py-3 d-flex justify-content-between align-items-center">
           <div class="fw-bold">
-            <i class="bi bi-check2-square me-2 text-success"></i>Sélectionner les supports 
+            <i class="bi bi-check2-square me-2 text-success"></i>Sélectionner les supports
             <span class="badge bg-light text-dark border ms-2 fw-normal">{{ supports|length }} disponible(s)</span>
           </div>
         </div>
+
         {% if supports %}
           <div class="card-footer bg-light p-3 d-flex justify-content-end gap-2">
             <a href="{% url 'campagne_detail' campagne.pk %}" class="btn btn-light border px-4">Annuler</a>
@@ -163,30 +130,23 @@
           {% if supports_enrichis or supports %}
             <div class="row g-4">
 
+              {# ═══════════════ PANNEAUX ═══════════════ #}
               {% if campagne.type_support == 'panneau' %}
                 {% for item in supports_enrichis %}
                   {% with support=item.support %}
                     <div class="col-md-6 col-xl-4">
                       <div class="card h-100 border rounded-3 overflow-hidden shadow-sm">
                         <div class="card-header bg-light border-bottom p-3">
-                          <div class="d-flex justify-content-between align-items-start">
-                            <div class="text-truncate">
-                              <h6 class="fw-bold mb-1 text-truncate">{{ support.code }} — {{ support.nom }}</h6>
-                              <div class="small text-muted"><i class="bi bi-geo-alt me-1"></i>{{ support.adresse|default:"Ouagadougou" }}</div>
-                            </div>
-                          </div>
+                          <h6 class="fw-bold mb-1 text-truncate">{{ support.code }} — {{ support.nom }}</h6>
+                          <div class="small text-muted"><i class="bi bi-geo-alt me-1"></i>{{ support.adresse|default:"Ouagadougou" }}</div>
                         </div>
-
                         <div class="card-body p-3">
                           <p class="text-uppercase text-muted fw-bold mb-3" style="font-size: .65rem;">Faces du panneau</p>
                           <div class="row g-2">
-
                             {% for fd in item.faces %}
                               {% with face=fd.face statut=fd.statut %}
                                 <div class="col-12">
-
                                   {% if statut == 'libre' or face.pk in selectionnes %}
-                                    <!-- Face libre ou déjà sélectionnée → cochable -->
                                     <div class="position-relative">
                                       <input type="checkbox" name="faces" value="{{ face.pk }}" id="face_{{ face.pk }}"
                                             class="btn-check face-checkbox" autocomplete="off"
@@ -207,11 +167,8 @@
                                         {% endif %}
                                       </label>
                                     </div>
-
                                   {% elif statut == 'reserve' %}
-                                    <!-- Face réservée par un autre client → verrouillée -->
-                                    <div class="d-flex justify-content-between align-items-center p-3 border bs-reserve rounded-3  opacity-75"
-                                        style="cursor: not-allowed;">
+                                    <div class="d-flex justify-content-between align-items-center p-3 border bs-reserve rounded-3 opacity-75" style="cursor: not-allowed;">
                                       <span class="small fw-bold">
                                         <i class="bi bi-clock-history me-2"></i>Face {{ face.label }}
                                         <small class="d-block fw-normal opacity-75">{{ face.get_eclairage_display }}</small>
@@ -219,33 +176,25 @@
                                       <span class="badge border bs-reserve">Réservée</span>
                                     </div>
                                   {% elif statut == 'panne' %}
-                                    <!-- Face réservée par un autre client → verrouillée -->
-                                    <div class="d-flex justify-content-between align-items-center p-3 border rounded-3 bs-panne opacity-75"
-                                        style="cursor: not-allowed;">
+                                    <div class="d-flex justify-content-between align-items-center p-3 border rounded-3 bs-panne opacity-75" style="cursor: not-allowed;">
                                       <span class="small fw-bold">
-                                        <i class="bi bi-clock-history me-2"></i>Face {{ face.label }}
+                                        <i class="bi bi-tools me-2"></i>Face {{ face.label }}
                                         <small class="d-block fw-normal opacity-75">{{ face.get_eclairage_display }}</small>
                                       </span>
                                       <span class="badge border bs-panne">En Panne</span>
                                     </div>
-
                                   {% else %}
-                                    <!-- Face occupée → verrouillée -->
-                                    <div class="d-flex justify-content-between align-items-center p-3 border rounded-3 bs-occupe opacity-50"
-                                        style="cursor: not-allowed;">
+                                    <div class="d-flex justify-content-between align-items-center p-3 border rounded-3 bs-occupe opacity-50" style="cursor: not-allowed;">
                                       <span class="small fw-bold text-danger-emphasis">
                                         <i class="bi bi-lock-fill me-2"></i>Face {{ face.label }}
                                         <small class="d-block fw-normal opacity-75">{{ face.get_eclairage_display }}</small>
                                       </span>
                                       <span class="badge border bs-occupe">Occupée</span>
                                     </div>
-
                                   {% endif %}
-
                                 </div>
                               {% endwith %}
                             {% endfor %}
-
                           </div>
                         </div>
                       </div>
@@ -253,62 +202,133 @@
                   {% endwith %}
                 {% endfor %}
 
+              {# ═══════════════ ÉCRANS ═══════════════ #}
               {% else %}
-                {% for support in supports %}
-                  <div class="col-md-6 col-xl-4">
-                    <div class="card h-100 border rounded-3 overflow-hidden shadow-sm">
-                      <div class="card-header bg-light border-bottom p-3">
-                        <div class="d-flex justify-content-between align-items-start">
-                          <div class="text-truncate">
-                            <h6 class="fw-bold mb-1 text-truncate">{{ support.code }} — {{ support.nom }}</h6>
-                            <div class="small text-muted"><i class="bi bi-geo-alt me-1"></i>{{ support.adresse|default:"Ouagadougou" }}</div>
-                          </div>
-                          {% if support.pk in selectionnes %}
-                            <span class="badge bg-primary">Actif</span>
-                          {% endif %}
-                        </div>
-                      </div>
+                {% for item in supports_enrichis %}
+                  {% with support=item.support ligne=item.ligne %}
+                    <div class="col-md-6 col-xl-4">
+                      <div class="card h-100 border rounded-3 overflow-hidden shadow-sm ecran-card" id="card_{{ support.pk }}">
 
-                      <div class="card-body p-3">
-                        <div class="mb-3">
-                          <input type="checkbox" name="supports" value="{{ support.pk }}" id="support_{{ support.pk }}"
-                                class="btn-check" autocomplete="off"
-                                {% if support.pk in selectionnes %}checked{% endif %}>
-                          <label class="btn btn-outline-primary w-100 py-3 rounded-3 text-start shadow-sm"
-                                for="support_{{ support.pk }}">
-                            <i class="bi {% if support.pk in selectionnes %}bi-check-square-fill{% else %}bi-square{% endif %} me-2"></i>
-                            <span class="fw-bold">{% if support.pk in selectionnes %}Écran sélectionné{% else %}Sélectionner cet écran{% endif %}</span>
-                          </label>
+                        <div class="card-header bg-light border-bottom p-3">
+                          <div class="d-flex justify-content-between align-items-start">
+                            <div class="text-truncate">
+                              <h6 class="fw-bold mb-1 text-truncate">{{ support.code }} — {{ support.nom }}</h6>
+                              <div class="small text-muted"><i class="bi bi-geo-alt me-1"></i>{{ support.adresse|default:"Ouagadougou" }}</div>
+                            </div>
+                            {% if support.pk in selectionnes %}
+                              <span class="badge bg-primary">Actif</span>
+                            {% endif %}
+                          </div>
                         </div>
 
-                        <div class="row g-2">
-                          <div class="col-6">
-                            <div class="p-2 border rounded text-center bg-light">
-                              <small class="d-block text-muted text-uppercase" style="font-size: .6rem;">Résolution</small>
-                              <div class="fw-bold small text-truncate">{{ support.ecran.get_resolution_display|default:"HD" }}</div>
+                        <div class="card-body p-3">
+
+                          {# Checkbox sélection #}
+                          <div class="mb-3">
+                            <input type="checkbox" name="supports" value="{{ support.pk }}" id="support_{{ support.pk }}"
+                                  class="btn-check ecran-checkbox" autocomplete="off"
+                                  {% if support.pk in selectionnes %}checked{% endif %}>
+                            <label class="btn btn-outline-primary w-100 py-3 rounded-3 text-start shadow-sm"
+                                  for="support_{{ support.pk }}">
+                              <i class="bi {% if support.pk in selectionnes %}bi-check-square-fill{% else %}bi-square{% endif %} me-2"></i>
+                              <span class="fw-bold">{% if support.pk in selectionnes %}Écran sélectionné{% else %}Sélectionner cet écran{% endif %}</span>
+                            </label>
+                          </div>
+
+                          {# Infos techniques écran #}
+                          <div class="row g-2 mb-3">
+                            <div class="col-6">
+                              <div class="p-2 border rounded text-center bg-light">
+                                <small class="d-block text-muted text-uppercase" style="font-size: .6rem;">Résolution</small>
+                                <div class="fw-bold small text-truncate">{{ support.ecran_info.get_resolution_display|default:"HD" }}</div>
+                              </div>
+                            </div>
+                            <div class="col-6">
+                              <div class="p-2 border rounded text-center bg-light">
+                                <small class="d-block text-muted text-uppercase" style="font-size: .6rem;">Taille</small>
+                                <div class="fw-bold small">{{ support.taille_pouces|default:"55" }}"</div>
+                              </div>
+                            </div>
+                            <div class="col-12 text-center py-1">
+                              <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill">
+                                <i class="bi bi-clock me-1"></i>{{ support.ecran_info.heure_allumage }} h – {{ support.ecran_info.heure_extinction }} h
+                              </span>
                             </div>
                           </div>
-                          <div class="col-6">
-                            <div class="p-2 border rounded text-center bg-light">
-                              <small class="d-block text-muted text-uppercase" style="font-size: .6rem;">Taille</small>
-                              <div class="fw-bold small">{{ support.ecran.taille_pouces|default:"55" }}"</div>
+
+                          {# ✅ Paramètres spécifiques par écran — visibles seulement si sélectionné #}
+                          <div class="ecran-params mt-3 {% if support.pk not in selectionnes %}d-none{% endif %}"
+                               id="params_{{ support.pk }}">
+                            <hr class="opacity-25">
+                            <p class="text-uppercase text-muted fw-bold mb-3" style="font-size: .65rem;">
+                              <i class="bi bi-sliders me-1"></i>Paramètres spécifiques
+                              <span class="text-primary">(optionnel — hérite de la campagne si vide)</span>
+                            </p>
+
+                            {# Période #}
+                            <div class="row g-2 mb-2">
+                              <div class="col-6">
+                                <label class="form-label small text-muted mb-1">Date début >= {{ campagne.date_debut|date:'Y-m-d' }}</label>
+                                <input type="date" class="form-control form-control-sm"
+                                       name="date_debut_{{ support.pk }}"
+                                       value="{{ ligne.date_debut|date:'Y-m-d'|default:'' }}"
+                                       min="{{ campagne.date_debut|date:'Y-m-d' }}"
+                                       max="{{ campagne.date_fin|date:'Y-m-d' }}"
+                                       placeholder="{{ campagne.date_debut|date:'Y-m-d' }}">
+                              </div>
+                              <div class="col-6">
+                                <label class="form-label small text-muted mb-1">Date fin <= {{ campagne.date_fin|date:'Y-m-d' }}</label>
+                                <input type="date" class="form-control form-control-sm"
+                                       name="date_fin_{{ support.pk }}"
+                                       value="{{ ligne.date_fin|date:'Y-m-d'|default:'' }}"
+                                       min="{{ campagne.date_debut|date:'Y-m-d' }}"
+                                       max="{{ campagne.date_fin|date:'Y-m-d' }}"
+                                       placeholder="{{ campagne.date_fin|date:'Y-m-d' }}">
+                              </div>
                             </div>
-                          </div>
-                          <div class="col-12 text-center py-1 mt-2">
-                            <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill">
-                              <i class="bi bi-clock me-1"></i>{{ support.ecran.heure_debut }}h – {{ support.ecran.heure_fin }}h
-                            </span>
-                          </div>
+
+                            {# Durée & Fréquence #}
+                            <div class="row g-2 mb-2">
+                              <div class="col-6">
+                                <label class="form-label small text-muted mb-1">Durée spot</label>
+                                <select class="form-select form-select-sm" name="duree_passage_{{ support.pk }}">
+                                  <option value="">— Campagne ({{ campagne.get_duree_passage_display }}) —</option>
+                                  {% for val, label in duree_choices %}
+                                    <option value="{{ val }}" {% if ligne.duree_passage == val %}selected{% endif %}>{{ label }}</option>
+                                  {% endfor %}
+                                </select>
+                              </div>
+                              <div class="col-6">
+                                <label class="form-label small text-muted mb-1">Fréquence</label>
+                                <select class="form-select form-select-sm" name="frequence_{{ support.pk }}">
+                                  <option value="">— Campagne ({{ campagne.get_frequence_display }}) —</option>
+                                  {% for val, label in frequence_choices %}
+                                    <option value="{{ val }}" {% if ligne.frequence == val %}selected{% endif %}>{{ label }}</option>
+                                  {% endfor %}
+                                </select>
+                              </div>
+                            </div>
+
+                            {# Tranches horaires #}
+                            <div class="mb-2">
+                              <label class="form-label small text-muted mb-1">Tranches horaires</label>
+                              <input type="text" class="form-control form-control-sm"
+                                     name="tranches_horaires_{{ support.pk }}"
+                                     value="{{ ligne.tranches_horaires|default:'' }}"
+                                     placeholder="Défaut : {{ campagne.tranches_horaires|default:'non défini' }}">
+                              <div class="form-text" style="font-size: .65rem;">Ex: 08:00-12:00, 14:00-18:00</div>
+                            </div>
+
+                          </div>{# fin .ecran-params #}
+
                         </div>
                       </div>
                     </div>
-                  </div>
+                  {% endwith %}
                 {% endfor %}
-
               {% endif %}
 
             </div>
-
           {% else %}
             <div class="text-center py-5">
               <i class="bi bi-inbox text-muted" style="font-size: 3rem; opacity: 0.3;"></i>
@@ -328,7 +348,31 @@
           </div>
         {% endif %}
       </form>
+
     </div>
   </div>
 </div>
+
+{# ✅ JS — afficher/masquer les paramètres quand on coche/décoche un écran #}
+<script>
+document.querySelectorAll('.ecran-checkbox').forEach(function(checkbox) {
+  checkbox.addEventListener('change', function() {
+    const supportId = this.value;
+    const params = document.getElementById('params_' + supportId);
+    const label = this.nextElementSibling;
+    const icon = label.querySelector('i');
+    const text = label.querySelector('span');
+
+    if (this.checked) {
+      params.classList.remove('d-none');
+      icon.className = 'bi bi-check-square-fill me-2';
+      text.textContent = 'Écran sélectionné';
+    } else {
+      params.classList.add('d-none');
+      icon.className = 'bi bi-square me-2';
+      text.textContent = 'Sélectionner cet écran';
+    }
+  });
+});
+</script>
 {% endblock %}

@@ -1,0 +1,249 @@
+{% extends 'staff/base_staff.html' %}
+{% load static %}
+
+{% block title %}Demandes - Staff GeoAd ERP{% endblock %}
+{% block page_title %}📥 Demandes de réservation{% endblock %}
+
+{% block content %}
+
+<div class="container-fluid">
+
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- FILTRES ET RECHERCHE                                               -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <div class="card mb-4">
+        <div class="card-body">
+            <form method="get" class="row g-3 align-items-end">
+                
+                <div class="col-md-4">
+                    <label class="form-label" for="search-input">
+                        <i class="fas fa-search"></i> Rechercher
+                    </label>
+                    <input type="text" 
+                           class="form-control" 
+                           id="search-input"
+                           name="q" 
+                           value="{{ q }}"
+                           placeholder="Référence, nom, email, société...">
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label" for="statut-select">Statut</label>
+                    <select class="form-select" id="statut-select" name="statut">
+                        <option value="">— Tous les statuts —</option>
+                        {% for value, label in statut_choices %}
+                            <option value="{{ value }}" {% if statut == value %}selected{% endif %}>
+                                {{ label }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-md-3">
+                    <label class="form-label" for="tri-select">Tri</label>
+                    <select class="form-select" id="tri-select" name="tri">
+                        <option value="-created_at" {% if tri == '-created_at' %}selected{% endif %}>
+                            Les plus récentes
+                        </option>
+                        <option value="created_at" {% if tri == 'created_at' %}selected{% endif %}>
+                            Les plus anciennes
+                        </option>
+                        <option value="-date_debut_souhaitee" {% if tri == '-date_debut_souhaitee' %}selected{% endif %}>
+                            Date début (récente)
+                        </option>
+                        <option value="date_debut_souhaitee" {% if tri == 'date_debut_souhaitee' %}selected{% endif %}>
+                            Date début (ancienne)
+                        </option>
+                    </select>
+                </div>
+
+                <div class="col-md-2">
+                    <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-filter"></i> Filtrer
+                    </button>
+                </div>
+
+            </form>
+        </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- INDICATEURS                                                         -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <div class="row mb-3">
+        <div class="col-md-4">
+            <div class="alert alert-warning mb-0">
+                <strong>{{ nb_nouvelles }}</strong> demande(s) nouvelle(s)
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="alert alert-info mb-0">
+                <strong>{{ nb_en_cours }}</strong> en cours de traitement
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="alert alert-secondary mb-0">
+                Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+            </div>
+        </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- TABLEAU DES DEMANDES                                                -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <div class="card">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0">
+                <thead>
+                    <tr>
+                        <th>Référence</th>
+                        <th>Contact</th>
+                        <th>Société</th>
+                        <th style="width: 150px;">Période</th>
+                        <th style="width: 100px;">Faces</th>
+                        <th>Statut</th>
+                        <th style="width: 120px;">Créée</th>
+                        <th style="width: 80px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if page_obj %}
+                        {% for demande in page_obj %}
+                            <tr>
+                                <!-- Référence -->
+                                <td>
+                                    <strong class="text-primary">
+                                        {{ demande.reference }}
+                                    </strong>
+                                </td>
+
+                                <!-- Contact -->
+                                <td>
+                                    <div>{{ demande.nom_contact }}</div>
+                                    <small class="text-muted">{{ demande.email }}</small>
+                                </td>
+
+                                <!-- Société -->
+                                <td>
+                                    {% if demande.societe %}
+                                        <small>{{ demande.societe }}</small>
+                                    {% else %}
+                                        <small class="text-muted">—</small>
+                                    {% endif %}
+                                </td>
+
+                                <!-- Période -->
+                                <td>
+                                    <small>
+                                        {{ demande.date_debut_souhaitee|date:"d/m/y" }}<br>
+                                        {{ demande.date_fin_souhaitee|date:"d/m/y" }}<br>
+                                        <span class="text-muted">({{ demande.duree_jours }} j)</span>
+                                    </small>
+                                </td>
+
+                                <!-- Faces -->
+                                <td>
+                                    <span class="badge bg-info">
+                                        {{ demande.nb_faces }} face(s)
+                                    </span>
+                                </td>
+
+                                <!-- Statut -->
+                                <td>
+                                    <span class="badge badge-{{ demande.statut }}">
+                                        {{ demande.get_statut_display }}
+                                    </span>
+                                    {% if demande.traite_par %}
+                                        <br>
+                                        <small class="text-muted">
+                                            par {{ demande.traite_par.get_short_name|default:demande.traite_par.username }}
+                                        </small>
+                                    {% endif %}
+                                </td>
+
+                                <!-- Créée -->
+                                <td>
+                                    <small class="text-muted">
+                                        {{ demande.created_at|date:"d/m H:i" }}
+                                    </small>
+                                </td>
+
+                                <!-- Actions -->
+                                <td>
+                                    <a href="{% url 'staff:demande_detail' demande.uuid %}" 
+                                       class="btn btn-sm btn-primary"
+                                       title="Voir détail">
+                                        <i class="fas fa-eye"></i>
+                                    </a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="8" class="text-center py-5">
+                                <i class="fas fa-inbox text-muted" style="font-size: 3rem;"></i>
+                                <br><br>
+                                <h5>Aucune demande trouvée</h5>
+                                <small class="text-muted">Affinez votre recherche ou vos filtres</small>
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    <!-- PAGINATION                                                          -->
+    <!-- ════════════════════════════════════════════════════════════════════ -->
+    {% if page_obj.has_other_pages %}
+        <nav aria-label="Pagination" class="mt-4">
+            <ul class="pagination justify-content-center">
+                
+                {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page=1{{ q|urlencode:'q' }}{{ statut|urlencode:'statut' }}">
+                            <i class="fas fa-chevron-left"></i> Première
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{{ q|urlencode:'q' }}{{ statut|urlencode:'statut' }}">
+                            ← Précédente
+                        </a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link">← Précédente</span>
+                    </li>
+                {% endif %}
+
+                <li class="page-item active">
+                    <span class="page-link">
+                        Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+                    </span>
+                </li>
+
+                {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{{ q|urlencode:'q' }}{{ statut|urlencode:'statut' }}">
+                            Suivante →
+                        </a>
+                    </li>
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{{ q|urlencode:'q' }}{{ statut|urlencode:'statut' }}">
+                            Dernière <i class="fas fa-chevron-right"></i>
+                        </a>
+                    </li>
+                {% else %}
+                    <li class="page-item disabled">
+                        <span class="page-link">Suivante →</span>
+                    </li>
+                {% endif %}
+
+            </ul>
+        </nav>
+    {% endif %}
+
+</div>
+
+{% endblock %}

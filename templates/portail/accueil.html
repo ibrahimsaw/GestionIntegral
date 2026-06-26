@@ -1,0 +1,501 @@
+{% extends 'portail/base_portail.html' %}
+{% load static %}
+
+{% block title %}Accueil - Régie INTEGRAL GeoAd ERP{% endblock %}
+
+{% block extra_css %}
+<style>
+    #map {
+        height: 70vh;
+        border-radius: 0.5rem;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    }
+
+    .map-overlay {
+        position: absolute;
+        top: 1rem;
+        left: 1rem;
+        background: white;
+        padding: 1.5rem;
+        border-radius: 0.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        z-index: 400;
+        max-width: 300px;
+    }
+
+    .map-overlay h6 {
+        margin-bottom: 1rem;
+        font-weight: 700;
+    }
+
+    .filter-btn {
+        margin-right: 0.5rem;
+        margin-bottom: 0.5rem;
+        padding: 0.5rem 1rem;
+        border: 1px solid #dee2e6;
+        background: white;
+        border-radius: 9999px;
+        cursor: pointer;
+        font-size: 0.9rem;
+        transition: all 0.3s ease;
+    }
+
+    .filter-btn:hover, .filter-btn.active {
+        background-color: var(--primary);
+        color: white;
+        border-color: var(--primary);
+    }
+
+    .compteurs {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+        gap: 1.5rem;
+        margin-bottom: 3rem;
+    }
+
+    .compteur-box {
+        background: white;
+        padding: 2rem;
+        border-radius: 0.5rem;
+        text-align: center;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        border-top: 4px solid var(--primary);
+    }
+
+    .compteur-nombre {
+        font-size: 2.5rem;
+        font-weight: 700;
+        color: var(--primary);
+    }
+
+    .compteur-label {
+        color: var(--secondary);
+        font-size: 0.95rem;
+        margin-top: 0.5rem;
+    }
+
+    .format-card {
+        background: white;
+        border-radius: 0.5rem;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        transition: all 0.3s ease;
+    }
+
+    .format-card:hover {
+        box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+        transform: translateY(-4px);
+    }
+
+    .format-image {
+        height: 150px;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        color: white;
+        font-size: 3rem;
+    }
+
+    .format-content {
+        padding: 1.5rem;
+    }
+
+    .format-title {
+        font-size: 1.1rem;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+
+    .format-desc {
+        color: var(--secondary);
+        font-size: 0.9rem;
+        margin-bottom: 1rem;
+    }
+
+    .timeline {
+        position: relative;
+        padding: 2rem 0;
+    }
+
+    .timeline::before {
+        content: '';
+        position: absolute;
+        left: 50%;
+        top: 0;
+        bottom: 0;
+        width: 2px;
+        background: #dee2e6;
+        transform: translateX(-50%);
+    }
+
+    .timeline-item {
+        margin-bottom: 3rem;
+        position: relative;
+    }
+
+    .timeline-item:nth-child(odd) {
+        text-align: right;
+        padding-right: 51%;
+    }
+
+    .timeline-item:nth-child(even) {
+        padding-left: 51%;
+    }
+
+    .timeline-content {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 0.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+    }
+
+    .timeline-item::before {
+        content: '';
+        position: absolute;
+        left: 50%;
+        top: 1.5rem;
+        width: 12px;
+        height: 12px;
+        background: var(--primary);
+        border: 3px solid white;
+        border-radius: 50%;
+        transform: translateX(-50%);
+        z-index: 2;
+        box-shadow: 0 0 0 3px var(--primary);
+    }
+
+    .timeline-number {
+        display: inline-block;
+        width: 40px;
+        height: 40px;
+        background: var(--primary);
+        color: white;
+        border-radius: 50%;
+        text-align: center;
+        line-height: 40px;
+        font-weight: 700;
+        margin-bottom: 0.5rem;
+    }
+
+    @media (max-width: 768px) {
+        .timeline::before {
+            left: 0;
+        }
+
+        .timeline-item {
+            padding-left: 4rem !important;
+            padding-right: 0 !important;
+            text-align: left !important;
+        }
+
+        .timeline-item::before {
+            left: 0;
+        }
+
+        #map {
+            height: 50vh;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- ════════════════════════════════════════════════════════════════════════════ -->
+<!-- HERO SECTION                                                               -->
+<!-- ════════════════════════════════════════════════════════════════════════════ -->
+<div class="hero-section">
+    <div class="container">
+        <div class="row align-items-center min-vh-75">
+            <div class="col-lg-6 pb-4">
+                <h1 class="hero-title">
+                    Publicité Outdoor<br>
+                    au Cœur de l'Afrique
+                </h1>
+                <p class="hero-subtitle">
+                    Panneaux statiques et écrans LED pour une visibilité maximum à Ouagadougou et Bobo-Dioulasso.
+                </p>
+                <div class="d-flex gap-3 flex-wrap">
+                    <a href="{% url 'portail:reserver_etape1' %}" class="btn btn-lg btn-danger">
+                        ➕ Faire une demande
+                    </a>
+                    <a href="{% url 'portail:catalogue' %}" class="btn btn-lg btn-outline-light">
+                        📋 Voir le catalogue
+                    </a>
+                </div>
+            </div>
+            <div class="col-lg-6">
+                <div style="font-size: 5rem; text-align: center; opacity: 0.2;">
+                    🗺️
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════════════ -->
+<!-- CARTE INTERACTIVE                                                          -->
+<!-- ════════════════════════════════════════════════════════════════════════════ -->
+<div class="container section">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h2 class="section-title">🗺️ Nos emplacements</h2>
+            <p class="section-subtitle">Explorez notre réseau de panneaux et écrans en Afrique de l'Ouest</p>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col-12" style="position: relative;">
+            <div id="map"></div>
+            
+            <!-- Overlay filtres -->
+            <div class="map-overlay">
+                <h6>🔍 Filtrer par :</h6>
+                <div>
+                    <button class="filter-btn active" data-ville="">Tous</button>
+                    <button class="filter-btn" data-ville="Ouagadougou">Ouagadougou</button>
+                    <button class="filter-btn" data-ville="Bobo-Dioulasso">Bobo-Dioulasso</button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════════════ -->
+<!-- COMPTEURS ANIMÉS                                                           -->
+<!-- ════════════════════════════════════════════════════════════════════════════ -->
+<div class="container section">
+    <div class="compteurs">
+        <div class="compteur-box">
+            <div class="compteur-nombre" data-value="{{ compteurs.nb_supports }}">0</div>
+            <div class="compteur-label">Supports physiques</div>
+        </div>
+        <div class="compteur-box">
+            <div class="compteur-nombre" data-value="{{ compteurs.nb_ecrans }}">0</div>
+            <div class="compteur-label">Écrans LED</div>
+        </div>
+        <div class="compteur-box">
+            <div class="compteur-nombre" data-value="{{ compteurs.nb_libres }}">0</div>
+            <div class="compteur-label">Faces libres</div>
+        </div>
+        <div class="compteur-box">
+            <div class="compteur-nombre" data-value="{{ compteurs.nb_villes }}">0</div>
+            <div class="compteur-label">Villes couvertes</div>
+        </div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════════════ -->
+<!-- NOS FORMATS                                                                -->
+<!-- ════════════════════════════════════════════════════════════════════════════ -->
+<div class="container section" style="background-color: #f8f9fa; padding: 4rem 0; margin-left: -12px; margin-right: -12px; margin-bottom: 0;">
+    <div class="container">
+        <h2 class="section-title text-center mb-4">📺 Nos formats</h2>
+
+        <div class="row g-4 mb-4">
+            <!-- Panneau Standard -->
+            <div class="col-md-4">
+                <div class="format-card">
+                    <div class="format-image">4 × 3</div>
+                    <div class="format-content">
+                        <div class="format-title">Standard 12m²</div>
+                        <div class="format-desc">4m × 3m — Incontournable</div>
+                        <a href="{% url 'portail:supports_liste' %}?format=4x3" class="btn btn-sm btn-outline-primary">
+                            Voir →
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Panneau Géant -->
+            <div class="col-md-4">
+                <div class="format-card">
+                    <div class="format-image">10 × 4</div>
+                    <div class="format-content">
+                        <div class="format-title">Géant 40m²</div>
+                        <div class="format-desc">10m × 4m — Impact maximal</div>
+                        <a href="{% url 'portail:supports_liste' %}?format=10x4" class="btn btn-sm btn-outline-primary">
+                            Voir →
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Écran LED -->
+            <div class="col-md-4">
+                <div class="format-card">
+                    <div class="format-image">📺</div>
+                    <div class="format-content">
+                        <div class="format-title">Écrans LED</div>
+                        <div class="format-desc">Diffusion numérique — Dynamique</div>
+                        <a href="{% url 'portail:catalogue' %}" class="btn btn-sm btn-outline-primary">
+                            Voir →
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="text-center">
+            <a href="{% url 'portail:catalogue' %}" class="btn btn-lg btn-outline-primary">
+                Voir tous les formats →
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════════════ -->
+<!-- PROCESSUS EN 3 ÉTAPES                                                     -->
+<!-- ════════════════════════════════════════════════════════════════════════════ -->
+<div class="container section">
+    <h2 class="section-title text-center mb-5">🎯 Comment ça marche</h2>
+
+    <div class="timeline">
+        <div class="timeline-item">
+            <div class="timeline-content">
+                <div class="timeline-number">1</div>
+                <h5>Explorez nos emplacements</h5>
+                <p class="text-muted mb-0">
+                    Parcourez notre carte interactive pour découvrir tous nos panneaux et écrans disponibles.
+                </p>
+            </div>
+        </div>
+
+        <div class="timeline-item">
+            <div class="timeline-content">
+                <div class="timeline-number">2</div>
+                <h5>Faites votre demande</h5>
+                <p class="text-muted mb-0">
+                    Sélectionnez les emplacements qui vous intéressent et précisez votre période.
+                </p>
+            </div>
+        </div>
+
+        <div class="timeline-item">
+            <div class="timeline-content">
+                <div class="timeline-number">3</div>
+                <h5>Notre équipe vous contacte</h5>
+                <p class="text-muted mb-0">
+                    Sous 24h, nous validerons votre réservation et vous enverrons un devis personnalisé.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="text-center mt-5">
+        <a href="{% url 'portail:reserver_etape1' %}" class="btn btn-lg btn-danger">
+            ➕ Commencer une demande
+        </a>
+    </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════════════════════ -->
+<!-- CTA FINAL                                                                  -->
+<!-- ════════════════════════════════════════════════════════════════════════════ -->
+<div style="background: linear-gradient(135deg, #1a3c6b 0%, #0d2847 100%); color: white; padding: 4rem 0; margin-top: 4rem;">
+    <div class="container">
+        <div class="row align-items-center">
+            <div class="col-lg-8">
+                <h2 style="margin-bottom: 1rem;">Prêt à lancer votre campagne ?</h2>
+                <p style="font-size: 1.1rem; margin-bottom: 0; opacity: 0.95;">
+                    Nos équipes se tiennent à votre disposition pour vous accompagner.
+                </p>
+            </div>
+            <div class="col-lg-4 text-lg-end mt-4 mt-lg-0">
+                <a href="{% url 'portail:reserver_etape1' %}" class="btn btn-lg btn-light">
+                    Faire une demande →
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Initialiser la carte Leaflet
+document.addEventListener('DOMContentLoaded', function() {
+    // Créer la carte centrée sur Ouagadougou
+    const map = L.map('map').setView([12.3714, -1.5197], 9);
+
+    // Ajouter OpenStreetMap
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap',
+        maxZoom: 19
+    }).addTo(map);
+
+    // Charger les supports via GeoJSON API
+    fetch('{% url "portail:api_geojson" %}')
+        .then(response => response.json())
+        .then(geojson => {
+            L.geoJSON(geojson, {
+                pointToLayer: function(feature, latlng) {
+                    const color = feature.properties.color || '#0d6efd';
+                    return L.circleMarker(latlng, {
+                        radius: 8,
+                        fillColor: color,
+                        color: color,
+                        weight: 2,
+                        opacity: 1,
+                        fillOpacity: 0.8
+                    });
+                },
+                onEachFeature: function(feature, layer) {
+                    const props = feature.properties;
+                    let popup = `
+                        <strong>${props.code}</strong><br>
+                        ${props.nom}<br>
+                        <small class="text-muted">${props.adresse}</small>
+                    `;
+                    layer.bindPopup(popup);
+                }
+            }).addTo(map);
+        });
+
+    // Filtres par ville
+    document.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', function() {
+            document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+            this.classList.add('active');
+            // Recharger la carte avec le filtre
+            console.log('Filtre:', this.dataset.ville);
+        });
+    });
+
+    // Animer les compteurs
+    function animateCounter(element) {
+        const target = parseInt(element.dataset.value);
+        const duration = 2000;
+        const start = Date.now();
+
+        function update() {
+            const now = Date.now();
+            const progress = Math.min((now - start) / duration, 1);
+            const value = Math.floor(progress * target);
+            element.textContent = value;
+
+            if (progress < 1) {
+                requestAnimationFrame(update);
+            } else {
+                element.textContent = target;
+            }
+        }
+
+        update();
+    }
+
+    document.querySelectorAll('[data-value]').forEach(el => {
+        // Animer quand visible
+        const observer = new IntersectionObserver((entries) => {
+            if (entries[0].isIntersecting) {
+                animateCounter(el);
+                observer.unobserve(el);
+            }
+        });
+        observer.observe(el);
+    });
+});
+</script>
+{% endblock %}

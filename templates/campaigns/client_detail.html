@@ -58,23 +58,44 @@
     {% comment %} Bouton de création de réservation {% endcomment %}
     {% if user.is_staff_regie_role %}
     <div class="d-grid mt-3">
-      <a href="{% url 'reservations_bulk_action' client.pk %}" class="btn btn-primary"><i class="bi bi-calendar-plus me-2"></i>Créer des réservations</a>
+      <a href="{% url 'reservation_create' client.pk %}" class="btn btn-primary"><i class="bi bi-calendar-plus me-2"></i>Créer une réservation</a>
     </div>
     {% endif %}
-    {% comment %} liste les réservations {% endcomment %}
+
     {% if reservations %}
     <div class="card mt-4">
-      <div class="card-header"><i class="bi bi-calendar-event me-2"></i>Réservations à venir</div>
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-calendar-event me-2"></i>Réservations à venir</span>
+        {% if user.is_staff_regie_role %}
+        <a href="{% url 'reservation_create' client.pk %}" class="btn btn-sm btn-outline-primary">Nouvelle</a>
+        {% endif %}
+      </div>
       <div class="card-body p-0">
         <table class="table mb-0">
-          <thead><tr><th>Panneau</th><th>Face</th><th>Date de réservation</th></tr></thead>
+          <thead>
+            <tr>
+              <th>Réservation</th>
+              <th>Période</th>
+              <th>Statut</th>
+              {% if user.is_staff_regie_role %}<th>Actions</th>{% endif %}
+            </tr>
+          </thead>
           <tbody>
             {% for r in reservations %}
-            <tr>
-              <td>{{ r.panneau.code }}</td>
-              <td>{{ r.face }}</td>
-              <td class="mono" style="font-size:.75rem">{{ r.date_debut|date:"d/m/Y H:i" }} - {{ r.date_fin|date:"d/m/Y H:i" }}</td>
-            </tr>
+              {% for ligne in r.lignes.all %}
+              <tr>
+                <td>{{ r.nom }}</td>
+                <td class="mono" style="font-size:.75rem">{{ r.date_debut|date:"d/m/Y H:i" }} - {{ r.date_fin|date:"d/m/Y H:i" }}</td>
+                <td><span class="badge bg-{{ r.get_statut_badge }} text-white">{{ r.get_statut_display }}</span></td>
+                {% if user.is_staff_regie_role %}
+                <td class="text-nowrap">
+                  <a href="{% url 'reservation_detail' client.pk r.pk %}" class="btn btn-sm btn-outline-primary me-1"><i class="bi bi-eye"></i></a>
+                  <a href="{% url 'reservation_update' client.pk r.pk %}" class="btn btn-sm btn-outline-secondary me-1"><i class="bi bi-pencil"></i></a>
+                  <a href="{% url 'reservation_delete' client.pk r.pk %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></a>
+                </td>
+                {% endif %}
+              </tr>
+              {% endfor %}
             {% endfor %}
           </tbody>
         </table>

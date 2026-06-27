@@ -1,0 +1,430 @@
+{% extends 'portail/base_portail.html' %}
+{% load static %}
+
+{% block title %}Contact - Régie INTEGRAL{% endblock %}
+
+{% block topbar_title %} Nous contacter{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* ── Variables cohérentes avec le thème ── */
+  :root {
+    --contact-blue:      #2563eb;
+    --contact-blue-soft: #eff6ff;
+    --contact-blue-mid:  #93c5fd;
+    --contact-slate:     #0f172a;
+    --contact-muted:     #64748b;
+    --contact-border:    #e2e8f0;
+    --contact-surface:   #ffffff;
+    --contact-surface2:  #f8fafc;
+    --contact-ok:        #10b981;
+    --contact-err:       #ef4444;
+    --radius-sm:     6px;
+    --radius-md:     10px;
+    --radius-lg:     14px;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
+    --shadow-md: 0 4px 16px rgba(0,0,0,.08), 0 1px 4px rgba(0,0,0,.05);
+  }
+
+  /* ── Section ──────────────────────────────────────────── */
+  .contact-section {
+    margin-bottom: 28px;
+  }
+  .contact-title {
+    font-size: 1.15rem; font-weight: 800; color: var(--contact-slate);
+    margin-bottom: 2px; display: flex; align-items: center; gap: 8px;
+  }
+  .contact-subtitle {
+    font-size: .82rem; color: var(--contact-muted); margin-bottom: 16px;
+  }
+
+  /* ── Breadcrumb ─────────────────────────────────────────── */
+  .breadcrumb-custom {
+    background: var(--contact-surface2); padding: 14px 0;
+    border-bottom: 1px solid var(--contact-border);
+    margin: -18px -18px 24px;
+  }
+  .breadcrumb-custom .breadcrumb {
+    margin: 0; font-size: .82rem;
+  }
+  .breadcrumb-custom a {
+    color: var(--contact-blue); text-decoration: none; font-weight: 600;
+  }
+  .breadcrumb-custom .active {
+    color: var(--contact-muted);
+  }
+
+  /* ── Contact Layout ──────────────────────────────────── */
+  .contact-grid {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 24px; margin-bottom: 24px;
+  }
+
+  /* ── Card ──────────────────────────────────────────── */
+  .contact-card {
+    background: var(--contact-surface); border: 1px solid var(--contact-border);
+    border-radius: var(--radius-lg); padding: 20px;
+    box-shadow: var(--shadow-sm); transition: all .2s;
+  }
+  .contact-card:hover {
+    box-shadow: var(--shadow-md); border-color: var(--contact-blue);
+  }
+
+  .card-icon {
+    font-size: 1.8rem; margin-bottom: 10px;
+  }
+  .card-title {
+    font-size: .95rem; font-weight: 800; color: var(--contact-slate);
+    margin-bottom: 6px;
+  }
+  .card-text {
+    font-size: .85rem; color: var(--contact-muted); line-height: 1.6;
+  }
+  .card-link {
+    display: inline-block; margin-top: 10px;
+    color: var(--contact-blue); text-decoration: none;
+    font-weight: 600; font-size: .85rem;
+    transition: all .2s;
+  }
+  .card-link:hover {
+    color: var(--contact-blue); text-decoration: underline;
+  }
+
+  /* ── Form Card ──────────────────────────────────────── */
+  .form-card {
+    background: var(--contact-surface); border: 1px solid var(--contact-border);
+    border-radius: var(--radius-lg); padding: 24px;
+    box-shadow: var(--shadow-sm);
+  }
+
+  .form-group {
+    margin-bottom: 16px;
+  }
+  .form-group:last-child {
+    margin-bottom: 0;
+  }
+
+  .form-label {
+    display: block; font-size: .85rem; font-weight: 700;
+    color: var(--contact-slate); margin-bottom: 6px;
+  }
+
+  .form-control, .form-textarea {
+    width: 100%; padding: 10px 12px;
+    border: 1.5px solid var(--contact-border);
+    border-radius: var(--radius-sm);
+    background: var(--contact-surface2);
+    color: var(--contact-slate);
+    font-size: .9rem; font-family: inherit;
+    transition: all .15s;
+  }
+
+  .form-control:focus, .form-textarea:focus {
+    outline: none;
+    border-color: var(--contact-blue);
+    background: var(--contact-surface);
+    box-shadow: 0 0 0 3px rgba(37,99,235,.08);
+  }
+
+  .form-textarea {
+    resize: vertical; min-height: 120px;
+  }
+
+  /* ── Grid layout form ─────────────────────────────── */
+  .form-grid-2 {
+    display: grid; grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  /* ── Checkbox ─────────────────────────────────────── */
+  .form-check {
+    display: flex; align-items: flex-start; gap: 10px;
+    margin-top: 16px; padding: 10px 12px;
+    background: var(--contact-surface2);
+    border: 1px solid var(--contact-border);
+    border-radius: var(--radius-sm);
+    cursor: pointer; transition: all .15s;
+  }
+  .form-check:hover {
+    background: var(--contact-blue-soft);
+    border-color: var(--contact-blue);
+  }
+
+  .form-check input {
+    margin-top: 2px; width: 18px; height: 18px;
+    cursor: pointer; flex-shrink: 0;
+  }
+
+  .form-check label {
+    font-size: .85rem; color: var(--contact-slate);
+    cursor: pointer; flex: 1;
+  }
+
+  /* ── Boutons ───────────────────────────────────── */
+  .btn-submit {
+    width: 100%; padding: 12px;
+    background: var(--contact-blue);
+    color: white; border: none;
+    border-radius: var(--radius-sm);
+    font-weight: 700; font-size: .9rem;
+    cursor: pointer; transition: all .2s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .btn-submit:hover {
+    background: #1d4ed8; box-shadow: var(--shadow-md);
+  }
+  .btn-submit:active {
+    transform: translateY(1px);
+  }
+
+  /* ── Response Message ──────────────────────────── */
+  .form-response {
+    padding: 12px 14px; border-radius: var(--radius-sm);
+    margin-bottom: 16px; font-size: .85rem;
+    display: none; animation: slideDown .3s ease;
+  }
+  .form-response.success {
+    background: #d1fae5; border: 1px solid var(--contact-ok);
+    color: #065f46; display: block;
+  }
+  .form-response.error {
+    background: #fee2e2; border: 1px solid var(--contact-err);
+    color: #991b1b; display: block;
+  }
+
+  @keyframes slideDown {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* ── FAQ Section ───────────────────────────────── */
+  .faq-card {
+    background: var(--contact-surface); border: 1px solid var(--contact-border);
+    border-radius: var(--radius-md); overflow: hidden;
+    margin-bottom: 12px;
+  }
+
+  .faq-header {
+    padding: 12px 14px; background: var(--contact-surface2);
+    border-bottom: 1px solid var(--contact-border);
+    cursor: pointer; display: flex; justify-content: space-between;
+    align-items: center; transition: all .2s;
+    font-weight: 700; font-size: .9rem; color: var(--contact-slate);
+  }
+  .faq-header:hover {
+    background: var(--contact-blue-soft); color: var(--contact-blue);
+  }
+
+  .faq-body {
+    padding: 12px 14px; font-size: .85rem;
+    color: var(--contact-muted); display: none;
+  }
+  .faq-body.show { display: block; }
+
+  /* ── Responsive ───────────────────────────────── */
+  @media (max-width: 768px) {
+    .contact-grid { grid-template-columns: 1fr; }
+    .form-grid-2 { grid-template-columns: 1fr; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+
+
+
+<!-- EN-TÊTE -->
+<div class="contact-section">
+  <div class="contact-title">
+    <i class="bi bi-chat-dots-fill"></i> Nous contacter
+  </div>
+  <div class="contact-subtitle">
+    Vous avez une question ? Notre équipe est à votre écoute
+  </div>
+</div>
+
+<!-- CONTACT INFO CARDS -->
+<div class="contact-grid">
+  <div class="contact-card">
+    <div class="card-icon">📞</div>
+    <div class="card-title">Téléphone</div>
+    <div class="card-text">
+      Appelez-nous directement pour discuter de vos projets
+    </div>
+    <a href="tel:+226XXXXXXXX" class="card-link">
+      +226 XX XX XX XX →
+    </a>
+  </div>
+
+  <div class="contact-card">
+    <div class="card-icon">✉️</div>
+    <div class="card-title">Email</div>
+    <div class="card-text">
+      Envoyez-nous vos questions, nous répondons sous 24h
+    </div>
+    <a href="mailto:contact@integral.bf" class="card-link">
+      contact@integral.bf →
+    </a>
+  </div>
+</div>
+
+<!-- FORMULAIRE DE CONTACT -->
+<div class="form-card">
+  <div style="margin-bottom: 20px;">
+    <div class="contact-title" style="margin-bottom: 4px;">
+      <i class="bi bi-pencil-square"></i> Formulaire de contact
+    </div>
+    <div class="contact-subtitle">
+      Remplissez le formulaire ci-dessous et nous vous recontacterons rapidement
+    </div>
+  </div>
+
+  <form id="contact-form" class="contact-form">
+    {% csrf_token %}
+
+    <!-- Message de réponse -->
+    <div class="form-response" id="form-message"></div>
+
+    <!-- Nom et Email -->
+    <div class="form-grid-2">
+      <div class="form-group">
+        <label class="form-label" for="nom">
+          👤 Nom complet *
+        </label>
+        <input type="text" id="nom" name="nom" class="form-control" required>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="email">
+          ✉️ Adresse email *
+        </label>
+        <input type="email" id="email" name="email" class="form-control" required>
+      </div>
+    </div>
+
+    <!-- Téléphone et Societe -->
+    <div class="form-grid-2">
+      <div class="form-group">
+        <label class="form-label" for="telephone">
+          📞 Téléphone
+        </label>
+        <input type="tel" id="telephone" name="telephone" class="form-control" placeholder="+226 XX XX XX XX">
+      </div>
+
+      <div class="form-group">
+        <label class="form-label" for="societe">
+          🏢 Société/Organisation
+        </label>
+        <input type="text" id="societe" name="societe" class="form-control" placeholder="Optionnel">
+      </div>
+    </div>
+
+    <!-- Sujet -->
+    <div class="form-group">
+      <label class="form-label" for="sujet">
+        🎯 Sujet *
+      </label>
+      <select id="sujet" name="sujet" class="form-control" required>
+        <option value="">-- Sélectionnez un sujet --</option>
+        <option value="demande-reservation">Demande de réservation</option>
+        <option value="info-tarif">Informations tarifaires</option>
+        <option value="probleme-technique">Problème technique</option>
+        <option value="autre">Autre</option>
+      </select>
+    </div>
+
+    <!-- Message -->
+    <div class="form-group">
+      <label class="form-label" for="message">
+        💬 Message *
+      </label>
+      <textarea id="message" name="message" class="form-textarea" required
+                placeholder="Décrivez votre demande en détail..."></textarea>
+    </div>
+
+    <!-- Checkbox -->
+    <label class="form-check">
+      <input type="checkbox" id="conditions" name="conditions" required>
+      <label for="conditions">
+        ✓ J'accepte que mes données soient traitées pour répondre à ma demande
+      </label>
+    </label>
+
+    <!-- Submit Button -->
+    <button type="submit" class="btn-submit" style="margin-top: 20px;">
+      <i class="bi bi-send-fill"></i> Envoyer le message
+    </button>
+  </form>
+</div>
+
+<!-- FAQ -->
+<div class="contact-section" style="margin-top: 40px;">
+  <div class="contact-title">
+    <i class="bi bi-question-circle-fill"></i> Questions fréquentes
+  </div>
+  <div class="contact-subtitle">
+    Trouvez les réponses aux questions les plus posées
+  </div>
+
+  <div class="faq-card">
+    <div class="faq-header">
+      <span>Combien de temps pour obtenir un devis ?</span>
+      <i class="bi bi-chevron-down"></i>
+    </div>
+    <div class="faq-body">
+      Notre équipe traite les demandes sous 24 heures ouvrables. Vous recevrez un devis détaillé par email.
+    </div>
+  </div>
+
+  <div class="faq-card">
+    <div class="faq-header">
+      <span>Quels sont les délais de mise en place ?</span>
+      <i class="bi bi-chevron-down"></i>
+    </div>
+    <div class="faq-body">
+      Les délais varient selon le format et les emplacements choisis. Comptez généralement 2 à 4 semaines pour une campagne standard.
+    </div>
+  </div>
+
+  <div class="faq-card">
+    <div class="faq-header">
+      <span>Acceptez-vous les paiements partiels ?</span>
+      <i class="bi bi-chevron-down"></i>
+    </div>
+    <div class="faq-body">
+      Oui, nous proposons des plans de paiement flexibles. Contactez notre équipe pour discuter des modalités.
+    </div>
+  </div>
+
+  <div class="faq-card">
+    <div class="faq-header">
+      <span>Comment puis-je suivre ma campagne ?</span>
+      <i class="bi bi-chevron-down"></i>
+    </div>
+    <div class="faq-body">
+      Vous recevrez un tableau de bord en ligne avec les statistiques de votre campagne en temps réel.
+    </div>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // Accordion FAQ
+  document.querySelectorAll('.faq-header').forEach(header => {
+    header.addEventListener('click', function() {
+      const body = this.nextElementSibling;
+      const icon = this.querySelector('i');
+      
+      body.classList.toggle('show');
+      icon.classList.toggle('bi-chevron-down');
+      icon.classList.toggle('bi-chevron-up');
+    });
+  });
+
+
+});
+</script>
+{% endblock %}

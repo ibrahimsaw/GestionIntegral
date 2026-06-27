@@ -1901,7 +1901,7 @@ class StaffOnlyMixin(LoginRequiredMixin, UserPassesTestMixin):
 # Dashboard Staff
 # ══════════════════════════════════════════════════════════════════════════════
 
-class DashboardView(StaffOnlyMixin, View):
+class DashboardViewDemander(StaffOnlyMixin, View):
     """
     Page d'accueil du staff avec statistiques et actions rapides.
     """

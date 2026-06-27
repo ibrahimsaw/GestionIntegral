@@ -1,0 +1,730 @@
+{% extends 'portail/base_portail.html' %}
+{% load static %}
+
+{% block title %}Catalogue — Régie INTEGRAL{% endblock %}
+{% block topbar_title %} Notre catalogue{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* ── TYPOGRAPHIE & VARIABLES ────────────────────────────────────────── */
+    :root {
+        --c-standard: var(--color-primary);
+        --c-geant:    var(--color-secondary);
+        --c-sucette:  #7c3aed;
+        --c-marche:   #059669;
+        --c-ecran:    #0891b2;
+        --radius-lg:  14px;
+    }
+
+    /* ── SECTION HEADERS ────────────────────────────────────────────────── */
+    .cat-section { margin-bottom: 40px; }
+
+    .cat-label {
+        display: inline-flex; align-items: center; gap: 8px;
+        font-size: .68rem; font-weight: 800; letter-spacing: .12em;
+        text-transform: uppercase; padding: 4px 12px;
+        border-radius: 20px; margin-bottom: 8px;
+    }
+    .cat-label.standard { background: #dbeafe; color: var(--c-standard); }
+    .cat-label.geant    { background: #ede9fe; color: var(--c-geant); }
+    .cat-label.sucette  { background: #f3e8ff; color: var(--c-sucette); }
+    .cat-label.marche   { background: #d1fae5; color: var(--c-marche); }
+    .cat-label.ecran    { background: #cffafe; color: var(--c-ecran); }
+
+    .cat-title {
+        font-size: 1.4rem; font-weight: 900; color: var(--text);
+        margin: 0 0 4px; letter-spacing: -.02em; line-height: 1.2;
+    }
+    .cat-subtitle { font-size: .84rem; color: var(--text-muted); margin-bottom: 20px; }
+
+    /* ── SHOWCASE CARD ──────────────────────────────────────────────────── */
+    .showcase {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        box-shadow: 0 2px 16px rgba(0,0,0,.07);
+        overflow: hidden;
+    }
+
+    /* Barre colorée en haut */
+    .showcase-bar {
+        height: 4px; width: 100%;
+    }
+    .showcase.standard .showcase-bar { background: var(--c-standard); }
+    .showcase.geant    .showcase-bar { background: var(--c-geant); }
+    .showcase.sucette  .showcase-bar { background: var(--c-sucette); }
+    .showcase.marche   .showcase-bar { background: var(--c-marche); }
+
+    /* Header */
+    .showcase-header {
+        padding: 18px 24px 14px;
+        display: flex; align-items: center; justify-content: space-between;
+        flex-wrap: wrap; gap: 12px;
+        border-bottom: 1px solid var(--border);
+        background: var(--bg-card2);
+    }
+    .showcase-header h3 { font-size: 1.05rem; font-weight: 800; margin: 0 0 2px; color: var(--text); }
+    .showcase-header small { font-size: .78rem; color: var(--text-muted); }
+
+    /* Sélecteur format */
+    .fmt-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+    .fmt-pill {
+        padding: 5px 14px; border-radius: 20px; font-size: .76rem; font-weight: 700;
+        border: 1.5px solid var(--border); background: var(--bg-card);
+        color: var(--text-muted); cursor: pointer; transition: all .15s;
+        white-space: nowrap; line-height: 1.4;
+    }
+    .fmt-pill:hover { border-color: var(--color-primary); color: var(--color-primary); }
+    .showcase.standard .fmt-pill.active { background: var(--c-standard); border-color: var(--c-standard); color: #fff; }
+    .showcase.geant    .fmt-pill.active { background: var(--c-geant);    border-color: var(--c-geant);    color: #fff; }
+    .showcase.sucette  .fmt-pill.active { background: var(--c-sucette);  border-color: var(--c-sucette);  color: #fff; }
+    .showcase.marche   .fmt-pill.active { background: var(--c-marche);   border-color: var(--c-marche);   color: #fff; }
+
+    /* Body 2 colonnes */
+    .showcase-body {
+        display: grid; grid-template-columns: 1fr 1fr;
+        gap: 28px; padding: 24px;
+        align-items: start;
+    }
+    @media (max-width: 768px) { .showcase-body { grid-template-columns: 1fr; } }
+
+    /* Preview panneau */
+    .preview-wrap {
+        border: 1px solid var(--border); border-radius: 10px;
+        overflow: hidden; background: var(--bg-card2);
+    }
+    .preview-frame {
+        display: flex; align-items: center; justify-content: center;
+        min-height: 180px; padding: 12px;
+    }
+    .preview-frame svg { width: 100%; height: auto; display: block; max-height: 260px; }
+
+    .preview-upload {
+        padding: 10px 14px; border-top: 1px solid var(--border);
+        background: var(--bg-card); display: flex; align-items: center; gap: 10px;
+    }
+    .upload-btn {
+        display: inline-flex; align-items: center; gap: 6px;
+        font-size: .76rem; font-weight: 700; color: var(--color-primary);
+        cursor: pointer; padding: 5px 10px;
+        border: 1px solid var(--color-primary); border-radius: 6px;
+        transition: all .15s; white-space: nowrap;
+    }
+    .upload-btn:hover { background: var(--color-primary); color: #fff; }
+    .preview-upload input[type="file"] { display: none; }
+    .preview-filename { font-size: .73rem; color: var(--text-muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .btn-reset-img { font-size: .82rem; color: var(--text-muted); cursor: pointer; border: none; background: none; padding: 0; display: none; }
+    .btn-reset-img:hover { color: #ef4444; }
+
+    /* Specs grid */
+    .specs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+    .spec-box {
+        padding: 12px 14px; border-radius: 10px;
+        background: var(--bg-card2); border: 1px solid var(--border);
+        border: 2px solid;
+    }
+    .showcase.standard .spec-box { border-color: var(--c-standard); }
+    .showcase.geant    .spec-box { border-color: var(--c-geant); }
+    .showcase.sucette  .spec-box { border-color: var(--c-sucette); }
+    .showcase.marche   .spec-box { border-color: var(--c-marche); }
+    .spec-box .lbl { font-size: .65rem; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); margin-bottom: 4px; }
+    .spec-box .val { font-size: 1.05rem; font-weight: 800; color: var(--text); line-height: 1.1; }
+
+    /* Disponibilité bar */
+    .dispo-bar-wrap { margin-bottom: 20px; }
+    .dispo-bar-label { display: flex; justify-content: space-between; font-size: .75rem; color: var(--text-muted); margin-bottom: 6px; }
+    .dispo-bar-track { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
+    .dispo-bar-fill { height: 100%; border-radius: 4px; transition: width .4s; }
+    .showcase.standard .dispo-bar-fill { background: var(--c-standard); }
+    .showcase.geant    .dispo-bar-fill { background: var(--c-geant); }
+    .showcase.sucette  .dispo-bar-fill { background: var(--c-sucette); }
+    .showcase.marche   .dispo-bar-fill { background: var(--c-marche); }
+
+    /* Gallery thumbs */
+    .gallery-row { display: flex; gap: 8px; flex-wrap: wrap; }
+    .gallery-thumb {
+        width: 64px; height: 48px; border-radius: 8px;
+        background: var(--border); border: 1px solid var(--border);
+        display: flex; align-items: center; justify-content: center;
+        color: var(--text-muted); font-size: 1.1rem;
+        cursor: pointer; transition: all .15s; overflow: hidden;
+    }
+    .gallery-thumb:hover { border-color: var(--color-primary); color: var(--color-primary); }
+    .gallery-thumb img { width: 100%; height: 100%; object-fit: cover; }
+
+    /* Footer showcase */
+    .showcase-footer {
+        padding: 14px 24px;
+        background: var(--bg-card2); border-top: 1px solid var(--border);
+        display: flex; justify-content: space-between; align-items: center;
+        flex-wrap: wrap; gap: 10px;
+    }
+    .showcase-footer .badge-dispo {
+        display: inline-flex; align-items: center; gap: 6px;
+        font-size: .78rem; font-weight: 700;
+    }
+    .showcase.standard .badge-dispo { color: var(--c-standard); }
+    .showcase.geant    .badge-dispo { color: var(--c-geant); }
+    .showcase.sucette  .badge-dispo { color: var(--c-sucette); }
+    .showcase.marche   .badge-dispo { color: var(--c-marche); }
+
+    /* ── ÉCRANS LED ────────────────────────────────────────────────────── */
+    .ecran-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        box-shadow: 0 2px 16px rgba(0,0,0,.07);
+        overflow: hidden;
+    }
+    .ecran-hero {
+        background: var(--c-ecran);
+        padding: 28px 32px; display: flex; align-items: center; gap: 24px; color: #fff;
+    }
+    .ecran-hero-icon {
+        width: 72px; height: 72px; background: rgba(255,255,255,.15);
+        border-radius: 16px; display: flex; align-items: center; justify-content: center;
+        font-size: 2.2rem; flex-shrink: 0;
+    }
+    .ecran-hero h4 { font-size: 1.3rem; font-weight: 900; margin: 0 0 4px; }
+    .ecran-hero p  { margin: 0; opacity: .85; font-size: .88rem; }
+
+    .ecran-body { padding: 28px; display: grid; grid-template-columns: 1fr 1px 1fr; gap: 32px; }
+    @media (max-width: 768px) { .ecran-body { grid-template-columns: 1fr; } }
+    .ecran-divider { background: var(--border); }
+    .ecran-section h6 { font-size: .88rem; font-weight: 800; color: var(--text); margin-bottom: 16px; display: flex; align-items: center; gap: 6px; }
+
+    .ecran-specs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+    .ecran-spec {
+        padding: 12px 14px; border-radius: 10px;
+        background: #f0f9ff; border: 1px solid #bae6fd;
+        border: 2px solid var(--c-ecran);
+    }
+    .ecran-spec .lbl { font-size: .65rem; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; color: #0891b2; margin-bottom: 4px; }
+    .ecran-spec .val { font-size: 1rem; font-weight: 800; color: var(--text); }
+
+    .avantage-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
+    .avantage-list li { display: flex; align-items: flex-start; gap: 10px; font-size: .84rem; color: var(--text); line-height: 1.4; }
+    .avantage-list li .ico { color: var(--c-ecran); font-size: 1rem; margin-top: 1px; flex-shrink: 0; }
+
+    /* ── CTA FINAL ──────────────────────────────────────────────────────── */
+    .cta-block {
+        margin: 40px 0 0;
+        background: var(--color-secondary);
+        border-radius: var(--radius-lg); padding: 40px 32px;
+        text-align: center; color: #000;
+    }
+    .cta-block h3 { font-size: 1.4rem; font-weight: 900; margin: 0 0 8px; }
+    .cta-block p  { margin: 0 0 24px; opacity: .9; font-size: .92rem; }
+    .cta-block .btn-cta {
+        display: inline-flex; align-items: center; gap: 8px;
+        background: #fff; color: var(--color-primary); font-weight: 800;
+        padding: 12px 28px; border-radius: 50px; font-size: .92rem;
+        text-decoration: none; transition: all .15s; border: 2px solid #fff;
+    }
+    .cta-block .btn-cta:hover { background: transparent; color: #fff; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+    <!-- ── EN-TÊTE ───────────────────────────────────────────────────────────── -->
+    <div class="mb-4">
+    <h1 style="font-size:1.6rem;font-weight:900;margin:0 0 4px;letter-spacing:-.02em;">Notre catalogue</h1>
+    <p style="color:var(--text-muted);font-size:.88rem;margin:0;">Tous nos formats de panneaux statiques et écrans numériques disponibles à Ouagadougou et Bobo-Dioulasso.</p>
+    </div>
+
+    <!-- ══ STANDARD ═════════════════════════════════════════════════════════════ -->
+    <div class="cat-section">
+        <div class="cat-label standard"><i class="bi bi-easel2-fill"></i> Panneaux Standard</div>
+        <h2 class="cat-title">Le format incontournable</h2>
+        <p class="cat-subtitle">Le 4×3 s'impose partout — axes routiers, carrefours, zones commerciales.</p>
+
+        <div class="showcase standard" data-type="standard">
+            <div class="showcase-header">
+            <div>
+                <h3 id="standard-titre">Standard — 4m × 3m</h3>
+                <small id="standard-sous-titre">12 m² · 458 emplacements · 289 faces libres</small>
+            </div>
+            <div class="fmt-pills">
+                <button class="fmt-pill active" data-type="standard" data-code="4x3" data-larg="4" data-haut="3" data-surface="12" data-nb="458" data-libres="289" data-label="Standard — 4m × 3m" data-desc="12 m² · 458 emplacements · 289 faces libres">4×3</button>
+            </div>
+            </div>
+            <div class="showcase-body">
+            <div class="preview-wrap">
+                <div class="preview-frame">
+                <svg id="svg-standard" viewBox="0 0 440 320" xmlns="http://www.w3.org/2000/svg">
+                    <rect width="440" height="320" fill="#0f172a"/>
+                    <rect x="24" y="24" width="400" height="260" fill="rgba(0,0,0,.4)" rx="6"/>
+                    <rect x="20" y="20" width="400" height="260" fill="#1a3c6b" rx="5"/>
+                    <image id="img-standard" x="20" y="20" width="400" height="260" href="" preserveAspectRatio="xMidYMid slice" style="display:none;" clip-path="url(#clip-standard)"/>
+                    <clipPath id="clip-standard"><rect x="20" y="20" width="400" height="260" rx="5"/></clipPath>
+                    <g id="label-standard">
+                    <text x="220" y="148" text-anchor="middle" font-size="56" font-weight="900" fill="#e8b84b" font-family="system-ui,sans-serif" opacity=".95">4×3</text>
+                    <text x="220" y="178" text-anchor="middle" font-size="15" fill="rgba(255,255,255,.45)" font-family="system-ui,sans-serif">12 m²</text>
+                    </g>
+                    <rect x="20" y="20" width="400" height="260" fill="none" stroke="#e8b84b" stroke-width="2" rx="5" opacity=".7"/>
+                    <!-- Cotations -->
+                    <line x1="20" y1="298" x2="420" y2="298" stroke="#475569" stroke-width="1"/>
+                    <text x="220" y="312" text-anchor="middle" font-size="11" fill="#64748b" font-family="system-ui,sans-serif">← 4 m →</text>
+                    <line x1="432" y1="20" x2="432" y2="280" stroke="#475569" stroke-width="1"/>
+                    <text x="438" y="155" text-anchor="middle" font-size="11" fill="#64748b" font-family="system-ui,sans-serif" transform="rotate(90,438,155)">← 3 m →</text>
+                </svg>
+                </div>
+                <div class="preview-upload">
+                <label class="upload-btn" for="upload-standard"><i class="bi bi-upload"></i> Tester un visuel</label>
+                <input type="file" id="upload-standard" accept="image/*" data-target="standard">
+                <span class="preview-filename" id="filename-standard">Aucun fichier</span>
+                <button class="btn-reset-img" id="reset-standard" onclick="resetPreview('standard')"><i class="bi bi-x-circle"></i></button>
+                </div>
+            </div>
+            <div>
+                <div class="specs-grid">
+                <div class="spec-box"><div class="lbl">Surface</div><div class="val" id="standard-surface">12 m²</div></div>
+                <div class="spec-box"><div class="lbl">Dimensions</div><div class="val" id="standard-dims">4m × 3m</div></div>
+                <div class="spec-box"><div class="lbl">Emplacements</div><div class="val" id="standard-nb">458</div></div>
+                <div class="spec-box"><div class="lbl">Faces libres</div><div class="val" id="standard-libres">289</div></div>
+                </div>
+                <div class="dispo-bar-wrap">
+                <div class="dispo-bar-label"><span>Disponibilité</span><span id="standard-pct">63%</span></div>
+                <div class="dispo-bar-track"><div class="dispo-bar-fill" id="standard-bar" style="width:63%"></div></div>
+                </div>
+                <p class="mb-3" style="font-size:.82rem;color:var(--text-muted);line-height:1.6;">
+                Le format 4×3 est notre produit phare — présent sur tous les grands axes de Ouagadougou et Bobo-Dioulasso, il garantit une exposition maximale pour toute campagne de notoriété.
+                </p>
+                <div class="gallery-row" id="gallery-standard">
+                <div class="gallery-thumb"><i class="bi bi-image"></i></div>
+                <div class="gallery-thumb"><i class="bi bi-image"></i></div>
+                <div class="gallery-thumb"><i class="bi bi-image"></i></div>
+                <div class="gallery-thumb"><i class="bi bi-image"></i></div>
+                </div>
+            </div>
+            </div>
+            <div class="showcase-footer">
+            <span class="badge-dispo"><i class="bi bi-circle-fill" style="font-size:.5rem;"></i> Disponible 24h/24</span>
+            <a href="{% url 'portail:supports_liste' %}?format=4x3" class="btn btn-primary btn-sm" id="standard-lien">
+                Voir les emplacements <i class="bi bi-arrow-right ms-1"></i>
+            </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- ══ GÉANTS ════════════════════════════════════════════════════════════════ -->
+    <div class="cat-section">
+    <div class="cat-label geant"><i class="bi bi-aspect-ratio-fill"></i> Panneaux Géants</div>
+    <h2 class="cat-title">Impact visuel exceptionnel</h2>
+    <p class="cat-subtitle">De 20 à 96 m² — pour les grandes artères et les messages qui marquent.</p>
+
+    <div class="showcase geant" data-type="geant">
+        <div class="showcase-header">
+        <div>
+            <h3 id="geant-titre">Géant — 6m × 4m</h3>
+            <small id="geant-sous-titre">24 m² · 28 emplacements · 18 faces libres</small>
+        </div>
+        <div class="fmt-pills">
+            <button class="fmt-pill active" data-type="geant" data-code="6x4"  data-larg="6"  data-haut="4" data-surface="24" data-nb="28" data-libres="18" data-label="Géant — 6m × 4m"   data-desc="24 m² · 28 emplacements · 18 faces libres">6×4</button>
+            <button class="fmt-pill"        data-type="geant" data-code="7x3"  data-larg="7"  data-haut="3" data-surface="21" data-nb="14" data-libres="9"  data-label="Géant — 7m × 3m"   data-desc="21 m² · 14 emplacements · 9 faces libres">7×3</button>
+            <button class="fmt-pill"        data-type="geant" data-code="8x4"  data-larg="8"  data-haut="4" data-surface="32" data-nb="19" data-libres="12" data-label="Géant — 8m × 4m"   data-desc="32 m² · 19 emplacements · 12 faces libres">8×4</button>
+            <button class="fmt-pill"        data-type="geant" data-code="10x4" data-larg="10" data-haut="4" data-surface="40" data-nb="15" data-libres="10" data-label="Géant — 10m × 4m"  data-desc="40 m² · 15 emplacements · 10 faces libres">10×4</button>
+            <button class="fmt-pill"        data-type="geant" data-code="12x4" data-larg="12" data-haut="4" data-surface="48" data-nb="12" data-libres="7"  data-label="Géant — 12m × 4m"  data-desc="48 m² · 12 emplacements · 7 faces libres">12×4</button>
+            <button class="fmt-pill"        data-type="geant" data-code="12x5" data-larg="12" data-haut="5" data-surface="60" data-nb="2"  data-libres="2"  data-label="Géant — 12m × 5m"  data-desc="60 m² · 2 emplacements · 2 faces libres">12×5</button>
+            <button class="fmt-pill"        data-type="geant" data-code="4x5"  data-larg="4"  data-haut="5" data-surface="20" data-nb="4"  data-libres="3"  data-label="Géant — 4m × 5m"   data-desc="20 m² · 4 emplacements · 3 faces libres">4×5</button>
+            <button class="fmt-pill"        data-type="geant" data-code="9x5"  data-larg="9"  data-haut="5" data-surface="45" data-nb="1"  data-libres="1"  data-label="Géant — 9m × 5m"   data-desc="45 m² · 1 emplacement">9×5</button>
+            <button class="fmt-pill"        data-type="geant" data-code="24x4" data-larg="24" data-haut="4" data-surface="96" data-nb="2"  data-libres="1"  data-label="Géant — 24m × 4m"  data-desc="96 m² · 2 emplacements · 1 face libre">24×4</button>
+        </div>
+        </div>
+        <div class="showcase-body">
+        <div class="preview-wrap">
+            <div class="preview-frame">
+            <svg id="svg-geant" viewBox="0 0 460 300" xmlns="http://www.w3.org/2000/svg">
+                <rect width="460" height="300" fill="#0f172a"/>
+                <rect x="24" y="24" width="420" height="220" fill="rgba(0,0,0,.4)" rx="6"/>
+                <rect x="20" y="20" width="420" height="220" fill="#1a3c6b" rx="5"/>
+                <image id="img-geant" x="20" y="20" width="420" height="220" href="" preserveAspectRatio="xMidYMid slice" style="display:none;" clip-path="url(#clip-geant)"/>
+                <clipPath id="clip-geant"><rect x="20" y="20" width="420" height="220" rx="5"/></clipPath>
+                <g id="label-geant">
+                <text id="svg-geant-dim" x="230" y="132" text-anchor="middle" font-size="50" font-weight="900" fill="#e8b84b" font-family="system-ui,sans-serif" opacity=".95">6×4</text>
+                <text id="svg-geant-surf" x="230" y="160" text-anchor="middle" font-size="14" fill="rgba(255,255,255,.45)" font-family="system-ui,sans-serif">24 m²</text>
+                </g>
+                <rect x="20" y="20" width="420" height="220" fill="none" stroke="#e8b84b" stroke-width="2" rx="5" opacity=".7"/>
+                <line x1="20" y1="258" x2="440" y2="258" stroke="#475569" stroke-width="1"/>
+                <text id="svg-geant-larg" x="230" y="272" text-anchor="middle" font-size="11" fill="#64748b" font-family="system-ui,sans-serif">← 6 m →</text>
+                <line x1="452" y1="20" x2="452" y2="240" stroke="#475569" stroke-width="1"/>
+                <text id="svg-geant-haut" x="458" y="135" text-anchor="middle" font-size="11" fill="#64748b" font-family="system-ui,sans-serif" transform="rotate(90,458,135)">← 4 m →</text>
+            </svg>
+            </div>
+            <div class="preview-upload">
+            <label class="upload-btn" for="upload-geant"><i class="bi bi-upload"></i> Tester un visuel</label>
+            <input type="file" id="upload-geant" accept="image/*" data-target="geant">
+            <span class="preview-filename" id="filename-geant">Aucun fichier</span>
+            <button class="btn-reset-img" id="reset-geant" onclick="resetPreview('geant')"><i class="bi bi-x-circle"></i></button>
+            </div>
+        </div>
+        <div>
+            <div class="specs-grid">
+            <div class="spec-box"><div class="lbl">Surface</div><div class="val" id="geant-surface">24 m²</div></div>
+            <div class="spec-box"><div class="lbl">Dimensions</div><div class="val" id="geant-dims">6m × 4m</div></div>
+            <div class="spec-box"><div class="lbl">Emplacements</div><div class="val" id="geant-nb">28</div></div>
+            <div class="spec-box"><div class="lbl">Faces libres</div><div class="val" id="geant-libres">18</div></div>
+            </div>
+            <div class="dispo-bar-wrap">
+            <div class="dispo-bar-label"><span>Disponibilité</span><span id="geant-pct">64%</span></div>
+            <div class="dispo-bar-track"><div class="dispo-bar-fill" id="geant-bar" style="width:64%"></div></div>
+            </div>
+            <p class="mb-3" style="font-size:.82rem;color:var(--text-muted);line-height:1.6;">
+            Les géants s'imposent aux points stratégiques de grande circulation. Un seul panneau peut couvrir un axe entier. Idéal pour les lancements, la grande distribution et les événements.
+            </p>
+            <div class="gallery-row" id="gallery-geant">
+            <div class="gallery-thumb"><i class="bi bi-image"></i></div>
+            <div class="gallery-thumb"><i class="bi bi-image"></i></div>
+            <div class="gallery-thumb"><i class="bi bi-image"></i></div>
+            <div class="gallery-thumb"><i class="bi bi-image"></i></div>
+            </div>
+        </div>
+        </div>
+        <div class="showcase-footer">
+        <span class="badge-dispo"><i class="bi bi-circle-fill" style="font-size:.5rem;"></i> Couverture exceptionnelle</span>
+        <a href="{% url 'portail:supports_liste' %}?format=6x4" class="btn btn-primary btn-sm" id="geant-lien">
+            Voir les emplacements <i class="bi bi-arrow-right ms-1"></i>
+        </a>
+        </div>
+    </div>
+    </div>
+
+    <!-- ══ SUCETTES ══════════════════════════════════════════════════════════════ -->
+    <div class="cat-section">
+    <div class="cat-label sucette"><i class="bi bi-signpost-2-fill"></i> Sucettes</div>
+    <h2 class="cat-title">Au plus près des piétons</h2>
+    <p class="cat-subtitle">Format urbain double face — zones commerciales, marchés, axes piétons.</p>
+
+    <div class="showcase sucette" data-type="sucette">
+        <div class="showcase-header">
+        <div>
+            <h3 id="sucette-titre">Sucette — 1,20m × 1,80m</h3>
+            <small id="sucette-sous-titre">2,16 m² · 64 emplacements · 41 faces libres</small>
+        </div>
+        <div class="fmt-pills">
+            <button class="fmt-pill active" data-type="sucette" data-code="1x2" data-larg="1.2" data-haut="1.8" data-surface="2.16" data-nb="64" data-libres="41" data-label="Sucette — 1,20m × 1,80m" data-desc="2,16 m² · 64 emplacements · 41 faces libres">1,20×1,80</button>
+        </div>
+        </div>
+        <div class="showcase-body">
+        <div class="preview-wrap">
+            <div class="preview-frame">
+            <svg id="svg-sucette" viewBox="0 0 200 360" xmlns="http://www.w3.org/2000/svg">
+                <rect width="200" height="360" fill="#0f172a"/>
+                <rect x="54" y="24" width="96" height="252" fill="rgba(0,0,0,.4)" rx="6"/>
+                <rect x="50" y="20" width="96" height="252" fill="#1a3c6b" rx="5"/>
+                <image id="img-sucette" x="50" y="20" width="96" height="252" href="" preserveAspectRatio="xMidYMid slice" style="display:none;" clip-path="url(#clip-sucette)"/>
+                <clipPath id="clip-sucette"><rect x="50" y="20" width="96" height="252" rx="5"/></clipPath>
+                <g id="label-sucette">
+                <text x="98" y="142" text-anchor="middle" font-size="22" font-weight="900" fill="#e8b84b" font-family="system-ui,sans-serif">1,20×</text>
+                <text x="98" y="168" text-anchor="middle" font-size="22" font-weight="900" fill="#e8b84b" font-family="system-ui,sans-serif">1,80</text>
+                <text x="98" y="192" text-anchor="middle" font-size="11" fill="rgba(255,255,255,.45)" font-family="system-ui,sans-serif">2,16 m²</text>
+                </g>
+                <rect x="50" y="20" width="96" height="252" fill="none" stroke="#7c3aed" stroke-width="2" rx="5" opacity=".8"/>
+                <rect x="88" y="272" width="20" height="52" fill="#334155" rx="2"/>
+                <rect x="68" y="322" width="60" height="10" fill="#1e293b" rx="3"/>
+            </svg>
+            </div>
+            <div class="preview-upload">
+            <label class="upload-btn" for="upload-sucette"><i class="bi bi-upload"></i> Tester un visuel</label>
+            <input type="file" id="upload-sucette" accept="image/*" data-target="sucette">
+            <span class="preview-filename" id="filename-sucette">Aucun fichier</span>
+            <button class="btn-reset-img" id="reset-sucette" onclick="resetPreview('sucette')"><i class="bi bi-x-circle"></i></button>
+            </div>
+        </div>
+        <div>
+            <div class="specs-grid">
+            <div class="spec-box"><div class="lbl">Surface</div><div class="val" id="sucette-surface">2,16 m²</div></div>
+            <div class="spec-box"><div class="lbl">Dimensions</div><div class="val" id="sucette-dims">1,20m × 1,80m</div></div>
+            <div class="spec-box"><div class="lbl">Emplacements</div><div class="val" id="sucette-nb">64</div></div>
+            <div class="spec-box"><div class="lbl">Faces libres</div><div class="val" id="sucette-libres">41</div></div>
+            </div>
+            <div class="dispo-bar-wrap">
+            <div class="dispo-bar-label"><span>Disponibilité</span><span id="sucette-pct">64%</span></div>
+            <div class="dispo-bar-track"><div class="dispo-bar-fill" id="sucette-bar" style="width:64%"></div></div>
+            </div>
+            <p class="mb-3" style="font-size:.82rem;color:var(--text-muted);line-height:1.6;">
+            Les sucettes captent l'attention à hauteur des yeux dans les zones de forte densité piétonne. Double face, elles maximisent la visibilité dans les deux sens de circulation.
+            </p>
+            <div class="gallery-row">
+            <div class="gallery-thumb"><i class="bi bi-image"></i></div>
+            <div class="gallery-thumb"><i class="bi bi-image"></i></div>
+            <div class="gallery-thumb"><i class="bi bi-image"></i></div>
+            <div class="gallery-thumb"><i class="bi bi-image"></i></div>
+            </div>
+        </div>
+        </div>
+        <div class="showcase-footer">
+        <span class="badge-dispo"><i class="bi bi-circle-fill" style="font-size:.5rem;"></i> Zones piétonnes & marchés</span>
+        <a href="{% url 'portail:supports_liste' %}?format=1x2" class="btn btn-primary btn-sm">
+            Voir les emplacements <i class="bi bi-arrow-right ms-1"></i>
+        </a>
+        </div>
+    </div>
+    </div>
+
+    <!-- ══ MARCHÉ ════════════════════════════════════════════════════════════════ -->
+    <div class="cat-section">
+    <div class="cat-label marche"><i class="bi bi-shop-window"></i> Panneaux Marché</div>
+    <h2 class="cat-title">Cœur des zones commerciales</h2>
+    <p class="cat-subtitle">Implantés dans les grands marchés — trafic piéton intense, visibilité locale.</p>
+
+    <div class="showcase marche" data-type="marche">
+        <div class="showcase-header">
+        <div>
+            <h3 id="marche-titre">Marché — 5m × 4m</h3>
+            <small id="marche-sous-titre">20 m² · 47 emplacements · 30 faces libres</small>
+        </div>
+        <div class="fmt-pills">
+            <button class="fmt-pill active" data-type="marche" data-code="gm-5x4"  data-larg="5"  data-haut="4" data-surface="20" data-nb="47" data-libres="30" data-label="Marché — 5m × 4m"  data-desc="20 m² · 47 emplacements · 30 faces libres">5×4</button>
+            <button class="fmt-pill"        data-type="marche" data-code="gm-4x3"  data-larg="4"  data-haut="3" data-surface="12" data-nb="8"  data-libres="5"  data-label="Marché — 4m × 3m"  data-desc="12 m² · 8 emplacements · 5 faces libres">4×3</button>
+            <button class="fmt-pill"        data-type="marche" data-code="gm-4x4"  data-larg="4"  data-haut="4" data-surface="16" data-nb="12" data-libres="8"  data-label="Marché — 4m × 4m"  data-desc="16 m² · 12 emplacements · 8 faces libres">4×4</button>
+            <button class="fmt-pill"        data-type="marche" data-code="gm-12x3" data-larg="12" data-haut="3" data-surface="36" data-nb="1"  data-libres="1"  data-label="Marché — 12m × 3m" data-desc="36 m² · 1 emplacement">12×3</button>
+        </div>
+        </div>
+        <div class="showcase-body">
+        <div class="preview-wrap">
+            <div class="preview-frame">
+            <svg id="svg-marche" viewBox="0 0 460 300" xmlns="http://www.w3.org/2000/svg">
+                <rect width="460" height="300" fill="#0f172a"/>
+                <rect x="24" y="24" width="380" height="220" fill="rgba(0,0,0,.4)" rx="6"/>
+                <rect x="20" y="20" width="380" height="220" fill="#1a3c6b" rx="5"/>
+                <image id="img-marche" x="20" y="20" width="380" height="220" href="" preserveAspectRatio="xMidYMid slice" style="display:none;" clip-path="url(#clip-marche)"/>
+                <clipPath id="clip-marche"><rect x="20" y="20" width="380" height="220" rx="5"/></clipPath>
+                <g id="label-marche">
+                <text id="svg-marche-dim" x="210" y="133" text-anchor="middle" font-size="48" font-weight="900" fill="#e8b84b" font-family="system-ui,sans-serif" opacity=".95">5×4</text>
+                <text id="svg-marche-surf" x="210" y="160" text-anchor="middle" font-size="14" fill="rgba(255,255,255,.45)" font-family="system-ui,sans-serif">20 m²</text>
+                </g>
+                <rect x="20" y="20" width="380" height="220" fill="none" stroke="#059669" stroke-width="2" rx="5" opacity=".8"/>
+                <line x1="20" y1="258" x2="400" y2="258" stroke="#475569" stroke-width="1"/>
+                <text id="svg-marche-larg" x="210" y="272" text-anchor="middle" font-size="11" fill="#64748b" font-family="system-ui,sans-serif">← 5 m →</text>
+                <line x1="412" y1="20" x2="412" y2="240" stroke="#475569" stroke-width="1"/>
+                <text id="svg-marche-haut" x="418" y="135" text-anchor="middle" font-size="11" fill="#64748b" font-family="system-ui,sans-serif" transform="rotate(90,418,135)">← 4 m →</text>
+            </svg>
+            </div>
+            <div class="preview-upload">
+            <label class="upload-btn" for="upload-marche"><i class="bi bi-upload"></i> Tester un visuel</label>
+            <input type="file" id="upload-marche" accept="image/*" data-target="marche">
+            <span class="preview-filename" id="filename-marche">Aucun fichier</span>
+            <button class="btn-reset-img" id="reset-marche" onclick="resetPreview('marche')"><i class="bi bi-x-circle"></i></button>
+            </div>
+        </div>
+        <div>
+            <div class="specs-grid">
+            <div class="spec-box"><div class="lbl">Surface</div><div class="val" id="marche-surface">20 m²</div></div>
+            <div class="spec-box"><div class="lbl">Dimensions</div><div class="val" id="marche-dims">5m × 4m</div></div>
+            <div class="spec-box"><div class="lbl">Emplacements</div><div class="val" id="marche-nb">47</div></div>
+            <div class="spec-box"><div class="lbl">Faces libres</div><div class="val" id="marche-libres">30</div></div>
+            </div>
+            <div class="dispo-bar-wrap">
+            <div class="dispo-bar-label"><span>Disponibilité</span><span id="marche-pct">64%</span></div>
+            <div class="dispo-bar-track"><div class="dispo-bar-fill" id="marche-bar" style="width:64%"></div></div>
+            </div>
+            <p class="mb-3" style="font-size:.82rem;color:var(--text-muted);line-height:1.6;">
+            Stratégiquement placés dans les marchés à fort passage, ces panneaux touchent une clientèle locale active. Parfaits pour les offres promotionnelles, produits de grande consommation et services locaux.
+            </p>
+            <div class="gallery-row">
+            <div class="gallery-thumb"><i class="bi bi-image"></i></div>
+            <div class="gallery-thumb"><i class="bi bi-image"></i></div>
+            <div class="gallery-thumb"><i class="bi bi-image"></i></div>
+            <div class="gallery-thumb"><i class="bi bi-image"></i></div>
+            </div>
+        </div>
+        </div>
+        <div class="showcase-footer">
+        <span class="badge-dispo"><i class="bi bi-circle-fill" style="font-size:.5rem;"></i> Trafic piéton intensif</span>
+        <a href="{% url 'portail:supports_liste' %}?format=gm-5x4" class="btn btn-primary btn-sm" id="marche-lien">
+            Voir les emplacements <i class="bi bi-arrow-right ms-1"></i>
+        </a>
+        </div>
+    </div>
+    </div>
+
+    <!-- ══ ÉCRANS LED ════════════════════════════════════════════════════════════ -->
+    <div class="cat-section">
+    <div class="cat-label ecran"><i class="bi bi-display"></i> Écrans LED</div>
+    <h2 class="cat-title">Diffusion numérique dynamique</h2>
+    <p class="cat-subtitle">8 écrans Full HD — contenus animés, fréquence configurable, impact immédiat.</p>
+
+    <div class="ecran-card">
+        <div class="ecran-hero">
+        <div class="ecran-hero-icon"><i class="bi bi-tv-fill"></i></div>
+        <div>
+            <h4>Écrans LED Full HD</h4>
+            <p>8 écrans actifs · Ouagadougou & Bobo-Dioulasso · Diffusion 6h – 23h</p>
+        </div>
+        </div>
+        <div class="ecran-body">
+        <div class="ecran-section">
+            <h6><i class="bi bi-sliders text-primary"></i> Caractéristiques techniques</h6>
+            <div class="ecran-specs">
+            <div class="ecran-spec"><div class="lbl">Résolution</div><div class="val">1920×1080</div></div>
+            <div class="ecran-spec"><div class="lbl">Durée spot</div><div class="val">5 – 20 sec</div></div>
+            <div class="ecran-spec"><div class="lbl">Plage horaire</div><div class="val">6h – 23h</div></div>
+            <div class="ecran-spec"><div class="lbl">Passages/jour</div><div class="val">~500</div></div>
+            <div class="ecran-spec"><div class="lbl">Écrans actifs</div><div class="val">8</div></div>
+            <div class="ecran-spec"><div class="lbl">Format fichier</div><div class="val">MP4 / PNG</div></div>
+            </div>
+            <div class="alert alert-info d-flex align-items-center gap-2 mb-0" style="font-size:.82rem;">
+            <i class="bi bi-info-circle-fill flex-shrink-0"></i>
+            <span>Vos créations sont diffusées en rotation avec les autres annonceurs sur le même écran.</span>
+            </div>
+        </div>
+        <div class="ecran-divider"></div>
+        <div class="ecran-section">
+            <h6><i class="bi bi-stars text-primary"></i> Pourquoi choisir le LED ?</h6>
+            <ul class="avantage-list">
+            <li><i class="bi bi-check-circle-fill ico"></i><span>Visibilité 24h/24 grâce à l'éclairage intégré</span></li>
+            <li><i class="bi bi-check-circle-fill ico"></i><span>Contenu animé — vidéo, image, message dynamique</span></li>
+            <li><i class="bi bi-check-circle-fill ico"></i><span>Fréquence de passage configurable selon budget</span></li>
+            <li><i class="bi bi-check-circle-fill ico"></i><span>Durée de spot flexible de 5 à 20 secondes</span></li>
+            <li><i class="bi bi-check-circle-fill ico"></i><span>Mise à jour du contenu sans impression</span></li>
+            <li><i class="bi bi-check-circle-fill ico"></i><span>ROI mesurable — comptage de passages disponible</span></li>
+            </ul>
+            <a href="{% url 'portail:services' %}" class="btn btn-sm btn-outline-primary mt-3">
+            En savoir plus <i class="bi bi-arrow-right ms-1"></i>
+            </a>
+        </div>
+        </div>
+    </div>
+    </div>
+
+    <!-- ── CTA FINAL ─────────────────────────────────────────────────────────── -->
+    <div class="cta-block">
+    <h3>Vous avez trouvé le format idéal ?</h3>
+    <p>Notre équipe vous accompagne du choix des emplacements jusqu'à la pose de vos visuels.</p>
+    <a href="{% url 'portail:reserver_etape1' %}" class="btn-cta">
+        <i class="bi bi-plus-lg"></i> Faire une demande maintenant
+    </a>
+    </div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    // ── SVG dynamique pour géant et marché ───────────────────────────────────────
+    const SVG_CONFIGS = {
+    geant:  { vw:460, vh:300, maxW:420, maxH:220, ox:20, oy:20 },
+    marche: { vw:460, vh:300, maxW:380, maxH:220, ox:20, oy:20 },
+    };
+
+    function updateSvg(type, larg, haut, surface) {
+    const cfg = SVG_CONFIGS[type];
+    if (!cfg) return;
+
+    const ratio = larg / haut;
+    let rw, rh;
+    if (ratio >= cfg.maxW / cfg.maxH) {
+        rw = cfg.maxW; rh = Math.round(cfg.maxW / ratio);
+    } else {
+        rh = cfg.maxH; rw = Math.round(cfg.maxH * ratio);
+    }
+    const cx = cfg.ox + Math.round((cfg.maxW - rw) / 2);
+    const cy = cfg.oy + Math.round((cfg.maxH - rh) / 2);
+    const mx = cx + rw / 2, my = cy + rh / 2;
+
+    const rects = document.querySelectorAll(`#svg-${type} rect`);
+    if (rects[1]) { rects[1].setAttribute('x', cx+4); rects[1].setAttribute('y', cy+4); rects[1].setAttribute('width', rw); rects[1].setAttribute('height', rh); }
+    if (rects[2]) { rects[2].setAttribute('x', cx);   rects[2].setAttribute('y', cy);   rects[2].setAttribute('width', rw); rects[2].setAttribute('height', rh); }
+
+    const svgImg  = document.getElementById(`img-${type}`);
+    if (svgImg)   { svgImg.setAttribute('x', cx); svgImg.setAttribute('y', cy); svgImg.setAttribute('width', rw); svgImg.setAttribute('height', rh); }
+    const clipRct = document.querySelector(`#clip-${type} rect`);
+    if (clipRct)  { clipRct.setAttribute('x', cx); clipRct.setAttribute('y', cy); clipRct.setAttribute('width', rw); clipRct.setAttribute('height', rh); }
+
+    const dimEl  = document.getElementById(`svg-${type}-dim`);
+    const surfEl = document.getElementById(`svg-${type}-surf`);
+    const largEl = document.getElementById(`svg-${type}-larg`);
+    const hautEl = document.getElementById(`svg-${type}-haut`);
+
+    if (dimEl)  { dimEl.setAttribute('x',  mx); dimEl.setAttribute('y',  my - 18); dimEl.textContent  = `${larg}×${haut}`; }
+    if (surfEl) { surfEl.setAttribute('x', mx); surfEl.setAttribute('y', my + 14); surfEl.textContent = `${surface} m²`; }
+    if (largEl) { largEl.setAttribute('x', cx + rw/2); largEl.textContent = `← ${larg} m →`; }
+    if (hautEl) {
+        const lineX = type === 'geant' ? 452 : 412;
+        hautEl.setAttribute('x', lineX + 6);
+        hautEl.setAttribute('y', cy + rh/2);
+        hautEl.setAttribute('transform', `rotate(90,${lineX+6},${cy+rh/2})`);
+        hautEl.textContent = `← ${haut} m →`;
+    }
+    }
+
+    // ── Mise à jour disponibilité bar ────────────────────────────────────────────
+    function updateDispoBar(type, libres, nb) {
+    const pct = nb > 0 ? Math.round(libres / nb * 100) : 0;
+    const bar = document.getElementById(`${type}-bar`);
+    const pctEl = document.getElementById(`${type}-pct`);
+    if (bar)   bar.style.width   = pct + '%';
+    if (pctEl) pctEl.textContent = pct + '%';
+    }
+
+    // ── Clic format pill ─────────────────────────────────────────────────────────
+    document.querySelectorAll('.fmt-pill').forEach(btn => {
+    btn.addEventListener('click', function () {
+        const type    = this.dataset.type;
+        const code    = this.dataset.code;
+        const larg    = parseFloat(this.dataset.larg);
+        const haut    = parseFloat(this.dataset.haut);
+        const surface = this.dataset.surface;
+        const nb      = parseInt(this.dataset.nb);
+        const libres  = parseInt(this.dataset.libres);
+
+        document.querySelectorAll(`.fmt-pill[data-type="${type}"]`).forEach(b => b.classList.remove('active'));
+        this.classList.add('active');
+
+        const titreEl = document.getElementById(`${type}-titre`);
+        const sousEl  = document.getElementById(`${type}-sous-titre`);
+        if (titreEl) titreEl.textContent = this.dataset.label;
+        if (sousEl)  sousEl.textContent  = this.dataset.desc;
+
+        const el = (id) => document.getElementById(id);
+        if (el(`${type}-surface`)) el(`${type}-surface`).textContent = `${surface} m²`;
+        if (el(`${type}-dims`))    el(`${type}-dims`).textContent    = `${larg}m × ${haut}m`;
+        if (el(`${type}-nb`))      el(`${type}-nb`).textContent      = nb;
+        if (el(`${type}-libres`))  el(`${type}-libres`).textContent  = libres;
+
+        const lienEl = document.getElementById(`${type}-lien`);
+        if (lienEl) lienEl.href = `/portail/supports/?format=${code}`;
+
+        updateSvg(type, larg, haut, surface);
+        updateDispoBar(type, libres, nb);
+        resetPreview(type);
+    });
+    });
+
+    // ── Preview image dans SVG ───────────────────────────────────────────────────
+    document.querySelectorAll('input[type="file"][data-target]').forEach(input => {
+    input.addEventListener('change', function () {
+        const target   = this.dataset.target;
+        const file     = this.files[0];
+        const svgImg   = document.getElementById(`img-${target}`);
+        const labelEl  = document.getElementById(`label-${target}`);
+        const filename = document.getElementById(`filename-${target}`);
+        const resetBtn = document.getElementById(`reset-${target}`);
+        if (!file || !svgImg) return;
+        const reader = new FileReader();
+        reader.onload = e => {
+        svgImg.setAttribute('href', e.target.result);
+        svgImg.style.display = '';
+        if (labelEl)  labelEl.style.display  = 'none';
+        if (filename) filename.textContent   = file.name.length > 28 ? file.name.substring(0,25)+'…' : file.name;
+        if (resetBtn) resetBtn.style.display = 'inline';
+        };
+        reader.readAsDataURL(file);
+    });
+    });
+
+    function resetPreview(target) {
+    const input   = document.getElementById(`upload-${target}`);
+    const svgImg  = document.getElementById(`img-${target}`);
+    const labelEl = document.getElementById(`label-${target}`);
+    const filename = document.getElementById(`filename-${target}`);
+    const resetBtn = document.getElementById(`reset-${target}`);
+    if (input)    input.value = '';
+    if (svgImg)  { svgImg.setAttribute('href',''); svgImg.style.display='none'; }
+    if (labelEl)   labelEl.style.display = '';
+    if (filename)  filename.textContent  = 'Aucun fichier';
+    if (resetBtn)  resetBtn.style.display = 'none';
+    }
+</script>
+{% endblock %}

@@ -1,0 +1,612 @@
+{% extends 'portail/base_portail.html' %}
+{% load static %}
+
+{% block title %}Demande de réservation — Étape 2{% endblock %}
+{% block topbar_title %}<i class="bi bi-calendar-check me-1" style="color:var(--color-primary)"></i> Demande de réservation{% endblock %}
+
+{% block extra_head %}
+<style>
+  :root {
+    --step-active:   var(--color-primary);
+    --step-done:     #10b981;
+    --step-inactive: #cbd5e1;
+    --radius-sm:  6px;
+    --radius-md:  10px;
+    --radius-lg:  14px;
+    --shadow-sm:  0 1px 3px rgba(0,0,0,.06);
+    --shadow-md:  0 4px 16px rgba(0,0,0,.08);
+  }
+
+  /* ── WIZARD ───────────────────────────────────────────── */
+  .wizard-steps {
+    display: flex; align-items: center; gap: 0;
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 14px 20px;
+    margin-bottom: 20px; box-shadow: var(--shadow-sm);
+  }
+  .step-item {
+    display: flex; align-items: center; gap: 10px; flex: 1;
+  }
+  .step-item:not(:last-child)::after {
+    content: ''; flex: 1; height: 2px;
+    background: var(--border); margin: 0 8px;
+  }
+  .step-item.done::after { background: var(--step-done); }
+  .step-circle {
+    width: 30px; height: 30px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .75rem; font-weight: 800; flex-shrink: 0;
+    border: 2px solid var(--step-inactive);
+    background: var(--bg-card); color: var(--step-inactive);
+  }
+  .step-item.active .step-circle { border-color: var(--step-active); background: var(--step-active); color: #fff; }
+  .step-item.done   .step-circle { border-color: var(--step-done);   background: var(--step-done);   color: #fff; }
+  .step-label { font-size: .78rem; font-weight: 700; color: var(--text-muted); white-space: nowrap; }
+  .step-item.active .step-label { color: var(--step-active); }
+  .step-item.done   .step-label { color: var(--step-done); }
+
+  /* ── LAYOUT ───────────────────────────────────────────── */
+  .etape2-grid {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 16px;
+  }
+  @media (max-width: 992px) { .etape2-grid { grid-template-columns: 1fr; } }
+
+  /* ── SECTION CARD ─────────────────────────────────────── */
+  .e2-card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); box-shadow: var(--shadow-sm);
+    overflow: hidden; margin-bottom: 16px;
+  }
+  .e2-card-header {
+    padding: 11px 16px; background: var(--bg-card2);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px;
+    font-size: .82rem; font-weight: 800; color: var(--text);
+  }
+  .e2-card-body { padding: 16px; }
+
+  /* ── RÉCAP EMPLACEMENTS ───────────────────────────────── */
+  .emplacement-chip {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 4px 10px; border-radius: 20px;
+    background: #eff6ff; border: 1px solid #bfdbfe;
+    color: var(--color-primary); font-size: .74rem; font-weight: 700;
+    margin: 3px;
+  }
+
+  /* ── FORM PÉRIODE ─────────────────────────────────────── */
+  .form-label-e2 {
+    display: block; font-size: .78rem; font-weight: 700;
+    color: var(--text); margin-bottom: 6px;
+  }
+  .form-control-e2 {
+    width: 100%; padding: 10px 12px;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-card2); color: var(--text);
+    font-size: .88rem; font-family: inherit;
+    transition: all .15s;
+  }
+  .form-control-e2:focus {
+    outline: none; border-color: var(--color-primary);
+    background: var(--bg-card); box-shadow: 0 0 0 3px rgba(37,99,235,.08);
+  }
+  .form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  @media (max-width: 600px) { .form-grid-2 { grid-template-columns: 1fr; } }
+
+  /* ── DATE ERROR ───────────────────────────────────────── */
+  .date-error {
+    padding: 8px 12px; border-radius: var(--radius-sm);
+    background: #fee2e2; border: 1px solid #fca5a5;
+    color: #991b1b; font-size: .78rem;
+    margin-top: 10px; display: none;
+    align-items: center; gap: 6px;
+  }
+  .date-error.show { display: flex; }
+
+  /* ── BOUTON VÉRIFIER ──────────────────────────────────── */
+  .btn-verifier {
+    width: 100%; padding: 10px;
+    background: var(--bg-card2); color: var(--color-primary);
+    border: 1.5px solid var(--color-primary);
+    border-radius: var(--radius-sm);
+    font-weight: 800; font-size: .82rem;
+    cursor: pointer; transition: all .2s;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    margin-top: 14px;
+  }
+  .btn-verifier:hover { background: #eff6ff; }
+  .btn-verifier:disabled { opacity: .45; cursor: not-allowed; }
+
+  /* ── RÉSULTATS DISPO ──────────────────────────────────── */
+  .dispo-result {
+    border-radius: var(--radius-md);
+    border: 1px solid var(--border);
+    overflow: hidden; margin-top: 14px;
+  }
+  .dispo-result-header {
+    padding: 8px 12px; background: var(--bg-card2);
+    border-bottom: 1px solid var(--border);
+    font-size: .72rem; font-weight: 800;
+    text-transform: uppercase; letter-spacing: .08em;
+    color: var(--text-muted);
+  }
+  .dispo-item {
+    display: flex; align-items: flex-start; gap: 10px;
+    padding: 10px 12px; border-bottom: 1px solid var(--border);
+    transition: background .15s;
+  }
+  .dispo-item:last-child { border-bottom: none; }
+  .dispo-item:hover { background: var(--bg-card2); }
+
+  .dispo-icon {
+    width: 24px; height: 24px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .7rem; flex-shrink: 0; margin-top: 1px;
+  }
+  .dispo-icon.ok      { background: #d1fae5; color: #059669; }
+  .dispo-icon.ko      { background: #fee2e2; color: #dc2626; }
+  .dispo-icon.loading { background: #e0e7ff; color: #4f46e5; }
+
+  .dispo-info { flex: 1; }
+  .dispo-name { font-size: .8rem; font-weight: 700; color: var(--text); }
+  .dispo-detail { font-size: .72rem; color: var(--text-muted); margin-top: 2px; }
+  .dispo-conflict {
+    font-size: .7rem; color: #dc2626;
+    background: #fee2e2; padding: 3px 8px;
+    border-radius: 4px; margin-top: 4px;
+    display: inline-block;
+  }
+
+  .btn-retirer-face {
+    font-size: .68rem; font-weight: 700; color: #dc2626;
+    background: #fee2e2; border: 1px solid #fca5a5;
+    border-radius: 4px; padding: 3px 8px; cursor: pointer;
+    transition: all .15s; flex-shrink: 0;
+  }
+  .btn-retirer-face:hover { background: #fecaca; }
+
+  /* ── SIDEBAR DROITE ───────────────────────────────────── */
+  .sidebar-card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); box-shadow: var(--shadow-sm);
+    overflow: hidden; margin-bottom: 16px;
+  }
+  .sidebar-card-header {
+    padding: 11px 16px; background: var(--bg-card2);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px;
+    font-size: .82rem; font-weight: 800; color: var(--text);
+  }
+  .sidebar-card-body { padding: 14px 16px; }
+
+  /* ── RÉSUMÉ ───────────────────────────────────────────── */
+  .resume-row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 7px 0; border-bottom: 1px solid var(--border);
+    font-size: .8rem;
+  }
+  .resume-row:last-child { border-bottom: none; }
+  .resume-label { color: var(--text-muted); font-weight: 600; }
+  .resume-val   { color: var(--text); font-weight: 800; }
+  .resume-val.ok { color: #10b981; }
+  .resume-val.ko { color: #ef4444; }
+
+  /* ── BOUTONS NAVIGATION ───────────────────────────────── */
+  .nav-btns { display: flex; gap: 8px; }
+  .btn-retour {
+    flex: 1; padding: 10px;
+    background: var(--bg-card2); color: var(--text);
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm);
+    font-weight: 700; font-size: .82rem;
+    cursor: pointer; transition: all .15s;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    text-decoration: none;
+  }
+  .btn-retour:hover { border-color: var(--color-primary); color: var(--color-primary); }
+
+  .btn-suivant {
+    flex: 2; padding: 10px;
+    background: var(--color-primary); color: #fff;
+    border: none; border-radius: var(--radius-sm);
+    font-weight: 800; font-size: .85rem;
+    cursor: pointer; transition: all .2s;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+  }
+  .btn-suivant:hover:not(:disabled) { background: #1d4ed8; box-shadow: var(--shadow-md); }
+  .btn-suivant:disabled { opacity: .45; cursor: not-allowed; background: var(--text-muted); }
+
+  /* ── SPINNER ──────────────────────────────────────────── */
+  .spinner {
+    width: 14px; height: 14px; border-radius: 50%;
+    border: 2px solid rgba(255,255,255,.3);
+    border-top-color: #fff;
+    animation: spin .6s linear infinite; display: none;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+</style>
+{% endblock %}
+
+{% block content %}
+
+  <!-- WIZARD STEPS -->
+  <div class="wizard-steps">
+    <div class="step-item done">
+      <div class="step-circle"><i class="bi bi-check-lg"></i></div>
+      <span class="step-label">Emplacements</span>
+    </div>
+    <div class="step-item active">
+      <div class="step-circle">2</div>
+      <span class="step-label">Période</span>
+    </div>
+    <div class="step-item">
+      <div class="step-circle">3</div>
+      <span class="step-label">Coordonnées</span>
+    </div>
+  </div>
+
+  <div class="etape2-grid">
+
+    <!-- COLONNE GAUCHE -->
+    <div>
+
+      <!-- RÉCAP EMPLACEMENTS -->
+      <div class="e2-card">
+        <div class="e2-card-header">
+          <i class="bi bi-pin-map-fill" style="color:var(--color-primary)"></i>
+          Emplacements sélectionnés
+          <span style="margin-left:auto;font-size:.72rem;color:var(--text-muted);font-weight:600">
+            {{ nb_faces }} emplacement{{ nb_faces|pluralize }}
+          </span>
+        </div>
+        <div class="e2-card-body">
+          {% for face in faces %}
+            <span class="emplacement-chip">
+              <i class="bi bi-geo-alt-fill"></i>
+              {{ face.support.code }} · Face {{ face.label }}
+              <span style="color:var(--text-muted);font-weight:500">{{ face.support.quartier }}</span>
+            </span>
+          {% endfor %}
+          {% for support in ecrans %}
+            <span class="emplacement-chip" style="background:#e0f2fe;border-color:#7dd3fc;color:#0369a1">
+              <i class="bi bi-display-fill"></i>
+              {{ support.code }} · Écran LED
+            </span>
+          {% endfor %}
+          <div style="margin-top:10px">
+            <a href="{% url 'portail:reserver_etape1' %}" style="font-size:.75rem;color:var(--color-primary);font-weight:700;text-decoration:none">
+              <i class="bi bi-pencil me-1"></i>Modifier la sélection
+            </a>
+          </div>
+        </div>
+      </div>
+
+      <!-- FORMULAIRE PÉRIODE -->
+      <div class="e2-card">
+        <div class="e2-card-header">
+          <i class="bi bi-calendar-range-fill" style="color:var(--color-primary)"></i>
+          Choisissez votre période
+        </div>
+        <div class="e2-card-body">
+          <form method="post" id="form-etape2" novalidate>
+            {% csrf_token %}
+
+            <div class="form-grid-2" style="margin-bottom:12px">
+              <div>
+                <label class="form-label-e2" for="date_debut">
+                  <i class="bi bi-calendar-plus text-success me-1"></i>Date de début *
+                </label>
+                <input type="date" id="date_debut" name="date_debut"
+                       class="form-control-e2"
+                       value="{{ form.date_debut.value|default:'' }}"
+                       min="{{ today }}" required>
+              </div>
+              <div>
+                <label class="form-label-e2" for="date_fin">
+                  <i class="bi bi-calendar-minus text-danger me-1"></i>Date de fin *
+                </label>
+                <input type="date" id="date_fin" name="date_fin"
+                       class="form-control-e2"
+                       value="{{ form.date_fin.value|default:'' }}"
+                       min="{{ today }}" required>
+              </div>
+            </div>
+
+            <div class="date-error" id="date-error">
+              <i class="bi bi-exclamation-triangle-fill"></i>
+              La date de fin doit être postérieure à la date de début.
+            </div>
+
+            <div style="margin-bottom:12px">
+              <label class="form-label-e2" for="nom_campagne">
+                <i class="bi bi-tag me-1"></i>Nom de la campagne
+                <span style="font-weight:500;color:var(--text-muted)">(optionnel)</span>
+              </label>
+              <input type="text" id="nom_campagne" name="nom_campagne"
+                     class="form-control-e2"
+                     placeholder="Ex : Lancement produit été 2026"
+                     value="{{ form.nom_campagne.value|default:'' }}">
+            </div>
+
+            <div>
+              <label class="form-label-e2" for="message">
+                <i class="bi bi-chat-left-text me-1"></i>Message libre
+                <span style="font-weight:500;color:var(--text-muted)">(optionnel)</span>
+              </label>
+              <textarea id="message" name="message"
+                        class="form-control-e2"
+                        rows="3"
+                        placeholder="Précisez vos besoins, questions particulières…">{{ form.message.value|default:'' }}</textarea>
+            </div>
+
+            <!-- Bouton vérifier dispo -->
+            <button type="button" class="btn-verifier" id="btn-verifier" disabled>
+              <span class="spinner" id="spinner-verifier"></span>
+              <i class="bi bi-shield-check" id="icon-verifier"></i>
+              Vérifier la disponibilité
+            </button>
+
+            <!-- Résultats vérification -->
+            <div id="dispo-results" style="display:none">
+              <div class="dispo-result">
+                <div class="dispo-result-header">Résultat de la vérification</div>
+                <div id="dispo-list"></div>
+              </div>
+            </div>
+
+          </form>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- COLONNE DROITE : RÉSUMÉ + ACTIONS -->
+    <div>
+
+      <!-- RÉSUMÉ DE LA DEMANDE -->
+      <div class="sidebar-card">
+        <div class="sidebar-card-header">
+          <i class="bi bi-clipboard-data" style="color:var(--color-primary)"></i>
+          Résumé
+        </div>
+        <div class="sidebar-card-body">
+          <div class="resume-row">
+            <span class="resume-label">Emplacements</span>
+            <span class="resume-val">{{ nb_faces }}</span>
+          </div>
+          <div class="resume-row">
+            <span class="resume-label">Durée</span>
+            <span class="resume-val" id="resume-duree">—</span>
+          </div>
+          <div class="resume-row">
+            <span class="resume-label">Disponibilité</span>
+            <span class="resume-val" id="resume-dispo">Non vérifiée</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ACTIONS -->
+      <div class="sidebar-card">
+        <div class="sidebar-card-body">
+          <div class="nav-btns">
+            <a href="{% url 'portail:reserver_etape1' %}" class="btn-retour">
+              <i class="bi bi-arrow-left"></i> Retour
+            </a>
+            <button type="submit" form="form-etape2" class="btn-suivant" id="btn-suivant" disabled>
+              Continuer <i class="bi bi-arrow-right"></i>
+            </button>
+          </div>
+          <div style="font-size:.7rem;color:var(--text-muted);text-align:center;margin-top:8px">
+            <i class="bi bi-shield-check me-1"></i>Vérifiez la disponibilité pour continuer
+          </div>
+        </div>
+      </div>
+
+      <!-- INFOS SUPPLÉMENTAIRES -->
+      <div class="sidebar-card">
+        <div class="sidebar-card-header">
+          <i class="bi bi-info-circle" style="color:#f59e0b"></i>
+          À savoir
+        </div>
+        <div class="sidebar-card-body" style="font-size:.78rem;color:var(--text-muted);line-height:1.6">
+          <p style="margin-bottom:8px">
+            <i class="bi bi-clock me-1" style="color:var(--color-primary)"></i>
+            Notre équipe confirme votre réservation sous <strong>24h ouvrables</strong>.
+          </p>
+          <p style="margin-bottom:8px">
+            <i class="bi bi-calendar-check me-1" style="color:#10b981"></i>
+            La durée minimale est de <strong>7 jours</strong>.
+          </p>
+          <p>
+            <i class="bi bi-shield-check me-1" style="color:#10b981"></i>
+            Aucun paiement n'est requis à cette étape.
+          </p>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+"use strict";
+
+const dateDebutEl = document.getElementById('date_debut');
+const dateFinEl   = document.getElementById('date_fin');
+const dateErrorEl = document.getElementById('date-error');
+const btnVerif    = document.getElementById('btn-verifier');
+const btnSuivant  = document.getElementById('btn-suivant');
+const resumeDuree = document.getElementById('resume-duree');
+const resumeDispo = document.getElementById('resume-dispo');
+
+// UUIDs des faces passées depuis la session (contexte Django)
+const facesUuids = {{ faces_uuids_json|safe }};
+
+// ── Validation dates ──────────────────────────────────────────────────────
+function datesValides() {
+  const d1 = dateDebutEl.value ? new Date(dateDebutEl.value) : null;
+  const d2 = dateFinEl.value   ? new Date(dateFinEl.value)   : null;
+  return d1 && d2 && d2 > d1;
+}
+
+function updateDuree() {
+  const d1 = dateDebutEl.value ? new Date(dateDebutEl.value) : null;
+  const d2 = dateFinEl.value   ? new Date(dateFinEl.value)   : null;
+
+  if (d1 && d2 && d2 <= d1) {
+    dateErrorEl.classList.add('show');
+    resumeDuree.textContent = '—';
+    btnVerif.disabled = true;
+    return;
+  }
+  dateErrorEl.classList.remove('show');
+
+  if (d1 && d2 && d2 > d1) {
+    const diff = Math.round((d2 - d1) / 86400000);
+    resumeDuree.textContent = diff === 1 ? '1 jour' : `${diff} jours`;
+    btnVerif.disabled = false;
+    // Réinitialiser la dispo si les dates changent
+    document.getElementById('dispo-results').style.display = 'none';
+    btnSuivant.disabled = true;
+    resumeDispo.textContent = 'Non vérifiée';
+    resumeDispo.className   = 'resume-val';
+  } else {
+    resumeDuree.textContent = '—';
+    btnVerif.disabled = true;
+  }
+}
+
+dateDebutEl.addEventListener('change', () => {
+  if (dateDebutEl.value) dateFinEl.min = dateDebutEl.value;
+  updateDuree();
+});
+dateFinEl.addEventListener('change', updateDuree);
+
+// ── Vérification disponibilité ────────────────────────────────────────────
+document.getElementById('btn-verifier').addEventListener('click', async () => {
+  if (!datesValides()) return;
+
+  const spinner  = document.getElementById('spinner-verifier');
+  const iconVerif= document.getElementById('icon-verifier');
+  spinner.style.display  = 'block';
+  iconVerif.style.display= 'none';
+  btnVerif.disabled = true;
+  btnSuivant.disabled = true;
+
+  try {
+    const res = await fetch('/portail/api/check-dispo/', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value,
+      },
+      body: JSON.stringify({
+        faces: facesUuids,
+        date_debut: dateDebutEl.value,
+        date_fin:   dateFinEl.value,
+      }),
+    });
+
+    if (!res.ok) throw new Error('Erreur serveur');
+    const data = await res.json();
+    renderDispoResults(data.resultats || []);
+
+  } catch(e) {
+    document.getElementById('dispo-list').innerHTML = `
+      <div class="dispo-item">
+        <div class="dispo-icon ko"><i class="bi bi-exclamation-triangle"></i></div>
+        <div class="dispo-info">
+          <div class="dispo-name">Erreur de vérification</div>
+          <div class="dispo-detail">Impossible de contacter le serveur. Réessayez.</div>
+        </div>
+      </div>`;
+    document.getElementById('dispo-results').style.display = 'block';
+  } finally {
+    spinner.style.display   = 'none';
+    iconVerif.style.display = '';
+    btnVerif.disabled = false;
+  }
+});
+
+// ── Rendu des résultats ───────────────────────────────────────────────────
+function renderDispoResults(resultats) {
+  const listEl = document.getElementById('dispo-list');
+  const resDiv = document.getElementById('dispo-results');
+  resDiv.style.display = 'block';
+  listEl.innerHTML = '';
+
+  let nbDispo = 0;
+
+  resultats.forEach(r => {
+    const ok = r.disponible;
+    if (ok) nbDispo++;
+
+    let conflitsHtml = '';
+    if (!ok && r.periodes_occupees && r.periodes_occupees.length) {
+      conflitsHtml = r.periodes_occupees.map(p =>
+        `<span class="dispo-conflict">
+          <i class="bi bi-calendar-x me-1"></i>Occupée du ${p.debut} au ${p.fin}
+          ${p.type === 'campagne' ? '(campagne)' : '(réservation)'}
+        </span>`
+      ).join('');
+    }
+
+    const retirerBtn = !ok ? `
+      <button class="btn-retirer-face" onclick="retirerFace('${r.face_uuid}', this)">
+        <i class="bi bi-x me-1"></i>Retirer
+      </button>` : '';
+
+    listEl.innerHTML += `
+      <div class="dispo-item" id="dispo-item-${r.face_uuid}">
+        <div class="dispo-icon ${ok ? 'ok' : 'ko'}">
+          <i class="bi bi-${ok ? 'check-lg' : 'x-lg'}"></i>
+        </div>
+        <div class="dispo-info">
+          <div class="dispo-name">${r.support_code} · Face ${r.face_label}</div>
+          <div class="dispo-detail">${ok ? 'Disponible sur la période sélectionnée' : 'Non disponible'}</div>
+          ${conflitsHtml}
+        </div>
+        ${retirerBtn}
+      </div>`;
+  });
+
+  const total = resultats.length;
+  if (nbDispo > 0) {
+    resumeDispo.textContent = `${nbDispo}/${total} disponible(s)`;
+    resumeDispo.className   = nbDispo === total ? 'resume-val ok' : 'resume-val';
+    btnSuivant.disabled = false;
+  } else {
+    resumeDispo.textContent = 'Aucun disponible';
+    resumeDispo.className   = 'resume-val ko';
+    btnSuivant.disabled = true;
+  }
+}
+
+// ── Retirer une face du résultat ─────────────────────────────────────────
+function retirerFace(faceUuid, btn) {
+  const item = document.getElementById(`dispo-item-${faceUuid}`);
+  if (item) {
+    item.style.opacity = '0';
+    item.style.transition = 'opacity .2s';
+    setTimeout(() => item.remove(), 200);
+  }
+  // Retirer de la liste des uuids côté client
+  const idx = facesUuids.indexOf(faceUuid);
+  if (idx > -1) facesUuids.splice(idx, 1);
+
+  // Recalculer le bouton suivant
+  const remaining = document.querySelectorAll('.dispo-icon.ok').length;
+  btnSuivant.disabled = remaining === 0;
+  resumeDispo.textContent = remaining > 0 ? `${remaining} disponible(s)` : 'Aucun disponible';
+  resumeDispo.className   = remaining > 0 ? 'resume-val ok' : 'resume-val ko';
+}
+
+// ── Init ──────────────────────────────────────────────────────────────────
+updateDuree();
+</script>
+{% endblock %}

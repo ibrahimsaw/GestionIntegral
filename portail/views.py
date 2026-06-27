@@ -15,7 +15,8 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 from django.views import View
 from django.views.generic import TemplateView
-
+from django.views.generic import ListView, DetailView, DeleteView, TemplateView, FormView, View
+from django.utils.safestring import mark_safe
 from campaigns.models import (
     DemandeReservation,
     LigneCampagne,
@@ -275,120 +276,169 @@ class SupportsListeView(View):
         })
 
 
-class SupportDetailView(View):
+class SupportDetailView(DetailView):
+    model = Support
     template_name = 'portail/support_detail.html'
+    context_object_name = 'support'
+    pk_url_kwarg = 'uuid'
 
-    def get(self, request, uuid):
-        support = get_object_or_404(
-            Support.objects
-            .select_related('ecran_info')
-            .prefetch_related(
-                Prefetch(
-                    'faces',
-                    queryset=FacePanneau.objects.prefetch_related(
-                        'lignes_campagne__campagne__client',
-                        'lignes_reservation__reservation',
-                    )
-                ),
-                'maintenances',
-            ),
-            uuid=uuid, actif=True
-        )
+    def get_object(self, queryset=None):
+        """
+        On centralise la récupération de l'objet ici pour éviter les conflits 
+        et intercepter la 404 avant le chargement du contexte.
+        """
+        uuid_val = self.kwargs.get(self.pk_url_kwarg)
+        
+        # Si l'utilisateur est un client, on restreint la recherche à ses campagnes
+        if self.request.user.is_authenticated and getattr(self.request.user, 'is_client', False):
+            client = getattr(self.request.user, 'client_profile', None)
+            if client is None:
+                raise PermissionDenied
+            
+            # NOTE : Si vous voulez qu'un client puisse voir TOUS les panneaux pour réserver,
+            # supprimez le filtre .filter(...) ci-dessous et mettez juste Support.objects.all()
+            return get_object_or_404(
+                Support.objects.filter(lignes_campagne__campagne__client=client).distinct(),
+                uuid=uuid_val
+            )
+        
+        # Sinon (Staff / Admin), on récupère le support normalement par son UUID
+        return get_object_or_404(Support, uuid=uuid_val)
 
-        today = timezone.now()
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        
+        # On récupère l'objet déjà validé par get_object()
+        support = self.object
 
-        # ── Statut des faces ──────────────────────────────────────────────
-        faces_data = []
+        # Client courant pour get_statut (None si staff)
+        client_courant = getattr(self.request.user, 'client_profile', None)
+
+        today = timezone.now().date()
+        now   = timezone.now()
+
+        # ── Campagnes actives et historique ───────────────────────────────
+        lignes_actives = LigneCampagne.objects.filter(
+            support=support,
+            campagne__date_debut__lte=today,
+            campagne__date_fin__gte=today,
+        ).select_related('campagne__client', 'face')
+
+        historique = LigneCampagne.objects.filter(
+            support=support,
+            campagne__date_fin__lt=today,
+        ).select_related('campagne__client').order_by('-campagne__date_fin')[:10]
+        
+        reservations = ReservationLigne.objects.filter(
+            support=support,
+            reservation__date_fin__gte=timezone.now(),
+            reservation__statut__in=['en_attente', 'confirmee'],
+        ).select_related('reservation__client').order_by('reservation__date_debut')
+
+        # ── Informations générales ─────────────────────────────────────────
+        info_rows = [
+            ('Code',         support.code),
+            ('Type',         support.get_type_support_display()),
+            ('Ville',        support.ville or '—'),
+            ('Quartier',     support.quartier or '—'),
+            ('Installation', support.date_installation.strftime('%d/%m/%Y') if support.date_installation else '—'),
+        ]
+
+        # ── Maintenances ──────────────────────────────────────────────────
+        maintenances = support.maintenances.order_by('-date_intervention')[:4]
+
+        ecran       = None
+        ecran_stats = []
+        spots_data  = []
+
+        # ── Logique spécifique PANNEAU ────────────────────────────────────
         if support.type_support == 'panneau':
+            if support.format:
+                info_rows.append(('Format',     support.get_format_display()))
+                info_rows.append(('Dimensions', support.dimensions))
+                info_rows.append(('Surface',    support.surface_m2))
+                info_rows.append(('Type',       support.type_panneau))
+
             for face in support.faces.all():
-                statut = face.get_statut(date_debut=today, date_fin=today)
-
-                # Prochaine disponibilité si occupée
-                prochaine_dispo = None
-                if statut in ('occupe', 'reserve'):
-                    lc = (
-                        LigneCampagne.objects.filter(
-                            face=face,
-                            campagne__date_fin__gte=today.date(),
-                            campagne__statut__in=['en_cours', 'a_venir'],
-                        )
-                        .order_by('-campagne__date_fin')
-                        .first()
-                    )
-                    if lc:
-                        prochaine_dispo = lc.campagne.date_fin + timedelta(days=1)
-
-                faces_data.append({
-                    'face':            face,
-                    'statut':          statut,
-                    'prochaine_dispo': prochaine_dispo,
-                })
-
-        # ── Calendrier 3 mois ─────────────────────────────────────────────
-        calendriers = []
-        if support.type_support == 'panneau':
-            debut_periode = today.date().replace(day=1)
-            for _ in range(3):
-                # Fin du mois courant
-                if debut_periode.month == 12:
-                    fin_mois = debut_periode.replace(year=debut_periode.year+1, month=1, day=1) - timedelta(days=1)
-                else:
-                    fin_mois = debut_periode.replace(month=debut_periode.month+1, day=1) - timedelta(days=1)
-
-                # Jours occupés sur ce mois (1 requête par mois)
-                jours_occupes = set()
-                lignes = LigneCampagne.objects.filter(
-                    support=support,
-                    campagne__date_debut__lte=fin_mois,
-                    campagne__date_fin__gte=debut_periode,
-                    campagne__statut__in=['en_cours', 'a_venir'],
+                statut = face.get_statut(
+                    date_debut=now,
+                    client=client_courant
                 )
-                for lc in lignes:
-                    cur = max(lc.campagne.date_debut, debut_periode)
-                    end = min(lc.campagne.date_fin, fin_mois)
-                    while cur <= end:
-                        jours_occupes.add(cur)
-                        cur += timedelta(days=1)
+                status_icon = (
+                    'bi-check2'    if statut == 'libre'   else
+                    'bi-broadcast' if statut == 'reserve' else
+                    'bi-x-circle'
+                )
+                status_class = (
+                    'bs-disponible' if statut == 'libre'   else
+                    'bs-reserve'    if statut == 'reserve' else
+                    'bs-occupe'
+                )
+                status_label = (
+                    'Disponible' if statut == 'libre'   else
+                    'Réservé'    if statut == 'reserve' else
+                    'Occupé'
+                )
 
-                # Semaines du mois
-                semaines = []
-                cur = debut_periode
-                while cur.weekday() != 0:
-                    cur -= timedelta(days=1)
-                while cur <= fin_mois:
-                    semaine = []
-                    for _ in range(7):
-                        if cur.month == debut_periode.month:
-                            semaine.append({
-                                'date':    cur,
-                                'occupe':  cur in jours_occupes,
-                                'passe':   cur < today.date(),
-                            })
-                        else:
-                            semaine.append(None)
-                        cur += timedelta(days=1)
-                    semaines.append(semaine)
+                badge = mark_safe(
+                    f'<span class="badge-status {status_class}">'
+                    f'<i class="bi {status_icon} me-1"></i>{status_label}</span>'
+                )
+                notes     = f' — {face.notes}' if face.notes else ''
+                face_info = mark_safe(
+                    f'{face.get_eclairage_display()}{notes} {badge}'
+                )
+                info_rows.append((f'Face {face.label}', face_info))
 
-                calendriers.append({
-                    'mois':     debut_periode,
-                    'semaines': semaines,
-                })
+        # ── Logique spécifique ÉCRAN ──────────────────────────────────────
+        elif support.type_support == 'ecran':
+            ecran = getattr(support, 'ecran_info', None)
 
-                # Mois suivant
-                if debut_periode.month == 12:
-                    debut_periode = debut_periode.replace(year=debut_periode.year+1, month=1)
-                else:
-                    debut_periode = debut_periode.replace(month=debut_periode.month+1)
+            if ecran:
+                h_allumage   = ecran.heure_allumage.strftime('%H:%M') if ecran.heure_allumage else '00:00'
+                h_extinction = ecran.heure_extinction.strftime('%H:%M') if ecran.heure_extinction else '00:00'
+                plage_str    = f'{h_allumage} – {h_extinction}'
+                taux         = ecran.taux_occupation_pourcentage()
 
-        return render(request, self.template_name, {
-            'support':      support,
-            'faces_data':   faces_data,
-            'calendriers':  calendriers,
-            'maps_url': (
-                f"https://www.google.com/maps?q="
-                f"{support.latitude},{support.longitude}"
-            ),
+                info_rows += [
+                    ('Résolution',      ecran.get_resolution_display()),
+                    ('Cellule',         f'{ecran.cellule}'),
+                    ('Type écran',      ecran.get_type_ecran_display()),
+                    ('Plage diffusion', plage_str),
+                    ('Occupation',      f'{taux}%'),
+                ]
+
+                ecran_stats = [
+                    ('Résolution', 'bi-aspect-ratio', ecran.get_resolution_display(), 'var(--text)'),
+                    ('Cellule',    'bi-tv',           f'{ecran.cellule}',              'var(--text)'),
+                    ('Occupation', 'bi-pie-chart',    f'{taux}%',                      'var(--color-primary)'),
+                    ('Diffusion',  'bi-clock',        plage_str,                       'var(--color-primary)'),
+                ]
+
+                for ligne in lignes_actives:
+                    spots_data.append({
+                        'id':       ligne.pk,
+                        'name':     f"{ligne.campagne.client.nom} — {ligne.campagne.nom}",
+                        'dur':      ligne.campagne.duree_passage or 20,
+                        'interval': ligne.campagne.frequence or 120,
+                    })
+
+        # ── Contexte final ────────────────────────────────────────────────
+        context.update({
+            'support':        support,
+            'lignes_actives': lignes_actives,
+            'historique':     historique,
+            'maintenances':   maintenances,
+            'ecran':          ecran,
+            'ecran_stats':    ecran_stats,
+            'info_rows':      info_rows,
+            'spots_data':     spots_data,
+            'reservations':   reservations,
         })
+        return context
+
+
+
 
 
 class ServicesView(TemplateView):
@@ -501,22 +551,22 @@ class ReserverEtape1View(View):
 
     def _panier(self, request):
         """Retourne les faces déjà dans le panier session."""
-        uuids = request.session.get('demande_faces_uuids', [])
-        if not uuids:
+        ids = request.session.get('demande_faces_uuids', [])
+        if not ids:
             return []
         return list(
-            FacePanneau.objects.filter(uuid__in=uuids)
+            FacePanneau.objects.filter(pk__in=ids)   # ← uuid__in → pk__in
             .select_related('support')
         )
 
     def get(self, request):
-        # Pré-sélection depuis query param ?face=<uuid>
-        face_uuid = request.GET.get('face')
-        if face_uuid:
-            faces_uuids = request.session.get('demande_faces_uuids', [])
-            if face_uuid not in faces_uuids:
-                faces_uuids.append(face_uuid)
-            request.session['demande_faces_uuids'] = faces_uuids
+        # Pré-sélection depuis query param ?face=<id>
+        face_id = request.GET.get('face')
+        if face_id:
+            faces_ids = request.session.get('demande_faces_uuids', [])
+            if face_id not in faces_ids:
+                faces_ids.append(face_id)
+            request.session['demande_faces_uuids'] = faces_ids
 
         form = Etape1Form(initial={
             'faces_selectionnees': json.dumps(
@@ -546,10 +596,10 @@ class ReserverEtape2View(View):
     template_name = 'portail/reserver_etape2.html'
 
     def _get_selections(self, request):
-        faces_uuids    = request.session.get('demande_faces_uuids', [])
-        supports_uuids = request.session.get('demande_supports_uuids', [])
-        faces    = list(FacePanneau.objects.filter(uuid__in=faces_uuids).select_related('support'))
-        supports = list(Support.objects.filter(uuid__in=supports_uuids))
+        faces_ids    = request.session.get('demande_faces_uuids', [])
+        supports_ids = request.session.get('demande_supports_uuids', [])
+        faces    = list(FacePanneau.objects.filter(pk__in=faces_ids).select_related('support'))   # ← corrigé
+        supports = list(Support.objects.filter(pk__in=supports_ids))                              # ← corrigé
         return faces, supports
 
     def get(self, request):
@@ -558,7 +608,6 @@ class ReserverEtape2View(View):
             messages.warning(request, "Veuillez d'abord sélectionner des emplacements.")
             return redirect('portail:reserver_etape1')
 
-        # Pré-remplissage depuis session si retour arrière
         initial = request.session.get('demande_etape2', {})
         form = Etape2Form(initial=initial)
         return render(request, self.template_name, {
@@ -573,10 +622,10 @@ class ReserverEtape2View(View):
         if form.is_valid():
             d = form.cleaned_data
             request.session['demande_etape2'] = {
-                'date_debut':  str(d['date_debut']),
-                'date_fin':    str(d['date_fin']),
+                'date_debut':   str(d['date_debut']),
+                'date_fin':     str(d['date_fin']),
                 'nom_campagne': d.get('nom_campagne', ''),
-                'message':     d.get('message', ''),
+                'message':      d.get('message', ''),
             }
             return redirect('portail:reserver_etape3')
 
@@ -592,19 +641,18 @@ class ReserverEtape3View(View):
     template_name = 'portail/reserver_etape3.html'
 
     def _check_session(self, request):
-        """Vérifie que les étapes précédentes ont été complétées."""
-        faces_uuids = request.session.get('demande_faces_uuids', [])
-        etape2      = request.session.get('demande_etape2', {})
-        if not faces_uuids or not etape2.get('date_debut'):
+        faces_ids = request.session.get('demande_faces_uuids', [])
+        etape2    = request.session.get('demande_etape2', {})
+        if not faces_ids or not etape2.get('date_debut'):
             return False
         return True
 
     def _get_recap(self, request):
-        faces_uuids    = request.session.get('demande_faces_uuids', [])
-        supports_uuids = request.session.get('demande_supports_uuids', [])
-        etape2         = request.session.get('demande_etape2', {})
-        faces    = list(FacePanneau.objects.filter(uuid__in=faces_uuids).select_related('support'))
-        supports = list(Support.objects.filter(uuid__in=supports_uuids))
+        faces_ids    = request.session.get('demande_faces_uuids', [])
+        supports_ids = request.session.get('demande_supports_uuids', [])
+        etape2       = request.session.get('demande_etape2', {})
+        faces    = list(FacePanneau.objects.filter(pk__in=faces_ids).select_related('support'))   # ← corrigé
+        supports = list(Support.objects.filter(pk__in=supports_ids))                              # ← corrigé
         return faces, supports, etape2
 
     def get(self, request):
@@ -640,7 +688,6 @@ class ReserverEtape3View(View):
         date_debut = date_type.fromisoformat(etape2['date_debut'])
         date_fin   = date_type.fromisoformat(etape2['date_fin'])
 
-        # ── Créer la DemandeReservation ───────────────────────────────────
         demande = DemandeReservation.objects.create(
             nom_contact          = d['nom_contact'],
             societe              = d.get('societe', ''),
@@ -658,10 +705,8 @@ class ReserverEtape3View(View):
         if supports:
             demande.supports_souhaites.set(supports)
 
-        # ── Emails ───────────────────────────────────────────────────────
         self._send_emails(demande, faces, supports, etape2)
 
-        # ── Nettoyage session ─────────────────────────────────────────────
         for key in ('demande_faces_uuids', 'demande_supports_uuids', 'demande_etape2'):
             request.session.pop(key, None)
 
@@ -723,7 +768,6 @@ class ConfirmationView(View):
     def get(self, request, uuid):
         demande = get_object_or_404(DemandeReservation, uuid=uuid)
         return render(request, self.template_name, {'demande': demande})
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 # API JSON

@@ -103,8 +103,8 @@ class ApiSupportPopupView(LoginRequiredMixin, View):
             'ville':             support.ville,
             'quartier':          support.quartier,
             'date_installation': support.date_installation.strftime('%d/%m/%Y') if support.date_installation else None,
-            'url_detail':        f'/inventory/{support.uuid}/',
-            'url_edit':          f'/inventory/{support.uuid}/modifier/',
+            'url_detail':        f'/gestion/inventory/{support.uuid}/',
+            'url_edit':          f'/gestion/inventory/{support.uuid}/modifier/',
             'photo':             support.photo_principale.url if support.photo_principale else None,
             'photos_maintenance': [],
         }

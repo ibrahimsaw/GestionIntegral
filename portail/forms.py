@@ -30,31 +30,34 @@ class Etape1Form(forms.Form):
         supports_json = cleaned.get('supports_selectionnes', '[]')
 
         try:
-            faces_uuids    = json.loads(faces_json)    if faces_json    else []
-            supports_uuids = json.loads(supports_json) if supports_json else []
+            faces_ids    = json.loads(faces_json)    if faces_json    else []
+            supports_ids = json.loads(supports_json) if supports_json else []
+            # Convertir en int, ignorer les valeurs invalides
+            faces_ids    = [int(x) for x in faces_ids    if str(x).strip().isdigit()]
+            supports_ids = [int(x) for x in supports_ids if str(x).strip().isdigit()]
         except (json.JSONDecodeError, ValueError):
             raise forms.ValidationError("Sélection invalide. Veuillez réessayer.")
 
-        if not faces_uuids and not supports_uuids:
+        if not faces_ids and not supports_ids:
             raise forms.ValidationError(
                 "Veuillez sélectionner au moins un emplacement sur la carte."
             )
 
-        # Vérifier que les UUIDs existent réellement
+        # Recherche par pk au lieu de uuid
         faces = list(
-            FacePanneau.objects.filter(uuid__in=faces_uuids)
+            FacePanneau.objects.filter(pk__in=faces_ids)
             .select_related('support')
         )
         supports = list(
-            Support.objects.filter(uuid__in=supports_uuids, type_support='ecran', actif=True)
+            Support.objects.filter(pk__in=supports_ids, type_support='ecran', actif=True)
         )
 
         cleaned['faces_objects']    = faces
         cleaned['supports_objects'] = supports
-        cleaned['faces_uuids']      = [str(f.uuid) for f in faces]
-        cleaned['supports_uuids']   = [str(s.uuid) for s in supports]
+        # On garde des strings pour la session
+        cleaned['faces_uuids']      = [str(f.pk) for f in faces]
+        cleaned['supports_uuids']   = [str(s.pk) for s in supports]
         return cleaned
-
 
 # ── Étape 2 — Période et projet ───────────────────────────────────────────────
 

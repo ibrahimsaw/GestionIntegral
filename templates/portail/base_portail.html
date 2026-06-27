@@ -1,408 +1,476 @@
 {% load static %}
-<!DOCTYPE html>
+<!doctype html>
 <html lang="fr">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}GeoAd ERP - Régie Publicitaire INTEGRAL{% endblock %}</title>
-    
-    <!-- Bootstrap 5 CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    
-    <!-- Font Awesome Icons -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    
-    <!-- Leaflet Maps -->
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-    
-    <!-- Custom CSS -->
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" type="image" href="{% static 'img/Logo-Integral-2-768x768.png' %}" />
+    <title>{% block title %}Integral{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
     <style>
-        :root {
-            --primary: #0d6efd;
-            --primary-dark: #0b5ed7;
-            --secondary: #6c757d;
-            --success: #198754;
-            --danger: #dc3545;
-            --warning: #ffc107;
-            --info: #0dcaf0;
-            --light: #f8f9fa;
-            --dark: #212529;
+      .cursor-pointer { cursor: pointer; }
+
+      .icon-circle {
+        width: 38px; height: 38px;
+        border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        flex-shrink: 0; font-size: 1.1rem;
+      }
+
+      .bg-danger-light  { background-color: rgba(220, 53, 69, 0.12); }
+      .bg-warning-light { background-color: rgba(255, 193, 7, 0.15); }
+      .bg-info-light    { background-color: rgba(13, 110, 253, 0.12); }
+
+      .alerte-item-hover { transition: background-color 0.2s ease; white-space: normal; }
+      .alerte-item-hover:hover { background-color: #f8f9fa !important; }
+
+      .alert-scroll-container::-webkit-scrollbar       { width: 5px; }
+      .alert-scroll-container::-webkit-scrollbar-track { background: #f1f1f1; }
+      .alert-scroll-container::-webkit-scrollbar-thumb { background: #ccc; border-radius: 10px; }
+      .alert-scroll-container::-webkit-scrollbar-thumb:hover { background: #999; }
+
+      .dropdown-item { display: flex !important; align-items: center; }
+
+      :root {
+        --color-disponible:  {{ DESIGN.COLOR_DISPONIBLE }};
+        --color-occupe:      {{ DESIGN.COLOR_OCCUPE }};
+        --color-reserve:     {{ DESIGN.COLOR_RESERVE }};
+        --color-panne:     {{ DESIGN.COLOR_PANNE }};
+
+        --color-disponible_bg:  {{ DESIGN.COLOR_DISPONIBLE_BG }};
+        --color-occupe_bg:      {{ DESIGN.COLOR_OCCUPE_BG }};
+        --color-reserve_bg:     {{ DESIGN.COLOR_RESERVE_BG }};
+        --color-panne_bg:     {{ DESIGN.COLOR_PANNE_BG }};
+
+        --color-maintenance: {{ DESIGN.COLOR_MAINTENANCE }};
+        --color-primary:     {{ DESIGN.COLOR_PRIMARY }};
+        --color-secondary:   {{ DESIGN.COLOR_SECONDARY }};
+        --color-noir:        {{ DESIGN.COLOR_NOIR }};
+        --bg:         #f1f5f9;
+        --bg-card:    #ffffff;
+        --bg-card2:   #f8fafc;
+        --border:     #e2e8f0;
+        --text:       #1e293b;
+        --text-muted: #64748b;
+        --sidebar-w:  260px;
+        --topbar-h:   65px;
+        --radius:     8px;
+        --shadow:     0 1px 3px rgba(0,0,0,.08);
+        --shadow-md:  0 4px 12px rgba(0,0,0,.1);
+      }
+
+      *,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+      html, body { height: 100%; }
+
+      body {
+        font-family: system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
+        background: var(--bg); color: var(--text);
+        font-size: 14px; display: flex;
+      }
+
+      ::-webkit-scrollbar       { width: 8px; height: 8px; }
+      ::-webkit-scrollbar-track { background: var(--bg); }
+      ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+
+      .visible { background: #dbeafe; }
+
+      /* SIDEBAR */
+      .sidebar {
+        width: var(--sidebar-w); min-height: 100vh;
+        background: var(--bg-card); border-right: 2px solid var(--border);
+        position: fixed; left: 0; top: 0; bottom: 0;
+        display: flex; flex-direction: column;
+        z-index: 1000; overflow-y: auto; transition: transform .25s;
+      }
+      .sidebar-brand {
+        padding: 18px 16px 14px;
+        border-bottom: 2px solid var(--border);
+        background: var(--bg-card);
+      }
+      .brand-name { font-size: 1.35rem; font-weight: 800; color: #fff; letter-spacing: -.5px; }
+      .brand-sub  { font-size: .6rem; color: var(--color-primary); text-transform: uppercase; letter-spacing: 1.5px; margin-top: 2px; }
+      .role-pill  {
+        display: inline-block; padding: 2px 10px; border-radius: 20px;
+        font-size: .62rem; font-weight: 700; text-transform: uppercase;
+        letter-spacing: .4px; margin-top: 8px;
+        background: rgb(from var(--color-primary) r g b / 0.2);
+        color: var(--color-primary);
+      }
+      .sidebar-nav { flex: 1; padding: 10px 8px; }
+      .nav-label {
+        font-size: .6rem; text-transform: uppercase; letter-spacing: 1.5px;
+        color: var(--text-muted); padding: 10px 10px 4px; font-weight: 700;
+      }
+      .nav-link {
+        display: flex; align-items: center; gap: 9px;
+        padding: 8px 10px; border-radius: 6px;
+        color: var(--text-muted); text-decoration: none;
+        font-size: .84rem; font-weight: 500;
+        transition: all .12s; margin-bottom: 1px;
+      }
+      .nav-link i { font-size: .95rem; flex-shrink: 0; }
+      .nav-link:hover { color: var(--color-secondary); background: #eff6ff; }
+      .nav-link.active {
+        color: var(--color-primary); background: #dbeafe;
+        font-weight: 700;
+        border-left: 3px solid var(--color-primary);
+        border-right: 3px solid var(--color-primary);
+        padding-left: 7px;
+      }
+      .sidebar-footer {
+        padding: 12px 14px; border-top: 2px solid var(--border);
+        background: var(--bg-card2); font-size: .75rem; color: var(--text-muted);
+      }
+
+      /* MAIN */
+      .main-wrap { margin-left: var(--sidebar-w); flex: 1; flex-direction: column; min-height: 100vh; }
+
+      /* TOPBAR */
+      .topbar {
+        height: var(--topbar-h); background: var(--bg-card);
+        display: flex; align-items: center; padding: 0 24px; gap: 10px;
+        position: sticky; top: 0; z-index: 500; box-shadow: var(--shadow);
+      }
+      .topbar-title {
+        font-size: .95rem; font-weight: 700; color: var(--text);
+        flex: 1; display: flex; align-items: center; gap: 8px;
+      }
+
+      /* PAGE CONTENT */
+      .page-content { flex: 1; padding: 18px; }
+
+      /* CARDS */
+      .card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow); }
+      .card-header {
+        background: var(--bg-card2); border-bottom: 1px solid var(--border);
+        padding: 11px 16px; font-size: .84rem; font-weight: 700; color: var(--text);
+        display: flex; align-items: center; gap: 8px;
+        border-radius: var(--radius) var(--radius) 0 0;
+      }
+      .card-body { padding: 16px; }
+
+      /* STAT CARDS */
+      .stat-card {
+        background: var(--bg-card); border: 1px solid var(--border);
+        border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow);
+        transition: box-shadow .2s, transform .15s; cursor: default;
+      }
+      .stat-card:hover { box-shadow: var(--shadow-md); transform: translateY(-1px); }
+      .stat-num { font-size: 2rem; font-weight: 800; line-height: 1; }
+      .stat-lbl { font-size: .68rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; margin-top: 4px; font-weight: 600; }
+
+      /* BADGES */
+      .badge-status {
+        display: inline-flex; align-items: center; gap: 4px;
+        padding: 3px 9px; border-radius: 20px;
+        font-size: .68rem; font-weight: 700;
+        text-transform: uppercase; letter-spacing: .4px; white-space: nowrap;
+      }
+      .bs-disponible  { background: var(--color-disponible_bg); color: var(--color-disponible) }
+      .bs-occupe      { background: var(--color-occupe_bg); color: var(--color-occupe) }
+      .bs-reserve     { background: var(--color-reserve_bg); color: var(--color-reserve) }
+      .bs-maintenance { background: #fee2e2; color: #b91c1c; }
+      .bs-panne       { background: var(--color-panne_bg); color: var(--color-panne); }
+      .bs-bientot     { background: #ede9fe; color: #6d28d9; }
+      .bs-brouillon   { background: #f1f5f9; color: #475569; }
+      .bs-en_cours    { background: #dcfce7; color: #15803d; }
+      .bs-a_venir     { background: #dbeafe; color: #1d4ed8; }
+      .bs-terminee    { background: #f1f5f9; color: #475569; }
+      .bs-annulee     { background: #fee2e2; color: #b91c1c; }
+      .bs-panneau     { background: #ede9fe; color: #6d28d9; }
+      .bs-ecran       { background: #dbeafe; color: #1d4ed8; }
+
+      .bs-border { border-left-width: 4px; border-left-style: solid; }
+      .border-disponible  { border-left-color: var(--color-disponible) }
+      .border-occupe      { border-left-color: var(--color-occupe) }
+      .border-reserve     { border-left-color: var(--color-reserve) }
+      .border-maintenance { border-left-color: #b91c1c; }
+      .border-panne       { border-left-color: var(--color-panne); }
+      .border-bientot     { border-left-color: #6d28d9; }
+      .border-brouillon   { border-left-color: #475569; }
+      .border-en_cours    { border-left-color: #15803d; }
+      .border-a_venir     { border-left-color: #1d4ed8; }
+      .border-terminee    { border-left-color: #475569; }
+      .border-annulee     { border-left-color: #b91c1c; }
+      .border-panneau     { border-left-color: #6d28d9; }
+      .border-ecran       { border-left-color: #1d4ed8; }
+
+      /* 1. On applique d'abord une règle commune pour activer la bordure sur tous ces boutons */
+      .btn-disponible, .btn-occupe, .btn-reserve, .btn-maintenance, 
+      .btn-panne, .btn-bientot, .btn-brouillon, .btn-en_cours, 
+      .btn-a_venir, .btn-terminee, .btn-annulee, .btn-panneau, 
+      .btn-ecran, .btn-secondary {
+          border-width: 1px;  /* Épaisseur de la bordure (ajustez à 2px si nécessaire) */
+          border-style: solid; /* Type de bordure obligatoire pour qu'elle soit visible */
+      }
+
+      /* 2. Vos classes avec les couleurs spécifiques */
+      .btn-disponible  { border-color: var(--color-disponible); background: var(--color-disponible_bg); color: var(--color-disponible); }
+      .btn-occupe      { border-color: var(--color-occupe); background: var(--color-occupe_bg); color: var(--color-occupe); }
+      .btn-reserve     { border-color: var(--color-reserve); background: var(--color-reserve_bg); color: var(--color-reserve); }
+      .btn-maintenance { border-color: #b91c1c; background: #fee2e2; color: #b91c1c; }
+      .btn-panne       { border-color: var(--color-panne); background: var(--color-panne_bg); color: var(--color-panne); } /* Corrigé ici */
+      .btn-bientot     { border-color: #6d28d9; background: #ede9fe; color: #6d28d9; }
+      .btn-brouillon   { border-color: #475569; background: #f1f5f9; color: #475569; }
+      .btn-en_cours    { border-color: #15803d; background: #dcfce7; color: #15803d; }
+      .btn-a_venir     { border-color: #1d4ed8; background: #dbeafe; color: #1d4ed8; }
+      .btn-terminee    { border-color: #475569; background: #f1f5f9; color: #475569; }
+      .btn-annulee     { border-color: #b91c1c; background: #fee2e2; color: #b91c1c; }
+      .btn-panneau     { border-color: #6d28d9; background: #ede9fe; color: #6d28d9; }
+      .btn-ecran       { border-color: #1d4ed8; background: #dbeafe; color: #1d4ed8; }
+      .btn-secondary   { border-color: #6c757d; background: #6c757d2f; color: #6c757d; }
+
+      .text-disponible  { color: var(--color-disponible) }
+      .text-occupe      { color: var(--color-occupe) }
+      .text-reserve     { color: var(--color-reserve) }
+      .text-maintenance { color: #b91c1c; }
+      .text-panne       { color: var(--color-panne); }
+      .text-bientot     { color: #6d28d9; }
+      .text-brouillon   { color: #475569; }
+      .text-en_cours    { color: #15803d; }
+      .text-a_venir     { color: #1d4ed8; }
+      .text-terminee    { color: #475569; }
+      .text-annulee     { color: #b91c1c; }
+      .text-panneau     { color: #6d28d9; }
+      .text-ecran       { color: #1d4ed8; }
+      .text-secondary   { color: #6c757d;}
+
+      .nav-pills .nav-link.active, .nav-pills .show>.nav-link {
+            color: var(--color-primary);
+            background: #dbeafe;
         }
 
-        body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            line-height: 1.6;
-            color: #333;
+      .card-libre {
+        background:  var(--bg-card2);
+        border: 1px solid var(--color-disponible);
+        color: var(--color-disponible);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .card-occupe {
+        background:  var(--bg-card2);
+        border: 1px solid var(--color-occupe);
+        color: var(--color-occupe);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+      .card-reserve {
+        background:  var(--bg-card2);
+        border: 1px solid var(--color-reserve);
+        color: var(--color-reserve);
+        border-radius: 8px;
+        overflow: hidden;
+      }
+
+      .taux-bar  { height: 6px; background: #e2e8f0; border-radius: 3px; overflow: hidden; }
+      .taux-fill { height: 100%; border-radius: 3px; transition: width .4s; }
+
+      /* FORMS */
+      .form-control, .form-select {
+        background: #fff; border: 1px solid var(--border);
+        color: var(--text); border-radius: 6px; font-size: .875rem;
+      }
+      .form-control:focus, .form-select:focus {
+        background: #fff; border-color: var(--color-primary);
+        color: var(--text); box-shadow: 0 0 0 3px rgba(37,99,235,.12);
+      }
+      .form-label {
+        font-size: .72rem; font-weight: 700; color: var(--text-muted);
+        text-transform: uppercase; letter-spacing: .4px; margin-bottom: 5px;
+      }
+
+      /* BUTTONS */
+      .btn-primary { background: var(--color-primary); border-color: var(--color-primary); color: #fff; font-weight: 600; }
+      .btn-primary:hover { background: var(--color-secondary); border-color: var(--color-secondary); color: #fff; }
+      .btn-outline-secondary {
+        border-color: var(--border); color: var(--text-muted);
+        background: var(--bg-card); font-weight: 500;
+      }
+      .btn-outline-secondary:hover { background: var(--bg-card2); color: var(--text); border-color: #94a3b8; }
+      .btn { font-size: .84rem; }
+      .btn-outline-primary {
+        --bs-btn-color: var(--color-primary);
+        --bs-btn-border-color: var(--color-primary);
+        --bs-btn-hover-color: #fff;
+        --bs-btn-hover-bg: var(--color-primary);
+        --bs-btn-hover-border-color: var(--color-primary);
+        --bs-btn-focus-shadow-rgb: 13, 110, 253;
+        --bs-btn-active-color: #fff;
+        --bs-btn-active-bg: var(--color-primary);
+        --bs-btn-active-border-color: var(--color-primary);
+        --bs-btn-active-shadow: inset 0 3px 5px rgba(0,0,0,.125);
+        --bs-btn-disabled-color: var(--color-primary);
+        --bs-btn-disabled-bg: transparent;
+        --bs-btn-disabled-border-color: var(--color-primary);
+        --bs-gradient: none;
+      }
+      .text-primary   { --bs-text-opacity: 1; color: var(--color-primary) !important; }
+      .border-primary { --bs-border-opacity: 1; border-color: var(--color-primary) !important; }
+
+      /* TABLES */
+      .table { color: var(--text); font-size: .875rem; --bs-table-bg: transparent; }
+      .table thead th {
+        background: var(--bg-card2); border-bottom: 2px solid var(--border);
+        font-size: .68rem; text-transform: uppercase; letter-spacing: 1px;
+        color: var(--text-muted); font-weight: 700; padding: 10px 14px; white-space: nowrap;
+      }
+      .table tbody td { border-color: var(--border); padding: 10px 14px; vertical-align: middle; }
+      .table tbody tr:hover { background: #f8fafc; }
+
+      .table-success {
+          --bs-table-color: #000;
+          --bs-table-bg: #16a34a30;
+          --bs-table-border-color: #a7b9b1;
+          --bs-table-striped-bg: #c7dbd2;
+          --bs-table-striped-color: #000;
+          --bs-table-active-bg: #bcd0c7;
+          --bs-table-active-color: #000;
+          --bs-table-hover-bg: #c1d6cc;
+          --bs-table-hover-color: #000;
+          color: var(--bs-table-color);
+          border-color: var(--bs-table-border-color);
+      }
+
+      .table-warning {
+            --bs-table-color: #000;
+            --bs-table-bg: #6c757d47;
+            --bs-table-border-color: #a7b9b1;
+            --bs-table-striped-bg: #c7dbd2;
+            --bs-table-striped-color: #000;
+            --bs-table-active-bg: #bcd0c7;
+            --bs-table-active-color: #000;
+            --bs-table-hover-bg: #c1d6cc;
+            --bs-table-hover-color: #000;
+            color: var(--bs-table-color);
+            border-color: var(--bs-table-border-color);
         }
 
-        /* ── Navbar ────────────────────────────────────────────────────── */
-        .navbar {
-            background: white !important;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-            padding: 1rem 0;
-        }
+      /* ALERTS */
+      .alert           { border-radius: var(--radius); font-size: .875rem; }
+      .alert-success   { background: #f0fdf4; color: #15803d; border-color: #bbf7d0; }
+      .alert-warning   { background: #fffbeb; color: #b45309; border-color: #fde68a; }
+      .alert-danger    { background: #fef2f2; color: #b91c1c; border-color: #fecaca; }
+      .alert-info      { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
 
-        .navbar-brand {
-            font-weight: 700;
-            font-size: 1.5rem;
-            color: var(--primary) !important;
-        }
+      ::-webkit-scrollbar       { width: 6px; height: 6px; }
+      ::-webkit-scrollbar-track { background: var(--bg); }
+      ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 3px; }
 
-        .navbar-nav .nav-link {
-            margin-left: 1.5rem;
-            color: #333 !important;
-            font-weight: 500;
-            transition: color 0.3s ease;
-        }
+      .leaflet-container { background: #e2e8f0 !important; }
+      .leaflet-popup-content-wrapper {
+        background: #fff; color: var(--text); border: 1px solid var(--border);
+        border-radius: var(--radius); box-shadow: var(--shadow-md); padding: 0;
+      }
+      .leaflet-popup-content { margin: 0; }
+      .leaflet-popup-tip     { background: #fff; }
+      .leaflet-control-zoom a { background: #fff !important; color: var(--text) !important; border-color: var(--border) !important; font-weight: 700; }
+      .leaflet-control-zoom a:hover { background: var(--bg-card2) !important; color: var(--color-primary) !important; }
 
-        .navbar-nav .nav-link:hover {
-            color: var(--primary) !important;
-        }
+      hr { border-color: var(--border); opacity: 1; }
 
-        .btn-reserver {
-            background-color: var(--danger);
-            color: white;
-            margin-left: 1.5rem;
-            padding: 0.5rem 1.5rem;
-            border-radius: 0.375rem;
-            font-weight: 600;
-            transition: all 0.3s ease;
-        }
+      @media(max-width:992px) {
+        .sidebar { transform: translateX(-100%); }
+        .sidebar.open { transform: translateX(0); }
+        .main-wrap { margin-left: 0; }
+      }
 
-        .btn-reserver:hover {
-            background-color: #c82333;
-            color: white;
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(220, 53, 69, 0.3);
-        }
+      .support-panneau {
+        font-size: 1.4rem; color: var(--color-secondary);
+        border: 2px solid var(--color-secondary); border-radius: 50%;
+        width: 40px; height: 40px;
+        display: inline-flex; align-items: center; justify-content: center;
+        transition: all 0.3s ease; box-shadow: 0 2px 6px rgba(167,139,250,0.2); cursor: pointer;
+      }
+      .support-panneau:hover { transform: scale(1.1) rotate(5deg); box-shadow: 0 4px 12px rgba(167,139,250,0.3); }
 
-        /* ── Hero Section ──────────────────────────────────────────────── */
-        .hero-section {
-            background: linear-gradient(135deg, #1a3c6b 0%, #0d2847 100%);
-            color: white;
-            padding: 3rem 0;
-        }
+      .support-ecran {
+        font-size: 1.4rem; color: var(--color-primary);
+        border: 2px solid var(--color-primary); border-radius: 50%;
+        width: 40px; height: 40px;
+        display: inline-flex; align-items: center; justify-content: center;
+        transition: all 0.3s ease; box-shadow: 0 2px 6px rgba(37,99,235,0.2); cursor: pointer;
+      }
+      .support-ecran:hover { transform: scale(1.1) rotate(-5deg); box-shadow: 0 4px 12px rgba(37,99,235,0.3); }
 
-        .hero-title {
-            font-size: 3rem;
-            font-weight: 700;
-            margin-bottom: 1rem;
-            line-height: 1.2;
-        }
-
-        .hero-subtitle {
-            font-size: 1.3rem;
-            margin-bottom: 2rem;
-            opacity: 0.95;
-        }
-
-        /* ── Cards ─────────────────────────────────────────────────────── */
-        .card {
-            border: 1px solid #dee2e6;
-            border-radius: 0.5rem;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
-            transition: all 0.3s ease;
-        }
-
-        .card:hover {
-            box-shadow: 0 8px 24px rgba(0,0,0,0.12);
-            transform: translateY(-4px);
-        }
-
-        /* ── Sections ──────────────────────────────────────────────────── */
-        .section {
-            padding: 4rem 0;
-        }
-
-        .section-title {
-            font-size: 2rem;
-            font-weight: 700;
-            margin-bottom: 0.5rem;
-            color: var(--dark);
-        }
-
-        .section-subtitle {
-            font-size: 1.1rem;
-            color: var(--secondary);
-            margin-bottom: 3rem;
-        }
-
-        /* ── Badges ────────────────────────────────────────────────────── */
-        .badge-custom {
-            padding: 0.5rem 1rem;
-            border-radius: 9999px;
-            font-weight: 600;
-            display: inline-block;
-        }
-
-        .badge-libre {
-            background-color: #d1e7dd;
-            color: #0f5132;
-        }
-
-        .badge-occupe {
-            background-color: #f8d7da;
-            color: #842029;
-        }
-
-        .badge-reserve {
-            background-color: #fff3cd;
-            color: #664d03;
-        }
-
-        .badge-panne {
-            background-color: #e2e3e5;
-            color: #383d41;
-        }
-
-        /* ── Footer ────────────────────────────────────────────────────── */
-        footer {
-            background-color: var(--dark);
-            color: white;
-            padding: 3rem 0 1rem;
-            margin-top: 4rem;
-        }
-
-        footer a {
-            color: #adb5bd;
-            text-decoration: none;
-            transition: color 0.3s ease;
-        }
-
-        footer a:hover {
-            color: white;
-        }
-
-        .footer-title {
-            font-weight: 700;
-            margin-bottom: 1rem;
-            color: white;
-        }
-
-        /* ── Responsive ────────────────────────────────────────────────── */
-        @media (max-width: 768px) {
-            .hero-title {
-                font-size: 2rem;
-            }
-
-            .hero-subtitle {
-                font-size: 1rem;
-            }
-
-            .btn-reserver {
-                margin-left: 0;
-                margin-top: 1rem;
-                width: 100%;
-            }
-
-            .section {
-                padding: 2rem 0;
-            }
-        }
-
-        /* ── Animations ────────────────────────────────────────────────── */
-        .fade-in {
-            animation: fadeIn 0.6s ease-in;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
-        }
-
-        .slide-up {
-            animation: slideUp 0.6s ease-out;
-        }
-
-        @keyframes slideUp {
-            from {
-                opacity: 0;
-                transform: translateY(30px);
-            }
-            to {
-                opacity: 1;
-                transform: translateY(0);
-            }
-        }
-
-        /* ── Custom ────────────────────────────────────────────────────– */
-        .text-primary-dark {
-            color: var(--primary-dark) !important;
-        }
-
-        .btn-outline-primary:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
-        }
-
-        .info-box {
-            background-color: #e7f3ff;
-            border-left: 4px solid var(--primary);
-            padding: 1.5rem;
-            border-radius: 0.375rem;
-            margin-bottom: 1.5rem;
-        }
-
-        .stat-number {
-            font-size: 2.5rem;
-            font-weight: 700;
-            color: var(--primary);
-        }
-
-        .stat-label {
-            color: var(--secondary);
-            font-size: 0.95rem;
-        }
+      .bg-occupe { --bs-bg-opacity: 1; background-color: var(--color-secondary) !important; }
+      .bg-primary { --bs-bg-opacity: 1; background-color: var(--color-primary) !important; }
+      .alert-primary { background: rgba(var(--color-primary),0.1); color: var(--color-primary); border-color: rgba(var(--color-primary),0.3); }
+      .btn-check:checked+.btn {
+        background: var(--color-primary) !important; border-color: var(--color-primary) !important; color: #fff !important;
+      }
+      .btn-check+.btn:hover {
+        background: var(--color-primary) !important; border-color: var(--color-primary) !important; color: #fff !important;
+      }
+      
     </style>
 
-    {% block extra_css %}{% endblock %}
-</head>
+    {% block extra_head %}{% endblock %}
+  </head>
+  <body>
 
-<body>
+    <!-- SIDEBAR -->
+    <aside class="sidebar" id="sidebar">
+      <div class="sidebar-brand d-flex align-items-center justify-content-between">
+        <div>
+          <div class="brand-name">
+            <img style="height: 60px" src="{% static 'img/logo.png' %}" alt="Logo" />
+          </div>
+        </div>
+        <button class="btn btn-sm btn-outline-secondary d-lg-none"
+          onclick="document.getElementById('sidebar').classList.remove('open')"
+          type="button" aria-label="Fermer le menu">
+          <i class="bi bi-x-lg"></i>
+        </button>
+      </div>
 
-    <!-- ════════════════════════════════════════════════════════════════════ -->
-    <!-- NAVBAR                                                              -->
-    <!-- ════════════════════════════════════════════════════════════════════ -->
-    <nav class="navbar navbar-expand-lg sticky-top">
-        <div class="container-fluid">
-            <a class="navbar-brand" href="{% url 'portail:accueil' %}">
-                🎯 INTEGRAL Régie
+      <nav class="sidebar-nav">
+        <div class="nav-label">Menu</div>
+            <a href="{% url 'portail:accueil' %}" class="nav-link {% if request.resolver_match.url_name == 'accueil' %}active{% endif %}">
+              <i class="bi bi-house-door-fill"></i> Accueil
             </a>
-            
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                <span class="navbar-toggler-icon"></span>
-            </button>
+            <a href="{% url 'portail:catalogue' %}" class="nav-link {% if request.resolver_match.url_name == 'catalogue' %}active{% endif %}">
+              <i class="bi bi-grid-3x3-gap-fill"></i> Catalogue
+            </a>
+            <a href="{% url 'portail:services' %}" class="nav-link {% if request.resolver_match.url_name == 'services' %}active{% endif %}">
+              <i class="bi bi-gear-fill"></i>Services
+            </a>
+            <a href="{% url 'portail:contact' %}" class="nav-link {% if request.resolver_match.url_name == 'contact' %}active{% endif %}">
+              <i class="bi bi-chat-dots-fill"></i>Contact
+            </a>
+      </nav>
+    </aside>
 
-            <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav ms-auto">
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'portail:catalogue' %}">
-                            <i class="fas fa-th"></i> Catalogue
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'portail:services' %}">
-                            <i class="fas fa-cogs"></i> Services
-                        </a>
-                    </li>
-                    <li class="nav-item">
-                        <a class="nav-link" href="{% url 'portail:contact' %}">
-                            <i class="fas fa-envelope"></i> Contact
-                        </a>
-                    </li>
-                </ul>
-
-                <a href="{% url 'portail:reserver_etape1' %}" class="btn-reserver">
-                    ➕ Faire une demande
-                </a>
-            </div>
+    <!-- MAIN -->
+    <div class="main-wrap">
+      <header class="topbar">
+        <button class="btn btn-sm btn-outline-secondary d-lg-none"
+          onclick="document.getElementById('sidebar').classList.toggle('open')">
+          <i class="bi bi-list fs-5"></i>
+        </button>
+        <div class="topbar-title">
+          {% block topbar_title %}Integral{% endblock %}
         </div>
-    </nav>
+            <a href="{% url 'portail:reserver_etape1' %}" class="btn btn-primary btn-sm">
+                <i class="bi bi-plus-lg me-1"></i> Faire une demande
+            </a>
+        {% block topbar_actions %}{% endblock %}
+      </header>
 
-    <!-- ════════════════════════════════════════════════════════════════════ -->
-    <!-- MESSAGES                                                            -->
-    <!-- ════════════════════════════════════════════════════════════════════ -->
-    {% if messages %}
-        <div class="container-fluid mt-3">
-            {% for message in messages %}
-                <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
-                    {% if message.tags == 'error' %}
-                        <i class="fas fa-exclamation-circle"></i>
-                    {% elif message.tags == 'success' %}
-                        <i class="fas fa-check-circle"></i>
-                    {% endif %}
-                    {{ message }}
-                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-                </div>
-            {% endfor %}
-        </div>
-    {% endif %}
 
-    <!-- ════════════════════════════════════════════════════════════════════ -->
-    <!-- MAIN CONTENT                                                        -->
-    <!-- ════════════════════════════════════════════════════════════════════ -->
-    {% block content %}{% endblock %}
+      <div class="page-content {% block full_page %}{% endblock %}">
+        {% block content %}{% endblock %}
+      </div>
+    </div>
 
-    <!-- ════════════════════════════════════════════════════════════════════ -->
-    <!-- FOOTER                                                              -->
-    <!-- ════════════════════════════════════════════════════════════════════ -->
-    <footer>
-        <div class="container">
-            <div class="row mb-4">
-                <div class="col-md-4">
-                    <div class="footer-title">📍 Régie INTEGRAL</div>
-                    <p class="small">
-                        Ouagadougou & Bobo-Dioulasso<br>
-                        Burkina Faso
-                    </p>
-                </div>
-
-                <div class="col-md-4">
-                    <div class="footer-title">📞 Contact</div>
-                    <p class="small">
-                        <a href="tel:+22670000000">+226 70 00 00 00</a><br>
-                        <a href="mailto:contact@integral.bf">contact@integral.bf</a>
-                    </p>
-                </div>
-
-                <div class="col-md-4">
-                    <div class="footer-title">🔗 Liens</div>
-                    <p class="small">
-                        <a href="{% url 'portail:catalogue' %}">Catalogue</a><br>
-                        <a href="{% url 'portail:contact' %}">Contact</a><br>
-                        <a href="{% url 'portail:reserver_etape1' %}">Réserver</a>
-                    </p>
-                </div>
-            </div>
-
-            <hr style="border-color: #495057;">
-
-            <div class="row">
-                <div class="col-12 text-center">
-                    <p class="small mb-0">
-                        © 2026 Régie INTEGRAL. Tous droits réservés.
-                    </p>
-                </div>
-            </div>
-        </div>
-    </footer>
-
-    <!-- Bootstrap JS -->
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    
-    <!-- Leaflet JS -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-
-    <!-- Custom JS -->
-    <script>
-        // CSRF Token pour AJAX
-        function getCookie(name) {
-            let cookieValue = null;
-            if (document.cookie && document.cookie !== '') {
-                const cookies = document.cookie.split(';');
-                for (let i = 0; i < cookies.length; i++) {
-                    const cookie = cookies[i].trim();
-                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
-                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
-                        break;
-                    }
-                }
-            }
-            return cookieValue;
-        }
-
-        const csrftoken = getCookie('csrftoken');
-
-        // Auto-dismiss alerts après 6 secondes
-        document.querySelectorAll('.alert').forEach(function(alert) {
-            setTimeout(function() {
-                const bsAlert = new bootstrap.Alert(alert);
-                bsAlert.close();
-            }, 6000);
-        });
-    </script>
-
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     {% block extra_js %}{% endblock %}
-
-</body>
+  </body>
 </html>
+
+
+
+

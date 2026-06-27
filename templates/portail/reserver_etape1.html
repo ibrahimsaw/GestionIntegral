@@ -1,0 +1,1022 @@
+{% extends 'portail/base_portail.html' %}
+{% load static %}
+
+{% block title %}Demande de réservation — Étape 1{% endblock %}
+{% block topbar_title %}<i class="bi bi-plus-circle-fill me-1" style="color:var(--color-primary)"></i> Demande de réservation{% endblock %}
+
+{% block extra_head %}
+<style>
+  :root {
+    --step-active:   var(--color-primary);
+    --step-done:     #10b981;
+    --step-inactive: #cbd5e1;
+    --radius-sm:  6px;
+    --radius-md:  10px;
+    --radius-lg:  14px;
+    --shadow-sm:  0 1px 3px rgba(0,0,0,.06);
+    --shadow-md:  0 4px 16px rgba(0,0,0,.08);
+    --c-libre:    #10b981;
+    --c-partiel:  #f59e0b;
+    --c-occupe:   #ef4444;
+    --c-panne:    #94a3b8;
+    --c-reserve:  #7c3aed;
+  }
+
+  /* ── WIZARD ──────────────────────────────────────────────── */
+  .wizard-steps {
+    display: flex; align-items: center;
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 14px 20px;
+    margin-bottom: 12px; box-shadow: var(--shadow-sm);
+  }
+  .step-item { display: flex; align-items: center; gap: 10px; flex: 1; }
+  .step-item:not(:last-child)::after {
+    content: ''; flex: 1; height: 2px; background: var(--border); margin: 0 8px;
+  }
+  .step-item.done::after { background: var(--step-done); }
+  .step-circle {
+    width: 30px; height: 30px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .75rem; font-weight: 800; flex-shrink: 0;
+    border: 2px solid var(--step-inactive);
+    background: var(--bg-card); color: var(--step-inactive); transition: all .2s;
+  }
+  .step-item.active .step-circle { border-color: var(--step-active); background: var(--step-active); color: #fff; }
+  .step-item.done   .step-circle { border-color: var(--step-done);   background: var(--step-done);   color: #fff; }
+  .step-label { font-size: .78rem; font-weight: 700; color: var(--text-muted); white-space: nowrap; }
+  .step-item.active .step-label { color: var(--step-active); }
+  .step-item.done   .step-label { color: var(--step-done); }
+
+  /* ── BARRE DATES ─────────────────────────────────────────── */
+  .dates-bar {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 10px 16px;
+    margin-bottom: 12px; box-shadow: var(--shadow-sm);
+  }
+  .dates-bar-label {
+    font-size: .75rem; font-weight: 800; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: .08em; white-space: nowrap;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .dates-bar-sep { color: var(--text-muted); font-size: .8rem; }
+  .date-input-wrap {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--bg-card2); border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm); padding: 5px 10px;
+    transition: border-color .15s;
+  }
+  .date-input-wrap:focus-within { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(37,99,235,.08); }
+  .date-input-wrap i { color: var(--text-muted); font-size: .8rem; flex-shrink: 0; }
+  .date-input-wrap input {
+    border: none; background: transparent; color: var(--text);
+    font-size: .8rem; font-weight: 600; outline: none;
+    width: 150px;
+  }
+  /* Badge statut dates */
+  #dates-status {
+    display: flex; align-items: center; gap: 6px;
+    font-size: .74rem; font-weight: 700; padding: 5px 12px;
+    border-radius: 20px; transition: all .2s; margin-left: auto;
+  }
+  #dates-status.waiting  { background: var(--bg-card2); color: var(--text-muted); border: 1px solid var(--border); }
+  #dates-status.loading  { background: #eff6ff; color: var(--color-primary); border: 1px solid #bfdbfe; }
+  #dates-status.ok       { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+  #dates-status.error    { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+  #dates-status .spin {
+    width: 12px; height: 12px; border: 2px solid currentColor;
+    border-top-color: transparent; border-radius: 50%;
+    animation: spin .6s linear infinite; flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── TOGGLE CARTE / LISTE ────────────────────────────────── */
+  .view-toggle {
+    display: inline-flex; gap: 3px;
+    background: var(--bg-card2); border: 1px solid var(--border);
+    border-radius: var(--radius-md); padding: 3px;
+  }
+  .vt-btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 14px; border-radius: var(--radius-sm);
+    border: none; background: transparent;
+    font-size: .78rem; font-weight: 700; color: var(--text-muted);
+    cursor: pointer; transition: all .18s;
+  }
+  .vt-btn.active {
+    background: var(--bg-card); color: var(--color-primary);
+    box-shadow: var(--shadow-sm); border: 1px solid var(--border);
+  }
+  .vt-btn:not(.active):hover { color: var(--text); }
+
+  /* ── LAYOUT ──────────────────────────────────────────────── */
+  .resa-grid {
+    display: grid;
+    grid-template-columns: 1fr 320px;
+    gap: 14px;
+    height: calc(100vh - 230px);
+    min-height: 480px;
+  }
+  @media (max-width: 992px) { .resa-grid { grid-template-columns: 1fr; height: auto; } }
+
+  /* ── SECTION PRINCIPALE ──────────────────────────────────── */
+  .main-section {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); overflow: hidden;
+    display: flex; flex-direction: column; box-shadow: var(--shadow-sm);
+  }
+  .section-header {
+    padding: 8px 12px; border-bottom: 1px solid var(--border);
+    background: var(--bg-card2);
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex-shrink: 0;
+  }
+
+  /* ── FILTRES ─────────────────────────────────────────────── */
+  .mf-select, .list-search {
+    padding: 5px 10px; border-radius: 20px;
+    border: 1.5px solid var(--border);
+    background: var(--bg-card); color: var(--text);
+    font-size: .74rem; font-weight: 600; cursor: pointer; transition: all .15s;
+  }
+  .list-search { padding-left: 28px; min-width: 170px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' fill='%2394a3b8' viewBox='0 0 16 16'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398l3.85 3.85a1 1 0 0 0 1.415-1.415l-3.868-3.833zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: 9px center;
+  }
+  .mf-select:focus, .list-search:focus {
+    outline: none; border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(37,99,235,.08);
+  }
+
+  /* ── CARTE ───────────────────────────────────────────────── */
+  #map-resa { flex: 1; min-height: 360px; }
+  .map-legend {
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    padding: 6px 12px; border-top: 1px solid var(--border);
+    background: var(--bg-card2); font-size: .68rem; flex-shrink: 0;
+  }
+  .leg-item { display: flex; align-items: center; gap: 4px; color: var(--text-muted); font-weight: 600; }
+  .leg-dot  { width: 8px; height: 8px; border-radius: 50%; }
+
+  /* ── VUE LISTE ───────────────────────────────────────────── */
+  #view-liste { display: none; flex: 1; overflow-y: auto; }
+  #view-liste::-webkit-scrollbar { width: 4px; }
+  #view-liste::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  .liste-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 10px; padding: 10px;
+  }
+  .liste-empty {
+    grid-column: 1/-1; padding: 50px 20px;
+    text-align: center; color: var(--text-muted);
+  }
+  .liste-empty i { font-size: 2.2rem; opacity: .25; display: block; margin-bottom: 8px; }
+  .liste-empty p { font-size: .8rem; }
+
+  /* ── CARD SUPPORT ────────────────────────────────────────── */
+  .support-card {
+    background: var(--bg-card2); border: 1px solid var(--border);
+    border-radius: var(--radius-md); overflow: hidden; transition: all .15s;
+  }
+  .support-card:hover { box-shadow: var(--shadow-md); }
+  .support-card.has-selected { border-color: var(--color-primary); box-shadow: 0 0 0 2px rgba(37,99,235,.1); }
+
+  .sc-header {
+    padding: 9px 11px; background: var(--bg-card);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .sc-icon {
+    width: 30px; height: 30px; border-radius: var(--radius-sm);
+    background: var(--color-primary); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .7rem; font-weight: 800; flex-shrink: 0;
+  }
+  .sc-info { flex: 1; overflow: hidden; }
+  .sc-code { font-size: .68rem; font-weight: 800; color: var(--color-primary); letter-spacing: .05em; }
+  .sc-nom  { font-size: .78rem; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sc-addr { font-size: .66rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sc-format {
+    font-size: .62rem; font-weight: 700; padding: 2px 7px;
+    border-radius: 20px; background: var(--bg-card2);
+    border: 1px solid var(--border); color: var(--text-muted); white-space: nowrap; flex-shrink: 0;
+  }
+  .sc-faces { padding: 7px 9px; display: flex; flex-direction: column; gap: 5px; }
+
+  /* ── BOUTON FACE ─────────────────────────────────────────── */
+  .face-btn {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 10px; border-radius: var(--radius-sm);
+    border: 1.5px solid; font-size: .74rem; font-weight: 700;
+    cursor: pointer; transition: all .15s; background: transparent; width: 100%;
+  }
+  .face-btn .fb-left { display: flex; align-items: center; gap: 6px; }
+  .face-btn .fb-badge { font-size: .6rem; font-weight: 800; padding: 2px 7px; border-radius: 20px; }
+
+  .face-btn.libre    { border-color: var(--c-libre);   color: var(--c-libre); }
+  .face-btn.libre:hover { background: #d1fae5; }
+  .face-btn.occupe   { border-color: var(--c-occupe);  color: var(--c-occupe);  cursor: not-allowed; opacity: .5; }
+  .face-btn.reserve  { border-color: var(--c-reserve); color: var(--c-reserve); cursor: not-allowed; opacity: .5; }
+  .face-btn.panne    { border-color: var(--c-panne);   color: var(--c-panne);   cursor: not-allowed; opacity: .5; }
+  .face-btn.selected { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+  .face-btn.selected:hover { filter: brightness(1.1); }
+
+  .face-btn.libre    .fb-badge { background: #d1fae5; color: #065f46; }
+  .face-btn.occupe   .fb-badge { background: #fee2e2; color: #991b1b; }
+  .face-btn.reserve  .fb-badge { background: #ede9fe; color: #5b21b6; }
+  .face-btn.panne    .fb-badge { background: #f1f5f9; color: #475569; }
+  .face-btn.selected .fb-badge { background: rgba(255,255,255,.2); color: #fff; }
+
+  /* Message "saisir dates" sur les faces */
+  .face-btn.need-dates {
+    border-color: var(--border); color: var(--text-muted); cursor: not-allowed; opacity: .65;
+  }
+  .face-btn.need-dates .fb-badge { background: var(--bg-card2); color: var(--text-muted); }
+
+  /* ── PANIER ──────────────────────────────────────────────── */
+  .panier-section {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); display: flex; flex-direction: column;
+    box-shadow: var(--shadow-sm); overflow: hidden;
+  }
+  .panier-header {
+    padding: 11px 14px; border-bottom: 1px solid var(--border);
+    background: var(--bg-card2);
+    display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+  }
+  .panier-title {
+    font-size: .82rem; font-weight: 800; color: var(--text);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .panier-count {
+    background: var(--color-primary); color: #fff;
+    font-size: .63rem; font-weight: 800;
+    padding: 2px 8px; border-radius: 20px; min-width: 22px; text-align: center;
+  }
+  .panier-body { flex: 1; overflow-y: auto; padding: 9px; }
+  .panier-body::-webkit-scrollbar { width: 4px; }
+  .panier-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+  .panier-item {
+    display: flex; align-items: center; gap: 7px;
+    padding: 7px 9px; border-radius: var(--radius-sm);
+    border: 1px solid var(--border); background: var(--bg-card2);
+    margin-bottom: 5px; transition: all .15s;
+  }
+  .panier-item:hover { border-color: var(--color-primary); background: #eff6ff; }
+  .pi-icon {
+    width: 26px; height: 26px; border-radius: 6px;
+    background: var(--color-primary); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .65rem; font-weight: 800; flex-shrink: 0;
+  }
+  .pi-info { flex: 1; overflow: hidden; }
+  .pi-code { font-size: .74rem; font-weight: 800; color: var(--text); }
+  .pi-addr { font-size: .66rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pi-remove {
+    width: 20px; height: 20px; border-radius: 4px;
+    background: transparent; border: 1px solid var(--border);
+    color: var(--text-muted); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .68rem; transition: all .15s; flex-shrink: 0;
+  }
+  .pi-remove:hover { background: #fee2e2; border-color: #ef4444; color: #ef4444; }
+
+  .panier-empty {
+    padding: 28px 14px; text-align: center; color: var(--text-muted);
+  }
+  .panier-empty i { font-size: 1.8rem; opacity: .3; display: block; margin-bottom: 7px; }
+  .panier-empty p { font-size: .75rem; line-height: 1.5; }
+
+  .panier-footer {
+    padding: 11px 12px; border-top: 1px solid var(--border);
+    background: var(--bg-card2); flex-shrink: 0;
+  }
+  .btn-continuer {
+    width: 100%; padding: 10px;
+    background: var(--color-primary); color: #fff;
+    border: none; border-radius: var(--radius-sm);
+    font-weight: 800; font-size: .83rem;
+    cursor: pointer; transition: all .2s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .btn-continuer:hover:not(:disabled) { background: #1d4ed8; box-shadow: var(--shadow-md); }
+  .btn-continuer:disabled { opacity: .45; cursor: not-allowed; background: var(--text-muted); }
+
+  /* ── POPUP LEAFLET ───────────────────────────────────────── */
+  .rl-popup { min-width: 210px; padding: 12px 14px; font-family: inherit; }
+  .rl-popup-code { font-size: .58rem; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; color: var(--color-primary, #2563eb); margin-bottom: 2px; }
+  .rl-popup-nom  { font-size: .82rem; font-weight: 700; margin-bottom: 3px; }
+  .rl-popup-addr { font-size: .7rem; color: #64748b; margin-bottom: 9px; display: flex; align-items: center; gap: 4px; }
+  .rl-popup-faces { display: flex; flex-direction: column; gap: 5px; }
+  .rl-face-btn {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 10px; border-radius: 6px; border: 1.5px solid;
+    font-size: .74rem; font-weight: 700; cursor: pointer;
+    transition: all .15s; background: transparent; width: 100%;
+  }
+  .rl-face-btn.libre    { border-color: #10b981; color: #10b981; }
+  .rl-face-btn.libre:hover { background: #d1fae5; }
+  .rl-face-btn.occupe   { border-color: #ef4444; color: #ef4444; cursor: not-allowed; opacity: .55; }
+  .rl-face-btn.reserve  { border-color: #7c3aed; color: #7c3aed; cursor: not-allowed; opacity: .55; }
+  .rl-face-btn.panne    { border-color: #94a3b8; color: #94a3b8; cursor: not-allowed; opacity: .55; }
+  .rl-face-btn.selected { background: #2563eb; border-color: #2563eb; color: #fff; }
+  .rl-face-btn.need-dates { border-color: #cbd5e1; color: #94a3b8; cursor: not-allowed; opacity: .7; }
+</style>
+{% endblock %}
+
+{% block full_page %}p-0{% endblock %}
+
+{% block content %}
+<div style="padding: 14px 16px;">
+
+  <!-- ── WIZARD ───────────────────────────────────────────── -->
+  <div class="wizard-steps">
+    <div class="step-item active">
+      <div class="step-circle">1</div>
+      <span class="step-label">Emplacements</span>
+    </div>
+    <div class="step-item">
+      <div class="step-circle">2</div>
+      <span class="step-label">Période</span>
+    </div>
+    <div class="step-item">
+      <div class="step-circle">3</div>
+      <span class="step-label">Coordonnées</span>
+    </div>
+  </div>
+
+  <!-- ── BARRE DATES ───────────────────────────────────────── -->
+  <div class="dates-bar">
+    <span class="dates-bar-label">
+      <i class="bi bi-calendar3" style="color:var(--color-primary)"></i>
+      Période
+    </span>
+    <div class="date-input-wrap">
+      <i class="bi bi-calendar-plus" style="color:#10b981"></i>
+      <input type="date" id="date-debut" placeholder="Date début"
+             min="{{ today_iso|default:'' }}">
+    </div>
+    <span class="dates-bar-sep">→</span>
+    <div class="date-input-wrap">
+      <i class="bi bi-calendar-minus" style="color:#ef4444"></i>
+      <input type="date" id="date-fin" placeholder="Date fin"
+             min="{{ today_iso|default:'' }}">
+    </div>
+    <div id="dates-status" class="waiting">
+      <i class="bi bi-info-circle"></i>
+      Saisissez les dates pour voir les disponibilités
+    </div>
+  </div>
+
+  <!-- ── GRILLE PRINCIPALE ────────────────────────────────── -->
+  <div class="resa-grid">
+
+    <!-- COLONNE GAUCHE -->
+    <div class="main-section">
+      <div class="section-header">
+
+        <!-- Toggle vue -->
+        <div class="view-toggle">
+          <button class="vt-btn active" id="btn-vue-carte" onclick="switchView('carte')">
+            <i class="bi bi-map-fill"></i> Carte
+          </button>
+          <button class="vt-btn" id="btn-vue-liste" onclick="switchView('liste')">
+            <i class="bi bi-list-ul"></i> Liste
+          </button>
+        </div>
+
+        <!-- Filtres carte -->
+        <div id="filtres-carte" style="display:flex;gap:6px;flex-wrap:wrap;flex:1">
+          <select class="mf-select" id="filter-ville">
+            <option value="">Toutes les villes</option>
+            <option value="Ouagadougou">Ouagadougou</option>
+            <option value="Bobo-Dioulasso">Bobo-Dioulasso</option>
+          </select>
+          <select class="mf-select" id="filter-type">
+            <option value="">Tous types</option>
+            <option value="panneau">Panneaux</option>
+            <option value="ecran">Écrans LED</option>
+          </select>
+          <select class="mf-select" id="filter-dispo">
+            <option value="">Tous états</option>
+            <option value="libre">Libres uniquement</option>
+          </select>
+        </div>
+
+        <!-- Filtres liste -->
+        <div id="filtres-liste" style="display:none;gap:6px;flex-wrap:wrap;flex:1;align-items:center">
+          <input type="search" class="list-search" id="list-search" placeholder="Code, quartier, nom…">
+          <select class="mf-select" id="list-filter-type">
+            <option value="">Tous types</option>
+            <option value="panneau">Panneaux</option>
+            <option value="ecran">Écrans LED</option>
+          </select>
+          <select class="mf-select" id="list-filter-dispo">
+            <option value="">Tous états</option>
+            <option value="libre">Libres uniquement</option>
+          </select>
+          <select class="mf-select" id="list-filter-format">
+            <option value="">Tous formats</option>
+          </select>
+        </div>
+
+      </div><!-- /section-header -->
+
+      <!-- VUE CARTE -->
+      <div id="view-carte" style="flex:1;display:flex;flex-direction:column;">
+        <div id="map-resa" style="flex:1;min-height:360px;"></div>
+        <div class="map-legend">
+          <span class="leg-item"><span class="leg-dot" style="background:#10b981"></span>Libre</span>
+          <span class="leg-item"><span class="leg-dot" style="background:#f59e0b"></span>Partiel</span>
+          <span class="leg-item"><span class="leg-dot" style="background:#7c3aed"></span>Réservé</span>
+          <span class="leg-item"><span class="leg-dot" style="background:#ef4444"></span>Occupé</span>
+          <span class="leg-item"><span class="leg-dot" style="background:#94a3b8"></span>Panne</span>
+          <span class="leg-item"><span class="leg-dot" style="background:var(--color-primary)"></span>Sélectionné</span>
+        </div>
+      </div>
+
+      <!-- VUE LISTE -->
+      <div id="view-liste">
+        <div class="liste-grid" id="liste-grid">
+          <div class="liste-empty">
+            <i class="bi bi-hourglass-split"></i>
+            <p>Chargement des supports…</p>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /main-section -->
+
+    <!-- COLONNE DROITE : PANIER -->
+    <div class="panier-section">
+      <div class="panier-header">
+        <div class="panier-title">
+          <i class="bi bi-bag-check-fill" style="color:var(--color-primary)"></i>
+          Sélection
+          <span class="panier-count" id="panier-count">0</span>
+        </div>
+        <button class="pi-remove" id="btn-vider-panier" title="Vider" style="display:none">
+          <i class="bi bi-trash3"></i>
+        </button>
+      </div>
+
+      <div class="panier-body" id="panier-body">
+        <div class="panier-empty" id="panier-empty">
+          <i class="bi bi-map"></i>
+          <p>Cliquez sur une face libre pour l'ajouter.</p>
+        </div>
+      </div>
+
+      <div class="panier-footer">
+        <form method="post" id="form-etape1">
+          {% csrf_token %}
+          <input type="hidden" name="faces_selectionnees" id="faces-input" value="">
+          <button type="submit" class="btn-continuer" id="btn-continuer" disabled>
+            <i class="bi bi-arrow-right-circle-fill"></i>
+            Continuer — <span id="btn-count">0</span> emplacement(s)
+          </button>
+        </form>
+        <div style="font-size:.68rem;color:var(--text-muted);text-align:center;margin-top:7px;">
+          <i class="bi bi-shield-check me-1"></i>Aucun engagement — demande sans frais
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /resa-grid -->
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    "use strict";
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // ÉTAT GLOBAL
+  // ─────────────────────────────────────────────────────────────────────────
+  let allFeatures    = [];
+  let facesOccupees  = new Set();
+  let markersMap     = {};
+  let panier         = {};
+  let currentView    = 'carte';
+  let currentPopup   = null;
+  let datesOk        = false;
+  let checkDispoTimer = null;
+
+  const COLORS = {
+    libre:   '#10b981',
+    partiel: '#f59e0b',
+    occupe:  '#ef4444',
+    panne:   '#94a3b8',
+    reserve: '#7c3aed',
+  };
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // CARTE LEAFLET
+  // ─────────────────────────────────────────────────────────────────────────
+  const map = L.map('map-resa', { zoomControl: true }).setView([12.3714, -1.5197], 12);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+    attribution: '© OpenStreetMap © CARTO', subdomains: 'abcd', maxZoom: 19
+  }).addTo(map);
+
+  // ── CORRECTION 1 : makeIcon reçoit (color, type, selected) ───────────────
+  function makeIcon(color, type = 'panneau', selected = false) {
+    const fillColor = selected ? '#dbeafe' : '#ffffff';
+    const inner = type === 'panneau'
+      ? `<rect x="8" y="5" width="14" height="10" rx="2" fill="${fillColor}" stroke="${color}" stroke-width="1.8"/>
+        <line x1="15" y1="15" x2="15" y2="20" stroke="${color}" stroke-width="1.5"/>`
+      : `<rect x="6" y="6" width="18" height="13" rx="2" fill="${fillColor}" stroke="${color}" stroke-width="1.8"/>
+        <circle cx="15" cy="22" r="1.5" fill="${color}"/>
+        <line x1="15" y1="19" x2="15" y2="23.5" stroke="${color}" stroke-width="1.2"/>`;
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 30 38">
+      <defs><filter id="sh${type}"><feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-opacity=".28"/></filter></defs>
+      <path d="M15 2C9.477 2 5 6.477 5 12c0 7.5 10 24 10 24s10-16.5 10-24C25 6.477 20.523 2 15 2z"
+            fill="${color}" filter="url(#sh${type})"/>
+      ${inner}
+    </svg>`;
+    return L.divIcon({ html: svg, iconSize: [32, 40], iconAnchor: [16, 40], popupAnchor: [0, -42], className: '' });
+  }
+
+  // ── Couleur d'un support ──────────────────────────────────────────────────
+  function getColor(p) {
+    if (p.etat === 'panne') return COLORS.panne;
+    if (p.type === 'ecran') return COLORS.libre;
+    const faces = p.faces || [];
+    if (!faces.length) return COLORS.panne;
+    const pannes = faces.filter(f => f.etat === 'panne').length;
+    if (pannes === faces.length) return COLORS.panne;
+    const libres = faces.filter(f => getFaceStatut(f) === 'libre').length;
+    if (libres === 0) return COLORS.occupe;
+    if (libres === faces.length) return COLORS.libre;
+    return COLORS.partiel;
+  }
+
+  // ── Statut d'une face ─────────────────────────────────────────────────────
+  function getFaceStatut(face) {
+    if (face.etat === 'panne') return 'panne';
+    if (datesOk) return facesOccupees.has(face.id) ? 'occupe' : 'libre';
+    if (face.dispo === false) return 'occupe';
+    if (face.disponibles === false && face.dispo === true) return 'reserve';
+    return 'libre';
+  }
+
+  // ── Rendu des markers ─────────────────────────────────────────────────────
+  function renderMarkers(features) {
+    Object.values(markersMap).forEach(m => map.removeLayer(m));
+    markersMap = {};
+    features.forEach(f => {
+      const p = f.properties;
+      const isSelected = isPanierContainsSupport(p.id);
+      const color = isSelected ? '#2563eb' : getColor(p);
+      // CORRECTION 2 : on passe p.type à makeIcon
+      const marker = L.marker(
+        [f.geometry.coordinates[1], f.geometry.coordinates[0]],
+        { icon: makeIcon(color, p.type || 'panneau', isSelected) }
+      );
+      marker.on('click', () => openPopupById(p.id, marker));
+      marker.addTo(map);
+      markersMap[String(p.id)] = marker;
+    });
+  }
+
+  function isPanierContainsSupport(supportId) {
+    return Object.values(panier).some(item => item.support_id === String(supportId));
+  }
+
+  // ── Popup carte ───────────────────────────────────────────────────────────
+  function openPopupById(supportId, marker) {
+    if (currentPopup) currentPopup.remove();
+    const feat = allFeatures.find(f => f.properties.id === supportId);
+    if (!feat) return;
+    const p = feat.properties;
+    const faces = p.faces || [];
+
+    let facesHtml = '';
+    faces.forEach(face => {
+      const key = String(face.id);
+      const inPanier = !!panier[key];
+      const statut = getFaceStatut(face);
+      const canToggle = statut === 'libre' || inPanier;
+      const icon = inPanier ? 'bi-dash-circle' : (canToggle ? 'bi-plus-circle' : 'bi-lock-fill');
+      const labelMap = { occupe: 'Occupée', reserve: 'Réservée', panne: 'En panne' };
+      const txt = inPanier ? `${face.label} — Retirer`
+                : canToggle ? `${face.label} — Ajouter`
+                : `${face.label} — ${labelMap[statut] || statut}`;
+      const disabled = !canToggle ? 'disabled' : '';
+      const needDates = !datesOk && !inPanier ? 'need-dates' : '';
+      const finalCls = inPanier ? 'selected' : (needDates || statut);
+
+      facesHtml += `
+        <button class="rl-face-btn ${finalCls}" ${disabled}
+          onclick="toggleFace('${key}','${p.code}','${face.label}','${escQ(p.quartier || p.ville || '')}','${p.id}')">
+          <span><i class="bi ${icon} me-1"></i>${txt}</span>
+        </button>`;
+    });
+
+    const noteDate = !datesOk
+      ? `<div style="margin-top:8px;padding:5px 8px;background:#fef9c3;border-radius:5px;font-size:.68rem;color:#854d0e;display:flex;align-items:center;gap:5px;">
+          <i class="bi bi-calendar-event"></i>Saisissez une période pour voir la disponibilité exacte.
+        </div>` : '';
+
+    currentPopup = L.popup({ maxWidth: 270, closeButton: true })
+      .setLatLng(marker.getLatLng())
+      .setContent(`
+        <div class="rl-popup">
+          <div class="rl-popup-code">${p.code}</div>
+          <div class="rl-popup-nom">${p.nom}</div>
+          <div class="rl-popup-addr"><i class="bi bi-geo-alt"></i>${p.quartier || p.ville || ''}</div>
+          <div class="rl-popup-faces">
+            ${facesHtml || '<span style="font-size:.74rem;color:#94a3b8">Aucune face configurée</span>'}
+          </div>
+          ${noteDate}
+        </div>`)
+      .openOn(map);
+  }
+
+  function escQ(s) { return String(s).replace(/'/g, "\\'"); }
+
+  // ── Filtres carte ─────────────────────────────────────────────────────────
+  function applyCarteFilters() {
+    const ville = document.getElementById('filter-ville').value;
+    const type  = document.getElementById('filter-type').value;
+    const dispo = document.getElementById('filter-dispo').value;
+    const filtered = allFeatures.filter(f => {
+      const p = f.properties;
+      if (ville && p.ville !== ville) return false;
+      if (type  && p.type  !== type)  return false;
+      if (dispo === 'libre') {
+        const faces = p.faces || [];
+        if (!faces.some(face => getFaceStatut(face) === 'libre')) return false;
+      }
+      return true;
+    });
+    renderMarkers(filtered);
+  }
+
+  ['filter-ville', 'filter-type', 'filter-dispo'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('change', applyCarteFilters);
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // VUE LISTE
+  // ─────────────────────────────────────────────────────────────────────────
+  function switchView(vue) {
+    currentView = vue;
+    document.getElementById('btn-vue-carte').classList.toggle('active', vue === 'carte');
+    document.getElementById('btn-vue-liste').classList.toggle('active', vue === 'liste');
+    document.getElementById('view-carte').style.display    = vue === 'carte' ? 'flex' : 'none';
+    document.getElementById('view-liste').style.display    = vue === 'liste' ? 'block' : 'none';
+    document.getElementById('filtres-carte').style.display = vue === 'carte' ? 'flex' : 'none';
+    document.getElementById('filtres-liste').style.display = vue === 'liste' ? 'flex' : 'none';
+    if (vue === 'carte') setTimeout(() => map && map.invalidateSize(), 50);
+    else renderListe();
+  }
+
+  function getListeFiltered() {
+    const q     = (document.getElementById('list-search').value || '').toLowerCase().trim();
+    const type  = document.getElementById('list-filter-type').value;
+    const dispo = document.getElementById('list-filter-dispo').value;
+    const fmt   = document.getElementById('list-filter-format').value;
+    return allFeatures.filter(f => {
+      const p = f.properties;
+      if (type && p.type   !== type) return false;
+      if (fmt  && p.format !== fmt)  return false;
+      if (q && !String(p.code).toLowerCase().includes(q)
+            && !(p.quartier || '').toLowerCase().includes(q)
+            && !(p.nom || '').toLowerCase().includes(q)) return false;
+      if (dispo === 'libre') {
+        const faces = p.faces || [];
+        if (!faces.some(face => getFaceStatut(face) === 'libre')) return false;
+      }
+      return true;
+    });
+  }
+
+  function renderListe() {
+    const grid = document.getElementById('liste-grid');
+    const filtered = getListeFiltered();
+    if (!filtered.length) {
+      grid.innerHTML = `<div class="liste-empty"><i class="bi bi-inbox"></i><p>Aucun support ne correspond aux filtres.</p></div>`;
+      return;
+    }
+    grid.innerHTML = filtered.map(f => buildSupportCard(f.properties)).join('');
+  }
+
+  function buildSupportCard(p) {
+    const hasSelected = isPanierContainsSupport(p.id);
+    const faces = p.faces || [];
+
+    const facesHtml = faces.map(face => {
+      const key = String(face.id);
+      const inPanier = !!panier[key];
+      const statut = getFaceStatut(face);
+      const canToggle = statut === 'libre' || inPanier;
+      const cls = inPanier ? 'selected' : (!datesOk && !inPanier ? 'need-dates' : statut);
+      const icon = inPanier ? 'bi-dash-circle-fill' : (canToggle ? 'bi-plus-circle' : 'bi-lock-fill');
+      const badgeLabels = { libre: 'Libre', occupe: 'Occupée', reserve: 'Réservée', panne: 'En panne' };
+      const badge = inPanier ? 'Sélectionnée'
+                  : !datesOk ? 'Sélectionner'
+                  : (badgeLabels[statut] || statut);
+      const disabled = (!canToggle && !inPanier) ? 'disabled' : '';
+      const onclick = (canToggle || inPanier)
+        ? `onclick="toggleFace('${key}','${p.code}','${face.label}','${escQ(p.quartier || p.ville || '')}','${p.id}');renderListe()"`
+        : '';
+
+      return `<button class="face-btn ${cls}" ${disabled} ${onclick}>
+        <span class="fb-left"><i class="bi ${icon}"></i> ${face.label}</span>
+        <span class="fb-badge">${badge}</span>
+      </button>`;
+    }).join('');
+
+    const formatBadge = p.format_display
+      ? `<span class="sc-format">${p.format_display}</span>` : '';
+
+    return `<div class="support-card ${hasSelected ? 'has-selected' : ''}" id="sc-${p.id}">
+      <div class="sc-header">
+        <div class="sc-icon">${p.type === 'ecran' ? '📺' : '🪧'}</div>
+        <div class="sc-info">
+          <div class="sc-code">${p.code}</div>
+          <div class="sc-nom">${p.nom}</div>
+          <div class="sc-addr"><i class="bi bi-geo-alt me-1"></i>${p.quartier || p.ville || '—'}</div>
+        </div>
+        ${formatBadge}
+      </div>
+      <div class="sc-faces">
+        ${facesHtml || '<span style="font-size:.7rem;color:#94a3b8;padding:4px">Aucune face configurée</span>'}
+      </div>
+    </div>`;
+  }
+
+  function populateFormatSelect() {
+    const formats = {};
+    allFeatures.forEach(f => {
+      const p = f.properties;
+      if (p.format && p.format_display) formats[p.format] = p.format_display;
+    });
+    const sel = document.getElementById('list-filter-format');
+    if (!sel) return;
+    Object.entries(formats).forEach(([val, lbl]) => {
+      const opt = document.createElement('option');
+      opt.value = val; opt.textContent = lbl; sel.appendChild(opt);
+    });
+  }
+
+  ['list-search', 'list-filter-type', 'list-filter-dispo', 'list-filter-format'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener(id === 'list-search' ? 'input' : 'change', renderListe);
+  });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // DATES + CHECK DISPO
+  // ─────────────────────────────────────────────────────────────────────────
+  const elDateDebut = document.getElementById('date-debut');
+  const elDateFin   = document.getElementById('date-fin');
+  const elStatus    = document.getElementById('dates-status');
+
+  function setDatesStatus(state, text) {
+    if (!elStatus) return;
+    elStatus.className = state;
+    const icons = {
+      waiting: '<i class="bi bi-info-circle"></i>',
+      loading: '<div class="spin"></div>',
+      ok:      '<i class="bi bi-check-circle-fill"></i>',
+      error:   '<i class="bi bi-exclamation-triangle-fill"></i>',
+    };
+    elStatus.innerHTML = `${icons[state] || ''} ${text}`;
+  }
+
+  function onDatesChange() {
+    const d1 = elDateDebut ? elDateDebut.value : '';
+    const d2 = elDateFin   ? elDateFin.value   : '';
+
+    if (d1 && elDateFin) elDateFin.min = d1;
+
+    if (!d1 || !d2) {
+      datesOk = false;
+      facesOccupees = new Set();
+      setDatesStatus('waiting', 'Saisissez les dates pour voir les disponibilités');
+      refreshAll();
+      return;
+    }
+    if (d1 >= d2) {
+      datesOk = false;
+      facesOccupees = new Set();
+      setDatesStatus('error', 'La date de fin doit être après la date de début');
+      refreshAll();
+      return;
+    }
+
+    clearTimeout(checkDispoTimer);
+    setDatesStatus('loading', 'Vérification en cours…');
+    checkDispoTimer = setTimeout(() => checkDispo(d1, d2), 400);
+  }
+
+  function checkDispo(d1, d2) {
+    // CORRECTION 3 : URL relative correcte, client_pk=0 pour le portail public
+    const url = `/campaigns/api/check-dispos/?date_debut=${encodeURIComponent(d1)}&date_fin=${encodeURIComponent(d2)}`;
+
+    fetch(url)
+      .then(r => {
+        if (!r.ok) throw new Error('API error ' + r.status);
+        return r.json();
+      })
+      .then(data => {
+        facesOccupees = new Set((data.faces_occupees || []).map(Number));
+        datesOk = true;
+        const nbOccupees = facesOccupees.size;
+        const nbTotal = allFeatures.reduce((acc, f) => acc + (f.properties.faces || []).length, 0);
+        const nbLibres = nbTotal - nbOccupees;
+        setDatesStatus('ok', `${nbLibres} face${nbLibres > 1 ? 's' : ''} disponible${nbLibres > 1 ? 's' : ''} sur cette période`);
+        refreshAll();
+      })
+      .catch(err => {
+        console.warn('check-dispo error:', err);
+        datesOk = false;
+        facesOccupees = new Set();
+        setDatesStatus('error', 'Impossible de vérifier — statuts instantanés affichés');
+        refreshAll();
+      });
+  }
+
+  function refreshAll() {
+    applyCarteFilters();
+    if (currentView === 'liste') renderListe();
+    // Rafraîchir le popup ouvert
+    if (currentPopup && currentPopup.isOpen()) {
+      const latlng = currentPopup.getLatLng();
+      let closest = null, minDist = Infinity;
+      allFeatures.forEach(f => {
+        const d = Math.abs(f.geometry.coordinates[1] - latlng.lat)
+                + Math.abs(f.geometry.coordinates[0] - latlng.lng);
+        if (d < minDist) { minDist = d; closest = f; }
+      });
+      if (closest && markersMap[String(closest.properties.id)]) {
+        openPopupById(closest.properties.id, markersMap[String(closest.properties.id)]);
+      }
+    }
+  }
+
+  if (elDateDebut) elDateDebut.addEventListener('change', onDatesChange);
+  if (elDateFin)   elDateFin.addEventListener('change', onDatesChange);
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // PANIER
+  // ─────────────────────────────────────────────────────────────────────────
+  function toggleFace(faceId, code, label, quartier, supportId) {
+    const key = String(faceId);
+    if (panier[key]) {
+      delete panier[key];
+    } else {
+      panier[key] = { code, label, quartier, support_id: String(supportId) };
+    }
+    updatePanier();
+    if (currentView === 'carte') {
+      const marker = markersMap[String(supportId)];
+      if (marker) openPopupById(parseInt(supportId), marker);
+    }
+    if (currentView === 'liste') renderListe();
+  }
+
+  function updatePanier() {
+    const items  = Object.entries(panier);
+    const count  = items.length;
+    const bodyEl = document.getElementById('panier-body');
+    const emptyEl= document.getElementById('panier-empty');
+    if (!bodyEl) return;
+
+    // CORRECTION 4 : garder les éléments existants, ne supprimer que les .panier-item
+    bodyEl.querySelectorAll('.panier-item').forEach(el => el.remove());
+
+    const countEl = document.getElementById('panier-count');
+    const btnCount = document.getElementById('btn-count');
+    const btnCont  = document.getElementById('btn-continuer');
+    const btnVider = document.getElementById('btn-vider-panier');
+    const facesInput = document.getElementById('faces-input');
+
+    if (countEl)    countEl.textContent = count;
+    if (btnCount)   btnCount.textContent = count;
+    if (btnCont)    btnCont.disabled = count === 0;
+    if (btnVider)   btnVider.style.display = count > 0 ? 'flex' : 'none';
+    if (facesInput) facesInput.value = JSON.stringify(Object.keys(panier));
+
+    if (count === 0) {
+      if (emptyEl) emptyEl.style.display = '';
+    } else {
+      if (emptyEl) emptyEl.style.display = 'none';
+      items.forEach(([uuid, item]) => {
+        const el = document.createElement('div');
+        el.className = 'panier-item';
+        el.dataset.uuid = uuid;
+        el.innerHTML = `
+          <div class="pi-icon">🪧</div>
+          <div class="pi-info">
+            <div class="pi-code">${item.code} · ${item.label}</div>
+            <div class="pi-addr">${item.quartier || ''}</div>
+          </div>
+          <button class="pi-remove" onclick="removePanierItem('${uuid}')" title="Retirer">
+            <i class="bi bi-x"></i>
+          </button>`;
+        if (emptyEl) bodyEl.insertBefore(el, emptyEl);
+        else bodyEl.appendChild(el);
+      });
+    }
+
+    // Màj couleurs markers
+    allFeatures.forEach(f => {
+      const p = f.properties;
+      const marker = markersMap[String(p.id)];
+      if (!marker) return;
+      const isSelected = isPanierContainsSupport(p.id);
+      const color = isSelected ? '#2563eb' : getColor(p);
+      marker.setIcon(makeIcon(color, p.type || 'panneau', isSelected));
+    });
+  }
+
+  function removePanierItem(faceId) {
+    const item = panier[faceId];
+    delete panier[faceId];
+    updatePanier();
+    if (currentView === 'liste') renderListe();
+    if (currentView === 'carte' && item) {
+      const marker = markersMap[item.support_id];
+      if (marker) openPopupById(parseInt(item.support_id), marker);
+    }
+  }
+
+  const btnViderEl = document.getElementById('btn-vider-panier');
+  if (btnViderEl) {
+    btnViderEl.addEventListener('click', () => {
+      panier = {};
+      updatePanier();
+      if (currentView === 'liste') renderListe();
+    });
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // CHARGEMENT GEOJSON
+  // ─────────────────────────────────────────────────────────────────────────
+  // CORRECTION 5 : URL GeoJSON correcte (portail, pas inventory)
+  fetch('/gestion/inventory/api/geojson/')
+    .then(r => r.json())
+    .then(data => {
+      allFeatures = data.features || [];
+      renderMarkers(allFeatures);
+      populateFormatSelect();
+
+      // Pré-sélection depuis session Django (panier existant)
+      {% if panier %}
+        {% for face in panier %}
+        (function() {
+          const fid = '{{ face.pk }}';
+          const feat = allFeatures.find(f =>
+            (f.properties.faces || []).some(fc => String(fc.id) === fid)
+          );
+          if (feat) {
+            const p = feat.properties;
+            const faceData = (p.faces || []).find(fc => String(fc.id) === fid);
+            if (faceData) {
+              panier[fid] = {
+                code: p.code, label: faceData.label,
+                quartier: p.quartier || p.ville, support_id: String(p.id),
+              };
+            }
+          }
+        })();
+        {% endfor %}
+        updatePanier();
+      {% endif %}
+    })
+    .catch(err => {
+      console.error('Erreur chargement GeoJSON:', err);
+      const grid = document.getElementById('liste-grid');
+      if (grid) grid.innerHTML =
+        '<div class="liste-empty"><i class="bi bi-exclamation-triangle"></i><p>Impossible de charger les supports.</p></div>';
+    });
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // PRÉ-SÉLECTION DEPUIS URL (?face=<id>)
+  // ─────────────────────────────────────────────────────────────────────────
+  const urlFaceId = new URLSearchParams(window.location.search).get('face');
+  if (urlFaceId) {
+    const wait = setInterval(() => {
+      if (!allFeatures.length) return;
+      clearInterval(wait);
+      allFeatures.forEach(f => {
+        const p = f.properties;
+        (p.faces || []).forEach(face => {
+          if (String(face.id) === urlFaceId && getFaceStatut(face) === 'libre') {
+            panier[urlFaceId] = {
+              code: p.code, label: face.label,
+              quartier: p.quartier || p.ville, support_id: String(p.id),
+            };
+            updatePanier();
+            map.setView([f.geometry.coordinates[1], f.geometry.coordinates[0]], 16);
+          }
+        });
+      });
+    }, 150);
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,385 @@
+{% extends 'portail/base_portail.html' %}
+{% load static %}
+
+{% block title %}Supports - Régie INTEGRAL{% endblock %}
+
+{% block extra_css %}
+<style>
+    .breadcrumb-custom {
+        background-color: #f8f9fa;
+        padding: 1.5rem 0;
+        border-bottom: 1px solid #dee2e6;
+    }
+
+    .filters-card {
+        background: white;
+        padding: 1.5rem;
+        border-radius: 0.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        margin-bottom: 2rem;
+        sticky: top 100px;
+    }
+
+    .support-card {
+        background: white;
+        border-radius: 0.5rem;
+        overflow: hidden;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        transition: all 0.3s ease;
+        margin-bottom: 1.5rem;
+    }
+
+    .support-card:hover {
+        box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+        transform: translateY(-4px);
+    }
+
+    .support-photo {
+        height: 200px;
+        background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 3rem;
+        color: #adb5bd;
+    }
+
+    .support-body {
+        padding: 1.5rem;
+    }
+
+    .support-code {
+        font-size: 1.3rem;
+        font-weight: 700;
+        color: var(--primary);
+        margin-bottom: 0.5rem;
+    }
+
+    .support-address {
+        color: var(--secondary);
+        font-size: 0.95rem;
+        margin-bottom: 1rem;
+    }
+
+    .support-format {
+        display: inline-block;
+        background-color: #e7f3ff;
+        color: var(--primary);
+        padding: 0.25rem 0.75rem;
+        border-radius: 9999px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        margin-bottom: 1rem;
+    }
+
+    .faces-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+        gap: 0.75rem;
+        margin-bottom: 1.5rem;
+    }
+
+    .face-badge {
+        background: white;
+        border: 1px solid #dee2e6;
+        padding: 0.75rem;
+        border-radius: 0.375rem;
+        text-align: center;
+        font-weight: 600;
+        font-size: 0.9rem;
+    }
+
+    .face-badge.libre {
+        background-color: #d1e7dd;
+        border-color: #198754;
+        color: #0f5132;
+    }
+
+    .face-badge.occupe {
+        background-color: #f8d7da;
+        border-color: #dc3545;
+        color: #842029;
+    }
+
+    .face-badge.reserve {
+        background-color: #fff3cd;
+        border-color: #ffc107;
+        color: #664d03;
+    }
+
+    .support-actions {
+        display: flex;
+        gap: 0.75rem;
+    }
+
+    .btn-detail {
+        flex: 1;
+        background-color: var(--primary);
+        color: white;
+        padding: 0.5rem 1rem;
+        border-radius: 0.375rem;
+        text-decoration: none;
+        text-align: center;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+
+    .btn-detail:hover {
+        background-color: var(--primary-dark);
+        color: white;
+        transform: translateY(-2px);
+    }
+
+    .view-toggle {
+        margin-bottom: 1.5rem;
+        display: flex;
+        gap: 0.5rem;
+    }
+
+    .view-btn {
+        padding: 0.5rem 1rem;
+        border: 1px solid #dee2e6;
+        background: white;
+        border-radius: 0.375rem;
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.3s ease;
+    }
+
+    .view-btn.active {
+        background-color: var(--primary);
+        color: white;
+        border-color: var(--primary);
+    }
+
+    #map-view {
+        height: 60vh;
+        border-radius: 0.5rem;
+        box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        display: none;
+    }
+
+    #map-view.active {
+        display: block;
+    }
+
+    @media (max-width: 768px) {
+        .filters-card {
+            position: static;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- BREADCRUMB -->
+<div class="breadcrumb-custom">
+    <div class="container">
+        <nav aria-label="breadcrumb">
+            <ol class="breadcrumb mb-0">
+                <li class="breadcrumb-item"><a href="{% url 'portail:accueil' %}">Accueil</a></li>
+                <li class="breadcrumb-item"><a href="{% url 'portail:catalogue' %}">Catalogue</a></li>
+                <li class="breadcrumb-item active">Supports disponibles</li>
+            </ol>
+        </nav>
+    </div>
+</div>
+
+<!-- EN-TÊTE -->
+<div class="container section">
+    <h1 class="section-title">🗺️ Supports disponibles</h1>
+    <p class="section-subtitle">
+        {{ page_obj.paginator.count }} emplacements — Filtrez pour trouver celui qui vous convient
+    </p>
+</div>
+
+<div class="container pb-5">
+    <div class="row">
+
+        <!-- FILTRES LATÉRAUX -->
+        <div class="col-lg-3">
+            <div class="filters-card">
+                <h6 class="mb-3" style="font-weight: 700;">🔍 Filtres</h6>
+
+                <form method="get" class="d-flex flex-column gap-3">
+                    
+                    <!-- Ville -->
+                    <div>
+                        <label class="form-label" style="font-weight: 600; font-size: 0.9rem;">Ville</label>
+                        <select class="form-select form-select-sm" name="ville">
+                            <option value="">Toutes</option>
+                            <option value="Ouagadougou" {% if ville == 'Ouagadougou' %}selected{% endif %}>Ouagadougou</option>
+                            <option value="Bobo-Dioulasso" {% if ville == 'Bobo-Dioulasso' %}selected{% endif %}>Bobo-Dioulasso</option>
+                        </select>
+                    </div>
+
+                    <!-- Quartier -->
+                    <div>
+                        <label class="form-label" style="font-weight: 600; font-size: 0.9rem;">Quartier</label>
+                        <input type="text" class="form-control form-control-sm" name="quartier" 
+                               placeholder="Ex: Patte d'Oie" value="{{ quartier }}">
+                    </div>
+
+                    <!-- État -->
+                    <div>
+                        <label class="form-label" style="font-weight: 600; font-size: 0.9rem;">État</label>
+                        <select class="form-select form-select-sm" name="etat">
+                            <option value="">Tous</option>
+                            <option value="bon" {% if etat == 'bon' %}selected{% endif %}>Bon état</option>
+                            <option value="maintenance" {% if etat == 'maintenance' %}selected{% endif %}>En maintenance</option>
+                        </select>
+                    </div>
+
+                    <!-- Boutons -->
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-sm btn-primary">
+                            <i class="fas fa-filter"></i> Filtrer
+                        </button>
+                        <a href="{% url 'portail:supports_liste' %}" class="btn btn-sm btn-outline-secondary">
+                            <i class="fas fa-redo"></i> Réinitialiser
+                        </a>
+                    </div>
+
+                </form>
+
+                <hr class="my-3">
+
+                <div style="font-size: 0.9rem; color: var(--secondary);">
+                    <p class="mb-1">
+                        <strong>{{ page_obj.paginator.count }}</strong> supports<br>
+                        <strong>{{ nb_libres }}</strong> faces libres
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- CONTENU PRINCIPAL -->
+        <div class="col-lg-9">
+
+            <!-- Toggle Vue -->
+            <div class="view-toggle">
+                <button class="view-btn active" id="list-view-btn">
+                    <i class="fas fa-list"></i> Liste
+                </button>
+                <button class="view-btn" id="map-view-btn">
+                    <i class="fas fa-map"></i> Carte
+                </button>
+            </div>
+
+            <!-- VUE LISTE -->
+            <div id="list-view">
+                {% if page_obj %}
+                    {% for support in page_obj %}
+                        <div class="support-card">
+                            <div class="support-photo">📍</div>
+                            <div class="support-body">
+                                
+                                <div class="support-code">{{ support.code }}</div>
+                                <div class="support-address">
+                                    <i class="fas fa-map-marker-alt"></i>
+                                    {{ support.adresse }}, {{ support.ville }}
+                                </div>
+
+                                {% if support.format %}
+                                    <span class="support-format">{{ support.get_format_display }}</span>
+                                {% endif %}
+
+                                <!-- Faces -->
+                                <div class="faces-grid">
+                                    {% for face in support.faces.all %}
+                                        <div class="face-badge {% if face.get_statut == 'libre' %}libre{% elif face.get_statut == 'occupe' %}occupe{% else %}reserve{% endif %}">
+                                            Face {{ face.label }}
+                                        </div>
+                                    {% endfor %}
+                                </div>
+
+                                <div class="support-actions">
+                                    <a href="{% url 'portail:support_detail' support.uuid %}" class="btn-detail">
+                                        Voir détail →
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                {% else %}
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle"></i> Aucun support ne correspond à votre recherche.
+                    </div>
+                {% endif %}
+            </div>
+
+            <!-- VUE CARTE -->
+            <div id="map-view"></div>
+
+            <!-- PAGINATION -->
+            {% if page_obj.has_other_pages %}
+                <nav aria-label="Pagination" class="mt-4">
+                    <ul class="pagination justify-content-center">
+                        {% if page_obj.has_previous %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page=1{{ query_string }}">Première</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.previous_page_number }}{{ query_string }}">← Précédente</a>
+                            </li>
+                        {% endif %}
+
+                        <li class="page-item active">
+                            <span class="page-link">
+                                Page {{ page_obj.number }} / {{ page_obj.paginator.num_pages }}
+                            </span>
+                        </li>
+
+                        {% if page_obj.has_next %}
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.next_page_number }}{{ query_string }}">Suivante →</a>
+                            </li>
+                            <li class="page-item">
+                                <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}{{ query_string }}">Dernière</a>
+                            </li>
+                        {% endif %}
+                    </ul>
+                </nav>
+            {% endif %}
+
+        </div>
+
+    </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const listViewBtn = document.getElementById('list-view-btn');
+    const mapViewBtn = document.getElementById('map-view-btn');
+    const listView = document.getElementById('list-view');
+    const mapView = document.getElementById('map-view');
+
+    listViewBtn.addEventListener('click', function() {
+        listViewBtn.classList.add('active');
+        mapViewBtn.classList.remove('active');
+        listView.style.display = 'block';
+        mapView.classList.remove('active');
+    });
+
+    mapViewBtn.addEventListener('click', function() {
+        listViewBtn.classList.remove('active');
+        mapViewBtn.classList.add('active');
+        listView.style.display = 'none';
+        mapView.classList.add('active');
+
+        // Initialiser la carte une seule fois
+        if (!mapView._initialized) {
+            const map = L.map('map-view').setView([12.3714, -1.5197], 10);
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '© OpenStreetMap'
+            }).addTo(map);
+            mapView._initialized = true;
+        }
+    });
+});
+</script>
+{% endblock %}

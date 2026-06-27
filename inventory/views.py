@@ -32,7 +32,7 @@ from typing import cast
 
 # ── API GeoJSON pour Leaflet ──────────────────────────────────────────────────
 
-class ApiGeojsonView(LoginRequiredMixin, View):
+class ApiGeojsonView(View):
     def get(self, request, *args, **kwargs):
         """Retourne tous les supports en GeoJSON avec couleur dynamique."""
         type_filtre = request.GET.get('type', '')

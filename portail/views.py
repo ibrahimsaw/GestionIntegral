@@ -544,9 +544,25 @@ class ContactConfirmationView(TemplateView):
 # ══════════════════════════════════════════════════════════════════════════════
 # Wizard réservation
 # ══════════════════════════════════════════════════════════════════════════════
+import json
+import logging
+from datetime import date as date_type
+
+from django.conf import settings
+from django.contrib import messages
+from django.core.mail import send_mail
+from django.shortcuts import render, redirect, get_object_or_404
+from django.views import View
+
+from inventory.models import FacePanneau, Support
+from campaigns.models import DemandeReservation
+from .forms import Etape1Form, Etape2Form, Etape3Form
+
+logger = logging.getLogger(__name__)
+
 
 class ReserverEtape1View(View):
-    """Sélection des emplacements sur la carte."""
+    """Étape 1 — Sélection des emplacements sur la carte + période souhaitée."""
     template_name = 'portail/reserver_etape1.html'
 
     def _panier(self, request):
@@ -555,7 +571,7 @@ class ReserverEtape1View(View):
         if not ids:
             return []
         return list(
-            FacePanneau.objects.filter(pk__in=ids)   # ← uuid__in → pk__in
+            FacePanneau.objects.filter(pk__in=ids)
             .select_related('support')
         )
 
@@ -568,10 +584,18 @@ class ReserverEtape1View(View):
                 faces_ids.append(face_id)
             request.session['demande_faces_uuids'] = faces_ids
 
+        # Période déjà saisie précédemment (retour en arrière depuis étape 2/3)
+        periode = request.session.get('demande_periode', {})
+
         form = Etape1Form(initial={
             'faces_selectionnees': json.dumps(
                 request.session.get('demande_faces_uuids', [])
-            )
+            ),
+            'supports_selectionnees': json.dumps(
+                request.session.get('demande_supports_uuids', [])
+            ),
+            'date_debut': periode.get('date_debut'),
+            'date_fin':   periode.get('date_fin'),
         })
         return render(request, self.template_name, {
             'form':   form,
@@ -581,8 +605,13 @@ class ReserverEtape1View(View):
     def post(self, request):
         form = Etape1Form(request.POST)
         if form.is_valid():
-            request.session['demande_faces_uuids']    = form.cleaned_data['faces_uuids']
-            request.session['demande_supports_uuids'] = form.cleaned_data['supports_uuids']
+            d = form.cleaned_data
+            request.session['demande_faces_uuids']    = d['faces_uuids']
+            request.session['demande_supports_uuids'] = d['supports_uuids']
+            request.session['demande_periode'] = {
+                'date_debut': str(d['date_debut']),
+                'date_fin':   str(d['date_fin']),
+            }
             return redirect('portail:reserver_etape2')
 
         return render(request, self.template_name, {
@@ -592,20 +621,22 @@ class ReserverEtape1View(View):
 
 
 class ReserverEtape2View(View):
-    """Sélection de la période et du projet."""
+    """Étape 2 — Détails complémentaires du projet (campagne / message, facultatif)."""
     template_name = 'portail/reserver_etape2.html'
 
     def _get_selections(self, request):
         faces_ids    = request.session.get('demande_faces_uuids', [])
         supports_ids = request.session.get('demande_supports_uuids', [])
-        faces    = list(FacePanneau.objects.filter(pk__in=faces_ids).select_related('support'))   # ← corrigé
-        supports = list(Support.objects.filter(pk__in=supports_ids))                              # ← corrigé
+        faces    = list(FacePanneau.objects.filter(pk__in=faces_ids).select_related('support'))
+        supports = list(Support.objects.filter(pk__in=supports_ids))
         return faces, supports
 
     def get(self, request):
         faces, supports = self._get_selections(request)
-        if not faces and not supports:
-            messages.warning(request, "Veuillez d'abord sélectionner des emplacements.")
+        periode = request.session.get('demande_periode', {})
+
+        if (not faces and not supports) or not periode.get('date_debut'):
+            messages.warning(request, "Veuillez d'abord sélectionner des emplacements et une période.")
             return redirect('portail:reserver_etape1')
 
         initial = request.session.get('demande_etape2', {})
@@ -614,6 +645,7 @@ class ReserverEtape2View(View):
             'form':     form,
             'faces':    faces,
             'supports': supports,
+            'periode':  periode,
         })
 
     def post(self, request):
@@ -622,8 +654,6 @@ class ReserverEtape2View(View):
         if form.is_valid():
             d = form.cleaned_data
             request.session['demande_etape2'] = {
-                'date_debut':   str(d['date_debut']),
-                'date_fin':     str(d['date_fin']),
                 'nom_campagne': d.get('nom_campagne', ''),
                 'message':      d.get('message', ''),
             }
@@ -633,26 +663,39 @@ class ReserverEtape2View(View):
             'form':     form,
             'faces':    faces,
             'supports': supports,
+            'periode':  request.session.get('demande_periode', {}),
         })
 
 
 class ReserverEtape3View(View):
-    """Coordonnées du visiteur et soumission finale."""
+    """Étape 3 — Coordonnées du visiteur et soumission finale."""
     template_name = 'portail/reserver_etape3.html'
 
     def _check_session(self, request):
-        faces_ids = request.session.get('demande_faces_uuids', [])
-        etape2    = request.session.get('demande_etape2', {})
-        if not faces_ids or not etape2.get('date_debut'):
+        faces_ids    = request.session.get('demande_faces_uuids', [])
+        supports_ids = request.session.get('demande_supports_uuids', [])
+        periode      = request.session.get('demande_periode', {})
+        if (not faces_ids and not supports_ids) or not periode.get('date_debut'):
             return False
         return True
 
     def _get_recap(self, request):
         faces_ids    = request.session.get('demande_faces_uuids', [])
         supports_ids = request.session.get('demande_supports_uuids', [])
-        etape2       = request.session.get('demande_etape2', {})
-        faces    = list(FacePanneau.objects.filter(pk__in=faces_ids).select_related('support'))   # ← corrigé
-        supports = list(Support.objects.filter(pk__in=supports_ids))                              # ← corrigé
+        periode      = request.session.get('demande_periode', {})
+        etape2_extra = request.session.get('demande_etape2', {})
+
+        faces    = list(FacePanneau.objects.filter(pk__in=faces_ids).select_related('support'))
+        supports = list(Support.objects.filter(pk__in=supports_ids))
+
+        # Dict reconstruit pour rester compatible avec le template existant
+        # (qui attend etape2.date_debut / etape2.date_fin / etape2.nom_campagne / etape2.message)
+        etape2 = {
+            'date_debut':   periode.get('date_debut'),
+            'date_fin':     periode.get('date_fin'),
+            'nom_campagne': etape2_extra.get('nom_campagne', ''),
+            'message':      etape2_extra.get('message', ''),
+        }
         return faces, supports, etape2
 
     def get(self, request):
@@ -683,7 +726,6 @@ class ReserverEtape3View(View):
             })
 
         d = form.cleaned_data
-        from datetime import date as date_type
 
         date_debut = date_type.fromisoformat(etape2['date_debut'])
         date_fin   = date_type.fromisoformat(etape2['date_fin'])
@@ -707,7 +749,7 @@ class ReserverEtape3View(View):
 
         self._send_emails(demande, faces, supports, etape2)
 
-        for key in ('demande_faces_uuids', 'demande_supports_uuids', 'demande_etape2'):
+        for key in ('demande_faces_uuids', 'demande_supports_uuids', 'demande_periode', 'demande_etape2'):
             request.session.pop(key, None)
 
         return redirect('portail:confirmation', uuid=demande.uuid)
@@ -768,7 +810,6 @@ class ConfirmationView(View):
     def get(self, request, uuid):
         demande = get_object_or_404(DemandeReservation, uuid=uuid)
         return render(request, self.template_name, {'demande': demande})
-
 # ══════════════════════════════════════════════════════════════════════════════
 # API JSON
 # ══════════════════════════════════════════════════════════════════════════════

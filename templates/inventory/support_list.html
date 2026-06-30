@@ -9,7 +9,6 @@
 {% endblock %}
 
 {% block content %}
-<!-- Search & filters -->
 <div class="card mb-4">
   <div class="card-body">
     <form method="get" class="row g-2 align-items-end">
@@ -71,100 +70,135 @@
 </div>
 
 <div class="card">
-  <div class="card-header">
-    {{ supports|length }} support(s) trouvé(s)
+  <div class="card-header d-flex align-items-center">
+    <span>{{ supports|length }} support(s) trouvé(s)</span>
     <a href="{% url 'carte' %}" class="btn btn-sm btn-outline-secondary ms-auto"><i class="bi bi-map me-1"></i>Voir carte</a>
   </div>
-  <div class="card-body p-0">
-    <table class="table mb-0">
-      <thead>
-        <tr><th>Code</th><th>Code Mairie</th><th>Nom</th>
+  <div class="card-body p-0 table-responsive">
+    
+    {# ─── UN SEUL TABLEAU ET UN SEUL THEAD ─── #}
+    <table class="table mb-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Code</th>
+          <th>Code Mairie</th>
+          <th>Nom</th>
           <th>Type</th>
-          {% comment %} <th>Localisation</th> {% endcomment %}
-          <th>État</th><th>Occupation</th><th>Actions</th></tr>
+          <th>État</th>
+          <th>Occupation</th>
+          <th>Actions</th>
+        </tr>
       </thead>
       <tbody>
         {% for s in supports %}
-        <tr class="{% if s.etat == 'panne' %}table-danger{% endif %}">
-          <td class="mono" style="font-size:.8rem;color:var(--color-primary)">{{ s.code }}</td>
-          <td class="mono" style="font-size:1rem;color:var(--color-primary);">{{ s.code_ext|default:"--" }}</td>
-          <td style="font-weight:600">
-            <a href="{% url 'support_detail' s.uuid %}" style="color:var(--text);text-decoration:none">{{ s.nom }}</a>
-          </td>
-          <td>
-            <span class="badge-status {% if s.type_support == 'panneau' %}bs-bientot{% else %}bs-en_cours{% endif %}">
-              {% if s.type_support == 'panneau' %}<i class="bi bi-sign-merge-right me-1"> {{ s.type_panneau }}</i>{% else %}<i class="bi bi-display me-1"></i>{{ s.get_type_support_display }}{% endif %}
-            </span>
-          </td>
-          {% comment %} <td style="font-size:.8rem;color:var(--text-muted)">{{ s.adresse|default:"—"|truncatechars:35 }}</td> {% endcomment %}
-          <td>
-            <span class="badge-status {% if s.etat == 'bon' %}bs-disponible{% elif s.etat == 'maintenance' %}bs-occupe{% else %}bs-panne{% endif %}">
-              {{ s.get_etat_display }}
-            </span>
-          </td>
-          <td>
-            {% if s.type_support == 'ecran' %}
-              {% if s.is_occupe %}
-              <span class="badge-status bs-occupe"><i class="bi bi-broadcast me-1"></i>Occupé {{s.taux_occupation_pourcentage}}%</span>
-              {% else %}
-              <span class="badge-status bs-disponible"><i class="bi bi-check2 me-1"></i>Libre</span>
-              {% endif %}
-            {% else %}
-              {% for face in s.faces.all %}
-                {% if face.get_statut == 'libre' %}
-                  <span class="badge-status bs-disponible"><i class="bi bi-check2 me-1"></i>Libre {{face.label}}</span>
-                {% elif face.get_statut == 'occupe' %}
-                  <span class="badge-status bs-occupe"><i class="bi bi-broadcast me-1"></i>Occupé {{face.label}}</span>
-                {% elif face.get_statut == 'reserve' %}
-                  <span class="badge-status bs-reserve"><i class="bi bi-clock me-1"></i>Réservé {{face.label}}</span>
+          
+          {# Si la VILLE change, on affiche une ligne d'en-tête pour la ville #}
+          {% ifchanged s.ville %}
+            <tr class="table-dark">
+              <td colspan="7" class="fw-bold text-uppercase ps-3 py-2" style="letter-spacing: 1px; font-size: 0.9rem; background-color: var(--color-primary);">
+                <i class="bi bi-building me-2"></i>{{ s.ville|default:"Ville non spécifiée" }}
+              </td>
+            </tr>
+          {% endifchanged %}
+
+          {# Si le QUARTIER change (ou si la ville a changé), on met une ligne pour le quartier #}
+          {% ifchanged s.ville s.quartier %}
+            <tr class="bg-light border-bottom">
+              <td colspan="7" class="fw-bold text-muted ps-4 py-2 text-uppercase" style="font-size: 0.8rem; color: var(--color-primary) !important; background-color: #f8f9fa;">
+                <i class="bi bi-signpost-split me-2"></i>Quartier : {{ s.quartier|default:"Général / Non spécifié" }}
+              </td>
+            </tr>
+          {% endifchanged %}
+
+          {# Ligne standard du support #}
+          <tr class="{% if s.etat == 'panne' %}table-danger{% endif %}">
+            <td class="mono ps-4" style="font-size:.8rem;color:var(--color-primary)">{{ s.code }}</td>
+            <td class="mono" style="font-size:1rem;color:var(--color-primary);">{{ s.code_ext|default:"--" }}</td>
+            <td style="font-weight:600">
+              <a href="{% url 'support_detail' s.uuid %}" style="color:var(--text);text-decoration:none">{{ s.nom }}</a>
+            </td>
+            <td>
+              <span class="badge-status {% if s.type_support == 'panneau' %}bs-bientot{% else %}bs-en_cours{% endif %}">
+                {% if s.type_support == 'panneau' %}
+                  <i class="bi bi-sign-merge-right me-1"> {{ s.type_panneau }}</i>
                 {% else %}
-                  <span class="badge-status bs-panne"><i class="bi bi-clock me-1"></i>En Panne {{face.label}}</span>
+                  <i class="bi bi-display me-1"></i>{{ s.get_type_support_display }}
                 {% endif %}
-              {% endfor %}
-            {% endif %}
-          </td>
-          <td>
-            <div class="d-flex gap-1">
-              {% if user.is_staff_regie_role %}
-              <a href="{% url 'support_detail' s.uuid %}" class="btn btn-sm btn-outline-secondary" title="Détail"><i class="bi bi-eye"></i></a>
-              
-              <a href="{% url 'support_edit' s.uuid %}" class="btn btn-sm btn-outline-secondary" title="Modifier"><i class="bi bi-pencil"></i></a>
+              </span>
+            </td>
+            <td>
+              <span class="badge-status {% if s.etat == 'bon' %}bs-disponible{% elif s.etat == 'maintenance' %}bs-occupe{% else %}bs-panne{% endif %}">
+                {{ s.get_etat_display }}
+              </span>
+            </td>
+            <td>
+              {% if s.type_support == 'ecran' %}
+                {% if s.is_occupe %}
+                  <span class="badge-status bs-occupe"><i class="bi bi-broadcast me-1"></i>Occupé {{s.taux_occupation_pourcentage}}%</span>
+                {% else %}
+                  <span class="badge-status bs-disponible"><i class="bi bi-check2 me-1"></i>Libre</span>
+                {% endif %}
+              {% else %}
+                {% for face in s.faces.all %}
+                  {% if face.get_statut == 'libre' %}
+                    <span class="badge-status bs-disponible"><i class="bi bi-check2 me-1"></i>Libre {{face.label}}</span>
+                  {% elif face.get_statut == 'occupe' %}
+                    <span class="badge-status bs-occupe"><i class="bi bi-broadcast me-1"></i>Occupé {{face.label}}</span>
+                  {% elif face.get_statut == 'reserve' %}
+                    <span class="badge-status bs-reserve"><i class="bi bi-clock me-1"></i>Réservé {{face.label}}</span>
+                  {% else %}
+                    <span class="badge-status bs-panne"><i class="bi bi-clock me-1"></i>En Panne {{face.label}}</span>
+                  {% endif %}
+                {% endfor %}
               {% endif %}
-              {% if user.is_technicien_role or user.is_staff_regie_role %}
-              <a href="{% url 'maintenance_create' s.pk %}" class="btn btn-sm btn-outline-secondary" title="Maintenance" style="color:#fbbf24;border-color:#fbbf2444"><i class="bi bi-tools"></i></a>
-              {% endif %}
-            </div>
-          </td>
-        </tr>
+            </td>
+            <td>
+              <div class="d-flex gap-1">
+                {% if user.is_staff_regie_role %}
+                  <a href="{% url 'support_detail' s.uuid %}" class="btn btn-sm btn-outline-secondary" title="Détail"><i class="bi bi-eye"></i></a>
+                  <a href="{% url 'support_edit' s.uuid %}" class="btn btn-sm btn-outline-secondary" title="Modifier"><i class="bi bi-pencil"></i></a>
+                {% endif %}
+                {% if user.is_technicien_role or user.is_staff_regie_role %}
+                  <a href="{% url 'maintenance_create' s.pk %}" class="btn btn-sm btn-outline-secondary" title="Maintenance" style="color:#fbbf24;border-color:#fbbf2444"><i class="bi bi-tools"></i></a>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+
         {% empty %}
-        <tr><td colspan="7" class="text-center py-5" style="color:var(--text-muted)">
-          <i class="bi bi-geo-alt d-block mb-2" style="font-size:2rem"></i>
-          Aucun support. <a href="{% url 'support_create' %}">Créer le premier</a>
-        </td></tr>
+          <tr>
+            <td colspan="7" class="text-center py-5" style="color:var(--text-muted)">
+              <i class="bi bi-geo-alt d-block mb-2" style="font-size:2rem"></i>
+              Aucun support trouvé. <a href="{% url 'support_create' %}">Créer le premier</a>
+            </td>
+          </tr>
         {% endfor %}
       </tbody>
     </table>
-      {% if is_paginated %}
-      <nav class="mt-4">
-        <ul class="pagination justify-content-center">
-          {% if page_obj.has_previous %}
-            <li class="page-item">
-              <a class="page-item btn btn-sm btn-outline-primary me-2" href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if type_f %}&type={{ type_f }}{% endif %}{% if etat_f %}&etat={{ etat_f }}{% endif %}{% if occupation_f %}&occupation={{ occupation_f }}{% endif %}{% if ville_f %}&occupation={{ ville_f }}{% endif %}">Précédent</a>
-            </li>
-          {% endif %}
 
-          <li class="page-item disabled">
-            <span class="page-link">Page {{ page_obj.number }}/{{ paginator.num_pages }}</span>
-          </li>
-
-          {% if page_obj.has_next %}
-            <li class="page-item">
-              <a class="page-item btn btn-sm btn-outline-primary ms-2" href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if type_f %}&type={{ type_f }}{% endif %}{% if etat_f %}&etat={{ etat_f }}{% endif %}{% if occupation_f %}&occupation={{ occupation_f }}{% endif %}{% if ville_f %}&ville={{ ville_f }}{% endif %}">Suivant</a>
-            </li>
-          {% endif %}
-        </ul>
-      </nav>
-      {% endif %}
   </div>
 </div>
+
+{# Pagination globale #}
+{% if is_paginated %}
+  <nav class="mt-4">
+    <ul class="pagination justify-content-center">
+      {% if page_obj.has_previous %}
+        <li class="page-item">
+          <a class="page-item btn btn-sm btn-outline-primary me-2" href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if type_f %}&type={{ type_f }}{% endif %}{% if etat_f %}&etat={{ etat_f }}{% endif %}{% if occupation_f %}&occupation={{ occupation_f }}{% endif %}{% if ville_f %}&ville={{ ville_f }}{% endif %}">Précédent</a>
+        </li>
+      {% endif %}
+
+      <li class="page-item disabled">
+        <span class="page-link">Page {{ page_obj.number }}/{{ paginator.num_pages }}</span>
+      </li>
+
+      {% if page_obj.has_next %}
+        <li class="page-item">
+          <a class="page-item btn btn-sm btn-outline-primary ms-2" href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if type_f %}&type={{ type_f }}{% endif %}{% if etat_f %}&etat={{ etat_f }}{% endif %}{% if occupation_f %}&occupation={{ occupation_f }}{% endif %}{% if ville_f %}&ville={{ ville_f }}{% endif %}">Suivant</a>
+        </li>
+      {% endif %}
+    </ul>
+  </nav>
+{% endif %}
 {% endblock %}

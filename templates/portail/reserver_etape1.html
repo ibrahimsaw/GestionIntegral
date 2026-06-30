@@ -327,661 +327,669 @@
 {% block full_page %}p-0{% endblock %}
 
 {% block content %}
-<div style="padding: 14px 16px;">
+  <div style="padding: 14px 16px;">
 
-  {% if form.errors %}
-  <div style="padding:10px 14px;border-radius:8px;margin-bottom:12px;font-size:.82rem;
-              background:#fee2e2;border:1px solid #fca5a5;color:#991b1b;
-              display:flex;align-items:flex-start;gap:8px;">
-    <i class="bi bi-exclamation-triangle-fill" style="margin-top:1px"></i>
-    <div>
-      {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
-      {% if form.date_debut.errors %}<div>{{ form.date_debut.errors.0 }}</div>{% endif %}
-      {% if form.date_fin.errors   %}<div>{{ form.date_fin.errors.0   }}</div>{% endif %}
+    {% if form.errors %}
+    <div style="padding:10px 14px;border-radius:8px;margin-bottom:12px;font-size:.82rem;
+                background:#fee2e2;border:1px solid #fca5a5;color:#991b1b;
+                display:flex;align-items:flex-start;gap:8px;">
+      <i class="bi bi-exclamation-triangle-fill" style="margin-top:1px"></i>
+      <div>
+        {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
+        {% if form.date_debut.errors %}<div>{{ form.date_debut.errors.0 }}</div>{% endif %}
+        {% if form.date_fin.errors   %}<div>{{ form.date_fin.errors.0   }}</div>{% endif %}
+      </div>
     </div>
-  </div>
-  {% endif %}
+    {% endif %}
 
-  <!-- WIZARD -->
-  <div class="wizard-steps">
-    <div class="step-item active">
-      <div class="step-circle">1</div>
-      <span class="step-label">Emplacements & Période</span>
+    <div class="wizard-steps">
+      <div class="step-item active">
+        <div class="step-circle">1</div>
+        <span class="step-label">Emplacements & Période</span>
+      </div>
+      <div class="step-item">
+        <div class="step-circle">2</div>
+        <span class="step-label">Votre projet</span>
+      </div>
+      <div class="step-item">
+        <div class="step-circle">3</div>
+        <span class="step-label">Coordonnées</span>
+      </div>
     </div>
-    <div class="step-item">
-      <div class="step-circle">2</div>
-      <span class="step-label">Votre projet</span>
-    </div>
-    <div class="step-item">
-      <div class="step-circle">3</div>
-      <span class="step-label">Coordonnées</span>
-    </div>
-  </div>
 
-  <!-- BARRE DATES -->
-  <div class="dates-bar">
-    <span class="dates-bar-label">
-      <i class="bi bi-calendar3" style="color:var(--color-primary)"></i>
-      Période souhaitée
-    </span>
-    <div class="date-input-wrap">
-      <i class="bi bi-calendar-plus" style="color:#10b981"></i>
-      <input type="date" id="date-debut"
-             value="{{ form.date_debut.value|default:'' }}"
-             min="{% now 'Y-m-d' %}" required>
+    <div class="dates-bar">
+      <span class="dates-bar-label">
+        <i class="bi bi-calendar3" style="color:var(--color-primary)"></i>
+        Période souhaitée
+      </span>
+      <div class="date-input-wrap">
+        <i class="bi bi-calendar-plus" style="color:#10b981"></i>
+        <input type="date" id="date-debut"
+              value="{{ form.date_debut.value|default:'' }}"
+              min="{% now 'Y-m-d' %}" required>
+      </div>
+      <span class="dates-bar-sep">→</span>
+      <div class="date-input-wrap">
+        <i class="bi bi-calendar-minus" style="color:#ef4444"></i>
+        <input type="date" id="date-fin"
+              value="{{ form.date_fin.value|default:'' }}"
+              min="{% now 'Y-m-d' %}" required>
+      </div>
+      <div id="dates-status" class="waiting">
+        <i class="bi bi-info-circle"></i>
+        Saisissez les dates pour voir les disponibilités
+      </div>
     </div>
-    <span class="dates-bar-sep">→</span>
-    <div class="date-input-wrap">
-      <i class="bi bi-calendar-minus" style="color:#ef4444"></i>
-      <input type="date" id="date-fin"
-             value="{{ form.date_fin.value|default:'' }}"
-             min="{% now 'Y-m-d' %}" required>
-    </div>
-    <div id="dates-status" class="waiting">
-      <i class="bi bi-info-circle"></i>
-      Saisissez les dates pour voir les disponibilités
-    </div>
-  </div>
 
-  <!-- GRILLE PRINCIPALE -->
-  <div class="resa-grid">
+    <div class="resa-grid">
 
-    <!-- COLONNE GAUCHE -->
-    <div class="main-section">
-      <div class="section-header">
+      <div class="main-section">
+        <div class="section-header">
 
-        <div class="view-toggle">
-          <button class="vt-btn active" id="btn-vue-carte" onclick="switchView('carte')">
-            <i class="bi bi-map-fill"></i> Carte
-          </button>
-          <button class="vt-btn" id="btn-vue-liste" onclick="switchView('liste')">
-            <i class="bi bi-list-ul"></i> Liste
-          </button>
+          <div class="view-toggle">
+            <button class="vt-btn active" id="btn-vue-carte" onclick="switchView('carte')">
+              <i class="bi bi-map-fill"></i> Carte
+            </button>
+            <button class="vt-btn" id="btn-vue-liste" onclick="switchView('liste')">
+              <i class="bi bi-list-ul"></i> Liste
+            </button>
+          </div>
+
+          <div id="filtres-carte" style="display:flex;gap:6px;flex-wrap:wrap;flex:1">
+            <select class="mf-select" id="filter-ville">
+              <option value="">Toutes les villes</option>
+            </select>
+            <select class="mf-select" id="filter-quartier">
+              <option value="">Tous les quartiers</option>
+            </select>
+            <select class="mf-select" id="filter-dispo">
+              <option value="">Tous états</option>
+              <option value="libre">Libres uniquement</option>
+            </select>
+          </div>
+
+          <div id="filtres-liste" style="display:none;gap:6px;flex-wrap:wrap;flex:1;align-items:center">
+            <input type="search" class="list-search" id="list-search" placeholder="Code ou nom du panneau…">
+            <select class="mf-select" id="list-filter-ville">
+              <option value="">Toutes les villes</option>
+            </select>
+            <select class="mf-select" id="list-filter-quartier">
+              <option value="">Tous les quartiers</option>
+            </select>
+            <select class="mf-select" id="list-filter-dispo">
+              <option value="">Tous états</option>
+              <option value="libre">Libres uniquement</option>
+            </select>
+            <select class="mf-select" id="list-filter-format">
+              <option value="">Tous formats</option>
+            </select>
+          </div>
+
         </div>
 
-        <!-- Filtres carte -->
-        <div id="filtres-carte" style="display:flex;gap:6px;flex-wrap:wrap;flex:1">
-          <select class="mf-select" id="filter-type">
-            <option value="">Tous types</option>
-            <option value="panneau">Panneaux</option>
-            <option value="ecran">Écrans LED</option>
-          </select>
-          <select class="mf-select" id="filter-dispo">
-            <option value="">Tous états</option>
-            <option value="libre">Libres uniquement</option>
-          </select>
+        <div id="view-carte" style="flex:1;display:flex;flex-direction:column;">
+          <div id="map-resa" style="flex:1;min-height:360px;"></div>
+          <div class="map-legend">
+            <span class="leg-item"><span class="leg-dot" style="background:#10b981"></span>Libre</span>
+            <span class="leg-item"><span class="leg-dot" style="background:#f59e0b"></span>Partiel</span>
+            <span class="leg-item"><span class="leg-dot" style="background:#7c3aed"></span>Réservé</span>
+            <span class="leg-item"><span class="leg-dot" style="background:#ef4444"></span>Occupé</span>
+            <span class="leg-item"><span class="leg-dot" style="background:#94a3b8"></span>Panne</span>
+            <span class="leg-item"><span class="leg-dot" style="background:var(--color-primary)"></span>Sélectionné</span>
+          </div>
         </div>
 
-        <!-- Filtres liste -->
-        <div id="filtres-liste" style="display:none;gap:6px;flex-wrap:wrap;flex:1;align-items:center">
-          <input type="search" class="list-search" id="list-search" placeholder="Code, quartier, nom…">
-          <select class="mf-select" id="list-filter-type">
-            <option value="">Tous types</option>
-            <option value="panneau">Panneaux</option>
-            <option value="ecran">Écrans LED</option>
-          </select>
-          <select class="mf-select" id="list-filter-dispo">
-            <option value="">Tous états</option>
-            <option value="libre">Libres uniquement</option>
-          </select>
-          <select class="mf-select" id="list-filter-format">
-            <option value="">Tous formats</option>
-          </select>
+        <div id="view-liste">
+          <div class="liste-grid" id="liste-grid">
+            <div class="liste-empty">
+              <i class="bi bi-hourglass-split"></i>
+              <p>Chargement des panneaux…</p>
+            </div>
+          </div>
         </div>
 
       </div>
 
-      <!-- VUE CARTE -->
-      <div id="view-carte" style="flex:1;display:flex;flex-direction:column;">
-        <div id="map-resa" style="flex:1;min-height:360px;"></div>
-        <div class="map-legend">
-          <span class="leg-item"><span class="leg-dot" style="background:#10b981"></span>Libre</span>
-          <span class="leg-item"><span class="leg-dot" style="background:#f59e0b"></span>Partiel</span>
-          <span class="leg-item"><span class="leg-dot" style="background:#7c3aed"></span>Réservé</span>
-          <span class="leg-item"><span class="leg-dot" style="background:#ef4444"></span>Occupé</span>
-          <span class="leg-item"><span class="leg-dot" style="background:#94a3b8"></span>Panne</span>
-          <span class="leg-item"><span class="leg-dot" style="background:var(--color-primary)"></span>Sélectionné</span>
+      <div class="panier-section">
+        <div class="panier-header">
+          <div class="panier-title">
+            <i class="bi bi-bag-check-fill" style="color:var(--color-primary)"></i>
+            Sélection
+            <span class="panier-count" id="panier-count">0</span>
+          </div>
+          <button class="pi-remove" id="btn-vider-panier" title="Vider" style="display:none">
+            <i class="bi bi-trash3"></i>
+          </button>
         </div>
-      </div>
 
-      <!-- VUE LISTE -->
-      <div id="view-liste">
-        <div class="liste-grid" id="liste-grid">
-          <div class="liste-empty">
-            <i class="bi bi-hourglass-split"></i>
-            <p>Chargement des supports…</p>
+        <div class="panier-body" id="panier-body">
+          <div class="panier-empty" id="panier-empty">
+            <i class="bi bi-map"></i>
+            <p>Cliquez sur une face libre pour l'ajouter.</p>
+          </div>
+        </div>
+
+        <div class="panier-footer">
+          <div class="dates-hint" id="dates-hint">
+            <i class="bi bi-calendar-event"></i>
+            Saisissez les dates pour continuer
+          </div>
+
+          <form method="post" id="form-etape1">
+            {% csrf_token %}
+            <input type="hidden" name="faces_selectionnees"    id="faces-input"    value="">
+            <input type="hidden" name="supports_selectionnees" id="supports-input" value="[]">
+            <input type="hidden" name="date_debut" id="hidden-date-debut" value="{{ form.date_debut.value|default:'' }}">
+            <input type="hidden" name="date_fin"   id="hidden-date-fin"   value="{{ form.date_fin.value|default:'' }}">
+
+            <button type="submit" class="btn-continuer" id="btn-continuer" disabled>
+              <i class="bi bi-arrow-right-circle-fill"></i>
+              Continuer — <span id="btn-count">0</span> panneau(x)
+            </button>
+          </form>
+
+          <div style="font-size:.68rem;color:var(--text-muted);text-align:center;margin-top:7px;">
+            <i class="bi bi-shield-check me-1"></i>Aucun engagement — demande sans frais
           </div>
         </div>
       </div>
 
     </div>
-
-    <!-- PANIER -->
-    <div class="panier-section">
-      <div class="panier-header">
-        <div class="panier-title">
-          <i class="bi bi-bag-check-fill" style="color:var(--color-primary)"></i>
-          Sélection
-          <span class="panier-count" id="panier-count">0</span>
-        </div>
-        <button class="pi-remove" id="btn-vider-panier" title="Vider" style="display:none">
-          <i class="bi bi-trash3"></i>
-        </button>
-      </div>
-
-      <div class="panier-body" id="panier-body">
-        <div class="panier-empty" id="panier-empty">
-          <i class="bi bi-map"></i>
-          <p>Cliquez sur une face libre pour l'ajouter.</p>
-        </div>
-      </div>
-
-      <div class="panier-footer">
-        <!-- Hint visible seulement si faces sélectionnées mais pas de dates -->
-        <div class="dates-hint" id="dates-hint">
-          <i class="bi bi-calendar-event"></i>
-          Saisissez les dates pour continuer
-        </div>
-
-        <form method="post" id="form-etape1">
-          {% csrf_token %}
-          <!-- Faces sélectionnées -->
-          <input type="hidden" name="faces_selectionnees"    id="faces-input"    value="">
-          <input type="hidden" name="supports_selectionnees" id="supports-input" value="[]">
-          <!-- Dates (liées aux inputs visibles via JS) -->
-          <input type="hidden" name="date_debut" id="hidden-date-debut"
-                 value="{{ form.date_debut.value|default:'' }}">
-          <input type="hidden" name="date_fin"   id="hidden-date-fin"
-                 value="{{ form.date_fin.value|default:'' }}">
-
-          <button type="submit" class="btn-continuer" id="btn-continuer" disabled>
-            <i class="bi bi-arrow-right-circle-fill"></i>
-            Continuer — <span id="btn-count">0</span> emplacement(s)
-          </button>
-        </form>
-
-        <div style="font-size:.68rem;color:var(--text-muted);text-align:center;margin-top:7px;">
-          <i class="bi bi-shield-check me-1"></i>Aucun engagement — demande sans frais
-        </div>
-      </div>
-    </div>
-
   </div>
-</div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-"use strict";
+    "use strict";
 
-// ── ÉTAT GLOBAL ───────────────────────────────────────────────────────────
-let allFeatures    = [];
-let facesOccupees  = new Set();
-let markersMap     = {};
-let panier         = {};
-let currentView    = 'carte';
-let currentPopup   = null;
-let datesOk        = false;
-let checkDispoTimer = null;
+    // ── ÉTAT GLOBAL ───────────────────────────────────────────────────────────
+    let allFeatures    = [];
+    let facesOccupees  = new Set();
+    let markersMap     = {};
+    let panier         = {};
+    let currentView    = 'carte';
+    let currentPopup   = null;
+    let datesOk        = false;
+    let checkDispoTimer = null;
 
-const COLORS = {
-  libre:   '#10b981',
-  partiel: '#f59e0b',
-  occupe:  '#ef4444',
-  panne:   '#94a3b8',
-  reserve: '#7c3aed',
-};
+    const COLORS = {
+      libre:   '#10b981',
+      partiel: '#f59e0b',
+      occupe:  '#ef4444',
+      panne:   '#94a3b8',
+      reserve: '#7c3aed',
+    };
 
-// ── CARTE ─────────────────────────────────────────────────────────────────
-const map = L.map('map-resa', { zoomControl: true }).setView([12.3714, -1.5197], 12);
-L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-  attribution: '© OpenStreetMap © CARTO', subdomains: 'abcd', maxZoom: 19
-}).addTo(map);
+    // ── CARTE ─────────────────────────────────────────────────────────────────
+    const map = L.map('map-resa', { zoomControl: true }).setView([12.3714, -1.5197], 12);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
+      attribution: '© OpenStreetMap © CARTO', subdomains: 'abcd', maxZoom: 19
+    }).addTo(map);
 
-function makeIcon(color, type, selected) {
-  type = type || 'panneau';
-  const fillColor = selected ? '#dbeafe' : '#ffffff';
-  const inner = type === 'panneau'
-    ? `<rect x="8" y="5" width="14" height="10" rx="2" fill="${fillColor}" stroke="${color}" stroke-width="1.8"/>
-       <line x1="15" y1="15" x2="15" y2="20" stroke="${color}" stroke-width="1.5"/>`
-    : `<rect x="6" y="6" width="18" height="13" rx="2" fill="${fillColor}" stroke="${color}" stroke-width="1.8"/>
-       <circle cx="15" cy="22" r="1.5" fill="${color}"/>
-       <line x1="15" y1="19" x2="15" y2="23.5" stroke="${color}" stroke-width="1.2"/>`;
-  const id = 'sh' + type + (selected ? 's' : '');
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 30 38">
-    <defs><filter id="${id}"><feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-opacity=".28"/></filter></defs>
-    <path d="M15 2C9.477 2 5 6.477 5 12c0 7.5 10 24 10 24s10-16.5 10-24C25 6.477 20.523 2 15 2z"
-          fill="${color}" filter="url(#${id})"/>
-    ${inner}
-  </svg>`;
-  return L.divIcon({ html: svg, iconSize: [32,40], iconAnchor: [16,40], popupAnchor: [0,-42], className: '' });
-}
+    function makeIcon(color, type, selected) {
+      const fillColor = selected ? '#dbeafe' : '#ffffff';
+      // Uniquement le dessin du panneau physique ici
+      const inner = `<rect x="8" y="5" width="14" height="10" rx="2" fill="${fillColor}" stroke="${color}" stroke-width="1.8"/>
+                    <line x1="15" y1="15" x2="15" y2="20" stroke="${color}" stroke-width="1.5"/>`;
+      const id = 'shpanneau' + (selected ? 's' : '');
+      const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 30 38">
+        <defs><filter id="${id}"><feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-opacity=".28"/></filter></defs>
+        <path d="M15 2C9.477 2 5 6.477 5 12c0 7.5 10 24 10 24s10-16.5 10-24C25 6.477 20.523 2 15 2z"
+              fill="${color}" filter="url(#${id})"/>
+        ${inner}
+      </svg>`;
+      return L.divIcon({ html: svg, iconSize: [32,40], iconAnchor: [16,40], popupAnchor: [0,-42], className: '' });
+    }
 
-function getColor(p) {
-  if (p.etat === 'panne') return COLORS.panne;
-  if (p.type === 'ecran') return COLORS.libre;
-  const faces = p.faces || [];
-  if (!faces.length) return COLORS.panne;
-  const pannes = faces.filter(f => f.etat === 'panne').length;
-  if (pannes === faces.length) return COLORS.panne;
-  const libres = faces.filter(f => getFaceStatut(f) === 'libre').length;
-  if (libres === 0) return COLORS.occupe;
-  if (libres === faces.length) return COLORS.libre;
-  return COLORS.partiel;
-}
-
-function getFaceStatut(face) {
-  if (face.etat === 'panne') return 'panne';
-  if (datesOk) return facesOccupees.has(face.id) ? 'occupe' : 'libre';
-  // Statut instantané depuis le GeoJSON
-  if (face.dispo === false) return 'occupe';
-  if (face.disponibles === false && face.dispo === true) return 'reserve';
-  return 'libre';
-}
-
-function renderMarkers(features) {
-  Object.values(markersMap).forEach(m => map.removeLayer(m));
-  markersMap = {};
-  features.forEach(f => {
-    const p = f.properties;
-    const isSelected = isPanierContainsSupport(p.id);
-    const color = isSelected ? '#2563eb' : getColor(p);
-    const marker = L.marker(
-      [f.geometry.coordinates[1], f.geometry.coordinates[0]],
-      { icon: makeIcon(color, p.type, isSelected) }
-    );
-    marker.on('click', () => openPopupById(p.id, marker));
-    marker.addTo(map);
-    markersMap[String(p.id)] = marker;
-  });
-}
-
-function isPanierContainsSupport(supportId) {
-  return Object.values(panier).some(item => item.support_id === String(supportId));
-}
-
-// ── POPUP ─────────────────────────────────────────────────────────────────
-function openPopupById(supportId, marker) {
-  if (currentPopup) currentPopup.remove();
-  const feat = allFeatures.find(f => f.properties.id === supportId);
-  if (!feat) return;
-  const p = feat.properties;
-  const faces = p.faces || [];
-
-  let facesHtml = '';
-  faces.forEach(face => {
-    const key = String(face.id);
-    const inPanier = !!panier[key];
-    const statut = getFaceStatut(face);
-    const canToggle = statut === 'libre' || inPanier;
-    const icon = inPanier ? 'bi-dash-circle' : (canToggle ? 'bi-plus-circle' : 'bi-lock-fill');
-    const labelMap = { occupe:'Occupée', reserve:'Réservée', panne:'En panne' };
-    const txt = inPanier ? `${face.label} — Retirer`
-              : canToggle ? `${face.label} — Ajouter`
-              : `${face.label} — ${labelMap[statut] || statut}`;
-    const disabled = !canToggle ? 'disabled' : '';
-    const cls = inPanier ? 'selected' : (!datesOk && !inPanier && statut === 'libre' ? 'libre' : statut);
-
-    facesHtml += `
-      <button class="rl-face-btn ${cls}" ${disabled}
-        onclick="toggleFace('${key}','${escQ(p.code)}','${face.label}','${escQ(p.quartier||p.ville||'')}','${p.id}')">
-        <span><i class="bi ${icon} me-1"></i>${txt}</span>
-      </button>`;
-  });
-
-  const noteDate = !datesOk
-    ? `<div style="margin-top:8px;padding:5px 8px;background:#fef9c3;border-radius:5px;
-                   font-size:.68rem;color:#854d0e;display:flex;align-items:center;gap:5px;">
-        <i class="bi bi-calendar-event"></i>Saisissez une période pour voir la disponibilité exacte.
-       </div>` : '';
-
-  currentPopup = L.popup({ maxWidth: 270, closeButton: true })
-    .setLatLng(marker.getLatLng())
-    .setContent(`
-      <div class="rl-popup">
-        <div class="rl-popup-code">${p.code}</div>
-        <div class="rl-popup-nom">${p.nom}</div>
-        <div class="rl-popup-addr"><i class="bi bi-geo-alt"></i>${p.quartier || p.ville || ''}</div>
-        <div class="rl-popup-faces">
-          ${facesHtml || '<span style="font-size:.74rem;color:#94a3b8">Aucune face configurée</span>'}
-        </div>
-        ${noteDate}
-      </div>`)
-    .openOn(map);
-}
-
-function escQ(s) { return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
-
-// ── FILTRES CARTE ─────────────────────────────────────────────────────────
-function applyCarteFilters() {
-  const type  = document.getElementById('filter-type').value;
-  const dispo = document.getElementById('filter-dispo').value;
-  const filtered = allFeatures.filter(f => {
-    const p = f.properties;
-    if (type && p.type !== type) return false;
-    if (dispo === 'libre') {
+    function getColor(p) {
+      if (p.etat === 'panne') return COLORS.panne;
       const faces = p.faces || [];
-      if (!faces.some(face => getFaceStatut(face) === 'libre')) return false;
+      if (!faces.length) return COLORS.panne;
+      const pannes = faces.filter(f => f.etat === 'panne').length;
+      if (pannes === faces.length) return COLORS.panne;
+      const libres = faces.filter(f => getFaceStatut(f) === 'libre').length;
+      if (libres === 0) return COLORS.occupe;
+      if (libres === faces.length) return COLORS.libre;
+      return COLORS.partiel;
     }
-    return true;
-  });
-  renderMarkers(filtered);
-}
-['filter-type','filter-dispo'].forEach(id => {
-  const el = document.getElementById(id);
-  if (el) el.addEventListener('change', applyCarteFilters);
-});
 
-// ── VUE LISTE ─────────────────────────────────────────────────────────────
-function switchView(vue) {
-  currentView = vue;
-  document.getElementById('btn-vue-carte').classList.toggle('active', vue === 'carte');
-  document.getElementById('btn-vue-liste').classList.toggle('active', vue === 'liste');
-  document.getElementById('view-carte').style.display    = vue === 'carte' ? 'flex' : 'none';
-  document.getElementById('view-liste').style.display    = vue === 'liste' ? 'block' : 'none';
-  document.getElementById('filtres-carte').style.display = vue === 'carte' ? 'flex' : 'none';
-  document.getElementById('filtres-liste').style.display = vue === 'liste' ? 'flex' : 'none';
-  if (vue === 'carte') setTimeout(() => map && map.invalidateSize(), 50);
-  else renderListe();
-}
+    // Déterminer la dispo réelle
+    function getFaceStatut(face) {
+      if (face.etat === 'panne') return 'panne';
+      if (datesOk) return facesOccupees.has(face.id) ? 'occupe' : 'libre';
+      if (face.dispo === false) return 'occupe';
+      if (face.disponibles === false && face.dispo === true) return 'reserve';
+      return 'libre';
+    }
 
-function getListeFiltered() {
-  const q     = (document.getElementById('list-search').value || '').toLowerCase().trim();
-  const type  = document.getElementById('list-filter-type').value;
-  const dispo = document.getElementById('list-filter-dispo').value;
-  const fmt   = document.getElementById('list-filter-format').value;
-  return allFeatures.filter(f => {
-    const p = f.properties;
-    if (type && p.type !== type) return false;
-    if (fmt  && p.format && p.format !== fmt) return false;
-    if (q && !String(p.code||'').toLowerCase().includes(q)
-          && !(p.quartier||'').toLowerCase().includes(q)
-          && !(p.nom||'').toLowerCase().includes(q)) return false;
-    if (dispo === 'libre') {
+    function renderMarkers(features) {
+      Object.values(markersMap).forEach(m => map.removeLayer(m));
+      markersMap = {};
+      features.forEach(f => {
+        const p = f.properties;
+        const isSelected = isPanierContainsSupport(p.id);
+        const color = isSelected ? '#2563eb' : getColor(p);
+        const marker = L.marker(
+          [f.geometry.coordinates[1], f.geometry.coordinates[0]],
+          { icon: makeIcon(color, p.type, isSelected) }
+        );
+        marker.on('click', () => openPopupById(p.id, marker));
+        marker.addTo(map);
+        markersMap[String(p.id)] = marker;
+      });
+    }
+
+    function isPanierContainsSupport(supportId) {
+      return Object.values(panier).some(item => item.support_id === String(supportId));
+    }
+
+    // ── POPUP PANNEAU ──────────────────────────────────────────────────────────
+    function openPopupById(supportId, marker) {
+      if (currentPopup) currentPopup.remove();
+      const feat = allFeatures.find(f => f.properties.id === supportId);
+      if (!feat) return;
+      const p = feat.properties;
       const faces = p.faces || [];
-      if (!faces.some(face => getFaceStatut(face) === 'libre')) return false;
+
+      let facesHtml = '';
+      faces.forEach(face => {
+        const key = String(face.id);
+        const inPanier = !!panier[key];
+        const statut = getFaceStatut(face);
+        const canToggle = statut === 'libre' || inPanier;
+        const icon = inPanier ? 'bi-dash-circle' : (canToggle ? 'bi-plus-circle' : 'bi-lock-fill');
+        const labelMap = { occupe:'Occupée', reserve:'Réservée', panne:'En panne' };
+        const txt = inPanier ? `${face.label} — Retirer`
+                  : canToggle ? `${face.label} — Ajouter`
+                  : `${face.label} — ${labelMap[statut] || statut}`;
+        const disabled = !canToggle ? 'disabled' : '';
+        const cls = inPanier ? 'selected' : (!datesOk && !inPanier && statut === 'libre' ? 'libre' : statut);
+
+        facesHtml += `
+          <button class="rl-face-btn ${cls}" ${disabled}
+            onclick="toggleFace('${key}','${escQ(p.code)}','${face.label}','${escQ(p.quartier||p.ville||'')}','${p.id}')">
+            <span><i class="bi ${icon} me-1"></i>${txt}</span>
+          </button>`;
+      });
+
+      const noteDate = !datesOk
+        ? `<div style="margin-top:8px;padding:5px 8px;background:#fef9c3;border-radius:5px;
+                      font-size:.68rem;color:#854d0e;display:flex;align-items:center;gap:5px;">
+            <i class="bi bi-calendar-event"></i>Saisissez la période pour valider la disponibilité.
+          </div>` : '';
+
+      currentPopup = L.popup({ maxWidth: 270, closeButton: true })
+        .setLatLng(marker.getLatLng())
+        .setContent(`
+          <div class="rl-popup">
+            <div class="rl-popup-code">${p.code}</div>
+            <div class="rl-popup-nom">${p.nom}</div>
+            <div class="rl-popup-addr"><i class="bi bi-geo-alt"></i>${p.quartier || p.ville || ''}</div>
+            <div class="rl-popup-faces">
+              ${facesHtml || '<span style="font-size:.74rem;color:#94a3b8">Aucune face configurée</span>'}
+            </div>
+            ${noteDate}
+          </div>`)
+        .openOn(map);
     }
-    return true;
-  });
-}
 
-function renderListe() {
-  const grid = document.getElementById('liste-grid');
-  const filtered = getListeFiltered();
-  if (!filtered.length) {
-    grid.innerHTML = `<div class="liste-empty"><i class="bi bi-inbox"></i><p>Aucun support ne correspond aux filtres.</p></div>`;
-    return;
-  }
-  grid.innerHTML = filtered.map(f => buildSupportCard(f.properties)).join('');
-}
+    function escQ(s) { return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
 
-function buildSupportCard(p) {
-  const hasSelected = isPanierContainsSupport(p.id);
-  const faces = p.faces || [];
+    // ── FILTRES SÉLECTIFS (PANNEAUX UNIQUEMENT) ───────────────────────────────
+    function getFilteredFeatures(isListeView = false) {
+      const prefix = isListeView ? 'list-filter-' : 'filter-';
+      
+      const ville = document.getElementById(prefix + 'ville').value;
+      const quartier = document.getElementById(prefix + 'quartier').value;
+      const dispo = document.getElementById(prefix + 'dispo').value;
+      
+      let q = '';
+      let fmt = '';
+      if (isListeView) {
+        q = (document.getElementById('list-search').value || '').toLowerCase().trim();
+        fmt = document.getElementById('list-filter-format').value;
+      }
 
-  const facesHtml = faces.map(face => {
-    const key = String(face.id);
-    const inPanier = !!panier[key];
-    const statut = getFaceStatut(face);
-    const canToggle = statut === 'libre' || inPanier;
-    const cls = inPanier ? 'selected' : statut;
-    const icon = inPanier ? 'bi-dash-circle-fill' : (canToggle ? 'bi-plus-circle' : 'bi-lock-fill');
-    const badgeLabels = { libre:'Libre', occupe:'Occupée', reserve:'Réservée', panne:'En panne' };
-    const badge = inPanier ? 'Sélectionnée' : (badgeLabels[statut] || statut);
-    const disabled = (!canToggle && !inPanier) ? 'disabled' : '';
-    const onclick = (canToggle || inPanier)
-      ? `onclick="toggleFace('${key}','${escQ(p.code)}','${face.label}','${escQ(p.quartier||p.ville||'')}','${p.id}');renderListe()"`
-      : '';
-
-    return `<button class="face-btn ${cls}" ${disabled} ${onclick}>
-      <span class="fb-left"><i class="bi ${icon}"></i> ${face.label}</span>
-      <span class="fb-badge">${badge}</span>
-    </button>`;
-  }).join('');
-
-  // format_display : peut venir du GeoJSON si disponibilite_json() l'expose,
-  // sinon on reconstruit depuis le code du support (optionnel)
-  const formatBadge = p.format_display
-    ? `<span class="sc-format">${p.format_display}</span>` : '';
-
-  return `<div class="support-card ${hasSelected ? 'has-selected' : ''}" id="sc-${p.id}">
-    <div class="sc-header">
-      <div class="sc-icon">${p.type === 'ecran' ? '📺' : '🪧'}</div>
-      <div class="sc-info">
-        <div class="sc-code">${p.code}</div>
-        <div class="sc-nom">${p.nom}</div>
-        <div class="sc-addr"><i class="bi bi-geo-alt me-1"></i>${p.quartier || p.ville || '—'}</div>
-      </div>
-      ${formatBadge}
-    </div>
-    <div class="sc-faces">
-      ${facesHtml || '<span style="font-size:.7rem;color:#94a3b8;padding:4px">Aucune face configurée</span>'}
-    </div>
-  </div>`;
-}
-
-function populateFormatSelect() {
-  const formats = {};
-  allFeatures.forEach(f => {
-    const p = f.properties;
-    if (p.format && p.format_display) formats[p.format] = p.format_display;
-  });
-  const sel = document.getElementById('list-filter-format');
-  if (!sel) return;
-  Object.entries(formats).forEach(([val, lbl]) => {
-    const opt = document.createElement('option');
-    opt.value = val; opt.textContent = lbl; sel.appendChild(opt);
-  });
-}
-
-['list-search','list-filter-type','list-filter-dispo','list-filter-format'].forEach(id => {
-  const el = document.getElementById(id);
-  if (el) el.addEventListener(id === 'list-search' ? 'input' : 'change', renderListe);
-});
-
-// ── DATES ─────────────────────────────────────────────────────────────────
-const elDateDebut = document.getElementById('date-debut');
-const elDateFin   = document.getElementById('date-fin');
-const elStatus    = document.getElementById('dates-status');
-
-function syncHiddenDates() {
-  const hd = document.getElementById('hidden-date-debut');
-  const hf = document.getElementById('hidden-date-fin');
-  if (hd) hd.value = elDateDebut ? elDateDebut.value : '';
-  if (hf) hf.value = elDateFin   ? elDateFin.value   : '';
-}
-
-function setDatesStatus(state, text) {
-  if (!elStatus) return;
-  elStatus.className = state;
-  const icons = {
-    waiting: '<i class="bi bi-info-circle"></i>',
-    loading: '<div class="spin"></div>',
-    ok:      '<i class="bi bi-check-circle-fill"></i>',
-    error:   '<i class="bi bi-exclamation-triangle-fill"></i>',
-  };
-  elStatus.innerHTML = `${icons[state] || ''} ${text}`;
-}
-
-function onDatesChange() {
-  syncHiddenDates();
-  const d1 = elDateDebut ? elDateDebut.value : '';
-  const d2 = elDateFin   ? elDateFin.value   : '';
-  if (d1 && elDateFin) elDateFin.min = d1;
-
-  if (!d1 || !d2) {
-    datesOk = false; facesOccupees = new Set();
-    setDatesStatus('waiting', 'Saisissez les dates pour voir les disponibilités');
-    refreshAll(); return;
-  }
-  if (d1 >= d2) {
-    datesOk = false; facesOccupees = new Set();
-    setDatesStatus('error', 'La date de fin doit être après la date de début');
-    refreshAll(); return;
-  }
-  clearTimeout(checkDispoTimer);
-  setDatesStatus('loading', 'Vérification en cours…');
-  checkDispoTimer = setTimeout(() => checkDispo(d1, d2), 400);
-}
-
-function checkDispo(d1, d2) {
-  // URL identique à celle qui a retourné 200 dans tes logs
-  const url = `/gestion/campaigns/api/check-dispo/0/?date_debut=${encodeURIComponent(d1)}&date_fin=${encodeURIComponent(d2)}`;
-  fetch(url)
-    .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
-    .then(data => {
-      facesOccupees = new Set((data.faces_occupees || []).map(Number));
-      datesOk = true;
-      const nbTotal  = allFeatures.reduce((acc, f) => acc + (f.properties.faces || []).length, 0);
-      const nbLibres = nbTotal - facesOccupees.size;
-      setDatesStatus('ok', `${nbLibres} face${nbLibres > 1 ? 's' : ''} disponible${nbLibres > 1 ? 's' : ''} sur cette période`);
-      refreshAll();
-    })
-    .catch(err => {
-      console.warn('check-dispo:', err);
-      datesOk = false; facesOccupees = new Set();
-      setDatesStatus('error', 'Vérification impossible — statuts instantanés affichés');
-      refreshAll();
-    });
-}
-
-function refreshAll() {
-  applyCarteFilters();
-  if (currentView === 'liste') renderListe();
-  updatePanier();
-  // Rafraîchir popup ouvert
-  if (currentPopup && currentPopup.isOpen()) {
-    const latlng = currentPopup.getLatLng();
-    let closest = null, minDist = Infinity;
-    allFeatures.forEach(f => {
-      const d = Math.abs(f.geometry.coordinates[1] - latlng.lat)
-              + Math.abs(f.geometry.coordinates[0] - latlng.lng);
-      if (d < minDist) { minDist = d; closest = f; }
-    });
-    if (closest && markersMap[String(closest.properties.id)]) {
-      openPopupById(closest.properties.id, markersMap[String(closest.properties.id)]);
+      return allFeatures.filter(f => {
+        const p = f.properties;
+        
+        // ⚠️ SÉCURITÉ : Bloquer absolument tout ce qui n'est pas un panneau physique
+        if (p.type !== 'panneau') return false; 
+        
+        if (ville && p.ville !== ville) return false;
+        if (quartier && p.quartier !== quartier) return false;
+        if (fmt && p.format && p.format !== fmt) return false;
+        if (q && !String(p.code||'').toLowerCase().includes(q)
+              && !(p.quartier||'').toLowerCase().includes(q)
+              && !(p.nom||'').toLowerCase().includes(q)) return false;
+        if (dispo === 'libre') {
+          const faces = p.faces || [];
+          if (!faces.some(face => getFaceStatut(face) === 'libre')) return false;
+        }
+        return true;
+      });
     }
-  }
-}
 
-if (elDateDebut) elDateDebut.addEventListener('change', onDatesChange);
-if (elDateFin)   elDateFin.addEventListener('change', onDatesChange);
+    function applyCarteFilters() {
+      const filtered = getFilteredFeatures(false);
+      renderMarkers(filtered);
+    }
 
-// Trigger initial si dates déjà remplies (retour en arrière)
-if (elDateDebut && elDateFin && elDateDebut.value && elDateFin.value && elDateDebut.value < elDateFin.value) {
-  syncHiddenDates();
-  checkDispo(elDateDebut.value, elDateFin.value);
-}
+    function updateQuartierDropdowns(isListeView = false) {
+      const prefix = isListeView ? 'list-filter-' : 'filter-';
+      const villeSel = document.getElementById(prefix + 'ville').value;
+      const quartierSelect = document.getElementById(prefix + 'quartier');
+      if (!quartierSelect) return;
+      
+      const ancienneValeur = quartierSelect.value;
+      quartierSelect.innerHTML = '<option value="">Tous les quartiers</option>';
+      
+      const quartiersSet = new Set();
+      allFeatures.forEach(f => {
+        const p = f.properties;
+        // Seulement les quartiers liés aux panneaux
+        if (p.type === 'panneau' && p.quartier && (!villeSel || p.ville === villeSel)) {
+          quartiersSet.add(p.quartier);
+        }
+      });
 
-// ── PANIER ────────────────────────────────────────────────────────────────
-function toggleFace(faceId, code, label, quartier, supportId) {
-  const key = String(faceId);
-  if (panier[key]) delete panier[key];
-  else panier[key] = { code, label, quartier, support_id: String(supportId) };
-  updatePanier();
-  if (currentView === 'carte') {
-    const marker = markersMap[String(supportId)];
-    if (marker) openPopupById(parseInt(supportId), marker);
-  }
-  if (currentView === 'liste') renderListe();
-}
+      Array.from(quartiersSet).sort().forEach(q => {
+        const opt = document.createElement('option');
+        opt.value = q; opt.textContent = q;
+        if (q === ancienneValeur) opt.selected = true;
+        quartierSelect.appendChild(opt);
+      });
+    }
 
-function updatePanier() {
-  const items   = Object.entries(panier);
-  const count   = items.length;
-  const bodyEl  = document.getElementById('panier-body');
-  const emptyEl = document.getElementById('panier-empty');
-  if (!bodyEl) return;
+    // ── VUE LISTE ─────────────────────────────────────────────────────────────
+    function switchView(vue) {
+      currentView = vue;
+      document.getElementById('btn-vue-carte').classList.toggle('active', vue === 'carte');
+      document.getElementById('btn-vue-liste').classList.toggle('active', vue === 'liste');
+      document.getElementById('view-carte').style.display    = vue === 'carte' ? 'flex' : 'none';
+      document.getElementById('view-liste').style.display    = vue === 'liste' ? 'block' : 'none';
+      document.getElementById('filtres-carte').style.display = vue === 'carte' ? 'flex' : 'none';
+      document.getElementById('filtres-liste').style.display = vue === 'liste' ? 'flex' : 'none';
+      if (vue === 'carte') setTimeout(() => map && map.invalidateSize(), 50);
+      else renderListe();
+    }
 
-  bodyEl.querySelectorAll('.panier-item').forEach(el => el.remove());
+    function renderListe() {
+      const grid = document.getElementById('liste-grid');
+      const filtered = getFilteredFeatures(true);
+      if (!filtered.length) {
+        grid.innerHTML = `<div class="liste-empty"><i class="bi bi-inbox"></i><p>Aucun panneau ne correspond aux filtres.</p></div>`;
+        return;
+      }
+      grid.innerHTML = filtered.map(f => buildSupportCard(f.properties)).join('');
+    }
 
-  const countEl    = document.getElementById('panier-count');
-  const btnCount   = document.getElementById('btn-count');
-  const btnCont    = document.getElementById('btn-continuer');
-  const btnVider   = document.getElementById('btn-vider-panier');
-  const facesInput = document.getElementById('faces-input');
-  const datesHint  = document.getElementById('dates-hint');
+    function buildSupportCard(p) {
+      console.log(p)
+      console.log(p.nom)
+      console.log(p.quartier)
+      console.log(p.ville)
+      const hasSelected = isPanierContainsSupport(p.id);
+      const faces = p.faces || [];
 
-  if (countEl)    countEl.textContent  = count;
-  if (btnCount)   btnCount.textContent = count;
-  if (facesInput) facesInput.value     = JSON.stringify(Object.keys(panier));
+      const facesHtml = faces.map(face => {
+        const key = String(face.id);
+        const inPanier = !!panier[key];
+        const statut = getFaceStatut(face);
+        const canToggle = statut === 'libre' || inPanier;
+        const cls = inPanier ? 'selected' : statut;
+        const icon = inPanier ? 'bi-dash-circle-fill' : (canToggle ? 'bi-plus-circle' : 'bi-lock-fill');
+        const badgeLabels = { libre:'Libre', occupe:'Occupée', reserve:'Réservée', panne:'En panne' };
+        const badge = inPanier ? 'Sélectionnée' : (badgeLabels[statut] || statut);
+        const disabled = (!canToggle && !inPanier) ? 'disabled' : '';
+        const onclick = (canToggle || inPanier)
+          ? `onclick="toggleFace('${key}','${escQ(p.code)}','${face.label}','${escQ(p.quartier||p.ville||'')}','${p.id}');renderListe()"`
+          : '';
 
-  // Bouton continuer : actif seulement si faces ET dates valides
-  const canContinue = count > 0 && datesOk;
-  if (btnCont)  btnCont.disabled = !canContinue;
-  if (btnVider) btnVider.style.display = count > 0 ? 'flex' : 'none';
-
-  // Hint "saisir les dates" visible si faces sélectionnées mais pas de dates
-  if (datesHint) datesHint.classList.toggle('show', count > 0 && !datesOk);
-
-  if (count === 0) {
-    if (emptyEl) emptyEl.style.display = '';
-  } else {
-    if (emptyEl) emptyEl.style.display = 'none';
-    items.forEach(([uuid, item]) => {
-      const el = document.createElement('div');
-      el.className = 'panier-item';
-      el.innerHTML = `
-        <div class="pi-icon">🪧</div>
-        <div class="pi-info">
-          <div class="pi-code">${item.code} · Face ${item.label}</div>
-          <div class="pi-addr">${item.quartier || ''}</div>
-        </div>
-        <button class="pi-remove" onclick="removePanierItem('${uuid}')" title="Retirer">
-          <i class="bi bi-x"></i>
+        return `<button class="face-btn ${cls}" ${disabled} ${onclick}>
+          <span class="fb-left"><i class="bi ${icon}"></i> ${face.label}</span>
+          <span class="fb-badge">${badge}</span>
         </button>`;
-      if (emptyEl) bodyEl.insertBefore(el, emptyEl);
-      else bodyEl.appendChild(el);
+      }).join('');
+
+      const formatBadge = p.format_display ? `<span class="sc-format">${p.format_display}</span>` : '';
+
+      return `<div class="support-card ${hasSelected ? 'has-selected' : ''}" id="sc-${p.id}">
+        <div class="sc-header">
+          <div class="sc-icon">🪧</div>
+          <div class="sc-info">
+            <div class="sc-code" style='text-align: center;'>${p.code}</div>
+            <div class="sc-nom">${p.nom}</div>
+          </div>
+          ${formatBadge}
+        </div>
+        <div class="sc-faces">
+          ${facesHtml || '<span style="font-size:.7rem;color:#94a3b8;padding:4px">Aucune face disponible</span>'}
+        </div>
+      </div>`;
+    }
+
+    function populateAllSelects() {
+      const villesSet = new Set();
+      const formats = {};
+
+      allFeatures.forEach(f => {
+        const p = f.properties;
+        // Ne prendre que les métadonnées des panneaux
+        if (p.type === 'panneau') {
+          if (p.ville) villesSet.add(p.ville);
+          if (p.format && p.format_display) formats[p.format] = p.format_display;
+        }
+      });
+
+      const sortedVilles = Array.from(villesSet).sort();
+      ['filter-ville', 'list-filter-ville'].forEach(id => {
+        const sel = document.getElementById(id);
+        if (!sel) return;
+        sortedVilles.forEach(v => {
+          const opt = document.createElement('option');
+          opt.value = v; opt.textContent = v; sel.appendChild(opt);
+        });
+      });
+
+      const selFmt = document.getElementById('list-filter-format');
+      if (selFmt) {
+        Object.entries(formats).forEach(([val, lbl]) => {
+          const opt = document.createElement('option');
+          opt.value = val; opt.textContent = lbl; selFmt.appendChild(opt);
+        });
+      }
+
+      updateQuartierDropdowns(false);
+      updateQuartierDropdowns(true);
+    }
+
+    // Triggers
+    document.getElementById('filter-ville').addEventListener('change', () => { updateQuartierDropdowns(false); applyCarteFilters(); });
+    document.getElementById('filter-quartier').addEventListener('change', applyCarteFilters);
+    document.getElementById('filter-dispo').addEventListener('change', applyCarteFilters);
+
+    document.getElementById('list-filter-ville').addEventListener('change', () => { updateQuartierDropdowns(true); renderListe(); });
+    document.getElementById('list-filter-quartier').addEventListener('change', renderListe);
+    document.getElementById('list-filter-dispo').addEventListener('change', renderListe);
+    document.getElementById('list-filter-format').addEventListener('change', renderListe);
+    document.getElementById('list-search').addEventListener('input', renderListe);
+
+
+    // ── DATES ─────────────────────────────────────────────────────────────────
+    const elDateDebut = document.getElementById('date-debut');
+    const elDateFin   = document.getElementById('date-fin');
+    const elStatus    = document.getElementById('dates-status');
+
+    function syncHiddenDates() {
+      const hd = document.getElementById('hidden-date-debut');
+      const hf = document.getElementById('hidden-date-fin');
+      if (hd) hd.value = elDateDebut ? elDateDebut.value : '';
+      if (hf) hf.value = elDateFin   ? elDateFin.value   : '';
+    }
+
+    function setDatesStatus(state, text) {
+      if (!elStatus) return;
+      elStatus.className = state;
+      const icons = {
+        waiting: '<i class="bi bi-info-circle"></i>',
+        loading: '<div class="spin"></div>',
+        ok:      '<i class="bi bi-check-circle-fill"></i>',
+        error:   '<i class="bi bi-exclamation-triangle-fill"></i>',
+      };
+      elStatus.innerHTML = `${icons[state] || ''} ${text}`;
+    }
+
+    function onDatesChange() {
+      syncHiddenDates();
+      const d1 = elDateDebut ? elDateDebut.value : '';
+      const d2 = elDateFin   ? elDateFin.value   : '';
+      if (d1 && elDateFin) elDateFin.min = d1;
+
+      if (!d1 || !d2) {
+        datesOk = false; facesOccupees = new Set();
+        setDatesStatus('waiting', 'Saisissez les dates pour voir les disponibilités');
+        refreshAll(); return;
+      }
+      if (d1 >= d2) {
+        datesOk = false; facesOccupees = new Set();
+        setDatesStatus('error', 'La date de fin doit être après la date de début');
+        refreshAll(); return;
+      }
+      clearTimeout(checkDispoTimer);
+      setDatesStatus('loading', 'Vérification en cours…');
+      checkDispoTimer = setTimeout(() => checkDispo(d1, d2), 400);
+    }
+
+    function checkDispo(d1, d2) {
+      const url = `/gestion/campaigns/api/check-dispo/0/?date_debut=${encodeURIComponent(d1)}&date_fin=${encodeURIComponent(d2)}`;
+      fetch(url)
+        .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+        .then(data => {
+          facesOccupees = new Set((data.faces_occupees || []).map(Number));
+          datesOk = true;
+          const nbTotal  = allFeatures.filter(f => f.properties.type === 'panneau').reduce((acc, f) => acc + (f.properties.faces || []).length, 0);
+          const nbLibres = nbTotal - facesOccupees.size;
+          setDatesStatus('ok', `${nbLibres} face${nbLibres > 1 ? 's' : ''} disponible${nbLibres > 1 ? 's' : ''} sur cette période`);
+          refreshAll();
+        })
+        .catch(err => {
+          console.warn('check-dispo:', err);
+          datesOk = false; facesOccupees = new Set();
+          setDatesStatus('error', 'Vérification impossible — statuts instantanés affichés');
+          refreshAll();
+        });
+    }
+
+    function refreshAll() {
+      applyCarteFilters();
+      if (currentView === 'liste') renderListe();
+      updatePanier();
+    }
+
+    if (elDateDebut) elDateDebut.addEventListener('change', onDatesChange);
+    if (elDateFin)   elDateFin.addEventListener('change', onDatesChange);
+
+  // ── PANIER ────────────────────────────────────────────────────────────────
+    function toggleFace(faceId, code, label, quartier, supportId) {
+      const key = String(faceId);
+      if (panier[key]) delete panier[key];
+      else panier[key] = { code, label, quartier, support_id: String(supportId) };
+      updatePanier();
+      if (currentView === 'carte') {
+        const marker = markersMap[String(supportId)];
+        if (marker) openPopupById(parseInt(supportId), marker);
+      }
+      if (currentView === 'liste') renderListe();
+    }
+
+    function updatePanier() {
+      const items   = Object.entries(panier);
+      const count   = items.length;
+      const bodyEl  = document.getElementById('panier-body');
+      const emptyEl = document.getElementById('panier-empty');
+      if (!bodyEl) return;
+
+      bodyEl.querySelectorAll('.panier-item').forEach(el => el.remove());
+
+      const countEl    = document.getElementById('panier-count');
+      const btnCount   = document.getElementById('btn-count');
+      const btnCont    = document.getElementById('btn-continuer');
+      const btnVider   = document.getElementById('btn-vider-panier');
+      const facesInput = document.getElementById('faces-input');
+      const datesHint  = document.getElementById('dates-hint');
+
+      if (countEl)    countEl.textContent  = count;
+      if (btnCount)   btnCount.textContent = count;
+      if (facesInput) facesInput.value     = JSON.stringify(Object.keys(panier));
+
+      const canContinue = count > 0 && datesOk;
+      if (btnCont)  btnCont.disabled = !canContinue;
+      if (btnVider) btnVider.style.display = count > 0 ? 'flex' : 'none';
+      if (datesHint) datesHint.classList.toggle('show', count > 0 && !datesOk);
+
+      if (count === 0) {
+        if (emptyEl) emptyEl.style.display = '';
+      } else {
+        if (emptyEl) emptyEl.style.display = 'none';
+        items.forEach(([uuid, item]) => {
+          const el = document.createElement('div');
+          el.className = 'panier-item';
+          el.innerHTML = `
+            <div class="pi-icon">🪧</div>
+            <div class="pi-info">
+              <div class="pi-code">${item.code} · Face ${item.label}</div>
+              <div class="pi-addr">${item.quartier || ''}</div>
+            </div>
+            <button class="pi-remove" onclick="removePanierItem('${uuid}')" title="Retirer">
+              <i class="bi bi-x"></i>
+            </button>`;
+          if (emptyEl) bodyEl.insertBefore(el, emptyEl);
+          else bodyEl.appendChild(el);
+        });
+      }
+
+      allFeatures.forEach(f => {
+        const p = f.properties;
+        if (p.type !== 'panneau') return;
+        const marker = markersMap[String(p.id)];
+        if (!marker) return;
+        const isSel = isPanierContainsSupport(p.id);
+        marker.setIcon(makeIcon(isSel ? '#2563eb' : getColor(p), 'panneau', isSel));
+      });
+    }
+
+    function removePanierItem(faceId) {
+      const item = panier[faceId];
+      delete panier[faceId];
+      updatePanier();
+      if (currentView === 'liste') renderListe();
+      if (currentView === 'carte' && item) {
+        const marker = markersMap[item.support_id];
+        if (marker) openPopupById(parseInt(item.support_id), marker);
+      }
+    }
+
+    document.getElementById('btn-vider-panier').addEventListener('click', () => {
+      panier = {}; updatePanier();
+      if (currentView === 'liste') renderListe();
     });
-  }
 
-  // Màj couleurs markers
-  allFeatures.forEach(f => {
-    const p = f.properties;
-    const marker = markersMap[String(p.id)];
-    if (!marker) return;
-    const isSel = isPanierContainsSupport(p.id);
-    marker.setIcon(makeIcon(isSel ? '#2563eb' : getColor(p), p.type, isSel));
-  });
-}
-
-function removePanierItem(faceId) {
-  const item = panier[faceId];
-  delete panier[faceId];
-  updatePanier();
-  if (currentView === 'liste') renderListe();
-  if (currentView === 'carte' && item) {
-    const marker = markersMap[item.support_id];
-    if (marker) openPopupById(parseInt(item.support_id), marker);
-  }
-}
-
-const btnViderEl = document.getElementById('btn-vider-panier');
-if (btnViderEl) btnViderEl.addEventListener('click', () => {
-  panier = {}; updatePanier();
-  if (currentView === 'liste') renderListe();
-});
-
-// ── CHARGEMENT GEOJSON ────────────────────────────────────────────────────
-// URL confirmée dans les logs : GET /inventory/api/geojson/ → 200
-fetch('/gestion/inventory/api/geojson/')
-  .then(r => {
-    if (!r.ok) throw new Error('HTTP ' + r.status);
-    return r.json();
-  })
+  // ── CHARGEMENT ────────────────────────────────────────────────────────────
+    fetch('/gestion/inventory/api/geojson/')
+  .then(r => r.json())
   .then(data => {
-    allFeatures = data.features || [];
+    // ⚠️ FILTRE MAXIMUM : On ne stocke même pas les écrans en mémoire
+    allFeatures = (data.features || []).filter(f => f.properties.type === 'panneau');
+    
     renderMarkers(allFeatures);
-    populateFormatSelect();
+    populateAllSelects();
 
-    // Pré-sélection depuis session (panier existant — retour en arrière)
     {% if panier %}
       {% for face in panier %}
       (function() {
         const fid  = '{{ face.pk }}';
-        const feat = allFeatures.find(f =>
-          (f.properties.faces || []).some(fc => String(fc.id) === fid)
-        );
+        const feat = allFeatures.find(f => (f.properties.faces || []).some(fc => String(fc.id) === fid));
         if (feat) {
           const p = feat.properties;
           const fd = (p.faces || []).find(fc => String(fc.id) === fid);
@@ -995,26 +1003,7 @@ fetch('/gestion/inventory/api/geojson/')
   .catch(err => {
     console.error('GeoJSON error:', err);
     const grid = document.getElementById('liste-grid');
-    if (grid) grid.innerHTML = '<div class="liste-empty"><i class="bi bi-exclamation-triangle"></i><p>Impossible de charger les supports.</p></div>';
+    if (grid) grid.innerHTML = '<div class="liste-empty"><i class="bi bi-exclamation-triangle"></i><p>Erreur de chargement.</p></div>';
   });
-
-// ── PRÉ-SÉLECTION URL (?face=<id>) ────────────────────────────────────────
-const urlFaceId = new URLSearchParams(window.location.search).get('face');
-if (urlFaceId) {
-  const wait = setInterval(() => {
-    if (!allFeatures.length) return;
-    clearInterval(wait);
-    allFeatures.forEach(f => {
-      const p = f.properties;
-      (p.faces || []).forEach(face => {
-        if (String(face.id) === urlFaceId) {
-          panier[urlFaceId] = { code: p.code, label: face.label, quartier: p.quartier || p.ville, support_id: String(p.id) };
-          updatePanier();
-          map.setView([f.geometry.coordinates[1], f.geometry.coordinates[0]], 16);
-        }
-      });
-    });
-  }, 150);
-}
 </script>
 {% endblock %}

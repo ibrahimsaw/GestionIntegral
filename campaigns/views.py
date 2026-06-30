@@ -908,7 +908,6 @@ class VisuelDeleteView(StaffRequiredMixin, View):
         return redirect('campagne_detail', pk=pk)
 
 
-# ── Lignes de Campagne ────────────────────────────────────────────────────────
 
 
 class SupportBulkActionView(StaffRequiredMixin, View):
@@ -926,7 +925,12 @@ class SupportBulkActionView(StaffRequiredMixin, View):
         supports_enrichis = []
 
         if type_support == 'panneau':
-            supports_qs = Support.objects.filter(type_support='panneau', etat='bon').prefetch_related('faces')
+            # ⚠️ CRUCIAL : .order_by('ville', 'quartier') ajouté pour le bon fonctionnement du regroupement template
+            supports_qs = Support.objects.filter(
+                type_support='panneau', 
+                etat='bon'
+            ).prefetch_related('faces').order_by('ville', 'quartier')
+            
             selectionnes = list(campagne.lignes.values_list('face_id', flat=True))
 
             for support in supports_qs:
@@ -942,7 +946,12 @@ class SupportBulkActionView(StaffRequiredMixin, View):
                 })
 
         else:
-            supports_qs = Support.objects.filter(type_support='ecran', etat='bon')
+            # ⚠️ CRUCIAL : .order_by('ville', 'quartier') également ajouté pour les écrans
+            supports_qs = Support.objects.filter(
+                type_support='ecran', 
+                etat='bon'
+            ).order_by('ville', 'quartier')
+            
             selectionnes = list(campagne.lignes.values_list('support_id', flat=True))
 
             # ✅ Récupérer les paramètres existants par écran pour pré-remplir le formulaire
@@ -1002,7 +1011,6 @@ class SupportBulkActionView(StaffRequiredMixin, View):
                 support = get_object_or_404(Support, pk=support_id, type_support='ecran')
 
                 # ✅ Récupérer les paramètres spécifiques à cet écran depuis le POST
-                # Les champs sont nommés : date_debut_{support_id}, frequence_{support_id}, etc.
                 date_debut_str      = request.POST.get(f'date_debut_{support_id}', '').strip()
                 date_fin_str        = request.POST.get(f'date_fin_{support_id}', '').strip()
                 duree_passage_str   = request.POST.get(f'duree_passage_{support_id}', '').strip()
@@ -1016,7 +1024,6 @@ class SupportBulkActionView(StaffRequiredMixin, View):
                 frequence     = None
 
                 try:
-                    from datetime import date
                     if date_debut_str:
                         date_debut = date.fromisoformat(date_debut_str)
                     if date_fin_str:
@@ -1054,8 +1061,6 @@ class SupportBulkActionView(StaffRequiredMixin, View):
 
         messages.success(request, "Mise à jour des supports effectuée.")
         return redirect('campagne_detail', pk=campagne_pk)
-
-
 # ── API JSON ──────────────────────────────────────────────────────────────────
 
 class ApiCheckDisponibiliteView(LoginRequiredMixin, View):

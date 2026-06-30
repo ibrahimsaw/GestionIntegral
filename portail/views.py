@@ -106,8 +106,158 @@ def _get_compteurs():
 # Pages publiques
 # ══════════════════════════════════════════════════════════════════════════════
 
+# portail/views.py
+"""
+Vue "Vitrine" — Page d'accueil de la régie publicitaire.
+
+Affiche, pour chaque ville où la régie est implantée, une carte récapitulative :
+- image d'illustration de la ville
+- nombre total de faces publicitaires (panneaux + écrans)
+- nombre de faces actuellement libres
+- répartition des faces par type de support (ex: "4m × 3m — Standard": 86, ...)
+
+Hypothèse de structure de données (la "face" est l'unité commerciale vendable) :
+- Un panneau statique (Support.type_support == 'panneau') se décompose en N
+  FacePanneau (en général Face A / Face B). Chaque face est libre ou non
+  selon FacePanneau.is_disponible().
+- Un écran numérique (Support.type_support == 'ecran') n'a pas de sous-faces :
+  le Support lui-même constitue une face unique, libre si Support.is_occupe()
+  est False.
+"""
+
+from collections import defaultdict
+
+from django.views import View
+from django.shortcuts import render
+from django.conf import settings
+
+
+
+
+# ──────────────────────────────────────────────────────────────────────────
+# Configuration des illustrations par ville.
+# À terme, ceci peut devenir un champ `image` sur un modèle "Ville" dédié.
+# En attendant, on mappe ici un chemin static + une valeur de repli.
+# ──────────────────────────────────────────────────────────────────────────
+VILLE_IMAGES = {
+    'Ouagadougou': 'img/villes/image1 (6).jfif',
+    'Bobo-Dioulasso':     'img/villes/image1 (5).jfif',
+}
+VILLE_IMAGE_DEFAUT = 'img/villes/default.jpg'
+
+
+def _label_support(support: Support) -> str:
+    """
+    Retourne le libellé du "type de support" utilisé pour le regroupement
+    des statistiques dans chaque carte ville.
+
+    - Panneau : on regroupe par format lisible (ex: "4m × 3m (12m²) — Standard")
+    - Écran   : on regroupe simplement sous "Écran Numérique"
+    """
+    if support.type_support == Support.TYPE_PANNEAU:
+        return support.get_format_display() if support.format else 'Panneau (format non défini)'
+    return 'Écran Numérique'
+
+
+def _get_compteurs() -> dict:
+    """
+    Calcule les statistiques agrégées par ville à partir de la base de données.
+
+    Retourne un dict prêt à être injecté dans le contexte du template :
+        {
+            'villes_stats': [
+                {
+                    'nom': 'Ouagadougou',
+                    'image_url': 'img/villes/ouagadougou.jpg',
+                    'total_faces': 220,
+                    'faces_libres': 31,
+                    'supports': [
+                        {'label': '4m × 3m (12m²) — Standard', 'count': 74},
+                        {'label': 'Écran Numérique', 'count': 8},
+                        ...
+                    ],
+                },
+                ...
+            ],
+            'total_faces_reseau': 1234,
+            'total_faces_libres_reseau': 123,
+        }
+    """
+    # On précharge tout ce qu'il faut en un minimum de requêtes :
+    # - les panneaux avec leurs faces (pour calculer libre/occupé sans requête par face)
+    # - les écrans (le support fait office de face unique)
+    supports = (
+        Support.objects
+        .filter(actif=True)
+        .select_related('ecran_info')
+        .prefetch_related('faces')
+    )
+
+    # Structure intermédiaire : { ville: { 'total': int, 'libres': int, 'supports': {label: count} } }
+    villes = defaultdict(lambda: {
+        'total_faces': 0,
+        'faces_libres': 0,
+        'supports': defaultdict(int),
+    })
+
+    for support in supports:
+        ville = support.ville or 'Non renseignée'
+        data = villes[ville]
+        label = _label_support(support)
+
+        if support.type_support == Support.TYPE_PANNEAU:
+            faces = list(support.faces.all())
+            if not faces:
+                # Panneau sans face créée en base : on le compte comme 1 face par sécurité
+                data['total_faces'] += 1
+                data['supports'][label] += 1
+                continue
+
+            for face in faces:
+                data['total_faces'] += 1
+                data['supports'][label] += 1
+                if face.is_disponible():
+                    data['faces_libres'] += 1
+        else:
+            # Écran numérique : le support = 1 face vendable
+            data['total_faces'] += 1
+            data['supports'][label] += 1
+            if not support.is_occupe():
+                data['faces_libres'] += 1
+
+    # ── Construction de la liste finale, triée par total de faces décroissant ──
+    villes_stats = []
+    total_faces_reseau = 0
+    total_faces_libres_reseau = 0
+
+    for nom_ville, data in villes.items():
+        supports_list = [
+            {'label': label, 'count': count}
+            for label, count in sorted(data['supports'].items(), key=lambda kv: -kv[1])
+        ]
+        villes_stats.append({
+            'nom': nom_ville,
+            'image_url': VILLE_IMAGES.get(nom_ville, VILLE_IMAGE_DEFAUT),
+            'total_faces': data['total_faces'],
+            'faces_libres': data['faces_libres'],
+            'supports': supports_list,
+        })
+        total_faces_reseau += data['total_faces']
+        total_faces_libres_reseau += data['faces_libres']
+
+    villes_stats.sort(key=lambda v: -v['total_faces'])
+
+    return {
+        'villes_stats': villes_stats,
+        'total_faces_reseau': total_faces_reseau,
+        'total_faces_libres_reseau': total_faces_libres_reseau,
+        'nb_villes': len(villes_stats),
+    }
+
+
 class AccueilView(View):
-    template_name = 'portail/accueil.html'
+    """Page d'accueil — vitrine publique de la régie publicitaire."""
+    template_name = 'portail/vitrine.html'
 
     def get(self, request):
         compteurs = _get_compteurs()
@@ -115,7 +265,6 @@ class AccueilView(View):
             **compteurs,
             'oua_center': [12.3714, -1.5197],
         })
-
 
 class CatalogueView(View):
     template_name = 'portail/catalogue.html'
@@ -561,6 +710,13 @@ from .forms import Etape1Form, Etape2Form, Etape3Form
 logger = logging.getLogger(__name__)
 
 
+import json
+from django.shortcuts import render, redirect, get_object_or_404
+from django.views import View
+# Assurez-vous d'importer vos modèles et formulaires correctement
+# from .models import FacePanneau
+# from .forms import Etape1Form
+
 class ReserverEtape1View(View):
     """Étape 1 — Sélection des emplacements sur la carte + période souhaitée."""
     template_name = 'portail/reserver_etape1.html'
@@ -875,7 +1031,7 @@ class ApiGeoJsonView(View):
                     'adresse':      support.adresse,
                     'color':        color,
                     'faces':        faces_data,
-                    'detail_url':   f"/portail/support/{support.uuid}/",
+                    'detail_url':   f"/gestion/portail/support/{support.uuid}/",
                 },
             })
 

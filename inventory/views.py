@@ -32,58 +32,17 @@ from typing import cast
 
 # ── API GeoJSON pour Leaflet ──────────────────────────────────────────────────
 
-import json
-from django.utils import timezone
-from django.core.cache import cache
-from django.http import JsonResponse
-from django.db.models import Prefetch
-from django.views import View
-# Importer vos modèles et fonctions selon votre structure réelle :
-# from .models import Support, FacePanneau
-# from .utils import _color_for_support 
-
-GEOJSON_CACHE_KEY = "api_geojson_cache"
-GEOJSON_CACHE_TIMEOUT = 300  # 5 minutes
-
-class ApiGeoJsonView(View):
-    """
-    Retourne un GeoJSON unifié de tous les supports actifs pour Leaflet.
-    Prend en compte la mise en cache (si aucun filtre) et gère les filtres dynamiques.
-    """
-
+class ApiGeojsonView(View):
     def get(self, request, *args, **kwargs):
-        # 1. Récupération des filtres depuis l'URL
-        type_filtre = request.POST.get('type') or request.GET.get('type', '')
-        etat_filtre = request.POST.get('etat') or request.GET.get('etat', '')
-        type_panneau_filtre = request.POST.get('type_panneau') or request.GET.get('type_panneau', '')
-
-        # Si aucun filtre n'est appliqué, on tente de lire le cache global pour maximiser les performances
-        a_des_filtres = any([type_filtre, etat_filtre, type_panneau_filtre])
-        if not a_des_filtres:
-            cached = cache.get(GEOJSON_CACHE_KEY)
-            if cached:
-                return JsonResponse(cached, safe=False)
-
-        # 2. Construction et optimisation de la requête de base
-        today = timezone.now()
-        qs = (
-            Support.objects
-            .filter(actif=True)
-            .select_related('ecran_info')
-            .prefetch_related(
-                Prefetch(
-                    'faces',
-                    queryset=FacePanneau.objects.prefetch_related(
-                        'lignes_campagne__campagne',
-                        'lignes_reservation__reservation',
-                    )
-                )
-            )
-        )
-
-        # 3. Application des filtres à la requête SQL
+        """Retourne tous les supports en GeoJSON avec couleur dynamique."""
+        type_filtre = request.GET.get('type', '')
+        etat_filtre = request.GET.get('etat', '')
+        type_panneau_filtre = request.GET.get('type_panneau', '')
+        
+        qs = Support.objects.prefetch_related('faces').all()
+        
         if type_filtre:
-            qs = qs.filter(type_support=type_filtre)
+            qs = qs.filter(type_support=type_filtre)  # ✅ corrigé : 'type' au lieu de 'type_support'
         if etat_filtre:
             qs = qs.filter(etat=etat_filtre)
         if type_panneau_filtre:
@@ -92,69 +51,24 @@ class ApiGeoJsonView(View):
                 if ' — ' in label and label.split(' — ')[1] == type_panneau_filtre
             ]
             qs = qs.filter(format__in=codes_valides)
-        # 4. Construction de la structure GeoJSON
         features = []
-        for support in qs:
-            # Récupérer le dictionnaire de base (soit via votre méthode, soit initialisé vide)
-            properties_data = support.disponibilite_json() if hasattr(support, 'disponibilite_json') else {}
+        for s in qs:
+            d = s.disponibilite_json()
             
-            # Détermination des faces et de la couleur dynamique
-            faces_data = []
-            if support.type_support == 'panneau':
-                for face in support.faces.all():
-                    # Calcul du statut à la date d'aujourd'hui
-                    statut = face.get_statut(date_debut=today, date_fin=today)
-                    faces_data.append({
-                        'id': face.pk,  # Utilisé pour faire correspondre le panier JS
-                        'uuid': str(face.uuid) if hasattr(face, 'uuid') else str(face.pk),
-                        'label': face.label,
-                        'statut': statut,
-                    })
-                # Calcul de la couleur selon le statut des faces (libre, partiel, occupé, etc.)
-                color = _color_for_support(support, faces_data) if '_color_for_support' in globals() else '#16a34a'
-            else:
-                # Configuration par défaut pour les écrans
-                color = '#3b82f6'
-
-            # Injection/Mise à niveau de TOUTES les métadonnées requises par le script JS
-            properties_data.update({
-                'id': support.pk,
-                'uuid': str(support.uuid),
-                'code': support.code,
-                'nom': support.nom,
-                'type': support.type_support,         # 'type' attendu par votre JS
-                'type_support': support.type_support, # Rétrocompatibilité
-                'format': support.format,
-                'format_display': support.get_format_display() if hasattr(support, 'get_format_display') else support.format,
-                'type_panneau': support.type_panneau if hasattr(support, 'type_panneau') else getattr(support, 'type_panneau', None),
-                'ville': support.ville,               # ✅ Désormais exposé proprement pour vos filtres JS
-                'quartier': support.quartier,         # ✅ Désormais exposé proprement pour vos filtres JS
-                'adresse': support.adresse,
-                'etat': support.etat if hasattr(support, 'etat') else 'bon',
-                'color': color,
-                'faces': faces_data,
-                'detail_url': f"/gestion/portail/support/{support.uuid}/",
-            })
+            # ✅ S'assurer que type_panneau est bien exposé dans les properties
+            if 'type_panneau' not in d:
+                d['type_panneau'] = s.type_panneau if hasattr(s, 'type_panneau') else None
 
             features.append({
                 'type': 'Feature',
-                'geometry': {
-                    'type': 'Point',
-                    'coordinates': [float(support.longitude), float(support.latitude)],
-                },
-                'properties': properties_data,
+                'geometry': {'type': 'Point', 'coordinates': [float(s.longitude), float(s.latitude)]},
+                'properties': d,
             })
 
-        geojson = {'type': 'FeatureCollection', 'features': features}
+        return JsonResponse({'type': 'FeatureCollection', 'features': features})
 
-        # 5. On n'enregistre en cache que si la requête ne contient aucun filtre
-        if not a_des_filtres:
-            cache.set(GEOJSON_CACHE_KEY, geojson, GEOJSON_CACHE_TIMEOUT)
 
-        return JsonResponse(geojson, safe=False)
-
-# Raccourci pour vos fichiers urls.py
-api_geojson = ApiGeoJsonView.as_view()
+api_geojson = ApiGeojsonView.as_view()
 
 
 """

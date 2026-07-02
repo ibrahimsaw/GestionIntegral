@@ -346,15 +346,17 @@ class SupportsListeView(View):
     per_page = 20
 
     def get(self, request):
-        fmt     = request.GET.get('format', '').strip()
-        ville   = request.GET.get('ville', '').strip()
-        quartier= request.GET.get('quartier', '').strip()
-        dispo   = request.GET.get('dispo', '').strip()
-        q       = request.GET.get('q', '').strip()
+        fmt         = request.GET.get('format', '').strip()
+        type_support= request.GET.get('type', '').strip()
+        type_panneau= request.GET.get('type_panneau', '').strip()
+        ville       = request.GET.get('ville', '').strip()
+        quartier    = request.GET.get('quartier', '').strip()
+        dispo       = request.GET.get('dispo', '').strip()
+        q           = request.GET.get('q', '').strip()
 
         qs = (
             Support.objects
-            .filter(type_support='panneau', actif=True)
+            .filter(actif=True)
             .prefetch_related(
                 Prefetch(
                     'faces',
@@ -367,6 +369,14 @@ class SupportsListeView(View):
             .order_by('ville', 'quartier', 'code')
         )
 
+        if type_support:
+            qs = qs.filter(type_support=type_support)
+        if type_panneau:
+            codes = list(FormatSupport.objects.filter(categorie__iexact=type_panneau).values_list('code', flat=True))
+            if codes:
+                qs = qs.filter(format__in=codes)
+            else:
+                qs = qs.none()
         if fmt:
             qs = qs.filter(format=fmt)
         if ville:
@@ -404,13 +414,16 @@ class SupportsListeView(View):
         page_obj   = paginator.get_page(page_num)
 
         # Données pour les <select> de filtres
-        villes    = sorted({v for v in Support.objects.filter(
-            type_support='panneau', actif=True).values_list('ville', flat=True) if v})
+        filter_kwargs = {'actif': True}
+        if type_support:
+            filter_kwargs['type_support'] = type_support
+
+        villes = sorted({v for v in Support.objects.filter(**filter_kwargs).values_list('ville', flat=True) if v})
         quartiers = sorted({v for v in Support.objects.filter(
-            type_support='panneau', actif=True, **(({'ville': ville}) if ville else {}),
+            **({**filter_kwargs, **({'ville': ville} if ville else {})})
         ).values_list('quartier', flat=True) if v})
-        formats   = sorted({v for v in Support.objects.filter(
-            type_support='panneau', actif=True).exclude(format='').values_list('format', flat=True) if v})
+        formats = sorted({v for v in Support.objects.filter(
+            **filter_kwargs).exclude(format='').values_list('format', flat=True) if v})
 
         return render(request, self.template_name, {
             'page_obj':  page_obj,
@@ -703,7 +716,7 @@ from django.core.mail import send_mail
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views import View
 
-from inventory.models import FacePanneau, Support
+from inventory.models import FacePanneau, Support, FormatSupport
 from campaigns.models import DemandeReservation
 from .forms import Etape1Form, Etape2Form, Etape3Form
 

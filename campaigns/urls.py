@@ -62,6 +62,7 @@ urlpatterns = [
     # API
     path('api/disponibilite/', views.ApiCheckDisponibiliteView.as_view(), name='api_disponibilite'),
     path('api/contrats-client/<int:client_id>/', views.GetClientContratsView.as_view(), name='get_client_contrats'),
+    path('api/campagnes-meres-client/<int:client_id>/', views.GetClientCampagnesMeresView.as_view(), name='get_client_campagnes_meres'),
     path('campagnes/simulation-ecran/', SimulationCampagneEcranView.as_view(), name='simulation_ecran'),
     
 

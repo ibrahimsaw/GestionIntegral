@@ -1,6 +1,6 @@
 from django import forms
 from .models import Client, Campagne, Contrat, LigneCampagne, CampagneVisuel
-from inventory.models import Support, FacePanneau
+from inventory.models import Support, FacePanneau, FormatSupport
 
 W = {'class': 'form-control'}
 S = {'class': 'form-select'}
@@ -67,6 +67,14 @@ class MultipleFileField(forms.FileField):
 
 
 class CampagneForm(forms.ModelForm):
+    # Champ de choix dynamique pour le type / format de campagne
+    type_support = forms.ChoiceField(
+        required=False,
+        choices=[],
+        widget=forms.Select(attrs=S),
+        label="Type / format"
+    )
+
     # Ajout du champ virtuel pour la sélection multiple
     visuels_multiples = MultipleFileField(
         widget=MultipleFileInput(attrs={
@@ -81,15 +89,17 @@ class CampagneForm(forms.ModelForm):
 
     class Meta:
         model = Campagne
-        # 'visuel' est retiré des champs du modèle Campagne
         fields = [
-            'client', 'nom', 'date_debut', 'date_fin', 'statut', 
-            'type_support', 'duree_passage', 'frequence', 
+            'client', 'nom', 'prix', 'campagne_parente', 'est_mere', 'date_debut', 'date_fin', 'statut',
+            'type_support', 'duree_passage', 'frequence',
             'tranches_horaires', 'notes', 'contrat'
         ]
         widgets = {
             'client': forms.Select(attrs=S),
             'nom': forms.TextInput(attrs=W),
+            'prix': forms.NumberInput(attrs={**W, 'step': '0.01', 'min': '0'}),
+            'campagne_parente': forms.Select(attrs=S),
+            'est_mere': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'date_debut': forms.DateInput(attrs=D),
             'date_fin': forms.DateInput(attrs=D),
             'statut': forms.Select(attrs=S),
@@ -109,11 +119,17 @@ class CampagneForm(forms.ModelForm):
         
         if client_id:
             qs = Contrat.objects.filter(client_id=client_id, actif=True)
-            
-            # Optionnel: Filtrage par dates si présentes
             self.fields['contrat'].queryset = qs
+            self.fields['campagne_parente'].queryset = Campagne.objects.filter(
+                client_id=client_id,
+                est_mere=True,
+            ).exclude(pk=self.instance.pk if self.instance.pk else None)
         else:
             self.fields['contrat'].queryset = Contrat.objects.none()
+            self.fields['campagne_parente'].queryset = Campagne.objects.none()
+
+        support_choices = [('', '--- Sélectionner un type / format ---')] + list(Campagne.TYPE_SUPPORT_CHOICES)
+        self.fields['type_support'].choices = support_choices
     
     def clean_visuels_multiples(self):
         return self.cleaned_data.get('visuels_multiples', [])
@@ -127,6 +143,25 @@ class CampagneForm(forms.ModelForm):
         # 1. Validation des dates de campagne
         if d1 and d2 and d1 > d2:
             raise forms.ValidationError("La date de fin doit être après la date de début.")
+
+        # 1.5 Validation de la hiérarchie
+        if cleaned.get('campagne_parente') and cleaned.get('campagne_parente').client_id != cleaned.get('client').id:
+            raise forms.ValidationError("La campagne mère doit appartenir au même client.")
+
+        if cleaned.get('est_mere') and cleaned.get('campagne_parente'):
+            raise forms.ValidationError("Une campagne mère ne peut pas être rattachée à une autre campagne mère.")
+
+        if cleaned.get('campagne_parente') and not cleaned.get('campagne_parente').est_mere:
+            raise forms.ValidationError("La campagne sélectionnée comme campagne mère doit être marquée comme campagne mère.")
+
+        if cleaned.get('campagne_parente') and not cleaned.get('type_support'):
+            parent = cleaned.get('campagne_parente')
+            if parent and parent.type_support:
+                cleaned['type_support'] = parent.type_support
+            else:
+                raise forms.ValidationError(
+                    "Le type de support est obligatoire pour une sous-campagne lorsque la campagne mère n'a pas de type défini."
+                )
 
         # 2. Validation spécifique au support écran (en utilisant la valeur brute 'ecran')
         if type_support == 'ecran':

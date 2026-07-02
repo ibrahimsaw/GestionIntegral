@@ -124,18 +124,29 @@ def _build_context_campagne(campagne):
     }
     """
 
+    enfants = []
+    campagnes = [campagne]
+
+    if campagne.est_mere:
+        enfants = list(campagne.sous_campagnes.all())
+        campagnes = enfants
+
     # ── Infos générales ──────────────────────────────────────────
     infos = {
-        "nom"          : campagne.nom,
-        "reference"    : campagne.reference,
-        "date_debut"   : campagne.date_debut,
-        "date_fin"     : campagne.date_fin,
-        "duree_jours"  : campagne.duree_jours(),
-        "statut"       : campagne.get_statut_display(),
-        "type_support" : campagne.get_type_support_display(),
-        "notes"        : campagne.notes,
-        "contrat"      : campagne.contrat,
-        "client"       : campagne.client,
+        "nom"                   : campagne.nom,
+        "reference"             : campagne.reference,
+        "date_debut"            : campagne.date_debut,
+        "date_fin"              : campagne.date_fin,
+        "duree_jours"           : campagne.duree_jours(),
+        "statut"                : campagne.get_statut_display(),
+        "type_support"          : "Campagne mère" if campagne.est_mere else campagne.get_type_support_display(),
+        "effective_type_support": None,
+        "notes"                 : campagne.notes,
+        "contrat"               : campagne.contrat,
+        "client"                : campagne.client,
+        "campagne_mere"         : campagne.est_mere,
+        "child_campaigns"       : enfants if campagne.est_mere else None,
+        "child_count"           : len(enfants) if campagne.est_mere else 0,
         # Champs écran
         "frequence"      : campagne.frequence,
         "freq_display"   : _format_freq(campagne),
@@ -143,68 +154,161 @@ def _build_context_campagne(campagne):
         "tranches"       : campagne.tranches_horaires or "—",
     }
 
-    # ── Détail supports ──────────────────────────────────────────
-    supports = []
-    lignes   = (
-        campagne.lignes
-        .select_related("support", "face")
-        .order_by("support__nom")
-    )
+    # ── Lignes associées ─────────────────────────────────────────
+    lignes = []
+    if campagne.est_mere:
+        for enfant in enfants:
+            lignes.extend(list(enfant.lignes.all()))
+    else:
+        lignes = list(campagne.lignes.all())
+
+    effective_support_types = {
+        ligne.support.type_support
+        for ligne in lignes
+        if ligne.support and ligne.support.type_support
+    }
 
     if campagne.type_support == "ecran":
+        infos["effective_type_support"] = "ecran"
+    elif campagne.type_support == "panneau":
+        infos["effective_type_support"] = "panneau"
+    elif "ecran" in effective_support_types:
+        infos["effective_type_support"] = "ecran"
+    elif "panneau" in effective_support_types:
+        infos["effective_type_support"] = "panneau"
+    else:
+        infos["effective_type_support"] = ""
+
+    # ── Détail supports ──────────────────────────────────────────
+    supports = []
+
+    if infos["effective_type_support"] == "ecran":
+        support_dict = {}
         for ligne in lignes:
-            supports.append({
-                "code"   : ligne.support.code,
-                "nom"    : ligne.support.nom,
-                "ville"  : ligne.support.ville,
-                "quartier":ligne.support.quartier,
-                "adresse" :ligne.support.adresse,
+            if not ligne.support or ligne.support.type_support != "ecran":
+                continue
+            support = ligne.support
+            support_dict.setdefault(support.pk, {
+                "code"   : support.code,
+                "nom"    : support.nom,
+                "ville"  : support.ville,
+                "quartier": support.quartier,
+                "adresse": support.adresse,
                 "type"   : "Écran",
                 "face"   : None,
             })
+        supports = list(support_dict.values())
 
-    elif campagne.type_support == "panneau":
-        # Regrouper les faces par support
+    elif infos["effective_type_support"] == "panneau":
         faces_dict = {}
         for ligne in lignes:
+            if not ligne.support or ligne.support.type_support != "panneau":
+                continue
             key = ligne.support.pk
             if key not in faces_dict:
                 faces_dict[key] = {
                     "code"        : ligne.support.code,
                     "nom"         : ligne.support.nom,
-                    "ville"  : ligne.support.ville,
-                    "quartier":ligne.support.quartier,
-                    "adresse" :ligne.support.adresse,
+                    "ville"       : ligne.support.ville,
+                    "quartier"    : ligne.support.quartier,
+                    "adresse"     : ligne.support.adresse,
                     "type"        : "Panneau",
                     "face_labels" : [],
                 }
-            if ligne.face:
+            if ligne.face and ligne.face.label not in faces_dict[key]["face_labels"]:
                 faces_dict[key]["face_labels"].append(ligne.face.label)
 
         for v in faces_dict.values():
             supports.append({
                 "code" : v["code"],
                 "nom"  : v["nom"],
-                "ville": v["ville"],
-                "quartier":v["quartier"],
+                "ville" : v["ville"],
+                "quartier" : v["quartier"],
                 "adresse" : v["adresse"],
                 "type" : v["type"],
                 "face" : " & ".join(v["face_labels"]) if v["face_labels"] else "—",
             })
 
+    supports_by_child = []
+    if campagne.est_mere:
+        for enfant in enfants:
+            child_supports = []
+            if infos["effective_type_support"] == "ecran":
+                support_dict = {}
+                for ligne in enfant.lignes.all():
+                    if not ligne.support or ligne.support.type_support != "ecran":
+                        continue
+                    support = ligne.support
+                    support_dict.setdefault(support.pk, {
+                        "code"   : support.code,
+                        "nom"    : support.nom,
+                        "ville"  : support.ville,
+                        "quartier": support.quartier,
+                        "adresse": support.adresse,
+                        "type"   : "Écran",
+                        "face"   : None,
+                    })
+                child_supports = list(support_dict.values())
+            elif infos["effective_type_support"] == "panneau":
+                faces_dict = {}
+                for ligne in enfant.lignes.all():
+                    if not ligne.support or ligne.support.type_support != "panneau":
+                        continue
+                    key = ligne.support.pk
+                    if key not in faces_dict:
+                        faces_dict[key] = {
+                            "code"        : ligne.support.code,
+                            "nom"         : ligne.support.nom,
+                            "ville"       : ligne.support.ville,
+                            "quartier"    : ligne.support.quartier,
+                            "adresse"     : ligne.support.adresse,
+                            "type"        : "Panneau",
+                            "face_labels" : [],
+                        }
+                    if ligne.face and ligne.face.label not in faces_dict[key]["face_labels"]:
+                        faces_dict[key]["face_labels"].append(ligne.face.label)
+
+                child_supports = [
+                    {
+                        "code" : v["code"],
+                        "nom"  : v["nom"],
+                        "ville" : v["ville"],
+                        "quartier" : v["quartier"],
+                        "adresse" : v["adresse"],
+                        "type" : v["type"],
+                        "face" : " & ".join(v["face_labels"]) if v["face_labels"] else "—",
+                    }
+                    for v in faces_dict.values()
+                ]
+
+            supports_by_child.append({
+                "campagne" : enfant,
+                "supports" : child_supports,
+            })
+
     # ── Spots par mois (écran uniquement) ────────────────────────
     spots_par_mois = []
 
-    if campagne.type_support == "ecran":
-        spots_total   = campagne.calculer_nombre_spots()
-        nb_ecrans     = len([l for l in lignes if l.support.type_support == "ecran"])
-        total_general = 0
+    if infos["effective_type_support"] == "ecran":
+        spots_by_month = {}
+        total_spots = 0
+        for campagne_item in campagnes:
+            spots_total = campagne_item.calculer_nombre_spots()
+            total_spots += spots_total
+            for (annee, mois) in _mois_couverts(campagne_item.date_debut, campagne_item.date_fin):
+                spots_mois = _spots_du_mois(campagne_item, spots_total, annee, mois)
+                if spots_mois == 0:
+                    continue
+                spots_by_month[(annee, mois)] = spots_by_month.get((annee, mois), 0) + spots_mois
 
-        for (annee, mois) in _mois_couverts(campagne.date_debut, campagne.date_fin):
-            spots_mois = _spots_du_mois(campagne, spots_total, annee, mois)
-            if spots_mois == 0:
-                continue
-            total_general += spots_mois
+        nb_ecrans = len({
+            ligne.support.pk
+            for ligne in lignes
+            if ligne.support and ligne.support.type_support == "ecran"
+        })
+
+        total_general = sum(spots_by_month.values())
+        for (annee, mois), spots_mois in sorted(spots_by_month.items()):
             spots_par_mois.append({
                 "label"      : f"{MOIS_FR[mois]} {annee}",
                 "spots"      : spots_mois,
@@ -212,7 +316,6 @@ def _build_context_campagne(campagne):
                 "nb_ecrans"  : nb_ecrans,
             })
 
-        # Ligne total
         if spots_par_mois:
             spots_par_mois.append({
                 "label"      : "TOTAL",
@@ -222,12 +325,16 @@ def _build_context_campagne(campagne):
                 "is_total"   : True,
             })
 
+    infos["support_count"] = len(supports)
+    infos["total_spots"] = sum(c.calculer_nombre_spots() for c in campagnes)
+
     return {
         "campagne"      : campagne,
         "client"        : campagne.client,
         "today"         : datetime.date.today(),
         "infos"         : infos,
         "supports"      : supports,
+        "supports_by_child": supports_by_child,
         "spots_par_mois": spots_par_mois,
     }
 
@@ -241,7 +348,12 @@ class ExportCampagnePdfView(ClientStaffRequiredMixin, View):
         """Télécharge le détail d'une campagne en PDF."""
         campagne = get_object_or_404(
             Campagne.objects.select_related("client", "contrat")
-                            .prefetch_related("lignes__support", "lignes__face"),
+                            .prefetch_related(
+                                "lignes__support",
+                                "lignes__face",
+                                "sous_campagnes__lignes__support",
+                                "sous_campagnes__lignes__face",
+                            ),
             pk=pk,
         )
 
@@ -268,7 +380,12 @@ class PreviewCampagnePdfView(ClientStaffRequiredMixin, View):
         """Prévisualise le détail d'une campagne dans le navigateur."""
         campagne = get_object_or_404(
             Campagne.objects.select_related("client", "contrat")
-                            .prefetch_related("lignes__support", "lignes__face"),
+                            .prefetch_related(
+                                "lignes__support",
+                                "lignes__face",
+                                "sous_campagnes__lignes__support",
+                                "sous_campagnes__lignes__face",
+                            ),
             pk=pk,
         )
         return render(

@@ -169,15 +169,29 @@
             <tr class="bs-border border-{{ c.statut }}">
               <td style="text-align: center; vertical-align: middle;">
                 <a href="{% url 'campagne_detail' c.pk %}">
-                {% if c.type_support == 'panneau' %}
-                  <i class="bi bi-sign-merge-right support-panneau" title="Panneau"></i>
+                {% if c.est_mere %}
+                  <i class="bi bi-diagram-3 support-mere"></i>
+                {% elif c.type_support == 'ecran' %}
+                  <i class="bi bi-display support-ecran"></i>
                 {% else %}
-                  <i class="bi bi-display support-ecran" title="Écran"></i>
+                  <i class="bi bi-sign-merge-right support-panneau" title="Panneau"></i>
                 {% endif %}
                 </a>
               </td>
               <td class="mono" style="font-size:.72rem;color:var(--text-muted)">{{ c.reference }}</td>
-              <td style="font-weight:600">{{ c.nom }}</td>
+              <td>
+                  {{ c.nom }}
+                {% if c.campagne_parente %}
+                <div class="small text-muted mt-1">
+                  Sous-campagne de
+                  <a href="{% url 'campagne_detail' c.campagne_parente.pk %}" class="text-decoration-none">{{ c.campagne_parente.nom }}</a>
+                </div>
+                {% elif c.est_mere %}
+                <div class="small text-muted mt-1">
+                  Campagne mère • {{ c.sous_campagnes.count }} sous-campagne{% if c.sous_campagnes.count > 1 %}s{% endif %}
+                </div>
+                {% endif %}
+              </td>
               <td class="mono" style="font-size:.75rem">{{ c.date_debut|date:"d/m/Y" }}<br>{{ c.date_fin|date:"d/m/Y" }}</td>
               <td class="mono">{{ c.nb_supports }}</td>
               <td class="mono">{{ c.calculer_nombre_spots }}</td>

@@ -65,10 +65,10 @@
               <div class="p-3 border rounded-3 bg-light-subtle h-100">
                 <small class="text-uppercase text-muted d-block font-monospace mb-1" style="font-size: 0.6rem;">Support</small>
                 <div class="fw-bold small">
-                  {% if campagne.type_support == 'panneau' %}
-                    <i class="bi bi-sign-merge-right text-warning me-1"></i>Panneaux
-                  {% else %}
+                  {% if campagne.type_support == 'ecran' %}
                     <i class="bi bi-display text-primary me-1"></i>Écrans
+                  {% else %}
+                    <i class="bi bi-sign-merge-right text-warning me-1"></i>{{campagne.type_support}}
                   {% endif %}
                 </div>
               </div>
@@ -149,86 +149,8 @@
 
                     <div class="row g-4">
 
-                      {# ═══════════════ PANNEAUX ═══════════════ #}
-                      {% if campagne.type_support == 'panneau' %}
-                        {% for item in quartier.list %} {# On boucle sur les éléments du quartier #}
-                          {% with support=item.support %}
-                            <div class="col-md-6 col-xl-4">
-                              <div class="card h-100 border rounded-3 overflow-hidden shadow-sm">
-                                <div class="card-header bg-light border-bottom p-3" style="display: block;">
-                                  <h6 class="fw-bold mb-1 text-truncate">
-                                    <p class="mb-0" style="color: var(--color-primary);">{{ support.code }}</p>
-                                    <span class="small text-muted">{{ support.nom }}</span>
-                                  </h6>
-                                  <div class="small text-muted" style="text-align: center;">
-                                    <i class="bi bi-geo-alt me-1"></i>{{ support.quartier|default:"" }} ({{ support.ville|default:"Ouagadougou" }})
-                                  </div>
-                                </div>
-
-                                <div class="card-body p-3">
-                                  <p class="text-uppercase text-muted fw-bold mb-3" style="font-size: .65rem;">Faces du panneau</p>
-                                  <div class="row g-2">
-                                    {% for fd in item.faces %}
-                                      {% with face=fd.face statut=fd.statut %}
-                                        <div class="col-12">
-                                          {% if statut == 'libre' or face.pk in selectionnes %}
-                                            <div class="position-relative">
-                                              <input type="checkbox" name="faces" value="{{ face.pk }}" id="face_{{ face.pk }}"
-                                                    class="btn-check face-checkbox" autocomplete="off"
-                                                    {% if face.pk in selectionnes %}checked{% endif %}>
-                                              <label class="btn bs-disponible w-100 text-start p-3 d-flex justify-content-between align-items-center rounded-3 face-label-element"
-                                                    for="face_{{ face.pk }}">
-                                                <span class="d-flex align-items-center">
-                                                  <i class="bi {% if face.pk in selectionnes %}bi-check-circle-fill{% else %}bi-circle{% endif %} fs-5 me-2 check-icon"></i>
-                                                  <span>
-                                                    <strong class="d-block">Face {{ face.label }}</strong>
-                                                    <small class="opacity-75">{{ face.get_eclairage_display }}</small>
-                                                  </span>
-                                                </span>
-                                                {% if face.pk in selectionnes %}
-                                                  <span class="badge bg-primary-subtle text-primary border border-primary-subtle status-badge">Sélectionnée</span>
-                                                {% else %}
-                                                  <span class="badge border bs-disponible">Libre</span>
-                                                {% endif %}
-                                              </label>
-                                            </div>
-                                          {% elif statut == 'reserve' %}
-                                            <div class="d-flex justify-content-between align-items-center p-3 border bs-reserve rounded-3 opacity-75" style="cursor: not-allowed;">
-                                              <span class="small fw-bold">
-                                                <i class="bi bi-clock-history me-2"></i>Face {{ face.label }}
-                                                <small class="d-block fw-normal opacity-75">{{ face.get_eclairage_display }}</small>
-                                              </span>
-                                              <span class="badge border bs-reserve">Réservée</span>
-                                            </div>
-                                          {% elif statut == 'panne' %}
-                                            <div class="d-flex justify-content-between align-items-center p-3 border rounded-3 bs-panne opacity-75" style="cursor: not-allowed;">
-                                              <span class="small fw-bold">
-                                                <i class="bi bi-tools me-2"></i>Face {{ face.label }}
-                                                <small class="d-block fw-normal opacity-75">{{ face.get_eclairage_display }}</small>
-                                              </span>
-                                              <span class="badge border bs-panne">En Panne</span>
-                                            </div>
-                                          {% else %}
-                                            <div class="d-flex justify-content-between align-items-center p-3 border rounded-3 bs-occupe opacity-50" style="cursor: not-allowed;">
-                                              <span class="small fw-bold text-danger-emphasis">
-                                                <i class="bi bi-lock-fill me-2"></i>Face {{ face.label }}
-                                                <small class="d-block fw-normal opacity-75">{{ face.get_eclairage_display }}</small>
-                                              </span>
-                                              <span class="badge border bs-occupe">Occupée</span>
-                                            </div>
-                                          {% endif %}
-                                        </div>
-                                      {% endwith %}
-                                    {% endfor %}
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          {% endwith %}
-                        {% endfor %}
-
                       {# ═══════════════ ÉCRANS ═══════════════ #}
-                      {% else %}
+                      {% if campagne.type_support == 'ecran' %}
                         {% for item in quartier.list %} {# On boucle sur les éléments du quartier #}
                           {% with support=item.support ligne=item.ligne %}
                             <div class="col-md-6 col-xl-4">
@@ -339,6 +261,83 @@
                                     </div>
                                   </div>
 
+                                </div>
+                              </div>
+                            </div>
+                          {% endwith %}
+                        {% endfor %}
+                      {# ═══════════════ PANNEAUX ═══════════════ #}
+                      {% else %}
+                        {% for item in quartier.list %} {# On boucle sur les éléments du quartier #}
+                          {% with support=item.support %}
+                            <div class="col-md-6 col-xl-4">
+                              <div class="card h-100 border rounded-3 overflow-hidden shadow-sm">
+                                <div class="card-header bg-light border-bottom p-3" style="display: block;">
+                                  <h6 class="fw-bold mb-1 text-truncate">
+                                    <p class="mb-0" style="color: var(--color-primary);">{{ support.code }}</p>
+                                    <span class="small text-muted">{{ support.nom }}</span>
+                                  </h6>
+                                  <div class="small text-muted" style="text-align: center;">
+                                    <i class="bi bi-geo-alt me-1"></i>{{ support.quartier|default:"" }} ({{ support.ville|default:"Ouagadougou" }})
+                                  </div>
+                                </div>
+
+                                <div class="card-body p-3">
+                                  <p class="text-uppercase text-muted fw-bold mb-3" style="font-size: .65rem;">Faces du panneau</p>
+                                  <div class="row g-2">
+                                    {% for fd in item.faces %}
+                                      {% with face=fd.face statut=fd.statut %}
+                                        <div class="col-12">
+                                          {% if statut == 'libre' or face.pk in selectionnes %}
+                                            <div class="position-relative">
+                                              <input type="checkbox" name="faces" value="{{ face.pk }}" id="face_{{ face.pk }}"
+                                                    class="btn-check face-checkbox" autocomplete="off"
+                                                    {% if face.pk in selectionnes %}checked{% endif %}>
+                                              <label class="btn bs-disponible w-100 text-start p-3 d-flex justify-content-between align-items-center rounded-3 face-label-element"
+                                                    for="face_{{ face.pk }}">
+                                                <span class="d-flex align-items-center">
+                                                  <i class="bi {% if face.pk in selectionnes %}bi-check-circle-fill{% else %}bi-circle{% endif %} fs-5 me-2 check-icon"></i>
+                                                  <span>
+                                                    <strong class="d-block">Face {{ face.label }}</strong>
+                                                    <small class="opacity-75">{{ face.get_eclairage_display }}</small>
+                                                  </span>
+                                                </span>
+                                                {% if face.pk in selectionnes %}
+                                                  <span class="badge bg-primary-subtle text-primary border border-primary-subtle status-badge">Sélectionnée</span>
+                                                {% else %}
+                                                  <span class="badge border bs-disponible">Libre</span>
+                                                {% endif %}
+                                              </label>
+                                            </div>
+                                          {% elif statut == 'reserve' %}
+                                            <div class="d-flex justify-content-between align-items-center p-3 border bs-reserve rounded-3 opacity-75" style="cursor: not-allowed;">
+                                              <span class="small fw-bold">
+                                                <i class="bi bi-clock-history me-2"></i>Face {{ face.label }}
+                                                <small class="d-block fw-normal opacity-75">{{ face.get_eclairage_display }}</small>
+                                              </span>
+                                              <span class="badge border bs-reserve">Réservée</span>
+                                            </div>
+                                          {% elif statut == 'panne' %}
+                                            <div class="d-flex justify-content-between align-items-center p-3 border rounded-3 bs-panne opacity-75" style="cursor: not-allowed;">
+                                              <span class="small fw-bold">
+                                                <i class="bi bi-tools me-2"></i>Face {{ face.label }}
+                                                <small class="d-block fw-normal opacity-75">{{ face.get_eclairage_display }}</small>
+                                              </span>
+                                              <span class="badge border bs-panne">En Panne</span>
+                                            </div>
+                                          {% else %}
+                                            <div class="d-flex justify-content-between align-items-center p-3 border rounded-3 bs-occupe opacity-50" style="cursor: not-allowed;">
+                                              <span class="small fw-bold text-danger-emphasis">
+                                                <i class="bi bi-lock-fill me-2"></i>Face {{ face.label }}
+                                                <small class="d-block fw-normal opacity-75">{{ face.get_eclairage_display }}</small>
+                                              </span>
+                                              <span class="badge border bs-occupe">Occupée</span>
+                                            </div>
+                                          {% endif %}
+                                        </div>
+                                      {% endwith %}
+                                    {% endfor %}
+                                  </div>
                                 </div>
                               </div>
                             </div>

@@ -56,37 +56,65 @@
             </div>
 
             <!-- NOM -->
-            <div class="col-md-6">
+            <div class="col-md-4">
               <label class="form-label">Nom de la campagne *</label>
               {{ form.nom }}
             </div>
 
+            <!-- PRIX -->
+            <div class="col-md-2">
+              <label class="form-label">Prix (FCFA)</label>
+              {{ form.prix }}
+              {{ form.prix.errors }}
+            </div>
 
-            <div class="col-md-6">
+
+            <div class="col-md-4">
                 <label class="form-label">Date de début *</label>
-                <input type="date" name="date_debut" class="form-control" 
+                <input type="date" name="date_debut" id="id_date_debut" class="form-control" 
                       value="{{ form.date_debut.value|date:'Y-m-d' }}">
                 {{ form.date_debut.errors }}
             </div>
-            <div class="col-md-6">
+            <div class="col-md-4">
+                <label class="form-label">Durée (jours)</label>
+                <input type="number" min="1" id="id_duree_jours" class="form-control" placeholder="Ex: 15">
+                <div class="form-text">Calcule automatiquement la date de fin.</div>
+            </div>
+            <div class="col-md-4">
                 <label class="form-label">Date de fin *</label>
-                <input type="date" name="date_fin" class="form-control" 
-                      value="{{ form.date_fin.value|date:'Y-m-d' }}">
+                <input type="date" name="date_fin" id="id_date_fin" class="form-control" 
+                      value="{{ form.date_fin.value|date:'Y-m-d' }}" readonly
+                      style="background:var(--bg-card2); cursor:not-allowed;">
                 {{ form.date_fin.errors }}
+                <div class="form-text">Se remplit automatiquement à partir de la date de début + la durée. <a href="#" id="edit-date-fin-link">Modifier manuellement</a></div>
             </div>
 
             <!-- STATUT -->
             <div class="col-md-6">
               <label class="form-label">Statut</label>
               {{ form.statut }}
+              <div class="form-text">Calculé automatiquement selon les dates de la campagne.</div>
             </div>
 
             <!-- TYPE SUPPORT -->
             <div class="col-md-6">
-              <label class="form-label">Type de support</label>
+              <label class="form-label">Type / format</label>
               {{ form.type_support }}
+              <div class="form-text">Choisissez « Écran » ou un format de panneau.</div>
             </div>
-              <div class="col-md-12 ecran-fields d-none">
+            <div class="col-md-6">
+              <label class="form-label">Campagne mère</label>
+              {{ form.campagne_parente }}
+              <div class="form-text">Laisser vide pour créer une campagne autonome.</div>
+            </div>
+            <div class="col-md-6">
+              <div class="form-check mt-4 pt-2">
+                {{ form.est_mere }}
+                <label class="form-check-label" for="id_est_mere">Campagne mère</label>
+                <div class="form-text">Cochez pour déclarer cette campagne comme conteneur de sous-campagnes.</div>
+              </div>
+            </div>
+            <div class="col-md-12 ecran-fields d-none">
                   <label class="form-label" style="font-weight: 700; color: var(--color-primary);">Contrat associé *</label>
                   {{ form.contrat }}
                   {{ form.contrat.errors }}
@@ -183,26 +211,133 @@ document.addEventListener('DOMContentLoaded', function () {
     const typeSupport = document.getElementById('id_type_support');
     const clientSelect = document.getElementById('id_client');
     const contratSelect = document.getElementById('id_contrat');
+    const parentSelect = document.getElementById('id_campagne_parente');
+    const estMereCheckbox = document.getElementById('id_est_mere');
     const ecranFields = document.querySelectorAll('.ecran-fields');
+    const campagneId = '{{ obj.pk|default_if_none:"" }}';
 
     /* =========================
        TOGGLE CHAMPS ECRAN
     ========================= */
     function toggleFields() {
-        const isEcran = typeSupport.value === 'ecran';
+        const isEcran = typeSupport && typeSupport.value === 'ecran';
         ecranFields.forEach(el => {
             el.classList.toggle('d-none', !isEcran);
             el.querySelectorAll('input, select, textarea').forEach(input => {
                 // On ne rend "required" que si c'est affiché
-                if(isEcran) input.setAttribute('required', 'required');
+                if (isEcran) input.setAttribute('required', 'required');
                 else input.removeAttribute('required');
             });
         });
     }
 
+    function toggleEstMereFields() {
+        const isMere = estMereCheckbox && estMereCheckbox.checked;
+
+        if (parentSelect) {
+            if (isMere) {
+                parentSelect.value = '';
+                parentSelect.disabled = true;
+                parentSelect.style.background = 'var(--bg-card2)';
+                parentSelect.style.cursor = 'not-allowed';
+            } else {
+                parentSelect.disabled = false;
+                parentSelect.style.background = '';
+                parentSelect.style.cursor = '';
+            }
+        }
+
+        if (typeSupport) {
+            if (isMere) {
+                typeSupport.value = '';
+                typeSupport.disabled = true;
+                typeSupport.style.background = 'var(--bg-card2)';
+                typeSupport.style.cursor = 'not-allowed';
+            } else {
+                typeSupport.disabled = false;
+                typeSupport.style.background = '';
+                typeSupport.style.cursor = '';
+            }
+        }
+
+        toggleFields();
+    }
+
     if (typeSupport) {
         typeSupport.addEventListener('change', toggleFields);
         toggleFields();
+    }
+
+    if (estMereCheckbox) {
+        estMereCheckbox.addEventListener('change', toggleEstMereFields);
+        toggleEstMereFields();
+    }
+
+    /* =========================
+       STATUT — GRISÉ / NON MODIFIABLE
+    ========================= */
+    const statutSelect = document.getElementById('id_statut');
+    if (statutSelect) {
+        statutSelect.style.background = 'var(--bg-card2)';
+        statutSelect.style.cursor = 'not-allowed';
+        statutSelect.style.pointerEvents = 'none';
+        statutSelect.setAttribute('tabindex', '-1');
+        statutSelect.setAttribute('aria-readonly', 'true');
+    }
+
+    /* =========================
+       DURÉE → CALCUL AUTO DATE DE FIN
+    ========================= */
+    const dateDebutInput = document.getElementById('id_date_debut');
+    const dureeInput      = document.getElementById('id_duree_jours');
+    const dateFinInput    = document.getElementById('id_date_fin');
+    const editDateFinLink = document.getElementById('edit-date-fin-link');
+
+    function formatDateISO(d) {
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, '0');
+        const day = String(d.getDate()).padStart(2, '0');
+        return `${y}-${m}-${day}`;
+    }
+
+    function calculerDateFin() {
+        if (!dateDebutInput.value || !dureeInput.value) return;
+        const duree = parseInt(dureeInput.value, 10);
+        if (isNaN(duree) || duree < 1) return;
+
+        // Date de début + (durée - 1) jours = date de fin incluse
+        const debut = new Date(dateDebutInput.value + 'T00:00:00');
+        const fin = new Date(debut);
+        fin.setDate(fin.getDate() + (duree - 1));
+
+        dateFinInput.value = formatDateISO(fin);
+    }
+
+    // Pré-remplir la durée si les deux dates existent déjà (mode édition)
+    (function initDureeDepuisDates() {
+        if (dateDebutInput.value && dateFinInput.value) {
+            const debut = new Date(dateDebutInput.value + 'T00:00:00');
+            const fin = new Date(dateFinInput.value + 'T00:00:00');
+            const diffJours = Math.round((fin - debut) / (1000 * 60 * 60 * 24)) + 1;
+            if (diffJours > 0) {
+                dureeInput.value = diffJours;
+            }
+        }
+    })();
+
+    if (dateDebutInput) dateDebutInput.addEventListener('change', calculerDateFin);
+    if (dureeInput) dureeInput.addEventListener('input', calculerDateFin);
+
+    // Permettre de repasser en édition manuelle de la date de fin si besoin
+    if (editDateFinLink) {
+        editDateFinLink.addEventListener('click', function (e) {
+            e.preventDefault();
+            dateFinInput.readOnly = false;
+            dateFinInput.style.background = '';
+            dateFinInput.style.cursor = '';
+            dureeInput.value = '';
+            editDateFinLink.parentElement.textContent = '';
+        });
     }
 
     /* =========================
@@ -218,7 +353,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const dateDebut = document.querySelector('input[name="date_debut"]').value;
             const dateFin   = document.querySelector('input[name="date_fin"]').value;
 
-            let url = `/campaigns/api/contrats-client/${clientId}/`;
+            let url = `/gestion/campaigns/api/contrats-client/${clientId}/`;
             if (dateDebut && dateFin) {
                 url += `?date_debut=${dateDebut}&date_fin=${dateFin}`;
             }
@@ -248,16 +383,56 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
         }
 
+        function chargerCampagnesMeres(clientId, campagneActuelleId = null) {
+            if (!clientId || !parentSelect) {
+                return;
+            }
+            let url = `/gestion/campaigns/api/campagnes-meres-client/${clientId}/`;
+            if (campagneActuelleId) {
+                url += `?exclude=${campagneActuelleId}`;
+            }
+
+            parentSelect.innerHTML = '<option value="">Chargement...</option>';
+            parentSelect.disabled = true;
+
+            fetch(url)
+                .then(r => r.json())
+                .then(data => {
+                    parentSelect.disabled = false;
+                    if (data.length === 0) {
+                        parentSelect.innerHTML = '<option value="">--- Sélectionner une campagne mère ---</option>';
+                        parentSelect.innerHTML += '<option value="">Aucune campagne mère disponible</option>';
+                        return;
+                    }
+                    parentSelect.innerHTML = '<option value="">--- Sélectionner une campagne mère ---</option>';
+                    data.forEach(c => {
+                        const selected = campagneActuelleId && c.id == campagneActuelleId ? 'selected' : '';
+                        parentSelect.innerHTML += `<option value="${c.id}" ${selected}>${c.display}</option>`;
+                    });
+                })
+                .catch(() => {
+                    parentSelect.disabled = false;
+                    parentSelect.innerHTML = '<option value="">Erreur de chargement</option>';
+                });
+        }
+
         // Quand le client change
         clientSelect.addEventListener('change', function() {
             chargerContrats(this.value);
+            if (parentSelect) {
+                chargerCampagnesMeres(this.value, campagneId);
+            }
         });
 
         // Au chargement initial (mode édition — recharger le contrat déjà sélectionné)
         const contratActuelId = contratSelect.value;
+        const campagneParenteActuelId = parentSelect ? parentSelect.value : null;
         const clientInitialId = clientSelect.value;
         if (clientInitialId) {
             chargerContrats(clientInitialId, contratActuelId);
+            if (parentSelect) {
+                chargerCampagnesMeres(clientInitialId, campagneParenteActuelId || campagneId);
+            }
         }
 
         // Recharger si les dates changent

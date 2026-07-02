@@ -1,0 +1,84 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Formats de Support — Integral{% endblock %}
+
+{% block topbar_title %}
+    <i class="bi bi-grid-1x2 me-2" style="color:var(--color-primary)"></i>Formats de Support
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    .form-section { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
+    .table-responsive { padding: 0; margin: 0; }
+    .table th { font-size: .78rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; color: var(--text-muted); background: var(--bg-card2); border-bottom: 1px solid var(--border); }
+    .table td { font-size: .84rem; vertical-align: middle; border-bottom: 1px solid var(--border); }
+    .badge-cat { padding: 5px 10px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-xl-12">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1 style="font-size:1.4rem;font-weight:800;margin:0">Gestion des Formats</h1>
+            <a href="{% url 'format_create' %}" class="btn btn-primary btn-sm px-3 shadow-sm">
+                <i class="bi bi-plus-lg me-2"></i>Ajouter un format
+            </a>
+        </div>
+
+        <div class="form-section shadow-sm">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0 align-middle">
+                    <thead>
+                        <tr>
+                            <th class="ps-4" style="width: 150px;">Code</th>
+                            <th style="width: 180px;">Catégorie</th>
+                            <th>Description / Libellé</th>
+                            <th style="width: 150px;">Dimensions</th>
+                            <th style="width: 150px;">Superficie</th>
+                            <th class="text-end pe-4" style="width: 120px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for format in formats %}
+                        <tr>
+                            <td class="ps-4"><code style="color: var(--color-primary); font-weight: 700;">{{ format.code }}</code></td>
+                            <td>
+                                <span class="badge-cat bg-light text-dark border">{{ format.categorie }}</span>
+                            </td>
+                            <td class="fw-semibold">{{ format.libelle }}</td>
+                            <td class="text-muted">{{ format.dimensions|default:"—" }}</td>
+                            <td>
+                                {% if format.superficie %}
+                                    <span class="text-primary fw-bold">{{ format.superficie }} m²</span>
+                                {% else %}
+                                    <span class="text-muted">—</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end pe-4">
+                                <div class="d-flex gap-2 justify-content-end">
+                                    <a href="{% url 'format_update' format.pk %}" class="btn btn-outline-warning btn-sm" title="Modifier">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    <a href="{% url 'format_delete' format.pk %}" class="btn btn-outline-danger btn-sm" title="Supprimer">
+                                        <i class="bi bi-trash"></i>
+                                    </a>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center py-5 text-muted">
+                                <i class="bi bi-folder-x d-block fs-2 mb-2" style="color: var(--text-muted)"></i>
+                                Aucun format enregistré en base de données.
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

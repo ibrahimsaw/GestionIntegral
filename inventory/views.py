@@ -30,6 +30,41 @@ from django.db import transaction
 from typing import cast
 
 
+
+from django.urls import reverse_lazy
+from django.views.generic import ListView, CreateView, UpdateView, DeleteView
+from django.contrib.auth.mixins import LoginRequiredMixin # Optionnel: pour sécuriser l'accès
+from .models import FormatSupport
+
+# 1. LISTER LES FORMATS
+class FormatSupportListView(LoginRequiredMixin, ListView):
+    model = FormatSupport
+    template_name = 'inventory/format_list.html'
+    context_object_name = 'formats'
+    # Les formats seront triés selon le Meta du modèle (catégorie, puis code)
+
+# 2. AJOUTER UN FORMAT
+class FormatSupportCreateView(LoginRequiredMixin, CreateView):
+    model = FormatSupport
+    fields = ['code', 'libelle', 'dimensions', 'superficie', 'categorie']
+    template_name = 'inventory/format_form.html'
+    success_url = reverse_lazy('format_list') # Redirection après succès
+
+# 3. MODIFIER UN FORMAT (Bonus utile)
+class FormatSupportUpdateView(LoginRequiredMixin, UpdateView):
+    model = FormatSupport
+    fields = ['code', 'libelle', 'dimensions', 'superficie', 'categorie']
+    template_name = 'inventory/format_form.html' # Réutilise le même formulaire qu'à l'ajout
+    success_url = reverse_lazy('format_list')
+
+# 4. SUPPRIMER UN FORMAT
+class FormatSupportDeleteView(LoginRequiredMixin, DeleteView):
+    model = FormatSupport
+    template_name = 'partials/confirm_delete.html'
+    success_url = reverse_lazy('format_list')
+
+
+
 # ── API GeoJSON pour Leaflet ──────────────────────────────────────────────────
 
 class ApiGeojsonView(View):

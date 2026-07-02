@@ -22,29 +22,34 @@ def calculer_duree_tranches(tranches: str) -> float:
 
     
 # ── FORMAT — défini au niveau du Support car identique sur les deux faces ──
-FORMAT_CHOICES = [
-    # ── Standard ────────────────────────────────────────────
-    ('4x3',    '4m × 3m (12m²) — Standard'),        # 458 supports
-        # ── Géants ──────────────────────────────────────────────
-    ('4x5',    '4m × 5m (20m²) — Géant'),        #   4 supports
-    ('7x3',    '7m × 3m (21m²) — Géant'),        #  14 supports
-    ('6x4',    '6m × 4m (24m²) — Géant'),          #  28 supports
-    ('8x4',    '8m × 4m (32m²) — Géant'),          #  19 supports
-    ('10x4',   '10m × 4m (40m²) — Géant'),          #  15 supports
-    ('12x4',   '12m × 4m (48m²) — Géant'),          #  12 supports
-    ('12x5',   '12m × 5m (60m²) — Géant'),          #   2 supports
-    ('24x4',   '24m × 4m (96m²) — Géant'),          #   2 supports
-    ('9x5',    '9m × 5m (45m²) — Géant'),           #   1 support
-    # ── Sucettes ────────────────────────────────────────────
-    ('1x2',    '1,20m × 1,80m (2,16m²) — Sucette'), #  64 supports
-    # ── Marché ─────────────────────────────────────────
-    ('gm-4x3', '4m × 3m (12m²) — Marché'),    #   8 supports
-    ('gm-4x4', '4m × 4m (16m²) — Marché'),    #  12 supports
-    ('gm-5x4', '5m × 4m (20m²) — Marché'),    #  47 supports
-    ('gm-12x3','12m × 3m (36m²) — Marché'),   #   1 support
-    # ── Personnalisé ─────────────────────────────────────────
-    ('custom', 'Personnalisé (voir notes)'),
-]
+# FORMAT_CHOICES = [
+#     # ── Standard ────────────────────────────────────────────
+#     ('4x3',    '4m × 3m (12m²) — Standard'),        # 458 supports
+#         # ── Géants ──────────────────────────────────────────────
+#     ('4x5',    '4m × 5m (20m²) — Géant'),        #   4 supports
+#     ('7x3',    '7m × 3m (21m²) — Géant'),        #  14 supports
+#     ('6x4',    '6m × 4m (24m²) — Géant'),          #  28 supports
+#     ('8x3',    '8m × 3m (24m²) — Géant'),          #  19 supports
+#     ('8x6',    '8m × 6m (48m²) — Géant'),
+#     ('6x8',    '6m × 8m (48m²) — Géant'),
+#     ('10x4',   '10m × 4m (40m²) — Géant'),          #  15 supports
+#     ('12x4',   '12m × 4m (48m²) — Géant'),          #  12 supports
+#     ('12x5',   '12m × 5m (60m²) — Géant'),          #   2 supports
+#     ('24x4',   '24m × 4m (96m²) — Géant'),          #   2 supports
+#     ('9x5',    '9m × 5m (45m²) — Géant'),           
+#     ('10x4.14',    '10m × 4.14m (41.4m²) — Géant'),
+#     ('10x4',    '10m × 4m (40m²) — Géant'),
+#     ('4.5x5.5',    '4.5m × 5.5m (24.75m²) — Géant'),
+#     # ── Sucettes ────────────────────────────────────────────
+#     ('1x2',    '1,20m × 1,80m (2,16m²) — Sucette'), #  64 supports
+#     # ── Marché ─────────────────────────────────────────
+#     ('gm-4x3', '4m × 3m (12m²) — Marché'),    #   8 supports
+#     ('gm-4x4', '4m × 4m (16m²) — Marché'),    #  12 supports
+#     ('gm-5x4', '5m × 4m (20m²) — Marché'),    #  47 supports
+#     ('gm-12x3','12m × 3m (36m²) — Marché'),   #   1 support
+#     # ── Personnalisé ─────────────────────────────────────────
+#     ('custom', 'Personnalisé (voir notes)'),
+# ]
 
 
 TYPE_PANNEAU = 'panneau'
@@ -61,6 +66,33 @@ ETAT_CHOICES = [
     (ETAT_MAINTENANCE, 'En maintenance'),
     (ETAT_PANNE,       'En panne'),
 ]
+
+
+class FormatSupport(models.Model):
+    code = models.CharField(max_length=20, unique=True, verbose_name="Code Format (ex: 4x3, gm-5x4)")
+    libelle = models.CharField(max_length=150, verbose_name="Description complète")
+    dimensions = models.CharField(max_length=50, blank=True, verbose_name="Dimensions (ex: 4m × 3m)")
+    superficie = models.FloatField(null=True, blank=True, verbose_name="Superficie en m²")
+    categorie = models.CharField(max_length=50, blank=True, verbose_name="Catégorie (Standard, Géant, Sucette, Marché)")
+
+    class Meta:
+        verbose_name = "Format de Support"
+        verbose_name_plural = "Formats de Supports"
+        ordering = ['categorie', 'code']
+
+    def __str__(self):
+        return self.libelle
+
+def get_dynamic_format_choices():
+    """Récupère dynamiquement les formats de la BDD pour les formulaires Django."""
+    try:
+        return [(f.code, f.libelle) for f in FormatSupport.objects.all()]
+    except Exception:
+        # Sécurité pour éviter que makemigrations ou le démarrage plante si la BDD n'est pas encore prête
+        return []
+
+FORMAT_CHOICES = get_dynamic_format_choices()
+
 
 
 

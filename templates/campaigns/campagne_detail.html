@@ -66,6 +66,20 @@
                   {{ campagne.reference }}
                 </span>
               </div>
+              {% if campagne.campagne_parente %}
+              <div class="mt-2 small text-muted">
+                <span class="badge bg-info text-dark me-2">Sous-campagne</span>
+                Campagne mère :
+                <a href="{% url 'campagne_detail' campagne.campagne_parente.pk %}" class="text-decoration-none">
+                  {{ campagne.campagne_parente.nom }}
+                </a>
+              </div>
+              {% elif campagne.est_mere %}
+              <div class="mt-2 small text-muted">
+                <span class="badge bg-warning text-dark me-2">Campagne mère</span>
+                {{ campagne.sous_campagnes.count }} sous-campagne{% if campagne.sous_campagnes.count > 1 %}s{% endif %}
+              </div>
+              {% endif %}
             </div>
 
             <span class="badge rounded-pill bg-{{ campagne.statut }} px-3 py-2" style="font-size: 0.75rem;">
@@ -93,10 +107,12 @@
               <div class="p-3 border rounded-3 bg-light-subtle h-100">
                 <small class="text-uppercase text-muted d-block font-monospace mb-1" style="font-size: 0.6rem;">Support</small>
                 <div class="fw-bold small">
-                  {% if campagne.type_support == 'panneau' %}
-                    <i class="bi bi-sign-merge-right text-warning me-1"></i>Panneaux
-                  {% else %}
+                  {% if campagne.est_mere %}
+                    <i class="bi bi-diagram-3 text-warning me-1"></i>Campagne mère
+                  {% elif campagne.type_support == 'ecran' %}
                     <i class="bi bi-display text-primary me-1"></i>Écrans
+                  {% else %}
+                    <i class="bi bi-sign-merge-right text-warning me-1"></i>{{campagne.type_support}}
                   {% endif %}
                 </div>
               </div>
@@ -104,15 +120,22 @@
             <div class="col-6 col-sm-4 col-md-3">
               <div class="p-3 border rounded-3 bg-light-subtle h-100">
                 <small class="text-uppercase text-muted d-block font-monospace mb-1" style="font-size: 0.6rem;">Total</small>
-                <div class="fw-bold h5 mb-0 font-monospace">{{ lignes|length }}</div>
-                <small class="text-muted">Supports</small>
+                <div class="fw-bold h5 mb-0 font-monospace">{{ total_supports }}</div>
+                <small class="text-muted">Supports{% if campagne.est_mere %} (somme des campagnes filles){% endif %}</small>
+              </div>
+            </div>
+            <div class="col-6 col-sm-4 col-md-3">
+              <div class="p-3 border rounded-3 bg-light-subtle h-100">
+                <small class="text-uppercase text-muted d-block font-monospace mb-1" style="font-size: 0.6rem;">Montant</small>
+                <div class="fw-bold h5 mb-0 font-monospace">{{ campagne.montant_total_display }}</div>
+                <small class="text-muted">{% if campagne.est_mere %}Somme des sous-campagnes{% else %}Prix de la campagne{% endif %}</small>
               </div>
             </div>
             <div class="col-6 col-sm-4 col-md-3">
               <div class="p-3 border rounded-3 bg-primary-subtle border-primary-subtle text-primary h-100">
                 <small class="text-uppercase opacity-75 d-block font-monospace mb-1" style="font-size: 0.6rem;">Nombre de Spots</small>
-                <div class="fw-bold h5 mb-0 font-monospace">{{ campagne.calculer_nombre_spots }}</div>
-                <small class="text-muted">Total campagne</small>
+                <div class="fw-bold h5 mb-0 font-monospace">{{ total_spots }}</div>
+                <small class="text-muted">Total campagne{% if campagne.est_mere %} (somme des campagnes filles){% endif %}</small>
               </div>
             </div>
             {% if campagne.type_support == 'ecran' %}
@@ -265,6 +288,66 @@
     </div>
   </div>
 
+  {% if campagne.est_mere %}
+  <div class="d-flex justify-content-between align-items-center mb-4 mt-5">
+    <div>
+      <h5 class="fw-bold mb-0">
+        <i class="bi bi-diagram-3 me-2" style="color: var(--color-primary);"></i>Campagnes filles
+      </h5>
+      <p class="small text-muted mb-0">Liste des sous-campagnes rattachées à cette campagne mère.</p>
+    </div>
+    {% if not request.user.is_client %}
+    <a href="{% url 'campagne_create' %}?client={{ campagne.client.pk }}&campagne_parente={{ campagne.pk }}" class="btn btn-primary btn-sm rounded-pill px-3">
+      <i class="bi bi-plus-lg me-1"></i>Ajouter une sous-campagne
+    </a>
+    {% endif %}
+  </div>
+
+  <div class="row g-4 mb-5">
+    {% if sous_campagnes %}
+      {% for fille in sous_campagnes %}
+      <div class="col-md-6 col-xl-4">
+        <div class="card border-0 shadow-sm rounded-4 h-100">
+          <div class="card-body">
+            <h6 class="fw-bold mb-2">
+              <a href="{% url 'campagne_detail' fille.pk %}" class="text-dark text-decoration-none">{{ fille.nom }}</a>
+            </h6>
+            <div class="small text-muted mb-3">Réf. {{ fille.reference }} • {{ fille.date_debut|date:"d/m/Y" }} → {{ fille.date_fin|date:"d/m/Y" }}</div>
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <span class="badge bg-light text-dark border">{{ fille.get_statut_display }}</span>
+              {% if fille.type_support %}
+                <span class="badge bg-primary-subtle text-primary border">{{ fille.get_type_support_display }}</span>
+              {% else %}
+                <span class="badge bg-warning-subtle text-warning border">Type non défini</span>
+              {% endif %}
+            </div>
+            <div class="small text-muted">Supports : {{ fille.lignes.count }} | Spots : {{ fille.calculer_nombre_spots }}</div>
+            <!-- Bouton a droit un div pour aller à la page de détail -->
+            <div class="d-flex justify-content-end mt-3">
+              <a href="{% url 'campagne_detail' fille.pk %}" class="btn btn-sm btn-outline-primary rounded-pill px-3">
+                <i class="bi bi-arrow-right me-1"></i>Voir la campagne
+              </a>
+            </div>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="col-12">
+        <div class="card border-0 shadow-sm rounded-4 p-4 text-center bg-white">
+          <i class="bi bi-diagram-2 text-muted fs-1"></i>
+          <h6 class="fw-bold mt-3 mb-1" style="color:var(--text-muted);">Aucune sous-campagne</h6>
+          <p class="text-muted small mb-3">Cette campagne mère n'a pas encore de campagne fille.</p>
+          {% if not request.user.is_client %}
+          <a href="{% url 'campagne_create' %}?client={{ campagne.client.pk }}&campagne_parente={{ campagne.pk }}" class="btn btn-primary btn-sm rounded-pill px-4">
+            <i class="bi bi-plus-lg me-1"></i>Ajouter une sous-campagne
+          </a>
+          {% endif %}
+        </div>
+      </div>
+    {% endif %}
+  </div>
+  {% else %}
   <div class="d-flex justify-content-between align-items-center mb-4 mt-5">
     <h5 class="fw-bold mb-0">
       <i class="bi bi-geo-alt-fill me-2" style="color: var(--color-primary);"></i>Cartographie des supports
@@ -279,6 +362,7 @@
   </div>
 
   {% regroup lignes by support as support_list %}
+  {% endif %}
   <div class="row g-4 mb-5">
     {% if support_list %}
       {% for group in support_list %}
@@ -355,30 +439,32 @@
         {% endwith %}
       {% endfor %}
     {% else %}
-      {% if not request.user.is_client%}
-        <div class="col-12">
-          <div class="card border-0 shadow-sm rounded-4 p-4 text-center bg-white">
-            <i class="bi bi-geo-alt-slash text-muted fs-1"></i>
-            <h6 class="fw-bold mt-3 mb-0" style="color:var(--text-muted);">Aucun support associé à cette campagne</h6>
-            <p class="text-muted small mt-2">Ajoutez des supports à votre campagne pour les voir apparaître ici et sur la carte.</p>
-            <a href="{% url 'supports_add_bulk' campagne.pk %}?type_support={{ campagne.type_support }}" class="btn btn-primary btn-sm rounded-pill px-4 mt-3 shadow-sm">
-              <i class="bi bi-plus-lg me-1"></i>Ajouter des supports
-            </a>
+      {% if not campagne.est_mere %}
+        {% if not request.user.is_client%}
+          <div class="col-12">
+            <div class="card border-0 shadow-sm rounded-4 p-4 text-center bg-white">
+              <i class="bi bi-geo-alt-slash text-muted fs-1"></i>
+              <h6 class="fw-bold mt-3 mb-0" style="color:var(--text-muted);">Aucun support associé à cette campagne</h6>
+              <p class="text-muted small mt-2">Ajoutez des supports à votre campagne pour les voir apparaître ici et sur la carte.</p>
+              <a href="{% url 'supports_add_bulk' campagne.pk %}?type_support={{ campagne.type_support }}" class="btn btn-primary btn-sm rounded-pill px-4 mt-3 shadow-sm">
+                <i class="bi bi-plus-lg me-1"></i>Ajouter des supports
+              </a>
+            </div>
           </div>
-        </div>
-      {% else %}
-        <div class="col-12">
-          <div class="card border-0 shadow-sm rounded-4 p-4 text-center bg-white">
-            <i class="bi bi-geo-alt-slash text-muted fs-1"></i>
-            <h6 class="fw-bold mt-3 mb-0" style="color:var(--text-muted);">Aucun support associé à cette campagne</h6>
-            <p class="text-muted small mt-2">Votre campagne n'est associée àucun support pour le moment. Veuillez contacter votre régie pour plus d'informations.</p>
+        {% else %}
+          <div class="col-12">
+            <div class="card border-0 shadow-sm rounded-4 p-4 text-center bg-white">
+              <i class="bi bi-geo-alt-slash text-muted fs-1"></i>
+              <h6 class="fw-bold mt-3 mb-0" style="color:var(--text-muted);">Aucun support associé à cette campagne</h6>
+              <p class="text-muted small mt-2">Votre campagne n'est associée àucun support pour le moment. Veuillez contacter votre régie pour plus d'informations.</p>
+            </div>
           </div>
-        </div>
+        {% endif %}
       {% endif %}
     {% endif %}
   </div>
 
-  {% if lignes %}
+  
   <div class="card border-0 shadow-sm rounded-4 p-4 text-center bg-white">
     <h6 class="fw-bold mb-3"><i class="bi bi-file-earmark-arrow-down me-2"></i>Générer les documents de campagne</h6>
     <div class="d-flex gap-3 justify-content-center flex-wrap">
@@ -390,7 +476,6 @@
       </a>
     </div>
   </div>
-  {% endif %}
 
 </div>
 

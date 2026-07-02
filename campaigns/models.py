@@ -1,10 +1,13 @@
 import datetime
 import uuid
+from decimal import Decimal
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
+
+from inventory.models import get_dynamic_format_choices
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Fonctions utilitaires
@@ -70,10 +73,7 @@ TYPE_CONTRAT_CHOICES = [
     ('ponctuel', 'Ponctuel'),
 ]
 
-TYPE_SUPPORT_CHOICES = [
-    ('panneau', 'Panneau'),
-    ('ecran', 'Écran'),
-]
+TYPE_SUPPORT_CHOICES = [('ecran', 'Écran')] + get_dynamic_format_choices()
 
 STATUT_EN_ATTENTE = 'en_attente'
 STATUT_CONFIRMEE  = 'confirmee'
@@ -95,8 +95,8 @@ class Client(models.Model):
     """Client de la régie publicitaire."""
     nom           = models.CharField(max_length=200, verbose_name="Raison sociale / Nom")
     contact_nom   = models.CharField(max_length=150, blank=True, verbose_name="Nom du Contact principal")
-    telephone     = models.CharField(max_length=30, blank=True)
-    email         = models.EmailField(blank=True)
+    telephone     = models.CharField(max_length=30)
+    email         = models.EmailField()
     adresse       = models.TextField(blank=True)
     logo          = models.ImageField(upload_to='logos/', blank=True, null=True)
     notes         = models.TextField(blank=True)
@@ -686,11 +686,20 @@ class Campagne(models.Model):
     
     client       = models.ForeignKey(Client, on_delete=models.PROTECT, related_name='campagnes')
     nom          = models.CharField(max_length=200, verbose_name="Nom de la campagne")
+    prix         = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="Prix")
     reference    = models.CharField(max_length=50, unique=True, blank=True)
     date_debut   = models.DateField(verbose_name="Date de début")
     date_fin     = models.DateField(verbose_name="Date de fin")
     statut       = models.CharField(max_length=20, choices=STATUT_CHOICES, default=STATUT_EN_COURS)
-    type_support = models.CharField(max_length=10, choices=TYPE_SUPPORT_CHOICES, default='panneau', verbose_name="Type de support")
+    type_support = models.CharField(
+        max_length=20,
+        choices=TYPE_SUPPORT_CHOICES,
+        blank=True,
+        default='',
+        verbose_name="Type de support",
+        help_text="Écran ou format de panneau (ex: 4x3, 1x2, gm-5x4)."
+    )
+    est_mere = models.BooleanField(default=False, verbose_name="Campagne mère")
     actif        = models.BooleanField(default=True)
     
     duree_passage = models.PositiveIntegerField(choices=DUREE_CHOICES, null=True, blank=True, verbose_name="Durée de passage (secondes)")
@@ -703,6 +712,18 @@ class Campagne(models.Model):
     updated_at   = models.DateTimeField(auto_now=True)
     contrat      = models.ForeignKey(Contrat, on_delete=models.SET_NULL, null=True, blank=True, related_name='campagnes')
 
+    campagne_parente = models.ForeignKey(
+        'self',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='sous_campagnes',
+        verbose_name="Campagne mère",
+        help_text=(
+            "Si renseigné, cette campagne est une sous-campagne rattachée à une campagne mère. "
+            "Laissez vide pour une campagne autonome."
+        ),
+    )
     class Meta:
         verbose_name = "Campagne"
         verbose_name_plural = "Campagnes"
@@ -726,6 +747,41 @@ class Campagne(models.Model):
         }
         return badges.get(self.statut, 'secondary')
 
+    def nombre_supports(self):
+        if not self.pk:
+            return 0
+        return self.lignes.filter(support__isnull=False).values('support').distinct().count()
+
+    def nombre_faces(self):
+        if not self.pk:
+            return 0
+        return self.lignes.filter(face__isnull=False).values('face').distinct().count()
+
+    def montant_total(self):
+        """Montant total de la campagne.
+
+        Pour une campagne mère, on somme les montants des sous-campagnes.
+        Pour une campagne simple, on multiplie le prix par le nombre de spots pour les écrans,
+        ou par le nombre de faces pour les formats de panneau.
+        """
+        prix = self.prix or Decimal('0.00')
+
+        if self.est_mere:
+            total = Decimal('0.00')
+            for enfant in self.sous_campagnes.all():
+                total += enfant.montant_total() or Decimal('0.00')
+            return total
+
+        if self.type_support == 'ecran':
+            spots = self.calculer_nombre_spots()
+            return (prix * Decimal(str(spots))).quantize(Decimal('0.01'))
+
+        faces = self.nombre_faces()
+        return (prix * Decimal(faces)).quantize(Decimal('0.01'))
+
+    def montant_total_display(self):
+        return f"{self.montant_total():,.2f}"
+
     def nb_supports(self):
         return self.lignes.count()
     
@@ -734,7 +790,7 @@ class Campagne(models.Model):
         if total_jours == 0:
             return 0
 
-        if self.type_support == 'panneau':
+        if self.type_support and self.type_support != 'ecran':
             total = 0
             for ligne in self.lignes.select_related('face__support').all():
                 if not ligne.face:
@@ -777,7 +833,8 @@ class Campagne(models.Model):
         return calculer_duree_tranches(self.tranches_horaires)
     
     def calculer_nombre_spots(self):
-        if self.type_support == 'panneau':
+        
+        if self.type_support and self.type_support != 'ecran':
             total_jours = self.duree_jours()
             if total_jours == 0:
                 return 0
@@ -818,6 +875,42 @@ class Campagne(models.Model):
 
     def clean(self):
         super().clean()
+
+        # Hiérarchie campagnes mère / sous-campagne
+        if self.est_mere and self.campagne_parente_id:
+            raise ValidationError({'campagne_parente': "Une campagne mère ne peut pas être rattachée à une autre campagne mère."})
+
+        if self.est_mere and self.pk and self.lignes.exists():
+            raise ValidationError("Une campagne mère ne peut pas avoir de lignes de campagne directes.")
+
+        if self.est_mere and self.type_support:
+            raise ValidationError({'type_support': "Une campagne mère ne doit pas définir de type de support ou de format."})
+
+        if self.pk and self.campagne_parente_id and self.sous_campagnes.exists():
+            raise ValidationError("Une sous-campagne ne peut pas avoir des sous-campagnes.")
+
+        if self.campagne_parente_id:
+            mere = self.campagne_parente
+            if mere and not mere.est_mere:
+                raise ValidationError({'campagne_parente': "La campagne sélectionnée doit être une campagne mère."})
+            if mere and mere.campagne_parente_id:
+                raise ValidationError({'campagne_parente': "La campagne mère ne peut pas hériter d'une autre campagne mère."})
+            if self.type_support == '':
+                raise ValidationError({'type_support': "Le type de support ou format est obligatoire pour une sous-campagne."})
+
+        if not self.est_mere and not self.campagne_parente_id and self.type_support == '':
+            raise ValidationError({'type_support': "Le type de support ou format est obligatoire pour une campagne autonome."})
+
+        if self.type_support == 'ecran' and self.campagne_parente_id and self.campagne_parente and self.campagne_parente.type_support != 'ecran':
+            raise ValidationError({'type_support': "La sous-campagne écran doit être rattachée à une campagne mère écran ou indiquer un type écran valide."})
+
+        if self.campagne_parente_id and self.date_debut and self.date_fin:
+            mere = self.campagne_parente
+            if mere and mere.date_debut and self.date_debut < mere.date_debut:
+                raise ValidationError({'date_debut': "La sous-campagne ne peut pas commencer avant la campagne mère."})
+            if mere and mere.date_fin and self.date_fin > mere.date_fin:
+                raise ValidationError({'date_fin': "La sous-campagne ne peut pas se terminer après la campagne mère."})
+
         if self.type_support == 'ecran':
             if not self.duree_passage:
                 raise ValidationError({'duree_passage': 'Ce champ est obligatoire pour les campagnes écran.'})
@@ -860,3 +953,32 @@ class LigneCampagne(models.Model):
 
     def __str__(self):
         return f"{self.campagne.nom} -> {self.support.code}"
+    
+    def get_duree_passage_effective(self):
+        return self.duree_passage or self.campagne.duree_passage
+
+    def get_frequence_effective(self):
+        return self.frequence or self.campagne.frequence
+
+    def get_tranches_effective(self):
+        return self.tranches_horaires or self.campagne.tranches_horaires
+
+    def calculer_spots(self):
+        """Calcule le nombre de spots pour cette ligne écran."""
+        frequence      = self.get_frequence_effective()
+        duree_passage  = self.get_duree_passage_effective()
+        tranches       = self.get_tranches_effective()
+
+        if not frequence or not duree_passage:
+            return 0
+
+        # Période effective de la ligne (surcharge possible par rapport à la campagne)
+        date_debut = self.date_debut or self.campagne.date_debut
+        date_fin   = self.date_fin   or self.campagne.date_fin
+
+        spots_par_heure = 3600 / frequence
+        heures_tranches = calculer_duree_tranches(tranches)
+        spots_par_jour  = spots_par_heure * heures_tranches
+
+        jours_dispo = self.support.jours_disponibles_sur_periode(date_debut, date_fin)
+        return round(spots_par_jour * jours_dispo)

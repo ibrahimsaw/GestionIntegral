@@ -1,0 +1,96 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ title }} — Integral{% endblock %}
+
+{% block topbar_title %}
+    <i class="bi bi-pencil-square me-2" style="color:var(--color-primary)"></i>{{ title }}
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    .form-section { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:20px; overflow:hidden; }
+    .form-section-hd { padding:13px 18px; border-bottom:1px solid var(--border); font-size:.84rem; font-weight:700; display:flex; align-items:center; gap:8px; }
+    .form-section-bd { padding:18px; }
+    .errorlist { color: #ef4444; font-size: 0.75rem; list-style: none; padding: 0; margin-top: 4px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-xl-8 col-lg-10">
+        <div class="d-flex align-items-center gap-3 mb-4">
+            <a href="{% url 'format_list' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i></a>
+            <h1 style="font-size:1.4rem;font-weight:800;margin:0">{{ title }}</h1>
+        </div>
+
+        <form method="post" id="mainFormatForm">
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+            {% endif %}
+
+            <div class="form-section">
+                <div class="form-section-hd">
+                    <i class="bi bi-info-circle" style="color:var(--color-primary)"></i>Caractéristiques du Format
+                </div>
+                <div class="form-section-bd">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Code Format * (ex: 4x3, gm-5x4)</label>
+                            {{ form.code }}
+                            {{ form.code.errors }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Catégorie * (Standard, Géant, Sucette, Marché)</label>
+                            {{ form.categorie }}
+                            {{ form.categorie.errors }}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Description / Libellé Complet *</label>
+                            {{ form.libelle }}
+                            {{ form.libelle.errors }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Dimensions (ex: 4m × 3m)</label>
+                            {{ form.dimensions }}
+                            {{ form.dimensions.errors }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Superficie (en m²)</label>
+                            {{ form.superficie }}
+                            {{ form.superficie.errors }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex gap-3 justify-content-end mt-4">
+                <a href="{% url 'format_list' %}" class="btn btn-outline-secondary">Annuler</a>
+                <button type="submit" class="btn btn-primary px-5 shadow-sm">
+                    <i class="bi bi-cloud-arrow-up me-2"></i>
+                    {% if object %}Mettre à jour{% else %}Enregistrer le format{% endif %}
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Ajout automatique des classes bootstrap sur les inputs du formulaire généré par Django
+        const inputs = document.querySelectorAll('input, select');
+        inputs.forEach(input => {
+            if(input.type !== 'submit' && input.type !== 'hidden') {
+                input.classList.add('form-control');
+                if (input.tagName === 'SELECT') {
+                    input.classList.remove('form-control');
+                    input.classList.add('form-select');
+                }
+            }
+        });
+    });
+</script>
+{% endblock %}

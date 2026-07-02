@@ -2,9 +2,11 @@ import json
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.http import JsonResponse
-from django.db.models import Q, Count
+from django.db.models import Q, Count, Sum, DecimalField, Value
 from django.db.models.deletion import ProtectedError
+from django.db.models.functions import Coalesce
 from django.utils import timezone
+from django.utils.text import slugify
 from django.urls import reverse
 from django.views import View
 from django.views.generic import TemplateView, DetailView, ListView, CreateView, UpdateView, DeleteView
@@ -18,9 +20,10 @@ from accounts.models import AuditLog
 from accounts.decorators import *
 from accounts.audit import log_action
 from .models import *
-from inventory.models import Support, FacePanneau, EcranNumerique
+from inventory.models import Support, FacePanneau, EcranNumerique, FormatSupport
 from .forms import ClientForm, ContratForm, CampagneForm, LigneCampagneForm
 # from .mixins import *
+from datetime import datetime, date  # ← Ajouter 'date' ici
 
 
 class GetClientContratsView(StaffRequiredMixin, View):
@@ -44,6 +47,24 @@ class GetClientContratsView(StaffRequiredMixin, View):
         ]
         return JsonResponse(data, safe=False)
 
+class GetClientCampagnesMeresView(StaffRequiredMixin, View):
+    def get(self, request, client_id):
+        qs = Campagne.objects.filter(client_id=client_id, est_mere=True)
+        exclude_id = request.GET.get('exclude')
+        if exclude_id:
+            qs = qs.exclude(pk=exclude_id)
+
+        data = [
+            {
+                'id': c.pk,
+                'nom': c.nom,
+                'reference': c.reference or '',
+                'display': f"{c.nom} ({c.reference})" if c.reference else c.nom,
+            }
+            for c in qs.order_by('nom')
+        ]
+        return JsonResponse(data, safe=False)
+
 class DashboardView(LoginRequiredMixin, TemplateView):
     template_name = 'campaigns/dashboard.html'
 
@@ -57,18 +78,56 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         for campagne in Campagne.objects.filter(statut__in=['a_venir', 'en_cours']):
             campagne.auto_update_statut()
 
-        def codes_par_type(type_label, etat=None):
-            """Retourne les codes de format définis pour un type donné"""
-            codes = [
-                code for code, label in Support.FORMAT_CHOICES
-                if ' — ' in label and label.split(' — ')[1] == type_label
-            ]
-            return codes
+        def get_format_category_codes():
+            """Retourne les codes de formats groupés par catégorie depuis la table FormatSupport."""
+            categories = {}
+            for row in FormatSupport.objects.exclude(categorie='').values('categorie', 'code').order_by('categorie', 'code'):
+                categories.setdefault(row['categorie'], []).append(row['code'])
+            return categories
 
-        codes_standard = codes_par_type('Standard', etat=Support.ETAT_BON)
-        codes_geants   = codes_par_type('Géant',    etat=Support.ETAT_BON)
-        codes_sucettes = codes_par_type('Sucette',  etat=Support.ETAT_BON)
-        codes_gm       = codes_par_type('Marché', etat=Support.ETAT_BON)
+        CATEGORY_COLORS = {
+            'Standard': 'var(--color-primary)',
+            'Géant': '#f59e0b',
+            'Sucette': '#a78bfa',
+            'Marché': '#f97316',
+        }
+        DEFAULT_CATEGORY_COLOR = '#64748b'
+
+        def build_format_category_stats(format_categories, supports, faces_occupees_ids, faces_reservees_ids):
+            stats = []
+            for categorie, codes in format_categories.items():
+                faces_qs = FacePanneau.objects.filter(support__format__in=codes)
+                if ville_active:
+                    faces_qs = faces_qs.filter(support__ville__iexact=ville_active)
+
+                total_faces = faces_qs.count()
+                if total_faces == 0:
+                    continue
+
+                faces_bon = faces_qs.filter(etat=Support.ETAT_BON)
+                nb_bon = faces_bon.count()
+                nb_occupe = faces_bon.filter(pk__in=faces_occupees_ids).count()
+                nb_reserve = faces_bon.filter(pk__in=faces_reservees_ids).exclude(pk__in=faces_occupees_ids).count()
+                nb_libre = nb_bon - nb_occupe - nb_reserve
+                nb_panne = faces_qs.filter(etat=Support.ETAT_PANNE).count()
+                nb_supports = supports.filter(type_support=Support.TYPE_PANNEAU, format__in=codes, etat=Support.ETAT_BON).count()
+
+                stats.append({
+                    'categorie': categorie,
+                    'label': categorie,
+                    'slug': slugify(categorie),
+                    'nb_supports': nb_supports,
+                    'nb_faces': total_faces,
+                    'nb_occupe': nb_occupe,
+                    'nb_reserve': nb_reserve,
+                    'nb_libre': nb_libre,
+                    'nb_panne': nb_panne,
+                    'panne_pct': round(nb_panne / total_faces * 100) if total_faces else 0,
+                    'color': CATEGORY_COLORS.get(categorie, DEFAULT_CATEGORY_COLOR),
+                })
+            return stats
+
+        format_categories = get_format_category_codes()
 
         # ── Queryset de base filtré par ville ─────────────────────
         supports = Support.objects.prefetch_related('faces').select_related('ecran_info').all()
@@ -87,6 +146,44 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             campagnes_actives_qs = campagnes_actives_qs.filter(lignes__support__ville__iexact=ville_active).distinct()
             campagnes_a_venir_qs = campagnes_a_venir_qs.filter(lignes__support__ville__iexact=ville_active).distinct()
             
+        revenu_actif = sum(c.montant_total() for c in campagnes_actives_qs)
+        revenu_a_venir = sum(c.montant_total() for c in campagnes_a_venir_qs)
+        campagnes_meres_qs = Campagne.objects.filter(est_mere=True, statut__in=['en_cours', 'a_venir'])
+        campagnes_meres_count = campagnes_meres_qs.count()
+        revenu_meres = sum(c.montant_total() for c in campagnes_meres_qs)
+
+        top_campaignes_prix = sorted(
+            campagnes_qs,
+            key=lambda c: c.montant_total(),
+            reverse=True
+        )[:6]
+        top_campaigns_json = json.dumps([
+            {
+                'label': c.nom[:30],
+                'client': c.client.nom,
+                'revenu': float(c.montant_total()),
+                'type': c.type_support or 'Mère',
+                'pk': c.pk,
+            }
+            for c in top_campaignes_prix
+        ])
+
+        top_faces = FacePanneau.objects.annotate(
+            usage_count=Count('lignes_campagne', filter=Q(lignes_campagne__campagne__statut__in=['en_cours','a_venir'])),
+            revenue=Coalesce(
+                Sum('lignes_campagne__campagne__prix', filter=Q(lignes_campagne__campagne__statut__in=['en_cours','a_venir'])),
+                Value(0, output_field=DecimalField(max_digits=12, decimal_places=2)),
+                output_field=DecimalField(max_digits=12, decimal_places=2)
+            ),
+        ).filter(usage_count__gt=0).order_by('-revenue', '-usage_count')[:6]
+        top_faces_json = json.dumps([
+            {
+                'label': f'{f.support.code}-{f.label}',
+                'revenue': float(f.revenue or 0),
+                'usage': f.usage_count,
+            }
+            for f in top_faces
+        ])
 
         nb_panneaux     = supports.filter(type_support=Support.TYPE_PANNEAU).count()
         nb_panneaux_bon = supports.filter(type_support=Support.TYPE_PANNEAU, etat=Support.ETAT_BON).count()
@@ -95,10 +192,6 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         nb_ecrans_panne   = supports.filter(type_support=Support.TYPE_ECRAN, etat=Support.ETAT_PANNE).count()
         nb_supports_panne = supports.filter(etat=Support.ETAT_PANNE).count()
         nb_supports_bon   = supports.filter(etat=Support.ETAT_BON).count()
-        nb_standard = supports.filter(format__in=codes_standard, etat=Support.ETAT_BON).count()
-        nb_geants   = supports.filter(format__in=codes_geants, etat=Support.ETAT_BON).count()
-        nb_sucettes = supports.filter(format__in=codes_sucettes, etat=Support.ETAT_BON).count()
-        nb_gm       = supports.filter(format__in=codes_gm, etat=Support.ETAT_BON).count()
 
         ids_occupes = set(
             LigneCampagne.objects.filter(
@@ -119,107 +212,64 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
         # ── IDs des faces réservées ───────────────────────────────
         faces_reservees_ids = set(
-            # ✅
             ReservationLigne.objects.filter(
                 reservation__date_fin__gte=today,
                 reservation__statut__in=[STATUT_EN_ATTENTE, STATUT_CONFIRMEE],
             ).values_list('face_id', flat=True)
         )
 
-        def pct(codes):
-            faces_qs = FacePanneau.objects.filter(support__format__in=codes)
-            if ville_active:
-                faces_qs = faces_qs.filter(support__ville__iexact=ville_active)
-            total = faces_qs.count()
-            if total == 0:
-                return 0, 0, 0, 0, 0, 0, 0, 0
+        format_category_stats = build_format_category_stats(format_categories, supports, faces_occupees_ids, faces_reservees_ids)
+        total_faces_occupe  = sum(cat['nb_occupe']  for cat in format_category_stats)
+        total_faces_reserve = sum(cat['nb_reserve'] for cat in format_category_stats)
+        total_faces_libre   = sum(cat['nb_libre']   for cat in format_category_stats)
+        total_faces_panne   = sum(cat['nb_panne']   for cat in format_category_stats)
+        total_faces         = sum(cat['nb_faces']   for cat in format_category_stats)
+        total_supports      = supports.count()
 
-            nb_panne   = faces_qs.filter(etat=Support.ETAT_PANNE).count()
-            faces_bon  = faces_qs.filter(etat=Support.ETAT_BON)
-            total_bon  = faces_bon.count()
+        category_index = {cat['categorie']: cat for cat in format_category_stats}
+        standard = category_index.get('Standard', {})
+        geant = category_index.get('Géant', {})
+        sucette = category_index.get('Sucette', {})
+        marche = category_index.get('Marché', {})
 
-            nb_occupe  = faces_bon.filter(pk__in=faces_occupees_ids).count()
-            nb_reserve = faces_bon.filter(
-                pk__in=faces_reservees_ids
-            ).exclude(
-                pk__in=faces_occupees_ids
-            ).count()
-            nb_libre   = total_bon - nb_occupe - nb_reserve
+        nb_standard = standard.get('nb_supports', 0)
+        nbt_std = standard.get('nb_faces', 0)
+        nbo_std = standard.get('nb_occupe', 0)
+        nbr_std = standard.get('nb_reserve', 0)
+        nbl_std = standard.get('nb_libre', 0)
+        npt_std = standard.get('nb_panne', 0)
+        o_std = round(nbo_std / nbt_std * 100) if nbt_std else 0
 
-            return (
-                round(nb_occupe  / total * 100) if total else 0,
-                round(nb_reserve / total * 100) if total else 0,
-                round(nb_libre   / total * 100) if total else 0,
-                nb_occupe,
-                nb_reserve,
-                nb_libre,
-                nb_panne,   # ← nouveau
-                total,
-            )
-    
-        o_std, r_std, d_std, nbo_std, nbr_std, nbl_std, npt_std, nbt_std = pct(codes_standard)
-        o_geo, r_geo, d_geo, nbo_geo, nbr_geo, nbl_geo, npt_geo, nbt_geo = pct(codes_geants)
-        o_suc, r_suc, d_suc, nbo_suc, nbr_suc, nbl_suc, npt_suc, nbt_suc = pct(codes_sucettes)
-        o_gm,  r_gm,  d_gm,  nbo_gm,  nbr_gm,  nbl_gm,  npt_gm,  nbt_gm  = pct(codes_gm)
-        # Totaux globaux toutes formats confondus
-        total_faces_occupe  = nbo_std + nbo_geo + nbo_suc + nbo_gm
-        total_faces_reserve = nbr_std + nbr_geo + nbr_suc + nbr_gm
-        total_faces_libre   = nbl_std + nbl_geo + nbl_suc + nbl_gm
-        total_faces_panne   = npt_std + npt_geo + npt_suc + npt_gm
-        total_faces         = nbt_std + nbt_geo + nbt_suc + nbt_gm
+        nb_geants = geant.get('nb_supports', 0)
+        nbt_geo = geant.get('nb_faces', 0)
+        nbo_geo = geant.get('nb_occupe', 0)
+        nbr_geo = geant.get('nb_reserve', 0)
+        nbl_geo = geant.get('nb_libre', 0)
+        npt_geo = geant.get('nb_panne', 0)
+        o_geo = round(nbo_geo / nbt_geo * 100) if nbt_geo else 0
 
-        format_stats_json = json.dumps([
-            {
-                'label'     : f'Standard ({nbt_std} faces)',
-                'occupe'    : o_std,
-                'reserve'   : r_std,
-                'disponible': d_std,
-                'panne'     : round(npt_std / nbt_std * 100) if nbt_std else 0,  # ← %
-                'nb_occupe' : nbo_std,
-                'nb_reserve': nbr_std,
-                'nb_libre'  : nbl_std,
-                'nb_panne'  : npt_std,
-            },
-            {
-                'label'     : f'Géants ({nbt_geo} faces)',
-                'occupe'    : o_geo,
-                'reserve'   : r_geo,
-                'disponible': d_geo,
-                'panne'     : round(npt_geo / nbt_geo * 100) if nbt_geo else 0,
-                'nb_occupe' : nbo_geo,
-                'nb_reserve': nbr_geo,
-                'nb_libre'  : nbl_geo,
-                'nb_panne'  : npt_geo,
-            },
-            {
-                'label'     : f'Sucettes ({nbt_suc} faces)',
-                'occupe'    : o_suc,
-                'reserve'   : r_suc,
-                'disponible': d_suc,
-                'panne'     : round(npt_suc / nbt_suc * 100) if nbt_suc else 0,
-                'nb_occupe' : nbo_suc,
-                'nb_reserve': nbr_suc,
-                'nb_libre'  : nbl_suc,
-                'nb_panne'  : npt_suc,
-            },
-            {
-                'label'     : f'Marché ({nbt_gm} faces)',
-                'occupe'    : o_gm,
-                'reserve'   : r_gm,
-                'disponible': d_gm,
-                'panne'     : round(npt_gm / nbt_gm * 100) if nbt_gm else 0,
-                'nb_occupe' : nbo_gm,
-                'nb_reserve': nbr_gm,
-                'nb_libre'  : nbl_gm,
-                'nb_panne'  : npt_gm,
-            },
-        ])
+        nb_sucettes = sucette.get('nb_supports', 0)
+        nbt_suc = sucette.get('nb_faces', 0)
+        nbo_suc = sucette.get('nb_occupe', 0)
+        nbr_suc = sucette.get('nb_reserve', 0)
+        nbl_suc = sucette.get('nb_libre', 0)
+        npt_suc = sucette.get('nb_panne', 0)
+        o_suc = round(nbo_suc / nbt_suc * 100) if nbt_suc else 0
+
+        nb_gm = marche.get('nb_supports', 0)
+        nbt_gm = marche.get('nb_faces', 0)
+        nbo_gm = marche.get('nb_occupe', 0)
+        nbr_gm = marche.get('nb_reserve', 0)
+        nbl_gm = marche.get('nb_libre', 0)
+        npt_gm = marche.get('nb_panne', 0)
+        o_gm = round(nbo_gm / nbt_gm * 100) if nbt_gm else 0
+
+        format_stats_json = json.dumps(format_category_stats)
         types_stats_json = json.dumps([
             {'label': 'Panneaux',          'count': nb_panneaux_bon},
             {'label': 'Écrans',            'count': nb_ecrans_bon},
             {'label': 'Supports en Panne', 'count': nb_supports_panne},
         ])
-
 
         # ── Liste des villes disponibles (pour le filtre) ─────────
         villes = sorted({
@@ -249,19 +299,20 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             'nb_ecrans_bon'  : nb_ecrans_bon,
             'nb_ecrans_panne': nb_ecrans_panne,
             'nb_ecrans'      : nb_ecrans,
-            'nb_standard'    : nb_standard,
-            'face_standard'  : nbt_std,
-            'nb_geants'      : nb_geants,
-            'face_geants'    : nbt_geo,
-            'nb_sucettes'    : nb_sucettes,
-            'face_sucettes'  : nbt_suc,
-            'nb_gm'          : nb_gm,
-            'face_gm'        : nbt_gm,
+            'format_categories': format_category_stats,
             'total_faces'  : total_faces,
             'total_faces_occupe'  : total_faces_occupe,
             'total_faces_reserve' : total_faces_reserve,
             'total_faces_libre'   : total_faces_libre,
             'total_faces_panne'   : total_faces_panne,
+            
+            # Détail revenu / campagnes
+            'revenu_actif'          : revenu_actif,
+            'revenu_a_venir'        : revenu_a_venir,
+            'revenu_meres'          : revenu_meres,
+            'campagnes_meres_count' : campagnes_meres_count,
+            'top_campaigns_json'    : top_campaigns_json,
+            'top_faces_json'        : top_faces_json,
             
             # Détail par type
             'nbl_std': nbl_std, 'nbo_std': nbo_std, 'nbr_std': nbr_std, 'npt_std': npt_std, 'nbt_std': nbt_std, 'o_std': o_std,
@@ -338,7 +389,7 @@ class ClientListView(StaffRequiredMixin, ListView):
                 'total': client.cp_total,
             }
             client.spots_stats = {
-                'panneau': sum(c.calculer_nombre_spots() for c in campagnes_actives if c.type_support == 'panneau'),
+                'panneau': sum(c.calculer_nombre_spots() for c in campagnes_actives if c.type_support and c.type_support != 'ecran'),
                 'ecran': sum(c.calculer_nombre_spots() for c in campagnes_actives if c.type_support == 'ecran'),
                 'total': sum(c.calculer_nombre_spots() for c in campagnes_actives),
             }
@@ -390,12 +441,12 @@ class ClientDetailView(ClientStaffRequiredMixin, DetailView):
 
         campagnes_actives = [c for c in campagnes if c.statut == 'en_cours' and (self.request.user.is_admin or c.actif)]
         client.campagnes_stats = {
-            'panneau': len([c for c in campagnes_actives if c.type_support == 'panneau']),
+            'panneau': len([c for c in campagnes_actives if c.type_support and c.type_support != 'ecran']),
             'ecran': len([c for c in campagnes_actives if c.type_support == 'ecran']),
             'total': len(campagnes_actives),
         }
         client.spots_stats = {
-            'panneau': sum(c.calculer_nombre_spots() for c in campagnes_actives if c.type_support == 'panneau'),
+            'panneau': sum(c.calculer_nombre_spots() for c in campagnes_actives if c.type_support and c.type_support != 'ecran'),
             'ecran': sum(c.calculer_nombre_spots() for c in campagnes_actives if c.type_support == 'ecran'),
             'total': sum(c.calculer_nombre_spots() for c in campagnes_actives),
         }
@@ -635,7 +686,7 @@ class CampagneListView(ClientStaffRequiredMixin, ListView):
         statut       = self.request.GET.get('statut', '')
         type_support = self.request.GET.get('type_support', '')
         actif        = self.request.GET.get('actif', '')
-        if type_support in ['panneau', 'ecran']:
+        if type_support:
             qs = qs.filter(type_support=type_support)
         if q:
             qs = qs.filter(Q(nom__icontains=q) | Q(client__nom__icontains=q) | Q(reference__icontains=q))
@@ -783,6 +834,16 @@ class CampagneDetailView(ClientStaffRequiredMixin, DetailView):
                 ligne.spots_calcules = 0
 
         context['lignes'] = lignes
+        context['sous_campagnes'] = campagne.sous_campagnes.all()
+
+        if campagne.est_mere:
+            enfants = campagne.sous_campagnes.all()
+            context['total_supports'] = sum(child.lignes.count() for child in enfants)
+            context['total_spots'] = sum(child.calculer_nombre_spots() for child in enfants)
+        else:
+            context['total_supports'] = lignes.count()
+            context['total_spots'] = campagne.calculer_nombre_spots()
+
         return context
 
 
@@ -803,6 +864,14 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
         # Utilisation de .get() pour éviter les erreurs si la clé n'existe pas
         if client_id := self.request.GET.get('client'):
             initial['client'] = client_id
+        if campagne_parente_id := self.request.GET.get('campagne_parente'):
+            initial['campagne_parente'] = campagne_parente_id
+            if not initial.get('client'):
+                try:
+                    mere = Campagne.objects.select_related('client').get(pk=campagne_parente_id)
+                    initial['client'] = mere.client_id
+                except Campagne.DoesNotExist:
+                    pass
         return initial
 
     @transaction.atomic
@@ -918,16 +987,39 @@ class SupportBulkActionView(StaffRequiredMixin, View):
 
     def get(self, request, campagne_pk):
         campagne = self.get_campagne(campagne_pk)
-        type_support = campagne.type_support
+        type_support = request.GET.get('type_support', campagne.type_support or '').strip()
 
         is_modification = campagne.lignes.exists()
         mode_title = "Modifier la sélection" if is_modification else "Ajouter des supports"
         supports_enrichis = []
 
-        if type_support == 'panneau':
-            # ⚠️ CRUCIAL : .order_by('ville', 'quartier') ajouté pour le bon fonctionnement du regroupement template
+        if type_support == 'ecran':
+            # Écrans : on filtre sur le type d'écran uniquement.
             supports_qs = Support.objects.filter(
-                type_support='panneau', 
+                type_support='ecran', 
+                etat='bon'
+            ).order_by('ville', 'quartier')
+
+            selectionnes = list(campagne.lignes.values_list('support_id', flat=True))
+
+            # ✅ Récupérer les paramètres existants par écran pour pré-remplir le formulaire
+            lignes_par_support = {
+                str(ligne.support_id): ligne
+                for ligne in campagne.lignes.filter(face__isnull=True)
+            }
+
+            for support in supports_qs:
+                ligne_existante = lignes_par_support.get(str(support.pk))
+                supports_enrichis.append({
+                    'support': support,
+                    'ligne': ligne_existante,
+                })
+
+        else:
+            # Panneaux : on ne garde que les panneaux du format ciblé par la campagne.
+            supports_qs = Support.objects.filter(
+                type_support='panneau',
+                format=type_support,
                 etat='bon'
             ).prefetch_related('faces').order_by('ville', 'quartier')
             
@@ -943,29 +1035,6 @@ class SupportBulkActionView(StaffRequiredMixin, View):
                 supports_enrichis.append({
                     'support': support,
                     'faces': faces_enrichies,
-                })
-
-        else:
-            # ⚠️ CRUCIAL : .order_by('ville', 'quartier') également ajouté pour les écrans
-            supports_qs = Support.objects.filter(
-                type_support='ecran', 
-                etat='bon'
-            ).order_by('ville', 'quartier')
-            
-            selectionnes = list(campagne.lignes.values_list('support_id', flat=True))
-
-            # ✅ Récupérer les paramètres existants par écran pour pré-remplir le formulaire
-            lignes_par_support = {
-                str(ligne.support_id): ligne
-                for ligne in campagne.lignes.filter(face__isnull=True)
-            }
-
-            supports_enrichis = []
-            for support in supports_qs:
-                ligne_existante = lignes_par_support.get(str(support.pk))
-                supports_enrichis.append({
-                    'support': support,
-                    'ligne': ligne_existante,  # None si pas encore sélectionné
                 })
 
         return render(request, self.template_name, {
@@ -984,7 +1053,7 @@ class SupportBulkActionView(StaffRequiredMixin, View):
         campagne = self.get_campagne(campagne_pk)
         type_support = campagne.type_support
 
-        if type_support == 'panneau':
+        if type_support != 'ecran':
             face_ids = request.POST.getlist('faces')
 
             # Synchronisation : retirer les faces décochées

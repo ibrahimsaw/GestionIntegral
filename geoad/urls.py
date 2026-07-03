@@ -11,5 +11,6 @@ urlpatterns = [
     path('gestion/planning/', include('planning.urls')),
     path('gestion/reports/', include('reports.urls')),
     path('', include('portail.urls')),
-    path('gestion', include('inventory.urls_map')),   # carte = page principale
+    path('gestion/', include('inventory.urls_map')),   # carte = page principale
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
+    

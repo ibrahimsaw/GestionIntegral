@@ -46,14 +46,14 @@ class FormatSupportListView(LoginRequiredMixin, ListView):
 # 2. AJOUTER UN FORMAT
 class FormatSupportCreateView(LoginRequiredMixin, CreateView):
     model = FormatSupport
-    fields = ['code', 'libelle', 'dimensions', 'superficie', 'categorie']
+    fields = ['code', 'dimensions', 'superficie', 'categorie']
     template_name = 'inventory/format_form.html'
     success_url = reverse_lazy('format_list') # Redirection après succès
 
 # 3. MODIFIER UN FORMAT (Bonus utile)
 class FormatSupportUpdateView(LoginRequiredMixin, UpdateView):
     model = FormatSupport
-    fields = ['code', 'libelle', 'dimensions', 'superficie', 'categorie']
+    fields = ['code', 'dimensions', 'superficie', 'categorie']
     template_name = 'inventory/format_form.html' # Réutilise le même formulaire qu'à l'ajout
     success_url = reverse_lazy('format_list')
 
@@ -81,10 +81,10 @@ class ApiGeojsonView(View):
         if etat_filtre:
             qs = qs.filter(etat=etat_filtre)
         if type_panneau_filtre:
-            codes_valides = [
-                code for code, label in Support.FORMAT_CHOICES 
-                if ' — ' in label and label.split(' — ')[1] == type_panneau_filtre
-            ]
+            codes_valides = list(
+                FormatSupport.objects.filter(categorie=type_panneau_filtre)
+                .values_list('code', flat=True)
+            )
             qs = qs.filter(format__in=codes_valides)
         features = []
         for s in qs:
@@ -417,10 +417,10 @@ class SupportListView(TechnicienStaffRequiredMixin, ListView):
 
         # 2. Filtres SQL (Rapides)
         if type_panneau_f:
-            codes_valides = [
-                code for code, label in Support.FORMAT_CHOICES 
-                if ' — ' in label and label.split(' — ')[1] == type_panneau_f
-            ]
+            codes_valides = list(
+                FormatSupport.objects.filter(categorie=type_panneau_f)
+                .values_list('code', flat=True)
+            )
             queryset = queryset.filter(format__in=codes_valides)
 
         if q:
@@ -465,9 +465,11 @@ class SupportListView(TechnicienStaffRequiredMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         # Préparation des choix pour le template
-        type_panneau_choices = sorted(list(set(
-            label.split(' — ')[1] for code, label in Support.FORMAT_CHOICES if ' — ' in label
-        )))
+        type_panneau_choices = sorted(
+            FormatSupport.objects.exclude(categorie='')
+            .values_list('dimensions', flat=True)
+            .distinct()
+        )
 
         # On renvoie les variables pour que le formulaire de filtre reste rempli
         villes = sorted({v.strip() for v in Support.objects.values_list('ville', flat=True) if v and v.strip()})

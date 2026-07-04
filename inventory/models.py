@@ -70,7 +70,6 @@ ETAT_CHOICES = [
 
 class FormatSupport(models.Model):
     code = models.CharField(max_length=20, unique=True, verbose_name="Code Format (ex: 4x3, gm-5x4)")
-    libelle = models.CharField(max_length=150, verbose_name="Description complète")
     dimensions = models.CharField(max_length=50, blank=True, verbose_name="Dimensions (ex: 4m × 3m)")
     superficie = models.FloatField(null=True, blank=True, verbose_name="Superficie en m²")
     categorie = models.CharField(max_length=50, blank=True, verbose_name="Catégorie (Standard, Géant, Sucette, Marché)")
@@ -81,24 +80,25 @@ class FormatSupport(models.Model):
         ordering = ['categorie', 'code']
 
     def __str__(self):
-        return self.libelle
+        parts = [self.dimensions]
+        if self.superficie:
+            parts.append(f"({self.superficie}m²)")
+        if self.categorie:
+            parts.append(f"— {self.categorie}")
+        return " ".join(p for p in parts if p)
 
 def get_dynamic_format_choices():
-    """Récupère dynamiquement les formats de la BDD pour les formulaires Django."""
-    try:
-        return [(f.code, f.libelle) for f in FormatSupport.objects.all()]
-    except Exception:
-        # Sécurité pour éviter que makemigrations ou le démarrage plante si la BDD n'est pas encore prête
-        return []
-
-FORMAT_CHOICES = get_dynamic_format_choices()
+    return [
+        (f.code, f"{f.dimensions} ({f.superficie}m²)" if f.superficie else f.dimensions)
+        for f in FormatSupport.objects.all()
+    ]
 
 
 
 
 class Support(models.Model):
     """Support publicitaire géolocalisé (Panneau ou Écran)."""
-    FORMAT_CHOICES = FORMAT_CHOICES
+    # FORMAT_CHOICES = staticmethod(get_dynamic_format_choices)
     TYPE_PANNEAU = TYPE_PANNEAU
     TYPE_ECRAN = TYPE_ECRAN
     TYPE_CHOICES = TYPE_CHOICES
@@ -129,7 +129,7 @@ class Support(models.Model):
     # ── Format (panneaux uniquement) ──────────────────────────────────────
     format = models.CharField(
         max_length=20,
-        choices=FORMAT_CHOICES,
+        choices=get_dynamic_format_choices,
         blank=True, default='',
         verbose_name="Format & Type",
         help_text="Renseigner uniquement pour les panneaux. Commun aux deux faces.",
@@ -158,6 +158,8 @@ class Support(models.Model):
         null=True, blank=True, related_name='supports_created'
     )
 
+    def get_dynamic_format_choices():
+        return [(f.code, f"{f.dimensions} ({f.superficie}m²)") for f in FormatSupport.objects.all()]
     class Meta:
         verbose_name = "Support Publicitaire"
         verbose_name_plural = "Supports Publicitaires"
@@ -248,20 +250,21 @@ class Support(models.Model):
             support.format_detail
             → {'dimensions': '4m × 3m', 'surface': '12m²', 'type': 'Standard'}
         """
-        label  = self.get_format_display()
-        result = {'dimensions': label, 'surface': '', 'type': ''}
- 
-        if ' — ' in label:
-            left, result['type'] = label.split(' — ', 1)
-        else:
-            left = label
- 
-        if '(' in left and ')' in left:
-            result['dimensions'] = left[:left.index('(')].strip()
-            result['surface']    = left[left.index('(')+1 : left.index(')')].strip()
-        else:
-            result['dimensions'] = left.strip()
- 
+        result = {'dimensions': '', 'surface': '', 'type': ''}
+
+        if not self.format:
+            return result
+
+        fs = FormatSupport.objects.filter(code=self.format).first()
+        if not fs:
+            # Fallback si le code ne correspond à aucun FormatSupport
+            result['dimensions'] = self.get_format_display()
+            return result
+
+        result['dimensions'] = fs.dimensions
+        result['surface'] = f"{fs.superficie}m²" if fs.superficie else ''
+        result['type'] = fs.categorie
+
         return result
     
     @property

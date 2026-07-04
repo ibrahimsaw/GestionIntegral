@@ -73,7 +73,8 @@ TYPE_CONTRAT_CHOICES = [
     ('ponctuel', 'Ponctuel'),
 ]
 
-TYPE_SUPPORT_CHOICES = [('ecran', 'Écran')] + get_dynamic_format_choices()
+def get_type_support_choices():
+    return [('ecran', 'Écran')] + get_dynamic_format_choices()
 
 STATUT_EN_ATTENTE = 'en_attente'
 STATUT_CONFIRMEE  = 'confirmee'
@@ -682,18 +683,22 @@ class Campagne(models.Model):
     STATUT_TERMINEE  = STATUT_TERMINEE
     STATUT_ANNULEE   = STATUT_ANNULEE
     STATUT_CHOICES   = STATUT_CHOICES
-    TYPE_SUPPORT_CHOICES = TYPE_SUPPORT_CHOICES
     
     client       = models.ForeignKey(Client, on_delete=models.PROTECT, related_name='campagnes')
     nom          = models.CharField(max_length=200, verbose_name="Nom de la campagne")
-    prix         = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="Prix")
+    # les champs ne sont pas obligatoir
+    prix         = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="Prix unitaire face",blank=True)
+    prix_affichage = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="Prix unitaire affichage",blank=True)
+    prix_impression = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="Prix unitaire impression",blank=True)
+    # lieu de la campagne donne des chois des ville des support
+    lieu = models.CharField(max_length=200, blank=True, verbose_name="Lieu de la campagne", help_text="Ville ou zone géographique de la campagne.")
     reference    = models.CharField(max_length=50, unique=True, blank=True)
     date_debut   = models.DateField(verbose_name="Date de début")
     date_fin     = models.DateField(verbose_name="Date de fin")
-    statut       = models.CharField(max_length=20, choices=STATUT_CHOICES, default=STATUT_EN_COURS)
+    statut       = models.CharField(max_length=20, choices=STATUT_CHOICES, default=STATUT_EN_COURS,blank=True)
     type_support = models.CharField(
         max_length=20,
-        choices=TYPE_SUPPORT_CHOICES,
+        choices=get_type_support_choices,
         blank=True,
         default='',
         verbose_name="Type de support",
@@ -778,9 +783,51 @@ class Campagne(models.Model):
 
         faces = self.nombre_faces()
         return (prix * Decimal(faces)).quantize(Decimal('0.01'))
+    
+    def montant_total_affichage(self):
+        prix = self.prix_affichage or Decimal('0.00')
 
+        if self.est_mere:
+            total = Decimal('0.00')
+            for enfant in self.sous_campagnes.all():
+                total += enfant.montant_total() or Decimal('0.00')
+            return total
+
+        if self.type_support == 'ecran':
+            spots = self.calculer_nombre_spots()
+            return (prix * Decimal(str(spots))).quantize(Decimal('0.01'))
+
+        faces = self.nombre_faces()
+        return (prix * Decimal(faces)).quantize(Decimal('0.01'))
+    
+    @staticmethod
+    def get_type_support_choices():
+        return [('ecran', 'Écran')] + get_dynamic_format_choices()
+    
+    def montant_total_impression(self):
+        prix = self.prix_impression or Decimal('0.00') 
+        
+        if self.est_mere:
+            total = Decimal('0.00')
+            for enfant in self.sous_campagnes.all():
+                total += enfant.montant_total() or Decimal('0.00')
+            return total
+        
+        if self.type_support == 'ecran':
+            spots = self.calculer_nombre_spots()
+            return (prix * Decimal(str(spots))).quantize(Decimal('0.01'))
+        
+        faces = self.nombre_faces()
+        return (prix * Decimal(faces)).quantize(Decimal('0.01'))
+    
     def montant_total_display(self):
         return f"{self.montant_total():,.2f}"
+    
+    def montant_total_display_affichage(self):
+            return f"{self.montant_total_affichage():,.2f}"
+        
+    def montant_total_display_impression(self):
+        return f"{self.montant_total_impression():,.2f}"
 
     def nb_supports(self):
         return self.lignes.count()
@@ -901,8 +948,8 @@ class Campagne(models.Model):
         if not self.est_mere and not self.campagne_parente_id and self.type_support == '':
             raise ValidationError({'type_support': "Le type de support ou format est obligatoire pour une campagne autonome."})
 
-        if self.type_support == 'ecran' and self.campagne_parente_id and self.campagne_parente and self.campagne_parente.type_support != 'ecran':
-            raise ValidationError({'type_support': "La sous-campagne écran doit être rattachée à une campagne mère écran ou indiquer un type écran valide."})
+        # if self.type_support == 'ecran' and self.campagne_parente_id and self.campagne_parente and self.campagne_parente.type_support != 'ecran':
+        #     raise ValidationError({'type_support': "La sous-campagne écran doit être rattachée à une campagne mère écran ou indiquer un type écran valide."})
 
         if self.campagne_parente_id and self.date_debut and self.date_fin:
             mere = self.campagne_parente

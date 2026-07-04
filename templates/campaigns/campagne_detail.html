@@ -27,7 +27,7 @@
           </button>
         </form>
       {% endif %}
-      
+
       <a href="{% url 'reports_index' %}" class="btn btn-sm btn-soft-success border-success-subtle">
         <i class="bi bi-download me-1"></i>Exporter
       </a>
@@ -37,13 +37,13 @@
 
 {% block content %}
 <div class="container-fluid py-3">
-  
+
   <div class="row g-4 mb-4">
-    
+
     <div class="col-lg-8">
       <div class="card border-0 shadow-sm rounded-4 h-100">
         <div class="card-body p-4">
-          
+
           <div class="d-flex align-items-center gap-3 mb-4 flex-wrap">
             <div class="bg-light rounded-3 p-2 border" style="width: 64px; height: 64px;">
               {% if campagne.client.logo %}
@@ -97,15 +97,17 @@
                 <div class="fw-bold small text-primary">{{ campagne.date_fin|date:"d/m/Y" }}</div>
               </div>
             </div>
+            {% if campagne.contrat.get_detail %}
             <div class="col-6 col-sm-4 col-md-3">
               <div class="p-3 border rounded-3 bg-light-subtle h-100">
                 <small class="text-uppercase text-muted d-block font-monospace mb-1" style="font-size: 0.6rem;">Contrat</small>
                 <div class="fw-bold small">{{ campagne.contrat.get_detail }}</div>
               </div>
             </div>
+            {% endif %}
             <div class="col-6 col-sm-4 col-md-3">
               <div class="p-3 border rounded-3 bg-light-subtle h-100">
-                <small class="text-uppercase text-muted d-block font-monospace mb-1" style="font-size: 0.6rem;">Support</small>
+                <small class="text-uppercase text-muted d-block font-monospace mb-1" style="font-size: 0.6rem;">Format</small>
                 <div class="fw-bold small">
                   {% if campagne.est_mere %}
                     <i class="bi bi-diagram-3 text-warning me-1"></i>Campagne mère
@@ -117,27 +119,37 @@
                 </div>
               </div>
             </div>
+            {% if campagne.est_mere %}
+            <div class="col-6 col-sm-4 col-md-3">
+              <div class="p-3 border rounded-3 bg-light-subtle h-100">
+                <small class="text-uppercase text-muted d-block font-monospace mb-1" style="font-size: 0.6rem;">Nombre de Campagnes</small>
+                <div class="fw-bold h5 mb-0 font-monospace">{{ nombre_sous_campagnes }} </div>
+                <small class="text-muted">campagne{{ nombre_sous_campagnes|pluralize }} fille{{ nombre_sous_campagnes|pluralize }}</small>
+              </div>
+            </div>
             <div class="col-6 col-sm-4 col-md-3">
               <div class="p-3 border rounded-3 bg-light-subtle h-100">
                 <small class="text-uppercase text-muted d-block font-monospace mb-1" style="font-size: 0.6rem;">Total</small>
                 <div class="fw-bold h5 mb-0 font-monospace">{{ total_supports }}</div>
-                <small class="text-muted">Supports{% if campagne.est_mere %} (somme des campagnes filles){% endif %}</small>
+                <small class="text-muted">Supports (somme des campagnes filles)</small>
               </div>
             </div>
+            {% else %}
             <div class="col-6 col-sm-4 col-md-3">
               <div class="p-3 border rounded-3 bg-light-subtle h-100">
-                <small class="text-uppercase text-muted d-block font-monospace mb-1" style="font-size: 0.6rem;">Montant</small>
-                <div class="fw-bold h5 mb-0 font-monospace">{{ campagne.montant_total_display }}</div>
-                <small class="text-muted">{% if campagne.est_mere %}Somme des sous-campagnes{% else %}Prix de la campagne{% endif %}</small>
+                <small class="text-uppercase text-muted d-block font-monospace mb-1" style="font-size: 0.6rem;">Ville</small>
+                <div class="fw-bold h5 mb-0 font-monospace">{{ campagne.lieu }}</div>
+                <small class="text-muted">Supports</small>
               </div>
             </div>
             <div class="col-6 col-sm-4 col-md-3">
               <div class="p-3 border rounded-3 bg-primary-subtle border-primary-subtle text-primary h-100">
-                <small class="text-uppercase opacity-75 d-block font-monospace mb-1" style="font-size: 0.6rem;">Nombre de Spots</small>
+                <small class="text-uppercase opacity-75 d-block font-monospace mb-1" style="font-size: 0.6rem;">Nombre de Spots/faces</small>
                 <div class="fw-bold h5 mb-0 font-monospace">{{ total_spots }}</div>
-                <small class="text-muted">Total campagne{% if campagne.est_mere %} (somme des campagnes filles){% endif %}</small>
+                <small class="text-muted">Total campagne</small>
               </div>
             </div>
+            {% endif %}
             {% if campagne.type_support == 'ecran' %}
             <div class="col-6 col-sm-4 col-md-3">
               <div class="p-3 border rounded-3 bg-primary-subtle border-primary-subtle text-primary h-100">
@@ -159,6 +171,96 @@
             </div>
             {% endif %}
           </div>
+
+          {% if campagne.est_mere %}
+          <div class="card border-0 shadow-sm rounded-4 mb-4 bg-light-subtle">
+            <div class="card-header bg-white py-3 border-bottom">
+              <h6 class="fw-bold mb-0 d-flex align-items-center">
+                <i class="bi bi-cash-coin me-2" style="color:var(--color-primary)"></i>Résumé financier — {{ nombre_sous_campagnes }} campagne{{ nombre_sous_campagnes|pluralize }} fille{{ nombre_sous_campagnes|pluralize }}
+              </h6>
+            </div>
+            <div class="card-body">
+              <div class="row g-3 text-center">
+                <div class="col-4">
+                  <div class="p-3 border rounded-3 bg-white h-100">
+                    <small class="text-uppercase text-muted d-block font-monospace mb-1" style="font-size:0.6rem;">Total faces/spots</small>
+                    <div class="fw-bold h6 mb-0 font-monospace">{{ total_campagne.prix|floatformat:2 }}</div>
+                  </div>
+                </div>
+                <div class="col-4">
+                  <div class="p-3 border rounded-3 bg-white h-100">
+                    <small class="text-uppercase text-muted d-block font-monospace mb-1" style="font-size:0.6rem;">Total affichage</small>
+                    <div class="fw-bold h6 mb-0 font-monospace">{{ total_campagne.affichage|floatformat:2 }}</div>
+                  </div>
+                </div>
+                <div class="col-4">
+                  <div class="p-3 border rounded-3 bg-white h-100">
+                    <small class="text-uppercase text-muted d-block font-monospace mb-1" style="font-size:0.6rem;">Total impression</small>
+                    <div class="fw-bold h6 mb-0 font-monospace">{{ total_campagne.impression|floatformat:2 }}</div>
+                  </div>
+                </div>
+              </div>
+              <div class="p-3 border rounded-3 bg-primary-subtle border-primary-subtle text-primary text-center mt-3">
+                <small class="text-uppercase opacity-75 d-block font-monospace mb-1" style="font-size:0.6rem;">Total général de la campagne mère</small>
+                <div class="fw-bold h4 mb-0 font-monospace">{{ total_campagne.total|floatformat:2 }}</div>
+              </div>
+            </div>
+          </div>
+          {% else %}
+          <div class="card border-0 shadow-sm rounded-4 mb-4 bg-light-subtle">
+            <div class="card-header bg-white py-3 border-bottom">
+              <h6 class="fw-bold mb-0 d-flex align-items-center">
+                <i class="bi bi-cash-coin me-2" style="color:var(--color-primary)"></i>Résumé financier
+              </h6>
+            </div>
+            <div class="card-body">
+              <div class="row g-3 text-center">
+                <div class="col-6 col-md-4">
+                  <div class="p-3 border rounded-3 bg-light-subtle h-100">
+                    <small class="text-uppercase text-muted d-block font-monospace mb-1" style="font-size:0.6rem;">Prix unit. {% if campagne.type_support == 'ecran' %}spot{% else %}face{% endif %}</small>
+                    <div class="fw-bold small mb-0 font-monospace">{{ campagne.prix|floatformat:2 }}</div>
+                  </div>
+                </div>
+                <div class="col-6 col-md-4">
+                  <div class="p-3 border rounded-3 bg-light-subtle h-100">
+                    <small class="text-uppercase text-muted d-block font-monospace mb-1" style="font-size:0.6rem;">Prix unit. affichage</small>
+                    <div class="fw-bold small mb-0 font-monospace">{{ campagne.prix_affichage|floatformat:2 }}</div>
+                  </div>
+                </div>
+                <div class="col-6 col-md-4">
+                  <div class="p-3 border rounded-3 bg-light-subtle h-100  ">
+                    <small class="text-uppercase text-muted d-block font-monospace mb-1" style="font-size:0.6rem;">Prix unit. impression</small>
+                    <div class="fw-bold small mb-0 font-monospace">{{ campagne.prix_impression|floatformat:2 }}</div>
+                  </div>
+                </div>
+                <div class="col-6 col-md-4">
+                  <div class="p-3 border rounded-3 bg-light-subtle h-100">
+                    <small class="text-uppercase text-muted d-block font-monospace mb-1" style="font-size:0.6rem;">Prix total {% if campagne.type_support == 'ecran' %}spots{% else %}faces{% endif %}</small>
+                    <div class="fw-bold h6 mb-0 font-monospace">{{ totaux_campagne.prix|floatformat:2 }}</div>
+                  </div>
+                </div>
+
+
+                <div class="col-6 col-md-4">
+                  <div class="p-3 border rounded-3 bg-light-subtle h-100">
+                    <small class="text-uppercase text-muted d-block font-monospace mb-1" style="font-size:0.6rem;">Prix total affichage</small>
+                    <div class="fw-bold h6 mb-0 font-monospace">{{ totaux_campagne.affichage|floatformat:2 }}</div>
+                  </div>
+                </div>
+                <div class="col-6 col-md-4">
+                  <div class="p-3 border rounded-3 bg-light-subtle h-100">
+                    <small class="text-uppercase text-muted d-block font-monospace mb-1" style="font-size:0.6rem;">Prix total impression</small>
+                    <div class="fw-bold h6 mb-0 font-monospace">{{ totaux_campagne.impression|floatformat:2 }}</div>
+                  </div>
+                </div>
+              </div>
+              <div class="p-3 border rounded-3 bg-primary-subtle border-primary-subtle text-primary text-center mt-3">
+                <small class="text-uppercase opacity-75 d-block font-monospace mb-1" style="font-size:0.8rem;">Total général de la campagne (faces/spots + affichage + impression)</small>
+                <div class="fw-bold h4 mb-0 font-monospace">{{ totaux_campagne.total|floatformat:2 }}</div>
+              </div>
+            </div>
+          </div>
+          {% endif %}
 
           {% if campagne.visuels.exists %}
           <div class="mb-3">
@@ -252,7 +354,7 @@
             {% endif %}
           {% endfor %}
         </div>
-        
+
         {% if campagne.type_support == 'ecran' %}
         <div class="card-header bg-light py-3 border-top border-bottom-0">
             <h6 class="fw-bold mb-0 d-flex align-items-center text-dark">
@@ -264,7 +366,7 @@
                 <span class="fw-bold text-primary small">Diffusions/heure</span>
                 <span class="badge bg-primary ms-auto font-monospace px-2" style="background-color: var(--color-primary) !important;">{{campagne.diffusions_par_heure}} stops</span>
           </div>
-          
+
           <div class="p-2 rounded-3 bg-light d-flex justify-content-between align-items-center">
                 <span class="fw-bold text-primary small">Nombre d'heure par jour</span>
                 <span class="badge bg-primary ms-auto font-monospace px-2" style="background-color: var(--color-primary) !important;">{{campagne.calculer_duree_tranches}} heures</span>
@@ -283,7 +385,7 @@
           </div>
         </div>
         {%endif%}
-        
+
       </div>
     </div>
   </div>
@@ -347,6 +449,89 @@
       </div>
     {% endif %}
   </div>
+
+  <!-- ============================================================ -->
+  <!-- DÉTAIL FINANCIER — CAMPAGNE MÈRE (tableaux par sous-campagne)  -->
+  <!-- Le résumé global est affiché plus haut, avant les visuels.     -->
+  <!-- ============================================================ -->
+  {% for ed in enfants_data %}
+  <div class="card border-0 shadow-sm rounded-4 mb-4">
+    <div class="card-header bg-white py-3 border-bottom d-flex justify-content-between align-items-center flex-wrap gap-2">
+      <div>
+        <h6 class="fw-bold mb-0">
+          <a href="{% url 'campagne_detail' ed.campagne.pk %}" class="text-decoration-none text-dark">
+            <i class="bi bi-megaphone me-2" style="color:var(--color-primary)"></i>{{ ed.campagne.nom }}
+          </a>
+        </h6>
+        <small class="text-muted">
+          {{ ed.campagne.contrat.get_detail|default:"—" }}
+          <span class="mx-1">•</span>
+          {{ ed.campagne.date_debut|date:"d/m/Y" }} → {{ ed.campagne.date_fin|date:"d/m/Y" }}
+        </small>
+      </div>
+      <span class="badge bg-light text-dark border font-monospace">{{ ed.campagne.reference }}</span>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="bg-light">
+          <tr class="small text-uppercase text-muted">
+            <th>Support</th>
+            <th>{% if ed.campagne.type_support == 'ecran' %}Spots{% else %}Faces{% endif %}</th>
+            <th class="text-end">Prix unit.</th>
+            <th class="text-end">Prix total</th>
+            <th class="text-end">Affich. unit.</th>
+            <th class="text-end">Affich. total</th>
+            <th class="text-end">Impr. unit.</th>
+            <th class="text-end">Impr. total</th>
+            <th class="text-end">Total support</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in ed.rows %}
+          <tr>
+            <td>
+              <a href="{% url 'support_detail' row.support.uuid %}" class="text-decoration-none fw-bold text-dark">
+                {{ row.support.code }} — {{ row.support.nom }}
+              </a>
+            </td>
+            <td>
+              {% if ed.campagne.type_support == 'ecran' %}
+                <span class="badge bg-primary-subtle text-primary border font-monospace">{{ row.quantite }} spot(s)</span>
+              {% else %}
+                {% for label in row.faces_labels %}
+                  <span class="badge bg-warning-subtle text-warning border font-monospace me-1">FACE {{ label }}</span>
+                {% endfor %}
+              {% endif %}
+            </td>
+            <td class="text-end font-monospace">{{ row.prix_unitaire|floatformat:2 }}</td>
+            <td class="text-end font-monospace fw-bold">{{ row.prix_total|floatformat:2 }}</td>
+            <td class="text-end font-monospace">{{ row.affichage_unitaire|floatformat:2 }}</td>
+            <td class="text-end font-monospace fw-bold">{{ row.affichage_total|floatformat:2 }}</td>
+            <td class="text-end font-monospace">{{ row.impression_unitaire|floatformat:2 }}</td>
+            <td class="text-end font-monospace fw-bold">{{ row.impression_total|floatformat:2 }}</td>
+            <td class="text-end font-monospace fw-bold text-primary">{{ row.total_support|floatformat:2 }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="9" class="text-center text-muted py-3">Aucun support</td></tr>
+          {% endfor %}
+        </tbody>
+        <tfoot class="table-light">
+          <tr class="fw-bold">
+            <td colspan="2" class="text-end">Sous-total</td>
+            <td></td>
+            <td class="text-end font-monospace">{{ ed.totaux.prix|floatformat:2 }}</td>
+            <td></td>
+            <td class="text-end font-monospace">{{ ed.totaux.affichage|floatformat:2 }}</td>
+            <td></td>
+            <td class="text-end font-monospace">{{ ed.totaux.impression|floatformat:2 }}</td>
+            <td class="text-end font-monospace text-primary">{{ ed.totaux.total|floatformat:2 }}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+  {% endfor %}
+
   {% else %}
   <div class="d-flex justify-content-between align-items-center mb-4 mt-5">
     <h5 class="fw-bold mb-0">
@@ -354,7 +539,7 @@
     </h5>
     {% if not request.user.is_client %}
     <div class="d-flex gap-2">
-      <a href="{% url 'supports_edit_bulk' campagne.pk %}" class="btn btn-primary btn-sm rounded-pill px-3">
+      <a href="{% url 'supports_edit_bulk' campagne.pk %}?type_support={{ campagne.type_support }}&ville={{ campagne.lieu }}" class="btn btn-primary btn-sm rounded-pill px-3">
         <i class="bi bi-pencil-square me-1"></i>Modifier
       </a>
     </div>
@@ -446,7 +631,7 @@
               <i class="bi bi-geo-alt-slash text-muted fs-1"></i>
               <h6 class="fw-bold mt-3 mb-0" style="color:var(--text-muted);">Aucun support associé à cette campagne</h6>
               <p class="text-muted small mt-2">Ajoutez des supports à votre campagne pour les voir apparaître ici et sur la carte.</p>
-              <a href="{% url 'supports_add_bulk' campagne.pk %}?type_support={{ campagne.type_support }}" class="btn btn-primary btn-sm rounded-pill px-4 mt-3 shadow-sm">
+              <a href="{% url 'supports_add_bulk' campagne.pk %}?type_support={{ campagne.type_support }}&ville={{ campagne.lieu }}" class="btn btn-primary btn-sm rounded-pill px-4 mt-3 shadow-sm">
                 <i class="bi bi-plus-lg me-1"></i>Ajouter des supports
               </a>
             </div>
@@ -464,7 +649,77 @@
     {% endif %}
   </div>
 
-  
+  <!-- ============================================================ -->
+  <!-- DÉTAIL FINANCIER — CAMPAGNE SIMPLE / FILLE                     -->
+  <!-- ============================================================ -->
+  {% if not campagne.est_mere %}
+  <div class="card border-0 shadow-sm rounded-4 mb-5">
+    <div class="card-header bg-white py-3 border-bottom">
+      <h6 class="fw-bold mb-0 d-flex align-items-center">
+        <i class="bi bi-cash-coin me-2" style="color:var(--color-primary)"></i>Détail financier par support
+      </h6>
+    </div>
+    <div class="table-responsive">
+      <table class="table table-hover align-middle mb-0">
+        <thead class="bg-light">
+          <tr class="small text-uppercase text-muted">
+            <th>Support</th>
+            <th>{% if campagne.type_support == 'ecran' %}Spots{% else %}Faces{% endif %}</th>
+            <th class="text-end">Prix unit.</th>
+            <th class="text-end">Prix total</th>
+            <th class="text-end">Affich. unit.</th>
+            <th class="text-end">Affich. total</th>
+            <th class="text-end">Impr. unit.</th>
+            <th class="text-end">Impr. total</th>
+            <th class="text-end">Total support</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for row in support_rows %}
+          <tr>
+            <td>
+              <a href="{% url 'support_detail' row.support.uuid %}" class="text-decoration-none fw-bold text-dark">
+                {{ row.support.code }} — {{ row.support.nom }}
+              </a>
+            </td>
+            <td>
+              {% if campagne.type_support == 'ecran' %}
+                <span class="badge bg-primary-subtle text-primary border font-monospace">{{ row.quantite }} spot(s)</span>
+              {% else %}
+                {% for label in row.faces_labels %}
+                  <span class="badge bg-warning-subtle text-warning border font-monospace me-1">FACE {{ label }}</span>
+                {% endfor %}
+              {% endif %}
+            </td>
+            <td class="text-end font-monospace">{{ row.prix_unitaire|floatformat:2 }}</td>
+            <td class="text-end font-monospace fw-bold">{{ row.prix_total|floatformat:2 }}</td>
+            <td class="text-end font-monospace">{{ row.affichage_unitaire|floatformat:2 }}</td>
+            <td class="text-end font-monospace fw-bold">{{ row.affichage_total|floatformat:2 }}</td>
+            <td class="text-end font-monospace">{{ row.impression_unitaire|floatformat:2 }}</td>
+            <td class="text-end font-monospace fw-bold">{{ row.impression_total|floatformat:2 }}</td>
+            <td class="text-end font-monospace fw-bold text-primary">{{ row.total_support|floatformat:2 }}</td>
+          </tr>
+          {% empty %}
+          <tr><td colspan="9" class="text-center text-muted py-4">Aucun support</td></tr>
+          {% endfor %}
+        </tbody>
+        <tfoot class="table-light">
+          <tr class="fw-bold">
+            <td colspan="2" class="text-end">TOTAUX</td>
+            <td></td>
+            <td class="text-end font-monospace">{{ totaux_campagne.prix|floatformat:2 }}</td>
+            <td></td>
+            <td class="text-end font-monospace">{{ totaux_campagne.affichage|floatformat:2 }}</td>
+            <td></td>
+            <td class="text-end font-monospace">{{ totaux_campagne.impression|floatformat:2 }}</td>
+            <td class="text-end font-monospace text-primary">{{ totaux_campagne.total|floatformat:2 }}</td>
+          </tr>
+        </tfoot>
+      </table>
+    </div>
+  </div>
+  {% endif %}
+
   <div class="card border-0 shadow-sm rounded-4 p-4 text-center bg-white">
     <h6 class="fw-bold mb-3"><i class="bi bi-file-earmark-arrow-down me-2"></i>Générer les documents de campagne</h6>
     <div class="d-flex gap-3 justify-content-center flex-wrap">
@@ -484,10 +739,10 @@
   .btn-soft-success { background: rgba(25, 135, 84, 0.1); color: #198754; border: 1px solid rgba(25, 135, 84, 0.2); }
   .btn-soft-danger { background: rgba(220, 53, 69, 0.1); color: #dc3545; border: 1px solid rgba(220, 53, 69, 0.2); }
   .bg-light-subtle { background-color: #f8f9fa; }
-  
+
   .support-card { transition: transform 0.2s ease, shadow 0.2s ease; border: 1px solid transparent !important; }
   .support-card:hover { transform: translateY(-3px); box-shadow: 0 10px 20px rgba(0,0,0,0.08) !important; border-color: var(--color-primary) !important; }
-  
+
   /* Badges de statut personnalisés */
   .bg-brouillon { background-color: #6c757d !important; }
   .bg-en_cours { background-color: #198754 !important; }

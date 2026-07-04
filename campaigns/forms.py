@@ -66,6 +66,15 @@ class MultipleFileField(forms.FileField):
         return [super(MultipleFileField, self).clean(d, initial) for d in data]
 
 
+# En haut du fichier forms.py, ajoutez si absent :
+from inventory.models import Support
+
+from django import forms
+from inventory.models import Support
+from .models import Campagne, Contrat, CampagneVisuel
+# adaptez les imports ci-dessus selon vos vrais chemins (MultipleFileField, MultipleFileInput, S, W, D)
+
+
 class CampagneForm(forms.ModelForm):
     # Champ de choix dynamique pour le type / format de campagne
     type_support = forms.ChoiceField(
@@ -75,10 +84,18 @@ class CampagneForm(forms.ModelForm):
         label="Type / format"
     )
 
+    # Champ de choix dynamique pour le lieu (villes des supports existants)
+    lieu = forms.ChoiceField(
+        required=False,
+        choices=[],
+        widget=forms.Select(attrs=S),
+        label="Lieu"
+    )
+
     # Ajout du champ virtuel pour la sélection multiple
     visuels_multiples = MultipleFileField(
         widget=MultipleFileInput(attrs={
-            'multiple': True, 
+            'multiple': True,
             'class': 'form-control',
             'accept': 'image/*,video/*'
         }),
@@ -90,7 +107,8 @@ class CampagneForm(forms.ModelForm):
     class Meta:
         model = Campagne
         fields = [
-            'client', 'nom', 'prix', 'campagne_parente', 'est_mere', 'date_debut', 'date_fin', 'statut',
+            'client', 'nom', 'prix', 'prix_affichage', 'prix_impression', 'campagne_parente', 'est_mere',
+            'date_debut', 'date_fin', 'statut', 'lieu',
             'type_support', 'duree_passage', 'frequence',
             'tranches_horaires', 'notes', 'contrat'
         ]
@@ -98,7 +116,10 @@ class CampagneForm(forms.ModelForm):
             'client': forms.Select(attrs=S),
             'nom': forms.TextInput(attrs=W),
             'prix': forms.NumberInput(attrs={**W, 'step': '0.01', 'min': '0'}),
+            'prix_affichage': forms.NumberInput(attrs={**W, 'step': '0.01', 'min': '0'}),
+            'prix_impression': forms.NumberInput(attrs={**W, 'step': '0.01', 'min': '0'}),
             'campagne_parente': forms.Select(attrs=S),
+            # 'lieu' géré par le ChoiceField explicite ci-dessus
             'est_mere': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'date_debut': forms.DateInput(attrs=D),
             'date_fin': forms.DateInput(attrs=D),
@@ -113,10 +134,18 @@ class CampagneForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        
-        # 1. Filtrage dynamique du champ 'contrat'
-        client_id = self.data.get('client') or (self.instance.client_id if self.instance.pk else None)
-        
+
+        # 1. Déterminer le client à utiliser pour filtrer contrat / campagne_parente
+        #    Ordre de priorité :
+        #    a) POST soumis (formulaire re-soumis après erreur)
+        #    b) instance existante (mode édition)
+        #    c) valeur initiale (mode création via lien "?client=" ou "?campagne_parente=")
+        client_id = (
+            self.data.get('client')
+            or (self.instance.client_id if self.instance.pk else None)
+            or self.initial.get('client')
+        )
+
         if client_id:
             qs = Contrat.objects.filter(client_id=client_id, actif=True)
             self.fields['contrat'].queryset = qs
@@ -128,57 +157,76 @@ class CampagneForm(forms.ModelForm):
             self.fields['contrat'].queryset = Contrat.objects.none()
             self.fields['campagne_parente'].queryset = Campagne.objects.none()
 
-        support_choices = [('', '--- Sélectionner un type / format ---')] + list(Campagne.TYPE_SUPPORT_CHOICES)
+        support_choices = [('', '--- Sélectionner un type / format ---')] + list(Campagne.get_type_support_choices())
         self.fields['type_support'].choices = support_choices
-    
+
+        # 2. Choix dynamique du lieu (villes distinctes présentes dans les supports)
+        villes = (
+            Support.objects
+            .exclude(ville__exact='')
+            .values_list('ville', flat=True)
+            .distinct()
+            .order_by('ville')
+        )
+        lieu_choices = [('', '--- Sélectionner une ville ---')] + [(v, v) for v in villes]
+        self.fields['lieu'].choices = lieu_choices
+
     def clean_visuels_multiples(self):
         return self.cleaned_data.get('visuels_multiples', [])
+
     def clean(self):
         cleaned = super().clean()
         d1 = cleaned.get('date_debut')
         d2 = cleaned.get('date_fin')
         type_support = cleaned.get('type_support')
         contrat = cleaned.get('contrat')
+        parent = cleaned.get('campagne_parente')
 
         # 1. Validation des dates de campagne
         if d1 and d2 and d1 > d2:
             raise forms.ValidationError("La date de fin doit être après la date de début.")
 
         # 1.5 Validation de la hiérarchie
-        if cleaned.get('campagne_parente') and cleaned.get('campagne_parente').client_id != cleaned.get('client').id:
+        if parent and cleaned.get('client') and parent.client_id != cleaned.get('client').id:
             raise forms.ValidationError("La campagne mère doit appartenir au même client.")
 
-        if cleaned.get('est_mere') and cleaned.get('campagne_parente'):
+        if cleaned.get('est_mere') and parent:
             raise forms.ValidationError("Une campagne mère ne peut pas être rattachée à une autre campagne mère.")
 
-        if cleaned.get('campagne_parente') and not cleaned.get('campagne_parente').est_mere:
+        if parent and not parent.est_mere:
             raise forms.ValidationError("La campagne sélectionnée comme campagne mère doit être marquée comme campagne mère.")
 
-        if cleaned.get('campagne_parente') and not cleaned.get('type_support'):
-            parent = cleaned.get('campagne_parente')
-            if parent and parent.type_support:
+        # 1.6 La sous-campagne doit être comprise dans la période de la mère
+        if parent and d1 and d2:
+            if parent.date_debut and d1 < parent.date_debut:
+                raise forms.ValidationError(
+                    f"La date de début ({d1.strftime('%d/%m/%Y')}) ne peut pas être antérieure "
+                    f"à celle de la campagne mère ({parent.date_debut.strftime('%d/%m/%Y')})."
+                )
+            if parent.date_fin and d2 > parent.date_fin:
+                raise forms.ValidationError(
+                    f"La date de fin ({d2.strftime('%d/%m/%Y')}) ne peut pas dépasser "
+                    f"celle de la campagne mère ({parent.date_fin.strftime('%d/%m/%Y')})."
+                )
+
+        if parent and not cleaned.get('type_support'):
+            if parent.type_support:
                 cleaned['type_support'] = parent.type_support
             else:
                 raise forms.ValidationError(
                     "Le type de support est obligatoire pour une sous-campagne lorsque la campagne mère n'a pas de type défini."
                 )
 
-        # 2. Validation spécifique au support écran (en utilisant la valeur brute 'ecran')
+        # 2. Validation spécifique au support écran
         if type_support == 'ecran':
-            # Vérifier que les dates sont dans la période du contrat si un contrat est lié
             if d1 and d2 and contrat:
                 if d1 < contrat.date_debut or d2 > contrat.date_fin:
                     raise forms.ValidationError(
                         f"Les dates de la campagne doivent être comprises dans la période du contrat "
                         f"({contrat.date_debut.strftime('%d/%m/%Y')} au {contrat.date_fin.strftime('%d/%m/%Y')})."
                     )
-        
+
         return cleaned
-
-
-
-
-
 class LigneCampagneForm(forms.ModelForm):
     TYPE_SUPPORT_CHOICES = [
         ('', '--- Sélectionner un type ---'),

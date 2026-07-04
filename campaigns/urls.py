@@ -96,4 +96,5 @@ urlpatterns = [
     path('api/check-faces-dispo/',
          views.AjaxCheckFacesDispoView.as_view(),
          name='ajax_check_faces_dispo'),
+    path('api/campagne-parente-info/<int:campagne_id>/', views.api_campagne_parente_info, name='api_campagne_parente_info'),
 ]

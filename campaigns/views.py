@@ -377,7 +377,7 @@ class ClientListView(StaffRequiredMixin, ListView):
         q = self.request.GET.get('q', '')
         if q:
             qs = qs.filter(Q(nom__icontains=q) | Q(contact_nom__icontains=q))
-        return qs.prefetch_related('campagnes')
+        return qs.prefetch_related('campagnes').order_by('nom')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -811,6 +811,89 @@ class CampagneSelectedDeleteView(StaffRequiredMixin, TemplateView):
 #         'statut_choices': Campagne.STATUT_CHOICES,
 #     })
 
+from decimal import Decimal, InvalidOperation
+
+
+def _to_decimal(val):
+    """Convertit int/float/Decimal en Decimal proprement (arrondi 2 décimales)."""
+    if val is None:
+        return Decimal('0.00')
+    try:
+        return Decimal(str(round(float(val), 2)))
+    except (InvalidOperation, ValueError, TypeError):
+        return Decimal('0.00')
+
+
+def build_support_rows(campagne, lignes):
+    """
+    Regroupe les lignes par support et calcule, pour chaque support :
+    - quantite (spots pour écran, nb de faces pour panneau)
+    - prix / affichage / impression unitaires et totaux
+    - total_support = prix_total + affichage_total + impression_total
+    Retourne (rows, totaux_campagne)
+    """
+    grouped = {}
+    order = []
+    for ligne in lignes:
+        support = ligne.face.support if ligne.face else ligne.support
+        if support is None:
+            continue
+        if support.pk not in grouped:
+            grouped[support.pk] = {'support': support, 'lignes': []}
+            order.append(support.pk)
+        grouped[support.pk]['lignes'].append(ligne)
+
+    prix_u = campagne.prix or Decimal('0.00')
+    aff_u = campagne.prix_affichage or Decimal('0.00')
+    imp_u = campagne.prix_impression or Decimal('0.00')
+
+    rows = []
+    totaux = {
+        'quantite': Decimal('0.00'),
+        'prix': Decimal('0.00'),
+        'affichage': Decimal('0.00'),
+        'impression': Decimal('0.00'),
+        'total': Decimal('0.00'),
+    }
+
+    for pk in order:
+        support = grouped[pk]['support']
+        group_lignes = grouped[pk]['lignes']
+
+        if campagne.type_support == 'ecran':
+            quantite = _to_decimal(sum(getattr(l, 'spots_calcules', 0) for l in group_lignes))
+            faces_labels = None
+        else:
+            quantite = Decimal(len(group_lignes))
+            faces_labels = [l.face.label for l in group_lignes if l.face]
+
+        prix_total = (prix_u * quantite).quantize(Decimal('0.01'))
+        aff_total = (aff_u * quantite).quantize(Decimal('0.01'))
+        imp_total = (imp_u * quantite).quantize(Decimal('0.01'))
+        total_support = prix_total + aff_total + imp_total
+
+        rows.append({
+            'support': support,
+            'quantite': quantite,
+            'faces_labels': faces_labels,
+            'prix_unitaire': prix_u,
+            'prix_total': prix_total,
+            'affichage_unitaire': aff_u,
+            'affichage_total': aff_total,
+            'impression_unitaire': imp_u,
+            'impression_total': imp_total,
+            'total_support': total_support,
+        })
+
+        totaux['quantite'] += quantite
+        totaux['prix'] += prix_total
+        totaux['affichage'] += aff_total
+        totaux['impression'] += imp_total
+        totaux['total'] += total_support
+
+    return rows, totaux
+
+
 class CampagneDetailView(ClientStaffRequiredMixin, DetailView):
     model = Campagne
     template_name = 'campaigns/campagne_detail.html'
@@ -824,11 +907,10 @@ class CampagneDetailView(ClientStaffRequiredMixin, DetailView):
             'support__ecran_info', 'face__support'
         ).all()
 
-        # Enrichissement des lignes avec spots calculés
         for ligne in lignes:
             if campagne.type_support == 'ecran' and hasattr(ligne.support, 'ecran_info'):
                 ligne.spots_calcules = ligne.support.ecran_info.calculer_nombre_spots_campagne(campagne)
-            elif campagne.type_support == 'panneau' and ligne.face:
+            elif campagne.type_support != 'ecran' and ligne.face:
                 ligne.spots_calcules = ligne.face.calculer_nombre_spots_campagne(campagne)
             else:
                 ligne.spots_calcules = 0
@@ -838,14 +920,49 @@ class CampagneDetailView(ClientStaffRequiredMixin, DetailView):
 
         if campagne.est_mere:
             enfants = campagne.sous_campagnes.all()
+            enfants_data = []
+            total_campagne = {
+                'quantite': Decimal('0.00'),
+                'prix': Decimal('0.00'),
+                'affichage': Decimal('0.00'),
+                'impression': Decimal('0.00'),
+                'total': Decimal('0.00'),
+            }
+
+            for enfant in enfants:
+                enfant_lignes = enfant.lignes.select_related(
+                    'support__ecran_info', 'face__support'
+                ).all()
+                for ligne in enfant_lignes:
+                    if enfant.type_support == 'ecran' and hasattr(ligne.support, 'ecran_info'):
+                        ligne.spots_calcules = ligne.support.ecran_info.calculer_nombre_spots_campagne(enfant)
+                    elif enfant.type_support != 'ecran' and ligne.face:
+                        ligne.spots_calcules = ligne.face.calculer_nombre_spots_campagne(enfant)
+                    else:
+                        ligne.spots_calcules = 0
+
+                rows, totaux = build_support_rows(enfant, enfant_lignes)
+                enfants_data.append({
+                    'campagne': enfant,
+                    'rows': rows,
+                    'totaux': totaux,
+                })
+                for key in total_campagne:
+                    total_campagne[key] += totaux[key]
+
+            context['enfants_data'] = enfants_data
+            context['total_campagne'] = total_campagne
+            context['nombre_sous_campagnes'] = enfants.count()
             context['total_supports'] = sum(child.lignes.count() for child in enfants)
             context['total_spots'] = sum(child.calculer_nombre_spots() for child in enfants)
         else:
+            support_rows, totaux_campagne = build_support_rows(campagne, lignes)
+            context['support_rows'] = support_rows
+            context['totaux_campagne'] = totaux_campagne
             context['total_supports'] = lignes.count()
             context['total_spots'] = campagne.calculer_nombre_spots()
 
         return context
-
 
 
 
@@ -881,16 +998,21 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
         if is_create:
             form.instance.created_by = self.request.user
         
-        # Quand le Statut est "Brouillon",actif est forcé en False
         if form.cleaned_data.get('statut') == Campagne.STATUT_BROUILLON:
             form.instance.actif = False
         
         self.object = form.save()
         
-        # Récupérer depuis cleaned_data plutôt que request.FILES
+        # Fichiers nouvellement uploadés
         fichiers = form.cleaned_data.get('visuels_multiples', [])
-        for f in fichiers:
-            CampagneVisuel.objects.create(campagne=self.object, fichier=f)
+        if fichiers:
+            for f in fichiers:
+                CampagneVisuel.objects.create(campagne=self.object, fichier=f)
+        elif self.object.campagne_parente_id and not self.object.visuels.exists():
+            # NOUVEAU : héritage des visuels de la campagne mère
+            # (seulement si aucun visuel propre n'existe déjà, pour éviter les doublons aux modifications suivantes)
+            for v in self.object.campagne_parente.visuels.all():
+                CampagneVisuel.objects.create(campagne=self.object, fichier=v.fichier)
 
         self.object.auto_update_statut()
         
@@ -906,8 +1028,8 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
         )
         
         messages.success(self.request, msg_text)
-        return super().form_valid(form)  # ← aussi, il manquait ça dans ton code original
-
+        return super().form_valid(form)
+    
     def get_success_url(self):
         return reverse('campagne_detail', kwargs={'pk': self.object.pk})
 
@@ -918,6 +1040,47 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
         if self.object:
             context['obj'] = self.object
         return context
+    # def get(self, request, *args, **kwargs):
+    #     self.object = self.get_object()
+    #     print("=== DEBUG EDIT ===")
+    #     print("kwargs:", self.kwargs)
+    #     print("self.object:", self.object)
+    #     if self.object:
+    #         print("self.object.pk:", self.object.pk)
+    #         print("self.object.date_debut:", self.object.date_debut)
+    #         print("self.object.prix:", self.object.prix)
+    #     form = self.get_form()
+    #     print("form.instance.pk:", form.instance.pk)
+    #     print("form.initial:", form.initial)
+    #     print("==================")
+    #     return super().get(request, *args, **kwargs)
+
+
+
+@login_required
+def api_campagne_parente_info(request, campagne_id):
+    """Retourne les dates et visuels d'une campagne mère, pour héritage côté sous-campagne."""
+    try:
+        parent = Campagne.objects.get(pk=campagne_id, est_mere=True)
+    except Campagne.DoesNotExist:
+        return JsonResponse({'error': 'Campagne mère introuvable'}, status=404)
+
+    visuels = [
+        {
+            'id': v.pk,
+            'url': v.fichier.url,
+            'is_video': v.fichier.url.lower().endswith('.mp4'),
+        }
+        for v in parent.visuels.all()
+    ]
+
+    return JsonResponse({
+        'date_debut': parent.date_debut.isoformat() if parent.date_debut else None,
+        'date_fin': parent.date_fin.isoformat() if parent.date_fin else None,
+        'visuels': visuels,
+    })
+
+
 
 
 class CampagneLancerView(StaffRequiredMixin, View):
@@ -977,8 +1140,6 @@ class VisuelDeleteView(StaffRequiredMixin, View):
         return redirect('campagne_detail', pk=pk)
 
 
-
-
 class SupportBulkActionView(StaffRequiredMixin, View):
     template_name = 'campaigns/supports_add_bulk.html'
 
@@ -988,17 +1149,30 @@ class SupportBulkActionView(StaffRequiredMixin, View):
     def get(self, request, campagne_pk):
         campagne = self.get_campagne(campagne_pk)
         type_support = request.GET.get('type_support', campagne.type_support or '').strip()
+        ville = request.GET.get('ville', campagne.lieu or '').strip()
 
         is_modification = campagne.lignes.exists()
         mode_title = "Modifier la sélection" if is_modification else "Ajouter des supports"
         supports_enrichis = []
 
+        # Liste des villes disponibles, pour le select de filtre dans le template
+        villes_disponibles = (
+            Support.objects
+            .exclude(ville__exact='')
+            .values_list('ville', flat=True)
+            .distinct()
+            .order_by('ville')
+        )
+
         if type_support == 'ecran':
-            # Écrans : on filtre sur le type d'écran uniquement.
+            # Écrans : on filtre sur le type d'écran, éventuellement la ville.
             supports_qs = Support.objects.filter(
-                type_support='ecran', 
+                type_support='ecran',
                 etat='bon'
-            ).order_by('ville', 'quartier')
+            )
+            if ville:
+                supports_qs = supports_qs.filter(ville=ville)
+            supports_qs = supports_qs.order_by('ville', 'quartier')
 
             selectionnes = list(campagne.lignes.values_list('support_id', flat=True))
 
@@ -1016,13 +1190,16 @@ class SupportBulkActionView(StaffRequiredMixin, View):
                 })
 
         else:
-            # Panneaux : on ne garde que les panneaux du format ciblé par la campagne.
+            # Panneaux : on ne garde que les panneaux du format ciblé, éventuellement de la ville ciblée.
             supports_qs = Support.objects.filter(
                 type_support='panneau',
                 format=type_support,
                 etat='bon'
-            ).prefetch_related('faces').order_by('ville', 'quartier')
-            
+            )
+            if ville:
+                supports_qs = supports_qs.filter(ville=ville)
+            supports_qs = supports_qs.prefetch_related('faces').order_by('ville', 'quartier')
+
             selectionnes = list(campagne.lignes.values_list('face_id', flat=True))
 
             for support in supports_qs:
@@ -1044,9 +1221,11 @@ class SupportBulkActionView(StaffRequiredMixin, View):
             'mode_title': mode_title,
             'is_modification': is_modification,
             'supports_enrichis': supports_enrichis,
-            # ✅ Choix pour les selects dans le template
             'duree_choices': DUREE_CHOICES,
             'frequence_choices': FREQUENCE_CHOICES,
+            # ✅ Nouveau : contexte pour le filtre ville
+            'ville_filtree': ville,
+            'villes_disponibles': villes_disponibles,
         })
 
     def post(self, request, campagne_pk):
@@ -1056,7 +1235,6 @@ class SupportBulkActionView(StaffRequiredMixin, View):
         if type_support != 'ecran':
             face_ids = request.POST.getlist('faces')
 
-            # Synchronisation : retirer les faces décochées
             campagne.lignes.filter(face__isnull=False).exclude(face_id__in=face_ids).delete()
 
             for face_id in face_ids:
@@ -1073,20 +1251,17 @@ class SupportBulkActionView(StaffRequiredMixin, View):
         else:
             support_ids = request.POST.getlist('supports')
 
-            # Synchronisation : retirer les écrans décochés
             campagne.lignes.filter(face__isnull=True).exclude(support_id__in=support_ids).delete()
 
             for support_id in support_ids:
                 support = get_object_or_404(Support, pk=support_id, type_support='ecran')
 
-                # ✅ Récupérer les paramètres spécifiques à cet écran depuis le POST
                 date_debut_str      = request.POST.get(f'date_debut_{support_id}', '').strip()
                 date_fin_str        = request.POST.get(f'date_fin_{support_id}', '').strip()
                 duree_passage_str   = request.POST.get(f'duree_passage_{support_id}', '').strip()
                 frequence_str       = request.POST.get(f'frequence_{support_id}', '').strip()
                 tranches_horaires   = request.POST.get(f'tranches_horaires_{support_id}', '').strip()
 
-                # Conversion des valeurs (None si vide → héritera de la campagne)
                 date_debut    = None
                 date_fin      = None
                 duree_passage = None
@@ -1112,7 +1287,6 @@ class SupportBulkActionView(StaffRequiredMixin, View):
                     support=support,
                     defaults={
                         'ordre_dans_boucle': 0,
-                        # ✅ Enregistrer les paramètres spécifiques (None = héritage campagne)
                         'date_debut':       date_debut,
                         'date_fin':         date_fin,
                         'duree_passage':    duree_passage,
@@ -1130,6 +1304,8 @@ class SupportBulkActionView(StaffRequiredMixin, View):
 
         messages.success(request, "Mise à jour des supports effectuée.")
         return redirect('campagne_detail', pk=campagne_pk)
+
+
 # ── API JSON ──────────────────────────────────────────────────────────────────
 
 class ApiCheckDisponibiliteView(LoginRequiredMixin, View):
@@ -1278,7 +1454,7 @@ class ReservationCreateView(StaffRequiredMixin, View):
         supports = _get_supports()
 
         # Formats présents parmi les supports disponibles uniquement
-        format_choices_map = dict(Support.FORMAT_CHOICES)
+        format_choices_map = dict(FormatSupport.objects.values_list('code', 'dimensions'))
         codes_uniques = (
             Support.objects
             .exclude(format__isnull=True)
@@ -1462,7 +1638,7 @@ class ReservationUpdateView(StaffRequiredMixin, View):
         now         = timezone.now()
         supports    = _get_supports()
         # Formats présents parmi les supports disponibles uniquement
-        format_choices_map = dict(Support.FORMAT_CHOICES)
+        format_choices_map = dict(FormatSupport.objects.values_list('code', 'dimensions'))
         codes_uniques = (
             Support.objects
             .exclude(format__isnull=True)

@@ -707,7 +707,7 @@ class CampagneListView(ClientStaffRequiredMixin, ListView):
         context['statut']               = self.request.GET.get('statut', '')
         context['statut_choices']       = Campagne.STATUT_CHOICES
         context['type_support']         = self.request.GET.get('type_support', '')
-        context['type_support_choices'] = Campagne.TYPE_SUPPORT_CHOICES
+        context['type_support_choices'] = get_type_support_choices()
         context['actif']                = self.request.GET.get('actif', '')
         return context
 

@@ -121,17 +121,92 @@ class Etape2Form(forms.Form):
     )
 
 
-class Etape3Form(forms.Form):
-    """Étape 3 — Coordonnées du visiteur (inchangé, conservé pour référence)."""
+"""
+Patch à fusionner dans portail/forms.py (ou l'app contenant Etape3Form).
+⚠️ Je n'ai pas le fichier forms.py original — j'ai reconstitué les champs
+existants d'après leur usage dans ReserverEtape3View (d['nom_contact'],
+d.get('societe'), d['email'], d['telephone'], d.get('accepte_contact')).
+Vérifie que les champs ci-dessous matchent bien tes vrais widgets/labels,
+et ne garde que les ajouts (type_client, reference_client_saisie, clean())
+si le reste diffère chez toi.
+"""
+from django import forms
+from django.core.exceptions import ValidationError
 
-    nom_contact = forms.CharField(label="Nom complet", max_length=200)
-    societe = forms.CharField(label="Société / Organisation", max_length=200, required=False)
-    email = forms.EmailField(label="Adresse email")
-    telephone = forms.CharField(label="Téléphone", max_length=30)
-    accepte_contact = forms.BooleanField(
-        label="J'accepte d'être recontacté(e) par la Régie INTEGRAL",
-        required=True,
+from campaigns.models import DemandeReservation
+
+
+class Etape3Form(forms.Form):
+    # ⚠️ required=False ici : la vraie obligation est conditionnelle
+    # (uniquement en mode "nouveau client"), gérée dans clean() ci-dessous.
+    nom_contact = forms.CharField(
+        max_length=200,
+        required=False,
+        label="Nom complet",
+        widget=forms.TextInput(attrs={'class': 'form-control'}),
     )
+    societe = forms.CharField(
+        max_length=200,
+        required=False,
+        label="Société / Organisation",
+        widget=forms.TextInput(attrs={'class': 'form-control'}),
+    )
+    email = forms.EmailField(
+        required=False,
+        label="Email",
+        widget=forms.EmailInput(attrs={'class': 'form-control'}),
+    )
+    telephone = forms.CharField(
+        max_length=30,
+        required=False,
+        label="Téléphone",
+        widget=forms.TextInput(attrs={'class': 'form-control'}),
+    )
+    accepte_contact = forms.BooleanField(
+        required=False,
+        label="J'accepte d'être recontacté(e)",
+    )
+
+    type_client = forms.ChoiceField(
+        choices=DemandeReservation.TYPE_CLIENT_CHOICES,
+        initial=DemandeReservation.TYPE_CLIENT_NOUVEAU,
+        widget=forms.RadioSelect,
+        label="Vous êtes",
+    )
+    reference_client_saisie = forms.CharField(
+        max_length=20,
+        required=False,
+        label="Votre référence client",
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'CLI-2026-A3F9K2',
+        }),
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        type_client = cleaned_data.get('type_client')
+        reference = cleaned_data.get('reference_client_saisie', '').strip()
+
+        if type_client == DemandeReservation.TYPE_CLIENT_EXISTANT:
+            if not reference:
+                self.add_error(
+                    'reference_client_saisie',
+                    "Merci de renseigner votre référence client (ex: CLI-2026-A3F9K2)."
+                )
+            # Pas besoin de nom/email/téléphone ici : ils seront récupérés
+            # depuis le Client rattaché par référence (voir DemandeReservation.save()).
+        else:
+            # Nouveau client : ces coordonnées sont la seule source d'info, obligatoires.
+            for field, msg in [
+                ('nom_contact', "Ce champ est obligatoire."),
+                ('email', "Ce champ est obligatoire."),
+                ('telephone', "Ce champ est obligatoire."),
+            ]:
+                if not cleaned_data.get(field):
+                    self.add_error(field, msg)
+
+        return cleaned_data
 
 # ── Formulaire de contact ─────────────────────────────────────────────────────
 

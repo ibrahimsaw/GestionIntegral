@@ -131,6 +131,7 @@ class SimulationCampagneEcranForm(forms.Form):
         required=False,
         widget=forms.Select(attrs={"class": "form-select"}),
     )
+
     tranches_horaires = forms.CharField(
         label="Tranches horaires",
         required=False,
@@ -138,7 +139,28 @@ class SimulationCampagneEcranForm(forms.Form):
             "class": "form-control",
             "placeholder": "Ex : 08:00-12:00,14:00-18:00",
         }),
-        help_text="Vide = la simulation propose des tranches.",
+        help_text="Vide = la simulation propose des tranches. Ou utilisez les 2 champs ci-dessous.",
+    )
+
+    # ── Nouveaux champs : saisie simplifiée par heure de début + durée ──────
+    heure_debut_diffusion = forms.TimeField(
+        label="Heure de début de diffusion",
+        required=False,
+        widget=forms.TimeInput(attrs={"type": "time", "class": "form-control"}),
+        help_text="Ex : 08:00",
+    )
+    duree_diffusion_heures = forms.DecimalField(
+        label="Durée de diffusion (heures)",
+        required=False,
+        min_value=0.25,
+        max_digits=4,
+        decimal_places=2,
+        widget=forms.NumberInput(attrs={
+            "class": "form-control",
+            "step": "0.25",
+            "placeholder": "Ex : 4 ou 4.5",
+        }),
+        help_text="Nombre d'heures à partir de l'heure de début (ex : 4.5 = 4h30).",
     )
 
     ecrans = forms.ModelMultipleChoiceField(
@@ -180,8 +202,35 @@ class SimulationCampagneEcranForm(forms.Form):
                 "ou date_debut + nb_jours."
             )
 
-        # Validation tranches si saisie
-        tranches = data.get("tranches_horaires")
+        # ── Calcul automatique de la tranche horaire depuis heure_debut + durée ──
+        heure_debut = data.get("heure_debut_diffusion")
+        duree_h     = data.get("duree_diffusion_heures")
+        tranches    = data.get("tranches_horaires")
+
+        if heure_debut and duree_h and not tranches:
+            debut_dt = datetime.combine(datetime.today(), heure_debut)
+            fin_dt   = debut_dt + timedelta(hours=float(duree_h))
+
+            # Cap à 23:00 comme le reste du système (heure_fin_maximale)
+            heure_fin_max = datetime.combine(datetime.today(), datetime.strptime("23:00", "%H:%M").time())
+            if fin_dt > heure_fin_max:
+                self.add_error(
+                    "duree_diffusion_heures",
+                    f"La diffusion dépasserait 23:00 (fin calculée : {fin_dt.strftime('%H:%M')}). "
+                    "Réduisez la durée ou avancez l'heure de début."
+                )
+            else:
+                tranche_str = f"{heure_debut.strftime('%H:%M')}-{fin_dt.strftime('%H:%M')}"
+                data["tranches_horaires"] = tranche_str
+                tranches = tranche_str
+
+        elif (heure_debut and not duree_h) or (duree_h and not heure_debut):
+            self.add_error(
+                "duree_diffusion_heures" if heure_debut else "heure_debut_diffusion",
+                "Renseignez à la fois l'heure de début ET la durée pour générer une tranche."
+            )
+
+        # Validation tranches si saisie (manuelle ou générée)
         if tranches:
             try:
                 h = calculer_duree_tranches(tranches)
@@ -191,7 +240,6 @@ class SimulationCampagneEcranForm(forms.Form):
                 self.add_error("tranches_horaires", "Format invalide — ex : 08:00-12:00,14:00-18:00")
 
         return data
-
 
 # ─────────────────────────────────────────────────────────────────────────────
 #  MOTEUR DE CALCUL

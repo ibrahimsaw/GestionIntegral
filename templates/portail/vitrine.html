@@ -34,8 +34,8 @@
   }
   .hero-bignum {
     position: absolute;
-    top: -0.2em; right: -0.02em;
-    font-size: 15rem;
+    top: -0.02em; right: 0.2em;
+    font-size: 5rem;
     font-weight: 800;
     line-height: 1;
     letter-spacing: var(--vt-tight);
@@ -93,15 +93,17 @@
     flex-direction: column;
     gap: 1.4rem;
   }
-  .hero-side-stat .num {
-    font-size: 2.1rem; font-weight: 800; letter-spacing: var(--vt-tight);
-    color: var(--text); line-height: 1;
+  .hero-side-title { font-weight:600; margin-bottom:.75rem; opacity:.85; }
+  .hero-side-villes { display:flex; flex-direction:column; gap:.5rem; max-height:280px; overflow-y:auto; }
+  .hero-side-ville {
+    display:flex; justify-content:space-between; align-items:center;
+    padding:.6rem .9rem; border-radius:10px; text-decoration:none; color:inherit;
+    background:rgba(255,255,255,.06); transition:background .15s;
   }
-  .hero-side-stat .num.ok { color: var(--map-ok); }
-  .hero-side-stat .lbl {
-    font-size: .76rem; color: var(--text-muted); margin-top: 4px;
-    text-transform: uppercase; letter-spacing: .07em; font-weight: 600;
-  }
+  .hero-side-ville:hover { background:rgba(255,255,255,.12); }
+  .hero-side-ville-badge { font-size:.75rem; padding:.15rem .5rem; border-radius:999px; }
+  .hero-side-ville-badge.ok { background:#1f9d55; color:#fff; }
+  .hero-side-ville-badge.full { background:#6b7280; color:#fff; }
 
   /* ─── SECTIONS GÉNÉRIQUES ─────────────────────────────────────── */
   .section { margin-bottom: 40px; }
@@ -140,12 +142,12 @@
     border-radius: var(--radius);
     overflow: hidden;
     transition: border-color .2s ease, box-shadow .2s ease;
+    scroll-margin-top: 90px;
   }
   .city-acc.is-open,
   .city-acc:hover { border-color: var(--color-primary); }
   .city-acc.is-open { box-shadow: var(--shadow-md); }
 
-  /* en-tête toujours visible, cliquable */
   .city-acc-head {
     display: flex;
     align-items: center;
@@ -205,21 +207,19 @@
     border-color: var(--color-primary);
   }
 
-  /* panneau déplié */
   .city-acc-panel {
     max-height: 0;
     overflow: hidden;
     transition: max-height .45s ease;
     background: var(--bg-card2);
   }
-  .city-acc.is-open .city-acc-panel { max-height: 900px; }
+  .city-acc.is-open .city-acc-panel { max-height: 1400px; }
 
   .city-acc-inner {
     border-top: 1px solid var(--border);
     display: grid;
     grid-template-columns: 1fr 1.15fr;
   }
-  /* alternance image gauche/droite selon la ville */
   .city-acc.alt-right .city-acc-inner { grid-template-columns: 1.15fr 1fr; }
   .city-acc.alt-right .city-acc-img { order: 2; }
   .city-acc.alt-right .city-acc-content { order: 1; }
@@ -230,7 +230,6 @@
     transition: transform .6s ease;
   }
   .city-acc.is-open .city-acc-img img { transform: scale(1.04); }
-  /* léger voile en bas pour la lisibilité, l'image reste nette ailleurs */
   .city-acc-img::after {
     content: '';
     position: absolute;
@@ -256,6 +255,8 @@
     align-items: stretch;
     justify-content: center;
     background: var(--bg-card);
+    max-height: 700px;
+    overflow-y: auto;
   }
   .city-acc.alt-right .city-acc-content { border-right: 1px solid var(--border); }
   .city-acc:not(.alt-right) .city-acc-content { border-left: 1px solid var(--border); }
@@ -277,7 +278,79 @@
   .support-types {
     display: flex;
     flex-direction: column;
+    gap: 8px;
   }
+
+  /* ── Mini-accordéon par catégorie ── */
+  .support-category {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    overflow: hidden;
+    background: var(--bg-card);
+  }
+  .support-category-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    width: 100%;
+    padding: 12px 14px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font: inherit;
+    text-align: left;
+  }
+  .support-category-title {
+    font-size: .75rem;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+    font-weight: 700;
+    color: var(--text-muted);
+  }
+  .support-category-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .support-category-total {
+    font-size: .8rem;
+    font-weight: 800;
+    color: var(--color-primary);
+    white-space: nowrap;
+  }
+  .support-category-chevron {
+    width: 24px; height: 24px;
+    border-radius: 50%;
+    border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-muted);
+    font-size: .7rem;
+    transition: transform .25s ease, background .2s ease, color .2s ease;
+    flex-shrink: 0;
+  }
+  .support-category.is-open .support-category-chevron {
+    transform: rotate(180deg);
+    background: var(--color-primary);
+    color: #fff;
+    border-color: var(--color-primary);
+  }
+  .support-category-panel {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height .35s ease;
+  }
+  .support-category.is-open .support-category-panel {
+    max-height: 600px;
+    border-top: 1px solid var(--border);
+  }
+  .support-category-list {
+    padding: 8px;
+    display: flex;
+    flex-direction: column;
+  }
+
   .support-type-row {
     display: grid;
     grid-template-columns: 1fr auto;
@@ -286,10 +359,10 @@
     padding: 14px 16px;
     border-bottom: 1px solid var(--border);
     border-radius: 14px;
-    background: var(--bg-card);
+    background: var(--bg-card2);
     transition: background .2s ease, transform .2s ease, box-shadow .2s ease;
   }
-  .support-type-row:last-child { border-bottom: none; }
+  .support-category-list .support-type-row:last-child { border-bottom: none; }
   .support-type-row:hover {
     background: rgba(59,130,246,.08);
     transform: translateY(-1px);
@@ -302,13 +375,6 @@
     gap: 10px;
     flex-wrap: wrap;
     justify-self: end;
-  }
-  .support-type-count {
-    font-size: 1.05rem;
-    font-weight: 800;
-    color: var(--color-primary);
-    min-width: 56px;
-    text-align: right;
   }
   .support-type-btn {
     display: inline-flex;
@@ -340,9 +406,10 @@
     font-size: 1.1rem; font-weight: 800; color: var(--color-primary);
     flex-shrink: 0;
     font-variant-numeric: tabular-nums;
+    min-width: 40px;
+    text-align: right;
   }
 
-  /* totaux centrés en bas, sur toute la largeur du panneau ouvert */
   .city-acc-totals {
     grid-column: 1 / -1;
     border-top: 1px solid var(--border);
@@ -400,7 +467,7 @@
   }
   .format-usage i { margin-top: 2px; flex-shrink: 0; color: var(--color-primary); }
 
-  /* ─── COMMENT ÇA MARCHE : parcours horizontal ──────────────────── */
+  /* ─── COMMENT ÇA MARCHE ─────────────────────────────────────────── */
   .process-track {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -425,7 +492,7 @@
   }
   .process-step p { font-size: .85rem; color: var(--text-muted); margin: 0; line-height: 1.5; }
 
-  /* ─── CTA FINAL ────────────────────────────────────────────────── */
+  /* ─── CTA FINAL ───────────────────────────────────────────────── */
   .cta-final {
     background: var(--color-primary);
     color: #fff;
@@ -463,7 +530,7 @@
 
   @media (max-width: 992px) {
     .hero-section { grid-template-columns: 1fr; padding: 3rem 2rem; }
-    .hero-side { border-left: none; border-top: 1px solid var(--border); padding-left: 0; padding-top: 1.4rem; flex-direction: row; flex-wrap: wrap; }
+    .hero-side { border-left: none; border-top: 1px solid var(--border); padding-left: 0; padding-top: 1.4rem; }
     .hero-bignum { font-size: 9rem; }
     .city-acc-inner,
     .city-acc.alt-right .city-acc-inner { grid-template-columns: 1fr; }
@@ -483,219 +550,264 @@
 {% block content %}
 <div class="vitrine">
 
-<!-- ═══════════ HERO ═══════════ -->
-<div class="hero-section">
-  <div class="hero-bignum">{{ total_faces_libres_reseau }}</div>
-  <div>
-    <div class="hero-eyebrow">Disponibilités en temps réel</div>
-    <h1 class="hero-title">Votre marque, partout où ça compte.</h1>
-    <p class="hero-subtitle">
-      Premier réseau indépendant d'affichage urbain, avec {{ total_faces_reseau }} faces publicitaires
-      réparties sur {{ nb_villes }} ville{{ nb_villes|pluralize }} — panneaux grand format et écrans numériques.
-    </p>
-    <div class="hero-actions">
-      <a href="#reseau" class="hero-btn hero-btn-solid"><i class="bi bi-geo-alt-fill"></i> Voir le réseau</a>
-      <a href="mailto:contact@regie-urbana.com" class="hero-btn hero-btn-outline"><i class="bi bi-envelope-fill"></i> Demander un devis</a>
-    </div>
-  </div>
-  <div class="hero-side">
-    <div class="hero-side-stat">
-      <div class="num">{{ nb_villes }}</div>
-      <div class="lbl">Villes couvertes</div>
-    </div>
-    <div class="hero-side-stat">
-      <div class="num">{{ total_faces_reseau }}</div>
-      <div class="lbl">Faces publicitaires</div>
-    </div>
-    <div class="hero-side-stat">
-      <div class="num ok">{{ total_faces_libres_reseau }}</div>
-      <div class="lbl">Disponibles aujourd'hui</div>
-    </div>
-  </div>
-</div>
-
-<!-- ═══════════ RÉSEAU PAR VILLE ═══════════ -->
-<div class="section" id="reseau">
-  <div class="section-header">
+  <!-- ═══════════ HERO ═══════════ -->
+  <div class="hero-section">
+    <div class="hero-bignum">{{ nb_villes }} ville{{ nb_villes|pluralize }}</div>
     <div>
-      <div class="section-tag">Réseau national</div>
-      <div class="section-title">Disponibilités ville par ville</div>
-      <div class="section-subtitle">Mises à jour en temps réel.</div>
+      <div class="hero-eyebrow">Disponibilités en temps réel</div>
+      <h1 class="hero-title">Votre marque, partout où ça compte.</h1>
+      <p class="hero-subtitle">
+        Premier réseau indépendant d'affichage urbain, avec {{ total_faces_reseau }} faces publicitaires
+        réparties sur {{ nb_villes }} ville{{ nb_villes|pluralize }} — panneaux grand format et écrans numériques.
+      </p>
+      <div class="hero-actions">
+        <a href="#reseau" class="hero-btn hero-btn-solid"><i class="bi bi-geo-alt-fill"></i> Voir le réseau</a>
+        <a href="mailto:contact@regie-urbana.com" class="hero-btn hero-btn-outline"><i class="bi bi-envelope-fill"></i> Demander un devis</a>
+      </div>
     </div>
-  </div>
 
-  <div class="city-list">
-    {% for ville in villes_stats %}
-    <div class="city-acc {% cycle '' 'alt-right' %}">
-      <button class="city-acc-head" type="button" onclick="
-        const acc = this.closest('.city-acc');
-        const wasOpen = acc.classList.contains('is-open');
-        acc.closest('.city-list').querySelectorAll('.city-acc.is-open').forEach(o => o.classList.remove('is-open'));
-        if (!wasOpen) acc.classList.add('is-open');
-      ">
-        <div class="city-acc-head-left">
-          <span class="city-acc-name">{{ ville.nom }}</span>
-          <span class="city-acc-mini">{{ ville.total_faces }} face{{ ville.total_faces|pluralize }} au total</span>
-        </div>
-        <div class="city-acc-head-right">
+    <div class="hero-side">
+      <div class="hero-side-title">Nos villes</div>
+      <div class="hero-side-villes">
+        {% for ville in villes_stats %}
+        <a href="#ville-{{ forloop.counter }}" class="hero-side-ville" onclick="
+          event.preventDefault();
+          document.querySelectorAll('.city-acc.is-open').forEach(o => o.classList.remove('is-open'));
+          const target = document.getElementById('ville-{{ forloop.counter }}');
+          if (target) {
+            target.classList.add('is-open');
+            target.scrollIntoView({behavior:'smooth', block:'start'});
+          }
+        ">
+          <span class="hero-side-ville-name">{{ ville.nom }}</span>
           {% if ville.faces_libres > 0 %}
-            <span class="city-badge-available">{{ ville.faces_libres }} libre{{ ville.faces_libres|pluralize }}</span>
+            <span class="hero-side-ville-badge ok">Voir les disponibilités</span>
           {% else %}
-            <span class="city-badge-full">Complet</span>
+            <span class="hero-side-ville-badge full">Complet</span>
           {% endif %}
-          <span class="city-acc-chevron"><i class="bi bi-chevron-down"></i></span>
-        </div>
-      </button>
+        </a>
+        {% empty %}
+        <p style="color:var(--text-muted);">Aucune ville disponible.</p>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
 
-      <div class="city-acc-panel">
-        <div class="city-acc-inner">
-          <div class="city-acc-img">
-            <img src="{% static ville.image_url %}" alt="{{ ville.nom }}" loading="lazy">
-            <span class="city-acc-img-caption"><i class="bi bi-geo-alt-fill"></i> {{ ville.nom }}</span>
-          </div>
-          <div class="city-acc-content">
-            <div class="city-acc-grouptitle">Panneaux par type</div>
-            <div class="support-types">
-              {% for support in ville.supports %}
-              <div class="support-type-row">
-                <div class="support-type-left">
-                  <div class="support-icon">
-                    <svg viewBox="0 0 16 16"><rect x="1" y="2" width="14" height="9" rx="1"/><rect x="6" y="11" width="4" height="3"/></svg>
-                  </div>
-                  <span class="support-type-name">{{ support.label }}</span>
-                </div>
-                <div class="support-type-actions">
-                  <span class="support-type-count">{{ support.count }}</span>
-                  <a href="{% url 'portail:reserver_etape1' %}?type_panneau={{ support.label|urlencode }}" class="support-type-btn">
-                    Réserver
-                  </a>
-                </div>
-              </div>
-              {% empty %}
-              <div class="support-type-row">
-                <span class="support-type-name">Aucun support enregistré</span>
-              </div>
+  <!-- ═══════════ RÉSEAU PAR VILLE ═══════════ -->
+  <div class="section" id="reseau">
+    <div class="section-header">
+      <div>
+        <div class="section-tag">Réseau national</div>
+        <div class="section-title">Disponibilités ville par ville</div>
+        <div class="section-subtitle">Mises à jour en temps réel.</div>
+      </div>
+    </div>
+
+    <div class="city-list">
+      {% for ville in villes_stats %}
+      <div class="city-acc {% cycle '' 'alt-right' %}" id="ville-{{ forloop.counter }}">
+        <button class="city-acc-head" type="button" onclick="
+          const acc = this.closest('.city-acc');
+          const wasOpen = acc.classList.contains('is-open');
+          acc.closest('.city-list').querySelectorAll('.city-acc.is-open').forEach(o => o.classList.remove('is-open'));
+          if (!wasOpen) acc.classList.add('is-open');
+        ">
+          <div class="city-acc-head-left">
+            <span class="city-acc-name">{{ ville.nom }}</span>
+            <span class="city-acc-mini">
+              {% for cat in ville.supports %}
+                {{ cat.categorie }}{% if not forloop.last %}, {% endif %}
               {% endfor %}
-            </div>
+            </span>
           </div>
-          <div class="city-acc-totals">
-            {% comment %} <div class="city-stat-box">
-              <div class="city-stat-num">{{ ville.total_faces }}</div>
-              <div class="city-stat-label">Faces totales</div>
+          <div class="city-acc-head-right">
+            {% if ville.faces_libres > 0 %}
+              <span class="city-badge-available"></span>
+            {% else %}
+              <span class="city-badge-full">Complet</span>
+            {% endif %}
+            <span class="city-acc-chevron"><i class="bi bi-chevron-down"></i></span>
+          </div>
+        </button>
+
+        <div class="city-acc-panel">
+          <div class="city-acc-inner">
+            <div class="city-acc-img">
+              <img src="{% static ville.image_url %}" alt="{{ ville.nom }}" loading="lazy">
+              <span class="city-acc-img-caption"><i class="bi bi-geo-alt-fill"></i> {{ ville.nom }}</span>
+            </div>
+            <div class="city-acc-content">
+              <div class="city-acc-grouptitle">Panneaux par type</div>
+              <div class="support-types">
+                {% for cat in ville.supports %}
+                <div class="support-category">
+                  <button type="button" class="support-category-head" onclick="
+                    this.closest('.support-category').classList.toggle('is-open');
+                  ">
+                    <span class="support-category-title">{{ cat.categorie }}</span>
+                    <span class="support-category-right">
+                      <span class="support-category-chevron"><i class="bi bi-chevron-down"></i></span>
+                    </span>
+                  </button>
+                  <div class="support-category-panel">
+                    <div class="support-category-list">
+                      {% for support in cat.liste %}
+                      <div class="support-type-row">
+                        <div class="support-type-left">
+                          <div class="support-icon">
+                            <svg viewBox="0 0 16 16"><rect x="1" y="2" width="14" height="9" rx="1"/><rect x="6" y="11" width="4" height="3"/></svg>
+                          </div>
+                          <span class="support-type-name">{{ support.label }}</span>
+                        </div>
+                        <div class="support-type-actions">
+                          <span class="support-type-count">
+                            {% if support.label != "Écran Numérique" %}
+                              <span class="badge-libre">{{ support.libre }} libre{{ support.libre|pluralize }}</span>
+                              <span class="support-type-total">/ {{ support.count }} face{{ support.count|pluralize }}</span>
+                            {% else %}
+                              <span class="support-type-total">{{ support.count }} écran{{ support.count|pluralize }}</span>
+                            {% endif %}
+                          </span>
+                          {% if support.libre > 0 %}
+                          <a href="{% url 'portail:reserver_etape1' %}?ville={{ ville.nom|urlencode }}&categorie={{ cat.categorie|urlencode }}&format={{ support.format|urlencode }}" class="support-type-btn">
+                            Réserver
+                          </a>
+                          {% else %}
+                          <span class="support-type-btn disabled" style="background: var(--color-secondary);">
+                            Complet
+                          </span>
+                          {% endif %}
+                        </div>
+                      </div>
+                      {% endfor %}
+                    </div>
+                  </div>
+                </div>
+                {% empty %}
+                <div class="support-type-row">
+                  <span class="support-type-name">Aucun support enregistré</span>
+                </div>
+                {% endfor %}
+              </div>
+            </div>
+            {% comment %} <div class="city-acc-totals">
+              <div class="city-stat-box">
+                <div class="city-stat-num available">{{ ville.faces_libres }}</div>
+                <div class="city-stat-label">Disponibles</div>
+              </div>
+              <div class="city-stat-box">
+                <div class="city-stat-num occupied">{{ ville.faces_occupees }}</div>
+                <div class="city-stat-label">Occupées</div>
+              </div>
             </div> {% endcomment %}
-            <div class="city-stat-box">
-              <div class="city-stat-num available">{{ ville.faces_libres }}</div>
-              <div class="city-stat-label">Disponibles</div>
-            </div>
           </div>
         </div>
       </div>
+      {% empty %}
+      <p style="color:var(--text-muted); padding:2rem;">Aucune statistique disponible pour le moment.</p>
+      {% endfor %}
     </div>
-    {% empty %}
-    <p style="color:var(--text-muted); padding:2rem;">Aucune statistique disponible pour le moment.</p>
-    {% endfor %}
   </div>
-</div>
 
-<!-- ═══════════ FORMATS DE SUPPORTS ═══════════ -->
-<div class="section">
-  <div class="section-header">
+  <!-- ═══════════ FORMATS DE SUPPORTS ═══════════ -->
+  <div class="section">
+    <div class="section-header">
+      <div>
+        <div class="section-tag">Catalogue</div>
+        <div class="section-title">Des supports pensés pour l'impact</div>
+        <div class="section-subtitle">Trois familles de formats, adaptées à chaque objectif média.</div>
+      </div>
+    </div>
+
+    <div class="formats-grid">
+
+      <div class="format-card">
+        <div class="format-image">
+          <img src="{% static 'img/formats/Gemini_Generated_Image_9l7hhk9l7hhk9l7h.jfif' %}" alt="Panneau 4x3">
+          <span class="format-tag">Grand Format</span>
+        </div>
+        <div class="format-body">
+          <div class="format-title">Panneaux 4×3 et Géants</div>
+          <p class="format-desc">Visibilité maximale sur les axes à fort trafic.</p>
+          <div class="format-usage">
+            <i class="bi bi-lightbulb-fill"></i>
+            Idéal pour les lancements de marque et campagnes nationales.
+          </div>
+        </div>
+      </div>
+
+      <div class="format-card">
+        <div class="format-image">
+          <img src="{% static 'img/formats/Gemini_Generated_Image_sx89ybsx89ybsx891.png' %}" alt="Écran numérique">
+          <span class="format-tag">Digital</span>
+        </div>
+        <div class="format-body">
+          <div class="format-title">Écrans Numériques LED</div>
+          <p class="format-desc">Contenu dynamique, diffusion programmée.</p>
+          <div class="format-usage">
+            <i class="bi bi-lightbulb-fill"></i>
+            Changement de visuels en temps réel, ciblage par tranche horaire.
+          </div>
+        </div>
+      </div>
+
+      <div class="format-card">
+        <div class="format-image">
+          <img src="{% static 'img/formats/Gemini_Generated_Image_sx89ybsx89ybsx89.png' %}" alt="Sucette publicitaire">
+          <span class="format-tag">Mobilier Urbain</span>
+        </div>
+        <div class="format-body">
+          <div class="format-title">Sucettes Publicitaires</div>
+          <p class="format-desc">Panneaux lumineux au cœur des trottoirs, à hauteur de regard.</p>
+          <div class="format-usage">
+            <i class="bi bi-lightbulb-fill"></i>
+            Visibilité piétonne maximale, idéal en centre-ville et zones commerçantes.
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ═══════════ COMMENT ÇA MARCHE ═══════════ -->
+  <div class="section">
+    <div class="section-header">
+      <div>
+        <div class="section-tag">Processus</div>
+        <div class="section-title">Comment ça marche</div>
+        <div class="section-subtitle">De la demande à la diffusion, en 3 étapes simples.</div>
+      </div>
+    </div>
+
+    <div class="process-track">
+      <div class="process-step">
+        <div class="process-index">01 — SÉLECTION</div>
+        <h5>Vous choisissez vos emplacements</h5>
+        <p>Sélectionnez les villes et types de supports qui correspondent à votre cible.</p>
+      </div>
+      <div class="process-step">
+        <div class="process-index">02 — VALIDATION</div>
+        <h5>Nous validons la disponibilité</h5>
+        <p>Notre équipe confirme les faces libres et bloque vos dates de diffusion.</p>
+      </div>
+      <div class="process-step">
+        <div class="process-index">03 — DIFFUSION</div>
+        <h5>Votre campagne est diffusée</h5>
+        <p>Suivi de diffusion et reporting fournis pendant toute la durée de la campagne.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════ CTA FINAL ═══════════ -->
+  <div class="cta-final">
     <div>
-      <div class="section-tag">Catalogue</div>
-      <div class="section-title">Des supports pensés pour l'impact</div>
-      <div class="section-subtitle">Trois familles de formats, adaptées à chaque objectif média.</div>
+      <h2>Prêt à rendre votre marque incontournable ?</h2>
+      <p>Nos conseillers en régie vous proposent un plan média sur mesure.</p>
     </div>
+    <a href="mailto:contact@regie-urbana.com" class="cta-final-btn">
+      Demander un devis gratuit <i class="bi bi-arrow-right"></i>
+    </a>
   </div>
-
-  <div class="formats-grid">
-
-    <div class="format-card">
-      <div class="format-image">
-        <img src="{% static 'img/formats/Gemini_Generated_Image_9l7hhk9l7hhk9l7h.jfif' %}" alt="Panneau 4x3">
-        <span class="format-tag">Grand Format</span>
-      </div>
-      <div class="format-body">
-        <div class="format-title">Panneaux 4×3 et Géants</div>
-        <p class="format-desc">Visibilité maximale sur les axes à fort trafic.</p>
-        <div class="format-usage">
-          <i class="bi bi-lightbulb-fill"></i>
-          Idéal pour les lancements de marque et campagnes nationales.
-        </div>
-      </div>
-    </div>
-
-    <div class="format-card">
-      <div class="format-image">
-        <img src="{% static 'img/formats/Gemini_Generated_Image_sx89ybsx89ybsx891.png' %}" alt="Écran numérique">
-        <span class="format-tag">Digital</span>
-      </div>
-      <div class="format-body">
-        <div class="format-title">Écrans Numériques LED</div>
-        <p class="format-desc">Contenu dynamique, diffusion programmée.</p>
-        <div class="format-usage">
-          <i class="bi bi-lightbulb-fill"></i>
-          Changement de visuels en temps réel, ciblage par tranche horaire.
-        </div>
-      </div>
-    </div>
-
-    <div class="format-card">
-      <div class="format-image">
-        <img src="{% static 'img/formats/Gemini_Generated_Image_sx89ybsx89ybsx89.png' %}" alt="Sucette publicitaire">
-        <span class="format-tag">Mobilier Urbain</span>
-      </div>
-      <div class="format-body">
-        <div class="format-title">Sucettes Publicitaires</div>
-        <p class="format-desc">Panneaux lumineux au cœur des trottoirs, à hauteur de regard.</p>
-        <div class="format-usage">
-          <i class="bi bi-lightbulb-fill"></i>
-          Visibilité piétonne maximale, idéal en centre-ville et zones commerçantes.
-        </div>
-      </div>
-    </div>
-
-  </div>
-</div>
-
-<!-- ═══════════ COMMENT ÇA MARCHE ═══════════ -->
-<div class="section">
-  <div class="section-header">
-    <div>
-      <div class="section-tag">Processus</div>
-      <div class="section-title">Comment ça marche</div>
-      <div class="section-subtitle">De la demande à la diffusion, en 3 étapes simples.</div>
-    </div>
-  </div>
-
-  <div class="process-track">
-    <div class="process-step">
-      <div class="process-index">01 — SÉLECTION</div>
-      <h5>Vous choisissez vos emplacements</h5>
-      <p>Sélectionnez les villes et types de supports qui correspondent à votre cible.</p>
-    </div>
-    <div class="process-step">
-      <div class="process-index">02 — VALIDATION</div>
-      <h5>Nous validons la disponibilité</h5>
-      <p>Notre équipe confirme les faces libres et bloque vos dates de diffusion.</p>
-    </div>
-    <div class="process-step">
-      <div class="process-index">03 — DIFFUSION</div>
-      <h5>Votre campagne est diffusée</h5>
-      <p>Suivi de diffusion et reporting fournis pendant toute la durée de la campagne.</p>
-    </div>
-  </div>
-</div>
-
-<!-- ═══════════ CTA FINAL ═══════════ -->
-<div class="cta-final">
-  <div>
-    <h2>Prêt à rendre votre marque incontournable ?</h2>
-    <p>Nos conseillers en régie vous proposent un plan média sur mesure.</p>
-  </div>
-  <a href="mailto:contact@regie-urbana.com" class="cta-final-btn">
-    Demander un devis gratuit <i class="bi bi-arrow-right"></i>
-  </a>
-</div>
 
 </div>
 {% endblock %}

@@ -4,7 +4,8 @@
 {% block topbar_title %}<i class="bx bx-tachometer me-2" style="color:var(--color-primary)"></i>Tableau de Bord{% endblock %}
 {% block topbar_actions %}
   <a href="{% url 'campagne_create' %}" class="btn btn-primary btn-sm">
-    <i class="bx bx-plus me-1"></i>Nouvelle Campagne
+    <i class="bx bx-plus me-1"></i>
+    <span class="d-none d-md-inline">Nouvelle Campagne</span>
   </a>
 {% endblock %}
 
@@ -76,10 +77,44 @@
   .qa-card i    { font-size:1.6rem; }
   .qa-card span { font-size:.78rem; font-weight:700; text-align:center; }
 </style>
+<style>
+  /* ... votre CSS existant ... */
+
+  .custom-modal-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.55);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 1050; padding: 20px;
+  }
+  .custom-modal-box {
+    background: var(--bg-card, #fff); border-radius: 12px;
+    width: 100%; max-width: 640px; max-height: 85vh;
+    display: flex; flex-direction: column; overflow: hidden;
+    box-shadow: 0 10px 40px rgba(0,0,0,.25);
+  }
+  .custom-modal-header {
+    padding: 16px 20px; border-bottom: 1px solid var(--border, #e5e7eb);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .custom-modal-header h5 { margin: 0; }
+  .custom-modal-close {
+    background: none; border: none; font-size: 1.4rem; line-height: 1;
+    color: var(--text-muted, #888); cursor: pointer; padding: 0 4px;
+  }
+  .custom-modal-close:hover { color: #ef4444; }
+  .custom-modal-body { padding: 18px 20px; overflow-y: auto; }
+</style>
 {% endblock %}
 
 {% block content %}
-
+<div id="custom-modal-overlay" class="custom-modal-overlay" style="display:none;" onclick="if(event.target === this) closeCustomModal()">
+  <div class="custom-modal-box">
+    <div class="custom-modal-header">
+      <h5 id="custom-modal-title" class="fw-bold"></h5>
+      <button type="button" class="custom-modal-close" onclick="closeCustomModal()">&times;</button>
+    </div>
+    <div id="custom-modal-body" class="custom-modal-body"></div>
+  </div>
+</div>
 <!-- Filtre villes -->
 <ul class="nav nav-pills mb-3 nav-fill d-none d-sm-flex" role="tablist" id="filtre-villes">
   <li class="nav-item">
@@ -102,27 +137,30 @@
   <span class="sec-lbl"><i class="bx bx-time me-1"></i>Aujourd'hui</span>
 </div>
 <div class="row g-3 mb-4">
-  <div class="col-6 col-md-3">
-    <div class="m-card">
-      <div class="m-lbl">Clients actifs</div>
-      <div class="m-val" style="color:#a78bfa">{{ total_clients }}</div>
-      <div class="m-bar"><div class="m-bar-fill" style="width:100%;background:#a78bfa"></div></div>
-    </div>
+<div class="col-6 col-md-3">
+  <div class="m-card" style="cursor:pointer;"
+       onclick="loadModalContent('{% url 'api_dashboard_clients_actifs' %}?ville={{ ville_active }}', 'Clients actifs')">
+    <div class="m-lbl">Clients actifs</div>
+    <div class="m-val" style="color:#a78bfa">{{ total_clients }}</div>
+    <div class="m-bar"><div class="m-bar-fill" style="width:100%;background:#a78bfa"></div></div>
   </div>
-  <div class="col-6 col-md-3">
-    <div class="m-card">
-      <div class="m-lbl">Campagnes en cours</div>
-      <div class="m-val" style="color:var(--color-disponible)">{{ campagnes_actives }}</div>
-      <div class="m-sub">actives maintenant</div>
-    </div>
+</div>
+<div class="col-6 col-md-3">
+  <div class="m-card" style="cursor:pointer;"
+       onclick="loadModalContent('{% url 'api_dashboard_campagnes' 'en_cours' %}?ville={{ ville_active }}', 'Campagnes en cours')">
+    <div class="m-lbl">Campagnes en cours</div>
+    <div class="m-val" style="color:var(--color-disponible)">{{ campagnes_actives }}</div>
+    <div class="m-sub">actives maintenant</div>
   </div>
-  <div class="col-6 col-md-3">
-    <div class="m-card">
-      <div class="m-lbl">À venir</div>
-      <div class="m-val" style="color:#60a5fa">{{ campagnes_a_venir }}</div>
-      <div class="m-sub">dans les 30 jours</div>
-    </div>
+</div>
+<div class="col-6 col-md-3">
+  <div class="m-card" style="cursor:pointer;"
+       onclick="loadModalContent('{% url 'api_dashboard_campagnes' 'a_venir' %}?ville={{ ville_active }}', 'Campagnes à venir')">
+    <div class="m-lbl">À venir</div>
+    <div class="m-val" style="color:#60a5fa">{{ campagnes_a_venir }}</div>
+    <div class="m-sub">dans les 30 jours</div>
   </div>
+</div>
   <div class="col-6 col-md-3">
     <div class="m-card">
       <div class="m-lbl">Revenu actif</div>
@@ -137,13 +175,13 @@
       <div class="m-sub">campagnes futures</div>
     </div>
   </div>
-  <div class="col-6 col-md-3">
+  {% comment %} <div class="col-6 col-md-3">
     <div class="m-card">
       <div class="m-lbl">Campagnes mère</div>
       <div class="m-val" style="color:#fb923c">{{ campagnes_meres_count }}</div>
       <div class="m-sub">conteneurs actifs</div>
     </div>
-  </div>
+  </div> {% endcomment %}
   <div class="col-8 col-md-6">
     <div class="row g-2 h-100">
       <div class="col-4">
@@ -172,13 +210,13 @@
 <!-- Cases détaillées par type avec mini charts -->
 <div class="d-flex align-items-end justify-content-between">
   <p class="sec-lbl">Parc publicitaire</p>
-  <span class="sec-lbl">{{ total_supports }} supports · {{ total_faces }} faces</span>
+  <span class="sec-lbl">{{ total_faces }} faces/{{ total_supports }} supports</span>
 </div>
 <div class="row g-3 mb-4">
  
   {% if nb_ecrans > 0 %}
   <div class="col-12 col-md-6 col-lg">
-    <div class="card border-0 shadow-sm h-100" style="border-radius:14px;border-top:3px solid #06b6d4 !important;">
+    <div class="card border-0 shadow-sm h-100" style="border-radius:14px;border:3px solid #06b6d4 !important;">
       <div class="card-body p-3">
         <div class="d-flex align-items-center justify-content-between mb-2">
           <span class="fw-bold" style="font-size:.85rem;">Écrans</span>
@@ -210,7 +248,7 @@
  
   {% for cat in format_categories %}
   <div class="col-12 col-md-6 col-lg">
-    <div class="card border-0 shadow-sm h-100" style="border-radius:14px;border-top:3px solid {{ cat.color }} !important;">
+    <div class="card border-0 shadow-sm h-100" style="border-radius:14px;border:3px solid {{ cat.color }} !important;">
       <div class="card-body p-3">
         <div class="d-flex align-items-center justify-content-between mb-2">
           <span class="fw-bold" style="font-size:.85rem;">{{ cat.label }}</span>
@@ -218,8 +256,8 @@
             <i class="bx bx-chart" style="color:{{ cat.color }};font-size:1.2rem;"></i>
           </span>
         </div>
-        <div class="fw-bold mb-1" style="font-size:2rem;line-height:1;color:{{ cat.color }};">{{ cat.nb_supports }}</div>
-        <div class="small text-muted mb-3">{{ cat.nb_faces }} faces</div>
+        <div class="fw-bold mb-1" style="font-size:2rem;line-height:1;color:{{ cat.color }};">{{ cat.nb_faces }} faces</div>
+        <div class="small text-muted mb-3">{{ cat.nb_supports }} supports</div>
         <div class="d-flex align-items-center gap-3">
           <div style="width:80px;height:80px;flex-shrink:0;">
             <canvas id="chart-{{ cat.slug }}" width="80" height="80"></canvas>
@@ -480,9 +518,9 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
 (function () {
-  // ── Couleurs CSS ──────────────────────────────────────────────────────
   const cs        = getComputedStyle(document.documentElement);
   const C_PRIMARY = cs.getPropertyValue('--color-primary').trim() || '#6366f1';
   const C_OCCUPE  = '#ef4444';
@@ -490,7 +528,6 @@
   const C_LIBRE   = '#10b981';
   const C_PANNE   = '#94a3b8';
 
-  // ── Parser JSON sécurisé ──────────────────────────────────────────────
   function safeJSON(id) {
     const el = document.getElementById(id);
     if (!el) return [];
@@ -498,7 +535,7 @@
       let d = JSON.parse(el.textContent || '[]');
       if (typeof d === 'string') d = JSON.parse(d);
       return d;
-    } catch(e) { return []; }
+    } catch (e) { return []; }
   }
 
   const fStats = safeJSON('format-stats').filter(
@@ -506,7 +543,7 @@
   );
   const tStats = safeJSON('types-stats');
 
-  // ── Graphique occupation — barres horizontales groupées ───────────────
+  // ── Graphique occupation par format — barres horizontales ──
   const ctxOcc = document.getElementById('chartOccupation');
   if (ctxOcc && fStats.length) {
     new Chart(ctxOcc, {
@@ -525,25 +562,18 @@
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: {
-            position: 'bottom',
-            labels: { boxWidth: 12, font: { size: 11 }, padding: 12 },
-          },
-          tooltip: {
-            callbacks: {
-              label: ctx => ` ${ctx.dataset.label} : ${ctx.parsed.x} face(s)`,
-            },
-          },
+          legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 }, padding: 12 } },
+          tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label} : ${ctx.parsed.x} face(s)` } },
         },
         scales: {
           x: { grid: { color: 'rgba(0,0,0,.05)' }, ticks: { font: { size: 11 } } },
-          y: { grid: { display: false },            ticks: { font: { size: 11 } } },
+          y: { grid: { display: false }, ticks: { font: { size: 11 } } },
         },
       },
     });
   }
 
-  // ── Graphique types — donut ───────────────────────────────────────────
+  // ── Graphique répartition du parc — donut ──
   const ctxTypes = document.getElementById('chartTypes');
   if (ctxTypes && tStats.length) {
     new Chart(ctxTypes, {
@@ -552,7 +582,7 @@
         labels: tStats.map(s => s.label),
         datasets: [{
           data: tStats.map(s => s.count),
-          backgroundColor: [C_PRIMARY, '#06b6d4', '#ef4444'],
+          backgroundColor: tStats.map(s => s.color || C_PRIMARY),
           borderWidth: 2,
           borderColor: '#fff',
           hoverOffset: 6,
@@ -563,16 +593,41 @@
         cutout: '72%',
         plugins: {
           legend: { display: false },
-          tooltip: {
-            callbacks: {
-              label: ctx => ` ${ctx.label} : ${ctx.parsed}`,
-            },
-          },
+          tooltip: { callbacks: { label: ctx => ` ${ctx.label} : ${ctx.parsed}` } },
         },
       },
     });
   }
 
+  // ── Mini-donuts par catégorie (chart-{{ cat.slug }}) — générés dynamiquement,
+  //    au lieu d'IDs codés en dur qui ne correspondaient plus au HTML ──
+  const MINI_OPTS = {
+    responsive: false,
+    cutout: '68%',
+    plugins: { legend: { display: false }, tooltip: { enabled: false } },
+    animation: { duration: 600 },
+  };
+
+  function miniDonut(id, data, colors) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const total = data.reduce((a, b) => a + b, 0);
+    if (total === 0) return;
+    new Chart(el, {
+      type: 'doughnut',
+      data: { datasets: [{ data, backgroundColor: colors, borderWidth: 2, borderColor: '#fff', hoverOffset: 4 }] },
+      options: MINI_OPTS,
+    });
+  }
+
+  fStats.forEach(s => {
+    miniDonut(`chart-${s.slug}`, [s.nb_occupe, s.nb_reserve, s.nb_libre, s.nb_panne],
+      [C_OCCUPE, C_RESERVE, C_LIBRE, C_PANNE]);
+  });
+
+  miniDonut('chartEcrans', [{{ nb_ecrans_bon }}, {{ nb_ecrans_panne }}], ['#10b981', '#94a3b8']);
+
+  // ── Listes top campagnes / top faces ──
   const topCampaigns = safeJSON('top-campaigns');
   const topCampaignsList = document.getElementById('topCampaignsList');
   if (topCampaignsList && topCampaigns.length) {
@@ -587,8 +642,7 @@
         <div class="text-end">
           <div class="fw-bold">${c.revenu.toLocaleString('fr-FR')} FCFA</div>
           <a href="/campaigns/${c.pk}/" class="small text-decoration-none">Détail</a>
-        </div>
-      `;
+        </div>`;
       topCampaignsList.appendChild(item);
     });
   }
@@ -606,14 +660,37 @@
         </div>
         <div class="text-end">
           <div class="fw-bold">${f.revenue.toLocaleString('fr-FR')} FCFA</div>
-        </div>
-      `;
+        </div>`;
       topFacesList.appendChild(item);
     });
   }
 })();
 </script>
 
+<script>
+function openCustomModal(title) {
+    document.getElementById('custom-modal-title').textContent = title;
+    document.getElementById('custom-modal-body').innerHTML =
+        '<div class="text-center py-4"><div class="spinner-border text-primary"></div></div>';
+    document.getElementById('custom-modal-overlay').style.display = 'flex';
+    document.body.style.overflow = 'hidden';
+}
+function closeCustomModal() {
+    document.getElementById('custom-modal-overlay').style.display = 'none';
+    document.body.style.overflow = '';
+}
+function loadModalContent(url, title) {
+    openCustomModal(title);
+    fetch(url)
+        .then(r => r.text())
+        .then(html => { document.getElementById('custom-modal-body').innerHTML = html; })
+        .catch(() => {
+            document.getElementById('custom-modal-body').innerHTML =
+                '<p class="text-danger text-center py-3">Erreur de chargement.</p>';
+        });
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeCustomModal(); });
+</script>
 <script>
 (function () {
   const OPTS = {

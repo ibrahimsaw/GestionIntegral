@@ -15,6 +15,7 @@ from accounts.models import AuditLog
 from accounts.audit import log_action
 from campaigns.mixins import StaffRequiredMixin
 from campaigns.models import *
+from core.mixins import SortableListMixin
 from .forms import *
 from .models import *
 from accounts.models import User
@@ -389,13 +390,21 @@ def get_faces_support(request, support_id):
 #     def get_success_url(self):
 #         return reverse('support_detail', kwargs={'pk': self.support.pk})
 
-
-class SupportListView(TechnicienStaffRequiredMixin, ListView):
+class SupportListView(TechnicienStaffRequiredMixin,SortableListMixin, ListView):
     model = Support
     template_name = 'inventory/support_list.html'
     context_object_name = 'supports'
-    paginate_by = 15
-    
+    SORT_FIELDS = {
+        'code':  'code',
+        'code_mairie': 'code_mairie',
+        'nom':   'nom',
+        'type_support': 'type_support',
+        'etat':  'etat',
+        'occupation':'occupation',
+    }
+    DEFAULT_SORT = 'code'
+    DEFAULT_DIR = 'asc'
+
     occupation = {
         'occupe': 'Occupé',
         'libre': 'Libre',
@@ -414,69 +423,81 @@ class SupportListView(TechnicienStaffRequiredMixin, ListView):
         ville_f = self.request.GET.get('ville', '')
         occupation_f = self.request.GET.get('occupation', '')
         type_panneau_f = self.request.GET.get('type_panneau', '')
+        desactif = self.request.GET.get('desactif', '')
 
-        # 2. Filtres SQL (Rapides)
+        # Filtre par format (code) — la valeur envoyée par le <select> est bien le code
         if type_panneau_f:
-            codes_valides = list(
-                FormatSupport.objects.filter(categorie=type_panneau_f)
-                .values_list('code', flat=True)
-            )
-            queryset = queryset.filter(format__in=codes_valides)
+            fmt = FormatSupport.objects.filter(code=type_panneau_f).first()
+            if fmt and fmt.categorie == 'Ecran':
+                queryset = queryset.filter(ecran_info__cellule=type_panneau_f)
+            else:
+                queryset = queryset.filter(format=type_panneau_f)
 
         if q:
             queryset = queryset.filter(
                 Q(code__icontains=q) | Q(nom__icontains=q) | Q(adresse__icontains=q)
             )
-        
+
         if type_f:
             queryset = queryset.filter(type_support=type_f)
-            
+
         if etat_f:
             queryset = queryset.filter(etat=etat_f)
 
         if ville_f:
             queryset = queryset.filter(ville__iexact=ville_f)
 
-        if occupation_f in ['occupe','total_occupe', 'libre', 'reserve','total_reserve', 'non_reserve', 'occupe_ou_reserve']:
+        if occupation_f in ['occupe', 'total_occupe', 'libre', 'reserve', 'total_reserve', 'non_reserve', 'occupe_ou_reserve']:
             if occupation_f == 'occupe':
-                # Occupé physiquement (réservé ou non, l'occupation prime)
                 queryset = [s for s in queryset if s.is_occupe()]
             elif occupation_f == 'total_occupe':
-                # Totalement occupé = toutes les faces sont occupées (même si certaines sont réservées)
                 queryset = [s for s in queryset if s.is_occupe() and not s.is_libre()]
             elif occupation_f == 'reserve':
-                # Réservé = non occupé physiquement MAIS a une réservation active/à venir
                 queryset = [s for s in queryset if s.is_reserve()]
             elif occupation_f == 'total_reserve':
-                # Totalement réservé = aucune face n'est ni libre ni occupée (toutes sont réservées)
                 queryset = [s for s in queryset if s.is_reserve() and not s.is_libre() and not s.is_occupe()]
             elif occupation_f == 'non_reserve':
-                # Non réservé = ni occupé ni réservé
                 queryset = [s for s in queryset if not s.is_reserve()]
             elif occupation_f == 'occupe_ou_reserve':
-                # Occupé ou réservé = soit occupé, soit réservé
                 queryset = [s for s in queryset if s.is_occupe() or s.is_reserve()]
             else:  # libre
-                # Libre = ni occupé ni réservé
                 queryset = [s for s in queryset if not s.is_occupe() and not s.is_reserve()]
-        
+
         return queryset
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        # Préparation des choix pour le template
-        type_panneau_choices = sorted(
-            FormatSupport.objects.exclude(categorie='')
-            .values_list('dimensions', flat=True)
-            .distinct()
-        )
+        type_f = self.request.GET.get('type', '')
 
-        # On renvoie les variables pour que le formulaire de filtre reste rempli
+        if type_f == Support.TYPE_ECRAN:
+            # Type = Écran → uniquement les formats catégorie "Ecran", affichés en Cellules
+            type_panneau_choices = [
+                (f.code, f"{f.dimensions} ({f.superficie} Cellules)" if f.superficie else f.dimensions)
+                for f in FormatSupport.filtre_par_categorie(['Ecran'])
+            ]
+        elif type_f == Support.TYPE_PANNEAU:
+            # Type = Panneau → tous les formats sauf "Ecran", affichés en m²
+            type_panneau_choices = [
+                (f.code, f"{f.dimensions} ({f.superficie}m²)" if f.superficie else f.dimensions)
+                for f in FormatSupport.hors_ecran()
+            ]
+        else:
+            # Type vide → on affiche TOUT (panneaux + écrans confondus)
+            type_panneau_choices = [
+                (f.code, f"{f.dimensions} ({f.superficie} Cellules)" if f.categorie == 'Ecran' and f.superficie
+                else f"{f.dimensions} ({f.superficie}m²)" if f.superficie
+                else f.dimensions)
+                for f in FormatSupport.objects.exclude(categorie='')
+            ]
+
+        type_panneau_choices = sorted(type_panneau_choices)
+
+        
         villes = sorted({v.strip() for v in Support.objects.values_list('ville', flat=True) if v and v.strip()})
 
         context.update({
             'q': self.request.GET.get('q', ''),
-            'type_f': self.request.GET.get('type', ''),
+            'type_f': type_f,
             'etat_f': self.request.GET.get('etat', ''),
             'ville_f': self.request.GET.get('ville', ''),
             'occupation_f': self.request.GET.get('occupation', ''),
@@ -484,11 +505,9 @@ class SupportListView(TechnicienStaffRequiredMixin, ListView):
             'type_panneau_choices': type_panneau_choices,
             'occupation_choices': self.occupation,
             'villes': villes,
+            'desactif': self.request.GET.get('desactif', '')
         })
         return context
-    
-
-
 
 class SupportDetailView(ClientStaffRequiredMixin, DetailView):
     model = Support
@@ -616,7 +635,7 @@ class SupportDetailView(ClientStaffRequiredMixin, DetailView):
 
                 info_rows += [
                     ('Résolution',      ecran.get_resolution_display()),
-                    ('Cellule',         f'{ecran.cellule}'),
+                    ('Cellule', f'{ecran.format_detail["dimensions"]} ({ecran.format_detail["superficie"]}m²)'),
                     ('Type écran',      ecran.get_type_ecran_display()),
                     ('Plage diffusion', plage_str),
                     ('Occupation',      f'{taux}%'),
@@ -624,7 +643,7 @@ class SupportDetailView(ClientStaffRequiredMixin, DetailView):
 
                 ecran_stats = [
                     ('Résolution', 'bi-aspect-ratio', ecran.get_resolution_display(), 'var(--text)'),
-                    ('Cellule',    'bi-tv',           f'{ecran.cellule}',              'var(--text)'),
+                    ('Cellule',    'bi-tv',           f'{ecran.format_detail["dimensions"]} ({ecran.format_detail["superficie"]}m²)',              'var(--text)'),
                     ('Occupation', 'bi-pie-chart',    f'{taux}%',                      'var(--color-primary)'),
                     ('Diffusion',  'bi-clock',        plage_str,                       'var(--color-primary)'),
                 ]
@@ -861,20 +880,34 @@ class SupportDeleteView(StaffRequiredMixin, DeleteView):
         return context
 
 
-class MaintenanceListView(LoginRequiredMixin, ListView):
+from core.mixins import SortableListMixin
+
+
+from core.mixins import SortableListMixin
+
+
+class MaintenanceListView(LoginRequiredMixin, SortableListMixin, ListView):
     model               = Maintenance
     template_name       = 'inventory/maintenance_list.html'
     context_object_name = 'maintenances'
-    paginate_by         = 20
+
+    SORT_FIELDS = {
+        'support':           'support__code',
+        'face':              'face__label',
+        'technicien':        'effectue_par__username',
+        'date_intervention': 'date_intervention',
+        'etat_apres':        'etat_apres',
+    }
+    DEFAULT_SORT = 'date_intervention'
+    DEFAULT_DIR  = 'desc'
+    paginate_by  = 20
 
     def get_queryset(self):
         qs = Maintenance.objects.select_related('support', 'face', 'effectue_par')
 
-        # ✅ Filtre technicien → voit uniquement ses maintenances
         if self.request.user.is_technicien:
             qs = qs.filter(effectue_par=self.request.user)
 
-        # ✅ Filtres GET
         support_id = self.request.GET.get('support')
         etat_apres = self.request.GET.get('etat')
         technicien = self.request.GET.get('technicien')
@@ -884,13 +917,13 @@ class MaintenanceListView(LoginRequiredMixin, ListView):
         if technicien:
             qs = qs.filter(effectue_par_id=technicien)
 
+        qs = self.apply_sort(qs)
         return qs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['etat_choices'] = Maintenance.ETAT_CHOICES
         context['supports']     = Support.objects.filter(actif=True).order_by('code')
-        # ✅ Pour le filtre technicien, on affiche uniquement les techniciens qui ont des maintenances (ou tous si admin)
         if self.request.user.is_technicien:
             context['techniciens'] = User.objects.filter(
                 maintenances__effectue_par=self.request.user
@@ -907,11 +940,12 @@ class MaintenanceDetailView(LoginRequiredMixin, DetailView):
 
     def get_queryset(self):
         qs = Maintenance.objects.select_related('support', 'face', 'effectue_par')
-        # ✅ Technicien → voit uniquement ses maintenances
         if self.request.user.is_technicien:
             qs = qs.filter(effectue_par=self.request.user)
         return qs
 
+
+import json
 
 class MaintenanceCreateView(LoginRequiredMixin, CreateView):
     model         = Maintenance
@@ -919,7 +953,6 @@ class MaintenanceCreateView(LoginRequiredMixin, CreateView):
     template_name = 'inventory/maintenance_form.html'
     success_url   = reverse_lazy('maintenance_list')
 
-    # Dans MaintenanceCreateView et MaintenanceUpdateView
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs['user'] = self.request.user
@@ -930,7 +963,6 @@ class MaintenanceCreateView(LoginRequiredMixin, CreateView):
 
     def get_initial(self):
         initial = super().get_initial()
-        # ✅ Pré-remplit le support si passé en URL ou GET
         support_id = self.kwargs.get('pk') or self.request.GET.get('support')
         if support_id:
             initial['support'] = support_id
@@ -944,10 +976,27 @@ class MaintenanceCreateView(LoginRequiredMixin, CreateView):
         if self.request.user.is_technicien:
             form.instance.effectue_par = self.request.user
 
+        appliquer_tout = form.cleaned_data.get('appliquer_tout_le_support', False)
+
+        if appliquer_tout:
+            support = form.cleaned_data['support'] or form.instance.support
+            maintenances = Maintenance.creer_pour_support_complet(
+                support=support,
+                etat_apres=form.instance.etat_apres,
+                effectue_par=form.instance.effectue_par,
+                description=form.instance.description,
+                photo=self.request.FILES.get('photo'),
+            )
+            messages.success(
+                self.request,
+                f"{len(maintenances)} face(s) mise(s) à jour pour {support.code}."
+            )
+            return redirect(self.success_url)
+
         response = super().form_valid(form)
         messages.success(self.request, f'Maintenance enregistrée pour {self.object.support.code}.')
         return response
-    
+
     def form_invalid(self, form):
         messages.error(self.request, "Veuillez corriger les erreurs dans le formulaire.")
         return super().form_invalid(form)
@@ -955,6 +1004,10 @@ class MaintenanceCreateView(LoginRequiredMixin, CreateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['title'] = 'Nouvelle maintenance'
+        context['support_types_json'] = json.dumps({
+            s.pk: s.type_support
+            for s in Support.objects.filter(actif=True).only('pk', 'type_support')
+        })
         return context
 
 
@@ -966,7 +1019,6 @@ class MaintenanceUpdateView(LoginRequiredMixin, UpdateView):
 
     def get_queryset(self):
         qs = Maintenance.objects.select_related('support', 'effectue_par')
-        # ✅ Technicien → ne peut modifier que ses propres maintenances
         if self.request.user.is_technicien:
             qs = qs.filter(effectue_par=self.request.user)
         return qs
@@ -985,8 +1037,12 @@ class MaintenanceUpdateView(LoginRequiredMixin, UpdateView):
         context = super().get_context_data(**kwargs)
         context['title'] = f'Modifier maintenance — {self.object.support.code}'
         context['obj']   = self.object
+        context['support_types_json'] = json.dumps({
+            s.pk: s.type_support
+            for s in Support.objects.filter(actif=True).only('pk', 'type_support')
+        })
         return context
-    
+
 
 class SupportPeriodesVanneView(LoginRequiredMixin, View):
     template_name = 'inventory/support_periodes_panne.html'

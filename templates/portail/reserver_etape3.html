@@ -103,6 +103,31 @@
   }
   .check-row span { font-size: .78rem; color: var(--text); line-height: 1.5; }
 
+  /* ── TOGGLE TYPE DE CLIENT (NOUVEAU) ─────────────────────
+     Même logique visuelle que .check-row : carte cliquable,
+     mais en radio group à deux options côte à côte. */
+  .client-type-toggle { display: flex; gap: 10px; }
+  .client-type-option {
+    position: relative;
+    flex: 1; display: flex; align-items: center; gap: 9px;
+    padding: 12px 14px; border-radius: var(--radius-sm);
+    background: var(--bg-card2); border: 1.5px solid var(--border);
+    cursor: pointer; transition: all .15s;
+    font-size: .82rem; font-weight: 700; color: var(--text);
+  }
+  .client-type-option:hover { border-color: var(--color-primary); background: #eff6ff; }
+  .client-type-option input {
+    position: absolute; opacity: 0; width: 0; height: 0;
+  }
+  .client-type-option:has(input:checked) {
+    border-color: var(--color-primary); background: #eff6ff; color: var(--color-primary);
+  }
+  .client-type-option i { font-size: 1rem; flex-shrink: 0; }
+
+  .reference-hint {
+    font-size: .72rem; color: var(--text-muted); margin-top: 6px; line-height: 1.5;
+  }
+
   /* ── RÉCAP SIDEBAR ────────────────────────────────────── */
   .recap-block {
     background: var(--bg-card); border: 1px solid var(--border);
@@ -180,17 +205,17 @@
 {% endblock %}
 
 {% block content %}
-<div style="padding: 14px 16px;">
+<div>
 
   <!-- WIZARD -->
   <div class="wizard-steps">
     <div class="step-item done">
       <div class="step-circle"><i class="bi bi-check-lg"></i></div>
-      <span class="step-label">Emplacements & Période</span>
+      <span class="step-label d-none d-md-inline ms-1">Emplacements & Période</span>
     </div>
     <div class="step-item done">
       <div class="step-circle"><i class="bi bi-check-lg"></i></div>
-      <span class="step-label">Votre projet</span>
+      <span class="step-label d-none d-md-inline ms-1">Votre projet</span>
     </div>
     <div class="step-item active">
       <div class="step-circle">3</div>
@@ -219,58 +244,101 @@
           <form method="post" id="form-etape3" novalidate>
             {% csrf_token %}
 
-            <!-- Nom + Société -->
-            <div class="form-grid-2">
-              <div class="form-row">
-                <label class="form-label-e3" for="nom_contact">
-                  <i class="bi bi-person"></i> Nom complet <span class="req">*</span>
+            <!-- Type de client (NOUVEAU) -->
+            <div class="form-row">
+              <label class="form-label-e3">
+                <i class="bi bi-person-badge"></i> Vous êtes <span class="req">*</span>
+              </label>
+              <div class="client-type-toggle">
+                <label class="client-type-option" for="type_client_nouveau">
+                  <input type="radio" name="type_client" id="type_client_nouveau" value="nouveau"
+                         {% if form.type_client.value != 'existant' %}checked{% endif %}>
+                  <i class="bi bi-person-plus-fill"></i>
+                  <span>Nouveau client</span>
                 </label>
-                <input type="text" id="nom_contact" name="nom_contact"
-                       class="form-control-e3 {% if form.nom_contact.errors %}error{% endif %}"
-                       value="{{ form.nom_contact.value|default:'' }}"
-                       placeholder="Votre nom et prénom" autocomplete="name" required>
-                <div class="form-error-msg {% if form.nom_contact.errors %}show{% endif %}">
-                  <i class="bi bi-exclamation-circle"></i>
-                  {{ form.nom_contact.errors.0|default:"Ce champ est obligatoire." }}
-                </div>
-              </div>
-              <div class="form-row">
-                <label class="form-label-e3" for="societe">
-                  <i class="bi bi-building"></i> Société / Organisation
+                <label class="client-type-option" for="type_client_existant">
+                  <input type="radio" name="type_client" id="type_client_existant" value="existant"
+                         {% if form.type_client.value == 'existant' %}checked{% endif %}>
+                  <i class="bi bi-person-check-fill"></i>
+                  <span>Client existant</span>
                 </label>
-                <input type="text" id="societe" name="societe"
-                       class="form-control-e3"
-                       value="{{ form.societe.value|default:'' }}"
-                       placeholder="Optionnel" autocomplete="organization">
               </div>
             </div>
 
-            <!-- Email + Téléphone -->
-            <div class="form-grid-2">
-              <div class="form-row">
-                <label class="form-label-e3" for="email">
-                  <i class="bi bi-envelope"></i> Email <span class="req">*</span>
-                </label>
-                <input type="email" id="email" name="email"
-                       class="form-control-e3 {% if form.email.errors %}error{% endif %}"
-                       value="{{ form.email.value|default:'' }}"
-                       placeholder="votre@email.com" autocomplete="email" required>
-                <div class="form-error-msg {% if form.email.errors %}show{% endif %}">
-                  <i class="bi bi-exclamation-circle"></i>
-                  {{ form.email.errors.0|default:"Email invalide." }}
+            <!-- Référence client (affiché seulement si "Client existant") -->
+            <div class="form-row" id="bloc-reference-client" style="display:none">
+              <label class="form-label-e3" for="reference_client_saisie">
+                <i class="bi bi-upc-scan"></i> Votre référence client <span class="req">*</span>
+              </label>
+              <input type="text" id="reference_client_saisie" name="reference_client_saisie"
+                     class="form-control-e3 {% if form.reference_client_saisie.errors %}error{% endif %}"
+                     value="{{ form.reference_client_saisie.value|default:'' }}"
+                     placeholder="CLI-2026-A3F9K2">
+              <div class="form-error-msg {% if form.reference_client_saisie.errors %}show{% endif %}">
+                <i class="bi bi-exclamation-circle"></i>
+                {{ form.reference_client_saisie.errors.0|default:"Merci de renseigner votre référence client." }}
+              </div>
+              <div class="reference-hint">
+                Cette référence vous a été communiquée lors de votre inscription. Si vous ne
+                la retrouvez pas, laissez le champ vide — notre équipe fera le rapprochement manuellement.
+              </div>
+            </div>
+
+            <!-- Coordonnées (masquées si "Client existant") -->
+            <div id="bloc-coordonnees-nouveau">
+              <!-- Nom + Société -->
+              <div class="form-grid-2">
+                <div class="form-row">
+                  <label class="form-label-e3" for="nom_contact">
+                    <i class="bi bi-person"></i> Nom complet <span class="req">*</span>
+                  </label>
+                  <input type="text" id="nom_contact" name="nom_contact"
+                         class="form-control-e3 {% if form.nom_contact.errors %}error{% endif %}"
+                         value="{{ form.nom_contact.value|default:'' }}"
+                         placeholder="Votre nom et prénom" autocomplete="name">
+                  <div class="form-error-msg {% if form.nom_contact.errors %}show{% endif %}">
+                    <i class="bi bi-exclamation-circle"></i>
+                    {{ form.nom_contact.errors.0|default:"Ce champ est obligatoire." }}
+                  </div>
+                </div>
+                <div class="form-row">
+                  <label class="form-label-e3" for="societe">
+                    <i class="bi bi-building"></i> Société / Organisation
+                  </label>
+                  <input type="text" id="societe" name="societe"
+                         class="form-control-e3"
+                         value="{{ form.societe.value|default:'' }}"
+                         placeholder="Optionnel" autocomplete="organization">
                 </div>
               </div>
-              <div class="form-row">
-                <label class="form-label-e3" for="telephone">
-                  <i class="bi bi-telephone"></i> Téléphone <span class="req">*</span>
-                </label>
-                <input type="tel" id="telephone" name="telephone"
-                       class="form-control-e3 {% if form.telephone.errors %}error{% endif %}"
-                       value="{{ form.telephone.value|default:'' }}"
-                       placeholder="+226 XX XX XX XX" autocomplete="tel" required>
-                <div class="form-error-msg {% if form.telephone.errors %}show{% endif %}">
-                  <i class="bi bi-exclamation-circle"></i>
-                  {{ form.telephone.errors.0|default:"Numéro invalide." }}
+
+              <!-- Email + Téléphone -->
+              <div class="form-grid-2">
+                <div class="form-row">
+                  <label class="form-label-e3" for="email">
+                    <i class="bi bi-envelope"></i> Email <span class="req">*</span>
+                  </label>
+                  <input type="email" id="email" name="email"
+                         class="form-control-e3 {% if form.email.errors %}error{% endif %}"
+                         value="{{ form.email.value|default:'' }}"
+                         placeholder="votre@email.com" autocomplete="email">
+                  <div class="form-error-msg {% if form.email.errors %}show{% endif %}">
+                    <i class="bi bi-exclamation-circle"></i>
+                    {{ form.email.errors.0|default:"Email invalide." }}
+                  </div>
+                </div>
+                <div class="form-row">
+                  <label class="form-label-e3" for="telephone">
+                    <i class="bi bi-telephone"></i> Téléphone <span class="req">*</span>
+                  </label>
+                  <input type="tel" id="telephone" name="telephone"
+                         class="form-control-e3 {% if form.telephone.errors %}error{% endif %}"
+                         value="{{ form.telephone.value|default:'' }}"
+                         placeholder="+226 XX XX XX XX" autocomplete="tel">
+                  <div class="form-error-msg {% if form.telephone.errors %}show{% endif %}">
+                    <i class="bi bi-exclamation-circle"></i>
+                    {{ form.telephone.errors.0|default:"Numéro invalide." }}
+                  </div>
                 </div>
               </div>
             </div>
@@ -411,13 +479,48 @@
 <script>
 "use strict";
 
+// ── Type de client : affiche/masque référence VS coordonnées ──────────────
+function toggleTypeClient() {
+  const estExistant = document.getElementById('type_client_existant').checked;
+  const blocReference   = document.getElementById('bloc-reference-client');
+  const blocCoordonnees = document.getElementById('bloc-coordonnees-nouveau');
+  const champReference  = document.getElementById('reference_client_saisie');
+
+  blocReference.style.display   = estExistant ? 'block' : 'none';
+  blocCoordonnees.style.display = estExistant ? 'none'  : 'block';
+
+  champReference.required = estExistant;
+  if (!estExistant) {
+    champReference.classList.remove('error');
+    const errEl = champReference.parentElement.querySelector('.form-error-msg');
+    if (errEl) errEl.classList.remove('show');
+  }
+
+  ['nom_contact', 'email', 'telephone'].forEach(id => {
+    const el = document.getElementById(id);
+    el.required = !estExistant;
+    if (estExistant) {
+      el.classList.remove('error');
+      const errEl = el.parentElement.querySelector('.form-error-msg');
+      if (errEl) errEl.classList.remove('show');
+    }
+  });
+}
+document.getElementById('type_client_nouveau').addEventListener('change', toggleTypeClient);
+document.getElementById('type_client_existant').addEventListener('change', toggleTypeClient);
+document.addEventListener('DOMContentLoaded', toggleTypeClient);
+
 // ── Validation + soumission ───────────────────────────────────────────────
 document.getElementById('form-etape3').addEventListener('submit', function(e) {
-  const fields = [
-    { id: 'nom_contact',  msg: 'Ce champ est obligatoire.' },
-    { id: 'email',        msg: 'Email obligatoire.' },
-    { id: 'telephone',    msg: 'Téléphone obligatoire.' },
-  ];
+  const estExistant = document.getElementById('type_client_existant').checked;
+
+  const fields = estExistant
+    ? [{ id: 'reference_client_saisie', msg: 'Merci de renseigner votre référence client.' }]
+    : [
+        { id: 'nom_contact',  msg: 'Ce champ est obligatoire.' },
+        { id: 'email',        msg: 'Email obligatoire.' },
+        { id: 'telephone',    msg: 'Téléphone obligatoire.' },
+      ];
 
   let hasError = false;
 
@@ -434,13 +537,15 @@ document.getElementById('form-etape3').addEventListener('submit', function(e) {
     }
   });
 
-  // Validation format email
-  const emailEl = document.getElementById('email');
-  if (emailEl.value.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailEl.value.trim())) {
-    emailEl.classList.add('error');
-    const errEl = emailEl.parentElement.querySelector('.form-error-msg');
-    if (errEl) { errEl.innerHTML = '<i class="bi bi-exclamation-circle"></i>Adresse email invalide.'; errEl.classList.add('show'); }
-    hasError = true;
+  // Validation format email (uniquement en mode "nouveau client")
+  if (!estExistant) {
+    const emailEl = document.getElementById('email');
+    if (emailEl.value.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailEl.value.trim())) {
+      emailEl.classList.add('error');
+      const errEl = emailEl.parentElement.querySelector('.form-error-msg');
+      if (errEl) { errEl.innerHTML = '<i class="bi bi-exclamation-circle"></i>Adresse email invalide.'; errEl.classList.add('show'); }
+      hasError = true;
+    }
   }
 
   if (hasError) { e.preventDefault(); return; }
@@ -457,9 +562,10 @@ document.getElementById('form-etape3').addEventListener('submit', function(e) {
 });
 
 // ── Live validation au blur ───────────────────────────────────────────────
-['nom_contact', 'email', 'telephone'].forEach(id => {
+['nom_contact', 'email', 'telephone', 'reference_client_saisie'].forEach(id => {
   const el = document.getElementById(id);
   el.addEventListener('blur', () => {
+    if (!el.required) return; // pas de faux positif sur un champ masqué/optionnel
     const errEl = el.parentElement.querySelector('.form-error-msg');
     if (el.value.trim()) {
       el.classList.remove('error');

@@ -92,8 +92,28 @@ STATUT_RESERVATION_CHOICES = [
 # Modèles de Base (Clients & Contrats)
 # ══════════════════════════════════════════════════════════════════════════════
 
+"""
+Modifications à apporter à Client (clients/models.py).
+Le champ `reference` est un code client court, unique, généré
+automatiquement à la création (ex: CLI-00001), sur le même principe
+que Support.save() dans inventory/models.py.
+"""
+
+
 class Client(models.Model):
     """Client de la régie publicitaire."""
+
+    # ── NOUVEAU CHAMP ────────────────────────────────────────────────────────
+    reference = models.CharField(
+        max_length=20,
+        unique=True,
+        blank=True,
+        editable=False,
+        verbose_name="Code client",
+        help_text="Généré automatiquement. Ex: CLI-00001. À communiquer au client "
+                   "pour qu'il puisse s'identifier lors d'une future demande.",
+    )
+
     nom           = models.CharField(max_length=200, verbose_name="Raison sociale / Nom")
     contact_nom   = models.CharField(max_length=150, blank=True, verbose_name="Nom du Contact principal")
     telephone     = models.CharField(max_length=30)
@@ -112,7 +132,18 @@ class Client(models.Model):
     def __str__(self):
         return self.nom
 
+    # ── NOUVELLE MÉTHODE ──────────────────────────────────────────────────────
+    def save(self, *args, **kwargs):
+        if not self.reference:
+            import random
+            import string
+            from django.utils import timezone
+            suffixe = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+            self.reference = f"CLI-{timezone.now().year}-{suffixe}"
+        super().save(*args, **kwargs)
+
     def get_contrat_actif(self):
+        from django.utils import timezone
         today = timezone.now().date()
         return self.contrats.filter(
             actif=True,
@@ -127,9 +158,9 @@ class Client(models.Model):
         return "Aucun contrat actif"
 
     def campagnes_actives(self):
+        from django.utils import timezone
         today = timezone.now().date()
         return self.campagnes.filter(date_debut__lte=today, date_fin__gte=today, statut__in=['en_cours', 'a_venir'])
-
 
 class Contrat(models.Model):
     """Contrat signé par un client."""
@@ -378,7 +409,6 @@ class ReservationLigne(models.Model):
 # ══════════════════════════════════════════════════════════════════════════════
 # DemandeReservation — Demande publique (visiteur non connecté)
 # ══════════════════════════════════════════════════════════════════════════════
-
 class DemandeReservation(models.Model):
     """
     Demande de réservation soumise depuis le portail public par un visiteur
@@ -392,7 +422,11 @@ class DemandeReservation(models.Model):
 
     IMPORTANT : Ce modèle ne crée PAS automatiquement de Client ni de
     Reservation. C'est le staff qui effectue ces opérations manuellement
-    depuis la vue de traitement (/staff/demandes/<uuid>/).
+    depuis la vue de traitement (/staff/demandes/<uuid>/), SAUF si le
+    visiteur s'est déclaré "client existant" avec une référence valide :
+    dans ce cas, le Client est rapproché automatiquement au save()
+    (voir plus bas), mais la Reservation, elle, reste toujours créée
+    manuellement par le staff à la validation.
     """
 
     # ── Statuts ───────────────────────────────────────────────────────────────
@@ -406,6 +440,14 @@ class DemandeReservation(models.Model):
         (STATUT_EN_COURS,  'En cours de traitement'),
         (STATUT_VALIDEE,   'Validée — Réservation créée'),
         (STATUT_REFUSEE,   'Refusée'),
+    ]
+
+    # ── Type de client (NOUVEAU) ────────────────────────────────────────────
+    TYPE_CLIENT_NOUVEAU  = 'nouveau'
+    TYPE_CLIENT_EXISTANT = 'existant'
+    TYPE_CLIENT_CHOICES = [
+        (TYPE_CLIENT_NOUVEAU,  'Nouveau client'),
+        (TYPE_CLIENT_EXISTANT, 'Client existant'),
     ]
 
     # ── Identité ──────────────────────────────────────────────────────────────
@@ -445,6 +487,21 @@ class DemandeReservation(models.Model):
         default=False,
         verbose_name="Accepte d'être recontacté",
         help_text="Le visiteur a coché la case d'acceptation de contact commercial.",
+    )
+
+    # ── Type de client (NOUVEAU) ─────────────────────────────────────────────
+    type_client = models.CharField(
+        max_length=10,
+        choices=TYPE_CLIENT_CHOICES,
+        default=TYPE_CLIENT_NOUVEAU,
+        verbose_name="Type de client",
+    )
+    reference_client_saisie = models.CharField(
+        max_length=20,
+        blank=True,
+        verbose_name="Référence client saisie",
+        help_text="Code client (ex: CLI-2026-A3F9K2) fourni par le visiteur s'il se "
+                   "déclare déjà client. Rempli côté public, vérifié par le staff.",
     )
 
     # ── Supports souhaités ────────────────────────────────────────────────────
@@ -506,14 +563,16 @@ class DemandeReservation(models.Model):
     )
 
     # ── Associations créées après validation ──────────────────────────────────
-    # Remplies par le staff depuis la vue de traitement
+    # Remplies par le staff depuis la vue de traitement (ou automatiquement
+    # au save() pour 'client', si la référence saisie matche — voir save()).
     client = models.ForeignKey(
         Client,
         on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name='demandes_reservation',
         verbose_name="Client associé",
-        help_text="Renseigné par le staff après validation.",
+        help_text="Renseigné automatiquement si la référence client saisie est "
+                   "valide, sinon par le staff après validation.",
     )
     reservation = models.ForeignKey(
         Reservation,
@@ -552,6 +611,36 @@ class DemandeReservation(models.Model):
     def save(self, *args, **kwargs):
         if not self.reference:
             self.reference = f"DEM-{timezone.now().year}-{str(uuid.uuid4())[:6].upper()}"
+
+        # ── NOUVEAU : rapprochement automatique du Client existant ──────────
+        # Si le visiteur se déclare "client existant" avec une référence, et
+        # qu'aucun Client n'est encore rattaché, on tente un rapprochement
+        # automatique par référence. Si ça ne matche pas, on laisse le champ
+        # vide : le staff verra reference_client_saisie et devra vérifier
+        # manuellement (faute de frappe possible, etc.) — voir les propriétés
+        # client_resolu_automatiquement / reference_client_non_trouvee.
+        if (
+            self.type_client == self.TYPE_CLIENT_EXISTANT
+            and self.reference_client_saisie
+            and not self.client_id
+        ):
+            match = Client.objects.filter(
+                reference__iexact=self.reference_client_saisie.strip()
+            ).first()
+            if match:
+                self.client = match
+                # Le visiteur n'a pas ressaisi ses coordonnées (masquées côté
+                # formulaire en mode "client existant") : on les récupère
+                # depuis la fiche Client pour que la demande reste exploitable.
+                if not self.nom_contact:
+                    self.nom_contact = match.contact_nom or match.nom
+                if not self.email:
+                    self.email = match.email
+                if not self.telephone:
+                    self.telephone = match.telephone
+                if not self.societe:
+                    self.societe = match.nom
+
         super().save(*args, **kwargs)
 
     # ── Validation ────────────────────────────────────────────────────────────
@@ -570,6 +659,14 @@ class DemandeReservation(models.Model):
                 raise ValidationError(
                     _("La durée souhaitée ne peut pas dépasser 1 an.")
                 )
+
+        # ── NOUVEAU : référence obligatoire si "client existant" ────────────
+        if self.type_client == self.TYPE_CLIENT_EXISTANT and not self.reference_client_saisie.strip():
+            raise ValidationError({
+                'reference_client_saisie': _(
+                    "Merci de renseigner votre référence client (ex: CLI-2026-A3F9K2)."
+                )
+            })
 
     # ── Propriétés ────────────────────────────────────────────────────────────
 
@@ -599,6 +696,27 @@ class DemandeReservation(models.Model):
     def peut_etre_traitee(self) -> bool:
         """True si la demande peut encore être validée ou refusée."""
         return self.statut in (self.STATUT_NOUVELLE, self.STATUT_EN_COURS)
+
+    @property
+    def client_resolu_automatiquement(self) -> bool:
+        """
+        NOUVEAU. True si le Client a pu être rapproché automatiquement par
+        référence (utile pour l'affichage staff : badge vert de confirmation).
+        """
+        return self.type_client == self.TYPE_CLIENT_EXISTANT and self.client_id is not None
+
+    @property
+    def reference_client_non_trouvee(self) -> bool:
+        """
+        NOUVEAU. True si le visiteur a saisi une référence mais qu'aucun
+        Client ne matche (utile pour l'affichage staff : badge d'alerte,
+        vérification manuelle nécessaire avant validation).
+        """
+        return (
+            self.type_client == self.TYPE_CLIENT_EXISTANT
+            and bool(self.reference_client_saisie)
+            and not self.client_id
+        )
 
     def get_statut_badge(self) -> str:
         """Retourne la classe Bootstrap pour le badge de statut."""
@@ -668,9 +786,6 @@ class DemandeReservation(models.Model):
     def nb_emplacements(self) -> int:
         """Nombre total d'emplacements demandés (faces + écrans)."""
         return self.faces_souhaitees.count() + self.supports_souhaites.count()
-
-
-
 # ══════════════════════════════════════════════════════════════════════════════
 # Modèles de Campagnes (Écrans & Panneaux)
 # ══════════════════════════════════════════════════════════════════════════════

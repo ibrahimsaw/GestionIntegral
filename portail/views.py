@@ -146,46 +146,25 @@ VILLE_IMAGES = {
 VILLE_IMAGE_DEFAUT = 'img/villes/default.jpg'
 
 
-def _label_support(support: Support) -> str:
+def _label_support(support: Support, formats_map: dict) -> tuple[str, str]:
     """
-    Retourne le libellé du "type de support" utilisé pour le regroupement
-    des statistiques dans chaque carte ville.
-
-    - Panneau : on regroupe par format lisible (ex: "4m × 3m (12m²) — Standard")
-    - Écran   : on regroupe simplement sous "Écran Numérique"
+    Retourne (categorie, label) pour regrouper les stats :
+    - Panneau : categorie = FormatSupport.categorie, label = "dimensions (superficie m²)"
+    - Écran   : categorie = 'Digital', label = 'Écran Numérique'
     """
     if support.type_support == Support.TYPE_PANNEAU:
-        return support.get_format_display() if support.format else 'Panneau (format non défini)'
-    return 'Écran Numérique'
-
+        if support.format:
+            fs = formats_map.get(support.format)
+            if fs:
+                categorie = fs.categorie or 'Autres'
+                label = fs.dimensions
+                if fs.superficie:
+                    label = f"{label} ({fs.superficie}m²)"
+                return categorie, label
+        return 'Autres', 'Panneau (format non défini)'
+    return 'Digital', 'Écran Numérique'
 
 def _get_compteurs() -> dict:
-    """
-    Calcule les statistiques agrégées par ville à partir de la base de données.
-
-    Retourne un dict prêt à être injecté dans le contexte du template :
-        {
-            'villes_stats': [
-                {
-                    'nom': 'Ouagadougou',
-                    'image_url': 'img/villes/ouagadougou.jpg',
-                    'total_faces': 220,
-                    'faces_libres': 31,
-                    'supports': [
-                        {'label': '4m × 3m (12m²) — Standard', 'count': 74},
-                        {'label': 'Écran Numérique', 'count': 8},
-                        ...
-                    ],
-                },
-                ...
-            ],
-            'total_faces_reseau': 1234,
-            'total_faces_libres_reseau': 123,
-        }
-    """
-    # On précharge tout ce qu'il faut en un minimum de requêtes :
-    # - les panneaux avec leurs faces (pour calculer libre/occupé sans requête par face)
-    # - les écrans (le support fait office de face unique)
     supports = (
         Support.objects
         .filter(actif=True)
@@ -193,53 +172,98 @@ def _get_compteurs() -> dict:
         .prefetch_related('faces')
     )
 
-    # Structure intermédiaire : { ville: { 'total': int, 'libres': int, 'supports': {label: count} } }
+    formats_map = {f.code: f for f in FormatSupport.objects.all()}
+
     villes = defaultdict(lambda: {
         'total_faces': 0,
         'faces_libres': 0,
-        'supports': defaultdict(int),
+        # on groupe maintenant par (categorie, label, code_format)
+        'categories': defaultdict(lambda: defaultdict(lambda: {'total': 0, 'libre': 0, 'code': ''})),
     })
 
     for support in supports:
         ville = support.ville or 'Non renseignée'
         data = villes[ville]
-        label = _label_support(support)
+        categorie, label = _label_support(support, formats_map)
+
+        # ── Code stable pour le filtre JS/URL ──
+        if support.type_support == Support.TYPE_PANNEAU:
+            code_format = support.format
+        else:
+            code_format = getattr(getattr(support, 'ecran_info', None), 'cellule', '')
 
         if support.type_support == Support.TYPE_PANNEAU:
             faces = list(support.faces.all())
             if not faces:
-                # Panneau sans face créée en base : on le compte comme 1 face par sécurité
                 data['total_faces'] += 1
-                data['supports'][label] += 1
+                entry = data['categories'][categorie][label]
+                entry['total'] += 1
+                entry['code'] = code_format
                 continue
 
             for face in faces:
                 data['total_faces'] += 1
-                data['supports'][label] += 1
-                if face.is_disponible():
-                    data['faces_libres'] += 1
-        else:
-            # Écran numérique : le support = 1 face vendable
-            data['total_faces'] += 1
-            data['supports'][label] += 1
-            if not support.is_occupe():
-                data['faces_libres'] += 1
+                entry = data['categories'][categorie][label]
+                entry['total'] += 1
+                entry['code'] = code_format
 
-    # ── Construction de la liste finale, triée par total de faces décroissant ──
+                face_libre = (
+                    face.etat == Support.ETAT_BON
+                    and face.is_disponibles()
+                )
+                if face_libre:
+                    data['faces_libres'] += 1
+                    entry['libre'] += 1
+        else:
+            data['total_faces'] += 1
+            entry = data['categories'][categorie][label]
+            entry['total'] += 1
+            entry['code'] = code_format
+
+            support_libre = (
+                support.etat == Support.ETAT_BON
+                and not support.is_occupe()
+            )
+            if support_libre:
+                data['faces_libres'] += 1
+                entry['libre'] += 1
+
     villes_stats = []
     total_faces_reseau = 0
     total_faces_libres_reseau = 0
 
     for nom_ville, data in villes.items():
-        supports_list = [
-            {'label': label, 'count': count}
-            for label, count in sorted(data['supports'].items(), key=lambda kv: -kv[1])
-        ]
+        supports_list = []
+        categories_triees = sorted(
+            data['categories'].items(),
+            key=lambda kv: -sum(v['total'] for v in kv[1].values())
+        )
+        for categorie, labels in categories_triees:
+            liste = []
+            for label, counts in sorted(labels.items(), key=lambda kv: -kv[1]['total']):
+                total = counts['total']
+                libre = counts['libre']
+                liste.append({
+                    'label': label,
+                    'format': counts['code'],   # <-- code stable ajouté ici
+                    'count': total,
+                    'libre': libre,
+                    'occupe': total - libre,
+                })
+            supports_list.append({
+                'categorie': categorie,
+                'total': sum(c['total'] for c in labels.values()),
+                'libre': sum(c['libre'] for c in labels.values()),
+                'occupe': sum(c['total'] - c['libre'] for c in labels.values()),
+                'liste': liste,
+            })
+
         villes_stats.append({
             'nom': nom_ville,
             'image_url': VILLE_IMAGES.get(nom_ville, VILLE_IMAGE_DEFAUT),
             'total_faces': data['total_faces'],
             'faces_libres': data['faces_libres'],
+            'faces_occupees': data['total_faces'] - data['faces_libres'],
             'supports': supports_list,
         })
         total_faces_reseau += data['total_faces']
@@ -251,10 +275,10 @@ def _get_compteurs() -> dict:
         'villes_stats': villes_stats,
         'total_faces_reseau': total_faces_reseau,
         'total_faces_libres_reseau': total_faces_libres_reseau,
+        'total_faces_occupees_reseau': total_faces_reseau - total_faces_libres_reseau,
         'nb_villes': len(villes_stats),
     }
-
-
+    
 class AccueilView(View):
     """Page d'accueil — vitrine publique de la régie publicitaire."""
     template_name = 'portail/vitrine.html'
@@ -706,6 +730,9 @@ class ContactConfirmationView(TemplateView):
 # ══════════════════════════════════════════════════════════════════════════════
 # Wizard réservation
 # ══════════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════════════
+# Wizard réservation
+# ══════════════════════════════════════════════════════════════════════════════
 import json
 import logging
 from datetime import date as date_type
@@ -731,6 +758,7 @@ from django.views import View
 # from .forms import Etape1Form
 
 class ReserverEtape1View(View):
+    
     """Étape 1 — Sélection des emplacements sur la carte + période souhaitée."""
     template_name = 'portail/reserver_etape1.html'
 
@@ -744,6 +772,14 @@ class ReserverEtape1View(View):
             .select_related('support')
         )
 
+    def _filtres(self, request):
+        """Récupère les filtres de présélection depuis les query params."""
+        return {
+            'ville': request.GET.get('ville', '').strip(),
+            'categorie': request.GET.get('categorie', '').strip(),
+            'format': request.GET.get('format', '').strip(),
+        }
+
     def get(self, request):
         # Pré-sélection depuis query param ?face=<id>
         face_id = request.GET.get('face')
@@ -752,6 +788,9 @@ class ReserverEtape1View(View):
             if face_id not in faces_ids:
                 faces_ids.append(face_id)
             request.session['demande_faces_uuids'] = faces_ids
+
+        # Filtres venant de la vitrine (ville / catégorie / format)
+        filtres = self._filtres(request)
 
         # Période déjà saisie précédemment (retour en arrière depuis étape 2/3)
         periode = request.session.get('demande_periode', {})
@@ -769,6 +808,7 @@ class ReserverEtape1View(View):
         return render(request, self.template_name, {
             'form':   form,
             'panier': self._panier(request),
+            'filtres': filtres,
         })
 
     def post(self, request):
@@ -786,6 +826,7 @@ class ReserverEtape1View(View):
         return render(request, self.template_name, {
             'form':   form,
             'panier': self._panier(request),
+            'filtres': self._filtres(request),
         })
 
 
@@ -899,17 +940,23 @@ class ReserverEtape3View(View):
         date_debut = date_type.fromisoformat(etape2['date_debut'])
         date_fin   = date_type.fromisoformat(etape2['date_fin'])
 
+        # ── NOUVEAU : type_client / reference_client_saisie ─────────────────
+        # DemandeReservation.save() se charge du rapprochement automatique
+        # avec un Client existant si la référence saisie matche (voir le
+        # modèle). Ici on transmet juste ce que le visiteur a rempli.
         demande = DemandeReservation.objects.create(
-            nom_contact          = d['nom_contact'],
-            societe              = d.get('societe', ''),
-            email                = d['email'],
-            telephone            = d['telephone'],
-            accepte_contact      = d.get('accepte_contact', False),
-            date_debut_souhaitee = date_debut,
-            date_fin_souhaitee   = date_fin,
-            nom_campagne         = etape2.get('nom_campagne', ''),
-            message              = etape2.get('message', ''),
-            statut               = DemandeReservation.STATUT_NOUVELLE,
+            nom_contact              = d['nom_contact'],
+            societe                  = d.get('societe', ''),
+            email                    = d['email'],
+            telephone                = d['telephone'],
+            accepte_contact          = d.get('accepte_contact', False),
+            type_client              = d.get('type_client', DemandeReservation.TYPE_CLIENT_NOUVEAU),
+            reference_client_saisie  = d.get('reference_client_saisie', ''),
+            date_debut_souhaitee     = date_debut,
+            date_fin_souhaitee       = date_fin,
+            nom_campagne             = etape2.get('nom_campagne', ''),
+            message                  = etape2.get('message', ''),
+            statut                   = DemandeReservation.STATUT_NOUVELLE,
         )
         if faces:
             demande.faces_souhaitees.set(faces)
@@ -929,11 +976,24 @@ class ReserverEtape3View(View):
             [f"  - Écran {s.code} · {s.quartier}" for s in supports]
         ) or '  (aucun)'
 
+        # ── NOUVEAU : mention du type de client dans l'email staff ──────────
+        if demande.type_client == DemandeReservation.TYPE_CLIENT_EXISTANT:
+            if demande.client_resolu_automatiquement:
+                ligne_client = f"Client existant : rapproché automatiquement avec {demande.client.nom} ({demande.client.reference})"
+            else:
+                ligne_client = (
+                    f"Client existant déclaré, référence saisie « {demande.reference_client_saisie or '—'} » "
+                    f"— NON TROUVÉE, vérification manuelle nécessaire."
+                )
+        else:
+            ligne_client = "Nouveau client"
+
         corps_staff = (
             f"Nouvelle demande reçue : {demande.reference}\n\n"
             f"Contact   : {demande.nom_contact} ({demande.societe or '—'})\n"
             f"Email     : {demande.email}\n"
-            f"Téléphone : {demande.telephone}\n\n"
+            f"Téléphone : {demande.telephone}\n"
+            f"{ligne_client}\n\n"
             f"Période   : {demande.date_debut_souhaitee:%d/%m/%Y} → {demande.date_fin_souhaitee:%d/%m/%Y}\n"
             f"Campagne  : {demande.nom_campagne or '—'}\n\n"
             f"Emplacements souhaités :\n{recap_emplacements}\n\n"

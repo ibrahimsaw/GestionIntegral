@@ -6,6 +6,25 @@
   <i class="bi bi-tools me-2" style="color:#fbbf24"></i>{{ title }}
 {% endblock %}
 
+<!-- ── jQuery doit être chargé AVANT Select2 ── -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.1/jquery.min.js"></script>
+<link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.1.0-rc.0/css/select2.min.css" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.1.0-rc.0/js/select2.min.js"></script>
+
+<style>
+  .select2-container .select2-selection--single {
+    height: calc(2.25rem + 2px) !important;
+    padding: 4px 4px !important;
+    border: 1px solid var(--border, #ced4da) !important;
+    border-radius: .375rem !important;
+  }
+  .select2-container--default .select2-selection--single .select2-selection__rendered {
+    line-height: 1.9 !important;
+  }
+  .select2-container--default .select2-selection--single .select2-selection__arrow {
+    height: 2.25rem !important;
+  }
+</style>
 {% block content %}
 <div class="row justify-content-center">
   <div class="col-md-12">
@@ -26,7 +45,7 @@
 
     <form method="post" enctype="multipart/form-data">
       {% csrf_token %}
-              {% if form.errors %}
+      {% if form.errors %}
         <div class="alert alert-danger">
             <strong>Le formulaire contient des erreurs :</strong>
             <ul>
@@ -40,7 +59,7 @@
                 {% endif %}
             </ul>
         </div>
-        {% endif %}
+      {% endif %}
 
       {# ✅ Champs cachés pour les valeurs disabled #}
       <input type="hidden" name="effectue_par" value="{{ request.user.pk }}">
@@ -64,12 +83,27 @@
               {% endif %}
             </div>
 
+            <!-- Case "appliquer à tout le support" (uniquement en création) -->
+            {% if form.appliquer_tout_le_support %}
+            <div class="col-md-6 d-flex align-items-center" id="bloc-appliquer-tout" style="display:none;">
+              <div class="form-check mt-4">
+                {{ form.appliquer_tout_le_support }}
+                <label class="form-check-label" for="id_appliquer_tout" style="font-size:.85rem">
+                  {{ form.appliquer_tout_le_support.label }}
+                </label>
+                <div style="font-size:.72rem;color:var(--text-muted);margin-top:2px">
+                  {{ form.appliquer_tout_le_support.help_text }}
+                </div>
+              </div>
+            </div>
+            {% endif %}
+
             <!-- Face -->
-            <div class="col-md-6">
+            <div class="col-md-6" id="bloc-face" style="display:none;">
               <label class="form-label"><i class="bi bi-card-list me-1"></i>Face</label>
               {{ form.face }}
-              <div style="font-size:.72rem;color:var(--text-muted);margin-top:4px">
-                Choisissez la face du panneau si la maintenance concerne uniquement une face.
+              <div style="font-size:.72rem;color:var(--text-muted);margin-top:4px" id="face-help-text">
+                Choisissez la face du panneau concernée par cette maintenance.
               </div>
               {% if form.face.errors %}
                 <div class="text-danger" style="font-size:.75rem">{{ form.face.errors }}</div>
@@ -94,10 +128,20 @@
               {% endif %}
             </div>
 
-            <!-- État -->
+            <!-- État : boutons Bon / Panne -->
             <div class="col-md-6">
               <label class="form-label"><i class="bi bi-circle-fill me-1"></i>État enregistré *</label>
-              {{ form.etat_apres }}
+              <div class="btn-group w-100" role="group" id="etat-group">
+                {% for radio in form.etat_apres %}
+                <div class="etat-option flex-fill">
+                  {{ radio.tag }}
+                  <label for="{{ radio.id_for_label }}"
+                         class="btn-etat w-100 {% if radio.data.value == 'panne' %}btn-etat-panne{% else %}btn-etat-bon{% endif %}">
+                    {{ radio.choice_label }}
+                  </label>
+                </div>
+                {% endfor %}
+              </div>
               <div style="font-size:.72rem;color:var(--text-muted);margin-top:4px">
                 <i class="bi bi-info-circle me-1"></i>L'état du support sera mis à jour automatiquement
               </div>
@@ -160,77 +204,133 @@
   </div>
 </div>
 
+<style>
+  #etat-group { gap: 10px; }
+  #etat-group .etat-option { flex: 1; }
+  #etat-group input[type="radio"] { display: none; }
+  .btn-etat {
+    display: flex; align-items: center; justify-content: center;
+    padding: 10px; border: 1px solid var(--border); border-radius: 8px;
+    cursor: pointer; font-weight: 700; font-size: .85rem; margin: 0;
+    transition: background .15s, color .15s;
+  }
+  #etat-group input[type="radio"]:checked + .btn-etat-bon {
+    background: var(--map-ok, #16a34a); color: #fff; border-color: var(--map-ok, #16a34a);
+  }
+  #etat-group input[type="radio"]:checked + .btn-etat-panne {
+    background: var(--map-err, #dc2626); color: #fff; border-color: var(--map-err, #dc2626);
+  }
+</style>
+
 <script>
-document.addEventListener("DOMContentLoaded", function () {
+  const supportTypes = {{ support_types_json|safe }};
 
-    // ── Prévisualisation photo ────────────────────────────────────────
-    const photoInput = document.querySelector('input[type="file"][name="photo"]');
-    const previewImg = document.getElementById('image-preview');
-    if (photoInput && previewImg) {
-        photoInput.addEventListener('change', function () {
-            const file = this.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = e => {
-                    previewImg.src = e.target.result;
-                    previewImg.classList.remove('d-none');
-                };
-                reader.readAsDataURL(file);
-            }
-        });
-    }
+  document.addEventListener("DOMContentLoaded", function () {
 
-    // ── Chargement dynamique des faces ───────────────────────────────
-    const supportSelect = document.querySelector('select[name="support"]');
-    const faceSelect    = document.querySelector('select[name="face"]');
+      // ── Select2 : recherche instantanée dans le select Support ─────────
+      if (window.jQuery) {
+          $('#id_support').select2({
+              placeholder: "Rechercher un support (ville, quartier, code)...",
+              allowClear: true,
+              width: '100%',
+          });
+      }
 
-    if (!supportSelect || !faceSelect) return;
+      // ── Prévisualisation photo ────────────────────────────────────────
+      const photoInput = document.querySelector('input[type="file"][name="photo"]');
+      const previewImg = document.getElementById('image-preview');
+      if (photoInput && previewImg) {
+          photoInput.addEventListener('change', function () {
+              const file = this.files[0];
+              if (file) {
+                  const reader = new FileReader();
+                  reader.onload = e => {
+                      previewImg.src = e.target.result;
+                      previewImg.classList.remove('d-none');
+                  };
+                  reader.readAsDataURL(file);
+              }
+          });
+      }
 
-    function chargerFaces(supportId, faceSelectionnee = null) {
-        // Réinitialiser
-        faceSelect.innerHTML = '<option value="">---------</option>';
-        faceSelect.disabled = true;
+      // ── Éléments clés (une seule déclaration chacun) ────────────────────
+      const supportSelect    = document.getElementById('id_support');
+      const faceSelect       = document.getElementById('id_face');
+      const blocFace          = document.getElementById('bloc-face');
+      const blocAppliqueTout  = document.getElementById('bloc-appliquer-tout');
+      const checkboxTout      = document.getElementById('id_appliquer_tout');
 
-        if (!supportId) return;
+      if (!supportSelect) return;
 
-        fetch(`/gestion/inventory/api/faces/${supportId}/`)
-            .then(r => r.json())
-            .then(data => {
-                if (data.faces.length === 0) {
-                    // Écran numérique → pas de face
-                    faceSelect.disabled = true;
-                    return;
-                }
-                data.faces.forEach(face => {
-                    const opt = document.createElement('option');
-                    opt.value = face.id;
-                    opt.textContent = `Face ${face.label}`;
-                    if (faceSelectionnee && face.id == faceSelectionnee) {
-                        opt.selected = true;
-                    }
-                    faceSelect.appendChild(opt);
-                });
-                faceSelect.disabled = false;
-            })
-            .catch(() => {
-                faceSelect.disabled = true;
-            });
-    }
+      function chargerFaces(supportId, faceSelectionnee = null) {
+          if (!faceSelect) return Promise.resolve();
+          faceSelect.innerHTML = '<option value="">---------</option>';
 
-    // Au changement de support
-    supportSelect.addEventListener('change', function () {
-        chargerFaces(this.value);
-    });
+          if (!supportId) return Promise.resolve();
 
-    // Au chargement initial (mode édition — support déjà sélectionné)
-    const supportInitial = supportSelect.value;
-    const faceInitiale   = faceSelect.value;  // valeur déjà sélectionnée en édition
-    if (supportInitial) {
-        chargerFaces(supportInitial, faceInitiale);
-    } else {
-        faceSelect.disabled = true;
-    }
+          return fetch(`/gestion/inventory/api/faces/${supportId}/`)
+              .then(r => r.json())
+              .then(data => {
+                  (data.faces || []).forEach(face => {
+                      const opt = document.createElement('option');
+                      opt.value = face.id;
+                      opt.textContent = `Face ${face.label}`;
+                      if (faceSelectionnee && face.id == faceSelectionnee) {
+                          opt.selected = true;
+                      }
+                      faceSelect.appendChild(opt);
+                  });
+              })
+              .catch(() => { /* silencieux : liste vide si l'API échoue, ça ne bloque plus l'affichage */ });
+      }
 
-});
+      function toggleFaceVisibility() {
+          if (!blocFace) return;
+          if (checkboxTout && checkboxTout.checked) {
+              blocFace.style.display = 'none';
+              if (faceSelect) faceSelect.value = '';
+          } else {
+              blocFace.style.display = '';
+          }
+      }
+
+      // ── Bascule l'affichage selon le type de support (lecture directe, sans réseau) ──
+      function onSupportChange(faceSelectionnee = null) {
+          const supportId = supportSelect.value;
+          const type = supportTypes[supportId];
+
+          if (type === 'panneau') {
+              // Panneau → case "appliquer à tout" toujours visible, cochée par défaut
+              if (blocAppliqueTout) blocAppliqueTout.style.display = 'flex';
+              if (checkboxTout) checkboxTout.checked = true;
+              chargerFaces(supportId, faceSelectionnee).then(toggleFaceVisibility);
+          } else if (type === 'ecran') {
+              // Écran → pas de face, pas de case à cocher
+              if (blocAppliqueTout) blocAppliqueTout.style.display = 'none';
+              if (checkboxTout) checkboxTout.checked = false;
+              if (blocFace) blocFace.style.display = 'none';
+              if (faceSelect) faceSelect.innerHTML = '<option value="">---------</option>';
+          } else {
+              // Aucun support sélectionné
+              if (blocAppliqueTout) blocAppliqueTout.style.display = 'none';
+              if (blocFace) blocFace.style.display = 'none';
+          }
+      }
+
+      if (window.jQuery) {
+          $(supportSelect).on('change', function () { onSupportChange(); });
+      } else {
+          supportSelect.addEventListener('change', function () { onSupportChange(); });
+      }
+
+      if (checkboxTout) {
+          checkboxTout.addEventListener('change', toggleFaceVisibility);
+      }
+
+      // ── État initial (création avec support pré-rempli, ou édition) ──
+      const faceInitiale = faceSelect ? faceSelect.value : null;
+      onSupportChange(faceInitiale);
+
+  });
 </script>
 {% endblock %}

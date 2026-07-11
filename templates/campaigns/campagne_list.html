@@ -1,12 +1,17 @@
 {% extends 'base.html' %}
+{% load sort_tags %}
 {% block title %}Campagnes — Integral{% endblock %}
 {% block topbar_title %}<i class="bi bi-megaphone me-2" style="color:var(--color-primary)"></i>Campagnes{% endblock %}
 {% block topbar_actions %}
   {% if user.is_staff_regie_role %}
   <a href="{% url 'simulation_ecran' %}" class="btn btn-outline-warning btn-sm me-2">
-    <i class="bi bi-calculator-fill me-1"></i>Simulateur
+    <i class="bi bi-calculator-fill me-1"></i>
+    <span class="d-none d-md-inline ms-1">Simulateur</span>
   </a>
-  <a href="{% url 'campagne_create' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Nouvelle</a>
+  <a href="{% url 'campagne_create' %}" class="btn btn-primary btn-sm">
+    <i class="bi bi-plus-lg me-1"></i>
+    <span class="d-none d-md-inline ms-1">Nouvelle</span>
+  </a>
   {% endif %}
 {% endblock %}
 
@@ -74,23 +79,24 @@
 
     </div>
 
-    <div class="card-body p-0">
+    <div class="card-body p-0 table-responsive">
       <table class="table mb-0">
         <thead>
           <tr>
             <th style="width:2rem"></th>
             <th>#</th>
-            <th>Réf.</th>
-            <th>Client</th>
-            <th>Campagne</th>
-              {% if user.is_admin %}
-              <th>Archivée</th>
-              {% endif %}
-            <th>Période</th>
-            <th>Supports</th>
-            <th>Type</th>
+            <th>{% sortable_th sort_links sort_key sort_dir 'reference' 'Réf.' %}</th>
+            <th>{% sortable_th sort_links sort_key sort_dir 'client' 'Client' %}</th>
+            <th>{% sortable_th sort_links sort_key sort_dir 'nom' 'Campagne' %}</th>
+            <th>{% sortable_th sort_links sort_key sort_dir 'statut' 'Statut' %}</th>
+            <th>{% sortable_th sort_links sort_key sort_dir 'date_debut' 'Période' %}</th>
+            <th>{% sortable_th sort_links sort_key sort_dir 'nb_supports' 'Supports' %}</th>
+            <th>{% sortable_th sort_links sort_key sort_dir 'type_support' 'Type' %}</th>
             <th>Spots</th>
-            <th>Statut</th><th></th>
+            {% if user.is_admin %}
+              <th>{% sortable_th sort_links sort_key sort_dir 'actif' 'Archivée' %}</th>
+            {% endif %}
+            <th></th>
           </tr>
         </thead>
         <tbody>
@@ -116,15 +122,8 @@
               </div>
               {% endif %}
             </td>
-            {% if user.is_admin %}
-            <td>
-              {% if c.actif %}
-              <span class="badge-status bs-success">Active</span>
-              {% else %}
-              <span class="badge-status bs-danger">Archivée</span>
-              {% endif %}
-            </td>
-            {% endif %}
+            <td><span class="badge-status bs-{{ c.statut }}">{{ c.get_statut_display }}</span></td>
+
             <td class="mono" style="font-size:.75rem">
               {{ c.date_debut|date:"d/m/Y" }}<br>{{ c.date_fin|date:"d/m/Y" }}
             </td>
@@ -141,7 +140,15 @@
               </a>
             </td>
             <td class="font-monospace fw-bold">{{ c.calculer_nombre_spots }}</td>
-            <td><span class="badge-status bs-{{ c.statut }}">{{ c.get_statut_display }}</span></td>
+            {% if user.is_admin %}
+            <td>
+              {% if c.actif %}
+              <span class="badge-status bs-success">Active</span>
+              {% else %}
+              <span class="badge-status bs-danger">Archivée</span>
+              {% endif %}
+            </td>
+            {% endif %}
             <td>
               <div class="d-flex gap-1">
                 <a href="{% url 'campagne_detail' c.pk %}" class="btn btn-sm btn-outline-secondary">
@@ -167,7 +174,7 @@
     </div>
   </div>
 </form>
-
+{% pagination_nav %}
 <script>
 const selectAll  = document.getElementById('select-all');
 const actionsBar = document.getElementById('actions-bar');

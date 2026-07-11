@@ -24,7 +24,8 @@ from inventory.models import Support, FacePanneau, EcranNumerique, FormatSupport
 from .forms import ClientForm, ContratForm, CampagneForm, LigneCampagneForm
 # from .mixins import *
 from datetime import datetime, date  # ← Ajouter 'date' ici
-
+today = timezone.now().date()
+from core.mixins import SortableListMixin
 
 class GetClientContratsView(StaffRequiredMixin, View):
     def get(self, request, client_id):
@@ -65,98 +66,226 @@ class GetClientCampagnesMeresView(StaffRequiredMixin, View):
         ]
         return JsonResponse(data, safe=False)
 
+
+from django.http import HttpResponse
+from django.utils.html import format_html, format_html_join
+from django.urls import reverse
+
+
+from django.http import HttpResponse
+from django.shortcuts import get_object_or_404
+from django.urls import reverse
+from django.utils import timezone
+from django.utils.html import format_html, format_html_join
+
+from .models import Client, Campagne
+
+
+def api_dashboard_clients_actifs(request):
+    ville = request.GET.get('ville', '').strip()
+    today = timezone.now().date()
+
+    clients_qs = Client.objects.filter(
+        actif=False,
+        campagnes__date_debut__lte=today,
+        campagnes__date_fin__gte=today,
+    ).exclude(
+        campagnes__statut__in=[Campagne.STATUT_BROUILLON, Campagne.STATUT_ANNULEE]
+    ).distinct()
+
+    if ville:
+        clients_qs = clients_qs.filter(campagnes__lignes__support__ville__iexact=ville).distinct()
+
+    clients_qs = clients_qs.order_by('nom')
+
+    if not clients_qs.exists():
+        return HttpResponse('<p class="text-muted text-center py-3">Aucun client actif trouvé.</p>')
+
+    rows = format_html_join(
+        '',
+        '''<a href="#" class="list-group-item list-group-item-action d-flex justify-content-between align-items-center"
+               onclick="loadModalContent('{}', '{} — Campagnes'); return false;">
+              <span><i class="bi bi-building me-2"></i>{}</span>
+              <i class="bi bi-chevron-right text-muted"></i>
+           </a>''',
+        (
+            (reverse('api_dashboard_client_campagnes', args=[c.pk]), c.nom, c.nom)
+            for c in clients_qs
+        )
+    )
+    return HttpResponse(format_html('<div class="list-group">{}</div>', rows))
+
+
+def api_dashboard_campagnes(request, statut):
+    ville = request.GET.get('ville', '').strip()
+    campagnes_qs = Campagne.objects.filter(statut=statut).select_related('client').order_by('-date_debut')
+
+    if ville:
+        campagnes_qs = campagnes_qs.filter(lignes__support__ville__iexact=ville).distinct()
+
+    if not campagnes_qs.exists():
+        return HttpResponse('<p class="text-muted text-center py-3">Aucune campagne trouvée.</p>')
+
+    rows = format_html_join(
+        '',
+        '''<a href="{}" class="list-group-item list-group-item-action">
+              <div class="d-flex justify-content-between align-items-center">
+                <strong>{}</strong>
+                <span class="badge bg-light text-dark border">{} → {}</span>
+              </div>
+              <small class="text-muted">{}</small>
+           </a>''',
+        (
+            (
+                reverse('campagne_detail', args=[c.pk]),
+                c.nom,
+                c.date_debut.strftime('%d/%m/%Y'),
+                c.date_fin.strftime('%d/%m/%Y'),
+                c.client.nom,
+            )
+            for c in campagnes_qs
+        )
+    )
+    return HttpResponse(format_html('<div class="list-group">{}</div>', rows))
+
+
+def api_dashboard_client_campagnes(request, client_id):
+    client = get_object_or_404(Client, pk=client_id)
+    campagnes_qs = client.campagnes.filter(statut__in=['en_cours', 'a_venir']).order_by('-date_debut')
+
+    back_button = format_html(
+        '''<button class="btn btn-sm btn-outline-secondary mb-3"
+                   onclick="loadModalContent('{}', 'Clients actifs')">
+              <i class="bi bi-arrow-left me-1"></i>Retour
+           </button>''',
+        reverse('api_dashboard_clients_actifs')
+    )
+
+    if not campagnes_qs.exists():
+        html = format_html(
+            '{}<p class="text-muted text-center py-3">Aucune campagne en cours ou à venir pour ce client.</p>',
+            back_button
+        )
+        return HttpResponse(html)
+
+    rows = format_html_join(
+        '',
+        '''<a href="{}" class="list-group-item list-group-item-action">
+              <div class="d-flex justify-content-between align-items-center">
+                <strong>{}</strong>
+                <span class="badge bg-{}">{}</span>
+              </div>
+              <small class="text-muted">{} → {}</small>
+           </a>''',
+        (
+            (
+                reverse('campagne_detail', args=[c.pk]),
+                c.nom,
+                c.statut,
+                c.get_statut_display(),
+                c.date_debut.strftime('%d/%m/%Y'),
+                c.date_fin.strftime('%d/%m/%Y'),
+            )
+            for c in campagnes_qs
+        )
+    )
+    return HttpResponse(format_html('{}<div class="list-group">{}</div>', back_button, rows))
+
+import json
+
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db.models import Count, Sum, Q, Value, DecimalField
+from django.db.models.functions import Coalesce
+from django.template.defaultfilters import slugify
+from django.utils import timezone
+from django.views.generic import TemplateView
+
+from inventory.models import Support, FacePanneau, FormatSupport
+from .models import (
+    Campagne, Client, LigneCampagne, ReservationLigne,
+    STATUT_EN_ATTENTE, STATUT_CONFIRMEE,
+)
+
+
 class DashboardView(LoginRequiredMixin, TemplateView):
     template_name = 'campaigns/dashboard.html'
+
+    CATEGORY_COLORS = {
+        'Standard': 'var(--color-primary)',
+        'Géant': '#f59e0b',
+        'Sucette': '#a78bfa',
+        'Marché': '#f97316',
+    }
+    DEFAULT_CATEGORY_COLOR = '#64748b'
+    COLOR_ECRANS = '#06b6d4'
+    COLOR_PANNE = '#94a3b8'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         today = timezone.now().date()
-
-        # ── Filtre ville ──────────────────────────────────────────
         ville_active = self.request.GET.get("ville", "").strip()
 
-        for campagne in Campagne.objects.filter(statut__in=['a_venir', 'en_cours']):
-            campagne.auto_update_statut()
+        # ── Mise à jour des statuts en masse : 2 requêtes au lieu d'une
+        # écriture par campagne (auto_update_statut() en boucle coûtait
+        # jusqu'à N requêtes + N écritures à chaque chargement du dashboard) ──
+        Campagne.objects.filter(
+            statut__in=[Campagne.STATUT_A_VENIR, Campagne.STATUT_EN_COURS],
+            date_fin__lt=today,
+        ).exclude(statut=Campagne.STATUT_ANNULEE).update(statut=Campagne.STATUT_TERMINEE)
 
-        def get_format_category_codes():
-            """Retourne les codes de formats groupés par catégorie depuis la table FormatSupport."""
-            categories = {}
-            for row in FormatSupport.objects.exclude(categorie='').values('categorie', 'code').order_by('categorie', 'code'):
-                categories.setdefault(row['categorie'], []).append(row['code'])
-            return categories
+        Campagne.objects.filter(
+            statut=Campagne.STATUT_A_VENIR,
+            date_debut__lte=today,
+            date_fin__gte=today,
+        ).update(statut=Campagne.STATUT_EN_COURS)
 
-        CATEGORY_COLORS = {
-            'Standard': 'var(--color-primary)',
-            'Géant': '#f59e0b',
-            'Sucette': '#a78bfa',
-            'Marché': '#f97316',
-        }
-        DEFAULT_CATEGORY_COLOR = '#64748b'
+        # ── Formats groupés par catégorie (1 requête) ──
+        format_categories_codes = {}
+        for row in FormatSupport.objects.exclude(categorie='').values('categorie', 'code').order_by('categorie', 'code'):
+            format_categories_codes.setdefault(row['categorie'], []).append(row['code'])
 
-        def build_format_category_stats(format_categories, supports, faces_occupees_ids, faces_reservees_ids):
-            stats = []
-            for categorie, codes in format_categories.items():
-                faces_qs = FacePanneau.objects.filter(support__format__in=codes)
-                if ville_active:
-                    faces_qs = faces_qs.filter(support__ville__iexact=ville_active)
-
-                total_faces = faces_qs.count()
-                if total_faces == 0:
-                    continue
-
-                faces_bon = faces_qs.filter(etat=Support.ETAT_BON)
-                nb_bon = faces_bon.count()
-                nb_occupe = faces_bon.filter(pk__in=faces_occupees_ids).count()
-                nb_reserve = faces_bon.filter(pk__in=faces_reservees_ids).exclude(pk__in=faces_occupees_ids).count()
-                nb_libre = nb_bon - nb_occupe - nb_reserve
-                nb_panne = faces_qs.filter(etat=Support.ETAT_PANNE).count()
-                nb_supports = supports.filter(type_support=Support.TYPE_PANNEAU, format__in=codes, etat=Support.ETAT_BON).count()
-
-                stats.append({
-                    'categorie': categorie,
-                    'label': categorie,
-                    'slug': slugify(categorie),
-                    'nb_supports': nb_supports,
-                    'nb_faces': total_faces,
-                    'nb_occupe': nb_occupe,
-                    'nb_reserve': nb_reserve,
-                    'nb_libre': nb_libre,
-                    'nb_panne': nb_panne,
-                    'panne_pct': round(nb_panne / total_faces * 100) if total_faces else 0,
-                    'color': CATEGORY_COLORS.get(categorie, DEFAULT_CATEGORY_COLOR),
-                })
-            return stats
-
-        format_categories = get_format_category_codes()
-
-        # ── Queryset de base filtré par ville ─────────────────────
-        supports = Support.objects.prefetch_related('faces').select_related('ecran_info').all()
-        # ── Campagnes filtrées par ville ──────────────────────────
+        # ── Querysets de base ──
+        supports = Support.objects.all()
         campagnes_qs = Campagne.objects.select_related('client').order_by('-created_at')
-        # Clients actifs ayant des supports dans la ville sélectionnée
-        clients_qs = Client.objects.filter(actif=True)
-        # Campagnes en cours avec au moins un support dans la ville
-        campagnes_actives_qs = Campagne.objects.filter(statut='en_cours')
-        campagnes_a_venir_qs = Campagne.objects.filter(statut='a_venir')
-        
+        clients_qs = Client.objects.filter(
+            actif=False,
+            campagnes__date_debut__lte=today,
+            campagnes__date_fin__gte=today,
+        ).exclude(
+            campagnes__statut__in=[Campagne.STATUT_BROUILLON, Campagne.STATUT_ANNULEE]
+        ).distinct()
+        campagnes_actives_qs = Campagne.objects.filter(statut='en_cours', est_mere=False).select_related('client')
+        campagnes_a_venir_qs = Campagne.objects.filter(statut='a_venir').select_related('client')
+
         if ville_active:
             supports = supports.filter(ville__iexact=ville_active)
             campagnes_qs = campagnes_qs.filter(lignes__support__ville__iexact=ville_active).distinct()
             clients_qs = clients_qs.filter(campagnes__lignes__support__ville__iexact=ville_active).distinct()
             campagnes_actives_qs = campagnes_actives_qs.filter(lignes__support__ville__iexact=ville_active).distinct()
             campagnes_a_venir_qs = campagnes_a_venir_qs.filter(lignes__support__ville__iexact=ville_active).distinct()
-            
-        revenu_actif = sum(c.montant_total() for c in campagnes_actives_qs)
-        revenu_a_venir = sum(c.montant_total() for c in campagnes_a_venir_qs)
-        campagnes_meres_qs = Campagne.objects.filter(est_mere=True, statut__in=['en_cours', 'a_venir'])
+
+        # Prefetch pour limiter les requêtes N+1 déclenchées par montant_total()
+        campagnes_actives_list = list(
+            campagnes_actives_qs.prefetch_related('lignes__face__support', 'lignes__support')
+        )
+        campagnes_a_venir_list = list(
+            campagnes_a_venir_qs.prefetch_related('lignes__face__support', 'lignes__support')
+        )
+
+        revenu_actif = sum(c.montant_total() for c in campagnes_actives_list)
+        revenu_a_venir = sum(c.montant_total() for c in campagnes_a_venir_list)
+
+        campagnes_meres_qs = Campagne.objects.filter(
+            est_mere=True, statut__in=['en_cours', 'a_venir']
+        ).prefetch_related('sous_campagnes__lignes__face__support')
         campagnes_meres_count = campagnes_meres_qs.count()
         revenu_meres = sum(c.montant_total() for c in campagnes_meres_qs)
 
-        top_campaignes_prix = sorted(
-            campagnes_qs,
-            key=lambda c: c.montant_total(),
-            reverse=True
-        )[:6]
+        # ── Top campagnes : on ne calcule montant_total() que sur les
+        # campagnes actives/à venir (déjà chargées ci-dessus), au lieu
+        # de tout l'historique via campagnes_qs. ──
+        candidats = campagnes_actives_list + campagnes_a_venir_list
+        top_campaignes_prix = sorted(candidats, key=lambda c: c.montant_total(), reverse=True)[:6]
         top_campaigns_json = json.dumps([
             {
                 'label': c.nom[:30],
@@ -168,40 +297,38 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             for c in top_campaignes_prix
         ])
 
-        top_faces = FacePanneau.objects.annotate(
-            usage_count=Count('lignes_campagne', filter=Q(lignes_campagne__campagne__statut__in=['en_cours','a_venir'])),
+        # ── Faces les plus productives ──
+        top_faces_qs = FacePanneau.objects.select_related('support').annotate(
+            usage_count=Count('lignes_campagne', filter=Q(lignes_campagne__campagne__statut__in=['en_cours', 'a_venir'])),
             revenue=Coalesce(
-                Sum('lignes_campagne__campagne__prix', filter=Q(lignes_campagne__campagne__statut__in=['en_cours','a_venir'])),
+                Sum('lignes_campagne__campagne__prix', filter=Q(lignes_campagne__campagne__statut__in=['en_cours', 'a_venir'])),
                 Value(0, output_field=DecimalField(max_digits=12, decimal_places=2)),
-                output_field=DecimalField(max_digits=12, decimal_places=2)
+                output_field=DecimalField(max_digits=12, decimal_places=2),
             ),
-        ).filter(usage_count__gt=0).order_by('-revenue', '-usage_count')[:6]
+        ).filter(usage_count__gt=0)
+
+        if ville_active:
+            top_faces_qs = top_faces_qs.filter(support__ville__iexact=ville_active)
+
+        top_faces = top_faces_qs.order_by('-revenue', '-usage_count')[:6]
         top_faces_json = json.dumps([
-            {
-                'label': f'{f.support.code}-{f.label}',
-                'revenue': float(f.revenue or 0),
-                'usage': f.usage_count,
-            }
+            {'label': f'{f.support.code}-{f.label}', 'revenue': float(f.revenue or 0), 'usage': f.usage_count}
             for f in top_faces
         ])
 
-        nb_panneaux     = supports.filter(type_support=Support.TYPE_PANNEAU).count()
-        nb_panneaux_bon = supports.filter(type_support=Support.TYPE_PANNEAU, etat=Support.ETAT_BON).count()
-        nb_ecrans       = supports.filter(type_support=Support.TYPE_ECRAN).count()
-        nb_ecrans_bon   = supports.filter(type_support=Support.TYPE_ECRAN, etat=Support.ETAT_BON).count()
-        nb_ecrans_panne   = supports.filter(type_support=Support.TYPE_ECRAN, etat=Support.ETAT_PANNE).count()
-        nb_supports_panne = supports.filter(etat=Support.ETAT_PANNE).count()
-        nb_supports_bon   = supports.filter(etat=Support.ETAT_BON).count()
-
-        ids_occupes = set(
-            LigneCampagne.objects.filter(
-                campagne__date_debut__lte=today,
-                campagne__date_fin__gte=today,
-                campagne__statut__in=['en_cours', 'a_venir'],
-            ).values_list('support_id', flat=True)
+        # ── Comptages du parc : 1 seule requête agrégée au lieu de 7 ──
+        parc = supports.aggregate(
+            total=Count('id'),
+            nb_panneaux=Count('id', filter=Q(type_support=Support.TYPE_PANNEAU)),
+            nb_panneaux_bon=Count('id', filter=Q(type_support=Support.TYPE_PANNEAU, etat=Support.ETAT_BON)),
+            nb_ecrans=Count('id', filter=Q(type_support=Support.TYPE_ECRAN)),
+            nb_ecrans_bon=Count('id', filter=Q(type_support=Support.TYPE_ECRAN, etat=Support.ETAT_BON)),
+            nb_ecrans_panne=Count('id', filter=Q(type_support=Support.TYPE_ECRAN, etat=Support.ETAT_PANNE)),
+            nb_supports_panne=Count('id', filter=Q(etat=Support.ETAT_PANNE)),
+            nb_supports_bon=Count('id', filter=Q(etat=Support.ETAT_BON)),
         )
 
-        # ── IDs des faces occupées (campagne active) ─────────────
+        # ── Faces occupées / réservées (déjà optimal) ──
         faces_occupees_ids = set(
             LigneCampagne.objects.filter(
                 campagne__date_debut__lte=today,
@@ -209,8 +336,6 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 campagne__statut__in=['en_cours', 'a_venir'],
             ).values_list('face_id', flat=True)
         )
-
-        # ── IDs des faces réservées ───────────────────────────────
         faces_reservees_ids = set(
             ReservationLigne.objects.filter(
                 reservation__date_fin__gte=today,
@@ -218,113 +343,165 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             ).values_list('face_id', flat=True)
         )
 
-        format_category_stats = build_format_category_stats(format_categories, supports, faces_occupees_ids, faces_reservees_ids)
-        total_faces_occupe  = sum(cat['nb_occupe']  for cat in format_category_stats)
+        format_category_stats = self._build_format_category_stats(
+            format_categories_codes, ville_active, faces_occupees_ids, faces_reservees_ids
+        )
+
+        total_faces_occupe = sum(cat['nb_occupe'] for cat in format_category_stats)
         total_faces_reserve = sum(cat['nb_reserve'] for cat in format_category_stats)
-        total_faces_libre   = sum(cat['nb_libre']   for cat in format_category_stats)
-        total_faces_panne   = sum(cat['nb_panne']   for cat in format_category_stats)
-        total_faces         = sum(cat['nb_faces']   for cat in format_category_stats)
-        total_supports      = supports.count()
+        total_faces_libre = sum(cat['nb_libre'] for cat in format_category_stats)
+        total_faces_panne = sum(cat['nb_panne'] for cat in format_category_stats)
+        total_faces = sum(cat['nb_faces'] for cat in format_category_stats)
 
         category_index = {cat['categorie']: cat for cat in format_category_stats}
-        standard = category_index.get('Standard', {})
+        standard = category_index.get('12m²', {})
         geant = category_index.get('Géant', {})
         sucette = category_index.get('Sucette', {})
         marche = category_index.get('Marché', {})
 
-        nb_standard = standard.get('nb_supports', 0)
-        nbt_std = standard.get('nb_faces', 0)
-        nbo_std = standard.get('nb_occupe', 0)
-        nbr_std = standard.get('nb_reserve', 0)
-        nbl_std = standard.get('nb_libre', 0)
-        npt_std = standard.get('nb_panne', 0)
-        o_std = round(nbo_std / nbt_std * 100) if nbt_std else 0
+        def pct(o, t):
+            return round(o / t * 100) if t else 0
 
-        nb_geants = geant.get('nb_supports', 0)
-        nbt_geo = geant.get('nb_faces', 0)
-        nbo_geo = geant.get('nb_occupe', 0)
-        nbr_geo = geant.get('nb_reserve', 0)
-        nbl_geo = geant.get('nb_libre', 0)
-        npt_geo = geant.get('nb_panne', 0)
-        o_geo = round(nbo_geo / nbt_geo * 100) if nbt_geo else 0
-
-        nb_sucettes = sucette.get('nb_supports', 0)
-        nbt_suc = sucette.get('nb_faces', 0)
-        nbo_suc = sucette.get('nb_occupe', 0)
-        nbr_suc = sucette.get('nb_reserve', 0)
-        nbl_suc = sucette.get('nb_libre', 0)
-        npt_suc = sucette.get('nb_panne', 0)
-        o_suc = round(nbo_suc / nbt_suc * 100) if nbt_suc else 0
-
-        nb_gm = marche.get('nb_supports', 0)
-        nbt_gm = marche.get('nb_faces', 0)
-        nbo_gm = marche.get('nb_occupe', 0)
-        nbr_gm = marche.get('nb_reserve', 0)
-        nbl_gm = marche.get('nb_libre', 0)
-        npt_gm = marche.get('nb_panne', 0)
-        o_gm = round(nbo_gm / nbt_gm * 100) if nbt_gm else 0
+        nb_standard, nbt_std, nbo_std, nbr_std, nbl_std, npt_std = (
+            standard.get('nb_supports', 0), standard.get('nb_faces', 0), standard.get('nb_occupe', 0),
+            standard.get('nb_reserve', 0), standard.get('nb_libre', 0), standard.get('nb_panne', 0),
+        )
+        nb_geants, nbt_geo, nbo_geo, nbr_geo, nbl_geo, npt_geo = (
+            geant.get('nb_supports', 0), geant.get('nb_faces', 0), geant.get('nb_occupe', 0),
+            geant.get('nb_reserve', 0), geant.get('nb_libre', 0), geant.get('nb_panne', 0),
+        )
+        nb_sucettes, nbt_suc, nbo_suc, nbr_suc, nbl_suc, npt_suc = (
+            sucette.get('nb_supports', 0), sucette.get('nb_faces', 0), sucette.get('nb_occupe', 0),
+            sucette.get('nb_reserve', 0), sucette.get('nb_libre', 0), sucette.get('nb_panne', 0),
+        )
+        nb_gm, nbt_gm, nbo_gm, nbr_gm, nbl_gm, npt_gm = (
+            marche.get('nb_supports', 0), marche.get('nb_faces', 0), marche.get('nb_occupe', 0),
+            marche.get('nb_reserve', 0), marche.get('nb_libre', 0), marche.get('nb_panne', 0),
+        )
 
         format_stats_json = json.dumps(format_category_stats)
-        types_stats_json = json.dumps([
-            {'label': 'Panneaux',          'count': nb_panneaux_bon},
-            {'label': 'Écrans',            'count': nb_ecrans_bon},
-            {'label': 'Supports en Panne', 'count': nb_supports_panne},
-        ])
 
-        # ── Liste des villes disponibles (pour le filtre) ─────────
-        villes = sorted({
-            v.strip()
-            for v in Support.objects.values_list("ville", flat=True)
-            if v and v.strip()
-        })
+        types_stats = [
+            {'label': cat['label'], 'count': cat['nb_supports'], 'color': cat['color']}
+            for cat in format_category_stats if cat['nb_supports'] > 0
+        ]
+        if parc['nb_ecrans_bon']:
+            types_stats.append({'label': 'Écrans', 'count': parc['nb_ecrans_bon'], 'color': self.COLOR_ECRANS})
+        if parc['nb_supports_panne']:
+            types_stats.append({'label': 'En panne', 'count': parc['nb_supports_panne'], 'color': self.COLOR_PANNE})
+        types_stats_json = json.dumps(types_stats)
+
+        # ── Villes disponibles : distinct côté base plutôt qu'en Python ──
+        villes = list(
+            Support.objects.exclude(ville='').values_list('ville', flat=True).distinct().order_by('ville')
+        )
 
         context.update({
-            # Filtre
-            'ville_active' : ville_active,
-            'villes'       : villes,
+            'ville_active': ville_active,
+            'villes': villes,
 
-            # KPI globaux (respectent le filtre ville)
-            'total_supports'    : supports.count(),
-            'supports_bon'      : nb_supports_bon,
-            'supports_panne'    : nb_supports_panne,
-            'total_clients'     : clients_qs.count(),
-            'campagnes_actives' : campagnes_actives_qs.count(),
-            'campagnes_a_venir' : campagnes_a_venir_qs.count(),
+            'total_supports': parc['total'],
+            'supports_bon': parc['nb_supports_bon'],
+            'supports_panne': parc['nb_supports_panne'],
+            'total_clients': clients_qs.count(),
+            'campagnes_actives': len(campagnes_actives_list),
+            'campagnes_a_venir': len(campagnes_a_venir_list),
             'campagnes_recentes': campagnes_qs[:8],
-            'alertes'           : get_cached_alertes(),
+            'alertes': get_cached_alertes(),
 
-            # Répartition parc
-            'nb_panneaux'    : nb_panneaux,
-            'nb_panneaux_bon': nb_panneaux_bon,
-            'nb_ecrans_bon'  : nb_ecrans_bon,
-            'nb_ecrans_panne': nb_ecrans_panne,
-            'nb_ecrans'      : nb_ecrans,
+            'clients_actifs_list': clients_qs.order_by('nom')[:8],
+            'campagnes_en_cours_list': sorted(campagnes_actives_list, key=lambda c: c.date_debut, reverse=True)[:6],
+            'campagnes_a_venir_list': sorted(campagnes_a_venir_list, key=lambda c: c.date_debut)[:6],
+
+            'nb_panneaux': parc['nb_panneaux'],
+            'nb_panneaux_bon': parc['nb_panneaux_bon'],
+            'nb_ecrans_bon': parc['nb_ecrans_bon'],
+            'nb_ecrans_panne': parc['nb_ecrans_panne'],
+            'nb_ecrans': parc['nb_ecrans'],
             'format_categories': format_category_stats,
-            'total_faces'  : total_faces,
-            'total_faces_occupe'  : total_faces_occupe,
-            'total_faces_reserve' : total_faces_reserve,
-            'total_faces_libre'   : total_faces_libre,
-            'total_faces_panne'   : total_faces_panne,
-            
-            # Détail revenu / campagnes
-            'revenu_actif'          : revenu_actif,
-            'revenu_a_venir'        : revenu_a_venir,
-            'revenu_meres'          : revenu_meres,
-            'campagnes_meres_count' : campagnes_meres_count,
-            'top_campaigns_json'    : top_campaigns_json,
-            'top_faces_json'        : top_faces_json,
-            
-            # Détail par type
-            'nbl_std': nbl_std, 'nbo_std': nbo_std, 'nbr_std': nbr_std, 'npt_std': npt_std, 'nbt_std': nbt_std, 'o_std': o_std,
-            'nbl_geo': nbl_geo, 'nbo_geo': nbo_geo, 'nbr_geo': nbr_geo, 'npt_geo': npt_geo, 'nbt_geo': nbt_geo, 'o_geo': o_geo,
-            'nbl_suc': nbl_suc, 'nbo_suc': nbo_suc, 'nbr_suc': nbr_suc, 'npt_suc': npt_suc, 'nbt_suc': nbt_suc, 'o_suc': o_suc,
-            'nbl_gm':  nbl_gm,  'nbo_gm':  nbo_gm,  'nbr_gm':  nbr_gm,  'npt_gm':  npt_gm,  'nbt_gm':  nbt_gm,  'o_gm':  o_gm,
-            # Graphiques
+            'total_faces': total_faces,
+            'total_faces_occupe': total_faces_occupe,
+            'total_faces_reserve': total_faces_reserve,
+            'total_faces_libre': total_faces_libre,
+            'total_faces_panne': total_faces_panne,
+
+            'revenu_actif': revenu_actif,
+            'revenu_a_venir': revenu_a_venir,
+            'revenu_meres': revenu_meres,
+            'campagnes_meres_count': campagnes_meres_count,
+            'top_campaigns_json': top_campaigns_json,
+            'top_faces_json': top_faces_json,
+            'nb_standard':nb_standard, 'nb_geants':nb_geants, 'nb_sucettes':nb_sucettes, 'nb_gm':nb_gm,
+
+            'nbl_std': nbl_std, 'nbo_std': nbo_std, 'nbr_std': nbr_std, 'npt_std': npt_std, 'nbt_std': nbt_std, 'o_std': pct(nbo_std, nbt_std),
+            'nbl_geo': nbl_geo, 'nbo_geo': nbo_geo, 'nbr_geo': nbr_geo, 'npt_geo': npt_geo, 'nbt_geo': nbt_geo, 'o_geo': pct(nbo_geo, nbt_geo),
+            'nbl_suc': nbl_suc, 'nbo_suc': nbo_suc, 'nbr_suc': nbr_suc, 'npt_suc': npt_suc, 'nbt_suc': nbt_suc, 'o_suc': pct(nbo_suc, nbt_suc),
+            'nbl_gm': nbl_gm, 'nbo_gm': nbo_gm, 'nbr_gm': nbr_gm, 'npt_gm': npt_gm, 'nbt_gm': nbt_gm, 'o_gm': pct(nbo_gm, nbt_gm),
+
             'format_stats_json': format_stats_json,
-            'types_stats_json' : types_stats_json,
+            'types_stats_json': types_stats_json,
         })
         return context
-    
+
+    def _build_format_category_stats(self, format_categories_codes, ville_active, faces_occupees_ids, faces_reservees_ids):
+        """Calcule les stats par catégorie de format en 3 requêtes fixes,
+        quel que soit le nombre de catégories (au lieu de 5 requêtes x N catégories)."""
+        all_codes = [code for codes in format_categories_codes.values() for code in codes]
+        if not all_codes:
+            return []
+
+        faces_qs = FacePanneau.objects.filter(support__format__in=all_codes)
+        if ville_active:
+            faces_qs = faces_qs.filter(support__ville__iexact=ville_active)
+
+        # 1) total / panne par format
+        par_format = faces_qs.values('support__format').annotate(
+            total=Count('id'),
+            panne=Count('id', filter=Q(etat=Support.ETAT_PANNE)),
+        )
+        stats_par_format = {row['support__format']: row for row in par_format}
+
+        # 2) faces en bon état + leur format (pour dériver occupé/réservé/libre en mémoire)
+        faces_bon = faces_qs.filter(etat=Support.ETAT_BON).values_list('id', 'support__format')
+        bon_par_format = {}
+        for face_id, fmt in faces_bon:
+            bon_par_format.setdefault(fmt, []).append(face_id)
+
+        # 3) nb de supports en bon état par format
+        supports_qs = Support.objects.filter(type_support=Support.TYPE_PANNEAU, format__in=all_codes, etat=Support.ETAT_BON)
+        if ville_active:
+            supports_qs = supports_qs.filter(ville__iexact=ville_active)
+        supports_par_format = dict(supports_qs.values('format').annotate(n=Count('id')).values_list('format', 'n'))
+
+        stats = []
+        for categorie, codes in format_categories_codes.items():
+            total_faces = sum(stats_par_format.get(code, {}).get('total', 0) for code in codes)
+            if total_faces == 0:
+                continue
+            nb_panne = sum(stats_par_format.get(code, {}).get('panne', 0) for code in codes)
+            nb_supports = sum(supports_par_format.get(code, 0) for code in codes)
+
+            faces_ids_bon = [fid for code in codes for fid in bon_par_format.get(code, [])]
+            nb_bon = len(faces_ids_bon)
+            nb_occupe = sum(1 for fid in faces_ids_bon if fid in faces_occupees_ids)
+            nb_reserve = sum(1 for fid in faces_ids_bon if fid in faces_reservees_ids and fid not in faces_occupees_ids)
+            nb_libre = nb_bon - nb_occupe - nb_reserve
+
+            stats.append({
+                'categorie': categorie,
+                'label': categorie,
+                'slug': slugify(categorie),
+                'nb_supports': nb_supports,
+                'nb_faces': total_faces,
+                'nb_occupe': nb_occupe,
+                'nb_reserve': nb_reserve,
+                'nb_libre': nb_libre,
+                'nb_panne': nb_panne,
+                'panne_pct': round(nb_panne / total_faces * 100) if total_faces else 0,
+                'color': self.CATEGORY_COLORS.get(categorie, self.DEFAULT_CATEGORY_COLOR),
+            })
+        return stats
+
 def _build_alertes():
     alertes = []
     today = timezone.now().date()
@@ -673,19 +850,36 @@ class ContratDeleteView(StaffRequiredMixin, DeleteView):
 
 # Les Classe des vues de campagne : list, create, detail, edit, lancer, delete
 
-class CampagneListView(ClientStaffRequiredMixin, ListView):
+class CampagneListView(ClientStaffRequiredMixin, SortableListMixin, ListView):
     model = Campagne
     template_name = 'campaigns/campagne_list.html'
     context_object_name = 'campagnes'
 
+    SORT_FIELDS = {
+        'reference':    'reference',
+        'client':       'client__nom',
+        'nom':          'nom',
+        'statut':       'statut',
+        'date_debut':   'date_debut',
+        'date_fin':     'date_fin',
+        'nb_supports':  'nb_supports_annotate',
+        'type_support': 'type_support',
+        'actif':        'actif',
+    }
+    DEFAULT_SORT = 'statut'   # nom de colonne, sans signe
+    DEFAULT_DIR  = 'asc'     # 'asc' ou 'desc'
+
     def get_queryset(self):
         qs = super().get_queryset().select_related('client')
+
         if self.request.user.is_client_role and self.request.user.client_profile:
             qs = qs.filter(client=self.request.user.client_profile)
+
         q            = self.request.GET.get('q', '')
         statut       = self.request.GET.get('statut', '')
         type_support = self.request.GET.get('type_support', '')
         actif        = self.request.GET.get('actif', '')
+
         if type_support:
             qs = qs.filter(type_support=type_support)
         if q:
@@ -694,25 +888,30 @@ class CampagneListView(ClientStaffRequiredMixin, ListView):
             qs = qs.filter(statut=statut)
         if actif:
             qs = qs.filter(actif=actif)
+
+        qs = qs.annotate(nb_supports_annotate=Count('lignes__support', distinct=True))
+        qs = self.apply_sort(qs)  # ← remplace tout le bloc "Tri" manuel précédent
+
         return qs
 
     def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        # not is_admin
+        context = super().get_context_data(**kwargs)  # ← ajoute déjà sort_key / sort_dir / sort_links via le mixin
+
         if not self.request.user.is_admin:
             if self.request.user.is_client_role and self.request.user.client_profile:
                 context['campagnes'] = context['campagnes'].filter(client=self.request.user.client_profile)
             context['campagnes'] = context['campagnes'].filter(actif=True)
+
         context['q']                    = self.request.GET.get('q', '')
         context['statut']               = self.request.GET.get('statut', '')
         context['statut_choices']       = Campagne.STATUT_CHOICES
         context['type_support']         = self.request.GET.get('type_support', '')
         context['type_support_choices'] = get_type_support_choices()
         context['actif']                = self.request.GET.get('actif', '')
+
         return context
 
     def post(self, request, *args, **kwargs):
-        # Seul le staff peut effectuer des actions
         if not request.user.is_staff_regie_role:
             messages.error(request, "Permission refusée.")
             return redirect('campagne_list')
@@ -725,20 +924,14 @@ class CampagneListView(ClientStaffRequiredMixin, ListView):
             return redirect('campagne_list')
         qs = Campagne.objects.filter(pk__in=selected_ids)
         if action == 'supprimer':
-            #count = qs.count()
-            #qs.delete()
-            #messages.success(request, f"{count} campagne(s) supprimée(s).")
-            # fonction (Class) de suppression à implémenter (avec confirmation côté client)
             request.session['selected_campagne_ids'] = selected_ids
             return redirect('campagne_selected_delete')
         elif action == 'archiver':
             count = qs.update(actif=False)
             messages.success(request, f"{count} campagne(s) archivée(s).")
-            pass
         else:
             messages.error(request, f"Action inconnue : {action}")
         return redirect('campagne_list')
-
 
 class CampagneSelectedDeleteView(StaffRequiredMixin, TemplateView):
     # On cible ton fichier HTML générique de confirmation
@@ -1816,7 +2009,24 @@ class ReservationDetailView(ClientStaffRequiredMixin, DetailView):
         context['can_delete'] = self.request.user.is_staff_regie_role
         return context
 
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.views import View
+from django.shortcuts import redirect, get_object_or_404
 
+from .models import Reservation
+
+
+class ReservationRedirectView(LoginRequiredMixin, View):
+    """
+    Raccourci d'accès à une réservation à partir de son seul ID.
+    Redirige vers l'URL canonique 'reservation_detail' (imbriquée sous le
+    client), sans avoir besoin de connaître client_pk à l'endroit d'où
+    on linke (ex: depuis une DemandeReservation).
+    """
+    def get(self, request, pk):
+        reservation = get_object_or_404(Reservation, pk=pk)
+        return redirect('reservation_detail', client_pk=reservation.client_id, resa_pk=reservation.pk)
+    
 class ReservationListView(StaffRequiredMixin, ListView):
     model = Reservation
     template_name = 'campaigns/reservation_list.html'
@@ -1950,7 +2160,7 @@ def api_check_dispo(request, client_pk):
     """
     Retourne le statut de chaque face sur une période donnée.
     
-    GET /campaigns/api/check-dispo/<client_pk>/?date_debut=...&date_fin=...
+    GET /gestion/campaigns/api/check-dispo/<client_pk>/?date_debut=...&date_fin=...
     
     Réponse :
     {
@@ -2218,398 +2428,6 @@ class DashboardViewDemander(StaffOnlyMixin, View):
         })
 
 
-# ══════════════════════════════════════════════════════════════════════════════
-# Liste des demandes
-# ══════════════════════════════════════════════════════════════════════════════
-
-class DemandeListView(StaffOnlyMixin, View):
-    """
-    Affiche la liste des demandes avec filtres et recherche.
-    """
-    template_name = 'staff/demandes_liste.html'
-
-    def get(self, request):
-        qs = (
-            DemandeReservation.objects
-            .select_related('client', 'traite_par')
-            .prefetch_related('faces_souhaitees__support', 'supports_souhaites')
-        )
-
-        # ── Filtres ───────────────────────────────────────────────────────
-        statut = request.GET.get('statut', '').strip()
-        q      = request.GET.get('q', '').strip()
-        tri    = request.GET.get('tri', '-created_at').strip()
-
-        if statut and statut in dict(DemandeReservation.STATUT_CHOICES):
-            qs = qs.filter(statut=statut)
-        
-        if q:
-            qs = qs.filter(
-                Q(reference__icontains=q) |
-                Q(nom_contact__icontains=q) |
-                Q(email__icontains=q) |
-                Q(societe__icontains=q) |
-                Q(nom_campagne__icontains=q)
-            )
-
-        # ── Tri ───────────────────────────────────────────────────────────
-        if tri in ['-created_at', 'created_at', '-date_debut_souhaitee', 'date_debut_souhaitee']:
-            qs = qs.order_by(tri)
-        else:
-            qs = qs.order_by('-created_at')
-
-        # ── Pagination ────────────────────────────────────────────────────
-        paginator = Paginator(qs, 20)
-        page_obj  = paginator.get_page(request.GET.get('page', 1))
-
-        # ── Compteurs ─────────────────────────────────────────────────────
-        nb_nouvelles = DemandeReservation.objects.filter(
-            statut=DemandeReservation.STATUT_NOUVELLE
-        ).count()
-        
-        nb_en_cours = DemandeReservation.objects.filter(
-            statut=DemandeReservation.STATUT_EN_COURS
-        ).count()
-
-        return render(request, self.template_name, {
-            'page_obj':          page_obj,
-            'statut':            statut,
-            'q':                 q,
-            'tri':               tri,
-            'statut_choices':    DemandeReservation.STATUT_CHOICES,
-            'nb_nouvelles':      nb_nouvelles,
-            'nb_en_cours':       nb_en_cours,
-        })
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# Détail d'une demande
-# ══════════════════════════════════════════════════════════════════════════════
-
-class DemandeDetailView(StaffOnlyMixin, View):
-    """
-    Affiche le détail complet d'une demande et permet le traitement.
-    """
-    template_name = 'staff/demande_detail.html'
-
-    def get(self, request, uuid):
-        demande = get_object_or_404(
-            DemandeReservation.objects
-            .select_related('client', 'reservation', 'traite_par')
-            .prefetch_related(
-                'faces_souhaitees__support',
-                'supports_souhaites',
-            ),
-            uuid=uuid
-        )
-
-        # ── Marquer en cours si nouvelle ──────────────────────────────────
-        if demande.statut == DemandeReservation.STATUT_NOUVELLE:
-            demande.marquer_en_cours(request.user)
-
-        # ── Vérifier disponibilité des faces sur la période ────────────────
-        faces_avec_statut = self._get_faces_avec_statut(demande)
-
-        # ── Clients existants pour le formulaire ──────────────────────────
-        clients = Client.objects.filter(actif=True).order_by('nom')
-
-        # ── Supports écrans (si demande écrans) ───────────────────────────
-        supports_ecrans = demande.supports_souhaites.all()
-
-        return render(request, self.template_name, {
-            'demande':            demande,
-            'faces_avec_statut':  faces_avec_statut,
-            'clients':            clients,
-            'supports_ecrans':    supports_ecrans,
-            'duree_jours':        demande.duree_jours(),
-        })
-
-    def _get_faces_avec_statut(self, demande):
-        """
-        Retourne une liste de dicts avec chaque face et son statut
-        + détails des conflits éventuels.
-        """
-        faces_avec_statut = []
-        
-        date_debut_dt = timezone.make_aware(
-            datetime_type.combine(demande.date_debut_souhaitee, datetime_type.min.time())
-        )
-        date_fin_dt = timezone.make_aware(
-            datetime_type.combine(demande.date_fin_souhaitee, datetime_type.max.time())
-        )
-
-        for face in demande.faces_souhaitees.all().select_related('support'):
-            statut = face.get_statut(
-                date_debut=date_debut_dt,
-                date_fin=date_fin_dt,
-            )
-            
-            # ── Détails du conflit ────────────────────────────────────────
-            conflit = None
-            if statut in ('occupe', 'reserve'):
-                # Chercher conflit campagne
-                lc = (
-                    LigneCampagne.objects
-                    .filter(
-                        face=face,
-                        campagne__date_debut__lte=demande.date_fin_souhaitee,
-                        campagne__date_fin__gte=demande.date_debut_souhaitee,
-                        campagne__statut__in=['en_cours', 'a_venir'],
-                    )
-                    .select_related('campagne__client')
-                    .first()
-                )
-                if lc:
-                    conflit = {
-                        'type':  'campagne',
-                        'label': f"{lc.campagne.nom}",
-                        'client_nom': lc.campagne.client.nom,
-                        'debut': lc.campagne.date_debut,
-                        'fin':   lc.campagne.date_fin,
-                    }
-                else:
-                    # Chercher conflit réservation
-                    rl = (
-                        ReservationLigne.objects
-                        .filter(
-                            face=face,
-                            reservation__date_debut__lte=date_fin_dt,
-                            reservation__date_fin__gte=date_debut_dt,
-                            reservation__statut__in=[STATUT_EN_ATTENTE, STATUT_CONFIRMEE],
-                        )
-                        .exclude(reservation__demandes=demande)  # Exclure la demande actuelle
-                        .select_related('reservation__client')
-                        .first()
-                    )
-                    if rl:
-                        conflit = {
-                            'type':  'reservation',
-                            'label': rl.reservation.nom,
-                            'client_nom': rl.reservation.client.nom,
-                            'debut': rl.reservation.date_debut,
-                            'fin':   rl.reservation.date_fin,
-                        }
-
-            faces_avec_statut.append({
-                'face':    face,
-                'statut':  statut,
-                'conflit': conflit,
-            })
-
-        return faces_avec_statut
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# Traitement (validation) d'une demande
-# ══════════════════════════════════════════════════════════════════════════════
-
-class DemandeTraiterView(StaffOnlyMixin, View):
-    """
-    POST : crée le Client (si nouveau) + Reservation + ReservationLigne
-           puis valide la demande et envoie les emails.
-    """
-    template_name = 'staff/demande_detail.html'
-
-    def post(self, request, uuid):
-        demande = get_object_or_404(DemandeReservation, uuid=uuid)
-
-        if demande.est_traitee:
-            messages.warning(request, "Cette demande a déjà été traitée.")
-            return redirect('staff:demande_detail', uuid=uuid)
-
-        # ── Récupération des données ──────────────────────────────────────
-        client_pk       = request.POST.get('client_pk', '').strip()
-        nouveau_client  = request.POST.get('nouveau_client') == '1'
-        face_ids        = request.POST.getlist('faces')
-        nom_reservation = request.POST.get(
-            'nom_reservation',
-            demande.nom_campagne or f"Réservation {demande.reference}"
-        ).strip()
-
-        # ── Dates ─────────────────────────────────────────────────────────
-        try:
-            date_debut_str = request.POST.get('date_debut', str(demande.date_debut_souhaitee))
-            date_fin_str   = request.POST.get('date_fin', str(demande.date_fin_souhaitee))
-            
-            date_debut_d = date_type.fromisoformat(date_debut_str)
-            date_fin_d   = date_type.fromisoformat(date_fin_str)
-            
-            date_debut = timezone.make_aware(
-                datetime_type.combine(date_debut_d, datetime_type.min.time())
-            )
-            date_fin = timezone.make_aware(
-                datetime_type.combine(date_fin_d, datetime_type.max.time())
-            )
-        except (ValueError, TypeError) as e:
-            messages.error(request, f"Dates invalides : {e}")
-            return redirect('staff:demande_detail', uuid=uuid)
-
-        if not face_ids:
-            messages.error(request, "Sélectionnez au moins une face.")
-            return redirect('staff:demande_detail', uuid=uuid)
-
-        try:
-            with transaction.atomic():
-                # 1. ── Récupérer ou créer le client ──────────────────────
-                if nouveau_client:
-                    client = Client.objects.create(
-                        nom       = demande.societe or demande.nom_contact,
-                        email     = demande.email,
-                        telephone = demande.telephone,
-                        actif     = True,
-                    )
-                    logger.info(f"[Demande {demande.reference}] Client créé : {client.nom}")
-                elif client_pk:
-                    client = get_object_or_404(Client, pk=client_pk)
-                else:
-                    messages.error(request, "Sélectionnez un client ou créez-en un nouveau.")
-                    return redirect('staff:demande_detail', uuid=uuid)
-
-                # 2. ── Créer la Reservation ──────────────────────────────
-                reservation = Reservation.objects.create(
-                    client      = client,
-                    nom         = nom_reservation,
-                    date_debut  = date_debut,
-                    date_fin    = date_fin,
-                    statut      = STATUT_CONFIRMEE,
-                    created_by  = request.user,
-                )
-                logger.info(f"[Demande {demande.reference}] Réservation créée : {reservation.reference}")
-
-                # 3. ── Créer les ReservationLigne avec validation ────────
-                faces = FacePanneau.objects.filter(
-                    pk__in=face_ids
-                ).select_related('support')
-                
-                erreurs = []
-                lignes  = []
-                
-                for face in faces:
-                    ligne = ReservationLigne(
-                        reservation=reservation,
-                        support=face.support,
-                        face=face,
-                    )
-                    
-                    # Vérifier les conflits
-                    conflit = ReservationLigne.objects.filter(
-                        face=face,
-                        reservation__date_debut__lt=date_fin,
-                        reservation__date_fin__gt=date_debut,
-                        reservation__statut__in=[STATUT_EN_ATTENTE, STATUT_CONFIRMEE],
-                    ).exclude(reservation=reservation).first()
-                    
-                    if conflit:
-                        erreurs.append(
-                            f"Face {face.support.code}-{face.label} : "
-                            f"conflit avec {conflit.reservation.client.nom}"
-                        )
-                    else:
-                        lignes.append(ligne)
-
-                if erreurs:
-                    messages.error(request, f"Conflits détectés : {', '.join(erreurs)}")
-                    return redirect('staff:demande_detail', uuid=uuid)
-
-                if lignes:
-                    ReservationLigne.objects.bulk_create(lignes)
-                    logger.info(f"[Demande {demande.reference}] {len(lignes)} lignes créées")
-
-                # 4. ── Valider la demande ────────────────────────────────
-                demande.valider(request.user, reservation, client)
-
-                # 5. ── Envoyer les emails ────────────────────────────────
-                self._send_confirmation_emails(demande, reservation, date_debut_d, date_fin_d)
-
-        except Exception as exc:
-            logger.error(f"Erreur traitement demande {uuid} : {exc}", exc_info=True)
-            messages.error(request, f"Erreur : {exc}")
-            return redirect('staff:demande_detail', uuid=uuid)
-
-        messages.success(
-            request,
-            f"✅ Demande {demande.reference} validée — Réservation {reservation.reference} créée."
-        )
-        return redirect('staff:demande_detail', uuid=uuid)
-
-    def _send_confirmation_emails(self, demande, reservation, date_debut_d, date_fin_d):
-        """Envoie les emails de confirmation au visiteur."""
-        try:
-            # Email au visiteur
-            send_mail(
-                subject=f"Confirmation de réservation — {demande.reference} | Régie INTEGRAL",
-                message=(
-                    f"Bonjour {demande.nom_contact},\n\n"
-                    f"Votre demande de réservation {demande.reference} a été validée ✅\n\n"
-                    f"Détails de votre réservation :\n"
-                    f"  Référence : {reservation.reference}\n"
-                    f"  Période : {date_debut_d:%d/%m/%Y} → {date_fin_d:%d/%m/%Y} "
-                    f"({demande.duree_jours()} jours)\n"
-                    f"  Campagne : {demande.nom_campagne or 'Non spécifiée'}\n\n"
-                    f"Notre équipe vous contactera bientôt pour les détails de la mise en place.\n\n"
-                    f"Cordialement,\n"
-                    f"Équipe Régie INTEGRAL\n"
-                    f"📞 +226 XX XX XX XX\n"
-                    f"✉️ contact@integral.bf"
-                ),
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[demande.email],
-                fail_silently=False,
-            )
-            logger.info(f"Email confirmation envoyé à {demande.email}")
-        except Exception as e:
-            logger.warning(f"Erreur envoi email confirmation : {e}")
-
-
-# ══════════════════════════════════════════════════════════════════════════════
-# Refus d'une demande
-# ══════════════════════════════════════════════════════════════════════════════
-
-class DemandeRefuserView(StaffOnlyMixin, View):
-    """
-    POST : refuse la demande et envoie un email au visiteur.
-    """
-
-    def post(self, request, uuid):
-        demande = get_object_or_404(DemandeReservation, uuid=uuid)
-
-        if demande.est_traitee:
-            messages.warning(request, "Cette demande a déjà été traitée.")
-            return redirect('staff:demande_detail', uuid=uuid)
-
-        notes = request.POST.get('notes_staff', '').strip()
-        demande.refuser(request.user, notes)
-
-        logger.info(f"Demande {demande.reference} refusée par {request.user.username}")
-
-        # Email de refus au visiteur
-        try:
-            send_mail(
-                subject=f"Demande de réservation — {demande.reference} | Régie INTEGRAL",
-                message=(
-                    f"Bonjour {demande.nom_contact},\n\n"
-                    f"Nous avons examiné votre demande {demande.reference} "
-                    f"pour la période {demande.date_debut_souhaitee:%d/%m/%Y} → "
-                    f"{demande.date_fin_souhaitee:%d/%m/%Y}.\n\n"
-                    f"Malheureusement, nous ne sommes pas en mesure de la satisfaire "
-                    f"pour le moment.\n\n"
-                    + (f"Raison : {notes}\n\n" if notes else "")
-                    + f"N'hésitez pas à nous recontacter pour une autre période.\n\n"
-                    f"Cordialement,\n"
-                    f"Équipe Régie INTEGRAL\n"
-                    f"📞 +226 XX XX XX XX"
-                ),
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[demande.email],
-                fail_silently=False,
-            )
-            logger.info(f"Email refus envoyé à {demande.email}")
-        except Exception as e:
-            logger.warning(f"Erreur envoi email refus : {e}")
-
-        messages.success(request, f"❌ Demande {demande.reference} refusée et email envoyé.")
-        return redirect('staff:demande_detail', uuid=uuid)
-
 
 # ══════════════════════════════════════════════════════════════════════════════
 # APIs AJAX
@@ -2748,3 +2566,535 @@ class AjaxCheckFacesDispoView(StaffOnlyMixin, View):
             })
 
         return JsonResponse({'resultats': resultats})
+    
+    
+    
+"""
+Vues de traitement des DemandeReservation par le gestionnaire.
+À intégrer dans campaigns/views.py (ou un fichier dédié importé depuis là).
+"""
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.views import View
+from django.shortcuts import render, redirect, get_object_or_404
+from django.contrib import messages
+from django.db import transaction
+from django.core.mail import send_mail
+from django.core.exceptions import ValidationError
+from django.conf import settings
+from django.utils import timezone
+from datetime import datetime, time
+
+
+
+class DemandesListView(LoginRequiredMixin, View):
+    """Liste des demandes de réservation à traiter par le gestionnaire."""
+    template_name = 'campaigns/demandes_liste.html'
+
+    def get(self, request):
+        statut = request.GET.get('statut', '')
+        qs = (
+            DemandeReservation.objects
+            .select_related('client', 'reservation', 'traite_par')
+            .order_by('-created_at')
+        )
+
+        if statut:
+            qs = qs.filter(statut=statut)
+        else:
+            # Par défaut : uniquement les demandes qui nécessitent une action
+            qs = qs.filter(statut__in=[
+                DemandeReservation.STATUT_NOUVELLE,
+                DemandeReservation.STATUT_EN_COURS,
+            ])
+
+        compteurs = {
+            'nouvelle': DemandeReservation.objects.filter(statut=DemandeReservation.STATUT_NOUVELLE).count(),
+            'en_cours': DemandeReservation.objects.filter(statut=DemandeReservation.STATUT_EN_COURS).count(),
+            'validee':  DemandeReservation.objects.filter(statut=DemandeReservation.STATUT_VALIDEE).count(),
+            'refusee':  DemandeReservation.objects.filter(statut=DemandeReservation.STATUT_REFUSEE).count(),
+        }
+
+        return render(request, self.template_name, {
+            'demandes': qs,
+            'statut_actif': statut,
+            'compteurs': compteurs,
+        })
+
+
+class DemandeDetailView(LoginRequiredMixin, View):
+    """Détail d'une demande : emplacements, période, contact, actions."""
+    template_name = 'campaigns/demande_detail.html'
+
+    def get(self, request, uuid):
+        demande = get_object_or_404(
+            DemandeReservation.objects
+                .select_related('client', 'reservation', 'traite_par')
+                .prefetch_related('faces_souhaitees__support', 'supports_souhaites'),
+            uuid=uuid,
+        )
+
+        # Passe automatiquement en "en_cours" dès l'ouverture par le staff
+        if demande.est_nouvelle:
+            demande.marquer_en_cours(user=request.user)
+
+        return render(request, self.template_name, {'demande': demande})
+
+class DemandeValiderView(LoginRequiredMixin, View):
+    """
+    Valide la demande :
+      1. Récupère ou crée le Client (par email)
+      2. Crée la Reservation
+      3. Crée une ReservationLigne par face souhaitée
+      4. Marque la demande comme validée
+
+    Tout est fait dans une transaction atomique : si une seule face pose
+    problème (conflit de disponibilité détecté par ReservationLigne.clean()),
+    rien n'est créé.
+    """
+
+    def post(self, request, uuid):
+        demande = get_object_or_404(DemandeReservation, uuid=uuid)
+
+        if not demande.peut_etre_traitee:
+            messages.error(request, "Cette demande a déjà été traitée.")
+            return redirect('campaigns:demande_detail', uuid=uuid)
+
+        faces = list(demande.faces_souhaitees.select_related('support').all())
+        if not faces:
+            messages.error(
+                request,
+                "Impossible de valider : aucune face n'est associée à cette demande "
+                "(cas des écrans numériques non géré automatiquement — traiter manuellement)."
+            )
+            return redirect('campaigns:demande_detail', uuid=uuid)
+
+        try:
+            with transaction.atomic():
+                # ── Client ────────────────────────────────────────────────
+                # On ne réutilise un client existant que si son email n'est
+                # pas vide (évite de matcher tous les clients avec email='')
+                # et on prend le premier trouvé plutôt que d'utiliser
+                # get_or_create(), qui échoue avec MultipleObjectsReturned
+                # dès que plusieurs lignes Client partagent le même email
+                # (le champ n'a probablement pas de contrainte unique=True).
+                client = None
+                if demande.email:
+                    client = (
+                        Client.objects
+                        .filter(email=demande.email)
+                        .order_by('pk')
+                        .first()
+                    )
+                if client is None:
+                    client = Client.objects.create(
+                        email=demande.email,
+                        nom=demande.societe or demande.nom_contact,
+                        telephone=demande.telephone,
+                    )
+
+                # ── Réservation ───────────────────────────────────────────
+                date_debut_dt = timezone.make_aware(
+                    datetime.combine(demande.date_debut_souhaitee, time.min)
+                )
+                date_fin_dt = timezone.make_aware(
+                    datetime.combine(demande.date_fin_souhaitee, time.max)
+                )
+
+                reservation = Reservation(
+                    nom=demande.nom_campagne or f"Réservation {demande.reference}",
+                    client=client,
+                    date_debut=date_debut_dt,
+                    date_fin=date_fin_dt,
+                    created_by=request.user,
+                    notes=(
+                        f"Créée depuis la demande {demande.reference}.\n{demande.message}"
+                    ).strip(),
+                )
+                reservation.full_clean()  # applique Reservation.clean() (durée, dates)
+                reservation.save()
+
+                # ── Lignes (une par face demandée) ───────────────────────
+                # ReservationLigne.save() appelle full_clean() en interne,
+                # ce qui vérifie les conflits (campagnes + autres réservations).
+                for face in faces:
+                    ReservationLigne.objects.create(
+                        reservation=reservation,
+                        support=face.support,
+                        face=face,
+                    )
+
+                demande.marquer_validee(client=client, reservation=reservation, user=request.user)
+
+            messages.success(
+                request,
+                f"Demande {demande.reference} validée. Réservation {reservation.reference} créée "
+                f"({len(faces)} face{'s' if len(faces) > 1 else ''})."
+            )
+
+        except ValidationError as e:
+            # Regroupe les messages d'erreur (peut contenir un conflit de face)
+            detail = "; ".join(e.messages) if hasattr(e, 'messages') else str(e)
+            messages.error(request, f"Impossible de valider : {detail}")
+        except Exception as e:
+            messages.error(request, f"Erreur inattendue lors de la validation : {e}")
+
+        return redirect('demande_detail', uuid=uuid)
+class DemandeRefuserView(LoginRequiredMixin, View):
+    """Refuse la demande, enregistre le motif, notifie le client par email."""
+
+    def post(self, request, uuid):
+        demande = get_object_or_404(DemandeReservation, uuid=uuid)
+
+        if not demande.peut_etre_traitee:
+            messages.error(request, "Cette demande a déjà été traitée.")
+            return redirect('demande_detail', uuid=uuid)
+
+        motif = request.POST.get('motif', '').strip()
+        if not motif:
+            messages.error(request, "Le motif de refus est obligatoire.")
+            return redirect('demande_detail', uuid=uuid)
+
+        demande.marquer_refusee(user=request.user, notes=motif)
+
+        try:
+            send_mail(
+                subject=f"Votre demande de réservation {demande.reference}",
+                message=(
+                    f"Bonjour {demande.nom_contact},\n\n"
+                    f"Nous vous remercions pour votre demande de réservation "
+                    f"({demande.reference}) concernant : {demande.get_resume_emplacements()}.\n\n"
+                    f"Après étude, nous ne sommes malheureusement pas en mesure d'y donner suite "
+                    f"pour la raison suivante :\n\n{motif}\n\n"
+                    f"N'hésitez pas à nous recontacter pour toute autre demande.\n\n"
+                    f"Cordialement,\nL'équipe régie publicitaire"
+                ),
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[demande.email],
+                fail_silently=False,
+            )
+            messages.success(
+                request,
+                f"Demande {demande.reference} refusée. Le client a été notifié par email."
+            )
+        except Exception as e:
+            messages.warning(
+                request,
+                f"Demande refusée, mais l'envoi de l'email a échoué : {e}"
+            )
+
+        return redirect('demandes_liste')
+    
+
+# ══════════════════════════════════════════════════════════════════════════════
+# WIZARD STAFF — Création de réservation en 3 étapes
+# (Étape 1 : Client · Étape 2 : Faces · Étape 3 : Vérification & Validation)
+#
+# À COLLER DANS campaigns/views.py, à la suite des vues Reservation existantes.
+# Réutilise : StaffRequiredMixin, Client, Support, FacePanneau, FormatSupport,
+# Reservation, ReservationLigne, STATUT_EN_ATTENTE, STATUT_CONFIRMEE,
+# _get_supports(), _parse_dates()  — déjà présents dans ton fichier.
+#
+# NÉCESSITE : import json  (en haut de campaigns/views.py, s'il n'y est pas déjà)
+# ══════════════════════════════════════════════════════════════════════════════
+
+import json
+
+SESSION_CLIENT   = 'resa_wizard_client_pk'
+SESSION_DATES    = 'resa_wizard_dates'      # {'date_debut': iso, 'date_fin': iso}
+SESSION_FACES    = 'resa_wizard_faces'      # [id, id, ...]
+SESSION_NOM      = 'resa_wizard_nom'
+
+
+def _wizard_reset(request):
+    for key in (SESSION_CLIENT, SESSION_DATES, SESSION_FACES, SESSION_NOM):
+        request.session.pop(key, None)
+
+
+# ── Étape 1 — Client ─────────────────────────────────────────────────────────
+
+class ReservationWizardEtape1View(StaffRequiredMixin, View):
+    """
+    Étape 1 — Sélectionner un client existant OU en créer un nouveau.
+
+    URL  : /reservations/nouvelle/etape1/
+           /clients/<client_pk>/reservations/nouvelle/etape1/  (client déjà connu → saute à l'étape 2)
+    Name : reservation_wizard_etape1
+    """
+    template_name = 'campaigns/reservation_wizard_etape1_client.html'
+
+    def get(self, request, client_pk=None):
+        # Client déjà connu (venant de la fiche client) → on pré-remplit la
+        # session et on saute directement à l'étape 2.
+        if client_pk is not None:
+            client = get_object_or_404(Client, pk=client_pk)
+            request.session[SESSION_CLIENT] = client.pk
+            return redirect('reservation_wizard_etape2')
+
+        q = request.GET.get('q', '').strip()
+        clients = Client.objects.all().order_by('nom')
+        if q:
+            clients = clients.filter(Q(nom__icontains=q) | Q(email__icontains=q))
+
+        client_pk_session = request.session.get(SESSION_CLIENT)
+
+        return render(request, self.template_name, {
+            'clients':      clients,
+            'q':            q,
+            'selected_pk':  client_pk_session,
+            'mode_title':   'Nouvelle réservation — Étape 1/3',
+        })
+
+    def post(self, request, client_pk=None):
+        action = request.POST.get('action')
+
+        # ── Sélection d'un client existant ──────────────────────────────────
+        if action == 'selectionner':
+            client_pk = request.POST.get('client_pk')
+            client = get_object_or_404(Client, pk=client_pk)
+            request.session[SESSION_CLIENT] = client.pk
+            return redirect('reservation_wizard_etape2')
+
+        # ── Création d'un nouveau client ────────────────────────────────────
+        if action == 'creer':
+            nom       = request.POST.get('nom', '').strip()
+            email     = request.POST.get('email', '').strip()
+            telephone = request.POST.get('telephone', '').strip()
+
+            if not nom:
+                messages.error(request, "Le nom du client est obligatoire.")
+                return redirect('reservation_wizard_etape1')
+
+            client = Client.objects.create(
+                nom=nom, email=email, telephone=telephone,
+            )
+            request.session[SESSION_CLIENT] = client.pk
+            messages.success(request, f"Client « {client.nom} » créé.")
+            return redirect('reservation_wizard_etape2')
+
+        messages.error(request, "Action invalide.")
+        return redirect('reservation_wizard_etape1')
+
+
+# ── Étape 2 — Sélection des faces ────────────────────────────────────────────
+
+class ReservationWizardEtape2View(StaffRequiredMixin, View):
+    """
+    Étape 2 — Choix de la période et des faces via une interface carte/liste
+    interactive (identique à celle du wizard public), avec panier persistant.
+
+    URL  : /reservations/nouvelle/etape2/
+    Name : reservation_wizard_etape2
+    """
+    template_name = 'campaigns/reservation_wizard_etape2_faces.html'
+
+    def _get_client(self, request):
+        client_pk = request.session.get(SESSION_CLIENT)
+        if not client_pk:
+            return None
+        return Client.objects.filter(pk=client_pk).first()
+
+    def get(self, request):
+        client = self._get_client(request)
+        if not client:
+            messages.warning(request, "Veuillez d'abord sélectionner un client.")
+            return redirect('reservation_wizard_etape1')
+
+        dates        = request.session.get(SESSION_DATES, {})
+        selectionnes = request.session.get(SESSION_FACES, [])
+
+        # Pré-remplissage du panier JS à partir des faces déjà en session.
+        panier_faces = (
+            FacePanneau.objects.filter(id__in=selectionnes)
+            .select_related('support')
+        )
+
+        return render(request, self.template_name, {
+            'client':          client,
+            'panier_faces':    panier_faces,
+            'mode_title':      'Nouvelle réservation — Étape 2/3',
+            'date_debut':      dates.get('date_debut', ''),
+            'date_fin':        dates.get('date_fin', ''),
+            'nom_reservation': request.session.get(SESSION_NOM, ''),
+        })
+
+    def post(self, request):
+        client = self._get_client(request)
+        if not client:
+            return redirect('reservation_wizard_etape1')
+
+        try:
+            face_ids = [int(fid) for fid in json.loads(request.POST.get('faces_selectionnees', '[]'))]
+        except (ValueError, TypeError):
+            face_ids = []
+
+        date_debut_str  = request.POST.get('date_debut', '').strip()
+        date_fin_str    = request.POST.get('date_fin', '').strip()
+        nom_reservation = request.POST.get('nom_reservation', '').strip()
+
+        try:
+            _parse_dates(date_debut_str, date_fin_str)
+        except ValidationError as e:
+            messages.error(request, e.message)
+            return redirect('reservation_wizard_etape2')
+
+        if not face_ids:
+            messages.error(request, "Veuillez sélectionner au moins une face.")
+            return redirect('reservation_wizard_etape2')
+
+        request.session[SESSION_DATES] = {
+            'date_debut': date_debut_str,
+            'date_fin':   date_fin_str,
+        }
+        request.session[SESSION_FACES] = face_ids
+        request.session[SESSION_NOM]   = nom_reservation
+
+        return redirect('reservation_wizard_etape3')
+
+
+# ── Étape 3 — Vérification & validation ──────────────────────────────────────
+
+class ReservationWizardEtape3View(StaffRequiredMixin, View):
+    """
+    Étape 3 — Récapitulatif complet, détection des conflits, et création
+    atomique de la Reservation + ses ReservationLigne.
+
+    URL  : /reservations/nouvelle/etape3/
+    Name : reservation_wizard_etape3
+    """
+    template_name = 'campaigns/reservation_wizard_etape3_verification.html'
+
+    def _check_session(self, request):
+        return bool(
+            request.session.get(SESSION_CLIENT)
+            and request.session.get(SESSION_DATES, {}).get('date_debut')
+            and request.session.get(SESSION_FACES)
+        )
+
+    def _get_context(self, request):
+        client      = get_object_or_404(Client, pk=request.session[SESSION_CLIENT])
+        dates       = request.session[SESSION_DATES]
+        face_ids    = request.session[SESSION_FACES]
+        nom         = request.session.get(SESSION_NOM, '') or f"Réservation {timezone.now():%d/%m/%Y}"
+
+        date_debut, date_fin = _parse_dates(dates['date_debut'], dates['date_fin'])
+        faces = (
+            FacePanneau.objects.filter(id__in=face_ids)
+            .select_related('support')
+            .order_by('support__code', 'label')
+        )
+        duree_jours = (date_fin.date() - date_debut.date()).days + 1
+
+        return {
+            'client':      client,
+            'faces':       faces,
+            'date_debut':  date_debut,
+            'date_fin':    date_fin,
+            'duree_jours': duree_jours,
+            'nom_reservation': nom,
+            'mode_title':  'Nouvelle réservation — Étape 3/3',
+        }
+
+    def get(self, request):
+        if not self._check_session(request):
+            messages.warning(request, "Veuillez compléter les étapes précédentes.")
+            return redirect('reservation_wizard_etape1')
+
+        context = self._get_context(request)
+        return render(request, self.template_name, context)
+
+    def post(self, request):
+        if not self._check_session(request):
+            return redirect('reservation_wizard_etape1')
+
+        context     = self._get_context(request)
+        client      = context['client']
+        faces       = context['faces']
+        date_debut  = context['date_debut']
+        date_fin    = context['date_fin']
+        nom_reservation = context['nom_reservation']
+
+        # ── Revalidation des conflits juste avant écriture (les dispos ont pu
+        #    changer depuis l'étape 2) ────────────────────────────────────────
+        nouvelles_lignes = []
+        erreurs = []
+
+        for face in faces:
+            if face.support.type_support != 'panneau':
+                erreurs.append(f"Panneau {face.support.code} — Face {face.label} : type de support invalide.")
+                continue
+
+            conflit_resa = (
+                ReservationLigne.objects.filter(
+                    face=face,
+                    reservation__date_debut__lt=date_fin,
+                    reservation__date_fin__gt=date_debut,
+                    reservation__statut__in=[STATUT_EN_ATTENTE, STATUT_CONFIRMEE],
+                )
+                .select_related('reservation__client')
+                .first()
+            )
+            if conflit_resa:
+                r = conflit_resa.reservation
+                erreurs.append(
+                    f"Panneau {face.support.code} — Face {face.label} : déjà réservée "
+                    f"du {r.date_debut:%d/%m/%Y} au {r.date_fin:%d/%m/%Y} (client : {r.client.nom})."
+                )
+                continue
+
+            from campaigns.models import LigneCampagne
+            conflit_camp = (
+                LigneCampagne.objects.filter(
+                    face=face,
+                    campagne__date_debut__lte=date_fin.date(),
+                    campagne__date_fin__gte=date_debut.date(),
+                )
+                .select_related('campagne__client')
+                .first()
+            )
+            if conflit_camp:
+                c = conflit_camp.campagne
+                erreurs.append(
+                    f"Panneau {face.support.code} — Face {face.label} : occupée par la "
+                    f"campagne « {c.nom} » (client : {c.client.nom})."
+                )
+                continue
+
+            nouvelles_lignes.append(ReservationLigne(support=face.support, face=face))
+
+        if erreurs:
+            for err in erreurs:
+                messages.error(request, err)
+            # On revient à l'étape 3 avec le récap (l'utilisateur peut retourner
+            # à l'étape 2 pour ajuster la sélection).
+            return render(request, self.template_name, {**context, 'erreurs': erreurs})
+
+        try:
+            with transaction.atomic():
+                reservation = Reservation.objects.create(
+                    client=client,
+                    nom=nom_reservation,
+                    date_debut=date_debut,
+                    date_fin=date_fin,
+                    statut=STATUT_EN_ATTENTE,
+                    created_by=request.user if request.user.is_authenticated else None,
+                )
+                for ligne in nouvelles_lignes:
+                    ligne.reservation = reservation
+                ReservationLigne.objects.bulk_create(nouvelles_lignes)
+        except Exception as e:
+            messages.error(request, f"Erreur lors de la création : {str(e)}")
+            return render(request, self.template_name, {**context, 'erreurs': [str(e)]})
+
+        _wizard_reset(request)
+        messages.success(
+            request,
+            f"Réservation « {nom_reservation} » créée avec {len(nouvelles_lignes)} face(s)."
+        )
+        return redirect('reservation_detail', client_pk=client.pk, resa_pk=reservation.pk)
+
+
+class ReservationWizardCancelView(StaffRequiredMixin, View):
+    """Annule le wizard en cours et vide la session."""
+    def get(self, request):
+        _wizard_reset(request)
+        return redirect('reservation_list')

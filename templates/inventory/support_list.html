@@ -1,10 +1,17 @@
 {% extends 'base.html' %}
+{% load sort_tags %}
 {% block title %}Supports — Integral{% endblock %}
 {% block topbar_title %}<i class="bi bi-geo-alt me-2" style="color:var(--color-primary)"></i>Inventaire des Supports{% endblock %}
 {% block topbar_actions %}
   {% if user.is_staff_regie_role %}
-  <a href="{% url 'panneaux_report' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-file-earmark-bar-graph me-1"></i>Report Panneaux</a>
-  <a href="{% url 'support_create' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus-lg me-1"></i>Ajouter</a>
+  <a href="{% url 'panneaux_report' %}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-file-earmark-bar-graph me-1"></i>
+    <span class="d-none d-md-inline">Report Panneaux</span>
+  </a>
+  <a href="{% url 'support_create' %}" class="btn btn-primary btn-sm">
+    <i class="bi bi-plus-lg me-1"></i>
+    <span class="d-none d-md-inline">Ajouter</span>
+  </a>
   {% endif %}
 {% endblock %}
 
@@ -16,6 +23,7 @@
         <label class="form-label">Recherche</label>
         <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Code, nom, adresse...">
       </div>
+      {% if desactif != 'ecran' and desactif != 'panneau' %}
       <div class="col-md-2">
         <label class="form-label">Type</label>
         <select name="type" class="form-select">
@@ -24,6 +32,8 @@
           <option value="ecran"   {% if type_f == 'ecran'   %}selected{% endif %}>Écrans</option>
         </select>
       </div>
+      {% endif %}
+      {% if desactif != 'ville' %}
       <div class="col-md-2">
         <label class="form-label">Ville</label>
         <select name="ville" class="form-select">
@@ -33,6 +43,7 @@
           {% endfor %}
         </select>
       </div>
+      {% endif %}
       <div class="col-md-2">
         <label class="form-label">État</label>
         <select name="etat" class="form-select">
@@ -51,12 +62,12 @@
         </select>
       </div>
       <div class="col-md-2">
-        <label class="form-label">Type de Panneau</label>
+        <label class="form-label">Format</label>
         <select name="type_panneau" class="form-select">
           <option value="">Tous les types</option>
-          {% for choice in type_panneau_choices %}
-            <option value="{{ choice }}" {% if type_panneau_f == choice %}selected{% endif %}>
-              {{ choice }}
+          {% for code, libelle in type_panneau_choices %}
+            <option value="{{ code }}" {% if type_panneau_f == code %}selected{% endif %}>
+              {{ libelle }}
             </option>
           {% endfor %}
         </select>
@@ -77,16 +88,16 @@
   <div class="card-body p-0 table-responsive">
     
     {# ─── UN SEUL TABLEAU ET UN SEUL THEAD ─── #}
-    <table class="table mb-0 align-middle">
+    <table id="tableSupports" class="table mb-0 align-middle">
       <thead class="table-light">
         <tr>
-          <th>Code</th>
-          <th>Code Mairie</th>
-          <th>Nom</th>
-          <th>Type</th>
-          <th>État</th>
-          <th>Occupation</th>
-          <th>Actions</th>
+          <th>{% sortable_th sort_links sort_key sort_dir 'code' 'Code' %}</th>
+          <th>{% sortable_th sort_links sort_key sort_dir 'code_mairie' 'Code Mairie' %}</th>
+          <th>{% sortable_th sort_links sort_key sort_dir 'nom' 'Nom' %}</th>
+          <th>{% sortable_th sort_links sort_key sort_dir 'type_support' 'Type' %}</th>
+          <th>{% sortable_th sort_links sort_key sort_dir 'etat' 'État' %}</th>
+          <th>{% sortable_th sort_links sort_key sort_dir 'occupation' 'Occupation' %}</th>
+          <th>{% sortable_th sort_links sort_key sort_dir 'actions' 'Actions' %}
         </tr>
       </thead>
       <tbody>
@@ -179,26 +190,22 @@
   </div>
 </div>
 
-{# Pagination globale #}
-{% if is_paginated %}
-  <nav class="mt-4">
-    <ul class="pagination justify-content-center">
-      {% if page_obj.has_previous %}
-        <li class="page-item">
-          <a class="page-item btn btn-sm btn-outline-primary me-2" href="?page={{ page_obj.previous_page_number }}{% if q %}&q={{ q }}{% endif %}{% if type_f %}&type={{ type_f }}{% endif %}{% if etat_f %}&etat={{ etat_f }}{% endif %}{% if occupation_f %}&occupation={{ occupation_f }}{% endif %}{% if ville_f %}&ville={{ ville_f }}{% endif %}">Précédent</a>
-        </li>
-      {% endif %}
+{% pagination_nav %}
 
-      <li class="page-item disabled">
-        <span class="page-link">Page {{ page_obj.number }}/{{ paginator.num_pages }}</span>
-      </li>
+{% endblock %}
 
-      {% if page_obj.has_next %}
-        <li class="page-item">
-          <a class="page-item btn btn-sm btn-outline-primary ms-2" href="?page={{ page_obj.next_page_number }}{% if q %}&q={{ q }}{% endif %}{% if type_f %}&type={{ type_f }}{% endif %}{% if etat_f %}&etat={{ etat_f }}{% endif %}{% if occupation_f %}&occupation={{ occupation_f }}{% endif %}{% if ville_f %}&ville={{ ville_f }}{% endif %}">Suivant</a>
-        </li>
-      {% endif %}
-    </ul>
-  </nav>
-{% endif %}
+{% block extra_js %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/datatables/1.13.6/css/dataTables.bootstrap5.min.css">
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/datatables/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/datatables/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+<script>
+$(document).ready(function() {
+  $('#tableSupports').DataTable({
+    pageLength: 15,
+    lengthMenu: [10, 15, 25, 50, 100],
+    language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/fr-FR.json' }
+  });
+});
+</script>
 {% endblock %}

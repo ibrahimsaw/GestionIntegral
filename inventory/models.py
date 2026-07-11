@@ -86,14 +86,26 @@ class FormatSupport(models.Model):
         if self.categorie:
             parts.append(f"— {self.categorie}")
         return " ".join(p for p in parts if p)
+    @classmethod
+    def hors_ecran(cls):
+        return cls.objects.exclude(categorie='Ecran')
+    
+    @classmethod
+    def filtre_par_categorie(cls, categories):
+        return cls.objects.filter(categorie__in=categories)
 
 def get_dynamic_format_choices():
     return [
         (f.code, f"{f.dimensions} ({f.superficie}m²)" if f.superficie else f.dimensions)
-        for f in FormatSupport.objects.all()
+        for f in FormatSupport.hors_ecran()
     ]
 
-
+def get_dynamic_format_choices_ecran():
+    # categories different de Ecran
+    return [
+        (f.code, f"{f.dimensions} ({f.superficie} Cellules)" if f.superficie else f.dimensions)
+        for f in FormatSupport.filtre_par_categorie(['Ecran'])
+    ]
 
 
 class Support(models.Model):
@@ -222,16 +234,35 @@ class Support(models.Model):
             'type': self.type_support,
             'etat': self.etat,
             'adresse': self.adresse,
+            'ville': self.ville,
+            'quartier': self.quartier,
             'color': self.get_etat_color(),
             'type_panneau': self.type_panneau if self.type_support == self.TYPE_PANNEAU else None,
         }
+
         if self.type_support == self.TYPE_PANNEAU:
+            # Format brut (ex: "4x3", "gm-5x4") pour le filtre 'format'
+            result['format'] = self.format
+            result['format_display'] = self.get_format_display()
+            # Catégorie (ex: "Standard", "Géant", "Sucette", "Marché")
+            result['categorie'] = self.format_detail['type']
+
             faces = []
             for face in self.faces.all():
-                faces.append({'id': face.pk, 'label': face.get_label_display(), 'dispo': face.is_disponible(), 'disponibles': face.is_disponibles()})
+                faces.append({
+                    'id': face.pk,
+                    'label': face.get_label_display(),
+                    'etat': face.etat,
+                    'dispo': face.is_disponible(),
+                    'disponibles': face.is_disponibles(),
+                })
             result['faces'] = faces
-        return result
+        elif self.type_support == self.TYPE_ECRAN:
+            result['format'] = None
+            result['format_display'] = None
+            result['categorie'] = 'Ecran'
 
+        return result
     def intervalles_panne_bon(self):
         """Retourne les périodes panne → bon pour ce support."""
         return Maintenance.intervalles_panne_bon_for_support(self)
@@ -690,10 +721,10 @@ class EcranNumerique(models.Model):
         ('4k',     '4K 3840×2160'),
     ]
     CELLULE = [
-        ('8x5', '40'), # Nations Unis
-        ('6x4', '24'), # ASECNA , Moro Naaba, Thomas Sankara,
-        ('5x4', '20'), # Gounghin, Babassy
-        ('4x3', '12'), # Melkys, Larle, Bonheur Ville, RNB
+        ('8x5', '8x5 (40 Cellules)'), # Nations Unis
+        ('6x4', '6x4 (24 Cellules)'), # ASECNA , Moro Naaba, Thomas Sankara,
+        ('5x4', '5x4 (20 Cellules)'), # Gounghin, Babassy
+        ('4x3', '4x3 (12 Cellules)'), # Melkys, Larle, Bonheur Ville, RNB
         
     ]
 
@@ -718,7 +749,7 @@ class EcranNumerique(models.Model):
     )
     cellule = models.CharField(
         max_length=10,
-        choices=CELLULE,
+        choices=get_dynamic_format_choices_ecran,
         default='6x4',
         help_text="Nombre de spots simultanés (ex: 6x4 = 24)"
     )
@@ -739,7 +770,17 @@ class EcranNumerique(models.Model):
 
     def __str__(self):
         return f"Config Technique - {self.support.code}"
-
+    
+    @property
+    def format_detail(self):
+        fs = FormatSupport.objects.filter(code=self.cellule).first()
+        if not fs:
+            return {'dimensions': self.get_cellule_display(), 'superficie': None, 'categorie': ''}
+        return {
+            'dimensions': fs.dimensions,
+            'superficie': fs.superficie,
+            'categorie': fs.categorie,
+        }
     @property
     def secondes_totales_disponibles_jour(self):
         """Calcule le volume total de secondes de fonctionnement par jour."""
@@ -1047,6 +1088,54 @@ class Maintenance(models.Model):
         self.date_intervention = timezone.now()
         self.save()
         return self
+    
+    @classmethod
+    def creer_pour_support_complet(cls, support, etat_apres, effectue_par=None, description='', photo=None):
+        """
+        Crée une maintenance et applique le même état à TOUT le support :
+        - Pour un panneau : une Maintenance par face (l'état de chaque face est mis à jour,
+        puis l'état du support est recalculé automatiquement par Maintenance.save()).
+        - Pour un écran : une seule Maintenance au niveau support (pas de face).
+
+        Retourne la liste des instances Maintenance créées.
+        """
+        maintenances_creees = []
+
+        if support.type_support == Support.TYPE_PANNEAU:
+            faces = list(support.faces.all())
+            if not faces:
+                m = cls.objects.create(
+                    support=support,
+                    face=None,
+                    effectue_par=effectue_par,
+                    etat_apres=etat_apres,
+                    description=description,
+                    photo=photo,
+                )
+                maintenances_creees.append(m)
+            else:
+                for i, face in enumerate(faces):
+                    m = cls.objects.create(
+                        support=support,
+                        face=face,
+                        effectue_par=effectue_par,
+                        etat_apres=etat_apres,
+                        description=description,
+                        photo=photo if i == 0 else None,  # photo attachée une seule fois
+                    )
+                    maintenances_creees.append(m)
+        else:
+            m = cls.objects.create(
+                support=support,
+                face=None,
+                effectue_par=effectue_par,
+                etat_apres=etat_apres,
+                description=description,
+                photo=photo,
+            )
+            maintenances_creees.append(m)
+
+        return maintenances_creees
 
     def to_dict(self) -> dict:
         """Sérialisation légère pour API/popups."""

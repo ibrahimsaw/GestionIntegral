@@ -4,16 +4,36 @@
 {% block topbar_actions %}
   {% if user.is_staff_regie_role %}
     <div class="d-flex gap-2">
-      <a href="{% url 'client_edit' client.pk %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-pencil me-2"></i>Modifier</a>
-      <a href="{% url 'client_delete' client.pk %}" class="btn btn-outline-danger btn-sm"><i class="bi bi-trash me-2"></i>Supprimer</a>
-      <a href="{% url 'campagne_create' %}" class="btn btn-primary btn-sm"><i class="bi bi-plus me-1"></i>Nouvelle Campagne</a>
+      <a href="{% url 'client_edit' client.pk %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-pencil me-2"></i>
+        <span class="d-none d-md-inline ms-1">Modifier</span>
+      </a>
+      <a href="{% url 'client_delete' client.pk %}" class="btn btn-outline-danger btn-sm">
+        <i class="bi bi-trash me-2"></i>
+        <span class="d-none d-md-inline ms-1">Supprimer</span>
+      </a>
+      <a href="{% url 'campagne_create' %}" class="btn btn-primary btn-sm">
+        <i class="bi bi-plus me-1"></i>
+        <span class="d-none d-md-inline ms-1">Nouvelle Campagne</span>
+      </a>
       <div class="btn-group" role="group">
         <button type="button" class="btn btn-soft-success btn-sm dropdown-toggle" data-bs-toggle="dropdown">
-          <i class="bi bi-download me-1"></i>Exporter
+          <i class="bi bi-download me-1"></i>
+          <span class="d-none d-md-inline ms-1">Exporter</span>
         </button>
         <ul class="dropdown-menu dropdown-menu-end">
-          <li><a class="dropdown-item" href="{% url 'preview_client_pdf' client.pk %}"><i class="bi bi-eye me-2"></i>Prévisualiser</a></li>
-          <li><a class="dropdown-item" href="{% url 'export_client_pdf' client.pk %}"><i class="bi bi-file-earmark-pdf me-2"></i>PDF</a></li>
+          <li>
+            <a class="dropdown-item" href="{% url 'preview_client_pdf' client.pk %}">
+              <i class="bi bi-eye me-2"></i>Prévisualiser
+              {% comment %} <span class="d-none d-md-inline ms-1">Prévisualiser</span> {% endcomment %}
+            </a>
+          </li>
+          <li>
+            <a class="dropdown-item" href="{% url 'export_client_pdf' client.pk %}">
+              <i class="bi bi-file-earmark-pdf me-2"></i>PDF
+              {% comment %} <span class="d-none d-md-inline ms-1">PDF</span> {% endcomment %}
+            </a>
+          </li>
         </ul>
       </div>
     </div>
@@ -22,12 +42,19 @@
 
 {% block content %}
 <div class="row g-3">
+  <div class="d-flex align-items-center gap-3 mb-4">
+    <a href="javascript:void(0)" onclick="history.back()" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <h1 style="font-size:1.4rem;font-weight:800;margin:0">{{ title }}</h1>
+  </div>
   <div class="col-md-4">
     <div class="card mb-3">
       <div class="card-body text-center py-4">
         {% if client.logo %}<img src="{{ client.logo.url }}" style="width:80px;height:80px;object-fit:contain;border-radius:12px;margin-bottom:12px">{% else %}
         <div style="width:70px;height:70px;background:var(--bg-card2);border-radius:12px;display:flex;align-items:center;justify-content:center;margin:0 auto 12px"><i class="bi bi-building" style="font-size:2rem;color:var(--text-muted)"></i></div>{% endif %}
         <div style="font-size:1.1rem;font-weight:800">{{ client.nom }}</div>
+        <div style="font-size:.75rem;color:var(--text-muted)">{{ client.reference }}</div>
         <div style="font-size:.75rem;color:var(--text-muted)">{{ client.get_type_contrat_display }}</div>
       </div>
     </div>
@@ -58,7 +85,7 @@
     {% comment %} Bouton de création de réservation {% endcomment %}
     {% if user.is_staff_regie_role %}
     <div class="d-grid mt-3">
-      <a href="{% url 'reservation_create' client.pk %}" class="btn btn-primary"><i class="bi bi-calendar-plus me-2"></i>Créer une réservation</a>
+      <a href="{% url 'reservation_wizard_etape1' client.pk %}" class="btn btn-primary"><i class="bi bi-calendar-plus me-2"></i>Créer une réservation</a>
     </div>
     {% endif %}
 
@@ -67,10 +94,10 @@
       <div class="card-header d-flex justify-content-between align-items-center">
         <span><i class="bi bi-calendar-event me-2"></i>Réservations à venir</span>
         {% if user.is_staff_regie_role %}
-        <a href="{% url 'reservation_create' client.pk %}" class="btn btn-sm btn-outline-primary">Nouvelle</a>
+        <a href="{% url 'reservation_wizard_etape1' client.pk %}" class="btn btn-sm btn-outline-primary">Nouvelle</a>
         {% endif %}
       </div>
-      <div class="card-body p-0">
+      <div class="card-body p-0 table-responsive">
         <table class="table mb-0">
           <thead>
             <tr>
@@ -111,7 +138,7 @@
         <a href="{% url 'contrat_create_for_client' client.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-plus"></i></a>
         {% endif %}
       </div>
-      <div class="card-body p-0">
+      <div class="card-body p-0 table-responsive">
         <table class="table mb-0">
           <thead><tr><th>Type</th>
             <th>Nom</th>
@@ -160,7 +187,7 @@
     </div>
     <div class="card">
       <div class="card-header"><i class="bi bi-megaphone me-2"></i>Historique des Campagnes ({{ campagnes|length }}) </div>
-      <div class="card-body p-0">
+      <div class="card-body p-0 table-responsive">
         <table class="table mb-0">
           <thead><tr><th>type</th><th>Référence</th><th>Campagne</th><th>Période</th><th>Supports</th><th>Spots</th></tr></thead>
           <tbody>

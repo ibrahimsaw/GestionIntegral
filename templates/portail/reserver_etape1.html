@@ -321,13 +321,48 @@
   .rl-face-btn.panne    { border-color: #94a3b8; color: #94a3b8; cursor: not-allowed; opacity: .55; }
   .rl-face-btn.selected { background: #2563eb; border-color: #2563eb; color: #fff; }
   .rl-face-btn.need-dates { border-color: #cbd5e1; color: #94a3b8; cursor: not-allowed; opacity: .7; }
+  /* ── GROUPES VILLE / QUARTIER (vue Liste) ──────────────────── */
+  .liste-group-ville {
+    grid-column: 1 / -1;
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 4px 6px;
+    font-size: .85rem; font-weight: 800; color: var(--text);
+    border-bottom: 2px solid var(--color-primary);
+    margin-bottom: 4px;
+  }
+  .liste-group-ville:first-child { padding-top: 4px; }
+  .liste-group-ville i { color: var(--color-primary); }
+  .liste-group-ville .count-badge {
+    margin-left: auto; font-size: .68rem; font-weight: 700;
+    color: var(--text-muted); background: var(--bg-card2);
+    padding: 2px 9px; border-radius: 20px; border: 1px solid var(--border);
+  }
+  .liste-group-quartier {
+    grid-column: 1 / -1;
+    display: flex; align-items: center; gap: 7px;
+    padding: 4px 4px 2px 14px;
+    font-size: .72rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .05em; color: var(--text-muted);
+  }
+  .liste-group-quartier i { font-size: .7rem; color: var(--color-primary); opacity: .7; }
+
+  /* ── BOUTON "VOIR SUR LA CARTE" ──────────────────────────────── */
+  .sc-map-btn {
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    width: 100%; padding: 7px 0;
+    border: none; border-top: 1px solid var(--border);
+    background: var(--bg-card); color: var(--color-primary);
+    font-size: .72rem; font-weight: 700;
+    cursor: pointer; transition: background .15s ease;
+  }
+  .sc-map-btn:hover { background: var(--bg-card2); }
 </style>
 {% endblock %}
 
-{% block full_page %}p-0{% endblock %}
+{% block full_page %} {% endblock %}
 
 {% block content %}
-  <div style="padding: 14px 16px;">
+  <div>
 
     {% if form.errors %}
     <div style="padding:10px 14px;border-radius:8px;margin-bottom:12px;font-size:.82rem;
@@ -349,11 +384,11 @@
       </div>
       <div class="step-item">
         <div class="step-circle">2</div>
-        <span class="step-label">Votre projet</span>
+        <span class="step-label d-none d-md-inline ms-1">Votre projet</span>
       </div>
       <div class="step-item">
         <div class="step-circle">3</div>
-        <span class="step-label">Coordonnées</span>
+        <span class="step-label d-none d-md-inline ms-1">Coordonnées</span>
       </div>
     </div>
 
@@ -362,19 +397,38 @@
         <i class="bi bi-calendar3" style="color:var(--color-primary)"></i>
         Période souhaitée
       </span>
+
       <div class="date-input-wrap">
         <i class="bi bi-calendar-plus" style="color:#10b981"></i>
         <input type="date" id="date-debut"
               value="{{ form.date_debut.value|default:'' }}"
               min="{% now 'Y-m-d' %}" required>
       </div>
+
+      <div class="view-toggle" style="padding:2px">
+        <button type="button" class="vt-btn active" id="btn-mode-date" onclick="setModeFin('date')">
+          <i class="bi bi-calendar-minus"></i> Date de fin
+        </button>
+        <button type="button" class="vt-btn" id="btn-mode-duree" onclick="setModeFin('duree')">
+          <i class="bi bi-hourglass-split"></i> Durée
+        </button>
+      </div>
+
       <span class="dates-bar-sep">→</span>
-      <div class="date-input-wrap">
+
+      <div class="date-input-wrap" id="wrap-date-fin">
         <i class="bi bi-calendar-minus" style="color:#ef4444"></i>
         <input type="date" id="date-fin"
               value="{{ form.date_fin.value|default:'' }}"
               min="{% now 'Y-m-d' %}" required>
       </div>
+
+      <div class="date-input-wrap" id="wrap-duree-jours" style="display:none">
+        <i class="bi bi-hourglass-split" style="color:#f59e0b"></i>
+        <input type="number" id="duree-jours" min="1" step="1" placeholder="Nombre" style="width:80px">
+        <span style="font-size:.72rem;color:var(--text-muted);white-space:nowrap;">jour(s)</span>
+      </div>
+
       <div id="dates-status" class="waiting">
         <i class="bi bi-info-circle"></i>
         Saisissez les dates pour voir les disponibilités
@@ -399,6 +453,12 @@
             <select class="mf-select" id="filter-ville">
               <option value="">Toutes les villes</option>
             </select>
+            <select class="mf-select" id="filter-categorie">
+              <option value="">Toutes catégories</option>
+            </select>
+            <select class="mf-select" id="filter-format">
+              <option value="">Tous formats</option>
+            </select>
             <select class="mf-select" id="filter-quartier">
               <option value="">Tous les quartiers</option>
             </select>
@@ -412,6 +472,9 @@
             <input type="search" class="list-search" id="list-search" placeholder="Code ou nom du panneau…">
             <select class="mf-select" id="list-filter-ville">
               <option value="">Toutes les villes</option>
+            </select>
+            <select class="mf-select" id="list-filter-categorie">
+              <option value="">Toutes catégories</option>
             </select>
             <select class="mf-select" id="list-filter-quartier">
               <option value="">Tous les quartiers</option>
@@ -502,9 +565,16 @@
 <script>
     "use strict";
 
+    // ── FILTRES INITIAUX (depuis la vitrine) ───────────────────────────────────
+    const initialFiltres = {
+      ville: "{{ filtres.ville|escapejs }}",
+      categorie: "{{ filtres.categorie|escapejs }}",
+      format: "{{ filtres.format|escapejs }}",
+    };
     // ── ÉTAT GLOBAL ───────────────────────────────────────────────────────────
     let allFeatures    = [];
     let facesOccupees  = new Set();
+    let facesInfo      = {}; // { "<faceId>": {statut, info} } — infos occupant retournées par check-dispo
     let markersMap     = {};
     let panier         = {};
     let currentView    = 'carte';
@@ -528,7 +598,6 @@
 
     function makeIcon(color, type, selected) {
       const fillColor = selected ? '#dbeafe' : '#ffffff';
-      // Uniquement le dessin du panneau physique ici
       const inner = `<rect x="8" y="5" width="14" height="10" rx="2" fill="${fillColor}" stroke="${color}" stroke-width="1.8"/>
                     <line x1="15" y1="15" x2="15" y2="20" stroke="${color}" stroke-width="1.5"/>`;
       const id = 'shpanneau' + (selected ? 's' : '');
@@ -638,27 +707,27 @@
     // ── FILTRES SÉLECTIFS (PANNEAUX UNIQUEMENT) ───────────────────────────────
     function getFilteredFeatures(isListeView = false) {
       const prefix = isListeView ? 'list-filter-' : 'filter-';
-      
+
       const ville = document.getElementById(prefix + 'ville').value;
+      const categorie = document.getElementById(prefix + 'categorie').value;
       const quartier = document.getElementById(prefix + 'quartier').value;
       const dispo = document.getElementById(prefix + 'dispo').value;
-      
+      const fmt = document.getElementById(prefix + 'format').value;
+
       let q = '';
-      let fmt = '';
       if (isListeView) {
         q = (document.getElementById('list-search').value || '').toLowerCase().trim();
-        fmt = document.getElementById('list-filter-format').value;
       }
 
       return allFeatures.filter(f => {
         const p = f.properties;
-        
-        // ⚠️ SÉCURITÉ : Bloquer absolument tout ce qui n'est pas un panneau physique
-        if (p.type !== 'panneau') return false; 
-        
+
+        if (p.type !== 'panneau') return false;
+
         if (ville && p.ville !== ville) return false;
+        if (categorie && p.categorie !== categorie) return false;
         if (quartier && p.quartier !== quartier) return false;
-        if (fmt && p.format && p.format !== fmt) return false;
+        if (fmt && p.format !== fmt) return false;
         if (q && !String(p.code||'').toLowerCase().includes(q)
               && !(p.quartier||'').toLowerCase().includes(q)
               && !(p.nom||'').toLowerCase().includes(q)) return false;
@@ -670,35 +739,112 @@
       });
     }
 
-    function applyCarteFilters() {
+    function applyCarteFilters(fitCamera = false) {
       const filtered = getFilteredFeatures(false);
       renderMarkers(filtered);
+      if (fitCamera) fitMapToFeatures(filtered);
     }
 
-    function updateQuartierDropdowns(isListeView = false) {
-      const prefix = isListeView ? 'list-filter-' : 'filter-';
-      const villeSel = document.getElementById(prefix + 'ville').value;
-      const quartierSelect = document.getElementById(prefix + 'quartier');
-      if (!quartierSelect) return;
-      
-      const ancienneValeur = quartierSelect.value;
-      quartierSelect.innerHTML = '<option value="">Tous les quartiers</option>';
-      
-      const quartiersSet = new Set();
-      allFeatures.forEach(f => {
-        const p = f.properties;
-        // Seulement les quartiers liés aux panneaux
-        if (p.type === 'panneau' && p.quartier && (!villeSel || p.ville === villeSel)) {
-          quartiersSet.add(p.quartier);
-        }
-      });
+    // Recentre/zoome la carte sur les supports actuellement affichés.
+    function fitMapToFeatures(features) {
+      if (!features.length) return;
+      if (features.length === 1) {
+        const [lng, lat] = features[0].geometry.coordinates;
+        map.setView([lat, lng], 15);
+        return;
+      }
+      const bounds = L.latLngBounds(
+        features.map(f => [f.geometry.coordinates[1], f.geometry.coordinates[0]])
+      );
+      map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
+    }
 
-      Array.from(quartiersSet).sort().forEach(q => {
-        const opt = document.createElement('option');
-        opt.value = q; opt.textContent = q;
-        if (q === ancienneValeur) opt.selected = true;
-        quartierSelect.appendChild(opt);
+    // ── FACETTES CROISÉES (ville / catégorie / quartier / format) ─────────────
+    // Chaque select ne propose que les options encore cohérentes avec les
+    // AUTRES filtres actifs (on s'exclut soi-même pour ne pas se limiter
+    // à sa propre valeur courante).
+    function getPanneaux() {
+      return allFeatures.filter(f => f.properties.type === 'panneau');
+    }
+
+    function matchesFacet(p, filters, skip) {
+      if (skip !== 'ville'     && filters.ville     && p.ville     !== filters.ville)     return false;
+      if (skip !== 'categorie' && filters.categorie && p.categorie !== filters.categorie) return false;
+      if (skip !== 'quartier'  && filters.quartier  && p.quartier  !== filters.quartier)  return false;
+      if (skip !== 'format'    && filters.format    && p.format    !== filters.format)    return false;
+      return true;
+    }
+
+    function refreshFacetSelects(prefix) {
+      const elVille     = document.getElementById(prefix + 'ville');
+      const elCategorie = document.getElementById(prefix + 'categorie');
+      const elQuartier  = document.getElementById(prefix + 'quartier');
+      const elFormat    = document.getElementById(prefix + 'format');
+
+      const current = {
+        ville:     elVille     ? elVille.value     : '',
+        categorie: elCategorie ? elCategorie.value : '',
+        quartier:  elQuartier  ? elQuartier.value  : '',
+        format:    elFormat    ? elFormat.value    : '',
+      };
+
+      const panneaux = getPanneaux();
+
+      function rebuild(el, field, skipKey, labelFn) {
+        if (!el) return;
+        const values = new Map(); // value -> label affiché
+
+        panneaux.forEach(f => {
+          const p = f.properties;
+          if (!matchesFacet(p, current, skipKey)) return;
+          const val = p[field];
+          if (!val) return;
+          if (!values.has(val)) values.set(val, labelFn ? labelFn(p) : val);
+        });
+
+        const placeholder = el.options[0]; // "Toutes les villes" / "Tous formats" etc.
+        el.innerHTML = '';
+        el.appendChild(placeholder);
+
+        Array.from(values.entries())
+          .sort((a, b) => String(a[1]).localeCompare(String(b[1])))
+          .forEach(([val, lbl]) => {
+            const opt = document.createElement('option');
+            opt.value = val; opt.textContent = lbl;
+            el.appendChild(opt);
+          });
+
+        // Conserve la sélection si toujours valide, sinon réinitialise
+        el.value = (current[skipKey] && values.has(current[skipKey])) ? current[skipKey] : '';
+      }
+
+      rebuild(elVille,     'ville',     'ville');
+      rebuild(elCategorie, 'categorie', 'categorie');
+      rebuild(elQuartier,  'quartier',  'quartier');
+      rebuild(elFormat,    'format',    'format', p => p.format_display || p.format);
+    }
+
+    // ── NAVIGUER VERS UN SUPPORT SUR LA CARTE (depuis la vue Liste) ────────────
+    function goToOnMap(supportId) {
+      // Réinitialise les filtres carte pour garantir que le support soit visible
+      // (sinon le marqueur pourrait être exclu par un filtre encore actif)
+      ['filter-ville', 'filter-categorie', 'filter-quartier', 'filter-format', 'filter-dispo'].forEach(id => {
+        const el = document.getElementById(id);
+        if (el) el.value = '';
       });
+      refreshFacetSelects('filter-');
+      applyCarteFilters(false);
+
+      switchView('carte');
+
+      setTimeout(() => {
+        map.invalidateSize();
+        const marker = markersMap[String(supportId)];
+        if (marker) {
+          map.setView(marker.getLatLng(), 16);
+          openPopupById(parseInt(supportId, 10), marker);
+        }
+      }, 80);
     }
 
     // ── VUE LISTE ─────────────────────────────────────────────────────────────
@@ -721,14 +867,39 @@
         grid.innerHTML = `<div class="liste-empty"><i class="bi bi-inbox"></i><p>Aucun panneau ne correspond aux filtres.</p></div>`;
         return;
       }
-      grid.innerHTML = filtered.map(f => buildSupportCard(f.properties)).join('');
+
+      // ── Regroupement Ville → Quartier ──────────────────────────────────
+      const villes = new Map(); // ville -> Map(quartier -> [features])
+      filtered.forEach(f => {
+        const p = f.properties;
+        const ville = p.ville || 'Ville non renseignée';
+        const quartier = p.quartier || 'Quartier non renseigné';
+        if (!villes.has(ville)) villes.set(ville, new Map());
+        const quartiers = villes.get(ville);
+        if (!quartiers.has(quartier)) quartiers.set(quartier, []);
+        quartiers.get(quartier).push(f);
+      });
+
+      let html = '';
+      Array.from(villes.keys()).sort().forEach(ville => {
+        const quartiers = villes.get(ville);
+        const totalVille = Array.from(quartiers.values()).reduce((acc, arr) => acc + arr.length, 0);
+
+        html += `<div class="liste-group-ville">
+          <i class="bi bi-geo-alt-fill"></i> ${ville}
+          <span class="count-badge">${totalVille} panneau${totalVille > 1 ? 'x' : ''}</span>
+        </div>`;
+
+        Array.from(quartiers.keys()).sort().forEach(quartier => {
+          html += `<div class="liste-group-quartier"><i class="bi bi-signpost-split-fill"></i> ${quartier}</div>`;
+          html += quartiers.get(quartier).map(f => buildSupportCard(f.properties)).join('');
+        });
+      });
+
+      grid.innerHTML = html;
     }
 
     function buildSupportCard(p) {
-      console.log(p)
-      console.log(p.nom)
-      console.log(p.quartier)
-      console.log(p.ville)
       const hasSelected = isPanierContainsSupport(p.id);
       const faces = p.faces || [];
 
@@ -766,53 +937,65 @@
         <div class="sc-faces">
           ${facesHtml || '<span style="font-size:.7rem;color:#94a3b8;padding:4px">Aucune face disponible</span>'}
         </div>
+        <button type="button" class="sc-map-btn" onclick="goToOnMap('${p.id}')">
+          <i class="bi bi-map"></i> Voir sur la carte
+        </button>
       </div>`;
     }
 
     function populateAllSelects() {
-      const villesSet = new Set();
-      const formats = {};
+      refreshFacetSelects('filter-');
+      refreshFacetSelects('list-filter-');
 
-      allFeatures.forEach(f => {
-        const p = f.properties;
-        // Ne prendre que les métadonnées des panneaux
-        if (p.type === 'panneau') {
-          if (p.ville) villesSet.add(p.ville);
-          if (p.format && p.format_display) formats[p.format] = p.format_display;
-        }
-      });
-
-      const sortedVilles = Array.from(villesSet).sort();
-      ['filter-ville', 'list-filter-ville'].forEach(id => {
-        const sel = document.getElementById(id);
-        if (!sel) return;
-        sortedVilles.forEach(v => {
-          const opt = document.createElement('option');
-          opt.value = v; opt.textContent = v; sel.appendChild(opt);
-        });
-      });
-
-      const selFmt = document.getElementById('list-filter-format');
-      if (selFmt) {
-        Object.entries(formats).forEach(([val, lbl]) => {
-          const opt = document.createElement('option');
-          opt.value = val; opt.textContent = lbl; selFmt.appendChild(opt);
-        });
-      }
-
-      updateQuartierDropdowns(false);
-      updateQuartierDropdowns(true);
+      // ── Appliquer les filtres reçus depuis la vitrine ──────────────────────
+      applyInitialFiltres();
     }
 
-    // Triggers
-    document.getElementById('filter-ville').addEventListener('change', () => { updateQuartierDropdowns(false); applyCarteFilters(); });
-    document.getElementById('filter-quartier').addEventListener('change', applyCarteFilters);
-    document.getElementById('filter-dispo').addEventListener('change', applyCarteFilters);
+    function applyInitialFiltres() {
+      const { ville, categorie, format } = initialFiltres;
+      if (!ville && !categorie && !format) return;
 
-    document.getElementById('list-filter-ville').addEventListener('change', () => { updateQuartierDropdowns(true); renderListe(); });
-    document.getElementById('list-filter-quartier').addEventListener('change', renderListe);
+      const setSelectValue = (id, value) => {
+        const el = document.getElementById(id);
+        if (el && value) {
+          const optionExists = Array.from(el.options).some(o => o.value === value);
+          if (optionExists) el.value = value;
+        }
+      };
+
+      ['filter-', 'list-filter-'].forEach(prefix => {
+        setSelectValue(prefix + 'ville', ville);
+        setSelectValue(prefix + 'categorie', categorie);
+        setSelectValue(prefix + 'format', format);
+        refreshFacetSelects(prefix); // recadre les options selon la combinaison choisie
+      });
+
+      applyCarteFilters(true); // recentre la caméra sur la présélection venant de la vitrine
+      if (currentView === 'liste') renderListe();
+    }
+
+    // ── Triggers : vue Carte ────────────────────────────────────────────────
+    // Un changement de filtre recentre la caméra sur les résultats.
+    function onCarteFilterChange() {
+      refreshFacetSelects('filter-');
+      applyCarteFilters(true);
+    }
+    document.getElementById('filter-ville').addEventListener('change', onCarteFilterChange);
+    document.getElementById('filter-categorie').addEventListener('change', onCarteFilterChange);
+    document.getElementById('filter-quartier').addEventListener('change', onCarteFilterChange);
+    document.getElementById('filter-format').addEventListener('change', onCarteFilterChange);
+    document.getElementById('filter-dispo').addEventListener('change', () => applyCarteFilters(true));
+
+    // ── Triggers : vue Liste ─────────────────────────────────────────────────
+    function onListeFilterChange() {
+      refreshFacetSelects('list-filter-');
+      renderListe();
+    }
+    document.getElementById('list-filter-ville').addEventListener('change', onListeFilterChange);
+    document.getElementById('list-filter-categorie').addEventListener('change', onListeFilterChange);
+    document.getElementById('list-filter-quartier').addEventListener('change', onListeFilterChange);
+    document.getElementById('list-filter-format').addEventListener('change', onListeFilterChange);
     document.getElementById('list-filter-dispo').addEventListener('change', renderListe);
-    document.getElementById('list-filter-format').addEventListener('change', renderListe);
     document.getElementById('list-search').addEventListener('input', renderListe);
 
 
@@ -820,6 +1003,58 @@
     const elDateDebut = document.getElementById('date-debut');
     const elDateFin   = document.getElementById('date-fin');
     const elStatus    = document.getElementById('dates-status');
+    const elDureeJours = document.getElementById('duree-jours');
+
+    let modeFin = 'date'; // 'date' | 'duree'
+
+    function setModeFin(mode) {
+      modeFin = mode;
+      document.getElementById('btn-mode-date').classList.toggle('active', mode === 'date');
+      document.getElementById('btn-mode-duree').classList.toggle('active', mode === 'duree');
+      document.getElementById('wrap-date-fin').style.display    = mode === 'date'  ? 'flex' : 'none';
+      document.getElementById('wrap-duree-jours').style.display = mode === 'duree' ? 'flex' : 'none';
+
+      if (mode === 'duree') {
+        recalcDateFinFromDuree();
+      } else {
+        onDatesChange();
+      }
+    }
+
+    function addDaysToDateStr(dateStr, days) {
+      const d = new Date(dateStr + 'T00:00:00');
+      d.setDate(d.getDate() + days);
+      return d.toISOString().slice(0, 10);
+    }
+
+    // En mode "Durée" : la date de fin est calculée = date_debut + (N-1) jours
+    // (durée inclusive : 1 jour = date_debut === date_fin)
+    function recalcDateFinFromDuree() {
+      const d1 = elDateDebut ? elDateDebut.value : '';
+      const duree = elDureeJours ? parseInt(elDureeJours.value, 10) : NaN;
+
+      if (!d1) {
+        datesOk = false; facesOccupees = new Set(); facesInfo = {};
+        setDatesStatus('waiting', 'Saisissez la date de début');
+        return;
+      }
+      if (!duree || duree < 1) {
+        datesOk = false; facesOccupees = new Set(); facesInfo = {};
+        setDatesStatus('waiting', 'Indiquez le nombre de jours');
+        return;
+      }
+
+      elDateFin.value = addDaysToDateStr(d1, duree - 1);
+      onDatesChange();
+    }
+
+    function onDateDebutChange() {
+      if (modeFin === 'duree') {
+        recalcDateFinFromDuree();
+      } else {
+        onDatesChange();
+      }
+    }
 
     function syncHiddenDates() {
       const hd = document.getElementById('hidden-date-debut');
@@ -840,19 +1075,29 @@
       elStatus.innerHTML = `${icons[state] || ''} ${text}`;
     }
 
+    // Vide le panier — utilisé quand la période change, car une sélection
+    // faite sur une autre période n'est plus forcément valide.
+    function resetPanier() {
+      if (Object.keys(panier).length === 0) return; // rien à faire
+      panier = {};
+      updatePanier();
+      if (currentView === 'liste') renderListe();
+    }
+
     function onDatesChange() {
+      resetPanier();
       syncHiddenDates();
       const d1 = elDateDebut ? elDateDebut.value : '';
       const d2 = elDateFin   ? elDateFin.value   : '';
       if (d1 && elDateFin) elDateFin.min = d1;
 
       if (!d1 || !d2) {
-        datesOk = false; facesOccupees = new Set();
+        datesOk = false; facesOccupees = new Set(); facesInfo = {};
         setDatesStatus('waiting', 'Saisissez les dates pour voir les disponibilités');
         refreshAll(); return;
       }
       if (d1 >= d2) {
-        datesOk = false; facesOccupees = new Set();
+        datesOk = false; facesOccupees = new Set(); facesInfo = {};
         setDatesStatus('error', 'La date de fin doit être après la date de début');
         refreshAll(); return;
       }
@@ -866,7 +1111,15 @@
       fetch(url)
         .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
         .then(data => {
-          facesOccupees = new Set((data.faces_occupees || []).map(Number));
+          // Format réel de l'API : { "faces": { "<id>": {"statut": "libre|occupe|panne", "info": "..."} } }
+          const facesData = data.faces || {};
+          facesOccupees = new Set(
+            Object.entries(facesData)
+              .filter(([, info]) => info && info.statut === 'occupe')
+              .map(([id]) => Number(id))
+          );
+          facesInfo = facesData; // conservé pour affichage (nom client + date fin) dans popup/liste
+
           datesOk = true;
           const nbTotal  = allFeatures.filter(f => f.properties.type === 'panneau').reduce((acc, f) => acc + (f.properties.faces || []).length, 0);
           const nbLibres = nbTotal - facesOccupees.size;
@@ -875,7 +1128,7 @@
         })
         .catch(err => {
           console.warn('check-dispo:', err);
-          datesOk = false; facesOccupees = new Set();
+          datesOk = false; facesOccupees = new Set(); facesInfo = {};
           setDatesStatus('error', 'Vérification impossible — statuts instantanés affichés');
           refreshAll();
         });
@@ -887,8 +1140,9 @@
       updatePanier();
     }
 
-    if (elDateDebut) elDateDebut.addEventListener('change', onDatesChange);
-    if (elDateFin)   elDateFin.addEventListener('change', onDatesChange);
+    if (elDateDebut)  elDateDebut.addEventListener('change', onDateDebutChange);
+    if (elDateFin)    elDateFin.addEventListener('change', onDatesChange);
+    if (elDureeJours) elDureeJours.addEventListener('input', recalcDateFinFromDuree);
 
   // ── PANIER ────────────────────────────────────────────────────────────────
     function toggleFace(faceId, code, label, quartier, supportId) {
@@ -981,7 +1235,7 @@
   .then(data => {
     // ⚠️ FILTRE MAXIMUM : On ne stocke même pas les écrans en mémoire
     allFeatures = (data.features || []).filter(f => f.properties.type === 'panneau');
-    
+
     renderMarkers(allFeatures);
     populateAllSelects();
 

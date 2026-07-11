@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     'campaigns',
     'planning',
     'reports',
+    'core',
 ]
 
 MIDDLEWARE = [

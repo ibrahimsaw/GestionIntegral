@@ -9,6 +9,9 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <link href='https://unpkg.com/boxicons@2.1.4/css/boxicons.min.css' rel='stylesheet'>
+
+
 
     <style>
       .cursor-pointer { cursor: pointer; }
@@ -68,7 +71,8 @@
       body {
         font-family: system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;
         background: var(--bg); color: var(--text);
-        font-size: 14px; display: flex;
+        font-size: 14px; 
+        /* display: flex; */
       }
 
       ::-webkit-scrollbar       { width: 8px; height: 8px; }
@@ -412,7 +416,29 @@
       .btn-check+.btn:hover {
         background: var(--color-primary) !important; border-color: var(--color-primary) !important; color: #fff !important;
       }
-      
+      .sort-link {
+        color: inherit;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+        cursor: pointer;
+        user-select: none;
+      }
+      .sort-link:hover {
+        color: var(--color-primary);
+      }
+      .sort-link.active {
+        font-weight: 700;
+        color: var(--color-primary);
+      }
+      .sort-icon-idle {
+        opacity: 0.25;
+        font-size: .75rem;
+      }
+      .sort-link:hover .sort-icon-idle {
+        opacity: 0.6;
+      }
     </style>
 
     {% block extra_head %}{% endblock %}
@@ -458,7 +484,7 @@
             <a href="{% url 'support_list' %}" class="nav-link {% if 'support' in request.resolver_match.url_name and not request.GET.type %}active{% endif %}">
               <i class="bi bi-collection"></i>Tous les Supports
             </a>
-            <a href="{% url 'support_list' %}?type=panneau" class="nav-link {% if request.GET.type == 'panneau' and not request.GET.ville %}active{% endif %}">
+            <a href="{% url 'support_list' %}?type=panneau&desactif=panneau" class="nav-link {% if request.GET.type == 'panneau' and not request.GET.ville %}active{% endif %}">
               <i class="bi bi-sign-merge-right"></i>Panneaux
             </a>
             <a href="{% url 'format_list' %}" class="nav-link {% if request.resolver_match.url_name == 'format_list' %}active{% endif %}"">
@@ -467,15 +493,15 @@
             {% if inventory_villes %}
               <div class="nav-label">Panneaux par ville</div>
               {% for ville in inventory_villes %}
-                <a href="{% url 'support_list' %}?type=panneau&ville={{ ville|urlencode }}" class="nav-link {% if request.GET.type == 'panneau' and request.GET.ville == ville %}active{% endif %}">
+                <a href="{% url 'support_list' %}?type=panneau&ville={{ ville|urlencode }}&desactif=ville" class="nav-link {% if request.GET.type == 'panneau' and request.GET.ville == ville %}active{% endif %}">
                   <i class="bi bi-geo-alt"></i>{{ ville }}
                 </a>
               {% endfor %}
             {% endif %}
-            <a href="{% url 'support_list' %}?type=ecran" class="nav-link {% if request.GET.type == 'ecran' %}active{% endif %}">
+            <a href="{% url 'support_list' %}?type=ecran&desactif=ecran" class="nav-link {% if request.GET.type == 'ecran' %}active{% endif %}">
               <i class="bi bi-display"></i>Écrans
             </a>
-            <a href="{% url 'panneaux_report' %}" class="nav-link">
+            <a href="{% url 'panneaux_report' %}" class="nav-link {% if request.resolver_match.url_name == 'panneaux_report' %}active{% endif %}">
               <i class="bi bi-file-earmark-bar-graph-fill"></i>Report Panneaux
             </a>
             <a href="{% url 'maintenance_list' %}" class="nav-link {% if 'maintenance' in request.resolver_match.url_name %}active{% endif %}">
@@ -489,13 +515,15 @@
               <a href="{% url 'campagne_list' %}" class="nav-link {% if 'campagne' in request.resolver_match.url_name %}active{% endif %}">
                 <i class="bi bi-megaphone-fill"></i>Campagnes
               </a>
-              <a href="{% url 'simulation_ecran' %}" class="nav-link {% if request.resolver_match.url_name == 'simulation_ecran1' %}active{% endif %}">
+              <a href="{% url 'simulation_ecran' %}" class="nav-link {% if request.resolver_match.url_name == 'simulation_ecran' %}active{% endif %}">
                 <i class="bi bi-calculator-fill"></i>Simulateur Écran
               </a>
               <a href="{% url 'client_list' %}" class="nav-link {% if 'client' in request.resolver_match.url_name %}active{% endif %}">
                 <i class="bi bi-people-fill"></i>Clients
               </a>
-
+            <a href="{% url 'demandes_liste' %}" class="nav-link {% if 'demande' in request.resolver_match.url_name %}active{% endif %}">
+              <i class="bi bi-file-earmark-text-fill"></i>Demandes
+            </a>
               <div class="nav-label">Planning</div>
               <a href="{% url 'planning_calendrier' %}" class="nav-link {% if request.resolver_match.url_name == 'planning_calendrier' %}active{% endif %}">
                 <i class="bi bi-calendar3"></i>Calendrier

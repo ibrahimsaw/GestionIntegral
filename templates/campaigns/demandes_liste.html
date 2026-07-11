@@ -1,0 +1,113 @@
+{% extends 'base.html' %}
+{% block title %}Demandes de réservation — Integral{% endblock %}
+{% block topbar_title %}<i class="bi bi-file-earmark-text-fill me-2" style="color:var(--color-primary)"></i>Demandes de réservation{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* Badges spécifiques aux statuts de DemandeReservation (pas de collision avec bs-* existants) */
+  .bs-dem-nouvelle { background:#fef9c3; color:#854d0e; }
+  .bs-dem-en_cours { background:#dbeafe; color:#1d4ed8; }
+  .bs-dem-validee  { background: var(--color-disponible_bg); color: var(--color-disponible); }
+  .bs-dem-refusee  { background:#fee2e2; color:#b91c1c; }
+</style>
+{% endblock %}
+
+{% block content %}
+
+<!-- Filtres -->
+<div class="card mb-4">
+  <div class="card-body">
+    <div class="d-flex gap-2 flex-wrap">
+      <a href="?" class="btn btn-sm {% if not statut_actif %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+        À traiter <span class="badge bg-light text-dark ms-1">{{ compteurs.nouvelle|add:compteurs.en_cours }}</span>
+      </a>
+      <a href="?statut=nouvelle" class="btn btn-sm {% if statut_actif == 'nouvelle' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+        Nouvelles <span class="badge bg-light text-dark ms-1">{{ compteurs.nouvelle }}</span>
+      </a>
+      <a href="?statut=en_cours" class="btn btn-sm {% if statut_actif == 'en_cours' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+        En cours <span class="badge bg-light text-dark ms-1">{{ compteurs.en_cours }}</span>
+      </a>
+      <a href="?statut=validee" class="btn btn-sm {% if statut_actif == 'validee' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+        Validées <span class="badge bg-light text-dark ms-1">{{ compteurs.validee }}</span>
+      </a>
+      <a href="?statut=refusee" class="btn btn-sm {% if statut_actif == 'refusee' %}btn-primary{% else %}btn-outline-secondary{% endif %}">
+        Refusées <span class="badge bg-light text-dark ms-1">{{ compteurs.refusee }}</span>
+      </a>
+    </div>
+  </div>
+</div>
+
+<!-- Tableau -->
+<div class="card">
+  <div class="card-header d-flex align-items-center">
+    <span>{{ demandes|length }} demande(s)</span>
+  </div>
+  <div class="card-body p-0 table-responsive">
+    <table id="tableDemandes" class="table mb-0 align-middle">
+      <thead class="table-light">
+        <tr>
+          <th>Référence</th>
+          <th>Contact</th>
+          <th>Emplacements</th>
+          <th>Période souhaitée</th>
+          <th>Statut</th>
+          <th>Reçue le</th>
+          <th>Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for demande in demandes %}
+        <tr>
+          <td class="mono" style="font-size:.8rem;color:var(--color-primary)">{{ demande.reference }}</td>
+          <td>
+            <div style="font-weight:600">{{ demande.nom_contact }}</div>
+            {% if demande.societe %}<div style="font-size:.75rem;color:var(--text-muted)">{{ demande.societe }}</div>{% endif %}
+          </td>
+          <td>{{ demande.nb_emplacements }} emplacement{{ demande.nb_emplacements|pluralize }}</td>
+          <td>
+            {{ demande.date_debut_souhaitee|date:"d/m/Y" }} → {{ demande.date_fin_souhaitee|date:"d/m/Y" }}
+            <div style="font-size:.75rem;color:var(--text-muted)">{{ demande.duree_jours }} jour{{ demande.duree_jours|pluralize }}</div>
+          </td>
+          <td>
+            <span class="badge-status bs-dem-{{ demande.statut }}">
+              <i class="bi {{ demande.get_statut_icon }} me-1"></i>{{ demande.get_statut_display }}
+            </span>
+          </td>
+          <td style="color:var(--text-muted);font-size:.82rem">{{ demande.created_at|date:"d/m/Y H:i" }}</td>
+          <td>
+            <a href="{% url 'demande_detail' demande.uuid %}" class="btn btn-sm btn-primary">
+              Traiter <i class="bi bi-arrow-right ms-1"></i>
+            </a>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7" class="text-center py-5" style="color:var(--text-muted)">
+            <i class="bi bi-inbox d-block mb-2" style="font-size:2rem"></i>
+            Aucune demande dans cette catégorie.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+
+{% block extra_js %}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/datatables/1.13.6/css/dataTables.bootstrap5.min.css">
+<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/datatables/1.13.6/js/jquery.dataTables.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/datatables/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+<script>
+$(document).ready(function() {
+  $('#tableDemandes').DataTable({
+    pageLength: 15,
+    lengthMenu: [10, 15, 25, 50, 100],
+    order: [[5, 'desc']],
+    language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/fr-FR.json' }
+  });
+});
+</script>
+{% endblock %}

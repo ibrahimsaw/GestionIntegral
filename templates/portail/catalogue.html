@@ -6,50 +6,75 @@
 
 {% block extra_head %}
 <style>
-    /* ── TYPOGRAPHIE & VARIABLES ────────────────────────────────────────── */
-    :root {
+    /* ════════════════════════════════════════════════════════════════
+       Identité "Furni" — vert profond + jaune, Inter, formes arrondies,
+       puces icônes rondes, décor à points. Variables surchargées
+       localement sur .catalogue-page pour ne pas affecter le reste du site.
+       ════════════════════════════════════════════════════════════════ */
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+    .catalogue-page {
+        --color-primary:   {{ DESIGN.COLOR_PRIMARY }};
+        --color-secondary: {{ DESIGN.COLOR_SECONDARY }};
+        --text:             #1f2e28;
+        --text-muted:        #6a6a6a;
+        --border:             #e6e2d8;
+        --bg-card:              #ffffff;
+        --bg-card2:              #f8f6f1;
+
         --c-standard: var(--color-primary);
         --c-geant:    var(--color-secondary);
-        --c-sucette:  #7c3aed;
-        --c-marche:   #059669;
-        --c-ecran:    #0891b2;
-        --radius-lg:  14px;
+        --c-sucette:  {{ DESIGN.COLOR_SECONDARY }};
+        --c-marche:   #e08e45;
+        --c-ecran:    {{ DESIGN.COLOR_PRIMARY }};
+        --radius-lg:  8px;
+        --shadow-soft: 0 10px 28px rgba(31,46,40,.09), 0 2px 6px rgba(31,46,40,.06);
+        font-family: 'Inter', sans-serif;
+    }
+
+    .dots-deco {
+        position: absolute;
+        width: 110px; height: 110px;
+        background-image: radial-gradient(currentColor 2.5px, transparent 2.5px);
+        background-size: 15px 15px;
+        opacity: .3;
+        pointer-events: none;
+        z-index: 0;
     }
 
     /* ── SECTION HEADERS ────────────────────────────────────────────────── */
-    .cat-section { margin-bottom: 40px; }
+    .cat-section { margin-bottom: 44px; }
 
     .cat-label {
         display: inline-flex; align-items: center; gap: 8px;
         font-size: .68rem; font-weight: 800; letter-spacing: .12em;
-        text-transform: uppercase; padding: 4px 12px;
-        border-radius: 20px; margin-bottom: 8px;
+        text-transform: uppercase; padding: 6px 14px;
+        border-radius: 999px; margin-bottom: 10px;
     }
-    .cat-label.standard { background: #dbeafe; color: var(--c-standard); }
-    .cat-label.geant    { background: #ede9fe; color: var(--c-geant); }
-    .cat-label.sucette  { background: #f3e8ff; color: var(--c-sucette); }
-    .cat-label.marche   { background: #d1fae5; color: var(--c-marche); }
-    .cat-label.ecran    { background: #cffafe; color: var(--c-ecran); }
+    .cat-label.standard { background: rgba(59,93,80,.10); color: var(--c-standard); }
+    .cat-label.geant    { background: rgba(249,191,41,.18); color: #a97a10; }
+    .cat-label.sucette  { background: rgba(224,142,69,.15); color: var(--c-sucette); }
+    .cat-label.marche   { background: rgba(124,154,133,.18); color: #4c6357; }
+    .cat-label.ecran    { background: rgba(47,93,82,.10); color: var(--c-ecran); }
 
     .cat-title {
-        font-size: 1.4rem; font-weight: 900; color: var(--text);
+        font-size: 1.4rem; font-weight: 800; color: var(--text);
         margin: 0 0 4px; letter-spacing: -.02em; line-height: 1.2;
     }
     .cat-subtitle { font-size: .84rem; color: var(--text-muted); margin-bottom: 20px; }
 
     /* ── SHOWCASE CARD ──────────────────────────────────────────────────── */
     .showcase {
+        position: relative;
         background: var(--bg-card);
         border: 1px solid var(--border);
         border-radius: var(--radius-lg);
-        box-shadow: 0 2px 16px rgba(0,0,0,.07);
+        box-shadow: var(--shadow-soft);
         overflow: hidden;
     }
 
     /* Barre colorée en haut */
-    .showcase-bar {
-        height: 4px; width: 100%;
-    }
+    .showcase-bar { height: 5px; width: 100%; }
     .showcase.standard .showcase-bar { background: var(--c-standard); }
     .showcase.geant    .showcase-bar { background: var(--c-geant); }
     .showcase.sucette  .showcase-bar { background: var(--c-sucette); }
@@ -57,57 +82,68 @@
 
     /* Header */
     .showcase-header {
-        padding: 18px 24px 14px;
+        padding: 20px 26px 16px;
         display: flex; align-items: center; justify-content: space-between;
         flex-wrap: wrap; gap: 12px;
         border-bottom: 1px solid var(--border);
         background: var(--bg-card2);
     }
+    .showcase-header-left { display: flex; align-items: center; gap: 14px; }
+    .showcase-icon {
+        width: 44px; height: 44px; border-radius: 50%; flex-shrink: 0;
+        display: flex; align-items: center; justify-content: center;
+        color: #fff; font-size: 1.15rem;
+        box-shadow: var(--shadow-soft);
+    }
+    .showcase.standard .showcase-icon { background: var(--c-standard); }
+    .showcase.geant    .showcase-icon { background: var(--c-geant); color: var(--text); }
+    .showcase.sucette  .showcase-icon { background: var(--c-sucette); }
+    .showcase.marche   .showcase-icon { background: var(--c-marche); }
     .showcase-header h3 { font-size: 1.05rem; font-weight: 800; margin: 0 0 2px; color: var(--text); }
     .showcase-header small { font-size: .78rem; color: var(--text-muted); }
 
     /* Sélecteur format */
     .fmt-pills { display: flex; gap: 6px; flex-wrap: wrap; }
     .fmt-pill {
-        padding: 5px 14px; border-radius: 20px; font-size: .76rem; font-weight: 700;
+        padding: 6px 15px; border-radius: 999px; font-size: .76rem; font-weight: 700;
         border: 1.5px solid var(--border); background: var(--bg-card);
         color: var(--text-muted); cursor: pointer; transition: all .15s;
         white-space: nowrap; line-height: 1.4;
     }
     .fmt-pill:hover { border-color: var(--color-primary); color: var(--color-primary); }
     .showcase.standard .fmt-pill.active { background: var(--c-standard); border-color: var(--c-standard); color: #fff; }
-    .showcase.geant    .fmt-pill.active { background: var(--c-geant);    border-color: var(--c-geant);    color: #fff; }
+    .showcase.geant    .fmt-pill.active { background: var(--c-geant);    border-color: var(--c-geant);    color: var(--text); }
     .showcase.sucette  .fmt-pill.active { background: var(--c-sucette);  border-color: var(--c-sucette);  color: #fff; }
     .showcase.marche   .fmt-pill.active { background: var(--c-marche);   border-color: var(--c-marche);   color: #fff; }
 
     /* Body 2 colonnes */
     .showcase-body {
         display: grid; grid-template-columns: 1fr 1fr;
-        gap: 28px; padding: 24px;
+        gap: 30px; padding: 26px;
         align-items: start;
     }
     @media (max-width: 768px) { .showcase-body { grid-template-columns: 1fr; } }
 
     /* Preview panneau */
     .preview-wrap {
-        border: 1px solid var(--border); border-radius: 10px;
+        border: 1px solid var(--border); border-radius: var(--radius-lg);
         overflow: hidden; background: var(--bg-card2);
     }
     .preview-frame {
         display: flex; align-items: center; justify-content: center;
-        min-height: 180px; padding: 12px;
+        min-height: 180px; padding: 14px;
     }
     .preview-frame svg { width: 100%; height: auto; display: block; max-height: 260px; }
 
     .preview-upload {
-        padding: 10px 14px; border-top: 1px solid var(--border);
+        padding: 12px 16px; border-top: 1px solid var(--border);
         background: var(--bg-card); display: flex; align-items: center; gap: 10px;
     }
     .upload-btn {
         display: inline-flex; align-items: center; gap: 6px;
         font-size: .76rem; font-weight: 700; color: var(--color-primary);
-        cursor: pointer; padding: 5px 10px;
-        border: 1px solid var(--color-primary); border-radius: 6px;
+        cursor: pointer; padding: 6px 13px;
+        border: 1px solid var(--color-primary); border-radius: 999px;
         transition: all .15s; white-space: nowrap;
     }
     .upload-btn:hover { background: var(--color-primary); color: #fff; }
@@ -117,24 +153,25 @@
     .btn-reset-img:hover { color: #ef4444; }
 
     /* Specs grid */
-    .specs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+    .specs-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 22px; }
     .spec-box {
-        padding: 12px 14px; border-radius: 10px;
+        padding: 14px 16px; border-radius: 16px;
         background: var(--bg-card2); border: 1px solid var(--border);
-        border: 2px solid;
+        transition: border-color .15s, transform .15s;
     }
-    .showcase.standard .spec-box { border-color: var(--c-standard); }
-    .showcase.geant    .spec-box { border-color: var(--c-geant); }
-    .showcase.sucette  .spec-box { border-color: var(--c-sucette); }
-    .showcase.marche   .spec-box { border-color: var(--c-marche); }
-    .spec-box .lbl { font-size: .65rem; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); margin-bottom: 4px; }
+    .spec-box:hover { transform: translateY(-2px); }
+    .showcase.standard .spec-box { border-color: rgba(59,93,80,.35); }
+    .showcase.geant    .spec-box { border-color: rgba(249,191,41,.45); }
+    .showcase.sucette  .spec-box { border-color: rgba(224,142,69,.4); }
+    .showcase.marche   .spec-box { border-color: rgba(124,154,133,.45); }
+    .spec-box .lbl { font-size: .65rem; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; color: var(--text-muted); margin-bottom: 5px; display: flex; align-items: center; gap: 5px; }
     .spec-box .val { font-size: 1.05rem; font-weight: 800; color: var(--text); line-height: 1.1; }
 
     /* Disponibilité bar */
     .dispo-bar-wrap { margin-bottom: 20px; }
-    .dispo-bar-label { display: flex; justify-content: space-between; font-size: .75rem; color: var(--text-muted); margin-bottom: 6px; }
-    .dispo-bar-track { height: 8px; background: var(--border); border-radius: 4px; overflow: hidden; }
-    .dispo-bar-fill { height: 100%; border-radius: 4px; transition: width .4s; }
+    .dispo-bar-label { display: flex; justify-content: space-between; font-size: .75rem; color: var(--text-muted); margin-bottom: 6px; font-weight: 600; }
+    .dispo-bar-track { height: 9px; background: var(--border); border-radius: 999px; overflow: hidden; }
+    .dispo-bar-fill { height: 100%; border-radius: 999px; transition: width .4s; }
     .showcase.standard .dispo-bar-fill { background: var(--c-standard); }
     .showcase.geant    .dispo-bar-fill { background: var(--c-geant); }
     .showcase.sucette  .dispo-bar-fill { background: var(--c-sucette); }
@@ -143,8 +180,8 @@
     /* Gallery thumbs */
     .gallery-row { display: flex; gap: 8px; flex-wrap: wrap; }
     .gallery-thumb {
-        width: 64px; height: 48px; border-radius: 8px;
-        background: var(--border); border: 1px solid var(--border);
+        width: 64px; height: 48px; border-radius: 12px;
+        background: var(--bg-card2); border: 1px solid var(--border);
         display: flex; align-items: center; justify-content: center;
         color: var(--text-muted); font-size: 1.1rem;
         cursor: pointer; transition: all .15s; overflow: hidden;
@@ -154,7 +191,7 @@
 
     /* Footer showcase */
     .showcase-footer {
-        padding: 14px 24px;
+        padding: 16px 26px;
         background: var(--bg-card2); border-top: 1px solid var(--border);
         display: flex; justify-content: space-between; align-items: center;
         flex-wrap: wrap; gap: 10px;
@@ -164,75 +201,115 @@
         font-size: .78rem; font-weight: 700;
     }
     .showcase.standard .badge-dispo { color: var(--c-standard); }
-    .showcase.geant    .badge-dispo { color: var(--c-geant); }
+    .showcase.geant    .badge-dispo { color: #a97a10; }
     .showcase.sucette  .badge-dispo { color: var(--c-sucette); }
-    .showcase.marche   .badge-dispo { color: var(--c-marche); }
+    .showcase.marche   .badge-dispo { color: #4c6357; }
+
+    .showcase-footer .btn-primary {
+        border: none; border-radius: 999px; font-weight: 700;
+        padding: 9px 18px; transition: all .18s ease;
+    }
+    .showcase.standard .showcase-footer .btn-primary { background: var(--c-standard); }
+    .showcase.geant    .showcase-footer .btn-primary { background: var(--c-geant); color: var(--text); }
+    .showcase.sucette  .showcase-footer .btn-primary { background: var(--c-sucette); }
+    .showcase.marche   .showcase-footer .btn-primary { background: var(--c-marche); }
+    .showcase-footer .btn-primary:hover { transform: translateY(-1px); filter: brightness(.94); }
 
     /* ── ÉCRANS LED ────────────────────────────────────────────────────── */
     .ecran-card {
         background: var(--bg-card);
         border: 1px solid var(--border);
         border-radius: var(--radius-lg);
-        box-shadow: 0 2px 16px rgba(0,0,0,.07);
+        box-shadow: var(--shadow-soft);
         overflow: hidden;
     }
     .ecran-hero {
-        background: var(--c-ecran);
-        padding: 28px 32px; display: flex; align-items: center; gap: 24px; color: #fff;
+        position: relative;
+        overflow: hidden;
+        background: linear-gradient(135deg, var(--c-ecran) 0%, var(--color-primary) 100%);
+        padding: 30px 34px; display: flex; align-items: center; gap: 24px; color: #fff;
+    }
+    .ecran-hero .dots-deco { top: -20px; right: 30px; color: var(--color-secondary); opacity: .4; }
+    .ecran-hero::before {
+        content: '';
+        position: absolute;
+        bottom: -50px; right: -30px;
+        width: 180px; height: 180px;
+        background: rgba(249,191,41,.10);
+        border-radius: 42% 58% 65% 35% / 45% 45% 55% 55%;
     }
     .ecran-hero-icon {
+        position: relative; z-index: 1;
         width: 72px; height: 72px; background: rgba(255,255,255,.15);
-        border-radius: 16px; display: flex; align-items: center; justify-content: center;
-        font-size: 2.2rem; flex-shrink: 0;
+        border-radius: 50%; display: flex; align-items: center; justify-content: center;
+        font-size: 2.1rem; flex-shrink: 0;
     }
-    .ecran-hero h4 { font-size: 1.3rem; font-weight: 900; margin: 0 0 4px; }
-    .ecran-hero p  { margin: 0; opacity: .85; font-size: .88rem; }
+    .ecran-hero h4 { position: relative; z-index: 1; font-size: 1.3rem; font-weight: 800; margin: 0 0 4px; }
+    .ecran-hero p  { position: relative; z-index: 1; margin: 0; opacity: .85; font-size: .88rem; }
 
-    .ecran-body { padding: 28px; display: grid; grid-template-columns: 1fr 1px 1fr; gap: 32px; }
+    .ecran-body { padding: 30px; display: grid; grid-template-columns: 1fr 1px 1fr; gap: 34px; }
     @media (max-width: 768px) { .ecran-body { grid-template-columns: 1fr; } }
     .ecran-divider { background: var(--border); }
-    .ecran-section h6 { font-size: .88rem; font-weight: 800; color: var(--text); margin-bottom: 16px; display: flex; align-items: center; gap: 6px; }
+    .ecran-section h6 { font-size: .88rem; font-weight: 800; color: var(--text); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+    .ecran-section h6 i { color: var(--c-ecran) !important; }
 
-    .ecran-specs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 20px; }
+    .ecran-specs { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 20px; }
     .ecran-spec {
-        padding: 12px 14px; border-radius: 10px;
-        background: #f0f9ff; border: 1px solid #bae6fd;
-        border: 2px solid var(--c-ecran);
+        padding: 14px 16px; border-radius: 16px;
+        background: var(--bg-card2); border: 1px solid rgba(47,93,82,.25);
+        transition: transform .15s;
     }
-    .ecran-spec .lbl { font-size: .65rem; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; color: #0891b2; margin-bottom: 4px; }
+    .ecran-spec:hover { transform: translateY(-2px); }
+    .ecran-spec .lbl { font-size: .65rem; font-weight: 800; text-transform: uppercase; letter-spacing: .07em; color: var(--c-ecran); margin-bottom: 5px; }
     .ecran-spec .val { font-size: 1rem; font-weight: 800; color: var(--text); }
 
-    .avantage-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 10px; }
-    .avantage-list li { display: flex; align-items: flex-start; gap: 10px; font-size: .84rem; color: var(--text); line-height: 1.4; }
-    .avantage-list li .ico { color: var(--c-ecran); font-size: 1rem; margin-top: 1px; flex-shrink: 0; }
+    .avantage-list { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 12px; }
+    .avantage-list li { display: flex; align-items: flex-start; gap: 12px; font-size: .84rem; color: var(--text); line-height: 1.4; }
+    .avantage-list li .ico {
+        width: 22px; height: 22px; border-radius: 50%; flex-shrink: 0;
+        background: rgba(47,93,82,.12); color: var(--c-ecran);
+        display: flex; align-items: center; justify-content: center;
+        font-size: .72rem; margin-top: 1px;
+    }
+    .ecran-section .btn-outline-primary {
+        border-radius: 999px; font-weight: 700;
+        border-color: var(--c-ecran); color: var(--c-ecran);
+    }
+    .ecran-section .btn-outline-primary:hover { background: var(--c-ecran); border-color: var(--c-ecran); }
 
     /* ── CTA FINAL ──────────────────────────────────────────────────────── */
     .cta-block {
-        margin: 40px 0 0;
+        position: relative;
+        overflow: hidden;
+        margin: 44px 0 0;
         background: var(--color-secondary);
-        border-radius: var(--radius-lg); padding: 40px 32px;
-        text-align: center; color: #000;
+        border-radius: var(--radius-lg); padding: 44px 32px;
+        text-align: center; color: var(--text);
     }
-    .cta-block h3 { font-size: 1.4rem; font-weight: 900; margin: 0 0 8px; }
-    .cta-block p  { margin: 0 0 24px; opacity: .9; font-size: .92rem; }
+    .cta-block .dots-deco { top: -20px; left: 30px; color: var(--color-primary); opacity: .3; }
+    .cta-block::before {
+        content: '';
+        position: absolute;
+        bottom: -60px; right: -40px;
+        width: 220px; height: 220px;
+        background: rgba(31,46,40,.06);
+        border-radius: 42% 58% 65% 35% / 45% 45% 55% 55%;
+    }
+    .cta-block h3 { position: relative; z-index: 1; font-size: 1.4rem; font-weight: 800; margin: 0 0 8px; }
+    .cta-block p  { position: relative; z-index: 1; margin: 0 0 24px; opacity: .85; font-size: .92rem; }
     .cta-block .btn-cta {
+        position: relative; z-index: 1;
         display: inline-flex; align-items: center; gap: 8px;
-        background: #fff; color: var(--color-primary); font-weight: 800;
-        padding: 12px 28px; border-radius: 50px; font-size: .92rem;
-        text-decoration: none; transition: all .15s; border: 2px solid #fff;
+        background: var(--color-primary); color: #fff; font-weight: 700;
+        padding: 13px 30px; border-radius: 999px; font-size: .92rem;
+        text-decoration: none; transition: all .18s; border: 2px solid var(--color-primary);
     }
-    .cta-block .btn-cta:hover { background: transparent; color: #fff; }
+    .cta-block .btn-cta:hover { background: transparent; color: var(--color-primary); }
 </style>
 {% endblock %}
 
 {% block content %}
-
-    <!-- ── EN-TÊTE ───────────────────────────────────────────────────────────── -->
-    <div class="mb-4">
-    <h1 style="font-size:1.6rem;font-weight:900;margin:0 0 4px;letter-spacing:-.02em;">Notre catalogue</h1>
-    <p style="color:var(--text-muted);font-size:.88rem;margin:0;">Tous nos formats de panneaux statiques et écrans numériques disponibles à Ouagadougou et Bobo-Dioulasso.</p>
-    </div>
-
+<div class="catalogue-page">
     <!-- ══ STANDARD ═════════════════════════════════════════════════════════════ -->
     <div class="cat-section">
         <div class="cat-label standard"><i class="bi bi-easel2-fill"></i> Panneaux Standard</div>
@@ -240,10 +317,14 @@
         <p class="cat-subtitle">Le 4×3 s'impose partout — axes routiers, carrefours, zones commerciales.</p>
 
         <div class="showcase standard" data-type="standard">
+            <div class="showcase-bar"></div>
             <div class="showcase-header">
-            <div>
-                <h3 id="standard-titre">Standard — 4m × 3m</h3>
-                <small id="standard-sous-titre">12 m² · 458 emplacements · 289 faces libres</small>
+            <div class="showcase-header-left">
+                <div class="showcase-icon"><i class="bi bi-easel2-fill"></i></div>
+                <div>
+                    <h3 id="standard-titre">Standard — 4m × 3m</h3>
+                    <small id="standard-sous-titre">12 m² · 458 emplacements · 289 faces libres</small>
+                </div>
             </div>
             <div class="fmt-pills">
                 <button class="fmt-pill active" data-type="standard" data-code="4x3" data-larg="4" data-haut="3" data-surface="12" data-nb="458" data-libres="289" data-label="Standard — 4m × 3m" data-desc="12 m² · 458 emplacements · 289 faces libres">4×3</button>
@@ -253,21 +334,21 @@
             <div class="preview-wrap">
                 <div class="preview-frame">
                 <svg id="svg-standard" viewBox="0 0 440 320" xmlns="http://www.w3.org/2000/svg">
-                    <rect width="440" height="320" fill="#0f172a"/>
+                    <rect width="440" height="320" fill="#1f2e28"/>
                     <rect x="24" y="24" width="400" height="260" fill="rgba(0,0,0,.4)" rx="6"/>
-                    <rect x="20" y="20" width="400" height="260" fill="#1a3c6b" rx="5"/>
+                    <rect x="20" y="20" width="400" height="260" fill="#2c463c" rx="5"/>
                     <image id="img-standard" x="20" y="20" width="400" height="260" href="" preserveAspectRatio="xMidYMid slice" style="display:none;" clip-path="url(#clip-standard)"/>
                     <clipPath id="clip-standard"><rect x="20" y="20" width="400" height="260" rx="5"/></clipPath>
                     <g id="label-standard">
-                    <text x="220" y="148" text-anchor="middle" font-size="56" font-weight="900" fill="#e8b84b" font-family="system-ui,sans-serif" opacity=".95">4×3</text>
-                    <text x="220" y="178" text-anchor="middle" font-size="15" fill="rgba(255,255,255,.45)" font-family="system-ui,sans-serif">12 m²</text>
+                    <text x="220" y="148" text-anchor="middle" font-size="56" font-weight="900" fill="#f9bf29" font-family="system-ui,sans-serif" opacity=".95">4×3</text>
+                    <text x="220" y="178" text-anchor="middle" font-size="15" fill="rgba(255,255,255,.5)" font-family="system-ui,sans-serif">12 m²</text>
                     </g>
-                    <rect x="20" y="20" width="400" height="260" fill="none" stroke="#e8b84b" stroke-width="2" rx="5" opacity=".7"/>
+                    <rect x="20" y="20" width="400" height="260" fill="none" stroke="#f9bf29" stroke-width="2" rx="5" opacity=".7"/>
                     <!-- Cotations -->
-                    <line x1="20" y1="298" x2="420" y2="298" stroke="#475569" stroke-width="1"/>
-                    <text x="220" y="312" text-anchor="middle" font-size="11" fill="#64748b" font-family="system-ui,sans-serif">← 4 m →</text>
-                    <line x1="432" y1="20" x2="432" y2="280" stroke="#475569" stroke-width="1"/>
-                    <text x="438" y="155" text-anchor="middle" font-size="11" fill="#64748b" font-family="system-ui,sans-serif" transform="rotate(90,438,155)">← 3 m →</text>
+                    <line x1="20" y1="298" x2="420" y2="298" stroke="#8a8a80" stroke-width="1"/>
+                    <text x="220" y="312" text-anchor="middle" font-size="11" fill="#6a6a6a" font-family="system-ui,sans-serif">← 4 m →</text>
+                    <line x1="432" y1="20" x2="432" y2="280" stroke="#8a8a80" stroke-width="1"/>
+                    <text x="438" y="155" text-anchor="middle" font-size="11" fill="#6a6a6a" font-family="system-ui,sans-serif" transform="rotate(90,438,155)">← 3 m →</text>
                 </svg>
                 </div>
                 <div class="preview-upload">
@@ -279,10 +360,10 @@
             </div>
             <div>
                 <div class="specs-grid">
-                <div class="spec-box"><div class="lbl">Surface</div><div class="val" id="standard-surface">12 m²</div></div>
-                <div class="spec-box"><div class="lbl">Dimensions</div><div class="val" id="standard-dims">4m × 3m</div></div>
-                <div class="spec-box"><div class="lbl">Emplacements</div><div class="val" id="standard-nb">458</div></div>
-                <div class="spec-box"><div class="lbl">Faces libres</div><div class="val" id="standard-libres">289</div></div>
+                <div class="spec-box"><div class="lbl"><i class="bi bi-aspect-ratio"></i> Surface</div><div class="val" id="standard-surface">12 m²</div></div>
+                <div class="spec-box"><div class="lbl"><i class="bi bi-rulers"></i> Dimensions</div><div class="val" id="standard-dims">4m × 3m</div></div>
+                <div class="spec-box"><div class="lbl"><i class="bi bi-geo-alt"></i> Emplacements</div><div class="val" id="standard-nb">458</div></div>
+                <div class="spec-box"><div class="lbl"><i class="bi bi-check-circle"></i> Faces libres</div><div class="val" id="standard-libres">289</div></div>
                 </div>
                 <div class="dispo-bar-wrap">
                 <div class="dispo-bar-label"><span>Disponibilité</span><span id="standard-pct">63%</span></div>
@@ -315,10 +396,14 @@
     <p class="cat-subtitle">De 20 à 96 m² — pour les grandes artères et les messages qui marquent.</p>
 
     <div class="showcase geant" data-type="geant">
+        <div class="showcase-bar"></div>
         <div class="showcase-header">
-        <div>
-            <h3 id="geant-titre">Géant — 6m × 4m</h3>
-            <small id="geant-sous-titre">24 m² · 28 emplacements · 18 faces libres</small>
+        <div class="showcase-header-left">
+            <div class="showcase-icon"><i class="bi bi-aspect-ratio-fill"></i></div>
+            <div>
+                <h3 id="geant-titre">Géant — 6m × 4m</h3>
+                <small id="geant-sous-titre">24 m² · 28 emplacements · 18 faces libres</small>
+            </div>
         </div>
         <div class="fmt-pills">
             <button class="fmt-pill active" data-type="geant" data-code="6x4"  data-larg="6"  data-haut="4" data-surface="24" data-nb="28" data-libres="18" data-label="Géant — 6m × 4m"   data-desc="24 m² · 28 emplacements · 18 faces libres">6×4</button>
@@ -336,20 +421,20 @@
         <div class="preview-wrap">
             <div class="preview-frame">
             <svg id="svg-geant" viewBox="0 0 460 300" xmlns="http://www.w3.org/2000/svg">
-                <rect width="460" height="300" fill="#0f172a"/>
+                <rect width="460" height="300" fill="#1f2e28"/>
                 <rect x="24" y="24" width="420" height="220" fill="rgba(0,0,0,.4)" rx="6"/>
-                <rect x="20" y="20" width="420" height="220" fill="#1a3c6b" rx="5"/>
+                <rect x="20" y="20" width="420" height="220" fill="#2c463c" rx="5"/>
                 <image id="img-geant" x="20" y="20" width="420" height="220" href="" preserveAspectRatio="xMidYMid slice" style="display:none;" clip-path="url(#clip-geant)"/>
                 <clipPath id="clip-geant"><rect x="20" y="20" width="420" height="220" rx="5"/></clipPath>
                 <g id="label-geant">
-                <text id="svg-geant-dim" x="230" y="132" text-anchor="middle" font-size="50" font-weight="900" fill="#e8b84b" font-family="system-ui,sans-serif" opacity=".95">6×4</text>
-                <text id="svg-geant-surf" x="230" y="160" text-anchor="middle" font-size="14" fill="rgba(255,255,255,.45)" font-family="system-ui,sans-serif">24 m²</text>
+                <text id="svg-geant-dim" x="230" y="132" text-anchor="middle" font-size="50" font-weight="900" fill="#f9bf29" font-family="system-ui,sans-serif" opacity=".95">6×4</text>
+                <text id="svg-geant-surf" x="230" y="160" text-anchor="middle" font-size="14" fill="rgba(255,255,255,.5)" font-family="system-ui,sans-serif">24 m²</text>
                 </g>
-                <rect x="20" y="20" width="420" height="220" fill="none" stroke="#e8b84b" stroke-width="2" rx="5" opacity=".7"/>
-                <line x1="20" y1="258" x2="440" y2="258" stroke="#475569" stroke-width="1"/>
-                <text id="svg-geant-larg" x="230" y="272" text-anchor="middle" font-size="11" fill="#64748b" font-family="system-ui,sans-serif">← 6 m →</text>
-                <line x1="452" y1="20" x2="452" y2="240" stroke="#475569" stroke-width="1"/>
-                <text id="svg-geant-haut" x="458" y="135" text-anchor="middle" font-size="11" fill="#64748b" font-family="system-ui,sans-serif" transform="rotate(90,458,135)">← 4 m →</text>
+                <rect x="20" y="20" width="420" height="220" fill="none" stroke="#f9bf29" stroke-width="2" rx="5" opacity=".7"/>
+                <line x1="20" y1="258" x2="440" y2="258" stroke="#8a8a80" stroke-width="1"/>
+                <text id="svg-geant-larg" x="230" y="272" text-anchor="middle" font-size="11" fill="#6a6a6a" font-family="system-ui,sans-serif">← 6 m →</text>
+                <line x1="452" y1="20" x2="452" y2="240" stroke="#8a8a80" stroke-width="1"/>
+                <text id="svg-geant-haut" x="458" y="135" text-anchor="middle" font-size="11" fill="#6a6a6a" font-family="system-ui,sans-serif" transform="rotate(90,458,135)">← 4 m →</text>
             </svg>
             </div>
             <div class="preview-upload">
@@ -361,10 +446,10 @@
         </div>
         <div>
             <div class="specs-grid">
-            <div class="spec-box"><div class="lbl">Surface</div><div class="val" id="geant-surface">24 m²</div></div>
-            <div class="spec-box"><div class="lbl">Dimensions</div><div class="val" id="geant-dims">6m × 4m</div></div>
-            <div class="spec-box"><div class="lbl">Emplacements</div><div class="val" id="geant-nb">28</div></div>
-            <div class="spec-box"><div class="lbl">Faces libres</div><div class="val" id="geant-libres">18</div></div>
+            <div class="spec-box"><div class="lbl"><i class="bi bi-aspect-ratio"></i> Surface</div><div class="val" id="geant-surface">24 m²</div></div>
+            <div class="spec-box"><div class="lbl"><i class="bi bi-rulers"></i> Dimensions</div><div class="val" id="geant-dims">6m × 4m</div></div>
+            <div class="spec-box"><div class="lbl"><i class="bi bi-geo-alt"></i> Emplacements</div><div class="val" id="geant-nb">28</div></div>
+            <div class="spec-box"><div class="lbl"><i class="bi bi-check-circle"></i> Faces libres</div><div class="val" id="geant-libres">18</div></div>
             </div>
             <div class="dispo-bar-wrap">
             <div class="dispo-bar-label"><span>Disponibilité</span><span id="geant-pct">64%</span></div>
@@ -397,10 +482,14 @@
     <p class="cat-subtitle">Format urbain double face — zones commerciales, marchés, axes piétons.</p>
 
     <div class="showcase sucette" data-type="sucette">
+        <div class="showcase-bar"></div>
         <div class="showcase-header">
-        <div>
-            <h3 id="sucette-titre">Sucette — 1,20m × 1,80m</h3>
-            <small id="sucette-sous-titre">2,16 m² · 64 emplacements · 41 faces libres</small>
+        <div class="showcase-header-left">
+            <div class="showcase-icon"><i class="bi bi-signpost-2-fill"></i></div>
+            <div>
+                <h3 id="sucette-titre">Sucette — 1,20m × 1,80m</h3>
+                <small id="sucette-sous-titre">2,16 m² · 64 emplacements · 41 faces libres</small>
+            </div>
         </div>
         <div class="fmt-pills">
             <button class="fmt-pill active" data-type="sucette" data-code="1x2" data-larg="1.2" data-haut="1.8" data-surface="2.16" data-nb="64" data-libres="41" data-label="Sucette — 1,20m × 1,80m" data-desc="2,16 m² · 64 emplacements · 41 faces libres">1,20×1,80</button>
@@ -410,19 +499,19 @@
         <div class="preview-wrap">
             <div class="preview-frame">
             <svg id="svg-sucette" viewBox="0 0 200 360" xmlns="http://www.w3.org/2000/svg">
-                <rect width="200" height="360" fill="#0f172a"/>
+                <rect width="200" height="360" fill="#1f2e28"/>
                 <rect x="54" y="24" width="96" height="252" fill="rgba(0,0,0,.4)" rx="6"/>
-                <rect x="50" y="20" width="96" height="252" fill="#1a3c6b" rx="5"/>
+                <rect x="50" y="20" width="96" height="252" fill="#2c463c" rx="5"/>
                 <image id="img-sucette" x="50" y="20" width="96" height="252" href="" preserveAspectRatio="xMidYMid slice" style="display:none;" clip-path="url(#clip-sucette)"/>
                 <clipPath id="clip-sucette"><rect x="50" y="20" width="96" height="252" rx="5"/></clipPath>
                 <g id="label-sucette">
-                <text x="98" y="142" text-anchor="middle" font-size="22" font-weight="900" fill="#e8b84b" font-family="system-ui,sans-serif">1,20×</text>
-                <text x="98" y="168" text-anchor="middle" font-size="22" font-weight="900" fill="#e8b84b" font-family="system-ui,sans-serif">1,80</text>
-                <text x="98" y="192" text-anchor="middle" font-size="11" fill="rgba(255,255,255,.45)" font-family="system-ui,sans-serif">2,16 m²</text>
+                <text x="98" y="142" text-anchor="middle" font-size="22" font-weight="900" fill="#f9bf29" font-family="system-ui,sans-serif">1,20×</text>
+                <text x="98" y="168" text-anchor="middle" font-size="22" font-weight="900" fill="#f9bf29" font-family="system-ui,sans-serif">1,80</text>
+                <text x="98" y="192" text-anchor="middle" font-size="11" fill="rgba(255,255,255,.5)" font-family="system-ui,sans-serif">2,16 m²</text>
                 </g>
-                <rect x="50" y="20" width="96" height="252" fill="none" stroke="#7c3aed" stroke-width="2" rx="5" opacity=".8"/>
-                <rect x="88" y="272" width="20" height="52" fill="#334155" rx="2"/>
-                <rect x="68" y="322" width="60" height="10" fill="#1e293b" rx="3"/>
+                <rect x="50" y="20" width="96" height="252" fill="none" stroke="#e08e45" stroke-width="2" rx="5" opacity=".85"/>
+                <rect x="88" y="272" width="20" height="52" fill="#4a4238" rx="2"/>
+                <rect x="68" y="322" width="60" height="10" fill="#33302a" rx="3"/>
             </svg>
             </div>
             <div class="preview-upload">
@@ -434,10 +523,10 @@
         </div>
         <div>
             <div class="specs-grid">
-            <div class="spec-box"><div class="lbl">Surface</div><div class="val" id="sucette-surface">2,16 m²</div></div>
-            <div class="spec-box"><div class="lbl">Dimensions</div><div class="val" id="sucette-dims">1,20m × 1,80m</div></div>
-            <div class="spec-box"><div class="lbl">Emplacements</div><div class="val" id="sucette-nb">64</div></div>
-            <div class="spec-box"><div class="lbl">Faces libres</div><div class="val" id="sucette-libres">41</div></div>
+            <div class="spec-box"><div class="lbl"><i class="bi bi-aspect-ratio"></i> Surface</div><div class="val" id="sucette-surface">2,16 m²</div></div>
+            <div class="spec-box"><div class="lbl"><i class="bi bi-rulers"></i> Dimensions</div><div class="val" id="sucette-dims">1,20m × 1,80m</div></div>
+            <div class="spec-box"><div class="lbl"><i class="bi bi-geo-alt"></i> Emplacements</div><div class="val" id="sucette-nb">64</div></div>
+            <div class="spec-box"><div class="lbl"><i class="bi bi-check-circle"></i> Faces libres</div><div class="val" id="sucette-libres">41</div></div>
             </div>
             <div class="dispo-bar-wrap">
             <div class="dispo-bar-label"><span>Disponibilité</span><span id="sucette-pct">64%</span></div>
@@ -470,10 +559,14 @@
     <p class="cat-subtitle">Implantés dans les grands marchés — trafic piéton intense, visibilité locale.</p>
 
     <div class="showcase marche" data-type="marche">
+        <div class="showcase-bar"></div>
         <div class="showcase-header">
-        <div>
-            <h3 id="marche-titre">Marché — 5m × 4m</h3>
-            <small id="marche-sous-titre">20 m² · 47 emplacements · 30 faces libres</small>
+        <div class="showcase-header-left">
+            <div class="showcase-icon"><i class="bi bi-shop-window"></i></div>
+            <div>
+                <h3 id="marche-titre">Marché — 5m × 4m</h3>
+                <small id="marche-sous-titre">20 m² · 47 emplacements · 30 faces libres</small>
+            </div>
         </div>
         <div class="fmt-pills">
             <button class="fmt-pill active" data-type="marche" data-code="gm-5x4"  data-larg="5"  data-haut="4" data-surface="20" data-nb="47" data-libres="30" data-label="Marché — 5m × 4m"  data-desc="20 m² · 47 emplacements · 30 faces libres">5×4</button>
@@ -486,20 +579,20 @@
         <div class="preview-wrap">
             <div class="preview-frame">
             <svg id="svg-marche" viewBox="0 0 460 300" xmlns="http://www.w3.org/2000/svg">
-                <rect width="460" height="300" fill="#0f172a"/>
+                <rect width="460" height="300" fill="#1f2e28"/>
                 <rect x="24" y="24" width="380" height="220" fill="rgba(0,0,0,.4)" rx="6"/>
-                <rect x="20" y="20" width="380" height="220" fill="#1a3c6b" rx="5"/>
+                <rect x="20" y="20" width="380" height="220" fill="#2c463c" rx="5"/>
                 <image id="img-marche" x="20" y="20" width="380" height="220" href="" preserveAspectRatio="xMidYMid slice" style="display:none;" clip-path="url(#clip-marche)"/>
                 <clipPath id="clip-marche"><rect x="20" y="20" width="380" height="220" rx="5"/></clipPath>
                 <g id="label-marche">
-                <text id="svg-marche-dim" x="210" y="133" text-anchor="middle" font-size="48" font-weight="900" fill="#e8b84b" font-family="system-ui,sans-serif" opacity=".95">5×4</text>
-                <text id="svg-marche-surf" x="210" y="160" text-anchor="middle" font-size="14" fill="rgba(255,255,255,.45)" font-family="system-ui,sans-serif">20 m²</text>
+                <text id="svg-marche-dim" x="210" y="133" text-anchor="middle" font-size="48" font-weight="900" fill="#f9bf29" font-family="system-ui,sans-serif" opacity=".95">5×4</text>
+                <text id="svg-marche-surf" x="210" y="160" text-anchor="middle" font-size="14" fill="rgba(255,255,255,.5)" font-family="system-ui,sans-serif">20 m²</text>
                 </g>
-                <rect x="20" y="20" width="380" height="220" fill="none" stroke="#059669" stroke-width="2" rx="5" opacity=".8"/>
-                <line x1="20" y1="258" x2="400" y2="258" stroke="#475569" stroke-width="1"/>
-                <text id="svg-marche-larg" x="210" y="272" text-anchor="middle" font-size="11" fill="#64748b" font-family="system-ui,sans-serif">← 5 m →</text>
-                <line x1="412" y1="20" x2="412" y2="240" stroke="#475569" stroke-width="1"/>
-                <text id="svg-marche-haut" x="418" y="135" text-anchor="middle" font-size="11" fill="#64748b" font-family="system-ui,sans-serif" transform="rotate(90,418,135)">← 4 m →</text>
+                <rect x="20" y="20" width="380" height="220" fill="none" stroke="#7c9a85" stroke-width="2" rx="5" opacity=".85"/>
+                <line x1="20" y1="258" x2="400" y2="258" stroke="#8a8a80" stroke-width="1"/>
+                <text id="svg-marche-larg" x="210" y="272" text-anchor="middle" font-size="11" fill="#6a6a6a" font-family="system-ui,sans-serif">← 5 m →</text>
+                <line x1="412" y1="20" x2="412" y2="240" stroke="#8a8a80" stroke-width="1"/>
+                <text id="svg-marche-haut" x="418" y="135" text-anchor="middle" font-size="11" fill="#6a6a6a" font-family="system-ui,sans-serif" transform="rotate(90,418,135)">← 4 m →</text>
             </svg>
             </div>
             <div class="preview-upload">
@@ -511,10 +604,10 @@
         </div>
         <div>
             <div class="specs-grid">
-            <div class="spec-box"><div class="lbl">Surface</div><div class="val" id="marche-surface">20 m²</div></div>
-            <div class="spec-box"><div class="lbl">Dimensions</div><div class="val" id="marche-dims">5m × 4m</div></div>
-            <div class="spec-box"><div class="lbl">Emplacements</div><div class="val" id="marche-nb">47</div></div>
-            <div class="spec-box"><div class="lbl">Faces libres</div><div class="val" id="marche-libres">30</div></div>
+            <div class="spec-box"><div class="lbl"><i class="bi bi-aspect-ratio"></i> Surface</div><div class="val" id="marche-surface">20 m²</div></div>
+            <div class="spec-box"><div class="lbl"><i class="bi bi-rulers"></i> Dimensions</div><div class="val" id="marche-dims">5m × 4m</div></div>
+            <div class="spec-box"><div class="lbl"><i class="bi bi-geo-alt"></i> Emplacements</div><div class="val" id="marche-nb">47</div></div>
+            <div class="spec-box"><div class="lbl"><i class="bi bi-check-circle"></i> Faces libres</div><div class="val" id="marche-libres">30</div></div>
             </div>
             <div class="dispo-bar-wrap">
             <div class="dispo-bar-label"><span>Disponibilité</span><span id="marche-pct">64%</span></div>
@@ -548,6 +641,7 @@
 
     <div class="ecran-card">
         <div class="ecran-hero">
+        <div class="dots-deco"></div>
         <div class="ecran-hero-icon"><i class="bi bi-tv-fill"></i></div>
         <div>
             <h4>Écrans LED Full HD</h4>
@@ -556,7 +650,7 @@
         </div>
         <div class="ecran-body">
         <div class="ecran-section">
-            <h6><i class="bi bi-sliders text-primary"></i> Caractéristiques techniques</h6>
+            <h6><i class="bi bi-sliders"></i> Caractéristiques techniques</h6>
             <div class="ecran-specs">
             <div class="ecran-spec"><div class="lbl">Résolution</div><div class="val">1920×1080</div></div>
             <div class="ecran-spec"><div class="lbl">Durée spot</div><div class="val">5 – 20 sec</div></div>
@@ -565,21 +659,21 @@
             <div class="ecran-spec"><div class="lbl">Écrans actifs</div><div class="val">8</div></div>
             <div class="ecran-spec"><div class="lbl">Format fichier</div><div class="val">MP4 / PNG</div></div>
             </div>
-            <div class="alert alert-info d-flex align-items-center gap-2 mb-0" style="font-size:.82rem;">
-            <i class="bi bi-info-circle-fill flex-shrink-0"></i>
+            <div class="alert alert-info d-flex align-items-center gap-2 mb-0" style="font-size:.82rem; border-radius:16px; background: rgba(47,93,82,.08); border-color: rgba(47,93,82,.25); color: var(--text);">
+            <i class="bi bi-info-circle-fill flex-shrink-0" style="color: var(--c-ecran);"></i>
             <span>Vos créations sont diffusées en rotation avec les autres annonceurs sur le même écran.</span>
             </div>
         </div>
         <div class="ecran-divider"></div>
         <div class="ecran-section">
-            <h6><i class="bi bi-stars text-primary"></i> Pourquoi choisir le LED ?</h6>
+            <h6><i class="bi bi-stars"></i> Pourquoi choisir le LED ?</h6>
             <ul class="avantage-list">
-            <li><i class="bi bi-check-circle-fill ico"></i><span>Visibilité 24h/24 grâce à l'éclairage intégré</span></li>
-            <li><i class="bi bi-check-circle-fill ico"></i><span>Contenu animé — vidéo, image, message dynamique</span></li>
-            <li><i class="bi bi-check-circle-fill ico"></i><span>Fréquence de passage configurable selon budget</span></li>
-            <li><i class="bi bi-check-circle-fill ico"></i><span>Durée de spot flexible de 5 à 20 secondes</span></li>
-            <li><i class="bi bi-check-circle-fill ico"></i><span>Mise à jour du contenu sans impression</span></li>
-            <li><i class="bi bi-check-circle-fill ico"></i><span>ROI mesurable — comptage de passages disponible</span></li>
+            <li><span class="ico"><i class="bi bi-check-lg"></i></span><span>Visibilité 24h/24 grâce à l'éclairage intégré</span></li>
+            <li><span class="ico"><i class="bi bi-check-lg"></i></span><span>Contenu animé — vidéo, image, message dynamique</span></li>
+            <li><span class="ico"><i class="bi bi-check-lg"></i></span><span>Fréquence de passage configurable selon budget</span></li>
+            <li><span class="ico"><i class="bi bi-check-lg"></i></span><span>Durée de spot flexible de 5 à 20 secondes</span></li>
+            <li><span class="ico"><i class="bi bi-check-lg"></i></span><span>Mise à jour du contenu sans impression</span></li>
+            <li><span class="ico"><i class="bi bi-check-lg"></i></span><span>ROI mesurable — comptage de passages disponible</span></li>
             </ul>
             <a href="{% url 'portail:services' %}" class="btn btn-sm btn-outline-primary mt-3">
             En savoir plus <i class="bi bi-arrow-right ms-1"></i>
@@ -589,8 +683,7 @@
     </div>
     </div>
 
-
-
+</div>
 {% endblock %}
 {% block footerquestion %}Vous avez trouvé le format idéal ?{% endblock %}
 {% block footertext %}Notre équipe vous accompagne du choix des emplacements jusqu'à la pose de vos visuels.{% endblock %}

@@ -6,133 +6,208 @@
 
 {% block extra_head %}
 <style>
-  :root {
+  /* ════════════════════════════════════════════════════════════════
+     Identité "Furni" — vert profond + jaune, Inter, formes arrondies,
+     puces icônes rondes, décor à points. Variables surchargées
+     localement sur .services-page pour ne pas affecter le reste du site.
+     ════════════════════════════════════════════════════════════════ */
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+  .services-page {
+    --color-primary:   {{ DESIGN.COLOR_PRIMARY }};
+    --color-secondary: {{ DESIGN.COLOR_SECONDARY }};
+    --text:             #1f2e28;
+    --text-muted:        #6a6a6a;
+    --border:             #e6e2d8;
+    --bg-card:              #ffffff;
+    --bg-card2:              #f8f6f1;
+
     --c-standard: var(--color-primary);
     --c-geant:    var(--color-secondary);
-    --c-sucette:  #7c3aed;
-    --c-marche:   #059669;
-    --c-ecran:    #0891b2;
-    --radius-lg:  14px;
+    --c-sucette:  #e08e45;
+    --c-marche:   #7c9a85;
+    --c-ecran:    #2f5d52;
+    --c-compl:    #d97706;
+    --radius-lg:  8px;
+    --shadow-soft: 0 10px 28px rgba(31,46,40,.09), 0 2px 6px rgba(31,46,40,.06);
+    font-family: 'Inter', sans-serif;
+  }
+
+  .dots-deco {
+    position: absolute;
+    width: 110px; height: 110px;
+    background-image: radial-gradient(currentColor 2.5px, transparent 2.5px);
+    background-size: 15px 15px;
+    opacity: .3;
+    pointer-events: none;
+    z-index: 0;
   }
 
   /* ── PAGE HEADER ──────────────────────────────────────────────────── */
   .page-header { margin-bottom: 32px; }
-  .page-header h1 { font-size: 1.6rem; font-weight: 900; letter-spacing: -.02em; margin: 0 0 6px; }
+  .page-header h1 { font-size: 1.7rem; font-weight: 800; letter-spacing: -.02em; margin: 0 0 6px; color: var(--text); }
   .page-header p  { font-size: .88rem; color: var(--text-muted); margin: 0; }
 
   /* ── SERVICE BLOCKS ───────────────────────────────────────────────── */
   .srv-block {
     background: var(--bg-card); border: 1px solid var(--border);
     border-radius: var(--radius-lg); overflow: hidden;
-    box-shadow: 0 2px 16px rgba(0,0,0,.06); margin-bottom: 32px;
+    box-shadow: var(--shadow-soft); margin-bottom: 32px;
   }
 
   .srv-hero {
-    padding: 24px 28px; display: flex; align-items: center; gap: 20px;
+    position: relative;
+    padding: 26px 30px; display: flex; align-items: center; gap: 22px;
     border-bottom: 1px solid var(--border);
+    background: var(--bg-card2);
   }
   .srv-hero-icon {
-    width: 60px; height: 60px; border-radius: 14px;
+    width: 62px; height: 62px; border-radius: 50%;
     display: flex; align-items: center; justify-content: center;
-    font-size: 1.6rem; flex-shrink: 0;
+    font-size: 1.6rem; flex-shrink: 0; color: #fff;
+    box-shadow: var(--shadow-soft);
   }
-  .srv-hero h2 { font-size: 1.15rem; font-weight: 900; margin: 0 0 4px; color: var(--text); }
+  .srv-hero h2 { font-size: 1.15rem; font-weight: 800; margin: 0 0 4px; color: var(--text); }
   .srv-hero p  { font-size: .84rem; color: var(--text-muted); margin: 0; line-height: 1.5; }
 
   /* Couleurs par service */
-  .srv-panneau .srv-hero-icon { background: #dbeafe; color: var(--c-standard); }
-  .srv-geant   .srv-hero-icon { background: #ede9fe; color: var(--c-geant); }
-  .srv-sucette .srv-hero-icon { background: #f3e8ff; color: var(--c-sucette); }
-  .srv-marche  .srv-hero-icon { background: #d1fae5; color: var(--c-marche); }
-  .srv-ecran   .srv-hero-icon { background: #cffafe; color: var(--c-ecran); }
-  .srv-compl   .srv-hero-icon { background: #fef3c7; color: #d97706; }
+  .srv-panneau .srv-hero-icon { background: var(--c-standard); }
+  .srv-geant   .srv-hero-icon { background: var(--c-geant); color: var(--text); }
+  .srv-sucette .srv-hero-icon { background: var(--c-sucette); }
+  .srv-marche  .srv-hero-icon { background: var(--c-marche); }
+  .srv-ecran   .srv-hero-icon { background: var(--c-ecran); }
+  .srv-compl   .srv-hero-icon { background: var(--c-compl); }
 
-  .srv-body { padding: 24px 28px; }
+  .srv-body { padding: 26px 30px; }
 
   /* ── AVANTAGES ────────────────────────────────────────────────────── */
-  .avantage-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin-bottom: 24px; }
+  .avantage-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin-bottom: 26px; }
   .avantage-item {
-    display: flex; align-items: flex-start; gap: 10px;
-    padding: 12px 14px; border-radius: 10px;
+    display: flex; align-items: center; gap: 12px;
+    padding: 13px 15px; border-radius: 8px;
     background: var(--bg-card2); border: 1px solid var(--border);
     font-size: .83rem; color: var(--text); line-height: 1.4;
+    transition: transform .15s ease, border-color .15s ease;
   }
-  .avantage-item .ico { font-size: .9rem; flex-shrink: 0; margin-top: 1px; }
-  .srv-panneau .avantage-item .ico { color: var(--c-standard); }
-  .srv-geant   .avantage-item .ico { color: var(--c-geant); }
-  .srv-sucette .avantage-item .ico { color: var(--c-sucette); }
-  .srv-marche  .avantage-item .ico { color: var(--c-marche); }
-  .srv-ecran   .avantage-item .ico { color: var(--c-ecran); }
-  .srv-compl   .avantage-item .ico { color: #d97706; }
+  .avantage-item:hover { transform: translateY(-2px); }
+  .avantage-item .ico {
+    width: 26px; height: 26px; border-radius: 50%; flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .7rem; color: #fff;
+  }
+  .srv-panneau .avantage-item .ico { background: var(--c-standard); }
+  .srv-geant   .avantage-item .ico { background: var(--c-geant); color: var(--text); }
+  .srv-sucette .avantage-item .ico { background: var(--c-sucette); }
+  .srv-marche  .avantage-item .ico { background: var(--c-marche); }
+  .srv-ecran   .avantage-item .ico { background: var(--c-ecran); }
+  .srv-compl   .avantage-item .ico { background: var(--c-compl); }
 
   /* ── SECTION LABEL ────────────────────────────────────────────────── */
   .srv-section-label {
+    display: inline-flex; align-items: center; gap: 7px;
     font-size: .68rem; font-weight: 800; text-transform: uppercase;
-    letter-spacing: .1em; color: var(--text-muted); margin: 0 0 12px;
-    display: flex; align-items: center; gap: 6px;
+    letter-spacing: .1em; color: var(--color-primary); margin: 0 0 14px;
+    background: rgba(59,93,80,.08);
+    padding: 6px 14px; border-radius: 10px;
   }
-  .srv-section-label::after { content: ''; flex: 1; height: 1px; background: var(--border); }
 
   /* ── FORMATS TABLE ────────────────────────────────────────────────── */
-  .formats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 10px; }
+  .formats-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 12px; }
   .format-pill {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 10px 14px; border-radius: 10px;
-    background: var(--bg-card2); border: 1px solid var(--border);
+    padding: 12px 16px; border-radius: 10px;
+    background: var(--bg-card2); border: 1.5px solid var(--border);
     font-size: .82rem; gap: 8px;
+    transition: transform .15s ease;
   }
+  .format-pill:hover { transform: translateY(-2px); }
   .format-pill .fmt-code { font-weight: 800; color: var(--text); font-size: .9rem; }
   .format-pill .fmt-meta { color: var(--text-muted); font-size: .75rem; text-align: right; line-height: 1.3; }
   .format-pill .fmt-badge {
-    font-size: .62rem; font-weight: 800; padding: 2px 7px; border-radius: 20px;
+    font-size: .62rem; font-weight: 800; padding: 3px 10px; border-radius: 10px;
     white-space: nowrap;
   }
-  .srv-panneau .format-pill { border: 2px solid var(--c-standard); }
-  .srv-geant   .format-pill { border: 2px solid var(--c-geant); }
-  .srv-sucette .format-pill { border: 2px solid var(--c-sucette); }
-  .srv-marche  .format-pill { border: 2px solid var(--c-marche); }
+  .srv-panneau .format-pill { border-color: var(--c-standard); }
+  .srv-geant   .format-pill { border-color: var(--c-geant); }
+  .srv-sucette .format-pill { border-color: var(--c-sucette); }
+  .srv-marche  .format-pill { border-color: var(--c-marche); }
 
-  .badge-nb { background: #f1f5f9; color: #64748b; }
+  .badge-nb { background: var(--bg-card); border: 1px solid var(--border); color: var(--text-muted); }
 
   /* ── ÉCRAN TABLE ──────────────────────────────────────────────────── */
+  .ecran-table-wrap {
+    border: 1px solid var(--border); border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
   .ecran-table { width: 100%; border-collapse: collapse; font-size: .84rem; }
   .ecran-table th {
-    background: var(--bg-card2); border-bottom: 2px solid var(--border);
-    padding: 10px 12px; text-align: left; font-size: .68rem;
+    background: var(--bg-card2); border-bottom: 1px solid var(--border);
+    padding: 12px 16px; text-align: left; font-size: .68rem;
     font-weight: 800; text-transform: uppercase; letter-spacing: .06em;
     color: var(--text-muted);
   }
-  .ecran-table td { padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: middle; }
+  .ecran-table td { padding: 12px 16px; border-bottom: 1px solid var(--border); color: var(--text); vertical-align: middle; }
   .ecran-table tr:last-child td { border-bottom: none; }
-  .ecran-table tr:hover td { background: var(--bg-card2); }
-  .ecran-table .val { font-weight: 700; }
+  .ecran-table tr:hover td { background: rgba(59,93,80,.05); }
+  .ecran-table .val { font-weight: 800; }
 
   /* ── SERVICES COMPLÉMENTAIRES ─────────────────────────────────────── */
-  .compl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+  .compl-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; }
   .compl-item {
-    padding: 16px; border-radius: 10px;
+    padding: 22px 18px; border-radius: var(--radius-lg);
     background: var(--bg-card2); border: 1px solid var(--border);
     text-align: center;
+    transition: transform .18s ease, box-shadow .18s ease;
   }
-  .compl-item i { font-size: 1.6rem; margin-bottom: 8px; display: block; color: #d97706; }
+  .compl-item:hover { transform: translateY(-3px); box-shadow: var(--shadow-soft); }
+  .compl-item .compl-icon {
+    width: 48px; height: 48px; border-radius: 50%;
+    background: var(--c-compl); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.25rem; margin: 0 auto 12px;
+  }
   .compl-item .compl-title { font-size: .84rem; font-weight: 700; color: var(--text); margin-bottom: 4px; }
   .compl-item .compl-desc  { font-size: .76rem; color: var(--text-muted); line-height: 1.4; }
 
+  /* ── BOUTONS ──────────────────────────────────────────────────────── */
+  .srv-body .btn-primary {
+    border: none; border-radius: 10px; font-weight: 700;
+    background: var(--color-primary);
+  }
+  .srv-body .btn-primary:hover { background: #2f4a40; }
+  .srv-body .btn-outline-secondary {
+    border-radius: 10px; font-weight: 700;
+    border-color: var(--border); color: var(--text-muted);
+  }
+  .srv-body .btn-outline-secondary:hover { border-color: var(--color-primary); color: var(--color-primary); background: transparent; }
+
   /* ── CTA ──────────────────────────────────────────────────────────── */
   .cta-block {
+    position: relative;
+    overflow: hidden;
     background: var(--color-secondary);
-    border-radius: var(--radius-lg); padding: 40px 32px;
-    text-align: center; color: #000; margin-top: 8px;
+    border-radius: var(--radius-lg); padding: 44px 32px;
+    text-align: center; color: var(--text); margin-top: 8px;
   }
-  .cta-block h3 { font-size: 1.4rem; font-weight: 900; margin: 0 0 8px; }
-  .cta-block p  { margin: 0 0 24px; opacity: .9; font-size: .92rem; }
+  .cta-block .dots-deco { top: -20px; left: 30px; color: var(--color-primary); opacity: .3; }
+  .cta-block::before {
+    content: '';
+    position: absolute;
+    bottom: -60px; right: -40px;
+    width: 220px; height: 220px;
+    background: rgba(31,46,40,.06);
+    border-radius: 42% 58% 65% 35% / 45% 45% 55% 55%;
+  }
+  .cta-block h3 { position: relative; z-index: 1; font-size: 1.4rem; font-weight: 800; margin: 0 0 8px; }
+  .cta-block p  { position: relative; z-index: 1; margin: 0 0 24px; opacity: .85; font-size: .92rem; }
   .cta-block .btn-cta {
+    position: relative; z-index: 1;
     display: inline-flex; align-items: center; gap: 8px;
-    background: #fff; color: var(--color-primary); font-weight: 800;
-    padding: 12px 28px; border-radius: 50px; font-size: .92rem;
-    text-decoration: none; transition: all .15s; border: 2px solid #fff;
+    background: var(--color-primary); color: #fff; font-weight: 700;
+    padding: 13px 30px; border-radius: 10px; font-size: .92rem;
+    text-decoration: none; transition: all .18s; border: 2px solid var(--color-primary);
   }
-  .cta-block .btn-cta:hover { background: transparent; color: #fff; }
+  .cta-block .btn-cta:hover { background: transparent; color: var(--color-primary); }
 
   @media (max-width: 640px) {
     .srv-hero { flex-direction: column; align-items: flex-start; }
@@ -142,6 +217,7 @@
 {% endblock %}
 
 {% block content %}
+<div class="services-page">
 
   <!-- ── EN-TÊTE ───────────────────────────────────────────────────────────── -->
   <div class="page-header">
@@ -161,12 +237,12 @@
     <div class="srv-body">
       <div class="srv-section-label"><i class="bi bi-stars"></i> Avantages</div>
       <div class="avantage-grid">
-        <div class="avantage-item"><i class="bi bi-check-circle-fill ico"></i>Exposition permanente 24h/24, 7j/7</div>
-        <div class="avantage-item"><i class="bi bi-check-circle-fill ico"></i>2 faces par panneau (A et B)</div>
-        <div class="avantage-item"><i class="bi bi-check-circle-fill ico"></i>Éclairage disponible (LED, backlit, frontlit)</div>
-        <div class="avantage-item"><i class="bi bi-check-circle-fill ico"></i>Zones stratégiques sélectionnées</div>
-        <div class="avantage-item"><i class="bi bi-check-circle-fill ico"></i>Production et pose incluses sur demande</div>
-        <div class="avantage-item"><i class="bi bi-check-circle-fill ico"></i>Présence de marque durable et visible</div>
+        <div class="avantage-item"><span class="ico"><i class="bi bi-check-lg"></i></span>Exposition permanente 24h/24, 7j/7</div>
+        <div class="avantage-item"><span class="ico"><i class="bi bi-check-lg"></i></span>2 faces par panneau (A et B)</div>
+        <div class="avantage-item"><span class="ico"><i class="bi bi-check-lg"></i></span>Éclairage disponible (LED, backlit, frontlit)</div>
+        <div class="avantage-item"><span class="ico"><i class="bi bi-check-lg"></i></span>Zones stratégiques sélectionnées</div>
+        <div class="avantage-item"><span class="ico"><i class="bi bi-check-lg"></i></span>Production et pose incluses sur demande</div>
+        <div class="avantage-item"><span class="ico"><i class="bi bi-check-lg"></i></span>Présence de marque durable et visible</div>
       </div>
 
       <div class="srv-section-label"><i class="bi bi-grid"></i> Format disponible</div>
@@ -200,10 +276,10 @@
     <div class="srv-body">
       <div class="srv-section-label"><i class="bi bi-stars"></i> Avantages</div>
       <div class="avantage-grid">
-        <div class="avantage-item"><i class="bi bi-check-circle-fill ico"></i>Visibilité exceptionnelle à grande distance</div>
-        <div class="avantage-item"><i class="bi bi-check-circle-fill ico"></i>Impression forte sur les grands axes</div>
-        <div class="avantage-item"><i class="bi bi-check-circle-fill ico"></i>Large choix de dimensions (20 à 96 m²)</div>
-        <div class="avantage-item"><i class="bi bi-check-circle-fill ico"></i>Idéal pour événements et lancements</div>
+        <div class="avantage-item"><span class="ico"><i class="bi bi-check-lg"></i></span>Visibilité exceptionnelle à grande distance</div>
+        <div class="avantage-item"><span class="ico"><i class="bi bi-check-lg"></i></span>Impression forte sur les grands axes</div>
+        <div class="avantage-item"><span class="ico"><i class="bi bi-check-lg"></i></span>Large choix de dimensions (20 à 96 m²)</div>
+        <div class="avantage-item"><span class="ico"><i class="bi bi-check-lg"></i></span>Idéal pour événements et lancements</div>
       </div>
 
       <div class="srv-section-label"><i class="bi bi-grid"></i> Formats disponibles</div>
@@ -269,10 +345,10 @@
     <div class="srv-body">
       <div class="srv-section-label"><i class="bi bi-stars"></i> Avantages</div>
       <div class="avantage-grid">
-        <div class="avantage-item"><i class="bi bi-check-circle-fill ico"></i>À hauteur des yeux — contact direct</div>
-        <div class="avantage-item"><i class="bi bi-check-circle-fill ico"></i>Double face — visibilité dans les deux sens</div>
-        <div class="avantage-item"><i class="bi bi-check-circle-fill ico"></i>Zones à fort trafic piéton</div>
-        <div class="avantage-item"><i class="bi bi-check-circle-fill ico"></i>Coût accessible — bon rapport qualité/prix</div>
+        <div class="avantage-item"><span class="ico"><i class="bi bi-check-lg"></i></span>À hauteur des yeux — contact direct</div>
+        <div class="avantage-item"><span class="ico"><i class="bi bi-check-lg"></i></span>Double face — visibilité dans les deux sens</div>
+        <div class="avantage-item"><span class="ico"><i class="bi bi-check-lg"></i></span>Zones à fort trafic piéton</div>
+        <div class="avantage-item"><span class="ico"><i class="bi bi-check-lg"></i></span>Coût accessible — bon rapport qualité/prix</div>
       </div>
 
       <div class="srv-section-label"><i class="bi bi-grid"></i> Format disponible</div>
@@ -303,10 +379,10 @@
     <div class="srv-body">
       <div class="srv-section-label"><i class="bi bi-stars"></i> Avantages</div>
       <div class="avantage-grid">
-        <div class="avantage-item"><i class="bi bi-check-circle-fill ico"></i>Cœur des zones commerciales populaires</div>
-        <div class="avantage-item"><i class="bi bi-check-circle-fill ico"></i>Audience locale fidèle et récurrente</div>
-        <div class="avantage-item"><i class="bi bi-check-circle-fill ico"></i>Idéal pour produits de grande consommation</div>
-        <div class="avantage-item"><i class="bi bi-check-circle-fill ico"></i>Plusieurs formats selon l'emplacement</div>
+        <div class="avantage-item"><span class="ico"><i class="bi bi-check-lg"></i></span>Cœur des zones commerciales populaires</div>
+        <div class="avantage-item"><span class="ico"><i class="bi bi-check-lg"></i></span>Audience locale fidèle et récurrente</div>
+        <div class="avantage-item"><span class="ico"><i class="bi bi-check-lg"></i></span>Idéal pour produits de grande consommation</div>
+        <div class="avantage-item"><span class="ico"><i class="bi bi-check-lg"></i></span>Plusieurs formats selon l'emplacement</div>
       </div>
 
       <div class="srv-section-label"><i class="bi bi-grid"></i> Formats disponibles</div>
@@ -340,6 +416,7 @@
   <!-- ══ ÉCRANS LED ════════════════════════════════════════════════════════════ -->
   <div class="srv-block srv-ecran">
     <div class="srv-hero">
+      <div class="dots-deco" style="top:-10px; right:20px; color:var(--color-secondary);"></div>
       <div class="srv-hero-icon"><i class="bi bi-tv-fill"></i></div>
       <div>
         <h2>Écrans Numériques LED</h2>
@@ -349,15 +426,16 @@
     <div class="srv-body">
       <div class="srv-section-label"><i class="bi bi-stars"></i> Avantages</div>
       <div class="avantage-grid">
-        <div class="avantage-item"><i class="bi bi-check-circle-fill ico"></i>Contenu animé — vidéo, image dynamique</div>
-        <div class="avantage-item"><i class="bi bi-check-circle-fill ico"></i>Durée spot flexible (5s à 20s)</div>
-        <div class="avantage-item"><i class="bi bi-check-circle-fill ico"></i>Fréquence configurable selon budget</div>
-        <div class="avantage-item"><i class="bi bi-check-circle-fill ico"></i>Mise à jour contenu sans impression</div>
-        <div class="avantage-item"><i class="bi bi-check-circle-fill ico"></i>Horaires aménageables (6h – 23h)</div>
-        <div class="avantage-item"><i class="bi bi-check-circle-fill ico"></i>ROI mesurable — comptage de passages</div>
+        <div class="avantage-item"><span class="ico"><i class="bi bi-check-lg"></i></span>Contenu animé — vidéo, image dynamique</div>
+        <div class="avantage-item"><span class="ico"><i class="bi bi-check-lg"></i></span>Durée spot flexible (5s à 20s)</div>
+        <div class="avantage-item"><span class="ico"><i class="bi bi-check-lg"></i></span>Fréquence configurable selon budget</div>
+        <div class="avantage-item"><span class="ico"><i class="bi bi-check-lg"></i></span>Mise à jour contenu sans impression</div>
+        <div class="avantage-item"><span class="ico"><i class="bi bi-check-lg"></i></span>Horaires aménageables (6h – 23h)</div>
+        <div class="avantage-item"><span class="ico"><i class="bi bi-check-lg"></i></span>ROI mesurable — comptage de passages</div>
       </div>
 
       <div class="srv-section-label"><i class="bi bi-calculator"></i> Estimateur de passages / jour</div>
+      <div class="ecran-table-wrap">
       <table class="ecran-table">
         <thead>
           <tr>
@@ -394,6 +472,7 @@
           </tr>
         </tbody>
       </table>
+      </div>
 
       <div class="mt-3 d-flex flex-wrap gap-2">
         <a href="{% url 'portail:reserver_etape1' %}" class="btn btn-primary btn-sm">
@@ -418,32 +497,32 @@
     <div class="srv-body">
       <div class="compl-grid">
         <div class="compl-item">
-          <i class="bi bi-brush-fill"></i>
+          <div class="compl-icon"><i class="bi bi-brush-fill"></i></div>
           <div class="compl-title">Conception graphique</div>
           <div class="compl-desc">Création de visuels adaptés à chaque format de panneau</div>
         </div>
         <div class="compl-item">
-          <i class="bi bi-camera-video-fill"></i>
+          <div class="compl-icon"><i class="bi bi-camera-video-fill"></i></div>
           <div class="compl-title">Production vidéo</div>
           <div class="compl-desc">Montage et animation pour vos spots LED</div>
         </div>
         <div class="compl-item">
-          <i class="bi bi-printer-fill"></i>
+          <div class="compl-icon"><i class="bi bi-printer-fill"></i></div>
           <div class="compl-title">Impression & pose</div>
           <div class="compl-desc">Impression grand format et installation par nos équipes</div>
         </div>
         <div class="compl-item">
-          <i class="bi bi-bar-chart-fill"></i>
+          <div class="compl-icon"><i class="bi bi-bar-chart-fill"></i></div>
           <div class="compl-title">Suivi de campagne</div>
           <div class="compl-desc">Rapports de visibilité et bilan en fin de campagne</div>
         </div>
         <div class="compl-item">
-          <i class="bi bi-lightbulb-fill"></i>
+          <div class="compl-icon"><i class="bi bi-lightbulb-fill"></i></div>
           <div class="compl-title">Conseil stratégique</div>
           <div class="compl-desc">Sélection des meilleurs emplacements selon votre cible</div>
         </div>
         <div class="compl-item">
-          <i class="bi bi-headset"></i>
+          <div class="compl-icon"><i class="bi bi-headset"></i></div>
           <div class="compl-title">Assistance dédiée</div>
           <div class="compl-desc">Un interlocuteur unique du devis à la fin de campagne</div>
         </div>
@@ -451,7 +530,7 @@
     </div>
   </div>
 
-
+</div>
 {% endblock %}
 {% block footerquestion %}Prêt à lancer votre campagne ?{% endblock %}
 {% block footertext %}Notre équipe vous répond sous 24h avec un devis personnalisé.{% endblock %}

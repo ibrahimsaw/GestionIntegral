@@ -60,4 +60,5 @@ urlpatterns = [
     path('api/check-dispo/',
          views.ApiCheckDispoView.as_view(),
          name='api_check_dispo'),
+    path('contact/envoyer/', views.ContactFormView.as_view(), name='contact_envoyer'),
 ]

@@ -17,3 +17,13 @@ def inventory_villes(request):
     return {
         'inventory_villes': villes,
     }
+
+
+def contact_info(request):
+    """Injecte les coordonnées de contact dans tous les templates."""
+    return {
+        'CONTACT_EMAIL': getattr(settings, 'CONTACT_EMAIL', ''),
+        'CONTACT_EMAIL1': getattr(settings, 'CONTACT_EMAIL1', ''),
+        'CONTACT_TEL1': getattr(settings, 'CONTACT_TEL1', ''),
+        'CONTACT_TEL2': getattr(settings, 'CONTACT_TEL2', ''),
+    }

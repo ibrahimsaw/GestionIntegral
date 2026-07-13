@@ -4,9 +4,11 @@ Settings Django
 """
 import os  # <--- CRITIQUE : Ne pas oublier d'importer os pour os.environ
 from pathlib import Path
+from dotenv import load_dotenv
+
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-
+load_dotenv(BASE_DIR / '.env')
 # Mode de débogage (Mettre à False en production)
 DEBUG = True  # <--- CRITIQUE : Toujours désactiver le mode debug en production
 
@@ -34,6 +36,25 @@ else:
         'http://187.124.54.132:8086',
     ]
 
+# ─────────────────────────────────────────────────────────────────────────────
+# CONFIGURATION EMAIL
+# ─────────────────────────────────────────────────────────────────────────────
+if DEBUG:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'  # temporaire pour test
+    EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
+    EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
+    EMAIL_USE_TLS = True
+    EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER')
+    EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
+    DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
+else:
+    EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+    EMAIL_HOST = os.environ.get('EMAIL_HOST', 'smtp.gmail.com')
+    EMAIL_PORT = int(os.environ.get('EMAIL_PORT', 587))
+    EMAIL_USE_TLS = True
+    EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER')
+    EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
+    DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', EMAIL_HOST_USER)
 # ─────────────────────────────────────────────────────────────────────────────
 # CONFIGURATION DES APPLICATIONS
 # ─────────────────────────────────────────────────────────────────────────────
@@ -83,7 +104,8 @@ TEMPLATES = [
                 'django.contrib.messages.context_processors.messages',
                 'geoad.context_processors.design_config',
                 'geoad.context_processors.inventory_villes',
-                'campaigns.context_processors.alerts_data'
+                'campaigns.context_processors.alerts_data',
+                'geoad.context_processors.contact_info',  # ← ajoute cette ligne
             ],
         },
     },
@@ -157,6 +179,10 @@ DESIGN_CONFIG = {
     'TAUX_ALERTE':       75,          # % au-delà duquel afficher une alerte orange
     'TAUX_CRITIQUE':     90,          # % au-delà duquel afficher une alerte rouge
 }
+CONTACT_EMAIL1 = "reseau@promopub-integral.com"  # ou l'adresse que tu veux recevoir les demandes
+CONTACT_EMAIL = "support-it@promopub-integral.com"
+CONTACT_TEL1 = "+22674534694"
+CONTACT_TEL2 = "+22663696961"
 
 # Horaires de diffusion par défaut pour le planning des panneaux
 DIFFUSION_HEURE_DEBUT = 6    # 06:00

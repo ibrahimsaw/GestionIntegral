@@ -8,44 +8,56 @@
 {% block extra_head %}
 <style>
   /* ════════════════════════════════════════════════════════════════
-     Cette page hérite des variables du thème de base (base_portail.html) :
-     --color-primary, --color-secondary, --text, --text-muted, --border,
-     --bg-card, --bg-card2, --radius, --shadow, --shadow-md, --map-ok,
-     --map-ok-soft, --map-err, --map-err-soft...
-     Direction : tableau de bord réseau éditorial — la disponibilité en
-     temps réel est le sujet de la page, pas un détail en bas de carte.
+     Refonte "Furni" — pas qu'une palette : hero image/blob organique,
+     nav villes en pastilles, cartes à icônes rondes, timeline à
+     pastilles numérotées, CTA avec forme organique en fond.
+     Variables du thème de base surchargées localement sur .vitrine.
      ════════════════════════════════════════════════════════════════ */
 
-  .vitrine { --vt-tight: -0.02em; }
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
-  /* ─── HERO ─────────────────────────────────────────────────────── */
+  .vitrine {
+    --vt-tight: -0.02em;
+    --color-primary:   {{ DESIGN.COLOR_PRIMARY }};
+    --color-secondary: {{ DESIGN.COLOR_SECONDARY }};
+    --text:             #000000;
+    --text-muted:        #6a6a6a;
+    --border:            #e6e2d8;
+    --bg-card:            #ffffff;
+    --bg-card2:            #f8f6f1;
+    --radius:               5px;
+    --radius-sm:             10px;
+    --shadow:    0 1px 3px rgba(31,46,40,.07), 0 1px 2px rgba(31,46,40,.05);
+    --shadow-md: 0 10px 28px rgba(31,46,40,.10), 0 2px 6px rgba(31,46,40,.06);
+    font-family: 'Inter', sans-serif;
+  }
+
+  /* ── Décor "dots" (motif Furni) ─────────────────────────────────── */
+  .dots-deco {
+    position: absolute;
+    width: 130px; height: 130px;
+    background-image: radial-gradient(currentColor 2.5px, transparent 2.5px);
+    background-size: 15px 15px;
+    opacity: .3;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* ═══════════════════ HERO ═══════════════════════════════════════ */
   .hero-section {
     position: relative;
     background: var(--bg-card);
     border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 4.5rem 3rem 3rem;
-    margin-bottom: 32px;
+    /* border-radius: var(--radius); */
+    padding: 3.2rem 3rem;
+    margin-bottom: 28px;
     overflow: hidden;
     display: grid;
-    grid-template-columns: 1.3fr 1fr;
-    gap: 2rem;
-    align-items: end;
-  }
-  .hero-bignum {
-    position: absolute;
-    top: -0.02em; right: 0.2em;
-    font-size: 5rem;
-    font-weight: 800;
-    line-height: 1;
-    letter-spacing: var(--vt-tight);
-    color: var(--color-primary);
-    opacity: .07;
-    pointer-events: none;
-    z-index: 0;
+    grid-template-columns: 1.05fr .95fr;
+    gap: 2.5rem;
+    align-items: center;
   }
   .hero-eyebrow {
-    position: relative;
     display: inline-flex; align-items: center; gap: 8px;
     font-size: .72rem; font-weight: 700; letter-spacing: .12em;
     text-transform: uppercase; color: var(--color-primary);
@@ -56,54 +68,117 @@
     background: var(--map-ok); animation: pulse 1.8s ease-in-out infinite;
   }
   .hero-title {
-    position: relative;
-    font-size: clamp(2.2rem, 4vw, 3.1rem);
+    font-size: clamp(2.1rem, 3.6vw, 2.9rem);
     font-weight: 800;
-    line-height: 1.05;
+    line-height: 1.08;
     letter-spacing: var(--vt-tight);
     color: var(--text);
     margin-bottom: .9rem;
   }
   .hero-subtitle {
-    position: relative;
-    font-size: 1.02rem;
+    font-size: 1rem;
     color: var(--text-muted);
     margin-bottom: 1.85rem;
-    max-width: 480px;
+    max-width: 460px;
     line-height: 1.6;
   }
-  .hero-actions { position: relative; display: flex; gap: 12px; flex-wrap: wrap; }
+  .hero-actions { display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 1.6rem; }
   .hero-btn {
     display: inline-flex; align-items: center; gap: 8px;
-    padding: 12px 24px;
-    border-radius: var(--radius-sm, 6px);
+    padding: 12px 26px;
+    border-radius: 999px;
     font-weight: 700; font-size: .85rem;
     text-decoration: none;
-    transition: transform .15s ease, opacity .15s ease;
+    transition: transform .15s ease, background .15s ease;
   }
   .hero-btn:hover { transform: translateY(-1px); }
   .hero-btn-solid { background: var(--color-primary); color: #fff; }
+  .hero-btn-solid:hover { background: var(--color-primary); color: #fff; }
   .hero-btn-outline { background: transparent; color: var(--text); border: 1.5px solid var(--border); }
+  .hero-btn-outline:hover { border-color: var(--color-primary); color: var(--color-primary); }
 
-  .hero-side {
+  .hero-mini-stats { display: flex; gap: 26px; flex-wrap: wrap; }
+  .hero-mini-stat { display: flex; flex-direction: column; }
+  .hero-mini-num { font-size: 1.5rem; font-weight: 800; color: var(--text); letter-spacing: var(--vt-tight); }
+  .hero-mini-lbl { font-size: .72rem; color: var(--text-muted); font-weight: 600; }
+  .hero-mini-stats > div + div { padding-left: 26px; border-left: 1px solid var(--border); }
+
+  /* ── Visuel hero : blob organique + illustration + carte flottante ── */
+  .hero-visual {
     position: relative;
-    border-left: 1px solid var(--border);
-    padding-left: 2rem;
     display: flex;
-    flex-direction: column;
-    gap: 1.4rem;
+    align-items: center;
+    justify-content: center;
+    min-height: 340px;
   }
-  .hero-side-title { font-weight:600; margin-bottom:.75rem; opacity:.85; }
-  .hero-side-villes { display:flex; flex-direction:column; gap:.5rem; max-height:280px; overflow-y:auto; }
-  .hero-side-ville {
-    display:flex; justify-content:space-between; align-items:center;
-    padding:.6rem .9rem; border-radius:10px; text-decoration:none; color:inherit;
-    background:rgba(255,255,255,.06); transition:background .15s;
+  .hero-blob {
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    width: 88%;
+    height: 88%;
+    background: linear-gradient(155deg, var(--color-primary) 0%, var(--color-primary) 100%);
+    border-radius: 42% 58% 65% 35% / 45% 45% 55% 55%;
+    animation: blobMorph 12s ease-in-out infinite alternate;
   }
-  .hero-side-ville:hover { background:rgba(255,255,255,.12); }
-  .hero-side-ville-badge { font-size:.75rem; padding:.15rem .5rem; border-radius:999px; }
-  .hero-side-ville-badge.ok { background:#1f9d55; color:#fff; }
-  .hero-side-ville-badge.full { background:#6b7280; color:#fff; }
+  @keyframes blobMorph {
+    0%   { border-radius: 42% 58% 65% 35% / 45% 45% 55% 55%; }
+    50%  { border-radius: 58% 42% 40% 60% / 55% 60% 40% 45%; }
+    100% { border-radius: 42% 58% 65% 35% / 45% 45% 55% 55%; }
+  }
+  .hero-visual .dots-deco { color: var(--color-secondary); opacity: .55; z-index: 1; }
+  .hero-visual .dots-tl { top: -6px; left: -10px; width: 90px; height: 90px; }
+  .hero-visual .dots-br { bottom: -10px; right: 4px; width: 100px; height: 100px; }
+  .hero-illustration {
+    position: relative;
+    z-index: 2;
+    width: 78%;
+    max-width: 320px;
+    filter: drop-shadow(0 20px 30px rgba(31,46,40,.25));
+  }
+  .hero-float-card {
+    position: absolute;
+    z-index: 3;
+    left: -6px; bottom: 14px;
+    background: #fff;
+    border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-md);
+    padding: 12px 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+  .hero-float-icon {
+    width: 34px; height: 34px; border-radius: 50%;
+    background: var(--color-secondary);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text); font-size: 1rem; flex-shrink: 0;
+  }
+  .hero-float-num { font-size: 1.05rem; font-weight: 800; color: var(--text); line-height: 1.1; }
+  .hero-float-label { font-size: .68rem; color: var(--text-muted); font-weight: 600; }
+
+  /* ═══════════════════ NAV VILLES (pastilles) ═════════════════════ */
+  .city-nav {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 36px;
+  }
+  .city-pill {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 9px 18px;
+    border-radius: 9px;
+    background: var(--bg-card);
+    border: 1.5px solid var(--border);
+    color: var(--text);
+    font-size: .82rem; font-weight: 700;
+    text-decoration: none;
+    transition: all .15s ease;
+  }
+  .city-pill:hover { border-color: var(--color-primary); color: var(--color-primary); transform: translateY(-1px); }
+  .city-pill-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+  .city-pill-dot.ok { background: var(--map-ok); animation: pulse 1.8s ease-in-out infinite; }
+  .city-pill-dot.full { background: #9ca3af; }
 
   /* ─── SECTIONS GÉNÉRIQUES ─────────────────────────────────────── */
   .section { margin-bottom: 40px; }
@@ -132,6 +207,20 @@
     font-size: .72rem; font-weight: 700; letter-spacing: .1em;
     text-transform: uppercase; color: var(--color-primary);
   }
+  .section-header-left { display: flex; align-items: center; gap: 14px; }
+  .section-icon-chip {
+    width: 46px; height: 46px; border-radius: 50%; flex-shrink: 0;
+    background: linear-gradient(155deg, var(--color-primary) 0%, var(--color-primary) 100%);
+    color: #fff; display: flex; align-items: center; justify-content: center;
+    font-size: 1.15rem; box-shadow: var(--shadow-md);
+  }
+  .section-live-badge {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: var(--map-ok-soft); border: 1px solid var(--map-ok);
+    color: var(--color-primary); padding: 7px 15px; border-radius: 999px;
+    font-size: .75rem; font-weight: 700; white-space: nowrap;
+  }
+  .live-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--map-ok); animation: pulse 1.8s ease-in-out infinite; }
 
   /* ─── RÉSEAU PAR VILLE : accordéon ─────────────────────────────── */
   .city-list { display: flex; flex-direction: column; gap: 12px; }
@@ -153,7 +242,7 @@
     align-items: center;
     justify-content: space-between;
     gap: 16px;
-    padding: 18px 22px;
+    padding: 16px 22px;
     cursor: pointer;
     user-select: none;
     background: none;
@@ -163,6 +252,13 @@
     font: inherit;
   }
   .city-acc-head-left { display: flex; align-items: center; gap: 14px; min-width: 0; }
+  .city-acc-avatar {
+    width: 42px; height: 42px; border-radius: 50%;
+    background: linear-gradient(155deg, var(--color-primary) 0%, var(--color-primary) 100%);
+    color: #fff; font-weight: 800; font-size: .95rem;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+  }
   .city-acc-name {
     font-size: 1.1rem; font-weight: 800; letter-spacing: var(--vt-tight);
     color: var(--text); white-space: nowrap;
@@ -234,7 +330,7 @@
     content: '';
     position: absolute;
     inset: 0;
-    background: linear-gradient(to top, rgba(0,0,0,.55) 0%, rgba(0,0,0,0) 40%);
+    background: linear-gradient(to top, rgba(31,46,40,.6) 0%, rgba(31,46,40,0) 40%);
     pointer-events: none;
   }
   .city-acc-img-caption {
@@ -262,170 +358,119 @@
   .city-acc:not(.alt-right) .city-acc-content { border-left: 1px solid var(--border); }
 
   .city-acc-grouptitle {
-    display: flex;
+    display: inline-flex;
     align-items: center;
     gap: 8px;
     font-size: .72rem; font-weight: 700; letter-spacing: .1em;
     text-transform: uppercase; color: var(--color-primary);
-    margin-bottom: 6px;
-  }
-  .city-acc-grouptitle::after {
-    content: '';
-    flex: 1;
-    height: 1px;
-    background: var(--border);
+    background: var(--map-blue-soft, rgba(59,93,80,.09));
+    padding: 6px 14px;
+    border-radius: 999px;
+    margin-bottom: 14px;
   }
   .support-types {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 10px;
   }
 
-  /* ── Mini-accordéon par catégorie ── */
-  .support-category {
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    overflow: hidden;
-    background: var(--bg-card);
-  }
-  .support-category-head {
+  /* ── Types de supports : onglet catégorie + grille de cartes ── */
+  .category-block { }
+  .category-tab {
+    width: 100%;
     display: flex;
     align-items: center;
     justify-content: space-between;
     gap: 10px;
-    width: 100%;
-    padding: 12px 14px;
-    background: none;
-    border: none;
+    padding: 13px 18px;
+    border-radius: 16px;
+    border: 1.5px solid var(--border);
+    background: var(--bg-card2);
+    color: var(--text);
+    font-weight: 700;
+    font-size: .85rem;
     cursor: pointer;
+    transition: all .18s ease;
     font: inherit;
     text-align: left;
   }
-  .support-category-title {
-    font-size: .75rem;
-    text-transform: uppercase;
-    letter-spacing: .05em;
-    font-weight: 700;
-    color: var(--text-muted);
-  }
-  .support-category-right {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-shrink: 0;
-  }
-  .support-category-total {
-    font-size: .8rem;
-    font-weight: 800;
-    color: var(--color-primary);
-    white-space: nowrap;
-  }
-  .support-category-chevron {
-    width: 24px; height: 24px;
-    border-radius: 50%;
-    border: 1px solid var(--border);
-    display: flex; align-items: center; justify-content: center;
-    color: var(--text-muted);
-    font-size: .7rem;
-    transition: transform .25s ease, background .2s ease, color .2s ease;
-    flex-shrink: 0;
-  }
-  .support-category.is-open .support-category-chevron {
-    transform: rotate(180deg);
+  .category-tab:hover { border-color: var(--color-primary); }
+  .category-block.is-open .category-tab {
     background: var(--color-primary);
     color: #fff;
     border-color: var(--color-primary);
+    border-radius: 16px 16px 0 0;
   }
-  .support-category-panel {
-    max-height: 0;
-    overflow: hidden;
-    transition: max-height .35s ease;
+  .category-tab-left { display: flex; align-items: center; gap: 10px; }
+  .category-tab-count {
+    background: rgba(31,46,40,.08);
+    padding: 2px 10px;
+    border-radius: 999px;
+    font-size: .72rem;
+    font-weight: 800;
   }
-  .support-category.is-open .support-category-panel {
-    max-height: 600px;
-    border-top: 1px solid var(--border);
+  .category-block.is-open .category-tab-count { background: rgba(255,255,255,.22); }
+  .category-tab-chevron {
+    transition: transform .25s ease;
+    font-size: .75rem;
   }
-  .support-category-list {
-    padding: 8px;
-    display: flex;
-    flex-direction: column;
-  }
+  .category-block.is-open .category-tab-chevron { transform: rotate(180deg); }
 
-  .support-type-row {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    align-items: center;
-    gap: 10px;
-    padding: 14px 16px;
-    border-bottom: 1px solid var(--border);
-    border-radius: 14px;
+  .category-panel-grid {
+    display: none;
+    grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
+    gap: 12px;
+    padding: 16px;
     background: var(--bg-card2);
-    transition: background .2s ease, transform .2s ease, box-shadow .2s ease;
+    border: 1.5px solid var(--color-primary);
+    border-top: none;
+    border-radius: 0 0 16px 16px;
   }
-  .support-category-list .support-type-row:last-child { border-bottom: none; }
-  .support-type-row:hover {
-    background: rgba(59,130,246,.08);
-    transform: translateY(-1px);
-    box-shadow: 0 10px 30px rgba(15,23,42,.06);
+  .category-block.is-open .category-panel-grid { display: grid; }
+
+  .type-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 18px 14px 14px;
+    text-align: center;
+    transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
   }
-  .support-type-left { display: flex; align-items: center; gap: 12px; min-width: 0; }
-  .support-type-actions {
-    display: inline-flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-    justify-self: end;
+  .type-card:hover {
+    transform: translateY(-3px);
+    border-color: var(--color-primary);
+    box-shadow: var(--shadow-md);
   }
-  .support-type-btn {
-    display: inline-flex;
+  .type-card-icon {
+    width: 42px; height: 42px;
+    margin: 0 auto 10px;
+    border-radius: 50%;
+    background: var(--color-primary);
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: 0 4px 10px -4px color-mix(in srgb, var(--color-primary) 70%, transparent);
+  }
+  .type-card-icon svg { width: 16px; height: 16px; fill: #fff; }
+  .type-card-name { font-size: .8rem; font-weight: 700; color: var(--text); margin-bottom: 6px; line-height: 1.2; min-height: 2.2em; }
+  .type-card-count { font-size: 1.35rem; font-weight: 800; color: var(--color-primary); line-height: 1; font-variant-numeric: tabular-nums; }
+  .type-card-sub { font-size: .66rem; color: var(--text-muted); font-weight: 600; margin-bottom: 12px; }
+  .type-card-btn {
+    display: flex;
     align-items: center;
     justify-content: center;
-    padding: 9px 14px;
+    padding: 8px 10px;
     border-radius: 999px;
     background: var(--color-primary);
     color: #fff;
-    font-size: .8rem;
+    font-size: .74rem;
     font-weight: 700;
     text-decoration: none;
     transition: background .2s ease, transform .2s ease;
   }
-  .support-type-btn:hover {
-    background: #1d4ed8;
-    transform: translateY(-1px);
-  }
-  .support-icon {
-    width: 36px; height: 36px;
-    background: var(--color-primary);
-    border-radius: 9px;
-    display: flex; align-items: center; justify-content: center; flex-shrink: 0;
-    box-shadow: 0 4px 10px -4px color-mix(in srgb, var(--color-primary) 70%, transparent);
-  }
-  .support-icon svg { width: 15px; height: 15px; fill: #fff; }
-  .support-type-name { font-size: .89rem; font-weight: 600; color: var(--text); }
-  .support-type-count {
-    font-size: 1.1rem; font-weight: 800; color: var(--color-primary);
-    flex-shrink: 0;
-    font-variant-numeric: tabular-nums;
-    min-width: 40px;
-    text-align: right;
-  }
-
-  .city-acc-totals {
-    grid-column: 1 / -1;
-    border-top: 1px solid var(--border);
-    background: var(--bg-card);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    padding: 20px 0;
-  }
-  .city-stat-box { text-align: center; padding: 0 36px; }
-  .city-stat-box + .city-stat-box { border-left: 1px solid var(--border); }
-  .city-stat-num { font-size: 28px; font-weight: 800; letter-spacing: var(--vt-tight); color: var(--text); line-height: 1; }
-  .city-stat-num.available { color: var(--map-ok); }
-  .city-stat-label {
-    font-size: 10px; font-weight: 600; color: var(--text-muted);
-    text-transform: uppercase; letter-spacing: .08em; margin-top: 6px;
+  .type-card-btn:hover { background: #2f4a40; transform: translateY(-1px); color: #fff; }
+  .type-card-btn.disabled {
+    background: var(--color-secondary);
+    color: var(--text);
+    cursor: default;
   }
 
   @keyframes pulse {
@@ -433,71 +478,95 @@
     50% { opacity: 0.5; transform: scale(1.3); }
   }
 
-  /* ─── FORMATS DE SUPPORTS ──────────────────────────────────────── */
+  /* ═══════════ FORMATS DE SUPPORTS (cartes à badge circulaire) ═════ */
   .formats-grid {
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-    gap: 18px;
+    gap: 34px 20px;
   }
   .format-card {
+    position: relative;
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: var(--radius);
-    overflow: hidden;
+    overflow: visible;
     transition: box-shadow .2s ease, transform .2s ease;
   }
-  .format-card:hover { box-shadow: var(--shadow-md); transform: translateY(-2px); }
-  .format-image { height: 200px; position: relative; overflow: hidden; background: var(--bg-card2); }
+  .format-card:hover { box-shadow: var(--shadow-md); transform: translateY(-4px); }
+  .format-image {
+    height: 190px;
+    position: relative;
+    overflow: hidden;
+    background: var(--bg-card2);
+    border-radius: var(--radius) var(--radius) 0 0;
+  }
   .format-image img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .4s ease; }
   .format-card:hover .format-image img { transform: scale(1.06); }
-  .format-image .format-tag {
-    position: absolute; top: 10px; left: 10px;
-    background: var(--color-primary); color: #fff;
-    font-size: .66rem; font-weight: 800; letter-spacing: .05em;
-    padding: 4px 11px; border-radius: 20px;
+  .format-badge {
+    position: absolute;
+    top: -18px; left: 20px;
+    width: 52px; height: 52px;
+    border-radius: 50%;
+    background: var(--color-secondary);
+    color: var(--text);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.15rem;
+    box-shadow: 0 10px 20px rgba(31,46,40,.18);
+    z-index: 2;
+    border: 3px solid var(--bg-card);
   }
-  .format-body { padding: 18px; }
+  .format-body { padding: 26px 20px 20px; }
   .format-title { font-size: 1rem; font-weight: 800; letter-spacing: var(--vt-tight); color: var(--text); margin-bottom: 3px; }
   .format-desc { color: var(--text-muted); font-size: .82rem; margin-bottom: 10px; line-height: 1.45; }
   .format-usage {
     display: flex; align-items: flex-start; gap: 7px;
     font-size: .78rem; color: var(--text);
-    background: var(--bg-card2); border-radius: 6px;
-    padding: 9px 10px; line-height: 1.4;
+    background: var(--bg-card2); border-radius: 12px;
+    padding: 10px 12px; line-height: 1.4;
   }
   .format-usage i { margin-top: 2px; flex-shrink: 0; color: var(--color-primary); }
 
-  /* ─── COMMENT ÇA MARCHE ─────────────────────────────────────────── */
+  /* ═══════════ COMMENT ÇA MARCHE (pastilles numérotées) ═══════════ */
   .process-track {
+    position: relative;
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 0;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius);
-    overflow: hidden;
+    gap: 24px;
   }
-  .process-step {
-    padding: 26px 24px;
-    position: relative;
+  .process-track::before {
+    content: '';
+    position: absolute;
+    top: 26px; left: 12%; right: 12%;
+    height: 2px;
+    background-image: linear-gradient(to right, var(--border) 0 8px, transparent 8px 16px);
+    background-size: 16px 2px;
+    background-repeat: repeat-x;
+    z-index: 0;
   }
-  .process-step:not(:last-child) { border-right: 1px solid var(--border); }
+  .process-step { position: relative; z-index: 1; text-align: center; }
   .process-index {
-    font-size: .75rem; font-weight: 800; letter-spacing: .1em;
-    color: var(--color-primary); margin-bottom: 10px;
+    width: 52px; height: 52px;
+    margin: 0 auto 16px;
+    border-radius: 50%;
+    background: var(--color-primary);
+    color: #fff;
+    font-weight: 800; font-size: 1.1rem;
+    display: flex; align-items: center; justify-content: center;
+    box-shadow: var(--shadow-md);
   }
+  .process-step:nth-child(2) .process-index { background: var(--color-secondary); color: var(--text); }
   .process-step h5 {
     font-size: 1rem; font-weight: 800; letter-spacing: var(--vt-tight);
     color: var(--text); margin-bottom: 6px;
   }
-  .process-step p { font-size: .85rem; color: var(--text-muted); margin: 0; line-height: 1.5; }
+  .process-step p { font-size: .85rem; color: var(--text-muted); margin: 0 auto; line-height: 1.5; max-width: 260px; }
 
-  /* ─── CTA FINAL ───────────────────────────────────────────────── */
+  /* ═══════════ CTA FINAL (forme organique) ════════════════════════ */
   .cta-final {
-    background: var(--color-primary);
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary) 100%);
     color: #fff;
-    border-radius: var(--radius);
-    padding: 40px 44px;
+    /* border-radius: var(--radius); */
+    padding: 44px 48px;
     margin-top: 8px;
     display: flex;
     align-items: center;
@@ -510,36 +579,35 @@
   .cta-final::before {
     content: '';
     position: absolute;
-    top: -60px; right: -60px;
-    width: 240px; height: 240px;
-    background: rgba(255,255,255,.07);
-    border-radius: 50%;
+    top: -70px; right: -50px;
+    width: 260px; height: 260px;
+    background: rgba(249,191,41,.16);
+    border-radius: 42% 58% 65% 35% / 45% 45% 55% 55%;
   }
+  .cta-final .dots-deco { bottom: -20px; right: 90px; color: var(--color-secondary); opacity: .4; }
   .cta-final h2 { position: relative; font-size: 1.45rem; font-weight: 800; letter-spacing: var(--vt-tight); margin-bottom: 6px; }
   .cta-final p  { position: relative; font-size: .92rem; opacity: .85; margin-bottom: 0; }
   .cta-final-btn {
     position: relative;
     display: inline-flex; align-items: center; gap: 8px;
-    background: #fff; color: var(--color-primary);
-    padding: 13px 26px; border-radius: var(--radius-sm, 6px);
+    background: var(--color-secondary); color: var(--text);
+    padding: 13px 28px; border-radius: 999px;
     font-weight: 700; font-size: .88rem; text-decoration: none;
     white-space: nowrap;
-    transition: transform .15s ease;
+    transition: transform .15s ease, background .15s ease;
   }
-  .cta-final-btn:hover { transform: translateY(-1px); }
+  .cta-final-btn:hover { transform: translateY(-1px); background: #e8ac16; }
 
   @media (max-width: 992px) {
-    .hero-section { grid-template-columns: 1fr; padding: 3rem 2rem; }
-    .hero-side { border-left: none; border-top: 1px solid var(--border); padding-left: 0; padding-top: 1.4rem; }
-    .hero-bignum { font-size: 9rem; }
+    .hero-section { grid-template-columns: 1fr; padding: 2.6rem 2rem; }
+    .hero-visual { min-height: 260px; margin-top: 1.5rem; }
     .city-acc-inner,
     .city-acc.alt-right .city-acc-inner { grid-template-columns: 1fr; }
     .city-acc.alt-right .city-acc-img,
     .city-acc.alt-right .city-acc-content { order: initial; }
     .city-acc-img { min-height: 180px; }
-    .city-acc-totals { gap: 36px; }
-    .process-track { grid-template-columns: 1fr; }
-    .process-step:not(:last-child) { border-right: none; border-bottom: 1px solid var(--border); }
+    .process-track { grid-template-columns: 1fr; gap: 28px; }
+    .process-track::before { display: none; }
   }
   @media (max-width: 600px) {
     .cta-final { flex-direction: column; text-align: center; padding: 32px 24px; }
@@ -547,60 +615,110 @@
 </style>
 {% endblock %}
 
-{% block content %}
-<div class="vitrine">
-
+{% block header %}
   <!-- ═══════════ HERO ═══════════ -->
   <div class="hero-section">
-    <div class="hero-bignum">{{ nb_villes }} ville{{ nb_villes|pluralize }}</div>
     <div>
       <div class="hero-eyebrow">Disponibilités en temps réel</div>
       <h1 class="hero-title">Votre marque, partout où ça compte.</h1>
       <p class="hero-subtitle">
-        Premier réseau indépendant d'affichage urbain, avec {{ total_faces_reseau }} faces publicitaires
+        Premier réseau indépendant d'affichage urbain, avec plus de 400 faces publicitaires
         réparties sur {{ nb_villes }} ville{{ nb_villes|pluralize }} — panneaux grand format et écrans numériques.
       </p>
       <div class="hero-actions">
         <a href="#reseau" class="hero-btn hero-btn-solid"><i class="bi bi-geo-alt-fill"></i> Voir le réseau</a>
         <a href="mailto:contact@regie-urbana.com" class="hero-btn hero-btn-outline"><i class="bi bi-envelope-fill"></i> Demander un devis</a>
       </div>
-    </div>
-
-    <div class="hero-side">
-      <div class="hero-side-title">Nos villes</div>
-      <div class="hero-side-villes">
-        {% for ville in villes_stats %}
-        <a href="#ville-{{ forloop.counter }}" class="hero-side-ville" onclick="
-          event.preventDefault();
-          document.querySelectorAll('.city-acc.is-open').forEach(o => o.classList.remove('is-open'));
-          const target = document.getElementById('ville-{{ forloop.counter }}');
-          if (target) {
-            target.classList.add('is-open');
-            target.scrollIntoView({behavior:'smooth', block:'start'});
-          }
-        ">
-          <span class="hero-side-ville-name">{{ ville.nom }}</span>
-          {% if ville.faces_libres > 0 %}
-            <span class="hero-side-ville-badge ok">Voir les disponibilités</span>
-          {% else %}
-            <span class="hero-side-ville-badge full">Complet</span>
-          {% endif %}
-        </a>
-        {% empty %}
-        <p style="color:var(--text-muted);">Aucune ville disponible.</p>
-        {% endfor %}
+      <div class="hero-mini-stats">
+        <div class="hero-mini-stat">
+          <span class="hero-mini-num">{{ nb_villes }}</span>
+          <span class="hero-mini-lbl">ville{{ nb_villes|pluralize }} couverte{{ nb_villes|pluralize }}</span>
+        </div>
+        {% comment %} <div class="hero-mini-stat">
+          <span class="hero-mini-num">{{ total_faces_reseau }}</span>
+          <span class="hero-mini-lbl">faces publicitaires</span>
+        </div> {% endcomment %}
+        <div class="hero-mini-stat">
+          {% comment %} <span class="hero-mini-num">{{ categories_stats|length }} catégorie{{ categories_stats|length|pluralize }}</span> {% endcomment %}
+            {% for cat in categories_stats %}
+              <span class="hero-mini-lbl">
+                {{ cat.categorie }}
+              </span>
+            {% endfor %}
+        </div>
       </div>
     </div>
+
+    <!-- Visuel : blob organique + illustration + carte flottante -->
+    <div class="hero-visual">
+      <div class="hero-blob"></div>
+      <div class="dots-deco dots-tl"></div>
+      <div class="dots-deco dots-br"></div>
+      <svg class="hero-illustration" viewBox="0 0 320 320" xmlns="http://www.w3.org/2000/svg">
+        <!-- silhouettes d'immeubles -->
+        <rect x="24" y="150" width="34" height="120" rx="6" fill="#ffffff" opacity=".14"/>
+        <rect x="64" y="110" width="30" height="160" rx="6" fill="#ffffff" opacity=".22"/>
+        <rect x="240" y="130" width="30" height="140" rx="6" fill="#ffffff" opacity=".18"/>
+        <rect x="272" y="170" width="26" height="100" rx="6" fill="#ffffff" opacity=".14"/>
+        <!-- pied du panneau -->
+        <rect x="150" y="230" width="8" height="60" rx="3" fill="#ffffff" opacity=".55"/>
+        <rect x="176" y="230" width="8" height="60" rx="3" fill="#ffffff" opacity=".55"/>
+        <!-- panneau -->
+        <rect x="90" y="70" width="150" height="120" rx="16" fill="#ffffff"/>
+        <rect x="106" y="86" width="118" height="60" rx="10" fill="#f9bf29"/>
+        <path d="M106 146 L142 106 L166 130 L196 92 L224 146 Z" fill="#3b5d50" opacity=".85"/>
+        <rect x="106" y="156" width="70" height="10" rx="5" fill="#e6e2d8"/>
+        <rect x="106" y="172" width="46" height="10" rx="5" fill="#e6e2d8"/>
+        <!-- petit soleil / points -->
+        <circle cx="252" cy="60" r="9" fill="#f9bf29"/>
+        <circle cx="46" cy="90" r="5" fill="#f9bf29" opacity=".8"/>
+      </svg>
+      <div class="hero-float-card">
+        <div class="hero-float-icon"><i class="bi bi-graph-up-arrow"></i></div>
+        <div>
+          <div class="hero-float-num">{{ categories_stats|length }} catégorie{{ categories_stats|length|pluralize }}</div>
+          <div class="hero-float-label"> {% for cat in categories_stats %}{{ cat.categorie }}{% if not forloop.last %}, {% endif %}{% endfor %}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+
+{% block content %}
+<div class="vitrine">
+
+  <!-- ═══════════ NAV VILLES (pastilles) ═══════════ -->
+  <div class="city-nav">
+    {% for ville in villes_stats %}
+    <a href="#ville-{{ forloop.counter }}" class="city-pill" onclick="
+      event.preventDefault();
+      document.querySelectorAll('.city-acc.is-open').forEach(o => o.classList.remove('is-open'));
+      const target = document.getElementById('ville-{{ forloop.counter }}');
+      if (target) {
+        target.classList.add('is-open');
+        target.scrollIntoView({behavior:'smooth', block:'start'});
+      }
+    ">
+      <span class="city-pill-dot {% if ville.faces_libres > 0 %}ok{% else %}full{% endif %}"></span>
+      {{ ville.nom }}
+    </a>
+    {% empty %}
+    <p style="color:var(--text-muted);">Aucune ville disponible.</p>
+    {% endfor %}
   </div>
 
   <!-- ═══════════ RÉSEAU PAR VILLE ═══════════ -->
   <div class="section" id="reseau">
     <div class="section-header">
-      <div>
-        <div class="section-tag">Réseau national</div>
-        <div class="section-title">Disponibilités ville par ville</div>
-        <div class="section-subtitle">Mises à jour en temps réel.</div>
+      <div class="section-header-left">
+        <div class="section-icon-chip"><i class="bi bi-diagram-3-fill"></i></div>
+        <div>
+          <div class="section-tag">Réseau national</div>
+          <div class="section-title">Disponibilités ville par ville</div>
+        </div>
       </div>
+      <span class="section-live-badge"><span class="live-dot"></span> Mises à jour en temps réel</span>
     </div>
 
     <div class="city-list">
@@ -613,12 +731,15 @@
           if (!wasOpen) acc.classList.add('is-open');
         ">
           <div class="city-acc-head-left">
-            <span class="city-acc-name">{{ ville.nom }}</span>
-            <span class="city-acc-mini">
-              {% for cat in ville.supports %}
-                {{ cat.categorie }}{% if not forloop.last %}, {% endif %}
-              {% endfor %}
-            </span>
+            <span class="city-acc-avatar">{{ ville.nom|slice:":1" }}</span>
+            <div>
+              <div class="city-acc-name">{{ ville.nom }}</div>
+              <span class="city-acc-mini">
+                {% for cat in ville.supports %}
+                  {{ cat.categorie }}{% if not forloop.last %}, {% endif %}
+                {% endfor %}
+              </span>
+            </div>
           </div>
           <div class="city-acc-head-right">
             {% if ville.faces_libres > 0 %}
@@ -637,69 +758,52 @@
               <span class="city-acc-img-caption"><i class="bi bi-geo-alt-fill"></i> {{ ville.nom }}</span>
             </div>
             <div class="city-acc-content">
-              <div class="city-acc-grouptitle">Panneaux par type</div>
+              <div class="city-acc-grouptitle"><i class="bi bi-grid-fill"></i> Panneaux par type</div>
               <div class="support-types">
                 {% for cat in ville.supports %}
-                <div class="support-category">
-                  <button type="button" class="support-category-head" onclick="
-                    this.closest('.support-category').classList.toggle('is-open');
-                  ">
-                    <span class="support-category-title">{{ cat.categorie }}</span>
-                    <span class="support-category-right">
-                      <span class="support-category-chevron"><i class="bi bi-chevron-down"></i></span>
-                    </span>
-                  </button>
-                  <div class="support-category-panel">
-                    <div class="support-category-list">
+                  <div class="category-block">
+                    <button type="button" class="category-tab" onclick="
+                      const block = this.closest('.category-block');
+                      const wasOpen = block.classList.contains('is-open');
+                      block.parentElement.querySelectorAll('.category-block.is-open').forEach(o => o.classList.remove('is-open'));
+                      if (!wasOpen) block.classList.add('is-open');
+                    ">
+                      <span class="category-tab-left">
+                        <i class="bi bi-tag-fill"></i> {{ cat.categorie }}
+                        <span class="category-tab-count">{{ cat.liste|length }}</span>
+                      </span>
+                      <i class="bi bi-chevron-down category-tab-chevron"></i>
+                    </button>
+                    <div class="category-panel-grid">
                       {% for support in cat.liste %}
-                      <div class="support-type-row">
-                        <div class="support-type-left">
-                          <div class="support-icon">
-                            <svg viewBox="0 0 16 16"><rect x="1" y="2" width="14" height="9" rx="1"/><rect x="6" y="11" width="4" height="3"/></svg>
-                          </div>
-                          <span class="support-type-name">{{ support.label }}</span>
+                      <div class="type-card">
+                        <div class="type-card-icon">
+                          <svg viewBox="0 0 16 16"><rect x="1" y="2" width="14" height="9" rx="1"/><rect x="6" y="11" width="4" height="3"/></svg>
                         </div>
-                        <div class="support-type-actions">
-                          <span class="support-type-count">
-                            {% if support.label != "Écran Numérique" %}
-                              <span class="badge-libre">{{ support.libre }} libre{{ support.libre|pluralize }}</span>
-                              <span class="support-type-total">/ {{ support.count }} face{{ support.count|pluralize }}</span>
-                            {% else %}
-                              <span class="support-type-total">{{ support.count }} écran{{ support.count|pluralize }}</span>
-                            {% endif %}
-                          </span>
-                          {% if support.libre > 0 %}
-                          <a href="{% url 'portail:reserver_etape1' %}?ville={{ ville.nom|urlencode }}&categorie={{ cat.categorie|urlencode }}&format={{ support.format|urlencode }}" class="support-type-btn">
-                            Réserver
-                          </a>
-                          {% else %}
-                          <span class="support-type-btn disabled" style="background: var(--color-secondary);">
-                            Complet
-                          </span>
-                          {% endif %}
-                        </div>
+                        <div class="type-card-name">{{ support.label }}</div>
+                        {% if support.label != "Écran Numérique" %}
+                          <div class="type-card-count">{{ support.libre }}</div>
+                          <div class="type-card-sub">libre{{ support.libre|pluralize }} / {{ support.count }} face{{ support.count|pluralize }}</div>
+                        {% else %}
+                          <div class="type-card-count">{{ support.count }}</div>
+                          <div class="type-card-sub">écran{{ support.count|pluralize }}</div>
+                        {% endif %}
+                        {% if support.libre > 0 %}
+                        <a href="{% url 'portail:reserver_etape1' %}?ville={{ ville.nom|urlencode }}&categorie={{ cat.categorie|urlencode }}&format={{ support.format|urlencode }}" class="type-card-btn">
+                          Réserver
+                        </a>
+                        {% else %}
+                        <span class="type-card-btn disabled">Complet</span>
+                        {% endif %}
                       </div>
                       {% endfor %}
                     </div>
                   </div>
-                </div>
                 {% empty %}
-                <div class="support-type-row">
-                  <span class="support-type-name">Aucun support enregistré</span>
-                </div>
+                  <p style="color:var(--text-muted); font-size:.85rem;">Aucun support enregistré.</p>
                 {% endfor %}
               </div>
             </div>
-            {% comment %} <div class="city-acc-totals">
-              <div class="city-stat-box">
-                <div class="city-stat-num available">{{ ville.faces_libres }}</div>
-                <div class="city-stat-label">Disponibles</div>
-              </div>
-              <div class="city-stat-box">
-                <div class="city-stat-num occupied">{{ ville.faces_occupees }}</div>
-                <div class="city-stat-label">Occupées</div>
-              </div>
-            </div> {% endcomment %}
           </div>
         </div>
       </div>
@@ -724,8 +828,8 @@
       <div class="format-card">
         <div class="format-image">
           <img src="{% static 'img/formats/Gemini_Generated_Image_9l7hhk9l7hhk9l7h.jfif' %}" alt="Panneau 4x3">
-          <span class="format-tag">Grand Format</span>
         </div>
+        <div class="format-badge"><i class="bi bi-signpost-split-fill"></i></div>
         <div class="format-body">
           <div class="format-title">Panneaux 4×3 et Géants</div>
           <p class="format-desc">Visibilité maximale sur les axes à fort trafic.</p>
@@ -739,8 +843,8 @@
       <div class="format-card">
         <div class="format-image">
           <img src="{% static 'img/formats/Gemini_Generated_Image_sx89ybsx89ybsx891.png' %}" alt="Écran numérique">
-          <span class="format-tag">Digital</span>
         </div>
+        <div class="format-badge"><i class="bi bi-display"></i></div>
         <div class="format-body">
           <div class="format-title">Écrans Numériques LED</div>
           <p class="format-desc">Contenu dynamique, diffusion programmée.</p>
@@ -754,8 +858,8 @@
       <div class="format-card">
         <div class="format-image">
           <img src="{% static 'img/formats/Gemini_Generated_Image_sx89ybsx89ybsx89.png' %}" alt="Sucette publicitaire">
-          <span class="format-tag">Mobilier Urbain</span>
         </div>
+        <div class="format-badge"><i class="bi bi-lamp-fill"></i></div>
         <div class="format-body">
           <div class="format-title">Sucettes Publicitaires</div>
           <p class="format-desc">Panneaux lumineux au cœur des trottoirs, à hauteur de regard.</p>
@@ -781,33 +885,25 @@
 
     <div class="process-track">
       <div class="process-step">
-        <div class="process-index">01 — SÉLECTION</div>
+        <div class="process-index">1</div>
         <h5>Vous choisissez vos emplacements</h5>
         <p>Sélectionnez les villes et types de supports qui correspondent à votre cible.</p>
       </div>
       <div class="process-step">
-        <div class="process-index">02 — VALIDATION</div>
+        <div class="process-index">2</div>
         <h5>Nous validons la disponibilité</h5>
         <p>Notre équipe confirme les faces libres et bloque vos dates de diffusion.</p>
       </div>
       <div class="process-step">
-        <div class="process-index">03 — DIFFUSION</div>
+        <div class="process-index">3</div>
         <h5>Votre campagne est diffusée</h5>
         <p>Suivi de diffusion et reporting fournis pendant toute la durée de la campagne.</p>
       </div>
     </div>
   </div>
 
-  <!-- ═══════════ CTA FINAL ═══════════ -->
-  <div class="cta-final">
-    <div>
-      <h2>Prêt à rendre votre marque incontournable ?</h2>
-      <p>Nos conseillers en régie vous proposent un plan média sur mesure.</p>
-    </div>
-    <a href="mailto:contact@regie-urbana.com" class="cta-final-btn">
-      Demander un devis gratuit <i class="bi bi-arrow-right"></i>
-    </a>
-  </div>
+
 
 </div>
+
 {% endblock %}

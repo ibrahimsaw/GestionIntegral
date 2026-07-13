@@ -7,50 +7,91 @@
 
 {% block extra_head %}
 <style>
-  :root {
-    --success:      #10b981;
-    --success-soft: #d1fae5;
-    --radius-sm:  6px;
-    --radius-md:  10px;
-    --radius-lg:  14px;
-    --shadow-sm:  0 1px 3px rgba(0,0,0,.06), 0 1px 2px rgba(0,0,0,.04);
-    --shadow-md:  0 4px 16px rgba(0,0,0,.08), 0 1px 4px rgba(0,0,0,.05);
+  /* ════════════════════════════════════════════════════════════════
+     Identité "Furni" — vert profond + jaune, Inter, formes arrondies,
+     puces icônes rondes, décor à points. Variables surchargées
+     localement sur .confirmation pour ne pas affecter le reste du site.
+     ════════════════════════════════════════════════════════════════ */
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+  .confirmation {
+    --color-primary:   {{ DESIGN.COLOR_PRIMARY }};
+    --color-secondary: {{ DESIGN.COLOR_SECONDARY }};
+    --success:          #10b981;
+    --success-soft:      #d1fae5;
+    --text:               #000000;
+    --text-muted:          #6a6a6a;
+    --border:               #e6e2d8;
+    --bg-card:                #ffffff;
+    --bg-card2:                #f8f6f1;
+    --radius-sm:  10px;
+    --radius-md:  0px;
+    --radius-lg:  8x;
+    --shadow-sm:  0 1px 3px rgba(31,46,40,.07), 0 1px 2px rgba(31,46,40,.05);
+    --shadow-md:  0 10px 28px rgba(31,46,40,.10), 0 2px 6px rgba(31,46,40,.06);
+    font-family: 'Inter', sans-serif;
+  }
+
+  .dots-deco {
+    position: absolute;
+    width: 120px; height: 120px;
+    background-image: radial-gradient(currentColor 2.5px, transparent 2.5px);
+    background-size: 15px 15px;
+    opacity: .3;
+    pointer-events: none;
+    z-index: 0;
   }
 
   /* ── BREADCRUMB ──────────────────────────────────────────────── */
   .breadcrumb-custom {
-    background: var(--bg-card2); padding: 14px 0;
-    border-bottom: 1px solid var(--border);
-    margin: -18px -18px 24px;
+    background: var(--bg-card2); padding: 12px 20px;
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    margin: 0 0 24px;
+    display: inline-flex;
   }
   .breadcrumb-custom .breadcrumb { margin: 0; font-size: .82rem; }
   .breadcrumb-custom a {
-    color: var(--color-primary); text-decoration: none; font-weight: 600; transition: all .15s;
+    color: var(--color-primary); text-decoration: none; font-weight: 700; transition: all .15s;
   }
   .breadcrumb-custom a:hover { text-decoration: underline; }
   .breadcrumb-custom .active { color: var(--text-muted); }
 
   /* ── SUCCESS BANNER ──────────────────────────────────────────── */
   .success-banner {
-    background: linear-gradient(135deg, var(--success-soft) 0%, #ecfdf5 100%);
-    border: 1.5px solid var(--success);
+    position: relative;
+    overflow: hidden;
+    
+    background: linear-gradient(135deg, #10b981 0%, #ecfdf5 100%);
+    border: 1.5px solid #10b981;
     border-radius: var(--radius-lg);
-    padding: 32px 24px;
+    padding: 40px 24px;
     text-align: center;
-    margin-bottom: 28px;
+    /* margin-bottom: 28px; */
     box-shadow: var(--shadow-sm);
-    position: relative; overflow: hidden;
   }
+  .success-banner .dots-deco { top: -20px; right: 10px; color: var(--success); opacity: .25; }
   .success-banner::before {
-    content: ''; position: absolute; inset: 0;
-    background: radial-gradient(circle at 30% 50%, rgba(16, 185, 129, 0.05) 0%, transparent 70%);
+    content: '';
+    position: absolute;
+    bottom: -60px; left: -40px;
+    width: 200px; height: 200px;
+    background: rgba(16,185,129,.08);
+    border-radius: 42% 58% 65% 35% / 45% 45% 55% 55%;
     pointer-events: none;
   }
 
   .success-icon {
-    font-size: 3rem; margin-bottom: 16px;
-    animation: popIn .5s cubic-bezier(.36,.07,.19,.97);
     position: relative; z-index: 1;
+    width: 76px; height: 76px;
+    margin: 0 auto 18px;
+    border-radius: 50%;
+    background: #10b981;
+    color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 2.1rem;
+    box-shadow: 0 12px 26px rgba(16,185,129,.32);
+    animation: popIn .5s cubic-bezier(.36,.07,.19,.97);
   }
   @keyframes popIn {
     0%   { transform: scale(0) rotate(-180deg); opacity: 0; }
@@ -59,13 +100,13 @@
   }
 
   .success-title {
-    font-size: 1.3rem; font-weight: 800;
-    color: var(--success); margin-bottom: 8px;
     position: relative; z-index: 1;
+    font-size: 1.35rem; font-weight: 800;
+    color: #065f46; margin-bottom: 8px;
   }
   .success-text {
-    font-size: .95rem; color: #065f46;
     position: relative; z-index: 1;
+    font-size: .95rem; color: #065f46; opacity: .85;
   }
 
   /* ── REFERENCE CARD ──────────────────────────────────────────── */
@@ -73,73 +114,87 @@
     background: var(--bg-card);
     border: 1px solid var(--border);
     border-radius: var(--radius-lg);
-    padding: 18px 20px;
+    padding: 10px 22px;
     box-shadow: var(--shadow-sm);
     margin-bottom: 24px;
   }
   .ref-row {
     display: flex; justify-content: space-between; align-items: center;
-    padding: 10px 0; border-bottom: 1px solid var(--border);
+    padding: 14px 0; border-bottom: 1px solid var(--border);
   }
   .ref-row:last-child { border-bottom: none; }
   .ref-label {
+    display: flex; align-items: center; gap: 7px;
     font-size: .68rem; font-weight: 800; text-transform: uppercase;
-    letter-spacing: .08em; color: var(--text-muted);
+    letter-spacing: .08em; color: var(--text-muted); margin-bottom: 5px;
   }
+  .ref-label i { color: var(--color-primary); font-size: .85rem; }
   .ref-value {
     font-size: 1.05rem; font-weight: 800; color: var(--text);
     font-family: 'Monaco', 'Courier New', monospace; letter-spacing: 0.5px;
   }
 
   /* ── SECTION RECAP ───────────────────────────────────────────── */
-  .section-recap {
-    margin-bottom: 24px;
-  }
+  .section-recap { margin-bottom: 24px; }
   .section-title {
     font-size: .95rem; font-weight: 800;
     color: var(--text); margin-bottom: 12px;
-    display: flex; align-items: center; gap: 8px;
+    display: flex; align-items: center; gap: 10px;
+  }
+  .section-title-icon {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: var(--color-primary); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .82rem; flex-shrink: 0;
   }
 
   /* ── CARD LIST ───────────────────────────────────────────────── */
-  .card-list {
-    display: grid; gap: 10px;
-  }
+  .card-list { display: grid; gap: 10px; }
   .card-item {
     background: var(--bg-card); border: 1px solid var(--border);
-    border-radius: var(--radius-md); padding: 12px 14px;
+    border-radius: var(--radius-md); padding: 13px 15px;
     box-shadow: var(--shadow-sm);
-    display: flex; justify-content: space-between; align-items: flex-start;
-    transition: all .15s;
+    display: flex; align-items: center; gap: 12px;
+    transition: all .18s ease;
   }
   .card-item:hover {
     border-color: var(--color-primary); box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
   }
-  .item-code {
-    font-weight: 800; color: var(--text); font-size: .9rem;
-    display: flex; align-items: center; gap: 6px;
+  .card-item-icon {
+    width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
+    background: var(--color-primary); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .9rem;
   }
-  .item-meta {
-    font-size: .8rem; color: var(--text-muted);
-  }
+  .item-code { font-weight: 800; color: var(--text); font-size: .9rem; }
+  .item-meta { font-size: .8rem; color: var(--text-muted); margin-top: 1px; }
 
   /* ── GRID RECAP ──────────────────────────────────────────────– */
   .recap-grid {
     display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 14px; margin-bottom: 24px;
+    gap: 16px; margin-bottom: 24px;
   }
   .recap-box {
+    position: relative;
     background: var(--bg-card); border: 1px solid var(--border);
-    border-radius: var(--radius-lg); padding: 16px;
+    border-radius: var(--radius-lg); padding: 20px 18px 18px;
     box-shadow: var(--shadow-sm);
-    transition: all .15s;
+    transition: all .18s ease;
   }
   .recap-box:hover {
     border-color: var(--color-primary); box-shadow: var(--shadow-md);
+    transform: translateY(-3px);
+  }
+  .recap-icon {
+    width: 40px; height: 40px; border-radius: 50%;
+    background: var(--color-secondary); color: var(--text);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.05rem; margin-bottom: 12px;
   }
   .recap-label {
     font-size: .68rem; font-weight: 800; text-transform: uppercase;
-    letter-spacing: .08em; color: var(--text-muted); margin-bottom: 8px;
+    letter-spacing: .08em; color: var(--text-muted); margin-bottom: 6px;
   }
   .recap-value {
     font-size: 1rem; font-weight: 800; color: var(--text);
@@ -148,56 +203,56 @@
 
   /* ── NEXT STEPS ──────────────────────────────────────────────– */
   .next-steps {
-    background: #eff6ff; border: 1.5px solid var(--color-primary);
-    border-radius: var(--radius-lg); padding: 20px;
+    position: relative;
+    overflow: hidden;
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary) 100%);
+    color: #fff;
+    border-radius: var(--radius-lg); padding: 26px 24px;
     margin-bottom: 24px;
-    position: relative; overflow: hidden;
   }
-  .next-steps::before {
-    content: ''; position: absolute; inset: 0;
-    background: radial-gradient(circle at 100% 0%, rgba(37, 99, 235, 0.05) 0%, transparent 70%);
-    pointer-events: none;
-  }
+  .next-steps .dots-deco { bottom: -20px; right: -10px; color: var(--color-secondary); opacity: .6; }
   .next-steps-title {
-    font-weight: 800; color: var(--color-primary);
-    margin-bottom: 12px; display: flex; align-items: center; gap: 8px;
     position: relative; z-index: 1;
+    font-weight: 800; margin-bottom: 16px;
+    display: flex; align-items: center; gap: 10px;
+    font-size: 1.02rem;
   }
   .steps-list {
     list-style: none; padding: 0; margin: 0;
     position: relative; z-index: 1;
   }
   .steps-item {
-    display: flex; gap: 10px; padding: 10px 0;
-    font-size: .9rem; color: var(--text);
-    border-bottom: 1px solid rgba(37, 99, 235, .1);
+    display: flex; gap: 14px; padding: 12px 0;
+    font-size: .9rem; opacity: .95;
+    border-bottom: 1px solid rgba(255,255,255,.12);
   }
   .steps-item:last-child { border-bottom: none; }
   .steps-num {
     display: flex; align-items: center; justify-content: center;
-    width: 28px; height: 28px;
-    background: var(--color-primary); color: white;
-    border-radius: 50%; font-weight: 800; font-size: .75rem;
-    flex-shrink: 0; box-shadow: 0 2px 8px rgba(37, 99, 235, .25);
+    width: 30px; height: 30px;
+    background: var(--color-secondary); color: var(--text);
+    border-radius: 50%; font-weight: 800; font-size: .8rem;
+    flex-shrink: 0;
   }
 
   /* ── CONTACT BAR ──────────────────────────────────────────────– */
   .contact-bar {
     background: var(--bg-card); border: 1.5px solid var(--border);
-    border-radius: var(--radius-lg); padding: 18px;
-    margin-bottom: 24px; display: flex; gap: 20px; align-items: center;
+    border-radius: var(--radius-lg); padding: 20px 22px;
+    margin-bottom: 24px; display: flex; gap: 18px; align-items: center;
     box-shadow: var(--shadow-sm);
-    transition: all .15s;
+    transition: all .18s ease;
   }
   .contact-bar:hover {
     border-color: var(--color-primary); box-shadow: var(--shadow-md);
   }
   .contact-bar-icon {
-    font-size: 1.8rem; flex-shrink: 0;
+    width: 52px; height: 52px; border-radius: 50%; flex-shrink: 0;
+    background: var(--color-secondary); color: var(--text);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.35rem;
   }
-  .contact-bar-content {
-    flex: 1;
-  }
+  .contact-bar-content { flex: 1; }
   .contact-bar-title {
     font-weight: 800; color: var(--text); margin-bottom: 4px; font-size: .9rem;
   }
@@ -208,307 +263,259 @@
     color: var(--color-primary); font-weight: 700; text-decoration: none;
     transition: all .15s;
   }
-  .contact-bar-text a:hover {
-    text-decoration: underline; opacity: .8;
-  }
+  .contact-bar-text a:hover { text-decoration: underline; opacity: .8; }
 
   /* ── BUTTONS ──────────────────────────────────────────────────– */
-  .btn-group {
-    display: flex; gap: 12px; flex-wrap: wrap;
-    margin-top: 28px;
-  }
+  .btn-group { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 28px; }
   .btn-nav {
     display: inline-flex; align-items: center; gap: 8px;
-    padding: 12px 18px; border: none; border-radius: var(--radius-sm);
-    font-weight: 800; cursor: pointer; font-size: .9rem;
+    padding: 12px 22px; border: none; border-radius: 9px;
+    font-weight: 700; cursor: pointer; font-size: .88rem;
     transition: all .2s; text-decoration: none;
   }
-  .btn-primary {
-    background: var(--color-primary); color: white;
-    box-shadow: var(--shadow-sm);
-  }
-  .btn-primary:hover {
-    background: #1d4ed8; box-shadow: var(--shadow-md);
-    transform: translateY(-2px);
-  }
-  .btn-primary:active {
-    transform: translateY(0);
-  }
+  .btn-primary { background: var(--color-primary); color: #fff; box-shadow: var(--shadow-sm); }
+  .btn-primary:hover { background: #2f4a40; color: #fff; box-shadow: var(--shadow-md); transform: translateY(-2px); }
+  .btn-primary:active { transform: translateY(0); }
 
   .btn-secondary {
-    background: var(--bg-card2); border: 1.5px solid var(--border);
-    color: var(--text);
+    background: var(--bg-card2); border: 1.5px solid var(--border); color: var(--text);
   }
   .btn-secondary:hover {
     background: var(--bg-card); border-color: var(--color-primary);
-    box-shadow: var(--shadow-md);
+    color: var(--color-primary); box-shadow: var(--shadow-md);
   }
 
   /* ── DIVIDER ───────────────────────────────────────────────────– */
-  .divider {
-    height: 1px; background: var(--border);
-    margin: 24px 0;
-  }
+  .divider { height: 1px; background: var(--border); margin: 24px 0; }
 
   /* ── RESPONSIVE ────────────────────────────────────────────────– */
   @media (max-width: 768px) {
-    .ref-row {
-      flex-direction: column;
-      align-items: flex-start;
-      gap: 8px;
-    }
-    .recap-grid {
-      grid-template-columns: 1fr;
-    }
-    .contact-bar {
-      flex-direction: column;
-      align-items: flex-start;
-    }
-    .btn-group {
-      flex-direction: column;
-    }
-    .btn-nav {
-      width: 100%;
-      justify-content: center;
-    }
-    .success-banner {
-      padding: 24px 18px;
-    }
-    .success-icon {
-      font-size: 2.5rem;
-    }
-    .success-title {
-      font-size: 1.1rem;
-    }
+    .ref-row { flex-direction: column; align-items: flex-start; gap: 8px; }
+    .recap-grid { grid-template-columns: 1fr; }
+    .contact-bar { flex-direction: column; align-items: flex-start; }
+    .btn-group { flex-direction: column; }
+    .btn-nav { width: 100%; justify-content: center; }
+    .success-banner { padding: 30px 20px; }
+    .success-icon { width: 62px; height: 62px; font-size: 1.7rem; }
+    .success-title { font-size: 1.15rem; }
   }
 </style>
 {% endblock %}
 
+{% block header %}
+  <!-- SUCCESS BANNER -->
+  <div class="success-banner">
+    <div class="dots-deco"></div>
+    <div class="success-icon"><i class="bi bi-check-lg"></i></div>
+    <div class="success-title">Demande envoyée avec succès !</div>
+    <div class="success-text">
+      Votre demande a bien été enregistrée. Notre équipe vous contactera sous 24 heures.
+    </div>
+  </div>
+{% endblock %}
+
 {% block content %}
-
-<!-- BREADCRUMB -->
-<div class="breadcrumb-custom">
-  <nav aria-label="breadcrumb">
-    <ol class="breadcrumb mb-0">
-      <li class="breadcrumb-item"><a href="{% url 'portail:accueil' %}">Accueil</a></li>
-      <li class="breadcrumb-item active">Confirmation</li>
-    </ol>
-  </nav>
-</div>
-
-<!-- SUCCESS BANNER -->
-<div class="success-banner">
-  <div class="success-icon">✅</div>
-  <div class="success-title">Demande envoyée avec succès !</div>
-  <div class="success-text">
-    Votre demande a bien été enregistrée. Notre équipe vous contactera sous 24 heures.
-  </div>
-</div>
-
-<!-- RÉFÉRENCE & EMAIL -->
-<div class="ref-card">
-  <div class="ref-row">
-    <div>
-      <div class="ref-label">📋 Référence de demande</div>
-      <div class="ref-value">{{ demande.reference }}</div>
-    </div>
-    <div style="text-align: right;">
-      <div class="ref-label">✉️ Email de confirmation</div>
-      <div class="ref-value" style="font-size: .9rem;">{{ demande.email }}</div>
-    </div>
-  </div>
-</div>
-
-<!-- RÉCAPITULATIF RAPIDE -->
-<div class="recap-grid">
-  <div class="recap-box">
-    <div class="recap-label">📅 Période souhaitée</div>
-    <div class="recap-value">
-      {{ demande.date_debut_souhaitee|date:"d/m/Y" }}<br>
-      <span style="font-size: .85rem; color: var(--text-muted); display: block; margin-top: 3px;">→ {{ demande.date_fin_souhaitee|date:"d/m/Y" }}</span>
-    </div>
-  </div>
-
-  <div class="recap-box">
-    <div class="recap-label">📍 Emplacements</div>
-    <div class="recap-value">
-      {% if demande.faces_souhaitees.all %}
-        {{ demande.faces_souhaitees.all|length }} face{{ demande.faces_souhaitees.all|length|add:"-1"|yesno:",,s" }}
-      {% elif demande.supports_souhaites.all %}
-        {{ demande.supports_souhaites.all|length }} écran{{ demande.supports_souhaites.all|length|add:"-1"|yesno:",,s" }}
-      {% else %}
-        —
-      {% endif %}
-    </div>
-  </div>
-
-  <div class="recap-box">
-    <div class="recap-label">⏱️ Durée</div>
-    <div class="recap-value">
-      {% with duree_jours=demande.date_fin_souhaitee|add:"1" %}
-        {% ifchanged %}{{ duree_jours|add:demande.date_debut_souhaitee|add:"-2" }}{% endifchanged %} jour{{ duree_jours|add:demande.date_debut_souhaitee|add:"-2"|add:"-1"|yesno:",,s" }}
-      {% endwith %}
-    </div>
-  </div>
-
-  {% if demande.nom_campagne %}
-    <div class="recap-box">
-      <div class="recap-label">🎯 Nom de campagne</div>
-      <div class="recap-value">{{ demande.nom_campagne }}</div>
-    </div>
-  {% endif %}
-</div>
-
-<div class="divider"></div>
-
-<!-- DÉTAILS DE CONTACT -->
-<div class="section-recap">
-  <div class="section-title">
-    <i class="bi bi-person-vcard"></i> Vos coordonnées
-  </div>
-  <div class="card-list">
-    <div class="card-item">
+<div class="confirmation">
+  <!-- RÉFÉRENCE & EMAIL -->
+  <div class="ref-card">
+    <div class="ref-row">
       <div>
-        <div class="item-code">
-          <i class="bi bi-person-fill" style="color: var(--color-primary)"></i>
-          {{ demande.nom_contact }}
-        </div>
-        {% if demande.societe %}
-          <div class="item-meta">{{ demande.societe }}</div>
+        <div class="ref-label"><i class="bi bi-clipboard-check-fill"></i> Référence de demande</div>
+        <div class="ref-value">{{ demande.reference }}</div>
+      </div>
+      <div style="text-align: right;">
+        <div class="ref-label" style="justify-content: flex-end;"><i class="bi bi-envelope-fill"></i> Email de confirmation</div>
+        <div class="ref-value" style="font-size: .9rem;">{{ demande.email }}</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- RÉCAPITULATIF RAPIDE -->
+  <div class="recap-grid">
+    <div class="recap-box">
+      <div class="recap-icon"><i class="bi bi-calendar-event-fill"></i></div>
+      <div class="recap-label">Période souhaitée</div>
+      <div class="recap-value">
+        {{ demande.date_debut_souhaitee|date:"d/m/Y" }}<br>
+        <span style="font-size: .85rem; color: var(--text-muted); display: block; margin-top: 3px;">→ {{ demande.date_fin_souhaitee|date:"d/m/Y" }}</span>
+      </div>
+    </div>
+
+    <div class="recap-box">
+      <div class="recap-icon"><i class="bi bi-geo-alt-fill"></i></div>
+      <div class="recap-label">Emplacements</div>
+      <div class="recap-value">
+        {% if demande.faces_souhaitees.all %}
+          {{ demande.faces_souhaitees.all|length }} face{{ demande.faces_souhaitees.all|length|add:"-1"|yesno:",,s" }}
+        {% elif demande.supports_souhaites.all %}
+          {{ demande.supports_souhaites.all|length }} écran{{ demande.supports_souhaites.all|length|add:"-1"|yesno:",,s" }}
+        {% else %}
+          —
         {% endif %}
       </div>
     </div>
 
-    <div class="card-item">
-      <div>
-        <div class="item-code">
-          <i class="bi bi-envelope-fill" style="color: var(--color-primary)"></i>
-          {{ demande.email }}
-        </div>
-        <div class="item-meta">Email principal</div>
+    <div class="recap-box">
+      <div class="recap-icon"><i class="bi bi-clock-fill"></i></div>
+      <div class="recap-label">Durée</div>
+      <div class="recap-value">
+        {% with duree_jours=demande.date_fin_souhaitee|add:"1" %}
+          {% ifchanged %}{{ duree_jours|add:demande.date_debut_souhaitee|add:"-2" }}{% endifchanged %} jour{{ duree_jours|add:demande.date_debut_souhaitee|add:"-2"|add:"-1"|yesno:",,s" }}
+        {% endwith %}
       </div>
     </div>
 
-    <div class="card-item">
-      <div>
-        <div class="item-code">
-          <i class="bi bi-telephone-fill" style="color: var(--color-primary)"></i>
-          {{ demande.telephone }}
+    {% if demande.nom_campagne %}
+      <div class="recap-box">
+        <div class="recap-icon"><i class="bi bi-bullseye"></i></div>
+        <div class="recap-label">Nom de campagne</div>
+        <div class="recap-value">{{ demande.nom_campagne }}</div>
+      </div>
+    {% endif %}
+  </div>
+
+  <div class="divider"></div>
+
+  <!-- DÉTAILS DE CONTACT -->
+  <div class="section-recap">
+    <div class="section-title">
+      <span class="section-title-icon"><i class="bi bi-person-vcard"></i></span> Vos coordonnées
+    </div>
+    <div class="card-list">
+      <div class="card-item">
+        <div class="card-item-icon"><i class="bi bi-person-fill"></i></div>
+        <div>
+          <div class="item-code">{{ demande.nom_contact }}</div>
+          {% if demande.societe %}
+            <div class="item-meta">{{ demande.societe }}</div>
+          {% endif %}
         </div>
-        <div class="item-meta">Numéro de contact</div>
+      </div>
+
+      <div class="card-item">
+        <div class="card-item-icon"><i class="bi bi-envelope-fill"></i></div>
+        <div>
+          <div class="item-code">{{ demande.email }}</div>
+          <div class="item-meta">Email principal</div>
+        </div>
+      </div>
+
+      <div class="card-item">
+        <div class="card-item-icon"><i class="bi bi-telephone-fill"></i></div>
+        <div>
+          <div class="item-code">{{ demande.telephone }}</div>
+          <div class="item-meta">Numéro de contact</div>
+        </div>
       </div>
     </div>
   </div>
-</div>
 
-<!-- FACES SÉLECTIONNÉES -->
-{% if demande.faces_souhaitees.all %}
-  <div class="section-recap">
-    <div class="section-title">
-      <i class="bi bi-building"></i> Faces de panneaux sélectionnées
-    </div>
-    <div class="card-list">
-      {% for face in demande.faces_souhaitees.all %}
-        <div class="card-item">
-          <div>
-            <div class="item-code">
-              <i class="bi bi-square-fill" style="color: var(--color-primary); font-size: .65rem;"></i>
-              {{ face.support.code }} · Face {{ face.label }}
-            </div>
-            <div class="item-meta">
-              <i class="bi bi-geo-alt me-1" style="font-size: .75rem;"></i>
-              {{ face.support.adresse }} · {{ face.support.quartier }}
+  <!-- FACES SÉLECTIONNÉES -->
+  {% if demande.faces_souhaitees.all %}
+    <div class="section-recap">
+      <div class="section-title">
+        <span class="section-title-icon"><i class="bi bi-building"></i></span> Faces de panneaux sélectionnées
+      </div>
+      <div class="card-list">
+        {% for face in demande.faces_souhaitees.all %}
+          <div class="card-item">
+            <div class="card-item-icon"><i class="bi bi-square-fill" style="font-size:.7rem;"></i></div>
+            <div>
+              <div class="item-code">{{ face.support.code }} · Face {{ face.label }}</div>
+              <div class="item-meta">
+                <i class="bi bi-geo-alt me-1" style="font-size: .75rem;"></i>
+                {{ face.support.adresse }} · {{ face.support.quartier }}
+              </div>
             </div>
           </div>
-        </div>
-      {% endfor %}
+        {% endfor %}
+      </div>
     </div>
-  </div>
-{% endif %}
+  {% endif %}
 
-<!-- ÉCRANS SÉLECTIONNÉS -->
-{% if demande.supports_souhaites.all %}
-  <div class="section-recap">
-    <div class="section-title">
-      <i class="bi bi-tv"></i> Écrans LED sélectionnés
-    </div>
-    <div class="card-list">
-      {% for support in demande.supports_souhaites.all %}
-        <div class="card-item">
-          <div>
-            <div class="item-code">
-              <i class="bi bi-play-circle-fill" style="color: var(--color-primary); font-size: .8rem;"></i>
-              {{ support.code }}
-            </div>
-            <div class="item-meta">
-              <i class="bi bi-geo-alt me-1" style="font-size: .75rem;"></i>
-              {{ support.adresse }} · {{ support.quartier }}
+  <!-- ÉCRANS SÉLECTIONNÉS -->
+  {% if demande.supports_souhaites.all %}
+    <div class="section-recap">
+      <div class="section-title">
+        <span class="section-title-icon"><i class="bi bi-tv"></i></span> Écrans LED sélectionnés
+      </div>
+      <div class="card-list">
+        {% for support in demande.supports_souhaites.all %}
+          <div class="card-item">
+            <div class="card-item-icon"><i class="bi bi-play-circle-fill"></i></div>
+            <div>
+              <div class="item-code">{{ support.code }}</div>
+              <div class="item-meta">
+                <i class="bi bi-geo-alt me-1" style="font-size: .75rem;"></i>
+                {{ support.adresse }} · {{ support.quartier }}
+              </div>
             </div>
           </div>
-        </div>
-      {% endfor %}
+        {% endfor %}
+      </div>
+    </div>
+  {% endif %}
+
+  <!-- MESSAGE SUPPLÉMENTAIRE -->
+  {% if demande.message %}
+    <div class="section-recap">
+      <div class="section-title">
+        <span class="section-title-icon"><i class="bi bi-chat-dots"></i></span> Votre message
+      </div>
+      <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px 20px; font-size: .9rem; color: var(--text); line-height: 1.8; box-shadow: var(--shadow-sm);">
+        {{ demande.message|linebreaks }}
+      </div>
+    </div>
+  {% endif %}
+
+  <div class="divider"></div>
+
+  <!-- PROCHAINES ÉTAPES -->
+  <div class="next-steps">
+    <div class="dots-deco"></div>
+    <div class="next-steps-title">
+      <i class="bi bi-arrow-right-circle-fill"></i> Prochaines étapes
+    </div>
+    <ul class="steps-list">
+      <li class="steps-item">
+        <span class="steps-num">1</span>
+        <span>Notre équipe examine votre demande et vérifie les disponibilités réelles</span>
+      </li>
+      <li class="steps-item">
+        <span class="steps-num">2</span>
+        <span>Vous recevrez un email de confirmation avec les détails et un devis personnalisé</span>
+      </li>
+      <li class="steps-item">
+        <span class="steps-num">3</span>
+        <span>Mise en place de votre campagne selon les modalités convenues</span>
+      </li>
+    </ul>
+  </div>
+
+  <!-- CONTACT -->
+  <div class="contact-bar">
+    <div class="contact-bar-icon"><i class="bi bi-telephone-fill"></i></div>
+    <div class="contact-bar-content">
+      <div class="contact-bar-title">Besoin d'aide ou de précisions ?</div>
+      <div class="contact-bar-text">
+        Notre équipe est disponible du lundi au vendredi, 8h-17h<br>
+        <a href="tel:+226XXXXXXXX">+226 XX XX XX XX</a> ou <a href="mailto:reseau@promopub-integral.com">reseau@promopub-integral.com</a>
+      </div>
     </div>
   </div>
-{% endif %}
 
-<!-- MESSAGE SUPPLÉMENTAIRE -->
-{% if demande.message %}
-  <div class="section-recap">
-    <div class="section-title">
-      <i class="bi bi-chat-dots"></i> Votre message
-    </div>
-    <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 16px; font-size: .9rem; color: var(--text); line-height: 1.8; box-shadow: var(--shadow-sm);">
-      {{ demande.message|linebreaks }}
-    </div>
+  <!-- BOUTONS DE NAVIGATION -->
+  <div class="btn-group">
+    <a href="{% url 'portail:accueil' %}" class="btn-nav btn-secondary">
+      <i class="bi bi-house-fill"></i> Accueil
+    </a>
+    <a href="{% url 'portail:catalogue' %}" class="btn-nav btn-secondary">
+      <i class="bi bi-grid-3x3-gap-fill"></i> Catalogue
+    </a>
+    <a href="{% url 'portail:contact' %}" class="btn-nav btn-primary">
+      <i class="bi bi-chat-dots-fill"></i> Nous contacter
+    </a>
   </div>
-{% endif %}
 
-<div class="divider"></div>
-
-<!-- PROCHAINES ÉTAPES -->
-<div class="next-steps">
-  <div class="next-steps-title">
-    <i class="bi bi-arrow-right-circle-fill"></i> Prochaines étapes
-  </div>
-  <ul class="steps-list">
-    <li class="steps-item">
-      <span class="steps-num">1</span>
-      <span>Notre équipe examine votre demande et vérifie les disponibilités réelles</span>
-    </li>
-    <li class="steps-item">
-      <span class="steps-num">2</span>
-      <span>Vous recevrez un email de confirmation avec les détails et un devis personnalisé</span>
-    </li>
-    <li class="steps-item">
-      <span class="steps-num">3</span>
-      <span>Mise en place de votre campagne selon les modalités convenues</span>
-    </li>
-  </ul>
 </div>
-
-<!-- CONTACT -->
-<div class="contact-bar">
-  <div class="contact-bar-icon">📞</div>
-  <div class="contact-bar-content">
-    <div class="contact-bar-title">Besoin d'aide ou de précisions ?</div>
-    <div class="contact-bar-text">
-      Notre équipe est disponible du lundi au vendredi, 8h-17h<br>
-      <a href="tel:+226XXXXXXXX">+226 XX XX XX XX</a> ou <a href="mailto:contact@integral.bf">contact@integral.bf</a>
-    </div>
-  </div>
-</div>
-
-<!-- BOUTONS DE NAVIGATION -->
-<div class="btn-group">
-  <a href="{% url 'portail:accueil' %}" class="btn-nav btn-secondary">
-    <i class="bi bi-house-fill"></i> Accueil
-  </a>
-  <a href="{% url 'portail:catalogue' %}" class="btn-nav btn-secondary">
-    <i class="bi bi-grid-3x3-gap-fill"></i> Catalogue
-  </a>
-  <a href="{% url 'portail:contact' %}" class="btn-nav btn-primary">
-    <i class="bi bi-chat-dots-fill"></i> Nous contacter
-  </a>
-</div>
-
 {% endblock %}

@@ -279,8 +279,9 @@
                 {{ form.reference_client_saisie.errors.0|default:"Merci de renseigner votre référence client." }}
               </div>
               <div class="reference-hint">
-                Cette référence vous a été communiquée lors de votre inscription. Si vous ne
-                la retrouvez pas, laissez le champ vide — notre équipe fera le rapprochement manuellement.
+                Cette référence figure sur votre dossier d'inscription. Vous ne la retrouvez
+                pas ? <a href="mailto:reseau@promopub-integral.com">Contactez notre service
+                client</a>, nous ferons le rapprochement pour vous.
               </div>
             </div>
 
@@ -477,110 +478,110 @@
 
 {% block extra_js %}
 <script>
-"use strict";
+  "use strict";
 
-// ── Type de client : affiche/masque référence VS coordonnées ──────────────
-function toggleTypeClient() {
-  const estExistant = document.getElementById('type_client_existant').checked;
-  const blocReference   = document.getElementById('bloc-reference-client');
-  const blocCoordonnees = document.getElementById('bloc-coordonnees-nouveau');
-  const champReference  = document.getElementById('reference_client_saisie');
+  // ── Type de client : affiche/masque référence VS coordonnées ──────────────
+  function toggleTypeClient() {
+    const estExistant = document.getElementById('type_client_existant').checked;
+    const blocReference   = document.getElementById('bloc-reference-client');
+    const blocCoordonnees = document.getElementById('bloc-coordonnees-nouveau');
+    const champReference  = document.getElementById('reference_client_saisie');
 
-  blocReference.style.display   = estExistant ? 'block' : 'none';
-  blocCoordonnees.style.display = estExistant ? 'none'  : 'block';
+    blocReference.style.display   = estExistant ? 'block' : 'none';
+    blocCoordonnees.style.display = estExistant ? 'none'  : 'block';
 
-  champReference.required = estExistant;
-  if (!estExistant) {
-    champReference.classList.remove('error');
-    const errEl = champReference.parentElement.querySelector('.form-error-msg');
-    if (errEl) errEl.classList.remove('show');
+    champReference.required = estExistant;
+    if (!estExistant) {
+      champReference.classList.remove('error');
+      const errEl = champReference.parentElement.querySelector('.form-error-msg');
+      if (errEl) errEl.classList.remove('show');
+    }
+
+    ['nom_contact', 'email', 'telephone'].forEach(id => {
+      const el = document.getElementById(id);
+      el.required = !estExistant;
+      if (estExistant) {
+        el.classList.remove('error');
+        const errEl = el.parentElement.querySelector('.form-error-msg');
+        if (errEl) errEl.classList.remove('show');
+      }
+    });
   }
+  document.getElementById('type_client_nouveau').addEventListener('change', toggleTypeClient);
+  document.getElementById('type_client_existant').addEventListener('change', toggleTypeClient);
+  document.addEventListener('DOMContentLoaded', toggleTypeClient);
 
-  ['nom_contact', 'email', 'telephone'].forEach(id => {
+  // ── Validation + soumission ───────────────────────────────────────────────
+  document.getElementById('form-etape3').addEventListener('submit', function(e) {
+    const estExistant = document.getElementById('type_client_existant').checked;
+
+    const fields = estExistant
+      ? [{ id: 'reference_client_saisie', msg: 'Merci de renseigner votre référence client.' }]
+      : [
+          { id: 'nom_contact',  msg: 'Ce champ est obligatoire.' },
+          { id: 'email',        msg: 'Email obligatoire.' },
+          { id: 'telephone',    msg: 'Téléphone obligatoire.' },
+        ];
+
+    let hasError = false;
+
+    fields.forEach(({ id, msg }) => {
+      const el    = document.getElementById(id);
+      const errEl = el.parentElement.querySelector('.form-error-msg');
+      if (!el.value.trim()) {
+        el.classList.add('error');
+        if (errEl) { errEl.innerHTML = `<i class="bi bi-exclamation-circle"></i>${msg}`; errEl.classList.add('show'); }
+        hasError = true;
+      } else {
+        el.classList.remove('error');
+        if (errEl) errEl.classList.remove('show');
+      }
+    });
+
+    // Validation format email (uniquement en mode "nouveau client")
+    if (!estExistant) {
+      const emailEl = document.getElementById('email');
+      if (emailEl.value.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailEl.value.trim())) {
+        emailEl.classList.add('error');
+        const errEl = emailEl.parentElement.querySelector('.form-error-msg');
+        if (errEl) { errEl.innerHTML = '<i class="bi bi-exclamation-circle"></i>Adresse email invalide.'; errEl.classList.add('show'); }
+        hasError = true;
+      }
+    }
+
+    if (hasError) { e.preventDefault(); return; }
+
+    // Désactiver le bouton pour éviter double soumission
+    const btn     = document.getElementById('btn-envoyer');
+    const spinner = document.getElementById('spinner-btn');
+    const icon    = document.getElementById('icon-send');
+    const label   = document.getElementById('btn-label');
+    btn.disabled          = true;
+    spinner.style.display = 'block';
+    icon.style.display    = 'none';
+    label.textContent     = 'Envoi en cours…';
+  });
+
+  // ── Live validation au blur ───────────────────────────────────────────────
+  ['nom_contact', 'email', 'telephone', 'reference_client_saisie'].forEach(id => {
     const el = document.getElementById(id);
-    el.required = !estExistant;
-    if (estExistant) {
-      el.classList.remove('error');
+    el.addEventListener('blur', () => {
+      if (!el.required) return; // pas de faux positif sur un champ masqué/optionnel
       const errEl = el.parentElement.querySelector('.form-error-msg');
-      if (errEl) errEl.classList.remove('show');
-    }
+      if (el.value.trim()) {
+        el.classList.remove('error');
+        if (errEl) errEl.classList.remove('show');
+      } else {
+        el.classList.add('error');
+      }
+    });
+    el.addEventListener('input', () => {
+      if (el.value.trim()) {
+        el.classList.remove('error');
+        const errEl = el.parentElement.querySelector('.form-error-msg');
+        if (errEl) errEl.classList.remove('show');
+      }
+    });
   });
-}
-document.getElementById('type_client_nouveau').addEventListener('change', toggleTypeClient);
-document.getElementById('type_client_existant').addEventListener('change', toggleTypeClient);
-document.addEventListener('DOMContentLoaded', toggleTypeClient);
-
-// ── Validation + soumission ───────────────────────────────────────────────
-document.getElementById('form-etape3').addEventListener('submit', function(e) {
-  const estExistant = document.getElementById('type_client_existant').checked;
-
-  const fields = estExistant
-    ? [{ id: 'reference_client_saisie', msg: 'Merci de renseigner votre référence client.' }]
-    : [
-        { id: 'nom_contact',  msg: 'Ce champ est obligatoire.' },
-        { id: 'email',        msg: 'Email obligatoire.' },
-        { id: 'telephone',    msg: 'Téléphone obligatoire.' },
-      ];
-
-  let hasError = false;
-
-  fields.forEach(({ id, msg }) => {
-    const el    = document.getElementById(id);
-    const errEl = el.parentElement.querySelector('.form-error-msg');
-    if (!el.value.trim()) {
-      el.classList.add('error');
-      if (errEl) { errEl.innerHTML = `<i class="bi bi-exclamation-circle"></i>${msg}`; errEl.classList.add('show'); }
-      hasError = true;
-    } else {
-      el.classList.remove('error');
-      if (errEl) errEl.classList.remove('show');
-    }
-  });
-
-  // Validation format email (uniquement en mode "nouveau client")
-  if (!estExistant) {
-    const emailEl = document.getElementById('email');
-    if (emailEl.value.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailEl.value.trim())) {
-      emailEl.classList.add('error');
-      const errEl = emailEl.parentElement.querySelector('.form-error-msg');
-      if (errEl) { errEl.innerHTML = '<i class="bi bi-exclamation-circle"></i>Adresse email invalide.'; errEl.classList.add('show'); }
-      hasError = true;
-    }
-  }
-
-  if (hasError) { e.preventDefault(); return; }
-
-  // Désactiver le bouton pour éviter double soumission
-  const btn     = document.getElementById('btn-envoyer');
-  const spinner = document.getElementById('spinner-btn');
-  const icon    = document.getElementById('icon-send');
-  const label   = document.getElementById('btn-label');
-  btn.disabled          = true;
-  spinner.style.display = 'block';
-  icon.style.display    = 'none';
-  label.textContent     = 'Envoi en cours…';
-});
-
-// ── Live validation au blur ───────────────────────────────────────────────
-['nom_contact', 'email', 'telephone', 'reference_client_saisie'].forEach(id => {
-  const el = document.getElementById(id);
-  el.addEventListener('blur', () => {
-    if (!el.required) return; // pas de faux positif sur un champ masqué/optionnel
-    const errEl = el.parentElement.querySelector('.form-error-msg');
-    if (el.value.trim()) {
-      el.classList.remove('error');
-      if (errEl) errEl.classList.remove('show');
-    } else {
-      el.classList.add('error');
-    }
-  });
-  el.addEventListener('input', () => {
-    if (el.value.trim()) {
-      el.classList.remove('error');
-      const errEl = el.parentElement.querySelector('.form-error-msg');
-      if (errEl) errEl.classList.remove('show');
-    }
-  });
-});
 </script>
 {% endblock %}

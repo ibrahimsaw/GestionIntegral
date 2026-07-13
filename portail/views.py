@@ -140,6 +140,7 @@ from django.conf import settings
 # En attendant, on mappe ici un chemin static + une valeur de repli.
 # ──────────────────────────────────────────────────────────────────────────
 VILLE_IMAGES = {
+    'Koudougou': 'img/villes/image1 (1).jfif',
     'Ouagadougou': 'img/villes/image1 (6).jfif',
     'Bobo-Dioulasso':     'img/villes/image1 (5).jfif',
 }
@@ -232,6 +233,28 @@ def _get_compteurs() -> dict:
     total_faces_reseau = 0
     total_faces_libres_reseau = 0
 
+    # ── NOUVEAU : agrégation par catégorie, toutes villes confondues ────────
+    # Ex: Standard / Géant / Sucette / Marché / Ecran → total, libre, occupe,
+    # sur l'ensemble du réseau (indépendamment de la ville).
+    categories_globales = defaultdict(lambda: {'total': 0, 'libre': 0})
+    for data in villes.values():
+        for categorie, labels in data['categories'].items():
+            for label, counts in labels.items():
+                categories_globales[categorie]['total'] += counts['total']
+                categories_globales[categorie]['libre'] += counts['libre']
+
+    categories_stats = [
+        {
+            'categorie': categorie,
+            'total': stats['total'],
+            'libre': stats['libre'],
+            'occupe': stats['total'] - stats['libre'],
+        }
+        for categorie, stats in sorted(
+            categories_globales.items(), key=lambda kv: -kv[1]['total']
+        )
+    ]
+
     for nom_ville, data in villes.items():
         supports_list = []
         categories_triees = sorted(
@@ -273,12 +296,12 @@ def _get_compteurs() -> dict:
 
     return {
         'villes_stats': villes_stats,
+        'categories_stats': categories_stats,
         'total_faces_reseau': total_faces_reseau,
         'total_faces_libres_reseau': total_faces_libres_reseau,
         'total_faces_occupees_reseau': total_faces_reseau - total_faces_libres_reseau,
         'nb_villes': len(villes_stats),
     }
-    
 class AccueilView(View):
     """Page d'accueil — vitrine publique de la régie publicitaire."""
     template_name = 'portail/vitrine.html'
@@ -1198,3 +1221,72 @@ class ApiCheckDispoView(View):
             })
 
         return JsonResponse({'resultats': resultats})
+
+from django.conf import settings
+from django.core.mail import send_mail
+from django.http import JsonResponse
+from django.views import View
+from django.views.decorators.csrf import csrf_protect
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class ContactFormView(View):
+    """Traite le formulaire de contact et envoie un email au staff."""
+
+    def post(self, request):
+        nom        = request.POST.get('nom', '').strip()
+        email      = request.POST.get('email', '').strip()
+        telephone  = request.POST.get('telephone', '').strip()
+        societe    = request.POST.get('societe', '').strip()
+        sujet      = request.POST.get('sujet', '').strip()
+        message    = request.POST.get('message', '').strip()
+        conditions = request.POST.get('conditions')
+
+        # Validation minimale côté serveur (ne jamais faire confiance au JS seul)
+        if not all([nom, email, sujet, message, conditions]):
+            return JsonResponse(
+                {'success': False, 'error': "Veuillez remplir tous les champs obligatoires."},
+                status=400,
+            )
+
+        sujets_labels = {
+            'demande-reservation': 'Demande de réservation',
+            'info-tarif': 'Informations tarifaires',
+            'probleme-technique': 'Problème technique',
+            'autre': 'Autre',
+        }
+        sujet_label = sujets_labels.get(sujet, sujet)
+
+        corps = (
+            f"Nouveau message reçu via le formulaire de contact\n\n"
+            f"Nom       : {nom}\n"
+            f"Société   : {societe or '—'}\n"
+            f"Email     : {email}\n"
+            f"Téléphone : {telephone or '—'}\n"
+            f"Sujet     : {sujet_label}\n\n"
+            f"Message :\n{message}\n"
+        )
+
+        try:
+            send_mail(
+                subject=f"[Contact site] {sujet_label} — {nom}",
+                message=corps,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[settings.CONTACT_EMAIL],
+                fail_silently=False,
+                reply_to=[email],  # pour pouvoir répondre directement au visiteur
+            )
+        except Exception as exc:
+            logger.error("Email formulaire de contact échoué : %s", exc)
+            return JsonResponse(
+                {'success': False, 'error': "Une erreur est survenue lors de l'envoi. Veuillez réessayer."},
+                status=500,
+            )
+
+        return JsonResponse({'success': True, 'message': "Votre message a bien été envoyé. Merci !"})
+
+
+
+

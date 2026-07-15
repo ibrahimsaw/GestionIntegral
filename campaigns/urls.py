@@ -21,34 +21,27 @@ urlpatterns = [
     path('reservations/nouvelle/etape2/', views.ReservationWizardEtape2View.as_view(), name='reservation_wizard_etape2'),
     path('reservations/nouvelle/etape3/', views.ReservationWizardEtape3View.as_view(), name='reservation_wizard_etape3'),
     path('reservations/nouvelle/annuler/', views.ReservationWizardCancelView.as_view(), name='reservation_wizard_cancel'),
-    path('clients/<int:client_pk>/reservations/create/',
-        views.ReservationCreateView.as_view(),
-        name='reservation_create'),
+    path('clients/<int:client_pk>/reservations/create/',views.ReservationCreateView.as_view(),name='reservation_create'),
 
-    path('clients/<int:client_pk>/reservations/<int:resa_pk>/update/',
-        views.ReservationUpdateView.as_view(),
-        name='reservation_update'),
-    path('clients/<int:client_pk>/reservations/<int:resa_pk>/delete/',
-        views.ReservationDeleteView.as_view(),
-        name='reservation_delete'),
-    path('clients/<int:client_pk>/reservations/<int:resa_pk>/',
-        views.ReservationDetailView.as_view(),
-        name='reservation_detail'),
+    path('clients/<int:client_pk>/reservations/<int:resa_pk>/update/',views.ReservationUpdateView.as_view(),name='reservation_update'),
+    path('clients/<int:client_pk>/reservations/<int:resa_pk>/delete/',views.ReservationDeleteView.as_view(),name='reservation_delete'),
+    path('clients/<int:client_pk>/reservations/<int:resa_pk>/',views.ReservationDetailView.as_view(),name='reservation_detail'),
     # À ajouter dans campaigns/urls.py, à côté des autres routes 'reservations'
 
     path('reservations/<int:pk>/', views.ReservationRedirectView.as_view(), name='reservation_detail_direct'),
     path('reservations/select-client/', views.ReservationSelectClientView.as_view(), name='reservation_select_client'),
     path('reservations/', views.ReservationListView.as_view(), name='reservation_list'),
-    
+
+    path('clients/<int:client_pk>/reservations/<int:resa_pk>/traiter/',views.ReservationTraiterView.as_view(),name='reservation_traiter',),
     # Avant
     path('api/check-dispos/', views.verifier_dispo_faces_api, name='api_check_dispo'),
     # Après
     path('api/check-dispos/<int:client_pk>/', views.verifier_dispo_faces_api, name='api_check_dispo'),
     # urls.py
     path('api/check-dispo/<int:client_pk>/', views.api_check_dispo, name='api_check_dispo'),
-     path('api/dashboard/clients-actifs/', views.api_dashboard_clients_actifs, name='api_dashboard_clients_actifs'),
-     path('api/dashboard/campagnes/<str:statut>/', views.api_dashboard_campagnes, name='api_dashboard_campagnes'),
-     path('api/dashboard/client/<int:client_id>/campagnes/', views.api_dashboard_client_campagnes, name='api_dashboard_client_campagnes'),
+    path('api/dashboard/clients-actifs/', views.api_dashboard_clients_actifs, name='api_dashboard_clients_actifs'),
+    path('api/dashboard/campagnes/<str:statut>/', views.api_dashboard_campagnes, name='api_dashboard_campagnes'),
+    path('api/dashboard/client/<int:client_id>/campagnes/', views.api_dashboard_client_campagnes, name='api_dashboard_client_campagnes'),
     
     # Contrats
     path('contrats/creer/', views.ContratCreateView.as_view(), name='contrat_create'),
@@ -79,23 +72,17 @@ urlpatterns = [
     
 
     # ── Dashboard staff ───────────────────────────────────────────────────────
-    path('',
-         views.DashboardView.as_view(),
-         name='dashboard'),
+    path('',views.DashboardView.as_view(),name='dashboard'),
 
     # ── Gestion des demandes ──────────────────────────────────────────────────
 
 
     # ── AJAX ──────────────────────────────────────────────────────────────────
-    path('api/search-client/',
-         views.AjaxSearchClientView.as_view(),
-         name='ajax_search_client'),
+    path('api/search-client/',views.AjaxSearchClientView.as_view(),name='ajax_search_client'),
 
-    path('api/check-faces-dispo/',
-         views.AjaxCheckFacesDispoView.as_view(),
-         name='ajax_check_faces_dispo'),
+    path('api/check-faces-dispo/',views.AjaxCheckFacesDispoView.as_view(),name='ajax_check_faces_dispo'),
     path('api/campagne-parente-info/<int:campagne_id>/', views.api_campagne_parente_info, name='api_campagne_parente_info'),
-     path('demandes/', views.DemandesListView.as_view(), name='demandes_liste'),
+    path('demandes/', views.DemandesListView.as_view(), name='demandes_liste'),
     path('demandes/<uuid:uuid>/', views.DemandeDetailView.as_view(), name='demande_detail'),
     path('demandes/<uuid:uuid>/valider/', views.DemandeValiderView.as_view(), name='demande_valider'),
     path('demandes/<uuid:uuid>/refuser/', views.DemandeRefuserView.as_view(), name='demande_refuser'),

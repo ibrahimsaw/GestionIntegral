@@ -1,0 +1,176 @@
+{% extends 'base.html' %}
+{% block title %}Traiter — {{ reservation.reference }}{% endblock %}
+{% block topbar_title %}Traiter la réservation {{ reservation.reference }}{% endblock %}
+
+{% block content %}
+
+<div class="row justify-content-center">
+  <div class="col-12">
+    <!-- Bouton Retour & Titre -->
+    <div class="d-flex align-items-center gap-3 mb-4">
+      <a href="javascript:void(0)" onclick="history.back()" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left"></i>
+      </a>
+      <h1 class="h4 fw-bold mb-0">Traiter la réservation</h1>
+    </div>
+
+    <!-- Récapitulatif -->
+    <div class="card mb-4">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span style="font-weight:600">{{ reservation.nom }}</span>
+        {% if reservation.statut == 'en_attente' %}
+          <span class="badge-status bs-bientot"><i class="bx bx-time me-1"></i>En attente</span>
+        {% else %}
+          <span class="badge-status bs-disponible"><i class="bx bx-check me-1"></i>Confirmée</span>
+        {% endif %}
+      </div>
+      <div class="card-body">
+
+        <div class="row g-3 mb-3">
+          <div class="col-sm-6">
+            <div class="small text-muted" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em">Référence</div>
+            <div style="font-weight:600">{{ reservation.reference }}</div>
+          </div>
+          <div class="col-sm-6">
+            <div class="small text-muted" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em">Client</div>
+            <div>
+              <a href="{% url 'client_detail' reservation.client.pk %}" style="color:var(--color-primary);text-decoration:none;font-weight:600">
+                {{ reservation.client.nom }}
+              </a>
+            </div>
+          </div>
+          <div class="col-sm-6">
+            <div class="small text-muted" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em">Période</div>
+            <div style="font-size:.9rem">
+              <i class="bx bx-calendar me-1" style="color:var(--text-muted)"></i>
+              {{ reservation.date_debut|date:"d/m/Y" }}
+              <span class="mx-1">→</span>
+              {{ reservation.date_fin|date:"d/m/Y" }}
+              <span class="text-muted" style="font-size:.8rem">({{ reservation.duree_jours }} jour{{ reservation.duree_jours|pluralize }})</span>
+            </div>
+          </div>
+          <div class="col-sm-6">
+            <div class="small text-muted" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em">Créée par</div>
+            <div style="font-size:.9rem">{{ reservation.created_by|default:"—" }}</div>
+          </div>
+          <div class="col-sm-6">
+            <div class="small text-muted" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em">Faces concernées</div>
+            <div style="font-size:.9rem">{{ reservation.lignes.count }} face{{ reservation.lignes.count|pluralize }}</div>
+          </div>
+          {% if reservation.notes %}
+          <div class="col-12">
+            <div class="small text-muted" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em">Notes internes</div>
+            <div style="font-size:.85rem;white-space:pre-line">{{ reservation.notes }}</div>
+          </div>
+          {% endif %}
+        </div>
+
+        <hr>
+
+        <div class="small text-muted mb-2" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em">
+          Faces réservées
+        </div>
+        <div class="table-responsive">
+          <table class="table table-sm mb-0">
+            <thead>
+              <tr>
+                <th>Support</th>
+                <th>Face</th>
+                <th>Ville / Quartier</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for ligne in reservation.lignes.all %}
+              <tr>
+                <td style="font-weight:600">{{ ligne.support.code }}</td>
+                <td>{{ ligne.face.label|default:"—" }}</td>
+                <td style="color:var(--text-muted);font-size:.85rem">
+                  {{ ligne.support.quartier|default:ligne.support.ville|default:"—" }}
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="3" class="text-center text-muted py-3">Aucune face associée.</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Actions : Valider et Annuler côte à côte -->
+    <div class="row g-3">
+
+      <!-- Colonne Valider -->
+      <div class="col-md-6">
+        <div class="card h-100" style="{% if not peut_valider %}opacity:.55{% endif %}">
+          <div class="card-body d-flex flex-column">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <i class="bi bi-check-circle-fill" style="color:#10b981;font-size:1.2rem"></i>
+              <span style="font-weight:700">Valider</span>
+            </div>
+            <p class="text-muted mb-3" style="font-size:.83rem">
+              Confirme la réservation. Un second membre de l'équipe doit
+              obligatoirement effectuer ce contrôle.
+            </p>
+
+            {% if peut_valider %}
+              <form method="post" class="mt-auto">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="valider">
+                <button type="submit" class="btn btn-success w-100">
+                  <i class="bi bi-check-circle-fill me-1"></i>Confirmer la validation
+                </button>
+              </form>
+            {% else %}
+              <div class="alert alert-secondary mb-0 mt-auto" style="font-size:.8rem">
+                <i class="bi bi-lock-fill me-1"></i>{{ erreur_valider }}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Colonne Annuler -->
+      <div class="col-md-6">
+        <div class="card h-100" style="{% if not peut_annuler %}opacity:.55{% endif %}">
+          <div class="card-body d-flex flex-column">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <i class="bi bi-x-circle-fill" style="color:#ef4444;font-size:1.2rem"></i>
+              <span style="font-weight:700">Annuler</span>
+            </div>
+            <p class="text-muted mb-3" style="font-size:.83rem">
+              Libère immédiatement toutes les faces de cette réservation.
+              Action définitive.
+            </p>
+
+            {% if peut_annuler %}
+              <form method="post" class="mt-auto">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="annuler">
+                <div class="mb-2">
+                  <textarea name="motif" class="form-control form-control-sm" rows="2"
+                            placeholder="Motif (facultatif)"></textarea>
+                </div>
+                <button type="submit" class="btn btn-outline-danger w-100"
+                        onclick="return confirm('Confirmer l\'annulation de cette réservation ?');">
+                  <i class="bi bi-x-circle-fill me-1"></i>Confirmer l'annulation
+                </button>
+              </form>
+            {% else %}
+              <div class="alert alert-secondary mb-0 mt-auto" style="font-size:.8rem">
+                <i class="bi bi-lock-fill me-1"></i>{{ erreur_annuler }}
+              </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+  </div>
+</div>
+
+{% endblock %}

@@ -101,6 +101,8 @@
               <span class="badge-status bs-disponible"><i class="bx bx-check me-1"></i>Confirmée</span>
             {% elif r.statut == 'annulee' %}
               <span class="badge-status bs-panne"><i class="bx bx-x me-1"></i>Annulée</span>
+            {% elif r.statut == 'expiree' %}
+              <span class="badge-status bs-occupe"><i class="bx bx-hourglass me-1"></i>Expirée</span>
             {% else %}
               <span class="badge-status bs-occupe">{{ r.get_statut_display }}</span>
             {% endif %}
@@ -111,9 +113,30 @@
           <td>
             <div class="d-flex gap-1">
               {% if user.is_staff_regie_role %}
-                <a href="{% url 'reservation_detail' r.client.pk r.pk %}" class="btn btn-sm btn-outline-primary me-1"><i class="bi bi-eye"></i></a>
-                <a href="{% url 'reservation_update' r.client.pk r.pk %}" class="btn btn-sm btn-outline-secondary me-1"><i class="bi bi-pencil"></i></a>
-                <a href="{% url 'reservation_delete' r.client.pk r.pk %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></a>
+
+                {% if r.statut == 'en_attente' %}
+                  <!-- Non clôturée : action principale = Traiter (Valider/Annuler) -->
+                  {% if r.statut == 'en_attente' and r.created_by_id == user.id %}
+                    <span class="btn btn-sm btn-outline-secondary disabled me-1"
+                          title="Vous avez créé cette réservation — un autre membre de l'équipe doit la valider (l'annulation reste possible depuis le détail)">
+                      <i class="bi bi-clipboard-check"></i>
+                    </span>
+                  {% else %}
+                    <a href="{% url 'reservation_traiter' r.client.pk r.pk %}"
+                       class="btn btn-sm btn-outline-success me-1" title="Valider / Annuler">
+                      <i class="bi bi-clipboard-check"></i>
+                    </a>
+                  {% endif %}
+                {% else %}
+                  <!-- Déjà clôturée (annulée / expirée) : action principale = Détail -->
+                  <a href="{% url 'reservation_detail' r.client.pk r.pk %}"
+                     class="btn btn-sm btn-outline-primary me-1" title="Détail">
+                    <i class="bi bi-eye"></i>
+                  </a>
+                {% endif %}
+
+                <a href="{% url 'reservation_update' r.client.pk r.pk %}" class="btn btn-sm btn-outline-secondary me-1" title="Modifier"><i class="bi bi-pencil"></i></a>
+                <a href="{% url 'reservation_delete' r.client.pk r.pk %}" class="btn btn-sm btn-outline-danger" title="Supprimer"><i class="bi bi-trash"></i></a>
               {% endif %}
             </div>
           </td>

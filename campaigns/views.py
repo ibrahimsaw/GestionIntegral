@@ -875,6 +875,10 @@ class CampagneListView(ClientStaffRequiredMixin, SortableListMixin, ListView):
         if self.request.user.is_client_role and self.request.user.client_profile:
             qs = qs.filter(client=self.request.user.client_profile)
 
+        # ── Restriction non-admin : uniquement les campagnes actives ──
+        if not self.request.user.is_admin:
+            qs = qs.filter(actif=True)
+
         q            = self.request.GET.get('q', '')
         statut       = self.request.GET.get('statut', '')
         type_support = self.request.GET.get('type_support', '')
@@ -890,17 +894,12 @@ class CampagneListView(ClientStaffRequiredMixin, SortableListMixin, ListView):
             qs = qs.filter(actif=actif)
 
         qs = qs.annotate(nb_supports_annotate=Count('lignes__support', distinct=True))
-        qs = self.apply_sort(qs)  # ← remplace tout le bloc "Tri" manuel précédent
+        qs = self.apply_sort(qs)
 
         return qs
 
     def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)  # ← ajoute déjà sort_key / sort_dir / sort_links via le mixin
-
-        if not self.request.user.is_admin:
-            if self.request.user.is_client_role and self.request.user.client_profile:
-                context['campagnes'] = context['campagnes'].filter(client=self.request.user.client_profile)
-            context['campagnes'] = context['campagnes'].filter(actif=True)
+        context = super().get_context_data(**kwargs)  # ne touche plus à context['campagnes']
 
         context['q']                    = self.request.GET.get('q', '')
         context['statut']               = self.request.GET.get('statut', '')
@@ -910,7 +909,6 @@ class CampagneListView(ClientStaffRequiredMixin, SortableListMixin, ListView):
         context['actif']                = self.request.GET.get('actif', '')
 
         return context
-
     def post(self, request, *args, **kwargs):
         if not request.user.is_staff_regie_role:
             messages.error(request, "Permission refusée.")
@@ -2008,6 +2006,207 @@ class ReservationDetailView(ClientStaffRequiredMixin, DetailView):
         context['can_edit'] = self.request.user.is_staff_regie_role
         context['can_delete'] = self.request.user.is_staff_regie_role
         return context
+
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Vue unique : Valider OU Annuler une réservation, sur le même écran.
+# Remplace ReservationValiderView + ReservationAnnulerView.
+# ══════════════════════════════════════════════════════════════════════════════
+
+class ReservationTraiterView(ClientStaffRequiredMixin, View):
+    """
+    Écran unique pour traiter une réservation : Valider (EN_ATTENTE → CONFIRMEE)
+    ou Annuler (EN_ATTENTE/CONFIRMEE → ANNULEE).
+
+    Règles :
+      - Valider : uniquement depuis EN_ATTENTE, et request.user doit être
+        différent de reservation.created_by (double contrôle).
+      - Annuler : depuis EN_ATTENTE ou CONFIRMEE, sans restriction d'auteur.
+
+    GET  : affiche le récapitulatif + les deux actions possibles (grisées
+           si non autorisées, avec le motif du blocage).
+    POST : `action=valider` ou `action=annuler` dans le POST détermine
+           quelle opération est exécutée.
+
+    URL : /clients/<client_pk>/reservations/<resa_pk>/traiter/
+    Name: reservation_traiter
+    """
+    template_name = 'campaigns/reservation_traiter.html'
+
+    def get_reservation(self, client_pk, resa_pk):
+        return get_object_or_404(
+            Reservation.objects.select_related('client', 'created_by'),
+            pk=resa_pk,
+            client_id=client_pk,
+        )
+
+    def _check_valider(self, request, reservation):
+        """Retourne un message d'erreur si la validation est refusée, sinon None."""
+        if reservation.statut != STATUT_EN_ATTENTE:
+            return (
+                f"Cette réservation est au statut « {reservation.get_statut_display()} » "
+                f"et ne peut plus être validée."
+            )
+        if reservation.created_by_id and reservation.created_by_id == request.user.id:
+            return (
+                "Vous êtes à l'origine de cette réservation. Un autre membre de "
+                "l'équipe doit la valider (principe de double contrôle)."
+            )
+        return None
+
+    def _check_annuler(self, reservation):
+        """Retourne un message d'erreur si l'annulation est refusée, sinon None."""
+        if reservation.statut not in (STATUT_EN_ATTENTE, STATUT_CONFIRMEE):
+            return (
+                f"Cette réservation est au statut « {reservation.get_statut_display()} » "
+                f"et ne peut plus être annulée."
+            )
+        return None
+
+    # ── GET ──────────────────────────────────────────────────────────────────
+    def get(self, request, client_pk, resa_pk):
+        reservation = self.get_reservation(client_pk, resa_pk)
+
+        erreur_valider = self._check_valider(request, reservation)
+        erreur_annuler = self._check_annuler(reservation)
+
+        if erreur_valider and erreur_annuler:
+            messages.error(request, "Cette réservation ne peut plus être ni validée ni annulée.")
+            return redirect('reservation_detail', client_pk=client_pk, resa_pk=resa_pk)
+
+        return render(request, self.template_name, {
+            'reservation':     reservation,
+            'client':          reservation.client,
+            'peut_valider':    erreur_valider is None,
+            'erreur_valider':  erreur_valider,
+            'peut_annuler':    erreur_annuler is None,
+            'erreur_annuler':  erreur_annuler,
+        })
+
+    # ── POST ─────────────────────────────────────────────────────────────────
+    def post(self, request, client_pk, resa_pk):
+        reservation = self.get_reservation(client_pk, resa_pk)
+        action = request.POST.get('action')
+
+        if action == 'valider':
+            return self._traiter_validation(request, reservation, client_pk, resa_pk)
+        elif action == 'annuler':
+            return self._traiter_annulation(request, reservation, client_pk, resa_pk)
+
+        messages.error(request, "Action inconnue.")
+        return redirect('reservation_detail', client_pk=client_pk, resa_pk=resa_pk)
+
+    # ── Validation ───────────────────────────────────────────────────────────
+    def _traiter_validation(self, request, reservation, client_pk, resa_pk):
+        erreur = self._check_valider(request, reservation)
+        if erreur:
+            messages.error(request, erreur)
+            return redirect('reservation_detail', client_pk=client_pk, resa_pk=resa_pk)
+
+        try:
+            with transaction.atomic():
+                # Verrou + re-vérification pour éviter toute course concurrente
+                reservation = (
+                    Reservation.objects
+                    .select_for_update()
+                    .select_related('created_by')
+                    .get(pk=reservation.pk)
+                )
+                erreur = self._check_valider(request, reservation)
+                if erreur:
+                    messages.error(request, erreur)
+                    return redirect('reservation_detail', client_pk=client_pk, resa_pk=resa_pk)
+
+                reservation.statut = STATUT_CONFIRMEE
+                reservation.save(update_fields=['statut', 'updated_at'])
+
+        except Exception as e:
+            messages.error(request, f"Erreur lors de la validation : {str(e)}")
+            return redirect('reservation_detail', client_pk=client_pk, resa_pk=resa_pk)
+
+        messages.success(
+            request,
+            f"Réservation « {reservation.nom} » validée avec succès par {request.user}."
+        )
+        return redirect('reservation_detail', client_pk=client_pk, resa_pk=resa_pk)
+
+    # ── Annulation ───────────────────────────────────────────────────────────
+    def _traiter_annulation(self, request, reservation, client_pk, resa_pk):
+        erreur = self._check_annuler(reservation)
+        if erreur:
+            messages.error(request, erreur)
+            return redirect('reservation_detail', client_pk=client_pk, resa_pk=resa_pk)
+
+        motif = request.POST.get('motif', '').strip()
+
+        try:
+            with transaction.atomic():
+                reservation = (
+                    Reservation.objects
+                    .select_for_update()
+                    .get(pk=reservation.pk)
+                )
+                erreur = self._check_annuler(reservation)
+                if erreur:
+                    messages.error(request, erreur)
+                    return redirect('reservation_detail', client_pk=client_pk, resa_pk=resa_pk)
+
+                reservation.statut = STATUT_ANNULEE
+                update_fields = ['statut', 'updated_at']
+
+                if motif:
+                    horodatage = timezone.now().strftime('%d/%m/%Y %H:%M')
+                    note = f"[Annulation {horodatage} par {request.user}] {motif}"
+                    reservation.notes = f"{reservation.notes}\n{note}".strip() if reservation.notes else note
+                    update_fields.append('notes')
+
+                reservation.save(update_fields=update_fields)
+
+        except Exception as e:
+            messages.error(request, f"Erreur lors de l'annulation : {str(e)}")
+            return redirect('reservation_detail', client_pk=client_pk, resa_pk=resa_pk)
+
+        messages.success(request, f"Réservation « {reservation.nom} » annulée.")
+        return redirect('reservation_detail', client_pk=client_pk, resa_pk=resa_pk)
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Câblage urls.py — remplace les deux routes reservation_valider/reservation_annuler
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# path(
+#     'clients/<int:client_pk>/reservations/<int:resa_pk>/traiter/',
+#     ReservationTraiterView.as_view(),
+#     name='reservation_traiter',
+# ),
+#
+# ══════════════════════════════════════════════════════════════════════════════
+# Mise à jour suggérée de ReservationDetailView.get_context_data
+# ══════════════════════════════════════════════════════════════════════════════
+#
+# def get_context_data(self, **kwargs):
+#     context = super().get_context_data(**kwargs)
+#     reservation = self.object
+#     context['page_title']  = f'Détail réservation — {reservation.nom}'
+#     context['can_edit']    = self.request.user.is_staff_regie_role
+#     context['can_delete']  = self.request.user.is_staff_regie_role
+#     context['can_traiter'] = (
+#         self.request.user.is_staff_regie_role
+#         and reservation.statut in (STATUT_EN_ATTENTE, STATUT_CONFIRMEE)
+#     )
+#     return context
+#
+# Dans reservation_detail.html, un seul bouton suffit alors :
+# {% if can_traiter %}
+#   <a href="{% url 'reservation_traiter' reservation.client.pk reservation.pk %}" class="btn btn-primary">
+#     <i class="bi bi-check-circle me-1"></i>Valider / Annuler
+#   </a>
+# {% endif %}
+
+
+
+
 
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.views import View

@@ -158,12 +158,12 @@ def _label_support(support: Support, formats_map: dict) -> tuple[str, str]:
             fs = formats_map.get(support.format)
             if fs:
                 categorie = fs.categorie or 'Autres'
-                label = fs.dimensions
+                label = fs.code
                 if fs.superficie:
-                    label = f"{label} ({fs.superficie}m²)"
+                    label = f"{fs.superficie:g}m² ({label})"
                 return categorie, label
         return 'Autres', 'Panneau (format non défini)'
-    return 'Digital', 'Écran Numérique'
+    return 'Écran', 'Écran Numérique'
 
 def _get_compteurs() -> dict:
     supports = (
@@ -178,9 +178,11 @@ def _get_compteurs() -> dict:
     villes = defaultdict(lambda: {
         'total_faces': 0,
         'faces_libres': 0,
-        # on groupe maintenant par (categorie, label, code_format)
         'categories': defaultdict(lambda: defaultdict(lambda: {'total': 0, 'libre': 0, 'code': ''})),
     })
+
+    # NOUVEAU : Set pour stocker les formats uniques liés aux supports actifs
+    formats_utilises = set()
 
     for support in supports:
         ville = support.ville or 'Non renseignée'
@@ -192,6 +194,10 @@ def _get_compteurs() -> dict:
             code_format = support.format
         else:
             code_format = getattr(getattr(support, 'ecran_info', None), 'cellule', '')
+
+        # S'il y a un format valide, on l'ajoute à notre set
+        if code_format:
+            formats_utilises.add(code_format)
 
         if support.type_support == Support.TYPE_PANNEAU:
             faces = list(support.faces.all())
@@ -233,9 +239,6 @@ def _get_compteurs() -> dict:
     total_faces_reseau = 0
     total_faces_libres_reseau = 0
 
-    # ── NOUVEAU : agrégation par catégorie, toutes villes confondues ────────
-    # Ex: Standard / Géant / Sucette / Marché / Ecran → total, libre, occupe,
-    # sur l'ensemble du réseau (indépendamment de la ville).
     categories_globales = defaultdict(lambda: {'total': 0, 'libre': 0})
     for data in villes.values():
         for categorie, labels in data['categories'].items():
@@ -268,7 +271,7 @@ def _get_compteurs() -> dict:
                 libre = counts['libre']
                 liste.append({
                     'label': label,
-                    'format': counts['code'],   # <-- code stable ajouté ici
+                    'format': counts['code'],
                     'count': total,
                     'libre': libre,
                     'occupe': total - libre,
@@ -301,6 +304,7 @@ def _get_compteurs() -> dict:
         'total_faces_libres_reseau': total_faces_libres_reseau,
         'total_faces_occupees_reseau': total_faces_reseau - total_faces_libres_reseau,
         'nb_villes': len(villes_stats),
+        'nb_formats': len(formats_utilises),  # <-- Envoyé au template sous le nom `nb_formats`
     }
 class AccueilView(View):
     """Page d'accueil — vitrine publique de la régie publicitaire."""

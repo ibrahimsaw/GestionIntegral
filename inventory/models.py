@@ -222,7 +222,8 @@ class Support(models.Model):
             support=self,
             campagne__date_debut__lte=today,
             campagne__date_fin__gte=today,
-            campagne__statut__in=['en_cours', 'a_venir'],
+            # campagne__statut__in=['en_cours', 'a_venir'],
+            campagne__statut__in=['en_cours'],
         ).exists()
 
     def disponibilite_json(self):
@@ -315,10 +316,22 @@ class Support(models.Model):
     
     # Sur le modèle Support (ou FacePanneau selon ton archi)
     def is_reserve(self):
-        """True si au moins une face a une réservation active ou à venir."""
-        from django.utils import timezone
+        """True si une réservation active/à venir existe sur ce support."""
+        from campaigns.models import ReservationLigne
         now = timezone.now()
-        return self.lignes_client.filter(date_fin__gte=now).exists()
+
+        if self.type_support == self.TYPE_PANNEAU:
+            return ReservationLigne.objects.filter(
+                face__support=self,
+                reservation__date_fin__gte=now,
+                reservation__statut='confirmee',
+            ).exists()
+        else:
+            return ReservationLigne.objects.filter(
+                support=self,
+                reservation__date_fin__gte=now,
+                reservation__statut='confirmee',
+            ).exists()
     
     def is_libre(self):
         """True si au moins une face n'est pas occupée ni réservée."""
@@ -566,7 +579,8 @@ class FacePanneau(models.Model):
             face=self,
             campagne__date_debut__lte=date_fin,
             campagne__date_fin__gte=date_debut,
-            campagne__statut__in=['en_cours', 'a_venir'],
+            # campagne__statut__in=['en_cours', 'a_venir'],
+            campagne__statut__in=['en_cours'],
         ).exists()
  
         # 2. Vérification via ReservationLigne (nouveau modèle)
@@ -574,7 +588,8 @@ class FacePanneau(models.Model):
             face=self,
             reservation__date_debut__lt=date_fin,
             reservation__date_fin__gt=date_debut,
-            reservation__statut__in=['en_attente', 'confirmee'],
+            #reservation__statut__in=['en_attente', 'confirmee'],
+            reservation__statut__in=['confirmee'],
         ).exists()
  
         return not occupee_campagne and not occupee_reservation
@@ -614,18 +629,20 @@ class FacePanneau(models.Model):
             face=self,
             campagne__date_debut__lte=date_fin,
             campagne__date_fin__gte=date_debut,
-            campagne__statut__in=['en_cours', 'a_venir'],
+            # campagne__statut__in=['en_cours', 'a_venir'],
+            campagne__statut__in=['en_cours'],
         ).exists()
- 
+
         if occupee:
             return 'occupe'
- 
+
         # Réservé = ReservationLigne active sur la période
         qs_reserve = ReservationLigne.objects.filter(
             face=self,
             reservation__date_debut__lt=date_fin,
             reservation__date_fin__gt=date_debut,
-            reservation__statut__in=['en_attente', 'confirmee'],
+            # reservation__statut__in=['en_attente', 'confirmee'],
+            reservation__statut__in=['confirmee'],
         )
  
         if qs_reserve.exists():

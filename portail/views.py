@@ -147,23 +147,47 @@ VILLE_IMAGES = {
 VILLE_IMAGE_DEFAUT = 'img/villes/default.jpg'
 
 
-def _label_support(support: Support, formats_map: dict) -> tuple[str, str]:
+from collections import defaultdict
+from django.views import View
+from django.shortcuts import render
+
+def _label_support(support: Support, formats_map: dict) -> tuple[str, dict]:
     """
-    Retourne (categorie, label) pour regrouper les stats :
-    - Panneau : categorie = FormatSupport.categorie, label = "dimensions (superficie m²)"
-    - Écran   : categorie = 'Digital', label = 'Écran Numérique'
+    Retourne (categorie, label_data) pour regrouper les stats.
+    label_data est un dictionnaire contenant les clés :
+    - 'superficie' : ex "45m²" ou ""
+    - 'dimensions' : ex "9x5" ou "Écran Numérique"
+    - 'valeur_tri' : float pour trier du plus petit au plus grand
     """
     if support.type_support == Support.TYPE_PANNEAU:
         if support.format:
             fs = formats_map.get(support.format)
             if fs:
                 categorie = fs.categorie or 'Autres'
-                label = fs.code
-                if fs.superficie:
-                    label = f"{fs.superficie:g}m² ({label})"
-                return categorie, label
-        return 'Autres', 'Panneau (format non défini)'
-    return 'Écran', 'Écran Numérique'
+                superficie_str = f"{fs.superficie:g}m²" if fs.superficie else ""
+                valeur_tri = float(fs.superficie) if fs.superficie else 0.0
+                
+                label_data = {
+                    'superficie': superficie_str,
+                    'dimensions': f"({fs.code})",
+                    'valeur_tri': valeur_tri
+                }
+                return categorie, label_data
+                
+        label_data = {
+            'superficie': "",
+            'dimensions': "Panneau (format non défini)",
+            'valeur_tri': 0.0
+        }
+        return 'Autres', label_data
+        
+    label_data = {
+        'superficie': "",
+        'dimensions': "Écran Numérique",
+        'valeur_tri': 0.0 # Les écrans se placeront au début du tri (0m²)
+    }
+    return 'Écran', label_data
+
 
 def _get_compteurs() -> dict:
     supports = (
@@ -178,24 +202,27 @@ def _get_compteurs() -> dict:
     villes = defaultdict(lambda: {
         'total_faces': 0,
         'faces_libres': 0,
+        # On utilise une clé sérialisée (JSON/string) pour le regroupement dans le defaultdict :
         'categories': defaultdict(lambda: defaultdict(lambda: {'total': 0, 'libre': 0, 'code': ''})),
     })
 
-    # NOUVEAU : Set pour stocker les formats uniques liés aux supports actifs
     formats_utilises = set()
 
+    # Pour pouvoir utiliser le dictionnaire label_data comme clé de dictionnaire,
+    # on le convertit temporairement en tuple nommé ou on stocke une référence.
     for support in supports:
         ville = support.ville or 'Non renseignée'
         data = villes[ville]
-        categorie, label = _label_support(support, formats_map)
+        categorie, label_data = _label_support(support, formats_map)
 
-        # ── Code stable pour le filtre JS/URL ──
+        # Clé unique pour grouper par format physique précis
+        group_key = (label_data['superficie'], label_data['dimensions'], label_data['valeur_tri'])
+
         if support.type_support == Support.TYPE_PANNEAU:
             code_format = support.format
         else:
             code_format = getattr(getattr(support, 'ecran_info', None), 'cellule', '')
 
-        # S'il y a un format valide, on l'ajoute à notre set
         if code_format:
             formats_utilises.add(code_format)
 
@@ -203,14 +230,14 @@ def _get_compteurs() -> dict:
             faces = list(support.faces.all())
             if not faces:
                 data['total_faces'] += 1
-                entry = data['categories'][categorie][label]
+                entry = data['categories'][categorie][group_key]
                 entry['total'] += 1
                 entry['code'] = code_format
                 continue
 
             for face in faces:
                 data['total_faces'] += 1
-                entry = data['categories'][categorie][label]
+                entry = data['categories'][categorie][group_key]
                 entry['total'] += 1
                 entry['code'] = code_format
 
@@ -223,7 +250,7 @@ def _get_compteurs() -> dict:
                     entry['libre'] += 1
         else:
             data['total_faces'] += 1
-            entry = data['categories'][categorie][label]
+            entry = data['categories'][categorie][group_key]
             entry['total'] += 1
             entry['code'] = code_format
 
@@ -241,8 +268,8 @@ def _get_compteurs() -> dict:
 
     categories_globales = defaultdict(lambda: {'total': 0, 'libre': 0})
     for data in villes.values():
-        for categorie, labels in data['categories'].items():
-            for label, counts in labels.items():
+        for categorie, group_keys in data['categories'].items():
+            for group_key, counts in group_keys.items():
                 categories_globales[categorie]['total'] += counts['total']
                 categories_globales[categorie]['libre'] += counts['libre']
 
@@ -264,23 +291,30 @@ def _get_compteurs() -> dict:
             data['categories'].items(),
             key=lambda kv: -sum(v['total'] for v in kv[1].values())
         )
-        for categorie, labels in categories_triees:
+        for categorie, group_keys in categories_triees:
             liste = []
-            for label, counts in sorted(labels.items(), key=lambda kv: -kv[1]['total']):
+            for group_key, counts in group_keys.items():
+                superficie_val, dimensions_val, valeur_tri = group_key
                 total = counts['total']
                 libre = counts['libre']
                 liste.append({
-                    'label': label,
+                    'superficie': superficie_val,
+                    'dimensions': dimensions_val,
+                    'valeur_tri': valeur_tri,       # Servira au tri
                     'format': counts['code'],
                     'count': total,
                     'libre': libre,
                     'occupe': total - libre,
                 })
+            
+            # ── TRI DES FORMATS DE LA PLUS PETITE À LA PLUS GRANDE SUPERFICIE ──
+            liste.sort(key=lambda item: item['valeur_tri'])
+
             supports_list.append({
                 'categorie': categorie,
-                'total': sum(c['total'] for c in labels.values()),
-                'libre': sum(c['libre'] for c in labels.values()),
-                'occupe': sum(c['total'] - c['libre'] for c in labels.values()),
+                'total': sum(c['total'] for c in group_keys.values()),
+                'libre': sum(c['libre'] for c in group_keys.values()),
+                'occupe': sum(c['total'] - c['libre'] for c in group_keys.values()),
                 'liste': liste,
             })
 
@@ -304,8 +338,9 @@ def _get_compteurs() -> dict:
         'total_faces_libres_reseau': total_faces_libres_reseau,
         'total_faces_occupees_reseau': total_faces_reseau - total_faces_libres_reseau,
         'nb_villes': len(villes_stats),
-        'nb_formats': len(formats_utilises),  # <-- Envoyé au template sous le nom `nb_formats`
+        'nb_formats': len(formats_utilises),
     }
+
 class AccueilView(View):
     """Page d'accueil — vitrine publique de la régie publicitaire."""
     template_name = 'portail/vitrine.html'
@@ -316,7 +351,6 @@ class AccueilView(View):
             **compteurs,
             'oua_center': [12.3714, -1.5197],
         })
-
 class CatalogueView(View):
     template_name = 'portail/catalogue.html'
 

@@ -1,8 +1,8 @@
 {% extends 'portail/base_portail.html' %}
 {% load static %}
 
-{% block title %}Demande de réservation — Étape 1{% endblock %}
-{% block topbar_title %}<i class="bi bi-plus-circle-fill me-1" style="color:var(--color-primary)"></i> Demande de réservation{% endblock %}
+{% block title %}Sélectionnez votre emplacement — Étape 1{% endblock %}
+{% block topbar_title %}<i class="bi bi-plus-circle-fill me-1" style="color:var(--color-primary)"></i>Sélectionnez votre emplacement{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -63,6 +63,14 @@
   .step-label { font-size: .78rem; font-weight: 700; color: var(--text-muted); white-space: nowrap; }
   .step-item.active .step-label { color: var(--step-active); }
   .step-item.done   .step-label { color: var(--step-done); }
+
+  /* ── WIZARD STEPS : masquer les étapes inactives sur petit écran ──── */
+  @media (max-width: 768px) {
+    .step-item:not(.active) .step-circle,
+    .step-item:not(.active) .step-label {
+      display: none;
+    }
+  }
 
   /* ── BARRE DATES ─────────────────────────────────────────── */
   .dates-bar {
@@ -338,7 +346,7 @@
   .rl-face-btn.panne    { border-color: #94a3b8; color: #94a3b8; cursor: not-allowed; opacity: .55; }
   .rl-face-btn.selected { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
   .rl-face-btn.need-dates { border-color: #cbd5e1; color: #94a3b8; cursor: not-allowed; opacity: .7; }
-  /* ── GROUPES VILLE / QUARTIER (vue Liste) ──────────────────── */
+  /* ── GROUPES VILLE / FORMAT / QUARTIER (vue Liste, sticky empilé) ─── */
   .liste-group-ville {
     grid-column: 1 / -1;
     display: flex; align-items: center; gap: 10px;
@@ -346,6 +354,11 @@
     font-size: .85rem; font-weight: 800; color: var(--text);
     border-bottom: 2px solid var(--color-primary);
     margin-bottom: 4px;
+
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    background: var(--bg-card); /* ⚠️ doit être le fond réel derrière #liste-grid */
   }
   .liste-group-ville:first-child { padding-top: 4px; }
   .liste-group-ville i { color: var(--color-primary); }
@@ -354,12 +367,38 @@
     color: var(--text-muted); background: var(--bg-card2);
     padding: 2px 9px; border-radius: 20px; border: 1px solid var(--border);
   }
+
+  .liste-group-format {
+    grid-column: 1 / -1;
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 4px 6px 10px;
+    margin: 2px 0 2px;
+    font-size: .76rem; font-weight: 700; color: var(--text-muted);
+    border-bottom: 1px dashed var(--border);
+
+    position: sticky;
+    top: 42px; /* ⚠️ hauteur réelle de .liste-group-ville — à ajuster */
+    z-index: 2;
+    background: var(--bg-card);
+  }
+  .liste-group-format i { color: var(--color-primary); opacity: .8; }
+  .liste-group-format .count-badge {
+    margin-left: auto; font-size: .66rem; font-weight: 600;
+    color: var(--text-muted); background: var(--bg-card2);
+    padding: 2px 8px; border-radius: 20px; border: 1px solid var(--border);
+  }
+
   .liste-group-quartier {
     grid-column: 1 / -1;
     display: flex; align-items: center; gap: 7px;
     padding: 4px 4px 2px 14px;
     font-size: .72rem; font-weight: 700; text-transform: uppercase;
     letter-spacing: .05em; color: var(--text-muted);
+
+    position: sticky;
+    top: 72px; /* ⚠️ hauteur de .liste-group-ville + .liste-group-format — à ajuster */
+    z-index: 1;
+    background: var(--bg-card);
   }
   .liste-group-quartier i { font-size: .7rem; color: var(--color-primary); opacity: .7; }
 
@@ -397,11 +436,11 @@
     <div class="wizard-steps">
       <div class="step-item active">
         <div class="step-circle">1</div>
-        <span class="step-label">Emplacements & Période</span>
+        <span class="step-label">Sélection des emplacements & Période</span>
       </div>
       <div class="step-item">
         <div class="step-circle">2</div>
-        <span class="step-label d-none d-md-inline ms-1">Votre projet</span>
+        <span class="step-label d-none d-md-inline ms-1">Informations sur votre campagne</span>
       </div>
       <div class="step-item">
         <div class="step-circle">3</div>
@@ -458,15 +497,15 @@
         <div class="section-header">
 
           <div class="view-toggle">
-            <button class="vt-btn active" id="btn-vue-carte" onclick="switchView('carte')">
-              <i class="bi bi-map-fill"></i> Carte
-            </button>
-            <button class="vt-btn" id="btn-vue-liste" onclick="switchView('liste')">
+            <button class="vt-btn active" id="btn-vue-liste" onclick="switchView('liste')">
               <i class="bi bi-list-ul"></i> Liste
+            </button>
+            <button class="vt-btn" id="btn-vue-carte" onclick="switchView('carte')">
+              <i class="bi bi-map-fill"></i> Carte
             </button>
           </div>
 
-          <div id="filtres-carte" style="display:flex;gap:6px;flex-wrap:wrap;flex:1">
+          <div id="filtres-carte" style="display:none;gap:6px;flex-wrap:wrap;flex:1">
             <select class="mf-select" id="filter-ville">
               <option value="">Toutes les villes</option>
             </select>
@@ -481,11 +520,11 @@
             </select>
             <select class="mf-select" id="filter-dispo">
               <option value="">Tous états</option>
-              <option value="libre">Libres uniquement</option>
+              <option value="libre">Disponibles uniquement</option>
             </select>
           </div>
 
-          <div id="filtres-liste" style="display:none;gap:6px;flex-wrap:wrap;flex:1;align-items:center">
+          <div id="filtres-liste" style="display:flex;gap:6px;flex-wrap:wrap;flex:1;align-items:center">
             <input type="search" class="list-search" id="list-search" placeholder="Code ou nom du panneau…">
             <select class="mf-select" id="list-filter-ville">
               <option value="">Toutes les villes</option>
@@ -498,7 +537,7 @@
             </select>
             <select class="mf-select" id="list-filter-dispo">
               <option value="">Tous états</option>
-              <option value="libre">Libres uniquement</option>
+              <option value="libre">Disponibles uniquement</option>
             </select>
             <select class="mf-select" id="list-filter-format">
               <option value="">Tous formats</option>
@@ -507,19 +546,17 @@
 
         </div>
 
-        <div id="view-carte" style="flex:1;display:flex;flex-direction:column;">
+        <div id="view-carte" style="flex:1;display:none;flex-direction:column;">
           <div id="map-resa" style="flex:1;min-height:360px;"></div>
           <div class="map-legend">
-            <span class="leg-item"><span class="leg-dot" style="background:#10b981"></span>Libre</span>
+            <span class="leg-item"><span class="leg-dot" style="background:#10b981"></span>Disponible</span>
             <span class="leg-item"><span class="leg-dot" style="background:#f59e0b"></span>Partiel</span>
-            <span class="leg-item"><span class="leg-dot" style="background:#7c3aed"></span>Réservé</span>
             <span class="leg-item"><span class="leg-dot" style="background:#ef4444"></span>Occupé</span>
-            <span class="leg-item"><span class="leg-dot" style="background:#94a3b8"></span>Panne</span>
             <span class="leg-item"><span class="leg-dot" style="background:var(--color-primary)"></span>Sélectionné</span>
           </div>
         </div>
 
-        <div id="view-liste">
+        <div id="view-liste" style="display:block">
           <div class="liste-grid" id="liste-grid">
             <div class="liste-empty">
               <i class="bi bi-hourglass-split"></i>
@@ -564,7 +601,7 @@
 
             <button type="submit" class="btn-continuer" id="btn-continuer" disabled>
               <i class="bi bi-arrow-right-circle-fill"></i>
-              Continuer — <span id="btn-count">0</span> panneau(x)
+              Continuer — <span id="btn-count">0</span> face(s)
             </button>
           </form>
 
@@ -580,7 +617,7 @@
 
 {% block extra_js %}
 <script>
-    "use strict";
+  "use strict";
 
     // ── FILTRES INITIAUX (depuis la vitrine) ───────────────────────────────────
     const initialFiltres = {
@@ -594,7 +631,7 @@
     let facesInfo      = {}; // { "<faceId>": {statut, info} } — infos occupant retournées par check-dispo
     let markersMap     = {};
     let panier         = {};
-    let currentView    = 'carte';
+    let currentView    = 'liste';
     let currentPopup   = null;
     let datesOk        = false;
     let checkDispoTimer = null;
@@ -640,11 +677,12 @@
     }
 
     // Déterminer la dispo réelle
+    // NB: "reserve" est fusionné avec "occupe" (traité comme indisponible).
     function getFaceStatut(face) {
       if (face.etat === 'panne') return 'panne';
       if (datesOk) return facesOccupees.has(face.id) ? 'occupe' : 'libre';
       if (face.dispo === false) return 'occupe';
-      if (face.disponibles === false && face.dispo === true) return 'reserve';
+      if (face.disponibles === false && face.dispo === true) return 'occupe';
       return 'libre';
     }
 
@@ -675,7 +713,8 @@
       const feat = allFeatures.find(f => f.properties.id === supportId);
       if (!feat) return;
       const p = feat.properties;
-      const faces = p.faces || [];
+      // Les faces en panne ne sont jamais affichées.
+      const faces = (p.faces || []).filter(face => getFaceStatut(face) !== 'panne');
 
       let facesHtml = '';
       faces.forEach(face => {
@@ -684,7 +723,7 @@
         const statut = getFaceStatut(face);
         const canToggle = statut === 'libre' || inPanier;
         const icon = inPanier ? 'bi-dash-circle' : (canToggle ? 'bi-plus-circle' : 'bi-lock-fill');
-        const labelMap = { occupe:'Occupée', reserve:'Réservée', panne:'En panne' };
+        const labelMap = { occupe:'Occupée' };
         const txt = inPanier ? `${face.label} — Retirer`
                   : canToggle ? `${face.label} — Ajouter`
                   : `${face.label} — ${labelMap[statut] || statut}`;
@@ -712,7 +751,7 @@
             <div class="rl-popup-nom">${p.nom}</div>
             <div class="rl-popup-addr"><i class="bi bi-geo-alt"></i>${p.quartier || p.ville || ''}</div>
             <div class="rl-popup-faces">
-              ${facesHtml || '<span style="font-size:.74rem;color:#94a3b8">Aucune face configurée</span>'}
+              ${facesHtml || '<span style="font-size:.74rem;color:#94a3b8">Aucune face disponible</span>'}
             </div>
             ${noteDate}
           </div>`)
@@ -777,9 +816,6 @@
     }
 
     // ── FACETTES CROISÉES (ville / catégorie / quartier / format) ─────────────
-    // Chaque select ne propose que les options encore cohérentes avec les
-    // AUTRES filtres actifs (on s'exclut soi-même pour ne pas se limiter
-    // à sa propre valeur courante).
     function getPanneaux() {
       return allFeatures.filter(f => f.properties.type === 'panneau');
     }
@@ -809,7 +845,7 @@
 
       function rebuild(el, field, skipKey, labelFn) {
         if (!el) return;
-        const values = new Map(); // value -> label affiché
+        const values = new Map();
 
         panneaux.forEach(f => {
           const p = f.properties;
@@ -819,7 +855,7 @@
           if (!values.has(val)) values.set(val, labelFn ? labelFn(p) : val);
         });
 
-        const placeholder = el.options[0]; // "Toutes les villes" / "Tous formats" etc.
+        const placeholder = el.options[0];
         el.innerHTML = '';
         el.appendChild(placeholder);
 
@@ -831,7 +867,6 @@
             el.appendChild(opt);
           });
 
-        // Conserve la sélection si toujours valide, sinon réinitialise
         el.value = (current[skipKey] && values.has(current[skipKey])) ? current[skipKey] : '';
       }
 
@@ -843,8 +878,6 @@
 
     // ── NAVIGUER VERS UN SUPPORT SUR LA CARTE (depuis la vue Liste) ────────────
     function goToOnMap(supportId) {
-      // Réinitialise les filtres carte pour garantir que le support soit visible
-      // (sinon le marqueur pourrait être exclu par un filtre encore actif)
       ['filter-ville', 'filter-categorie', 'filter-quartier', 'filter-format', 'filter-dispo'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
@@ -885,31 +918,48 @@
         return;
       }
 
-      // ── Regroupement Ville → Quartier ──────────────────────────────────
-      const villes = new Map(); // ville -> Map(quartier -> [features])
+      // ── Regroupement Ville → Format → Quartier ─────────────────────────
+      const villes = new Map();
       filtered.forEach(f => {
         const p = f.properties;
         const ville = p.ville || 'Ville non renseignée';
+        const format = p.format_display || p.format || 'Format non renseigné';
         const quartier = p.quartier || 'Quartier non renseigné';
+
         if (!villes.has(ville)) villes.set(ville, new Map());
-        const quartiers = villes.get(ville);
+        const formats = villes.get(ville);
+
+        if (!formats.has(format)) formats.set(format, new Map());
+        const quartiers = formats.get(format);
+
         if (!quartiers.has(quartier)) quartiers.set(quartier, []);
         quartiers.get(quartier).push(f);
       });
 
       let html = '';
       Array.from(villes.keys()).sort().forEach(ville => {
-        const quartiers = villes.get(ville);
-        const totalVille = Array.from(quartiers.values()).reduce((acc, arr) => acc + arr.length, 0);
+        const formats = villes.get(ville);
+        const totalVille = Array.from(formats.values())
+          .reduce((acc, qMap) => acc + Array.from(qMap.values()).reduce((a, arr) => a + arr.length, 0), 0);
 
         html += `<div class="liste-group-ville">
           <i class="bi bi-geo-alt-fill"></i> ${ville}
           <span class="count-badge">${totalVille} panneau${totalVille > 1 ? 'x' : ''}</span>
         </div>`;
 
-        Array.from(quartiers.keys()).sort().forEach(quartier => {
-          html += `<div class="liste-group-quartier"><i class="bi bi-signpost-split-fill"></i> ${quartier}</div>`;
-          html += quartiers.get(quartier).map(f => buildSupportCard(f.properties)).join('');
+        Array.from(formats.keys()).sort().forEach(format => {
+          const quartiers = formats.get(format);
+          const totalFormat = Array.from(quartiers.values()).reduce((acc, arr) => acc + arr.length, 0);
+
+          html += `<div class="liste-group-format">
+            <i class="bi bi-aspect-ratio-fill"></i> ${format}
+            <span class="count-badge">${totalFormat} panneau${totalFormat > 1 ? 'x' : ''}</span>
+          </div>`;
+
+          Array.from(quartiers.keys()).sort().forEach(quartier => {
+            html += `<div class="liste-group-quartier"><i class="bi bi-signpost-split-fill"></i> ${quartier}</div>`;
+            html += quartiers.get(quartier).map(f => buildSupportCard(f.properties)).join('');
+          });
         });
       });
 
@@ -918,7 +968,7 @@
 
     function buildSupportCard(p) {
       const hasSelected = isPanierContainsSupport(p.id);
-      const faces = p.faces || [];
+      const faces = (p.faces || []).filter(face => getFaceStatut(face) !== 'panne');
 
       const facesHtml = faces.map(face => {
         const key = String(face.id);
@@ -927,7 +977,7 @@
         const canToggle = statut === 'libre' || inPanier;
         const cls = inPanier ? 'selected' : statut;
         const icon = inPanier ? 'bi-dash-circle-fill' : (canToggle ? 'bi-plus-circle' : 'bi-lock-fill');
-        const badgeLabels = { libre:'Libre', occupe:'Occupée', reserve:'Réservée', panne:'En panne' };
+        const badgeLabels = { libre:'Disponible', occupe:'Occupée' };
         const badge = inPanier ? 'Sélectionnée' : (badgeLabels[statut] || statut);
         const disabled = (!canToggle && !inPanier) ? 'disabled' : '';
         const onclick = (canToggle || inPanier)
@@ -963,8 +1013,6 @@
     function populateAllSelects() {
       refreshFacetSelects('filter-');
       refreshFacetSelects('list-filter-');
-
-      // ── Appliquer les filtres reçus depuis la vitrine ──────────────────────
       applyInitialFiltres();
     }
 
@@ -984,15 +1032,14 @@
         setSelectValue(prefix + 'ville', ville);
         setSelectValue(prefix + 'categorie', categorie);
         setSelectValue(prefix + 'format', format);
-        refreshFacetSelects(prefix); // recadre les options selon la combinaison choisie
+        refreshFacetSelects(prefix);
       });
 
-      applyCarteFilters(true); // recentre la caméra sur la présélection venant de la vitrine
+      applyCarteFilters(true);
       if (currentView === 'liste') renderListe();
     }
 
     // ── Triggers : vue Carte ────────────────────────────────────────────────
-    // Un changement de filtre recentre la caméra sur les résultats.
     function onCarteFilterChange() {
       refreshFacetSelects('filter-');
       applyCarteFilters(true);
@@ -1044,8 +1091,6 @@
       return d.toISOString().slice(0, 10);
     }
 
-    // En mode "Durée" : la date de fin est calculée = date_debut + (N-1) jours
-    // (durée inclusive : 1 jour = date_debut === date_fin)
     function recalcDateFinFromDuree() {
       const d1 = elDateDebut ? elDateDebut.value : '';
       const duree = elDureeJours ? parseInt(elDureeJours.value, 10) : NaN;
@@ -1092,10 +1137,10 @@
       elStatus.innerHTML = `${icons[state] || ''} ${text}`;
     }
 
-    // Vide le panier — utilisé quand la période change, car une sélection
-    // faite sur une autre période n'est plus forcément valide.
+    // Vide le panier — utilisé quand la période change MANUELLEMENT (input utilisateur),
+    // car une sélection faite sur une autre période n'est plus forcément valide.
     function resetPanier() {
-      if (Object.keys(panier).length === 0) return; // rien à faire
+      if (Object.keys(panier).length === 0) return;
       panier = {};
       updatePanier();
       if (currentView === 'liste') renderListe();
@@ -1123,19 +1168,32 @@
       checkDispoTimer = setTimeout(() => checkDispo(d1, d2), 400);
     }
 
+    // ⭐ NOUVEAU : revalide des dates déjà présentes (retour arrière depuis étape 2/3)
+    // SANS vider le panier pré-chargé depuis le serveur, contrairement à onDatesChange().
+    function initDatesFromServer() {
+      const d1 = elDateDebut ? elDateDebut.value : '';
+      const d2 = elDateFin   ? elDateFin.value   : '';
+      if (!d1 || !d2) return;
+      if (d1 >= d2) return;
+
+      if (elDateFin) elDateFin.min = d1;
+      clearTimeout(checkDispoTimer);
+      setDatesStatus('loading', 'Vérification en cours…');
+      checkDispo(d1, d2);
+    }
+
     function checkDispo(d1, d2) {
       const url = `/gestion/campaigns/api/check-dispo/0/?date_debut=${encodeURIComponent(d1)}&date_fin=${encodeURIComponent(d2)}`;
       fetch(url)
         .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
         .then(data => {
-          // Format réel de l'API : { "faces": { "<id>": {"statut": "libre|occupe|panne", "info": "..."} } }
           const facesData = data.faces || {};
           facesOccupees = new Set(
             Object.entries(facesData)
-              .filter(([, info]) => info && info.statut === 'occupe')
+              .filter(([, info]) => info && info.statut !== 'libre' && info.statut !== 'panne')
               .map(([id]) => Number(id))
           );
-          facesInfo = facesData; // conservé pour affichage (nom client + date fin) dans popup/liste
+          facesInfo = facesData;
 
           datesOk = true;
           const nbTotal  = allFeatures.filter(f => f.properties.type === 'panneau').reduce((acc, f) => acc + (f.properties.faces || []).length, 0);
@@ -1250,7 +1308,6 @@
     fetch('/gestion/inventory/api/geojson/')
   .then(r => r.json())
   .then(data => {
-    // ⚠️ FILTRE MAXIMUM : On ne stocke même pas les écrans en mémoire
     allFeatures = (data.features || []).filter(f => f.properties.type === 'panneau');
 
     renderMarkers(allFeatures);
@@ -1270,6 +1327,10 @@
       {% endfor %}
       updatePanier();
     {% endif %}
+
+    // ⭐ NOUVEAU : revalide les dates déjà présentes (retour arrière depuis étape 2/3)
+    // sans vider le panier qu'on vient de recharger juste au-dessus.
+    initDatesFromServer();
   })
   .catch(err => {
     console.error('GeoJSON error:', err);

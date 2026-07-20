@@ -512,7 +512,48 @@
     height: 16px; 
     fill: #fff; 
   }
+  /* Style de base du bouton "Tout voir" dans l'onglet (masqué par défaut) */
+  .category-tab-btn {
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 6px 12px;
+    border-radius: 6px;
+    background: var(--bg-card);
+    color: var(--color-primary);
+    border: 1px solid var(--border);
+    font-size: .74rem;
+    font-weight: 700;
+    text-decoration: none;
+    transition: all .2s ease;
+    margin-left: auto; /* Pousse le bouton vers la droite avant le chevron */
+    margin-right: 8px;
+  }
 
+  .category-tab-btn:hover {
+    background: var(--color-secondary);
+    color: var(--text);
+  }
+
+  /* S'affiche uniquement quand le bloc est ouvert */
+  .category-block.is-open .category-tab-btn {
+    display: inline-flex;
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
+    border-color: rgba(255, 255, 255, 0.3);
+  }
+
+  .category-block.is-open .category-tab-btn:hover {
+    background: #ffffff;
+    color: var(--color-primary);
+  }
+
+  /* On force le chevron à ne pas prendre toute la place restante */
+  .category-tab-chevron {
+    transition: transform .25s ease;
+    font-size: .75rem;
+    flex-shrink: 0;
+  }
   /* ── NOUVEAU : Structure pour l'affichage vertical (Superficie + Dimension) ── */
   .type-card-name { 
     display: flex;
@@ -965,46 +1006,66 @@
                 {% for cat in ville.supports %}
                   <div class="category-block">
                     <button type="button" class="category-tab" onclick="
+                      // On récupère l'événement pour vérifier si on a cliqué sur le bouton Tout voir
+                      if (event.target.closest('.category-tab-btn')) return;
+                      
                       const block = this.closest('.category-block');
                       const wasOpen = block.classList.contains('is-open');
                       block.parentElement.querySelectorAll('.category-block.is-open').forEach(o => o.classList.remove('is-open'));
                       if (!wasOpen) block.classList.add('is-open');
                     ">
                       <span class="category-tab-left">
-                        <i class="bi bi-tag-fill"></i> {{ cat.categorie }}
+                        <i class="bi bi-tag-fill"></i> 
+                        {{ cat.categorie }} : 
+                        {{ cat.total }} 
+                        {% if cat.categorie == "Écran" %}
+                          écran{{ cat.total|pluralize:",s" }}
+                        {% else %}
+                          face{{ cat.total|pluralize:",s" }}
+                        {% endif %}
+                        dont {{ cat.libre }} disponible{{ cat.libre|pluralize:",s" }}
                       </span>
+
+                      <!-- Ajout d'une classe spécifique et du stopPropagation pour éviter les conflits de clics -->
+                      <a href="{% url 'portail:reserver_etape1' %}?ville={{ ville.nom|urlencode }}&categorie={{ cat.categorie|urlencode }}" 
+                        class="category-tab-btn" 
+                        onclick="event.stopPropagation();">
+                        Tout voir
+                      </a>
+
                       <i class="bi bi-chevron-down category-tab-chevron"></i>
                     </button>
                     
                     <div class="category-panel-grid">
-                      
-                      {% if cat.liste|length > 1 %}
-                      <div class="type-card type-card-global">
-                        <div class="type-card-icon global-icon">
-                          <i class="bi bi-layers-half" style="color: #fff; font-size: 1.1rem;"></i>
-                        </div>
-                        
-                        <div class="type-card-name">
-                          <span class="superficie">Tous formats</span>
-                          <span class="dimensions">Choix flexible ({{ cat.categorie }})</span>
-                        </div>
+                      {% comment %}                       
+                        {% if cat.liste|length > 1 %}
+                          <div class="type-card type-card-global">
+                            <div class="type-card-icon global-icon">
+                              <i class="bi bi-layers-half" style="color: #fff; font-size: 1.1rem;"></i>
+                            </div>
+                            
+                            <div class="type-card-name">
+                              <span class="superficie">Tous formats</span>
+                              <span class="dimensions">Choix flexible ({{ cat.categorie }})</span>
+                            </div>
 
-                        <div class="type-card-count">
-                          {{ cat.libre }} face{{ cat.libre|pluralize:",s" }} disponible{{ cat.libre|pluralize:",s" }}
-                        </div>
-                        <div class="type-card-sub">
-                          Disponibilité globale
-                        </div>
+                            <div class="type-card-count">
+                              {{ cat.libre }} face{{ cat.libre|pluralize:",s" }} disponible{{ cat.libre|pluralize:",s" }}
+                            </div>
+                            <div class="type-card-sub">
+                              Disponibilité globale
+                            </div>
 
-                        {% if cat.libre > 0 %}
-                          <a href="{% url 'portail:reserver_etape1' %}?ville={{ ville.nom|urlencode }}&categorie={{ cat.categorie|urlencode }}" class="type-card-btn global-btn">
-                            Tout voir / Choisir
-                          </a>
-                        {% else %}
-                          <span class="type-card-btn disabled">Complet</span>
+                            {% if cat.libre > 0 %}
+                              <a href="{% url 'portail:reserver_etape1' %}?ville={{ ville.nom|urlencode }}&categorie={{ cat.categorie|urlencode }}" class="type-card-btn global-btn">
+                                Tout voir / Choisir
+                              </a>
+                            {% else %}
+                              <span class="type-card-btn disabled">Complet</span>
+                            {% endif %}
+                          </div>
                         {% endif %}
-                      </div>
-                      {% endif %}
+                      {% endcomment %}
 
                       {% for support in cat.liste %}
                       <div class="type-card">

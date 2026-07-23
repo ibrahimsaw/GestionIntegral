@@ -135,10 +135,7 @@ from django.core.exceptions import ValidationError
 
 from campaigns.models import DemandeReservation
 
-
 class Etape3Form(forms.Form):
-    # ⚠️ required=False ici : la vraie obligation est conditionnelle
-    # (uniquement en mode "nouveau client"), gérée dans clean() ci-dessous.
     nom_contact = forms.CharField(
         max_length=200,
         required=False,
@@ -162,9 +159,12 @@ class Etape3Form(forms.Form):
         label="Téléphone",
         widget=forms.TextInput(attrs={'class': 'form-control'}),
     )
+    # Consentement automatique : plus de case à cocher côté utilisateur,
+    # la valeur est forcée à True dans clean() ci-dessous.
     accepte_contact = forms.BooleanField(
         required=False,
-        label="J'accepte d'être recontacté(e)",
+        widget=forms.HiddenInput(),
+        label="Accepte d'être recontacté(e)",
     )
 
     type_client = forms.ChoiceField(
@@ -204,9 +204,11 @@ class Etape3Form(forms.Form):
                 if not cleaned_data.get(field):
                     self.add_error(field, msg)
 
-        return cleaned_data
-# ── Formulaire de contact ─────────────────────────────────────────────────────
+        # Le consentement n'est plus une option : toujours True,
+        # indépendamment de ce que le frontend a envoyé (ou pas envoyé).
+        cleaned_data['accepte_contact'] = True
 
+        return cleaned_data
 class SuiviDemandeForm(forms.Form):
     reference = forms.CharField(
         max_length=50,

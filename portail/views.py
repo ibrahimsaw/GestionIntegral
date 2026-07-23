@@ -1033,7 +1033,7 @@ class ReserverEtape3View(View):
             societe                  = d.get('societe', ''),
             email                    = d['email'],
             telephone                = d['telephone'],
-            accepte_contact          = d.get('accepte_contact', False),
+            accepte_contact          = True,  # Consentement automatique — plus d'option pour l'utilisateur
             type_client              = d.get('type_client', DemandeReservation.TYPE_CLIENT_NOUVEAU),
             reference_client_saisie  = d.get('reference_client_saisie', ''),
             date_debut_souhaitee     = date_debut,

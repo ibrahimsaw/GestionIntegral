@@ -2110,7 +2110,7 @@ class ReservationTraiterView(ClientStaffRequiredMixin, View):
                 reservation = (
                     Reservation.objects
                     .select_for_update()
-                    .select_related('created_by')
+                    .select_related('created_by', 'client')
                     .get(pk=reservation.pk)
                 )
                 erreur = self._check_valider(request, reservation)
@@ -2129,6 +2129,9 @@ class ReservationTraiterView(ClientStaffRequiredMixin, View):
             request,
             f"Réservation « {reservation.nom} » validée avec succès par {request.user}."
         )
+
+        self._send_emails_validation(reservation, request)
+
         return redirect('reservation_detail', client_pk=client_pk, resa_pk=resa_pk)
 
     # ── Annulation ───────────────────────────────────────────────────────────
@@ -2145,6 +2148,7 @@ class ReservationTraiterView(ClientStaffRequiredMixin, View):
                 reservation = (
                     Reservation.objects
                     .select_for_update()
+                    .select_related('client')
                     .get(pk=reservation.pk)
                 )
                 erreur = self._check_annuler(reservation)
@@ -2168,9 +2172,99 @@ class ReservationTraiterView(ClientStaffRequiredMixin, View):
             return redirect('reservation_detail', client_pk=client_pk, resa_pk=resa_pk)
 
         messages.success(request, f"Réservation « {reservation.nom} » annulée.")
+
+        self._send_emails_annulation(reservation, motif, request)
+
         return redirect('reservation_detail', client_pk=client_pk, resa_pk=resa_pk)
 
+    # ── Emails : validation ─────────────────────────────────────────────────
+    def _send_emails_validation(self, reservation, request):
+        client = reservation.client
 
+        # ── Client ──
+        if client and client.email:
+            try:
+                send_mail(
+                    subject=f"Votre réservation « {reservation.nom} » est confirmée",
+                    message=(
+                        f"Bonjour {client.nom},\n\n"
+                        f"Nous avons le plaisir de vous confirmer que votre réservation "
+                        f"« {reservation.nom} » a été validée.\n\n"
+                        f"Référence  : {reservation.reference}\n"
+                        f"Période    : {reservation.date_debut:%d/%m/%Y} → {reservation.date_fin:%d/%m/%Y}\n\n"
+                        f"Notre équipe reste à votre disposition pour toute question.\n\n"
+                        f"Cordialement,\nL'équipe régie publicitaire"
+                    ),
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[client.email],
+                    fail_silently=True,
+                )
+            except Exception as exc:
+                logger.error("Email client (validation résa) échoué pour %s : %s", reservation.reference, exc)
+
+        # ── Staff ──
+        try:
+            send_mail(
+                subject=f"[GeoAd] Réservation validée — {reservation.reference}",
+                message=(
+                    f"Réservation validée : {reservation.reference}\n\n"
+                    f"Nom       : {reservation.nom}\n"
+                    f"Client    : {client.nom if client else '—'} ({client.email if client else '—'})\n"
+                    f"Validée par : {request.user.get_full_name() or request.user.username}\n\n"
+                    f"Période   : {reservation.date_debut:%d/%m/%Y} → {reservation.date_fin:%d/%m/%Y}\n\n"
+                    f"Voir : {getattr(settings, 'SITE_URL', '')}/clients/{client.pk if client else ''}/reservations/{reservation.pk}/"
+                ),
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[settings.CONTACT_EMAIL1, settings.CONTACT_EMAIL2],
+                fail_silently=True,
+            )
+        except Exception as exc:
+            logger.error("Email staff (validation résa) échoué pour %s : %s", reservation.reference, exc)
+
+    # ── Emails : annulation ──────────────────────────────────────────────────
+    def _send_emails_annulation(self, reservation, motif, request):
+        client = reservation.client
+
+        # ── Client ──
+        if client and client.email:
+            try:
+                send_mail(
+                    subject=f"Votre réservation « {reservation.nom} » a été annulée",
+                    message=(
+                        f"Bonjour {client.nom},\n\n"
+                        f"Nous vous informons que votre réservation « {reservation.nom} » "
+                        f"(référence {reservation.reference}) a été annulée.\n\n"
+                        + (f"Motif : {motif}\n\n" if motif else "\n")
+                        + f"N'hésitez pas à nous recontacter pour toute question.\n\n"
+                        f"Cordialement,\nL'équipe régie publicitaire"
+                    ),
+                    from_email=settings.DEFAULT_FROM_EMAIL,
+                    recipient_list=[client.email],
+                    fail_silently=True,
+                )
+            except Exception as exc:
+                logger.error("Email client (annulation résa) échoué pour %s : %s", reservation.reference, exc)
+
+        # ── Staff ──
+        try:
+            send_mail(
+                subject=f"[GeoAd] Réservation annulée — {reservation.reference}",
+                message=(
+                    f"Réservation annulée : {reservation.reference}\n\n"
+                    f"Nom       : {reservation.nom}\n"
+                    f"Client    : {client.nom if client else '—'} ({client.email if client else '—'})\n"
+                    f"Annulée par : {request.user.get_full_name() or request.user.username}\n\n"
+                    f"Motif : {motif or '—'}\n\n"
+                    f"Voir : {getattr(settings, 'SITE_URL', '')}/clients/{client.pk if client else ''}/reservations/{reservation.pk}/"
+                ),
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[settings.CONTACT_EMAIL1, settings.CONTACT_EMAIL2],
+                fail_silently=True,
+            )
+        except Exception as exc:
+            logger.error("Email staff (annulation résa) échoué pour %s : %s", reservation.reference, exc)
+    
+    
 # ══════════════════════════════════════════════════════════════════════════════
 # Câblage urls.py — remplace les deux routes reservation_valider/reservation_annuler
 # ══════════════════════════════════════════════════════════════════════════════
@@ -2838,6 +2932,7 @@ class DemandeDetailView(LoginRequiredMixin, View):
 
         return render(request, self.template_name, {'demande': demande})
 
+
 class DemandeValiderView(LoginRequiredMixin, View):
     """
     Valide la demande :
@@ -2930,6 +3025,9 @@ class DemandeValiderView(LoginRequiredMixin, View):
                 f"({len(faces)} face{'s' if len(faces) > 1 else ''})."
             )
 
+            # ── Email STAFF UNIQUEMENT (pas de mail au client à la validation) ──
+            self._send_email_staff_validation(demande, reservation, faces, request)
+
         except ValidationError as e:
             # Regroupe les messages d'erreur (peut contenir un conflit de face)
             detail = "; ".join(e.messages) if hasattr(e, 'messages') else str(e)
@@ -2938,8 +3036,38 @@ class DemandeValiderView(LoginRequiredMixin, View):
             messages.error(request, f"Erreur inattendue lors de la validation : {e}")
 
         return redirect('demande_detail', uuid=uuid)
+
+    def _send_email_staff_validation(self, demande, reservation, faces, request):
+        recap_emplacements = '\n'.join(
+            f"  - {f.support.code} · Face {f.label} · {f.support.quartier}" for f in faces
+        ) or '  (aucun)'
+
+        corps_staff = (
+            f"Demande validée : {demande.reference}\n\n"
+            f"Réservation créée : {reservation.reference}\n"
+            f"Validée par : {request.user.get_full_name() or request.user.username}\n\n"
+            f"Contact   : {demande.nom_contact} ({demande.societe or '—'})\n"
+            f"Email     : {demande.email}\n"
+            f"Téléphone : {demande.telephone}\n\n"
+            f"Période   : {demande.date_debut_souhaitee:%d/%m/%Y} → {demande.date_fin_souhaitee:%d/%m/%Y}\n"
+            f"Campagne  : {demande.nom_campagne or '—'}\n\n"
+            f"Emplacements réservés :\n{recap_emplacements}\n\n"
+            f"Voir la réservation : {getattr(settings, 'SITE_URL', '')}/staff/reservations/{reservation.pk}/"
+        )
+        try:
+            send_mail(
+                subject=f"[GeoAd] Demande validée — {demande.reference}",
+                message=corps_staff,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[settings.CONTACT_EMAIL1, settings.CONTACT_EMAIL2],
+                fail_silently=True,
+            )
+        except Exception as exc:
+            logger.error("Email staff (validation) échoué pour demande %s : %s", demande.reference, exc)
+
+
 class DemandeRefuserView(LoginRequiredMixin, View):
-    """Refuse la demande, enregistre le motif, notifie le client par email."""
+    """Refuse la demande, enregistre le motif, notifie le client ET le staff par email."""
 
     def post(self, request, uuid):
         demande = get_object_or_404(DemandeReservation, uuid=uuid)
@@ -2955,6 +3083,7 @@ class DemandeRefuserView(LoginRequiredMixin, View):
 
         demande.marquer_refusee(user=request.user, notes=motif)
 
+        # ── Email CLIENT ──────────────────────────────────────────────────
         try:
             send_mail(
                 subject=f"Votre demande de réservation {demande.reference}",
@@ -2978,11 +3107,35 @@ class DemandeRefuserView(LoginRequiredMixin, View):
         except Exception as e:
             messages.warning(
                 request,
-                f"Demande refusée, mais l'envoi de l'email a échoué : {e}"
+                f"Demande refusée, mais l'envoi de l'email au client a échoué : {e}"
             )
 
+        # ── Email STAFF ───────────────────────────────────────────────────
+        self._send_email_staff_refus(demande, motif, request)
+
         return redirect('demandes_liste')
-    
+
+    def _send_email_staff_refus(self, demande, motif, request):
+        corps_staff = (
+            f"Demande refusée : {demande.reference}\n\n"
+            f"Refusée par : {request.user.get_full_name() or request.user.username}\n\n"
+            f"Contact   : {demande.nom_contact} ({demande.societe or '—'})\n"
+            f"Email     : {demande.email}\n"
+            f"Téléphone : {demande.telephone}\n\n"
+            f"Emplacements souhaités : {demande.get_resume_emplacements()}\n\n"
+            f"Motif du refus :\n{motif}\n"
+        )
+        try:
+            send_mail(
+                subject=f"[GeoAd] Demande refusée — {demande.reference}",
+                message=corps_staff,
+                from_email=settings.DEFAULT_FROM_EMAIL,
+                recipient_list=[settings.CONTACT_EMAIL1, settings.CONTACT_EMAIL2],
+                fail_silently=True,
+            )
+        except Exception as exc:
+            logger.error("Email staff (refus) échoué pour demande %s : %s", demande.reference, exc)
+
 
 # ══════════════════════════════════════════════════════════════════════════════
 # WIZARD STAFF — Création de réservation en 3 étapes

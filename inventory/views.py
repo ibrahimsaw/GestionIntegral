@@ -716,8 +716,9 @@ class SupportCreateView(StaffRequiredMixin, CreateView):
                     FacePanneau.objects.create(
                         support=self.object,
                         label=label,
-                        eclairage=self.request.POST.get(f'face_{i}_eclairage', 'oui'),
-                        notes=self.request.POST.get(f'face_{i}_notes', '')
+                        eclairage=self.request.POST.get(f'form-{i}-eclairage', 'oui'),
+                        notes=self.request.POST.get(f'form-{i}-notes', ''),
+                        photo=self.request.FILES.get(f'form-{i}-photo'),
                     )
             
             elif type_support == 'ecran' and ecran_form.is_valid():
@@ -794,23 +795,27 @@ class SupportUpdateView(StaffRequiredMixin, UpdateView):
             # 3. Cas PANNEAU : Gestion dynamique des faces
             elif support.type_support == 'panneau':
                 nb_faces = form.cleaned_data.get('nb_faces', 1)
-                
+
                 for i in range(nb_faces):
                     label = chr(65 + i)  # A, B, C...
                     data = {
-                        #'format': self.request.POST.get(f'face_{i}_format', '4x3'),
-                        'eclairage': self.request.POST.get(f'face_{i}_eclairage', 'non'),
-                        'notes': self.request.POST.get(f'face_{i}_notes', '')
+                        'eclairage': self.request.POST.get(f'form-{i}-eclairage', 'non'),
+                        'notes': self.request.POST.get(f'form-{i}-notes', '')
                     }
+                    # On ne touche à la photo QUE si une nouvelle a été envoyée,
+                    # sinon on écraserait la photo existante avec None à chaque update.
+                    photo = self.request.FILES.get(f'form-{i}-photo')
+                    if photo:
+                        data['photo'] = photo
+
                     FacePanneau.objects.update_or_create(
-                        support=support, 
-                        label=label, 
+                        support=support,
+                        label=label,
                         defaults=data
                     )
-                
+
                 # Nettoyage des faces obsolètes
                 support.faces.filter(label__gt=chr(64 + nb_faces)).delete()
-
             # 4. Journalisation (Audit Log)
             log_action(
                 self.request,

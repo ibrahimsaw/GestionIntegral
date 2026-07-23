@@ -51,7 +51,7 @@ urlpatterns = [
     path('confirmation/<uuid:uuid>/',
          views.ConfirmationView.as_view(),
          name='confirmation'),
-
+    path('suivi/', views.SuiviDemandeView.as_view(), name='suivi_demande'),     
     # ── API publiques (JSON) ──────────────────────────────────────────────────
     path('api/geojson/',
          views.ApiGeoJsonView.as_view(),

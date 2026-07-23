@@ -194,12 +194,10 @@ class Etape3Form(forms.Form):
                     'reference_client_saisie',
                     "Merci de renseigner votre référence client (ex: CLI-2026-A3F9K2)."
                 )
-            # Pas besoin de nom/email/téléphone ici : ils seront récupérés
-            # depuis le Client rattaché par référence (voir DemandeReservation.save()).
         else:
-            # Nouveau client : ces coordonnées sont la seule source d'info, obligatoires.
             for field, msg in [
                 ('nom_contact', "Ce champ est obligatoire."),
+                ('societe', "Ce champ est obligatoire."),
                 ('email', "Ce champ est obligatoire."),
                 ('telephone', "Ce champ est obligatoire."),
             ]:
@@ -207,8 +205,47 @@ class Etape3Form(forms.Form):
                     self.add_error(field, msg)
 
         return cleaned_data
-
 # ── Formulaire de contact ─────────────────────────────────────────────────────
+
+class SuiviDemandeForm(forms.Form):
+    reference = forms.CharField(
+        max_length=50,
+        label="Référence de la demande",
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'DEM-2026-A3F9K2',
+        }),
+    )
+    email = forms.EmailField(
+        label="Email utilisé lors de la demande",
+        widget=forms.EmailInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'vous@exemple.com',
+        }),
+    )
+
+    def clean(self):
+        cleaned = super().clean()
+        reference = cleaned.get('reference', '').strip()
+        email = cleaned.get('email', '').strip().lower()
+
+        if reference and email:
+            from campaigns.models import DemandeReservation
+            demande = DemandeReservation.objects.filter(
+                reference__iexact=reference,
+                email__iexact=email,
+            ).first()
+            if not demande:
+                raise forms.ValidationError(
+                    "Aucune demande ne correspond à cette référence et cet "
+                    "email. Vérifiez votre saisie ou contactez notre service "
+                    "client."
+                )
+            cleaned['demande'] = demande
+
+        return cleaned
+
+
 
 class ContactForm(forms.Form):
     nom = forms.CharField(

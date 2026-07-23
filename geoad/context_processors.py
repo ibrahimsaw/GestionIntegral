@@ -24,6 +24,8 @@ def contact_info(request):
     return {
         'CONTACT_EMAIL': getattr(settings, 'CONTACT_EMAIL', ''),
         'CONTACT_EMAIL1': getattr(settings, 'CONTACT_EMAIL1', ''),
+        'CONTACT_EMAIL2': getattr(settings, 'CONTACT_EMAIL2', ''),
         'CONTACT_TEL1': getattr(settings, 'CONTACT_TEL1', ''),
         'CONTACT_TEL2': getattr(settings, 'CONTACT_TEL2', ''),
+        'CONTACT_TEL3': getattr(settings, 'CONTACT_TEL3', ''),
     }

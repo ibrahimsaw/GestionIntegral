@@ -109,6 +109,43 @@
     font-size: .95rem; color: #065f46; opacity: .85;
   }
 
+  /* ── SUCCESS BANNER — VARIANTES STATUT (NOUVEAU) ─────────────── */
+  .success-banner.status-info {
+    background: linear-gradient(135deg, #3b82f6 0%, #eff6ff 100%);
+    border-color: #3b82f6;
+  }
+  .success-banner.status-info .success-icon { background: #3b82f6; box-shadow: 0 12px 26px rgba(59,130,246,.32); }
+  .success-banner.status-info .success-title,
+  .success-banner.status-info .success-text { color: #1e3a8a; }
+
+  .success-banner.status-danger {
+    background: linear-gradient(135deg, #ef4444 0%, #fef2f2 100%);
+    border-color: #ef4444;
+  }
+  .success-banner.status-danger .success-icon { background: #ef4444; box-shadow: 0 12px 26px rgba(239,68,68,.32); }
+  .success-banner.status-danger .success-title,
+  .success-banner.status-danger .success-text { color: #7f1d1d; }
+
+  .success-banner.status-secondary {
+    background: linear-gradient(135deg, #6b7280 0%, #f3f4f6 100%);
+    border-color: #9ca3af;
+  }
+  .success-banner.status-secondary .success-icon { background: #6b7280; box-shadow: 0 12px 26px rgba(107,114,128,.28); }
+  .success-banner.status-secondary .success-title,
+  .success-banner.status-secondary .success-text { color: #374151; }
+
+  /* ── BADGE STATUT (NOUVEAU) ──────────────────────────────────── */
+  .badge-statut {
+    display: inline-flex; align-items: center;
+    padding: 6px 14px; border-radius: 20px;
+    font-size: .82rem; font-weight: 800;
+  }
+  .badge-statut-warning   { background: #fef3c7; color: #92400e; }
+  .badge-statut-info      { background: #dbeafe; color: #1e40af; }
+  .badge-statut-success   { background: #d1fae5; color: #065f46; }
+  .badge-statut-danger    { background: #fee2e2; color: #991b1b; }
+  .badge-statut-secondary { background: #e5e7eb; color: #374151; }
+
   /* ── REFERENCE CARD ──────────────────────────────────────────── */
   .ref-card {
     background: var(--bg-card);
@@ -303,20 +340,97 @@
 {% endblock %}
 
 {% block header %}
-  <!-- SUCCESS BANNER -->
-  <div class="success-banner">
-    <div class="dots-deco"></div>
-    <div class="success-icon"><i class="bi bi-check-lg"></i></div>
-    <div class="success-title">Demande envoyée avec succès !</div>
-    <div class="success-text">
-      Votre demande a bien été enregistrée. Notre équipe vous contactera sous 24 heures.
+  {% if demande.est_refusee %}
+    <div class="success-banner status-danger">
+      <div class="dots-deco"></div>
+      <div class="success-icon"><i class="bi bi-x-lg"></i></div>
+      <div class="success-title">Demande refusée</div>
+      <div class="success-text">
+        Nous sommes désolés, votre demande n'a pas pu être retenue en l'état.
+        Contactez notre équipe pour en connaître les raisons ou explorer d'autres options.
+      </div>
     </div>
-  </div>
+
+  {% elif demande.est_validee %}
+    {% if demande.reservation %}
+      {% if demande.reservation.statut == 'annulee' %}
+        <div class="success-banner status-danger">
+          <div class="dots-deco"></div>
+          <div class="success-icon"><i class="bi bi-x-lg"></i></div>
+          <div class="success-title">Réservation annulée</div>
+          <div class="success-text">
+            Votre demande avait été validée, mais la réservation associée a
+            depuis été annulée. Contactez notre équipe pour plus de détails.
+          </div>
+        </div>
+      {% elif demande.reservation.statut == 'expiree' %}
+        <div class="success-banner status-secondary">
+          <div class="dots-deco"></div>
+          <div class="success-icon"><i class="bi bi-calendar-x"></i></div>
+          <div class="success-title">Réservation expirée</div>
+          <div class="success-text">
+            La période de cette réservation est désormais terminée. Contactez
+            notre équipe si vous souhaitez reconduire ou renouveler votre campagne.
+          </div>
+        </div>
+      {% elif demande.reservation.statut == 'confirmee' %}
+        <div class="success-banner">
+          <div class="dots-deco"></div>
+          <div class="success-icon"><i class="bi bi-check-lg"></i></div>
+          <div class="success-title">Réservation confirmée !</div>
+          <div class="success-text">
+            Votre réservation est confirmée et active. Notre équipe reste à
+            votre disposition pour la suite.
+          </div>
+        </div>
+      {% else %}
+        {# en_attente #}
+        <div class="success-banner status-info">
+          <div class="dots-deco"></div>
+          <div class="success-icon"><i class="bi bi-hourglass-split"></i></div>
+          <div class="success-title">Réservation en attente de confirmation</div>
+          <div class="success-text">
+            Votre demande a été validée et une réservation a été créée. Elle
+            est en attente de confirmation finale par notre équipe.
+          </div>
+        </div>
+      {% endif %}
+    {% else %}
+      <div class="success-banner">
+        <div class="dots-deco"></div>
+        <div class="success-icon"><i class="bi bi-check-lg"></i></div>
+        <div class="success-title">Demande validée !</div>
+        <div class="success-text">
+          Votre demande a été validée. Notre équipe finalise la création de
+          votre réservation.
+        </div>
+      </div>
+    {% endif %}
+
+  {% elif demande.est_en_cours %}
+    <div class="success-banner status-info">
+      <div class="dots-deco"></div>
+      <div class="success-icon"><i class="bi bi-hourglass-split"></i></div>
+      <div class="success-title">Demande en cours de traitement</div>
+      <div class="success-text">
+        Notre équipe examine actuellement votre demande. Vous recevrez une réponse sous peu.
+      </div>
+    </div>
+  {% else %}
+    <div class="success-banner">
+      <div class="dots-deco"></div>
+      <div class="success-icon"><i class="bi bi-check-lg"></i></div>
+      <div class="success-title">Demande envoyée avec succès !</div>
+      <div class="success-text">
+        Votre demande a bien été enregistrée. Notre équipe vous contactera sous 24 heures.
+      </div>
+    </div>
+  {% endif %}
 {% endblock %}
 
 {% block content %}
 <div class="confirmation">
-  <!-- RÉFÉRENCE & EMAIL -->
+  <!-- RÉFÉRENCE, STATUT & EMAIL -->
   <div class="ref-card">
     <div class="ref-row">
       <div>
@@ -327,6 +441,27 @@
         <div class="ref-label" style="justify-content: flex-end;"><i class="bi bi-envelope-fill"></i> Email de confirmation</div>
         <div class="ref-value" style="font-size: .9rem;">{{ demande.email }}</div>
       </div>
+    </div>
+    <div class="ref-row">
+      <div>
+        <div class="ref-label"><i class="bi {{ demande.get_statut_icon }}"></i> Statut de la demande</div>
+        <div class="ref-value">
+          <span class="badge-statut badge-statut-{{ demande.get_statut_badge }}">
+            <i class="bi {{ demande.get_statut_icon }} me-1"></i>{{ demande.get_statut_display }}
+          </span>
+        </div>
+      </div>
+
+      {% if demande.reservation %}
+        <div style="text-align: right;">
+          <div class="ref-label" style="justify-content: flex-end;"><i class="bi bi-bookmark-check-fill"></i> Statut de la réservation</div>
+          <div class="ref-value">
+            <span class="badge-statut badge-statut-{{ demande.reservation.get_statut_badge }}">
+              {{ demande.reservation.get_statut_display }}
+            </span>
+          </div>
+        </div>
+      {% endif %}
     </div>
   </div>
 
@@ -359,9 +494,7 @@
       <div class="recap-icon"><i class="bi bi-clock-fill"></i></div>
       <div class="recap-label">Durée</div>
       <div class="recap-value">
-        {% with duree_jours=demande.date_fin_souhaitee|add:"1" %}
-          {% ifchanged %}{{ duree_jours|add:demande.date_debut_souhaitee|add:"-2" }}{% endifchanged %} jour{{ duree_jours|add:demande.date_debut_souhaitee|add:"-2"|add:"-1"|yesno:",,s" }}
-        {% endwith %}
+        {{ demande.duree_jours }} jour{{ demande.duree_jours|pluralize }}
       </div>
     </div>
 
@@ -373,6 +506,35 @@
       </div>
     {% endif %}
   </div>
+
+  {% if demande.reservation %}
+    <div class="divider"></div>
+
+    <!-- DÉTAILS DE LA RÉSERVATION (NOUVEAU) -->
+    <div class="section-recap">
+      <div class="section-title">
+        <span class="section-title-icon"><i class="bi bi-bookmark-check-fill"></i></span> Détails de la réservation
+      </div>
+      <div class="card-list">
+        <div class="card-item">
+          <div class="card-item-icon"><i class="bi bi-upc-scan"></i></div>
+          <div>
+            <div class="item-code">{{ demande.reservation.reference }}</div>
+            <div class="item-meta">Référence de réservation</div>
+          </div>
+        </div>
+        <div class="card-item">
+          <div class="card-item-icon"><i class="bi bi-calendar-range"></i></div>
+          <div>
+            <div class="item-code">
+              {{ demande.reservation.date_debut|date:"d/m/Y" }} → {{ demande.reservation.date_fin|date:"d/m/Y" }}
+            </div>
+            <div class="item-meta">{{ demande.reservation.duree_jours }} jour{{ demande.reservation.duree_jours|pluralize }} · {{ demande.reservation.nb_faces }} emplacement{{ demande.reservation.nb_faces|pluralize }}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  {% endif %}
 
   <div class="divider"></div>
 
@@ -470,27 +632,133 @@
 
   <div class="divider"></div>
 
-  <!-- PROCHAINES ÉTAPES -->
-  <div class="next-steps">
-    <div class="dots-deco"></div>
-    <div class="next-steps-title">
-      <i class="bi bi-arrow-right-circle-fill"></i> Prochaines étapes
+  <!-- PROCHAINES ÉTAPES (adapté selon le statut demande + réservation) -->
+  {% if demande.est_refusee %}
+    <div class="next-steps" style="background: linear-gradient(135deg, #ef4444 0%, #ef4444 100%);">
+      <div class="dots-deco"></div>
+      <div class="next-steps-title">
+        <i class="bi bi-info-circle-fill"></i> Que faire maintenant ?
+      </div>
+      <ul class="steps-list">
+        <li class="steps-item">
+          <span class="steps-num">1</span>
+          <span>Contactez notre équipe pour connaître les raisons du refus et explorer d'autres options</span>
+        </li>
+        <li class="steps-item">
+          <span class="steps-num">2</span>
+          <span>Nous pouvons vous proposer des emplacements alternatifs disponibles</span>
+        </li>
+      </ul>
     </div>
-    <ul class="steps-list">
-      <li class="steps-item">
-        <span class="steps-num">1</span>
-        <span>Notre équipe examine votre demande et vérifie les disponibilités réelles</span>
-      </li>
-      <li class="steps-item">
-        <span class="steps-num">2</span>
-        <span>Vous recevrez un email de confirmation avec les détails et un devis personnalisé</span>
-      </li>
-      <li class="steps-item">
-        <span class="steps-num">3</span>
-        <span>Mise en place de votre campagne selon les modalités convenues</span>
-      </li>
-    </ul>
-  </div>
+
+  {% elif demande.est_validee and demande.reservation %}
+    {% if demande.reservation.statut == 'annulee' %}
+      <div class="next-steps" style="background: linear-gradient(135deg, #ef4444 0%, #ef4444 100%);">
+        <div class="dots-deco"></div>
+        <div class="next-steps-title">
+          <i class="bi bi-info-circle-fill"></i> Que faire maintenant ?
+        </div>
+        <ul class="steps-list">
+          <li class="steps-item">
+            <span class="steps-num">1</span>
+            <span>Contactez notre équipe pour connaître les raisons de l'annulation</span>
+          </li>
+          <li class="steps-item">
+            <span class="steps-num">2</span>
+            <span>Nous pouvons étudier une nouvelle demande selon vos disponibilités</span>
+          </li>
+        </ul>
+      </div>
+    {% elif demande.reservation.statut == 'expiree' %}
+      <div class="next-steps" style="background: linear-gradient(135deg, #6b7280 0%, #6b7280 100%);">
+        <div class="dots-deco"></div>
+        <div class="next-steps-title">
+          <i class="bi bi-arrow-repeat"></i> Envie de reconduire votre campagne ?
+        </div>
+        <ul class="steps-list">
+          <li class="steps-item">
+            <span class="steps-num">1</span>
+            <span>Contactez notre équipe pour renouveler votre réservation sur une nouvelle période</span>
+          </li>
+        </ul>
+      </div>
+    {% elif demande.reservation.statut == 'confirmee' %}
+      <div class="next-steps">
+        <div class="dots-deco"></div>
+        <div class="next-steps-title">
+          <i class="bi bi-check-circle-fill"></i> Votre réservation est active
+        </div>
+        <ul class="steps-list">
+          <li class="steps-item">
+            <span class="steps-num">1</span>
+            <span>Votre campagne est en cours de diffusion selon les modalités convenues</span>
+          </li>
+          <li class="steps-item">
+            <span class="steps-num">2</span>
+            <span>Notre équipe reste disponible pour toute question durant la campagne</span>
+          </li>
+        </ul>
+      </div>
+    {% else %}
+      {# en_attente #}
+      <div class="next-steps">
+        <div class="dots-deco"></div>
+        <div class="next-steps-title">
+          <i class="bi bi-hourglass-split"></i> Dernière étape avant confirmation
+        </div>
+        <ul class="steps-list">
+          <li class="steps-item">
+            <span class="steps-num">1</span>
+            <span>Notre équipe finalise les modalités administratives et le devis définitif</span>
+          </li>
+          <li class="steps-item">
+            <span class="steps-num">2</span>
+            <span>Vous recevrez une confirmation dès validation finale de la réservation</span>
+          </li>
+        </ul>
+      </div>
+    {% endif %}
+
+  {% elif demande.est_validee %}
+    <div class="next-steps">
+      <div class="dots-deco"></div>
+      <div class="next-steps-title">
+        <i class="bi bi-check-circle-fill"></i> Votre demande est validée
+      </div>
+      <ul class="steps-list">
+        <li class="steps-item">
+          <span class="steps-num">1</span>
+          <span>Notre équipe finalise la création de votre réservation</span>
+        </li>
+        <li class="steps-item">
+          <span class="steps-num">2</span>
+          <span>Vous serez contacté(e) pour la suite</span>
+        </li>
+      </ul>
+    </div>
+
+  {% else %}
+    <div class="next-steps">
+      <div class="dots-deco"></div>
+      <div class="next-steps-title">
+        <i class="bi bi-arrow-right-circle-fill"></i> Prochaines étapes
+      </div>
+      <ul class="steps-list">
+        <li class="steps-item">
+          <span class="steps-num">1</span>
+          <span>Notre équipe examine votre demande et vérifie les disponibilités réelles</span>
+        </li>
+        <li class="steps-item">
+          <span class="steps-num">2</span>
+          <span>Vous recevrez un email de confirmation avec les détails et un devis personnalisé</span>
+        </li>
+        <li class="steps-item">
+          <span class="steps-num">3</span>
+          <span>Mise en place de votre campagne selon les modalités convenues</span>
+        </li>
+      </ul>
+    </div>
+  {% endif %}
 
   <!-- CONTACT -->
   <div class="contact-bar">
@@ -503,10 +771,16 @@
         {% if CONTACT_TEL2 %}
              <a href="tel:{{ CONTACT_TEL2 }}" class="card-link mt-2"><i class="bi bi-telephone"></i>{{ CONTACT_TEL2 }}</a>
         {% endif %} 
+        {% if CONTACT_TEL3 %}
+          <a href="tel:{{ CONTACT_TEL3 }}" class="card-link mt-2"><i class="bi bi-telephone"></i>{{ CONTACT_TEL3 }}</a>
+        {% endif %} 
         ou 
-        <a href="mailto:{{ CONTACT_EMAIL }}" class="card-link"><i class="bi bi-envelope"></i> {{ CONTACT_EMAIL }}</a>
+          <a href="mailto:{{ CONTACT_EMAIL }}" class="card-link"><i class="bi bi-envelope"></i> {{ CONTACT_EMAIL }}</a>
         {% if CONTACT_EMAIL1 %}
-        <a href="mailto:{{ CONTACT_EMAIL1 }}" class="card-link"><i class="bi bi-envelope"></i>{{ CONTACT_EMAIL1 }}</a>
+          <a href="mailto:{{ CONTACT_EMAIL1 }}" class="card-link"><i class="bi bi-envelope"></i>{{ CONTACT_EMAIL1 }}</a>
+        {% endif %}
+        {% if CONTACT_EMAIL2 %}
+          <a href="mailto:{{ CONTACT_EMAIL2 }}" class="card-link"><i class="bi bi-envelope"></i>{{ CONTACT_EMAIL2 }}</a>
         {% endif %}
       </div>
     </div>
@@ -519,6 +793,9 @@
     </a>
     <a href="{% url 'portail:catalogue' %}" class="btn-nav btn-secondary">
       <i class="bi bi-grid-3x3-gap-fill"></i> Catalogue
+    </a>
+    <a href="{% url 'portail:suivi_demande' %}" class="btn-nav btn-secondary">
+      <i class="bi bi-search"></i> Suivre une autre demande
     </a>
     <a href="{% url 'portail:contact' %}" class="btn-nav btn-primary">
       <i class="bi bi-chat-dots-fill"></i> Nous contacter

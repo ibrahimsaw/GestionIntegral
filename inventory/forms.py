@@ -119,11 +119,12 @@ class FacePanneauForm(forms.ModelForm):
 
     class Meta:
         model  = FacePanneau
-        fields = ['label', 'eclairage', 'notes']
+        fields = ['label', 'eclairage', 'notes','photo']
         widgets = {
             'label':    forms.Select(attrs=S),
             'eclairage': forms.Select(attrs=S),
             'notes':    forms.Textarea(attrs={**W, 'rows': 2}),
+            'photo':   forms.FileInput(attrs={'class': 'form-control'}),
         }
 
     def __init__(self, *args, **kwargs):

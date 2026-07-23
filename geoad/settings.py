@@ -181,8 +181,10 @@ DESIGN_CONFIG = {
 }
 CONTACT_EMAIL1 = "reseau@promopub-integral.com"  # ou l'adresse que tu veux recevoir les demandes
 CONTACT_EMAIL = "support-it@promopub-integral.com"
-CONTACT_TEL1 = "+22674534694"
-CONTACT_TEL2 = "+22663696961"
+CONTACT_EMAIL2 = "secretariat@promopub-integral.com "
+CONTACT_TEL1 = "+22658800909"
+CONTACT_TEL2 = "+22678873301"
+CONTACT_TEL3 = "+22658906695"
 
 # Horaires de diffusion par défaut pour le planning des panneaux
 DIFFUSION_HEURE_DEBUT = 6    # 06:00
@@ -191,3 +193,5 @@ DIFFUSION_HEURE_FIN   = 22   # 22:00
 # Configuration de Django Crispy Forms
 CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
+# settings.py
+DEFAULT_SUPPORT_PHOTO_URL = '/static/img/logo.jpg'

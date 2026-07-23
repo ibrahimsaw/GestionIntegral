@@ -39,6 +39,7 @@
                 {% if form.non_field_errors %}
                     <div class="alert alert-danger">{{ form.non_field_errors }}</div>
                 {% endif %}
+
             <div class="row g-3">
 
                 <div class="col-lg-5">
@@ -69,16 +70,16 @@
                         <div class="form-section-hd"><i class="bi bi-grid-1x2" style="color:var(--color-primary)"></i>Type de Support</div>
                         <div class="form-section-bd">
                             <div class="d-flex gap-3 mb-3">
-                                <button type="button" 
-                                        class="type-card {% if object %}pe-none opacity-75{% endif %}" 
-                                        id="btn-panneau" 
+                                <button type="button"
+                                        class="type-card {% if object %}pe-none opacity-75{% endif %}"
+                                        id="btn-panneau"
                                         {% if not object %}onclick="selectType('panneau')"{% endif %}>
                                     <i class="bi bi-sign-merge-right"></i>Panneau Statique
                                 </button>
-                                
-                                <button type="button" 
-                                        class="type-card {% if object %}pe-none opacity-75{% endif %}" 
-                                        id="btn-ecran" 
+
+                                <button type="button"
+                                        class="type-card {% if object %}pe-none opacity-75{% endif %}"
+                                        id="btn-ecran"
                                         {% if not object %}onclick="selectType('ecran')"{% endif %}>
                                     <i class="bi bi-display"></i>Écran Numérique
                                 </button>
@@ -124,12 +125,12 @@
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label">Photo du support</label>
-                                    
+
                                     <div class="mb-2">
-                                        <img id="image-preview" 
-                                            src="{% if form.instance.photo_principale %}{{ form.instance.photo_principale.url }}{% else %}{% static 'img/logo.png' %}{% endif %}" 
-                                            alt="Aperçu" 
-                                            class="img-thumbnail {% if not form.instance.photo_principale %}d-none{% endif %}" 
+                                        <img id="image-preview"
+                                            src="{% if form.instance.photo_principale %}{{ form.instance.photo_principale.url }}{% else %}{% static 'img/logo.png' %}{% endif %}"
+                                            alt="Aperçu"
+                                            class="img-thumbnail {% if not form.instance.photo_principale %}d-none{% endif %}"
                                             style="height: 120px; width: 180px; object-fit: cover; border-radius: 8px; border: 2px solid var(--color-primary);">
                                     </div>
                                     <div>
@@ -139,7 +140,7 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="form-section panel" id="panel-panneau">
                         <div class="form-section-hd"><i class="bi bi-layers" style="color:#a78bfa"></i>Configuration des Faces</div>
                         <div class="form-section-bd">
@@ -157,6 +158,7 @@
                                     {{ form.format.errors }}
                                 </div>
                             </div>
+
                             <div id="faces-container"></div>
                         </div>
                     </div>
@@ -196,7 +198,7 @@
     <script id="existing-faces" type="application/json">
         [
             {% for f in existing_faces %}
-            {"label": "{{ f.label }}", "format": "{{ f.format }}", "eclairage": "{{ f.eclairage }}", "notes": "{{ f.notes|escapejs }}"}{% if not forloop.last %},{% endif %}
+            {"label": "{{ f.label }}", "format": "{{ f.format }}", "eclairage": "{{ f.eclairage }}", "notes": "{{ f.notes|escapejs }}", "photo_url": "{% if f.photo %}{{ f.photo.url }}{% endif %}"}{% if not forloop.last %},{% endif %}
             {% endfor %}
         ]
     </script>
@@ -212,6 +214,7 @@
     const codeInput = document.getElementById('id_code');
     const nbFacesInput = document.getElementById('id_nb_faces');
     const facesContainer = document.getElementById('faces-container');
+    const totalFormsInput = document.getElementById('id_form-TOTAL_FORMS');
 
     // ── CARTE GPS (Leaflet) ──────────────────────────────────────
     const latInput = document.getElementById('id_latitude');
@@ -304,46 +307,77 @@
             generateAutoCode();
         });
     }
-        // ── SÉLECTEUR DE TYPE ────────────────────────────────────────
+
+    // ── SÉLECTEUR DE TYPE ────────────────────────────────────────
     function selectType(t) {
         typeField.value = t;
-        
+
         // UI : Mise à jour des boutons
         document.getElementById('btn-panneau').className = 'type-card' + (t === 'panneau' ? ' sel-panneau' : '');
         document.getElementById('btn-ecran').className   = 'type-card' + (t === 'ecran'   ? ' sel-ecran'   : '');
-        
+
         // UI : Affichage des panels correspondants
         document.getElementById('panel-panneau').classList.toggle('show', t === 'panneau');
         document.getElementById('panel-ecran').classList.toggle('show', t === 'ecran');
-        
+
         // Logique métier
         generateAutoCode();
         if (t === 'panneau') updateFaces();
     }
 
     // ── GESTION DYNAMIQUE DES FACES ──────────────────────────────
+    const DEFAULT_PHOTO_URL = "{% static 'img/logo.png' %}";
+    const FORM_PREFIX = "form"; // doit correspondre au prefix utilisé côté vue : FacePanneauFormSet(..., prefix='form')
+
     function createFaceHTML(index, data = null) {
         const label = String.fromCharCode(65 + index);
-        const fVal = data ? data.format : '4x3';
         const eVal = data ? data.eclairage : 'non';
         const nVal = data ? data.notes : '';
+        const photoUrl = data && data.photo_url ? data.photo_url : DEFAULT_PHOTO_URL;
+        const hasPhoto = !!(data && data.photo_url);
 
-
-        const eOpts = ECLAIRAGE_CHOICES.map(c => `<option value="${c[0]}" ${c[0]===eVal?'selected':''}>${c[1]}</option>`).join('');
+        const eOpts = ECLAIRAGE_CHOICES.map(c =>
+            `<option value="${c[0]}" ${c[0] === eVal ? 'selected' : ''}>${c[1]}</option>`
+        ).join('');
 
         return `
         <div class="face-section p-3 mb-3" style="background:#dbeafe; border-radius:8px; border-left:3px solid var(--color-primary); border-right:3px solid var(--color-primary);">
             <h6 class="fw-bold mb-3" style="color:var(--color-primary);">Face ${label}</h6>
+            <input type="hidden" name="${FORM_PREFIX}-${index}-label" value="${label}">
             <div class="row g-2">
                 <div class="col-md-6">
                     <label class="small fw-bold">Éclairage</label>
-                    <select name="face_${index}_eclairage" class="form-select form-select-sm">${eOpts}</select>
+                    <select name="${FORM_PREFIX}-${index}-eclairage" id="id_${FORM_PREFIX}-${index}-eclairage" class="form-select form-select-sm">${eOpts}</select>
+                </div>
+                <div class="col-md-6">
+                    <label class="form-label">Photo de la Face</label>
+                    <div class="mb-2">
+                        <img id="image-preview-${index}"
+                            src="${photoUrl}"
+                            alt="Aperçu"
+                            class="img-thumbnail ${hasPhoto ? '' : 'd-none'}"
+                            style="height: 120px; width: 180px; object-fit: cover; border-radius: 8px; border: 2px solid var(--color-primary);">
+                    </div>
+                    <div>
+                        <input type="file" name="${FORM_PREFIX}-${index}-photo" id="id_${FORM_PREFIX}-${index}-photo"
+                            class="form-control" accept="image/*"
+                            onchange="previewFace(${index}, this)">
+                    </div>
                 </div>
                 <div class="col-12 mt-2">
-                    <textarea name="face_${index}_notes" class="form-control form-control-sm" placeholder="Notes spécifiques..." rows="1">${nVal}</textarea>
+                    <textarea name="${FORM_PREFIX}-${index}-notes" id="id_${FORM_PREFIX}-${index}-notes"
+                        class="form-control form-control-sm" placeholder="Notes spécifiques..." rows="1">${nVal}</textarea>
                 </div>
             </div>
         </div>`;
+    }
+
+    function previewFace(index, input) {
+        const preview = document.getElementById(`image-preview-${index}`);
+        if (input.files && input.files[0]) {
+            preview.src = URL.createObjectURL(input.files[0]);
+            preview.classList.remove('d-none');
+        }
     }
 
     function updateFaces() {
@@ -353,9 +387,11 @@
             const existing = (EXISTING_FACES && EXISTING_FACES[i]) ? EXISTING_FACES[i] : null;
             facesContainer.insertAdjacentHTML('beforeend', createFaceHTML(i, existing));
         }
+        // Indispensable : Django doit savoir combien de formulaires ont été soumis
+        totalFormsInput.value = count;
     }
 
-    // ── APERÇU D'IMAGE EN TEMPS RÉEL ─────────────────────────────
+    // ── APERÇU D'IMAGE EN TEMPS RÉEL (photo principale du support) ──
     const photoInput = document.querySelector('input[type="file"][name="photo_principale"]');
     if (photoInput) {
         photoInput.addEventListener('change', function() {
@@ -372,15 +408,10 @@
         });
     }
 
-    // ── INITIALISATION AU CHARGEMENT (LE COEUR DU FIX) ────────────
+    // ── INITIALISATION AU CHARGEMENT ─────────────────────────────
     document.addEventListener('DOMContentLoaded', function() {
         const isEdit = {% if object %}true{% else %}false{% endif %};
         const savedType = typeField.value || 'panneau';
-
-        // DEBUG : afficher la valeur du champ type_support
-        console.log('DEBUG: typeField.value =', typeField.value);
-        console.log('DEBUG: savedType =', savedType);
-        console.log('DEBUG: isEdit =', isEdit);
 
         if (isEdit) {
             // En modification : on applique le style visuel sans écraser le code
@@ -388,7 +419,7 @@
             document.getElementById('btn-ecran').className   = 'type-card' + (savedType === 'ecran'   ? ' sel-ecran'   : '');
             document.getElementById('panel-panneau').classList.toggle('show', savedType === 'panneau');
             document.getElementById('panel-ecran').classList.toggle('show', savedType === 'ecran');
-            
+
             // On sécurise le code existant
             delete codeInput.dataset.isAuto;
             codeInput.readOnly = true;
@@ -402,6 +433,5 @@
 
     // Écouteur pour le changement manuel du nombre de faces
     nbFacesInput.addEventListener('input', updateFaces);
-
 </script>
 {% endblock %}

@@ -6,6 +6,8 @@ from datetime import datetime, timedelta
 from datetime import datetime
 from typing import Optional
 import uuid
+from django.conf import settings
+
 
 def calculer_duree_tranches(tranches: str) -> float:
     total_heures = 0.0
@@ -96,7 +98,7 @@ class FormatSupport(models.Model):
 
 def get_dynamic_format_choices():
     return [
-        (f.code, f"{f.dimensions} ({f.superficie}m²)" if f.superficie else f.dimensions)
+        (f.code, f"{f.dimensions} ({f.superficie:g}m²)" if f.superficie else f.dimensions)
         for f in FormatSupport.hors_ecran()
     ]
 
@@ -179,7 +181,7 @@ class Support(models.Model):
     
     def __str__(self):
         if self.type_support == self.TYPE_PANNEAU and self.format:
-            return f"{self.code} — {self.nom} ({self.get_format_display()})"
+            return f"{self.code} — {self.nom} ({self.get_format_display()}tr)"
         return f"{self.code} — {self.nom}"
     
     def clean(self):
@@ -239,6 +241,7 @@ class Support(models.Model):
             'quartier': self.quartier,
             'color': self.get_etat_color(),
             'type_panneau': self.type_panneau if self.type_support == self.TYPE_PANNEAU else None,
+            # models.py
         }
 
         if self.type_support == self.TYPE_PANNEAU:
@@ -256,6 +259,7 @@ class Support(models.Model):
                     'etat': face.etat,
                     'dispo': face.is_disponible(),
                     'disponibles': face.is_disponibles(),
+                    'photo_url': face.photo.url if face.photo else self.photo_principale.url if self.photo_principale else settings.DEFAULT_SUPPORT_PHOTO_URL,
                 })
             result['faces'] = faces
         elif self.type_support == self.TYPE_ECRAN:
@@ -294,7 +298,7 @@ class Support(models.Model):
             return result
 
         result['dimensions'] = fs.dimensions
-        result['surface'] = f"{fs.superficie}m²" if fs.superficie else ''
+        result['surface'] = f"{fs.superficie:g}m²" if fs.superficie else ''
         result['type'] = fs.categorie
 
         return result
@@ -539,6 +543,7 @@ class FacePanneau(models.Model):
     eclairage = models.CharField(max_length=10, choices=ECLAIRAGE_CHOICES, default='non')
     etat      = models.CharField(max_length=20, choices=ETAT_CHOICES, default=ETAT_BON, verbose_name="État de la face")
     notes    = models.TextField(blank=True)
+    photo = models.ImageField(upload_to='photos_faces/', blank=True, null=True, verbose_name="Photo de la face")
 
     class Meta:
         unique_together = [('support', 'label')]

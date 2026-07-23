@@ -27,7 +27,7 @@ from campaigns.models import (
 )
 from inventory.models import FacePanneau, Support
 
-from .forms import ContactForm, Etape1Form, Etape2Form, Etape3Form
+from .forms import *
 
 logger = logging.getLogger(__name__)
 
@@ -938,6 +938,16 @@ class ReserverEtape2View(View):
         })
 
 
+
+from datetime import date as date_type
+
+from django.contrib import messages
+from django.core.mail import send_mail
+from django.conf import settings
+from django.shortcuts import redirect, render
+from django.views import View
+
+
 class ReserverEtape3View(View):
     """Étape 3 — Coordonnées du visiteur et soumission finale."""
     template_name = 'portail/reserver_etape3.html'
@@ -967,33 +977,46 @@ class ReserverEtape3View(View):
             'nom_campagne': etape2_extra.get('nom_campagne', ''),
             'message':      etape2_extra.get('message', ''),
         }
-        return faces, supports, etape2
+
+        # ── Calcul de la durée en jours (inclusive) ──────────────────────
+        duree_jours = None
+        if etape2['date_debut'] and etape2['date_fin']:
+            try:
+                d_debut = date_type.fromisoformat(etape2['date_debut'])
+                d_fin   = date_type.fromisoformat(etape2['date_fin'])
+                duree_jours = (d_fin - d_debut).days + 1
+            except (ValueError, TypeError):
+                duree_jours = None
+
+        return faces, supports, etape2, duree_jours
 
     def get(self, request):
         if not self._check_session(request):
             messages.warning(request, "Veuillez compléter les étapes précédentes.")
             return redirect('portail:reserver_etape1')
 
-        faces, supports, etape2 = self._get_recap(request)
+        faces, supports, etape2, duree_jours = self._get_recap(request)
         form = Etape3Form()
         return render(request, self.template_name, {
-            'form':     form,
-            'faces':    faces,
-            'supports': supports,
-            'etape2':   etape2,
+            'form':        form,
+            'faces':       faces,
+            'supports':    supports,
+            'etape2':      etape2,
+            'duree_jours': duree_jours,
         })
 
     def post(self, request):
         if not self._check_session(request):
             return redirect('portail:reserver_etape1')
 
-        faces, supports, etape2 = self._get_recap(request)
+        faces, supports, etape2, duree_jours = self._get_recap(request)
         form = Etape3Form(request.POST)
 
         if not form.is_valid():
             return render(request, self.template_name, {
                 'form': form, 'faces': faces,
                 'supports': supports, 'etape2': etape2,
+                'duree_jours': duree_jours,
             })
 
         d = form.cleaned_data
@@ -1066,7 +1089,7 @@ class ReserverEtape3View(View):
                 subject=f"[GeoAd] Nouvelle demande {demande.reference}",
                 message=corps_staff,
                 from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[settings.CONTACT_EMAIL],
+                recipient_list=[settings.CONTACT_EMAIL1, settings.CONTACT_EMAIL2],
                 fail_silently=False,
             )
         except Exception as exc:
@@ -1095,11 +1118,40 @@ class ReserverEtape3View(View):
 
 
 class ConfirmationView(View):
+    """
+    Affiche le récapitulatif d'une demande de réservation.
+
+    Utilisée à deux moments :
+      1. Juste après la soumission (étape 3) → redirection directe avec l'uuid.
+      2. Plus tard, via le lien reçu par email ou via la page de suivi
+         (recherche par référence + email), pour connaître le statut de
+         traitement (nouvelle / en cours / validée / refusée).
+    """
     template_name = 'portail/confirmation.html'
 
     def get(self, request, uuid):
         demande = get_object_or_404(DemandeReservation, uuid=uuid)
         return render(request, self.template_name, {'demande': demande})
+
+
+class SuiviDemandeView(View):
+    """
+    Page de recherche : un visiteur retrouve sa demande à partir de sa
+    référence + email, puis est redirigé vers ConfirmationView qui affiche
+    le statut détaillé.
+    """
+    template_name = 'portail/suivi_demande.html'
+
+    def get(self, request):
+        form = SuiviDemandeForm()
+        return render(request, self.template_name, {'form': form})
+
+    def post(self, request):
+        form = SuiviDemandeForm(request.POST)
+        if form.is_valid():
+            demande = form.cleaned_data['demande']
+            return redirect('portail:confirmation', uuid=demande.uuid)
+        return render(request, self.template_name, {'form': form})
 # ══════════════════════════════════════════════════════════════════════════════
 # API JSON
 # ══════════════════════════════════════════════════════════════════════════════

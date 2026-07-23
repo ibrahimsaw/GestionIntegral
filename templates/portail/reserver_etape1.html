@@ -70,6 +70,12 @@
     .step-item:not(.active) .step-label {
       display: none;
     }
+    .section-header{
+      flex-direction: column;
+    }
+    .view-toggle{
+      flex-direction: row !important;
+    }
   }
 
   /* ── BARRE DATES ─────────────────────────────────────────── */
@@ -120,6 +126,7 @@
     display: inline-flex; gap: 3px;
     background: var(--bg-card2); border: 1px solid var(--border);
     border-radius: var(--radius-md); padding: 3px;
+    flex-direction:column;
   }
   .vt-btn {
     display: flex; align-items: center; gap: 6px;
@@ -412,6 +419,161 @@
     cursor: pointer; transition: background .15s ease;
   }
   .sc-map-btn:hover { background: var(--bg-card2); }
+  /* ── Carte preview photo (desktop: hover / mobile: tap) ─────────────────── */
+  /* ── Ligne face-btn + icône photo à droite ────────────────────────────── */
+  .rl-face-row, .face-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+  }
+  .rl-face-row .rl-face-btn,
+  .face-row .face-btn {
+    flex: 1 1 auto;
+    min-width: 0; /* empêche le texte de pousser l'icône hors du flex */
+  }
+
+  .photo-trigger {
+    flex-shrink: 0;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: #f1f5f9;
+    color: #475569;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background .15s, color .15s;
+  }
+  .photo-trigger:hover {
+    background: #e0e7ff;
+    color: #4338ca;
+  }
+  .photo-trigger i {
+    font-size: .85rem;
+    pointer-events: none;
+  }
+
+  /* ── Carte preview photo (desktop: hover / mobile: tap) ──────────────────── */
+  .photo-hover-preview {
+    position: fixed;
+    z-index: 9999;
+    display: none;
+    width: 260px;
+    background: #fff;
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 12px 32px rgba(0,0,0,.22), 0 2px 8px rgba(0,0,0,.12);
+    border: 1px solid rgba(0,0,0,.06);
+    animation: photoPreviewIn .15s ease-out;
+  }
+  @keyframes photoPreviewIn {
+    from { opacity: 0; transform: translateY(4px) scale(.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .photo-hover-preview .php-img-wrap {
+    position: relative;
+    width: 100%;
+    height: 160px;
+    background: #e2e8f0;
+  }
+  .photo-hover-preview img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+  .photo-hover-preview .php-badge {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    background: rgba(0,0,0,.55);
+    color: #fff;
+    font-size: .68rem;
+    font-weight: 600;
+    padding: 3px 9px;
+    border-radius: 20px;
+    backdrop-filter: blur(2px);
+  }
+  .photo-hover-preview .php-body {
+    padding: 10px 12px 12px;
+  }
+  .photo-hover-preview .php-code {
+    font-weight: 700;
+    font-size: .85rem;
+    color: #1e293b;
+    margin-bottom: 2px;
+  }
+  .photo-hover-preview .php-nom {
+    font-size: .74rem;
+    color: #475569;
+    margin-bottom: 6px;
+  }
+  .photo-hover-preview .php-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+  .photo-hover-preview .php-tag {
+    font-size: .66rem;
+    color: #334155;
+    background: #f1f5f9;
+    padding: 3px 8px;
+    border-radius: 20px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+  }
+  .photo-hover-preview .php-close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: rgba(0,0,0,.5);
+    color: #fff;
+    border: none;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    cursor: pointer;
+  }
+
+  /* Photo dans le popup carte */
+  .rl-popup-photo-wrap {
+    width: 100%;
+    height: 120px;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 8px;
+  }
+  .rl-popup-photo-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+  }
+
+  /* ── MOBILE : carte preview centrée, tap pour fermer ──────────────────────── */
+  @media (hover: none), (pointer: coarse) {
+    .photo-hover-preview {
+      left: 50% !important;
+      top: 50% !important;
+      transform: translate(-50%, -50%) !important;
+      width: min(90vw, 340px);
+    }
+    .photo-hover-preview .php-img-wrap { height: 200px; }
+    .photo-hover-preview .php-close { display: flex; }
+    .photo-preview-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(15,23,42,.45);
+      z-index: 9998;
+      display: none;
+    }
+  }
 </style>
 {% endblock %}
 
@@ -453,38 +615,31 @@
         <i class="bi bi-calendar3" style="color:var(--color-primary)"></i>
         Période souhaitée
       </span>
-
+ 
       <div class="date-input-wrap">
         <i class="bi bi-calendar-plus" style="color:#10b981"></i>
         <input type="date" id="date-debut"
               value="{{ form.date_debut.value|default:'' }}"
               min="{% now 'Y-m-d' %}" required>
       </div>
-
-      <div class="view-toggle" style="padding:2px">
-        <button type="button" class="vt-btn active" id="btn-mode-date" onclick="setModeFin('date')">
-          <i class="bi bi-calendar-minus"></i> Date de fin
-        </button>
-        <button type="button" class="vt-btn" id="btn-mode-duree" onclick="setModeFin('duree')">
-          <i class="bi bi-hourglass-split"></i> Durée
-        </button>
-      </div>
-
+ 
       <span class="dates-bar-sep">→</span>
-
+ 
       <div class="date-input-wrap" id="wrap-date-fin">
         <i class="bi bi-calendar-minus" style="color:#ef4444"></i>
         <input type="date" id="date-fin"
               value="{{ form.date_fin.value|default:'' }}"
               min="{% now 'Y-m-d' %}" required>
       </div>
-
-      <div class="date-input-wrap" id="wrap-duree-jours" style="display:none">
+ 
+      <span class="dates-bar-sep">ou</span>
+ 
+      <div class="date-input-wrap" id="wrap-duree-jours">
         <i class="bi bi-hourglass-split" style="color:#f59e0b"></i>
         <input type="number" id="duree-jours" min="1" step="1" placeholder="Nombre" style="width:80px">
         <span style="font-size:.72rem;color:var(--text-muted);white-space:nowrap;">jour(s)</span>
       </div>
-
+ 
       <div id="dates-status" class="waiting">
         <i class="bi bi-info-circle"></i>
         Saisissez les dates pour voir les disponibilités
@@ -644,6 +799,118 @@
       reserve: '#7c3aed',
     };
 
+    // ── PHOTO PREVIEW (desktop: hover / mobile: tap sur l'icône caméra) ────────
+    const IS_TOUCH = window.matchMedia('(hover: none), (pointer: coarse)').matches;
+
+    const photoOverlay = document.createElement('div');
+    photoOverlay.className = 'photo-preview-overlay';
+    document.body.appendChild(photoOverlay);
+
+    const photoPreview = document.createElement('div');
+    photoPreview.className = 'photo-hover-preview';
+    photoPreview.innerHTML = `
+      <button class="php-close" aria-label="Fermer">&times;</button>
+      <div class="php-img-wrap">
+        <img src="" alt="Photo emplacement">
+        <span class="php-badge"></span>
+      </div>
+      <div class="php-body">
+        <div class="php-code"></div>
+        <div class="php-nom"></div>
+        <div class="php-meta"></div>
+      </div>`;
+    document.body.appendChild(photoPreview);
+
+    const photoPreviewImg   = photoPreview.querySelector('img');
+    const photoPreviewBadge = photoPreview.querySelector('.php-badge');
+    const photoPreviewCode  = photoPreview.querySelector('.php-code');
+    const photoPreviewNom   = photoPreview.querySelector('.php-nom');
+    const photoPreviewMeta  = photoPreview.querySelector('.php-meta');
+    const photoPreviewClose = photoPreview.querySelector('.php-close');
+
+    // info = { url, code, nom, quartier, format_display, label }
+    function showPhotoPreview(info, evt) {
+      if (!info || !info.url) return;
+      photoPreviewImg.src = info.url;
+      photoPreviewBadge.textContent = info.label ? `Face ${info.label}` : '';
+      photoPreviewBadge.style.display = info.label ? 'inline-flex' : 'none';
+      photoPreviewCode.textContent = info.code || '';
+      photoPreviewNom.textContent = info.nom || '';
+
+      let tags = '';
+      if (info.quartier) tags += `<span class="php-tag"><i class="bi bi-geo-alt"></i>${info.quartier}</span>`;
+      if (info.format_display) tags += `<span class="php-tag"><i class="bi bi-aspect-ratio"></i>${info.format_display}</span>`;
+      photoPreviewMeta.innerHTML = tags;
+
+      photoPreview.style.display = 'block';
+      if (IS_TOUCH) {
+        photoOverlay.style.display = 'block';
+      } else {
+        movePhotoPreview(evt);
+      }
+    }
+
+    function movePhotoPreview(evt) {
+      if (IS_TOUCH || !evt) return; // en mobile, la carte est centrée via CSS
+      const w = 260, h = 300;
+      const offset = 16;
+      let x = evt.clientX + offset;
+      let y = evt.clientY + offset;
+      if (x + w > window.innerWidth)  x = evt.clientX - w - offset;
+      if (y + h > window.innerHeight) y = window.innerHeight - h - offset;
+      photoPreview.style.left = x + 'px';
+      photoPreview.style.top  = y + 'px';
+    }
+
+    function hidePhotoPreview() {
+      photoPreview.style.display = 'none';
+      photoOverlay.style.display = 'none';
+    }
+
+    photoPreviewClose.addEventListener('click', hidePhotoPreview);
+    photoOverlay.addEventListener('click', hidePhotoPreview);
+    photoPreview.addEventListener('click', (e) => e.stopPropagation());
+
+    // Délégation d'événements : une seule icône .photo-trigger par face
+    document.addEventListener('mouseover', (e) => {
+      if (IS_TOUCH) return;
+      const trigger = e.target.closest('.photo-trigger');
+      if (trigger) showPhotoPreview(JSON.parse(trigger.dataset.photoInfo), e);
+    });
+    document.addEventListener('mousemove', (e) => {
+      if (IS_TOUCH) return;
+      if (photoPreview.style.display === 'block' && e.target.closest('.photo-trigger')) movePhotoPreview(e);
+    });
+    document.addEventListener('mouseout', (e) => {
+      if (IS_TOUCH) return;
+      if (e.target.closest('.photo-trigger')) hidePhotoPreview();
+    });
+    document.addEventListener('click', (e) => {
+      if (!IS_TOUCH) return;
+      const trigger = e.target.closest('.photo-trigger');
+      if (trigger) {
+        e.preventDefault();
+        e.stopPropagation();
+        showPhotoPreview(JSON.parse(trigger.dataset.photoInfo), e);
+      }
+    });
+
+    function buildPhotoTrigger(p, face) {
+      const url = (face && face.photo_url) || p.photo_url;
+      if (!url) return '';
+      const info = JSON.stringify({
+        url: url,
+        code: p.code,
+        nom: p.nom,
+        quartier: p.quartier || p.ville,
+        format_display: p.format_display,
+        label: face ? face.label : null,
+      }).replace(/"/g, '&quot;');
+      return `<span class="photo-trigger" data-photo-info="${info}" title="Voir la photo">
+                <i class="bi bi-camera-fill"></i>
+              </span>`;
+    }
+
     // ── CARTE ─────────────────────────────────────────────────────────────────
     const map = L.map('map-resa', { zoomControl: true }).setView([12.3714, -1.5197], 12);
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
@@ -729,12 +996,16 @@
                   : `${face.label} — ${labelMap[statut] || statut}`;
         const disabled = !canToggle ? 'disabled' : '';
         const cls = inPanier ? 'selected' : (!datesOk && !inPanier && statut === 'libre' ? 'libre' : statut);
+        const photoTrigger = buildPhotoTrigger(p, face);
 
         facesHtml += `
-          <button class="rl-face-btn ${cls}" ${disabled}
-            onclick="toggleFace('${key}','${escQ(p.code)}','${face.label}','${escQ(p.quartier||p.ville||'')}','${p.id}')">
-            <span><i class="bi ${icon} me-1"></i>${txt}</span>
-          </button>`;
+          <div class="rl-face-row">
+            <button class="rl-face-btn ${cls}" ${disabled}
+              onclick="toggleFace('${key}','${escQ(p.code)}','${face.label}','${escQ(p.quartier||p.ville||'')}','${p.id}')">
+              <span><i class="bi ${icon} me-1"></i>${txt}</span>
+            </button>
+            ${photoTrigger}
+          </div>`;
       });
 
       const noteDate = !datesOk
@@ -743,10 +1014,17 @@
             <i class="bi bi-calendar-event"></i>Saisissez la période pour valider la disponibilité.
           </div>` : '';
 
-      currentPopup = L.popup({ maxWidth: 270, closeButton: true })
+      const photoHtml = p.photo_url
+        ? `<div class="rl-popup-photo-wrap">
+             <img src="${p.photo_url}" alt="Photo ${escQ(p.code)}">
+           </div>`
+        : '';
+
+      currentPopup = L.popup({ maxWidth: 280, closeButton: true })
         .setLatLng(marker.getLatLng())
         .setContent(`
           <div class="rl-popup">
+            ${photoHtml}
             <div class="rl-popup-code">${p.code}</div>
             <div class="rl-popup-nom">${p.nom}</div>
             <div class="rl-popup-addr"><i class="bi bi-geo-alt"></i>${p.quartier || p.ville || ''}</div>
@@ -983,11 +1261,15 @@
         const onclick = (canToggle || inPanier)
           ? `onclick="toggleFace('${key}','${escQ(p.code)}','${face.label}','${escQ(p.quartier||p.ville||'')}','${p.id}');renderListe()"`
           : '';
+        const photoTrigger = buildPhotoTrigger(p, face);
 
-        return `<button class="face-btn ${cls}" ${disabled} ${onclick}>
-          <span class="fb-left"><i class="bi ${icon}"></i> ${face.label}</span>
-          <span class="fb-badge">${badge}</span>
-        </button>`;
+        return `<div class="face-row">
+          <button class="face-btn ${cls}" ${disabled} ${onclick}>
+            <span class="fb-left"><i class="bi ${icon}"></i> ${face.label}</span>
+            <span class="fb-badge">${badge}</span>
+          </button>
+          ${photoTrigger}
+        </div>`;
       }).join('');
 
       const formatBadge = p.format_display ? `<span class="sc-format">${p.format_display}</span>` : '';
@@ -1064,26 +1346,14 @@
 
 
     // ── DATES ─────────────────────────────────────────────────────────────────
-    const elDateDebut = document.getElementById('date-debut');
-    const elDateFin   = document.getElementById('date-fin');
-    const elStatus    = document.getElementById('dates-status');
+    // Les 2 champs (date de fin / nombre de jours) sont affichés en même temps
+    // et se synchronisent automatiquement l'un l'autre :
+    //  - on saisit la date de fin     → le nombre de jours est calculé
+    //  - on saisit le nombre de jours → la date de fin est calculée
+    const elDateDebut  = document.getElementById('date-debut');
+    const elDateFin    = document.getElementById('date-fin');
+    const elStatus     = document.getElementById('dates-status');
     const elDureeJours = document.getElementById('duree-jours');
-
-    let modeFin = 'date'; // 'date' | 'duree'
-
-    function setModeFin(mode) {
-      modeFin = mode;
-      document.getElementById('btn-mode-date').classList.toggle('active', mode === 'date');
-      document.getElementById('btn-mode-duree').classList.toggle('active', mode === 'duree');
-      document.getElementById('wrap-date-fin').style.display    = mode === 'date'  ? 'flex' : 'none';
-      document.getElementById('wrap-duree-jours').style.display = mode === 'duree' ? 'flex' : 'none';
-
-      if (mode === 'duree') {
-        recalcDateFinFromDuree();
-      } else {
-        onDatesChange();
-      }
-    }
 
     function addDaysToDateStr(dateStr, days) {
       const d = new Date(dateStr + 'T00:00:00');
@@ -1091,6 +1361,14 @@
       return d.toISOString().slice(0, 10);
     }
 
+    // Nombre de jours inclusif entre 2 dates (1 jour = date_debut === date_fin)
+    function diffDaysInclusive(d1Str, d2Str) {
+      const d1 = new Date(d1Str + 'T00:00:00');
+      const d2 = new Date(d2Str + 'T00:00:00');
+      return Math.round((d2 - d1) / 86400000) + 1;
+    }
+
+    // Recalcule la date de fin à partir de date_debut + nombre de jours.
     function recalcDateFinFromDuree() {
       const d1 = elDateDebut ? elDateDebut.value : '';
       const duree = elDureeJours ? parseInt(elDureeJours.value, 10) : NaN;
@@ -1101,21 +1379,42 @@
         return;
       }
       if (!duree || duree < 1) {
-        datesOk = false; facesOccupees = new Set(); facesInfo = {};
-        setDatesStatus('waiting', 'Indiquez le nombre de jours');
-        return;
+        return; // on laisse l'utilisateur terminer sa saisie
       }
 
       elDateFin.value = addDaysToDateStr(d1, duree - 1);
       onDatesChange();
     }
 
+    // Recalcule le nombre de jours à partir de date_debut et date_fin.
+    function recalcDureeFromDateFin() {
+      const d1 = elDateDebut ? elDateDebut.value : '';
+      const d2 = elDateFin   ? elDateFin.value   : '';
+      if (!d1 || !d2 || d1 >= d2) {
+        if (elDureeJours) elDureeJours.value = '';
+        return;
+      }
+      if (elDureeJours) elDureeJours.value = diffDaysInclusive(d1, d2);
+    }
+
     function onDateDebutChange() {
-      if (modeFin === 'duree') {
+      // Si un nombre de jours est déjà saisi, on recalcule la date de fin ;
+      // sinon on recalcule le nombre de jours à partir de la date de fin existante.
+      if (elDureeJours && elDureeJours.value) {
         recalcDateFinFromDuree();
       } else {
+        recalcDureeFromDateFin();
         onDatesChange();
       }
+    }
+
+    function onDateFinChange() {
+      recalcDureeFromDateFin();
+      onDatesChange();
+    }
+
+    function onDureeChange() {
+      recalcDateFinFromDuree();
     }
 
     function syncHiddenDates() {
@@ -1176,6 +1475,9 @@
       if (!d1 || !d2) return;
       if (d1 >= d2) return;
 
+      // Calcule aussi le nombre de jours correspondant pour préremplir le champ.
+      recalcDureeFromDateFin();
+
       if (elDateFin) elDateFin.min = d1;
       clearTimeout(checkDispoTimer);
       setDatesStatus('loading', 'Vérification en cours…');
@@ -1216,8 +1518,8 @@
     }
 
     if (elDateDebut)  elDateDebut.addEventListener('change', onDateDebutChange);
-    if (elDateFin)    elDateFin.addEventListener('change', onDatesChange);
-    if (elDureeJours) elDureeJours.addEventListener('input', recalcDateFinFromDuree);
+    if (elDateFin)    elDateFin.addEventListener('change', onDateFinChange);
+    if (elDureeJours) elDureeJours.addEventListener('input', onDureeChange);
 
   // ── PANIER ────────────────────────────────────────────────────────────────
     function toggleFace(faceId, code, label, quartier, supportId) {

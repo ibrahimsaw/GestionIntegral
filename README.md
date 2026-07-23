@@ -209,4 +209,6 @@ DESIGN_CONFIG = {
 
 *Integral — Développé avec Django 4.2 · Leaflet.js · Bootstrap 5 · ReportLab · openpyxl*
 source .venv/Scripts/activate
+python manage.py makemigrations
+python manage.py migrate
 python manage.py runserver 0.0.0.0:8080

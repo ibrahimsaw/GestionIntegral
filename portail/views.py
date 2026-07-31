@@ -339,11 +339,12 @@ def _get_compteurs() -> dict:
         'total_faces_occupees_reseau': total_faces_reseau - total_faces_libres_reseau,
         'nb_villes': len(villes_stats),
         'nb_formats': len(formats_utilises),
+        'formats_utilises': sorted(formats_utilises),
     }
 
 class AccueilView(View):
     """Page d'accueil — vitrine publique de la régie publicitaire."""
-    template_name = 'portail/vitrine.html'
+    template_name = 'portail/vitrine1.html'
 
     def get(self, request):
         compteurs = _get_compteurs()

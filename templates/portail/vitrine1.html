@@ -18,14 +18,18 @@
      ════════════════════════════════════════════════════════════════ */
 
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
+  :root {
+    --color-secondary: {{ DESIGN.COLOR_SECONDARY }}; /* Ou une valeur hexa directe comme #1a1a1a */
+    --color-primary: {{ DESIGN.COLOR_PRIMARY }};
+  }
   .vitrine {
     --vt-tight: -0.02em;
     --color-primary:   {{ DESIGN.COLOR_PRIMARY }};
     --color-secondary: {{ DESIGN.COLOR_SECONDARY }};
     --text:             #000000;
-    --text-muted:        #6a6a6a;
-    --border:            #e6e2d8;
+    --text-muted:        #000000;
+    --border:            var(--color-primary);
+    --borders:            var(--color-secondary);
     --bg-card:            #ffffff;
     --bg-card2:            #f8f6f1;
     --radius:               5px;
@@ -69,14 +73,14 @@
     width: 58px;
     height: 4px;
     border-radius: 4px;
-    background: linear-gradient(90deg, var(--color-primary), var(--color-secondary));
+    background: linear-gradient(90deg, var(--color-secondary), var(--color-secondary));
     margin: 0 auto 12px;
   }
   .sline.lft {
     margin-left: 0;
   }
   .sdesc {
-    color: #777;
+    color: #000;
     font-size: 0.93rem;
     line-height: 1.8;
   }
@@ -106,8 +110,8 @@
   /* ═══════════════════ HERO ═══════════════════════════════════════ */
   .hero-section {
     position: relative;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
+    background: var(--color-secondary);
+    border-top: 1px solid var(--border);
     /* border-radius: var(--radius); */
     padding: 3.2rem 3rem;
     margin-bottom: 28px;
@@ -116,6 +120,8 @@
     grid-template-columns: 1.05fr .95fr;
     gap: 2.5rem;
     align-items: center;
+    width: 100%;
+    min-height: 100vh;
   }
   .hero-eyebrow {
     display: inline-flex; align-items: center; gap: 8px;
@@ -153,6 +159,8 @@
   }
   .hero-btn:hover { transform: translateY(-1px); }
   .hero-btn-solid { background: var(--color-primary); color: #fff; }
+  .hero-btn-solids { background: #fff; color: #000; }
+  .hero-btn-solidy { background: var(--color-secondary); color: #000; border: 1.5px solid var(--color-secondary); }
   .hero-btn-solid:hover { background: var(--color-primary); color: #fff; }
   .hero-btn-outline { background: transparent; color: var(--text); border: 1.5px solid var(--border); }
   .hero-btn-outline:hover { border-color: var(--color-primary); color: var(--color-primary); }
@@ -195,6 +203,14 @@
     align-items: center;
     justify-content: center;
     min-height: 340px;
+    background: rgba(255,255,255,.35);
+    /*
+    border: 1px solid rgba(255,255,255,.4);
+    */
+    border-radius: var(--radius-sm, 16px);
+    backdrop-filter: blur(14px) saturate(160%);
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
+    box-shadow: 0 8px 32px rgba(31,46,40,.10);
   }
   .hero-blob {
     position: absolute;
@@ -211,7 +227,7 @@
     50%  { border-radius: 58% 42% 40% 60% / 55% 60% 40% 45%; }
     100% { border-radius: 42% 58% 65% 35% / 45% 45% 55% 55%; }
   }
-  .hero-visual .dots-deco { color: var(--color-secondary); opacity: .55; z-index: 1; }
+  .hero-visual .dots-deco { color: var(--color-primary); opacity: .55; z-index: 1; }
   .hero-visual .dots-tl { top: -6px; left: -10px; width: 90px; height: 90px; }
   .hero-visual .dots-br { bottom: -10px; right: 4px; width: 100px; height: 100px; }
   .hero-illustration {
@@ -697,11 +713,16 @@
 
   .format-card {
     position: relative;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
+    background: rgba(255,255,255,.72);
+    /*
+    border: 1px solid rgba(255,255,255,.5);
+    */
     border-radius: var(--radius);
     overflow: visible;
-    transition: box-shadow .2s ease, transform .2s ease;
+    backdrop-filter: blur(16px) saturate(160%);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    box-shadow: 0 8px 32px rgba(31,46,40,.12);
+    transition: box-shadow .2s ease, transform .2s ease, background .2s ease;
     display: flex;
     flex-direction: column;
   }
@@ -890,9 +911,25 @@
   }
   .cta-final-btn:hover { transform: translateY(-1px); background: #e8ac16; }
 
+  /* ── HERO : responsive progressif ────────────────────────────────────── */
   @media (max-width: 992px) {
-    .hero-section { grid-template-columns: 1fr; padding: 2.6rem 2rem; }
-    .hero-visual { min-height: 260px; margin-top: 1.5rem; }
+    .hero-section {
+      display: flex;
+      flex-direction: column;
+      min-height: auto;
+      overflow: visible;
+      padding: 2.4rem 1.8rem;
+    }
+    /* Le visuel passe AVANT le texte et devient plus imposant/visible */
+    .hero-visual {
+      order: -1;
+      width: 100%;
+      min-height: 300px;
+      margin-top: 0;
+      margin-bottom: 1.8rem;
+      flex-shrink: 0;
+    }
+    .hero-illustration { max-width: 260px; }
     .city-acc-inner,
     .city-acc.alt-right .city-acc-inner { grid-template-columns: 1fr; }
     .city-acc.alt-right .city-acc-img,
@@ -900,6 +937,37 @@
     .city-acc-img { min-height: 180px; }
     .process-track { grid-template-columns: 1fr; gap: 28px; }
     .process-track::before { display: none; }
+  }
+
+  @media (max-width: 768px) {
+    .hero-section { padding: 2rem 1.4rem; }
+    .hero-visual { min-height: 260px; margin-bottom: 1.5rem; }
+    .hero-illustration { max-width: 220px; }
+    .hero-section .stitle { font-size: clamp(1.7rem, 5.5vw, 2.3rem) !important; }
+    .hero-subtitle { font-size: .92rem; max-width: 100%; margin-bottom: 1.4rem; }
+    .hero-btn { padding: 10px 20px; font-size: .8rem; }
+    .hero-mini-num { font-size: 1.25rem; }
+    .hero-mini-lbl { font-size: .68rem; }
+    .hero-mini-stats { gap: 18px; }
+    .hero-mini-stats > div + div { padding-left: 18px; }
+  }
+
+  @media (max-width: 480px) {
+    .hero-section { padding: 1.6rem 1.1rem; }
+    .hero-visual { min-height: 210px; margin-bottom: 1.2rem; }
+    .hero-illustration { max-width: 175px; }
+    .hero-float-card { padding: 9px 13px; gap: 8px; left: 0; bottom: 8px; }
+    .hero-float-icon { width: 28px; height: 28px; font-size: .85rem; }
+    .hero-float-num { font-size: .92rem; }
+    .hero-float-label { font-size: .62rem; }
+    .hero-section .stitle { font-size: clamp(1.4rem, 7vw, 1.9rem) !important; }
+    .hero-subtitle { font-size: .85rem; margin-bottom: 1.2rem; }
+    .hero-actions { gap: 8px; }
+    .hero-btn { padding: 9px 16px; font-size: .74rem; }
+    .hero-mini-stats { gap: 12px; flex-wrap: wrap; row-gap: 10px; }
+    .hero-mini-num { font-size: 1.1rem; }
+    .hero-mini-lbl { font-size: .64rem; }
+    .hero-mini-stats > div + div { padding-left: 12px; }
   }
   @media (max-width: 600px) {
     .cta-final { flex-direction: column; text-align: center; padding: 32px 24px; }
@@ -960,8 +1028,27 @@
   /* ── CARTES ───────────────────────────────────────────────────────────── */
   .rn-wrap.gone { display: none; }
   .rn-group-cta.gone { display: none; }
+  .rn-ville-heading.gone { display: none; }
+
+  .rn-ville-heading-title {
+    display: flex; align-items: center; justify-content: center; gap: 16px;
+    text-align: center; margin: 8px 0 4px;
+    font-size: 1.15rem; font-weight: 800; letter-spacing: .03em;
+    color: var(--color-primary, #3b5d50);
+  }
+  .rn-ville-heading-title i { font-size: 1rem; }
+  .rn-ville-heading-title::before,
+  .rn-ville-heading-title::after {
+    content: ''; flex: 1; height: 2px; max-width: 260px;
+    background: linear-gradient(90deg, transparent, var(--color-primary, #3b5d50) 30%, var(--color-primary, #3b5d50) 70%, transparent);
+    opacity: .45;
+  }
+  .rn-ville-heading.gone { display: none; }
   .rn-card {
-    background: var(--bg-card, #fff); border: 1px solid var(--border, #e6e2d8);
+    background: var(--bg-card, #fff); 
+    /*
+    border: 1px solid var(--border, #e6e2d8);
+    */
     border-radius: var(--radius-lg, 12px); overflow: hidden; cursor: pointer;
     box-shadow: var(--shadow-sm, 0 1px 3px rgba(31,46,40,.07));
     transition: transform .2s, box-shadow .2s; height: 100%;
@@ -990,7 +1077,7 @@
     backdrop-filter: blur(2px);
   }
 
-  .rn-body { padding: 14px 16px 16px; display: flex; flex-direction: column; flex: 1; }
+  .rn-body { padding: 14px 16px 16px; display: flex; flex-direction: column; flex: 1; background-color: var(--color-secondary);}
   .rn-cat {
     font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em;
     color: var(--color-primary, #3b5d50); margin-bottom: 4px;
@@ -1006,13 +1093,14 @@
   .rn-stars i { color: var(--color-primary, #3b5d50); }
 
   .rn-add {
-    width: 34px; height: 34px; border-radius: 50%;
+    width: auto; height: 34px; border-radius: 20px;
     border: none; background: var(--color-primary, #3b5d50); color: #fff;
-    display: flex; align-items: center; justify-content: center;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 0 16px; font-size: .78rem; font-weight: 700; white-space: nowrap;
     cursor: pointer; transition: background .15s, transform .15s;
     flex-shrink: 0;
   }
-  .rn-add:hover { background: #2f4a40; transform: scale(1.08); }
+  .rn-add:hover { background: #fff; transform: scale(1.04); color: var(--color-primary); }
 
   /* ── POPUP DÉTAIL ─────────────────────────────────────────────────────── */
   .rn-pop {
@@ -1022,7 +1110,13 @@
   }
   .rn-pop.open { display: flex; }
   .rn-pop-box {
-    background: var(--bg-card, #fff); border-radius: 16px; overflow: hidden;
+    background: rgba(255,255,255,.82); 
+    /*
+    border: 1px solid rgba(255,255,255,.5);
+    */
+    border-radius: 16px; overflow: hidden;
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
     max-width: 480px; width: 100%; max-height: 90vh; overflow-y: auto;
     box-shadow: 0 20px 60px rgba(0,0,0,.3); position: relative;
     animation: rnPopIn .2s ease-out;
@@ -1038,10 +1132,17 @@
   .rn-pop-img { width: 100%; height: 320px; }
   .rn-pop-img img { width: 100%; height: 100%; object-fit: cover; }
 
-  .rn-pop-content { padding: 20px 22px 24px; }
+  .rn-pop-content { padding: 20px 22px 24px; background-color: var(--color-secondary); }
+  .rn-pop-cat-row {
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;
+  }
   .rn-pop-cat {
     font-size: .7rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em;
-    color: var(--color-primary, #3b5d50); margin-bottom: 6px;
+    color: var(--color-primary, #3b5d50); margin-bottom: 0;
+  }
+  .rn-pop-instant {
+    font-size: .68rem; font-weight: 700; color: var(--text-muted, #6a6a6a);
+    display: inline-flex; align-items: center; gap: 4px; text-transform: none; letter-spacing: 0;
   }
   .rn-pop-title { font-size: 1.3rem; font-weight: 800; color: var(--text, #000); margin-bottom: 10px; }
   .rn-pop-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
@@ -1101,8 +1202,10 @@
     display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 24px;
   }
   .team-card {
-    background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
-    padding: 28px 20px; text-align: center; transition: transform .2s, box-shadow .2s;
+    background: rgba(255,255,255,.72); border: 1px solid rgba(255,255,255,.5); border-radius: var(--radius);
+    backdrop-filter: blur(16px) saturate(160%); -webkit-backdrop-filter: blur(16px) saturate(160%);
+    box-shadow: 0 8px 32px rgba(31,46,40,.12);
+    padding: 28px 20px; text-align: center; transition: transform .2s, box-shadow .2s, background .2s;
   }
   .team-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); }
   .team-avatar {
@@ -1140,12 +1243,15 @@
     display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px;
   }
   .cat-card {
-    background: var(--bg-card); border: 1.5px solid var(--border); border-radius: var(--radius);
+    background: rgba(255,255,255,.68); border: 1.5px solid rgba(255,255,255,.5); border-radius: var(--radius);
+    backdrop-filter: blur(16px) saturate(160%); -webkit-backdrop-filter: blur(16px) saturate(160%);
+    box-shadow: 0 8px 28px rgba(31,46,40,.1);
     padding: 22px 14px; text-align: center; cursor: pointer;
     transition: all .18s ease;
   }
   .cat-card:hover, .cat-card.active {
     border-color: var(--color-primary); box-shadow: var(--shadow-md); transform: translateY(-3px);
+    background: rgba(255,255,255,.85);
   }
   .cat-card-icon {
     width: 52px; height: 52px; margin: 0 auto 12px; border-radius: 50%;
@@ -1163,7 +1269,7 @@
   .special-block {
     position: relative; overflow: hidden;
     background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary) 100%);
-    border-radius: var(--radius); padding: 46px 44px; color: #000;
+    border-radius: var(--radius); padding: clamp(20px, 4vw, 40px) clamp(20px, 5vw, 44px); color: #000;
   }
 
   .giraffe-spots {
@@ -1238,7 +1344,9 @@
   @media (max-width: 900px) { .special-grid { grid-template-columns: 1fr; } }
   .special-tag {
     display: inline-flex; align-items: center; gap: 7px;
-    background: rgba(255,255,255,.14); padding: 6px 14px; border-radius: 20px;
+    background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.25);
+    backdrop-filter: blur(10px) saturate(160%); -webkit-backdrop-filter: blur(10px) saturate(160%);
+    padding: 6px 14px; border-radius: 20px;
     font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em;
     margin-bottom: 14px;
   }
@@ -1247,12 +1355,15 @@
   .special-desc { font-size: .92rem; opacity: .88; line-height: 1.6; margin-bottom: 22px; max-width: 460px; }
   .cd-wrap { display: flex; gap: 14px; margin-bottom: 24px; }
   .cd-item {
-    background: rgba(255,255,255,.12); border-radius: 10px; padding: 12px 18px; text-align: center; min-width: 72px;
+    background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.25);
+    backdrop-filter: blur(10px) saturate(160%); -webkit-backdrop-filter: blur(10px) saturate(160%);
+    border-radius: 10px; padding: 12px 18px; text-align: center; min-width: 72px;
   }
   .cd-num { display: block; font-size: 1.5rem; font-weight: 800; font-variant-numeric: tabular-nums; }
   .cd-lbl { font-size: .66rem; opacity: .75; text-transform: uppercase; letter-spacing: .06em; }
   .special-visual {
-    background: rgba(255,255,255,.08); border: 1.5px dashed rgba(255,255,255,.3);
+    background: rgba(255,255,255,.1); border: 1.5px dashed rgba(255,255,255,.3);
+    backdrop-filter: blur(12px) saturate(160%); -webkit-backdrop-filter: blur(12px) saturate(160%);
     border-radius: var(--radius-sm); padding: 30px; text-align: center;
   }
   .special-visual-num { font-size: 2.6rem; font-weight: 800; color: var(--color-secondary); line-height: 1; }
@@ -1264,13 +1375,17 @@
   }
   @media (max-width: 900px) { .gal-grid { grid-template-columns: repeat(2, 1fr); } }
   .gal-item {
-    position: relative; border-radius: 10px; overflow: hidden; cursor: pointer;
+    position: relative; border-radius: 14px; overflow: hidden; cursor: pointer;
+    background: rgba(255,255,255,.35); border: 1px solid rgba(255,255,255,.4);
+    backdrop-filter: blur(10px) saturate(160%); -webkit-backdrop-filter: blur(10px) saturate(160%);
+    box-shadow: 0 8px 28px rgba(31,46,40,.10);
+    padding: 6px;
   }
   .gal-item:nth-child(1) { grid-column: span 2; grid-row: span 2; }
-  .gal-item img { width: 100%; height: 100%; object-fit: cover; transition: transform .4s; display: block; }
+  .gal-item img { width: 100%; height: 100%; object-fit: cover; transition: transform .4s; display: block; border-radius: 9px; }
   .gal-item:hover img { transform: scale(1.08); }
   .gal-overlay {
-    position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,.65), transparent 55%);
+    position: absolute; inset: 6px; border-radius: 9px; background: linear-gradient(to top, rgba(0,0,0,.65), transparent 55%);
     display: flex; align-items: flex-end; padding: 12px 14px;
     opacity: 0; transition: opacity .25s;
   }
@@ -1344,7 +1459,9 @@
   .hours-dot.off { background: #f87171; }
   .hours-card-white {
     position: relative; z-index: 1;
-    background: rgba(255,255,255,.08); border-radius: var(--radius-sm); padding: 26px;
+    background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.25);
+    backdrop-filter: blur(12px) saturate(160%); -webkit-backdrop-filter: blur(12px) saturate(160%);
+    border-radius: var(--radius-sm); padding: 26px;
   }
   .hours-card-white h5 { font-size: .9rem; font-weight: 800; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
   .hours-info-row {
@@ -1372,7 +1489,12 @@
 
   /* ═══════════ BLOG / CONSEILS ═════════════════════════════════════════ */
   .blog-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; }
-  .blog-card { background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; transition: transform .2s, box-shadow .2s; }
+  .blog-card {
+    background: rgba(255,255,255,.72); /*border: 1px solid rgba(255,255,255,.5); */border-radius: var(--radius);
+    backdrop-filter: blur(16px) saturate(160%); -webkit-backdrop-filter: blur(16px) saturate(160%);
+    box-shadow: 0 8px 32px rgba(31,46,40,.12);
+    overflow: hidden; transition: transform .2s, box-shadow .2s, background .2s;
+  }
   .blog-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); }
   .blog-img { height: 170px; position: relative; overflow: hidden; }
   .blog-img img { width: 100%; height: 100%; object-fit: cover; }
@@ -1417,7 +1539,9 @@
   .contact-form-card { 
     display: grid;
     background: var(--bg-card);
+    /*
     border: 1px solid var(--border);
+    */
     border-radius: var(--radius);
     padding: 28px;
     align-content: center;
@@ -1425,7 +1549,7 @@
 
   .contact-flbl { font-size: .78rem; font-weight: 700; color: var(--text); margin-bottom: 6px; display: block; }
   .contact-fctrl {
-    width: 100%; padding: 11px 14px; border: 1.5px solid var(--border); border-radius: 8px;
+    width: 100%; padding: 11px 14px; border: 1.5px solid var(--borders); border-radius: 8px;
     background: var(--bg-card2); font-size: .86rem; font-family: inherit; box-sizing: border-box;
   }
   .contact-fctrl:focus { outline: none; border-color: var(--color-primary); background: #fff; }
@@ -1464,14 +1588,31 @@
 
   /* ═══════════ NAVBAR ═══════════════════════════════════════════════════ */
   html { scroll-behavior: smooth; }
-  body { font-family: 'Inter', sans-serif; background: #fff; margin: 0; }
+  body {
+    font-family: 'Inter', sans-serif;
+    background-color: #F8F8F9;
+    margin: 0;
+    position: relative;
+  }
+  body::before {
+    content: '';
+    position: fixed;
+    inset: -20px; /* dépasse légèrement pour cacher les bords adoucis par le flou */
+    z-index: -1;
+    background-image: url('{% static "img/bg.jpg" %}');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    filter: blur(6px);
+    transform: scale(1.03); /* évite de voir les bords nets du flou */
+  }
 
   #nav {
-    background: #fff;
+    background: var(--color-secondary);
     position: sticky;
     top: 0;
     z-index: 1200;
-    box-shadow: 0 2px 20px rgba(0,0,0,.07);
+    box-shadow: 0 2px 20px rgba(var(--color-secondary),.07);
     transition: .4s;
   }
   #nav.scrolled { box-shadow: 0 4px 30px rgba(0,0,0,.14); }
@@ -1561,6 +1702,15 @@
     height: 16px; 
     fill: #fff; 
   }
+
+  /* ── Lisibilité du texte sur les cartes "verre" (fond flouté derrière) ── */
+  .format-title, .format-desc, .format-usage,
+  .team-name, .team-role, .team-desc,
+  .cat-card-name, .cat-card-count,
+  .blog-title, .blog-meta, .blog-tag,
+  .rn-pop-title, .rn-pop-desc, .rn-pop-meta {
+    text-shadow: 0 1px 2px rgba(255,255,255,.55);
+  }
 </style>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
 
@@ -1619,7 +1769,7 @@
         <a href="#reseau" class="hero-btn hero-btn-solid">
           <i class="bi bi-geo-alt-fill"></i> Découvrir nos emplacements
         </a>
-        <a href="{% url 'portail:suivi_demande' %}" class="hero-btn hero-btn-outline">
+        <a href="{% url 'portail:suivi_demande' %}" class="hero-btn hero-btn-solids">
           <i class="bi bi-search"></i> Suivre une autre demande
         </a>
       </div>
@@ -1702,38 +1852,40 @@
 
         <!-- ═══════════ CATEGORY (navigation rapide par format) ═══════════ -->
     <div class="section" id="category">
-      <div class="section-header">
-        <!--
-        <div>
-          <div class="section-tag">Parcourir</div>
-          <div class="section-title">Trouvez le format qu'il vous faut</div>
-          <div class="section-subtitle">Cliquez sur une catégorie pour filtrer directement le réseau ci-dessus.</div>
-        </div>
-        -->
-        <div class="text-center" data-aos="fade-up">
-          <span class="slbl">Parcourir</span>
-          <h2 class="stitle">Trouvez le format <span>qu'il vous faut</span></h2>
-          <div class="sline"></div>
-          <p class="sdesc mx-auto" style="max-width:480px;">Cliquez sur une catégorie pour filtrer directement le réseau ci-dessus.</p>
-        </div>
-      </div>
-      <div class="cat-grid">
-        <!-- 
-        <div class="cat-card" onclick="rnFilterByCategorie('all')">
-          <div class="cat-card-icon"><i class="bi bi-grid-3x3-gap-fill"></i></div>
-          <div class="cat-card-name">Tous les formats</div>
-          <div class="cat-card-count">{{ total_faces_reseau }} face{{ total_faces_reseau|pluralize:",s" }}</div>
-        </div>
-        -->
-        {% for cat in categories_stats %}
-        <div class="cat-card" onclick="rnFilterByCategorie('{{ cat.categorie|slugify }}')">
-          <div class="cat-card-icon">
-            {% if cat.categorie == "Écran" %}<i class="bi bi-display-fill"></i>{% else %}<i class="bi bi-signpost-split-fill"></i>{% endif %}
+      <div class="container">
+        <div class="section-header">
+          <!--
+          <div>
+            <div class="section-tag">Parcourir</div>
+            <div class="section-title">Trouvez le format qu'il vous faut</div>
+            <div class="section-subtitle">Cliquez sur une catégorie pour filtrer directement le réseau ci-dessus.</div>
           </div>
-          <div class="cat-card-name">{{ cat.categorie }}</div>
-          <div class="cat-card-count">{{ cat.libre }} disponible{{ cat.libre|pluralize:",s" }} / {{ cat.total }}</div>
+          -->
+          <div class="text-center" data-aos="fade-up">
+            <span class="slbl">Parcourir</span>
+            <h2 class="stitle">Trouvez le format <span>qu'il vous faut</span></h2>
+            <div class="sline"></div>
+            <p class="sdesc mx-auto" style="max-width:480px;">Cliquez sur une catégorie pour filtrer directement le réseau ci-dessus.</p>
+          </div>
         </div>
-        {% endfor %}
+        <div class="cat-grid">
+          <!-- 
+          <div class="cat-card" onclick="rnFilterByCategorie('all')">
+            <div class="cat-card-icon"><i class="bi bi-grid-3x3-gap-fill"></i></div>
+            <div class="cat-card-name">Tous les formats</div>
+            <div class="cat-card-count">{{ total_faces_reseau }} face{{ total_faces_reseau|pluralize:",s" }}</div>
+          </div>
+          -->
+          {% for cat in categories_stats %}
+          <div class="cat-card" onclick="rnFilterByCategorie('{{ cat.categorie|slugify }}')">
+            <div class="cat-card-icon">
+              {% if cat.categorie == "Écran" %}<i class="bi bi-display-fill"></i>{% else %}<i class="bi bi-signpost-split-fill"></i>{% endif %}
+            </div>
+            <div class="cat-card-name">{{ cat.categorie }}</div>
+            <div class="cat-card-count">{{ cat.libre }} disponible{{ cat.libre|pluralize:",s" }} / {{ cat.total }}</div>
+          </div>
+          {% endfor %}
+        </div>
       </div>
     </div>
 
@@ -1750,26 +1902,28 @@
           <span class="spot spot-7"></span>
           <span class="spot spot-8"></span>
         </div>
-        <div class="special-grid">
-          <div>
-            <div class="special-tag"><i class="bi bi-lightning-charge-fill"></i> Offre de lancement</div>
-            <h2 class="special-title">-15% sur votre<br>première <span>réservation</span></h2>
-            <p class="special-desc">
-              Toute nouvelle entreprise cliente bénéficie de 15% de réduction sur sa première campagne
-              d'affichage, quel que soit le format choisi. Offre valable jusqu'à la fin du mois.
-            </p>
-            <div class="cd-wrap">
-              <div class="cd-item"><span class="cd-num" id="cdJours">--</span><span class="cd-lbl">Jours</span></div>
-              <div class="cd-item"><span class="cd-num" id="cdHeures">--</span><span class="cd-lbl">Heures</span></div>
-              <div class="cd-item"><span class="cd-num" id="cdMinutes">--</span><span class="cd-lbl">Minutes</span></div>
+        <div class="container">
+          <div class="special-grid">
+            <div>
+              <div class="special-tag"><i class="bi bi-lightning-charge-fill"></i> Offre de lancement</div>
+              <h2 class="special-title">-15% sur votre<br>première <span>réservation</span></h2>
+              <p class="special-desc">
+                Toute nouvelle entreprise cliente bénéficie de 15% de réduction sur sa première campagne
+                d'affichage, quel que soit le format choisi. Offre valable jusqu'à la fin du mois.
+              </p>
+              <div class="cd-wrap">
+                <div class="cd-item"><span class="cd-num" id="cdJours">--</span><span class="cd-lbl">Jours</span></div>
+                <div class="cd-item"><span class="cd-num" id="cdHeures">--</span><span class="cd-lbl">Heures</span></div>
+                <div class="cd-item"><span class="cd-num" id="cdMinutes">--</span><span class="cd-lbl">Minutes</span></div>
+              </div>
+              <a href="{% url 'portail:reserver_etape1' %}" class="hero-btn hero-btn-solid" style="background:var(--color-secondary);color:var(--text);">
+                <i class="bi bi-calendar-check"></i> En profiter maintenant
+              </a>
             </div>
-            <a href="{% url 'portail:reserver_etape1' %}" class="hero-btn hero-btn-solid" style="background:var(--color-secondary);color:var(--text);">
-              <i class="bi bi-calendar-check"></i> En profiter maintenant
-            </a>
-          </div>
-          <div class="special-visual">
-            <div class="special-visual-num">-15%</div>
-            <div class="special-visual-lbl">Sur votre première demande de réservation, tous formats confondus</div>
+            <div class="special-visual">
+              <div class="special-visual-num">-15%</div>
+              <div class="special-visual-lbl">Sur votre première demande de réservation, tous formats confondus</div>
+            </div>
           </div>
         </div>
       </div>
@@ -1832,94 +1986,95 @@
           <i class="bi bi-bag-check-fill"></i> <span id="rnReserveAllLabel">Réserver tous ces formats</span>
         </a>
       </div>
-
-      <!-- GRILLE DE CARTES -->
-      <div class="row g-4" id="rn-grid">
-        {% for ville in villes_stats %}
-         <!-- Titre de la ville (répété à chaque section du réseau) -->
-          <div class="col-12 rn-ville-heading" data-v="{{ ville.nom|slugify }}">
-            <h3 class="rn-ville-heading-title">
-              <i class="bi bi-geo-alt-fill"></i> {{ ville.nom }}
-            </h3>
-          </div>
-          {% for cat in ville.supports %}
-            <!-- Tout réserver (affiché si ce groupe ville + catégorie a au moins 2 formats) -->
-            {% if cat.categorie != "Écran" and cat.liste|length >= 2 %}
-              <div class="col-12 rn-group-cta" data-v="{{ ville.nom|slugify }}" data-cat="{{ cat.categorie|slugify }}">
-                <div class="text-center mb-2">
-                  <a href="{% url 'portail:reserver_etape1' %}?ville={{ ville.nom|urlencode }}&categorie={{ cat.categorie|urlencode }}" class="hero-btn hero-btn-outline">
-                    <i class="bi bi-bag-check-fill"></i> Tout réserver — {{ cat.categorie }} à {{ ville.nom }}
-                  </a>
-                </div>
-              </div>
-            {% endif %}
-
-            {% for support in cat.liste %}
-            <div class="col-sm-6 col-lg-4 rn-wrap" data-v="{{ ville.nom|slugify }}" data-cat="{{ cat.categorie|slugify }}" data-aos="fade-up">
-              <div class="rn-card"
-                data-ville="{{ ville.nom|escapejs }}"
-                data-img="{% static ville.image_url %}"
-                data-categorie="{{ cat.categorie|escapejs }}"
-                data-dimensions="{{ support.dimensions|escapejs }}"
-                data-superficie="{{ support.superficie|default:''|escapejs }}"
-                data-libre="{{ support.libre|default:0 }}"
-                data-count="{{ support.count }}"
-                data-is-ecran="{% if cat.categorie == 'Écran' or support.dimensions == 'Écran Numérique' %}1{% else %}0{% endif %}"
-                data-reserve-url="{% if support.libre > 0 and support.dimensions != 'Écran Numérique' and cat.categorie != 'Écran' %}{% url 'portail:reserver_etape1' %}?ville={{ ville.nom|urlencode }}&categorie={{ cat.categorie|urlencode }}&format={{ support.format|urlencode }}{% endif %}">
-
-                <div class="rn-img">
-                  <img src="{% static ville.image_url %}" alt="{{ ville.nom }}" loading="lazy">
-                  {% if support.libre > 0 %}
-                    <div class="rn-bdg available"><i class="bi bi-check-circle-fill"></i> Disponible</div>
-                  {% else %}
-                    <div class="rn-bdg full"><i class="bi bi-x-circle-fill"></i> Complet</div>
-                  {% endif %}
-                  <div class="rn-ville-pill"><i class="bi bi-geo-alt-fill"></i> {{ ville.nom }}</div>
-                </div>
-
-                <div class="rn-body">
-                  <div class="rn-cat">{{ cat.categorie }}</div>
-                  <div class="rn-tit">
-                    {% if support.superficie %}{{ support.superficie }} · {% endif %}{{ support.dimensions }}
-                  </div>
-
-                  {% if cat.categorie != "Écran" and support.dimensions != "Écran Numérique" %}
-                    <div class="rn-desc">
-                      {{ support.libre }} face{{ support.libre|pluralize:",s" }} disponible{{ support.libre|pluralize:",s" }}
-                      sur {{ support.count }} face{{ support.count|pluralize:",s" }}
-                    </div>
-                  {% else %}
-                    <div class="rn-desc">
-                      {{ support.count }} écran{{ support.count|pluralize:",s" }} sur le réseau
-                    </div>
-                  {% endif %}
-
-                  <div class="rn-foot">
-                    <div class="rn-stars">
-                      <i class="bi bi-geo-alt-fill"></i>
-                      <span>{{ ville.nom }}</span>
-                    </div>
-                    <button class="rn-add" title="Voir les détails"><i class="bi bi-plus-lg"></i></button>
-                  </div>
-                </div>
-              </div>
+      <div class="container">
+        <!-- GRILLE DE CARTES -->
+        <div class="row g-4" id="rn-grid">
+          {% for ville in villes_stats %}
+          <!-- Titre de la ville (répété à chaque section du réseau) -->
+            <div class="col-12 rn-ville-heading" data-v="{{ ville.nom|slugify }}">
+              <h3 class="rn-ville-heading-title">
+                <i class="bi bi-geo-alt-fill"></i> {{ ville.nom }}
+              </h3>
             </div>
+            {% for cat in ville.supports %}
+              <!-- Tout réserver (affiché si ce groupe ville + catégorie a au moins 2 formats) -->
+              {% if cat.categorie != "Écran" and cat.liste|length >= 2 %}
+                <div class="col-12 rn-group-cta" data-v="{{ ville.nom|slugify }}" data-cat="{{ cat.categorie|slugify }}">
+                  <div class="text-center mb-2">
+                    <a href="{% url 'portail:reserver_etape1' %}?ville={{ ville.nom|urlencode }}&categorie={{ cat.categorie|urlencode }}" class="hero-btn hero-btn-solid" style="background:var(--color-secondary);color:var(--text);">
+                      <i class="bi bi-bag-check-fill"></i> Tout réserver — {{ cat.categorie }} à {{ ville.nom }}
+                    </a>
+                  </div>
+                </div>
+              {% endif %}
+
+              {% for support in cat.liste %}
+              <div class="col-sm-6 col-lg-4 rn-wrap" data-v="{{ ville.nom|slugify }}" data-cat="{{ cat.categorie|slugify }}" data-aos="fade-up">
+                <div class="rn-card"
+                  data-ville="{{ ville.nom|escapejs }}"
+                  data-img="{% static ville.image_url %}"
+                  data-categorie="{{ cat.categorie|escapejs }}"
+                  data-dimensions="{{ support.dimensions|escapejs }}"
+                  data-superficie="{{ support.superficie|default:''|escapejs }}"
+                  data-libre="{{ support.libre|default:0 }}"
+                  data-count="{{ support.count }}"
+                  data-is-ecran="{% if cat.categorie == 'Écran' or support.dimensions == 'Écran Numérique' %}1{% else %}0{% endif %}"
+                  data-reserve-url="{% if support.libre > 0 and support.dimensions != 'Écran Numérique' and cat.categorie != 'Écran' %}{% url 'portail:reserver_etape1' %}?ville={{ ville.nom|urlencode }}&categorie={{ cat.categorie|urlencode }}&format={{ support.format|urlencode }}{% endif %}">
+
+                  <div class="rn-img">
+                    <img src="{% static ville.image_url %}" alt="{{ ville.nom }}" loading="lazy">
+                    {% if support.libre > 0 %}
+                      <div class="rn-bdg available"><i class="bi bi-check-circle-fill"></i> Disponible</div>
+                    {% else %}
+                      <div class="rn-bdg full"><i class="bi bi-x-circle-fill"></i> Complet</div>
+                    {% endif %}
+                    <div class="rn-ville-pill"><i class="bi bi-geo-alt-fill"></i> {{ ville.nom }}</div>
+                  </div>
+
+                  <div class="rn-body">
+                    <div class="rn-cat">{{ cat.categorie }}</div>
+                    <div class="rn-tit">
+                      {% if support.superficie %}{{ support.superficie }} · {% endif %}{{ support.dimensions }}
+                    </div>
+
+                    {% if cat.categorie != "Écran" and support.dimensions != "Écran Numérique" %}
+                      <div class="rn-desc">
+                        {{ support.libre }} face{{ support.libre|pluralize:",s" }} disponible{{ support.libre|pluralize:",s" }}
+                        sur {{ support.count }} face{{ support.count|pluralize:",s" }}
+                      </div>
+                    {% else %}
+                      <div class="rn-desc">
+                        {{ support.count }} écran{{ support.count|pluralize:",s" }} sur le réseau
+                      </div>
+                    {% endif %}
+
+                    <div class="rn-foot">
+                      <div class="rn-stars">
+                        <i class="bi bi-geo-alt-fill"></i>
+                        <span>{{ ville.nom }}</span>
+                      </div>
+                      <button class="rn-add" title="Voir les détails"><i class="bi bi-plus-lg"></i>Réserver</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              {% endfor %}
+
+
             {% endfor %}
-
-
+          {% empty %}
+            <p style="color:var(--text-muted); padding:2rem; text-align:center; width:100%;">
+              Aucune statistique disponible pour le moment.
+            </p>
           {% endfor %}
-        {% empty %}
-          <p style="color:var(--text-muted); padding:2rem; text-align:center; width:100%;">
-            Aucune statistique disponible pour le moment.
-          </p>
-        {% endfor %}
-      </div>
+        </div>
 
-      <!-- MESSAGE AUCUN RÉSULTAT (affiché via JS si le filtre ville+format ne matche rien) -->
-      <div id="rn-empty" style="display:none; text-align:center; padding:3rem 1.5rem; color:var(--text-muted);">
-        <i class="bi bi-inboxes" style="font-size:2rem; display:block; margin-bottom:.75rem; color:var(--color-primary);"></i>
-        <div style="font-weight:700; color:var(--text); margin-bottom:.25rem;">Aucun emplacement disponible</div>
-        <div style="font-size:.9rem;">Aucun résultat ne correspond à ce format pour cette ville. Essayez une autre combinaison.</div>
+        <!-- MESSAGE AUCUN RÉSULTAT (affiché via JS si le filtre ville+format ne matche rien) -->
+        <div id="rn-empty" style="display:none; text-align:center; padding:3rem 1.5rem; color:var(--text-muted);">
+          <i class="bi bi-inboxes" style="font-size:2rem; display:block; margin-bottom:.75rem; color:var(--color-primary);"></i>
+          <div style="font-weight:700; color:var(--text); margin-bottom:.25rem;">Aucun emplacement disponible</div>
+          <div style="font-size:.9rem;">Aucun résultat ne correspond à ce format pour cette ville. Essayez une autre combinaison.</div>
+        </div>
       </div>
     </div>
 
@@ -1931,7 +2086,10 @@
           <img id="rnpImg" src="" alt="">
         </div>
         <div class="rn-pop-content">
-          <div class="rn-pop-cat" id="rnpCat"></div>
+          <div class="rn-pop-cat-row">
+            <span class="rn-pop-cat" id="rnpCat"></span>
+            <span class="rn-pop-instant"><i class="bi bi-clock-fill"></i> à l'instant</span>
+          </div>
           <div class="rn-pop-title" id="rnpTitle"></div>
           <div class="rn-pop-meta" id="rnpMeta"></div>
           <div class="rn-pop-desc" id="rnpDesc"></div>
@@ -1962,70 +2120,71 @@
           <p class="sdesc mx-auto" style="max-width:480px;">Trois familles de formats adaptées à chaque objectif média.</p>
         </div>
       </div>
+      <div class="container">
+        <div class="formats-grid">
 
-      <div class="formats-grid">
-
-        <div class="format-card" style="cursor:pointer" onclick="rnFilterByCategorie('all')">
-          <div class="format-image">
-            <img src="{% static 'img/formats/Gemini_Generated_Image_9l7hhk9l7hhk9l7h.jfif' %}" alt="Panneau 4x3">
-          </div>
-          <div class="format-badge"><i class="bi bi-signpost-split-fill"></i></div>
-          <div class="format-body">
-            <div class="format-title">Panneaux 4×3 et Géants</div>
-            <p class="format-desc">Dominez le paysage urbain.</p>
-            <div class="format-usage">
-              <p>Votre marque bénéficie d'une visibilité exceptionnelle sur les principaux axes de circulation.</p>
-              <div class="usage-title">
-                <i class="bi bi-lightbulb-fill"></i> Idéal pour :
+          <div class="format-card" style="cursor:pointer" onclick="rnFilterByCategorie('all')">
+            <div class="format-image">
+              <img src="{% static 'img/formats/Gemini_Generated_Image_9l7hhk9l7hhk9l7h.jfif' %}" alt="Panneau 4x3">
+            </div>
+            <div class="format-badge"><i class="bi bi-signpost-split-fill"></i></div>
+            <div class="format-body">
+              <div class="format-title">Panneaux 4×3 et Géants</div>
+              <p class="format-desc">Dominez le paysage urbain.</p>
+              <div class="format-usage">
+                <p>Votre marque bénéficie d'une visibilité exceptionnelle sur les principaux axes de circulation.</p>
+                <div class="usage-title">
+                  <i class="bi bi-lightbulb-fill"></i> Idéal pour :
+                </div>
+                <ul>
+                  <li>Lancement de produit</li>
+                  <li>Campagne nationale</li>
+                  <li>Notoriété de marque</li>
+                </ul>
               </div>
-              <ul>
-                <li>Lancement de produit</li>
-                <li>Campagne nationale</li>
-                <li>Notoriété de marque</li>
-              </ul>
             </div>
           </div>
-        </div>
 
-        <div class="format-card" style="cursor:pointer" onclick="rnFilterByCategorie('ecran')">
-          <div class="format-image">
-            <img src="{% static 'img/formats/Gemini_Generated_Image_sx89ybsx89ybsx891.png' %}" alt="Écran numérique">
-          </div>
-          <div class="format-badge"><i class="bi bi-display"></i></div>
-          <div class="format-body">
-            <div class="format-title">Écrans Numériques LED</div>
-            <p class="format-desc">Votre campagne prend vie.</p>
-            <div class="format-usage">
-              <p>Diffusez des contenus animés, programmés selon vos horaires et adaptés à vos objectifs.</p>
-              <div class="usage-title">
-                <i class="bi bi-lightbulb-fill"></i> Les avantages :
+          <div class="format-card" style="cursor:pointer" onclick="rnFilterByCategorie('ecran')">
+            <div class="format-image">
+              <img src="{% static 'img/formats/Gemini_Generated_Image_sx89ybsx89ybsx891.png' %}" alt="Écran numérique">
+            </div>
+            <div class="format-badge"><i class="bi bi-display"></i></div>
+            <div class="format-body">
+              <div class="format-title">Écrans Numériques LED</div>
+              <p class="format-desc">Votre campagne prend vie.</p>
+              <div class="format-usage">
+                <p>Diffusez des contenus animés, programmés selon vos horaires et adaptés à vos objectifs.</p>
+                <div class="usage-title">
+                  <i class="bi bi-lightbulb-fill"></i> Les avantages :
+                </div>
+                <ul>
+                  <li>Diffusion dynamique</li>
+                  <li>Changement instantané</li>
+                  <li>Plusieurs messages dans une même campagne</li>
+                </ul>
               </div>
-              <ul>
-                <li>Diffusion dynamique</li>
-                <li>Changement instantané</li>
-                <li>Plusieurs messages dans une même campagne</li>
-              </ul>
             </div>
           </div>
-        </div>
 
-        <div class="format-card" style="cursor:pointer" onclick="rnFilterByCategorie('sucette')">
-          <div class="format-image">
-            <img src="{% static 'img/formats/Gemini_Generated_Image_sx89ybsx89ybsx89.png' %}" alt="Sucette publicitaire">
-          </div>
-          <div class="format-badge"><i class="bi bi-lamp-fill"></i></div>
-          <div class="format-body">
-            <div class="format-title">Sucettes Publicitaires</div>
-            <p class="format-desc">Panneaux lumineux au cœur des trottoirs, à hauteur de regard.</p>
-            <div class="format-usage">
-              <div class="usage-title">
-                <i class="bi bi-lightbulb-fill"></i> Atout majeur :
+          <div class="format-card" style="cursor:pointer" onclick="rnFilterByCategorie('sucette')">
+            <div class="format-image">
+              <img src="{% static 'img/formats/Gemini_Generated_Image_sx89ybsx89ybsx89.png' %}" alt="Sucette publicitaire">
+            </div>
+            <div class="format-badge"><i class="bi bi-lamp-fill"></i></div>
+            <div class="format-body">
+              <div class="format-title">Sucettes Publicitaires</div>
+              <p class="format-desc">Panneaux lumineux au cœur des trottoirs, à hauteur de regard.</p>
+              <div class="format-usage">
+                <div class="usage-title">
+                  <i class="bi bi-lightbulb-fill"></i> Atout majeur :
+                </div>
+                <p>Visibilité piétonne maximale, idéale en centre-ville et dans les zones commerçantes.</p>
               </div>
-              <p>Visibilité piétonne maximale, idéale en centre-ville et dans les zones commerçantes.</p>
             </div>
           </div>
-        </div>
 
+        </div>
       </div>
     </div>
 
@@ -2068,49 +2227,51 @@
 
     <!-- ═══════════ À PROPOS ═══════════ -->
     <div class="section" id="about">
-      <div class="apropos-grid">
-        <div class="apropos-stack">
-          <div class="apropos-badge">
-            <div class="apropos-badge-num">{{ nb_villes }}</div>
-            <div class="apropos-badge-lbl">Ville{{ nb_villes|pluralize:",s" }} couverte{{ nb_villes|pluralize:",s" }}</div>
-          </div>
-          <div class="apropos-img">
-            <img src="{% static 'img/villes/image1 (6).jfif' %}" alt="Réseau d'affichage Integral" loading="lazy">
-          </div>
-        </div>
-        <div>
-          <div class="text-center" data-aos="fade-up">
-            <span class="slbl">Qui sommes-nous</span>
-            <h2 class="stitle">Une régie publicitaire au service de <span>votre visibilité</span></h2>
-            <div class="sline"></div>
-          </div>
-          <p class="section-subtitle" style="font-size:.92rem;line-height:1.7;">
-            Integral conçoit, exploite et commercialise un réseau de supports publicitaires
-            extérieurs — panneaux grand format, écrans numériques LED et sucettes urbaines —
-            répartis dans les principales villes du Burkina Faso. Notre mission : offrir aux
-            marques des emplacements stratégiques et un accompagnement de bout en bout, de la
-            sélection de l'emplacement jusqu'au suivi de campagne.
-          </p>
-          <div class="apropos-points">
-            <div class="apropos-point">
-              <div class="apropos-point-icon"><i class="bi bi-geo-alt-fill"></i></div>
-              <div>
-                <div class="apropos-point-title">Emplacements stratégiques</div>
-                <div class="apropos-point-desc">Des supports positionnés sur les axes à plus fort trafic et dans les zones à forte affluence.</div>
-              </div>
+      <div class="container">
+        <div class="apropos-grid">
+          <div class="apropos-stack">
+            <div class="apropos-badge">
+              <div class="apropos-badge-num">{{ nb_villes }}</div>
+              <div class="apropos-badge-lbl">Ville{{ nb_villes|pluralize:",s" }} couverte{{ nb_villes|pluralize:",s" }}</div>
             </div>
-            <div class="apropos-point">
-              <div class="apropos-point-icon"><i class="bi bi-shield-check"></i></div>
-              <div>
-                <div class="apropos-point-title">Disponibilités en temps réel</div>
-                <div class="apropos-point-desc">Consultez l'état de chaque face publicitaire avant de faire votre demande de réservation.</div>
-              </div>
+            <div class="apropos-img">
+              <img src="{% static 'img/villes/image1 (6).jfif' %}" alt="Réseau d'affichage Integral" loading="lazy">
             </div>
-            <div class="apropos-point">
-              <div class="apropos-point-icon"><i class="bi bi-headset"></i></div>
-              <div>
-                <div class="apropos-point-title">Accompagnement personnalisé</div>
-                <div class="apropos-point-desc">Une équipe dédiée vous accompagne du choix de l'emplacement jusqu'à la diffusion de votre campagne.</div>
+          </div>
+          <div>
+            <div class="text-center" data-aos="fade-up">
+              <span class="slbl">Qui sommes-nous</span>
+              <h2 class="stitle">Une régie publicitaire au service de <span>votre visibilité</span></h2>
+              <div class="sline"></div>
+            </div>
+            <p class="section-subtitle" style="font-size:.92rem;line-height:1.7;">
+              Integral conçoit, exploite et commercialise un réseau de supports publicitaires
+              extérieurs — panneaux grand format, écrans numériques LED et sucettes urbaines —
+              répartis dans les principales villes du Burkina Faso. Notre mission : offrir aux
+              marques des emplacements stratégiques et un accompagnement de bout en bout, de la
+              sélection de l'emplacement jusqu'au suivi de campagne.
+            </p>
+            <div class="apropos-points">
+              <div class="apropos-point">
+                <div class="apropos-point-icon"><i class="bi bi-geo-alt-fill"></i></div>
+                <div>
+                  <div class="apropos-point-title">Emplacements stratégiques</div>
+                  <div class="apropos-point-desc">Des supports positionnés sur les axes à plus fort trafic et dans les zones à forte affluence.</div>
+                </div>
+              </div>
+              <div class="apropos-point">
+                <div class="apropos-point-icon"><i class="bi bi-shield-check"></i></div>
+                <div>
+                  <div class="apropos-point-title">Disponibilités en temps réel</div>
+                  <div class="apropos-point-desc">Consultez l'état de chaque face publicitaire avant de faire votre demande de réservation.</div>
+                </div>
+              </div>
+              <div class="apropos-point">
+                <div class="apropos-point-icon"><i class="bi bi-headset"></i></div>
+                <div>
+                  <div class="apropos-point-title">Accompagnement personnalisé</div>
+                  <div class="apropos-point-desc">Une équipe dédiée vous accompagne du choix de l'emplacement jusqu'à la diffusion de votre campagne.</div>
+                </div>
               </div>
             </div>
           </div>
@@ -2136,24 +2297,26 @@
         </div>
       </div>
 
-      <div class="team-grid">
-        <div class="team-card">
-          <div class="team-avatar"><i class="bi bi-person-badge-fill"></i></div>
-          <div class="team-name">Service Commercial</div>
-          <div class="team-role">Conseil & Devis</div>
-          <div class="team-desc">Vous aide à choisir les emplacements adaptés à votre budget et à vos objectifs de campagne.</div>
-        </div>
-        <div class="team-card">
-          <div class="team-avatar"><i class="bi bi-tools"></i></div>
-          <div class="team-name">Équipe Technique</div>
-          <div class="team-role">Installation & Maintenance</div>
-          <div class="team-desc">Assure la pose, l'entretien et la remise en état rapide de tous nos supports d'affichage.</div>
-        </div>
-        <div class="team-card">
-          <div class="team-avatar"><i class="bi bi-person-lines-fill"></i></div>
-          <div class="team-name">Relation Client</div>
-          <div class="team-role">Suivi de campagne</div>
-          <div class="team-desc">Reste à votre écoute tout au long de votre campagne pour un suivi transparent et réactif.</div>
+      <div class="container">
+        <div class="team-grid">
+          <div class="team-card">
+            <div class="team-avatar"><i class="bi bi-person-badge-fill"></i></div>
+            <div class="team-name">Service Commercial</div>
+            <div class="team-role">Conseil & Devis</div>
+            <div class="team-desc">Vous aide à choisir les emplacements adaptés à votre budget et à vos objectifs de campagne.</div>
+          </div>
+          <div class="team-card">
+            <div class="team-avatar"><i class="bi bi-tools"></i></div>
+            <div class="team-name">Équipe Technique</div>
+            <div class="team-role">Installation & Maintenance</div>
+            <div class="team-desc">Assure la pose, l'entretien et la remise en état rapide de tous nos supports d'affichage.</div>
+          </div>
+          <div class="team-card">
+            <div class="team-avatar"><i class="bi bi-person-lines-fill"></i></div>
+            <div class="team-name">Relation Client</div>
+            <div class="team-role">Suivi de campagne</div>
+            <div class="team-desc">Reste à votre écoute tout au long de votre campagne pour un suivi transparent et réactif.</div>
+          </div>
         </div>
       </div>
     </div>
@@ -2175,41 +2338,43 @@
           <p class="sdesc mx-auto" style="max-width:480px;">Un aperçu de nos supports installés à travers les villes.</p>
         </div>
       </div>
-      <div class="gal-grid">
-        <div class="gal-item" data-gi="0"
-          data-gimg="{% static 'img/villes/image1 (6).jfif' %}"
-          data-gtitle="Panneaux grand format — Ouagadougou"
-          data-gdesc="Nos panneaux 4x3 et géants positionnés sur les grands axes de la capitale, pour une visibilité maximale.">
-          <img src="{% static 'img/villes/image1 (6).jfif' %}" alt="Ouagadougou">
-          <div class="gal-overlay"><span><i class="bi bi-arrows-fullscreen"></i> Ouagadougou</span></div>
-        </div>
-        <div class="gal-item" data-gi="1"
-          data-gimg="{% static 'img/formats/Gemini_Generated_Image_sx89ybsx89ybsx891.png' %}"
-          data-gtitle="Écrans numériques LED"
-          data-gdesc="Diffusion dynamique et programmable, idéale pour des messages qui évoluent en temps réel.">
-          <img src="{% static 'img/formats/Gemini_Generated_Image_sx89ybsx89ybsx891.png' %}" alt="Écran numérique">
-          <div class="gal-overlay"><span><i class="bi bi-arrows-fullscreen"></i> Écrans LED</span></div>
-        </div>
-        <div class="gal-item" data-gi="2"
-          data-gimg="{% static 'img/villes/image1 (5).jfif' %}"
-          data-gtitle="Réseau — Bobo-Dioulasso"
-          data-gdesc="Des emplacements stratégiques dans la deuxième ville économique du pays.">
-          <img src="{% static 'img/villes/image1 (5).jfif' %}" alt="Bobo-Dioulasso">
-          <div class="gal-overlay"><span><i class="bi bi-arrows-fullscreen"></i> Bobo-Dioulasso</span></div>
-        </div>
-        <div class="gal-item" data-gi="3"
-          data-gimg="{% static 'img/formats/Gemini_Generated_Image_sx89ybsx89ybsx89.png' %}"
-          data-gtitle="Sucettes publicitaires"
-          data-gdesc="Visibilité piétonne au cœur des zones commerçantes et des trottoirs à forte affluence.">
-          <img src="{% static 'img/formats/Gemini_Generated_Image_sx89ybsx89ybsx89.png' %}" alt="Sucette publicitaire">
-          <div class="gal-overlay"><span><i class="bi bi-arrows-fullscreen"></i> Sucettes</span></div>
-        </div>
-        <div class="gal-item" data-gi="4"
-          data-gimg="{% static 'img/villes/image1 (1).jfif' %}"
-          data-gtitle="Réseau — Koudougou"
-          data-gdesc="Extension de notre réseau vers les villes secondaires à fort potentiel commercial.">
-          <img src="{% static 'img/villes/image1 (1).jfif' %}" alt="Koudougou">
-          <div class="gal-overlay"><span><i class="bi bi-arrows-fullscreen"></i> Koudougou</span></div>
+      <div class="container">
+        <div class="gal-grid">
+          <div class="gal-item" data-gi="0"
+            data-gimg="{% static 'img/villes/image1 (6).jfif' %}"
+            data-gtitle="Panneaux grand format — Ouagadougou"
+            data-gdesc="Nos panneaux 4x3 et géants positionnés sur les grands axes de la capitale, pour une visibilité maximale.">
+            <img src="{% static 'img/villes/image1 (6).jfif' %}" alt="Ouagadougou">
+            <div class="gal-overlay"><span><i class="bi bi-arrows-fullscreen"></i> Ouagadougou</span></div>
+          </div>
+          <div class="gal-item" data-gi="1"
+            data-gimg="{% static 'img/formats/Gemini_Generated_Image_sx89ybsx89ybsx891.png' %}"
+            data-gtitle="Écrans numériques LED"
+            data-gdesc="Diffusion dynamique et programmable, idéale pour des messages qui évoluent en temps réel.">
+            <img src="{% static 'img/formats/Gemini_Generated_Image_sx89ybsx89ybsx891.png' %}" alt="Écran numérique">
+            <div class="gal-overlay"><span><i class="bi bi-arrows-fullscreen"></i> Écrans LED</span></div>
+          </div>
+          <div class="gal-item" data-gi="2"
+            data-gimg="{% static 'img/villes/image1 (5).jfif' %}"
+            data-gtitle="Réseau — Bobo-Dioulasso"
+            data-gdesc="Des emplacements stratégiques dans la deuxième ville économique du pays.">
+            <img src="{% static 'img/villes/image1 (5).jfif' %}" alt="Bobo-Dioulasso">
+            <div class="gal-overlay"><span><i class="bi bi-arrows-fullscreen"></i> Bobo-Dioulasso</span></div>
+          </div>
+          <div class="gal-item" data-gi="3"
+            data-gimg="{% static 'img/formats/Gemini_Generated_Image_sx89ybsx89ybsx89.png' %}"
+            data-gtitle="Sucettes publicitaires"
+            data-gdesc="Visibilité piétonne au cœur des zones commerçantes et des trottoirs à forte affluence.">
+            <img src="{% static 'img/formats/Gemini_Generated_Image_sx89ybsx89ybsx89.png' %}" alt="Sucette publicitaire">
+            <div class="gal-overlay"><span><i class="bi bi-arrows-fullscreen"></i> Sucettes</span></div>
+          </div>
+          <div class="gal-item" data-gi="4"
+            data-gimg="{% static 'img/villes/image1 (1).jfif' %}"
+            data-gtitle="Réseau — Koudougou"
+            data-gdesc="Extension de notre réseau vers les villes secondaires à fort potentiel commercial.">
+            <img src="{% static 'img/villes/image1 (1).jfif' %}" alt="Koudougou">
+            <div class="gal-overlay"><span><i class="bi bi-arrows-fullscreen"></i> Koudougou</span></div>
+          </div>
         </div>
       </div>
     </div>
@@ -2292,41 +2457,43 @@
           <p class="sdesc mx-auto" style="max-width:480px;">Nos derniers articles pour réussir vos campagnes d'affichage extérieur.</p>
         </div>
       </div>
-      <div class="blog-grid">
-        <div class="blog-card">
-          <div class="blog-img">
-            <img src="{% static 'img/villes/image1 (6).jfif' %}" alt="">
-            <div class="blog-date-bdg"><span class="bd">12</span><span class="bm">Juil</span></div>
+      <div class="container">
+        <div class="blog-grid">
+          <div class="blog-card">
+            <div class="blog-img">
+              <img src="{% static 'img/villes/image1 (6).jfif' %}" alt="">
+              <div class="blog-date-bdg"><span class="bd">12</span><span class="bm">Juil</span></div>
+            </div>
+            <div class="blog-body">
+              <div class="blog-tag">Stratégie</div>
+              <div class="blog-title"><a href="#">Comment choisir le bon format d'affichage pour votre campagne</a></div>
+              <div class="blog-meta"><span><i class="bi bi-person"></i> Équipe Integral</span><span><i class="bi bi-calendar3"></i> 5 min de lecture</span></div>
+              <a href="#" class="blog-more">Lire la suite <i class="bi bi-arrow-right"></i></a>
+            </div>
           </div>
-          <div class="blog-body">
-            <div class="blog-tag">Stratégie</div>
-            <div class="blog-title"><a href="#">Comment choisir le bon format d'affichage pour votre campagne</a></div>
-            <div class="blog-meta"><span><i class="bi bi-person"></i> Équipe Integral</span><span><i class="bi bi-calendar3"></i> 5 min de lecture</span></div>
-            <a href="#" class="blog-more">Lire la suite <i class="bi bi-arrow-right"></i></a>
+          <div class="blog-card">
+            <div class="blog-img">
+              <img src="{% static 'img/formats/Gemini_Generated_Image_sx89ybsx89ybsx891.png' %}" alt="">
+              <div class="blog-date-bdg"><span class="bd">28</span><span class="bm">Juin</span></div>
+            </div>
+            <div class="blog-body">
+              <div class="blog-tag">Digital</div>
+              <div class="blog-title"><a href="#">Pourquoi les écrans numériques transforment l'affichage urbain</a></div>
+              <div class="blog-meta"><span><i class="bi bi-person"></i> Équipe Integral</span><span><i class="bi bi-calendar3"></i> 4 min de lecture</span></div>
+              <a href="#" class="blog-more">Lire la suite <i class="bi bi-arrow-right"></i></a>
+            </div>
           </div>
-        </div>
-        <div class="blog-card">
-          <div class="blog-img">
-            <img src="{% static 'img/formats/Gemini_Generated_Image_sx89ybsx89ybsx891.png' %}" alt="">
-            <div class="blog-date-bdg"><span class="bd">28</span><span class="bm">Juin</span></div>
-          </div>
-          <div class="blog-body">
-            <div class="blog-tag">Digital</div>
-            <div class="blog-title"><a href="#">Pourquoi les écrans numériques transforment l'affichage urbain</a></div>
-            <div class="blog-meta"><span><i class="bi bi-person"></i> Équipe Integral</span><span><i class="bi bi-calendar3"></i> 4 min de lecture</span></div>
-            <a href="#" class="blog-more">Lire la suite <i class="bi bi-arrow-right"></i></a>
-          </div>
-        </div>
-        <div class="blog-card">
-          <div class="blog-img">
-            <img src="{% static 'img/villes/image1 (5).jfif' %}" alt="">
-            <div class="blog-date-bdg"><span class="bd">03</span><span class="bm">Juin</span></div>
-          </div>
-          <div class="blog-body">
-            <div class="blog-tag">Conseils</div>
-            <div class="blog-title"><a href="#">5 critères pour bien choisir l'emplacement de votre panneau</a></div>
-            <div class="blog-meta"><span><i class="bi bi-person"></i> Équipe Integral</span><span><i class="bi bi-calendar3"></i> 6 min de lecture</span></div>
-            <a href="#" class="blog-more">Lire la suite <i class="bi bi-arrow-right"></i></a>
+          <div class="blog-card">
+            <div class="blog-img">
+              <img src="{% static 'img/villes/image1 (5).jfif' %}" alt="">
+              <div class="blog-date-bdg"><span class="bd">03</span><span class="bm">Juin</span></div>
+            </div>
+            <div class="blog-body">
+              <div class="blog-tag">Conseils</div>
+              <div class="blog-title"><a href="#">5 critères pour bien choisir l'emplacement de votre panneau</a></div>
+              <div class="blog-meta"><span><i class="bi bi-person"></i> Équipe Integral</span><span><i class="bi bi-calendar3"></i> 6 min de lecture</span></div>
+              <a href="#" class="blog-more">Lire la suite <i class="bi bi-arrow-right"></i></a>
+            </div>
           </div>
         </div>
       </div>
@@ -2349,86 +2516,88 @@
           <p class="sdesc mx-auto" style="max-width:480px;">Notre équipe vous répond sous 48h ouvrables.</p>
         </div>
       </div>
-      <div class="contact-grid">
-        <div class="hours-block">
-          <div class="giraffe-spots" aria-hidden="true">
-            <span class="spot spot-1"></span>
-            <span class="spot spot-2"></span>
-            <span class="spot spot-3"></span>
-            <span class="spot spot-4"></span>
-            <span class="spot spot-5"></span>
-            <span class="spot spot-6"></span>
-            <span class="spot spot-7"></span>
-            <span class="spot spot-8"></span>
-          </div>
-          <div class="hours-grid">
-            <div>
-              <h3 style="color:#fff;font-weight:800;margin-bottom:18px;font-size:1.2rem;">
-                <i class="bi bi-clock-fill" style="color:var(--color-secondary)"></i> Nos horaires
-              </h3>
-              <div class="hours-row">
-                <span class="hours-day"><span class="hours-dot"></span> Lundi — Vendredi</span>
-                <span>08h00 — 18h00</span>
-              </div>
-              <div class="hours-row">
-                <span class="hours-day"><span class="hours-dot"></span> Samedi</span>
-                <span>09h00 — 13h00</span>
-              </div>
-              <div class="hours-row">
-                <span class="hours-day"><span class="hours-dot off"></span> Dimanche</span>
-                <span style="color:#fca5a5;">Fermé</span>
-              </div>
-              <p style="font-size:.8rem;opacity:.75;margin-top:16px;margin-bottom:0;">
-                Les demandes de réservation en ligne restent accessibles 24h/24 — notre équipe y répond sous 48h ouvrables.
-              </p>
+      <div class="container">
+        <div class="contact-grid">
+          <div class="hours-block">
+            <div class="giraffe-spots" aria-hidden="true">
+              <span class="spot spot-1"></span>
+              <span class="spot spot-2"></span>
+              <span class="spot spot-3"></span>
+              <span class="spot spot-4"></span>
+              <span class="spot spot-5"></span>
+              <span class="spot spot-6"></span>
+              <span class="spot spot-7"></span>
+              <span class="spot spot-8"></span>
             </div>
-            <div class="hours-card-white">
-              <h5><i class="bi bi-geo-alt-fill"></i> Nous trouver</h5>
-              <div class="hours-info-row"><span><i class="bi bi-signpost-split"></i> Adresse</span><span>Ouagadougou, Burkina Faso</span></div>
-              <div class="hours-info-row"><span><i class="bi bi-telephone"></i> Téléphone</span>
-                <div style="display: grid;">
-                  <span>{{ CONTACT_TEL01 }}</span>
-                  <span>{{ CONTACT_TEL02 }}</span>
-                  <span>{{ CONTACT_TEL03 }}</span>
+            <div class="hours-grid">
+              <div>
+                <h3 style="color:#fff;font-weight:800;margin-bottom:18px;font-size:1.2rem;">
+                  <i class="bi bi-clock-fill" style="color:var(--color-secondary)"></i> Nos horaires
+                </h3>
+                <div class="hours-row">
+                  <span class="hours-day"><span class="hours-dot"></span> Lundi — Vendredi</span>
+                  <span>08h00 — 18h00</span>
+                </div>
+                <div class="hours-row">
+                  <span class="hours-day"><span class="hours-dot"></span> Samedi</span>
+                  <span>09h00 — 13h00</span>
+                </div>
+                <div class="hours-row">
+                  <span class="hours-day"><span class="hours-dot off"></span> Dimanche</span>
+                  <span style="color:#fca5a5;">Fermé</span>
+                </div>
+                <p style="font-size:.8rem;opacity:.75;margin-top:16px;margin-bottom:0;">
+                  Les demandes de réservation en ligne restent accessibles 24h/24 — notre équipe y répond sous 48h ouvrables.
+                </p>
+              </div>
+              <div class="hours-card-white">
+                <h5><i class="bi bi-geo-alt-fill"></i> Nous trouver</h5>
+                <div class="hours-info-row"><span><i class="bi bi-signpost-split"></i> Adresse</span><span>Ouagadougou, Burkina Faso</span></div>
+                <div class="hours-info-row"><span><i class="bi bi-telephone"></i> Téléphone</span>
+                  <div style="display: grid;">
+                    <span>{{ CONTACT_TEL01 }}</span>
+                    <span>{{ CONTACT_TEL02 }}</span>
+                    <span>{{ CONTACT_TEL03 }}</span>
+                  </div>
+                </div>
+                <div class="hours-info-row"><span><i class="bi bi-envelope"></i> Email</span>
+                  <div style="display: grid;">
+                    <span>{{ CONTACT_EMAIL }}</span>
+                    <span>{{ CONTACT_EMAIL1 }}</span>
+                    <span>{{ CONTACT_EMAIL2 }}</span>
+                  </div>
                 </div>
               </div>
-              <div class="hours-info-row"><span><i class="bi bi-envelope"></i> Email</span>
-                <div style="display: grid;">
-                  <span>{{ CONTACT_EMAIL }}</span>
-                  <span>{{ CONTACT_EMAIL1 }}</span>
-                  <span>{{ CONTACT_EMAIL2 }}</span>
-                </div>
-              </div>
             </div>
           </div>
-        </div>
-        <div class="contact-form-card">
-          <form method="post" action="{% url 'portail:contact' %}">
-            {% csrf_token %}
-            <div class="row g-3">
-              <div class="col-md-6">
-                <label class="contact-flbl">Nom complet</label>
-                <input type="text" name="nom" class="contact-fctrl" placeholder="Votre nom">
+          <div class="contact-form-card">
+            <form method="post" action="{% url 'portail:contact' %}">
+              {% csrf_token %}
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="contact-flbl">Nom complet</label>
+                  <input type="text" name="nom" class="contact-fctrl" placeholder="Votre nom">
+                </div>
+                <div class="col-md-6">
+                  <label class="contact-flbl">Email</label>
+                  <input type="email" name="email" class="contact-fctrl" placeholder="votre@email.com">
+                </div>
+                <div class="col-12">
+                  <label class="contact-flbl">Sujet</label>
+                  <input type="text" name="sujet" class="contact-fctrl" placeholder="Objet de votre message">
+                </div>
+                <div class="col-12">
+                  <label class="contact-flbl">Message</label>
+                  <textarea name="message" class="contact-fctrl" rows="4" placeholder="Votre message..."></textarea>
+                </div>
+                <div class="col-12">
+                  <button type="submit" class="hero-btn hero-btn-solidy" style="width:100%;justify-content:center;">
+                    <i class="bi bi-send-fill"></i> Envoyer le message
+                  </button>
+                </div>
               </div>
-              <div class="col-md-6">
-                <label class="contact-flbl">Email</label>
-                <input type="email" name="email" class="contact-fctrl" placeholder="votre@email.com">
-              </div>
-              <div class="col-12">
-                <label class="contact-flbl">Sujet</label>
-                <input type="text" name="sujet" class="contact-fctrl" placeholder="Objet de votre message">
-              </div>
-              <div class="col-12">
-                <label class="contact-flbl">Message</label>
-                <textarea name="message" class="contact-fctrl" rows="4" placeholder="Votre message..."></textarea>
-              </div>
-              <div class="col-12">
-                <button type="submit" class="hero-btn hero-btn-solid" style="width:100%;justify-content:center;">
-                  <i class="bi bi-send-fill"></i> Envoyer le message
-                </button>
-              </div>
-            </div>
-          </form>
+            </form>
+          </div>
         </div>
       </div>
     </div>
@@ -2451,55 +2620,102 @@
         </div>
       </div>
 
-      <div class="swiper testiSwiper">
-        <div class="swiper-wrapper">
-          <div class="swiper-slide">
-            <div class="testi-card">
-              <div class="testi-stars">
-                <i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i>
+      <div class="container">
+        <div class="swiper testiSwiper">
+          <div class="swiper-wrapper">
+            <div class="swiper-slide">
+              <div class="testi-card">
+                <div class="testi-stars">
+                  <i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i>
+                </div>
+                <p class="testi-text">« Grâce à Integral, notre campagne de lancement a bénéficié d'une visibilité exceptionnelle sur les grands axes de Ouagadougou. Un accompagnement sérieux du début à la fin. »</p>
+                <div class="testi-author">
+                  <div class="testi-avatar">SK</div>
+                  <div>
+                    <div class="testi-name">Salif K.</div>
+                    <div class="testi-role">Directeur Marketing</div>
+                  </div>
+                </div>
               </div>
-              <p class="testi-text">« Grâce à Integral, notre campagne de lancement a bénéficié d'une visibilité exceptionnelle sur les grands axes de Ouagadougou. Un accompagnement sérieux du début à la fin. »</p>
-              <div class="testi-author">
-                <div class="testi-avatar">SK</div>
-                <div>
-                  <div class="testi-name">Salif K.</div>
-                  <div class="testi-role">Directeur Marketing</div>
+            </div>
+            <div class="swiper-slide">
+              <div class="testi-card">
+                <div class="testi-stars">
+                  <i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i>
+                </div>
+                <p class="testi-text">« Les écrans numériques nous ont permis de faire évoluer notre message en temps réel selon nos promotions. Un vrai gain d'efficacité pour notre communication. »</p>
+                <div class="testi-author">
+                  <div class="testi-avatar">AT</div>
+                  <div>
+                    <div class="testi-name">Aïcha T.</div>
+                    <div class="testi-role">Responsable Communication</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="swiper-slide">
+              <div class="testi-card">
+                <div class="testi-stars">
+                  <i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-half"></i>
+                </div>
+                <p class="testi-text">« Processus de réservation simple et transparent : on voit exactement quelles faces sont disponibles avant de s'engager. Le suivi après validation est également très réactif. »</p>
+                <div class="testi-author">
+                  <div class="testi-avatar">RB</div>
+                  <div>
+                    <div class="testi-name">Rasmané B.</div>
+                    <div class="testi-role">Gérant, PME locale</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="swiper-slide">
+              <div class="testi-card">
+                <div class="testi-stars">
+                  <i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i>
+                </div>
+                <p class="testi-text">« Une équipe réactive qui a su nous proposer les meilleurs emplacements en fonction de notre budget. Le rapport visibilité/prix est excellent. »</p>
+                <div class="testi-author">
+                  <div class="testi-avatar">MO</div>
+                  <div>
+                    <div class="testi-name">Mariam O.</div>
+                    <div class="testi-role">Fondatrice, startup locale</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="swiper-slide">
+              <div class="testi-card">
+                <div class="testi-stars">
+                  <i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i>
+                </div>
+                <p class="testi-text">« Nous travaillons avec Integral depuis plus de deux ans. La qualité des supports et le respect des délais d'installation sont constants à chaque campagne. »</p>
+                <div class="testi-author">
+                  <div class="testi-avatar">HB</div>
+                  <div>
+                    <div class="testi-name">Hamed B.</div>
+                    <div class="testi-role">Directeur Général</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="swiper-slide">
+              <div class="testi-card">
+                <div class="testi-stars">
+                  <i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-half"></i>
+                </div>
+                <p class="testi-text">« La plateforme en ligne facilite énormément le suivi de nos réservations. On sait exactement où en est chaque demande sans avoir à relancer par téléphone. »</p>
+                <div class="testi-author">
+                  <div class="testi-avatar">FZ</div>
+                  <div>
+                    <div class="testi-name">Fatimata Z.</div>
+                    <div class="testi-role">Chargée de communication</div>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
-          <div class="swiper-slide">
-            <div class="testi-card">
-              <div class="testi-stars">
-                <i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i>
-              </div>
-              <p class="testi-text">« Les écrans numériques nous ont permis de faire évoluer notre message en temps réel selon nos promotions. Un vrai gain d'efficacité pour notre communication. »</p>
-              <div class="testi-author">
-                <div class="testi-avatar">AT</div>
-                <div>
-                  <div class="testi-name">Aïcha T.</div>
-                  <div class="testi-role">Responsable Communication</div>
-                </div>
-              </div>
-            </div>
-          </div>
-          <div class="swiper-slide">
-            <div class="testi-card">
-              <div class="testi-stars">
-                <i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-half"></i>
-              </div>
-              <p class="testi-text">« Processus de réservation simple et transparent : on voit exactement quelles faces sont disponibles avant de s'engager. Le suivi après validation est également très réactif. »</p>
-              <div class="testi-author">
-                <div class="testi-avatar">RB</div>
-                <div>
-                  <div class="testi-name">Rasmané B.</div>
-                  <div class="testi-role">Gérant, PME locale</div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <div class="swiper-pagination"></div>
         </div>
-        <div class="swiper-pagination"></div>
       </div>
     </div>
 
@@ -2566,7 +2782,7 @@
       </div>
     </div>
     <div class="footer-bottom">
-      <span>&copy; {% now "Y" %} Integral — Régie Publicitaire. Tous droits réservés.</span>
+      <span>&copy; {% now "Y" %} Promo Pub – Integral by <strong style="color:#fff;">Ibrahim SAWADOGO</strong>. All Rights Reserved</span>
       <div>
         <a href="#">Mentions légales</a>
         <a href="#">Politique de confidentialité</a>
@@ -2583,11 +2799,12 @@
     slidesPerView: 1,
     spaceBetween: 22,
     loop: true,
+    loopAdditionalSlides: 2,
     autoplay: { delay: 4500, disableOnInteraction: false },
     pagination: { el: '.swiper-pagination', clickable: true },
     breakpoints: {
       768: { slidesPerView: 2 },
-      1100: { slidesPerView: 3 },
+      1100: { slidesPerView: 3, spaceBetween: 28 },
     },
   });
 </script>
@@ -2640,6 +2857,14 @@
       const matchVille = rnActiveVille === 'all' || g.getAttribute('data-v') === rnActiveVille;
       const matchCat    = rnActiveCat === 'all'   || g.getAttribute('data-cat') === rnActiveCat;
       g.classList.toggle('gone', !(matchVille && matchCat));
+    });
+
+    // Titre de ville : masqué si aucune carte de cette ville n'est visible
+    // après le filtrage en cours (ex: ville sans support dans la catégorie choisie).
+    document.querySelectorAll('.rn-ville-heading').forEach(h => {
+      const v = h.getAttribute('data-v');
+      const hasVisible = document.querySelector('.rn-wrap[data-v="' + v + '"]:not(.gone)');
+      h.classList.toggle('gone', !hasVisible);
     });
 
     // Bouton "Réserver tout" : uniquement quand une ville ET un format précis

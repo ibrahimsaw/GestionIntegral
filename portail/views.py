@@ -146,6 +146,41 @@ VILLE_IMAGES = {
 }
 VILLE_IMAGE_DEFAUT = 'img/villes/default.jpg'
 
+# ── NOUVEAU : image spécifique par couple (ville, code_format) ─────────────
+# Clé = (nom_ville, code_format) → chemin de l'image (relatif à /static/).
+# Si un couple n'est pas défini ici, on retombe sur VILLE_IMAGES[ville],
+# puis sur VILLE_IMAGE_DEFAUT en dernier recours.
+#
+# Exemples (à compléter avec vos vraies images) :
+# VILLE_FORMAT_IMAGES = {
+#     ('Ouagadougou', '4x3'):    'img/formats/ouaga-4x3.jpg',
+#     ('Ouagadougou', 'gm-5x4'): 'img/formats/ouaga-geant.jpg',
+#     ('Bobo-Dioulasso', '4x3'): 'img/formats/bobo-4x3.jpg',
+# }
+VILLE_FORMAT_IMAGES = {
+    # À compléter : (nom_ville, code_format): 'img/formats/xxx.jpg',
+    ('Ouagadougou', '4x3'):    'img/formats/ouaga-4x3.png',
+    ('Ouagadougou', '4x5'): 'img/formats/4x5.png',
+    ('Ouagadougou', '8x5'): 'img/formats/8x5.png',
+    ('Ouagadougou', '10x4'): 'img/formats/10x4.png',
+    ('Ouagadougou', '12x4'): 'img/formats/12x4.png',
+    ('Ouagadougou', '6x4'): 'img/formats/ecran.png',
+    ('Bobo-Dioulasso', '4x3'): 'img/formats/ouaga-4x3.png',
+}
+
+
+def get_support_image(ville: str, format_code: str) -> str:
+    """
+    Retourne l'image la plus précise disponible pour ce couple ville/format :
+    1) l'image spécifique au (ville, format) si définie,
+    2) sinon l'image générique de la ville,
+    3) sinon l'image par défaut.
+    """
+    cle = (ville, format_code or '')
+    if cle in VILLE_FORMAT_IMAGES:
+        return VILLE_FORMAT_IMAGES[cle]
+    return VILLE_IMAGES.get(ville, VILLE_IMAGE_DEFAUT)
+
 
 from collections import defaultdict
 from django.views import View
@@ -166,25 +201,25 @@ def _label_support(support: Support, formats_map: dict) -> tuple[str, dict]:
                 categorie = fs.categorie or 'Autres'
                 superficie_str = f"{fs.superficie:g}m²" if fs.superficie else ""
                 valeur_tri = float(fs.superficie) if fs.superficie else 0.0
-                
+
                 label_data = {
                     'superficie': superficie_str,
                     'dimensions': f"({fs.code})",
                     'valeur_tri': valeur_tri
                 }
                 return categorie, label_data
-                
+
         label_data = {
             'superficie': "",
             'dimensions': "Panneau (format non défini)",
             'valeur_tri': 0.0
         }
         return 'Autres', label_data
-        
+
     label_data = {
         'superficie': "",
         'dimensions': "Écran Numérique",
-        'valeur_tri': 0.0 # Les écrans se placeront au début du tri (0m²)
+        'valeur_tri': 0.0  # Les écrans se placeront au début du tri (0m²)
     }
     return 'Écran', label_data
 
@@ -297,6 +332,7 @@ def _get_compteurs() -> dict:
                 superficie_val, dimensions_val, valeur_tri = group_key
                 total = counts['total']
                 libre = counts['libre']
+                print(f"DEBUG: Ville={nom_ville}, Catégorie={categorie}, Format={counts['code']}, Total={total}, Libre={libre}")
                 liste.append({
                     'superficie': superficie_val,
                     'dimensions': dimensions_val,
@@ -305,8 +341,10 @@ def _get_compteurs() -> dict:
                     'count': total,
                     'libre': libre,
                     'occupe': total - libre,
+                    # ── NOUVEAU : image propre à ce couple ville + format ──
+                    'image_url': get_support_image(nom_ville, counts['code']),
                 })
-            
+
             # ── TRI DES FORMATS DE LA PLUS PETITE À LA PLUS GRANDE SUPERFICIE ──
             liste.sort(key=lambda item: item['valeur_tri'])
 
@@ -341,6 +379,7 @@ def _get_compteurs() -> dict:
         'nb_formats': len(formats_utilises),
         'formats_utilises': sorted(formats_utilises),
     }
+
 
 class AccueilView(View):
     """Page d'accueil — vitrine publique de la régie publicitaire."""

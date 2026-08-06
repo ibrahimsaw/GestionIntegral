@@ -159,13 +159,13 @@ VILLE_IMAGE_DEFAUT = 'img/villes/default.jpg'
 # }
 VILLE_FORMAT_IMAGES = {
     # À compléter : (nom_ville, code_format): 'img/formats/xxx.jpg',
-    ('Ouagadougou', '4x3'):    'img/formats/ouaga-4x3.png',
-    ('Ouagadougou', '4x5'): 'img/formats/4x5.png',
-    ('Ouagadougou', '8x5'): 'img/formats/8x5.png',
-    ('Ouagadougou', '10x4'): 'img/formats/10x4.png',
-    ('Ouagadougou', '12x4'): 'img/formats/12x4.png',
-    ('Ouagadougou', '6x4'): 'img/formats/ecran.png',
-    ('Bobo-Dioulasso', '4x3'): 'img/formats/ouaga-4x3.png',
+    ('Ouagadougou', '4x3'):    'img/formats/ouaga-4x3-removebg-preview.png',
+    ('Ouagadougou', '4x5'): 'img/formats/4x5-removebg-preview.png',
+    ('Ouagadougou', '8x5'): 'img/formats/8x5-removebg-preview.png',
+    ('Ouagadougou', '10x4'): 'img/formats/10x4-removebg-preview.png',
+    ('Ouagadougou', '12x4'): 'img/formats/12x4-removebg-preview.png',
+    ('Ouagadougou', '6x4'): 'img/formats/ecran-removebg-preview.png',
+    ('Bobo-Dioulasso', '4x3'): 'img/formats/ouaga-4x3-removebg-preview.png',
 }
 
 

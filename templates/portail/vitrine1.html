@@ -107,6 +107,29 @@
   }
 
 
+  /* ═══════════════════ DJANGO MESSAGES ══════════════════════════════ */
+  .django-messages {
+    position: fixed;
+    top: 90px;
+    right: 20px;
+    z-index: 2000;
+    width: min(380px, calc(100% - 40px));
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .django-messages .alert {
+    box-shadow: 0 10px 30px rgba(0,0,0,.18);
+    border: none;
+    border-radius: 10px;
+    font-size: .88rem;
+    display: flex;
+    align-items: center;
+  }
+  @media (max-width: 600px) {
+    .django-messages { top: 74px; right: 10px; left: 10px; width: auto; }
+  }
+
   /* ═══════════════════ HERO ═══════════════════════════════════════ */
   .hero-section {
     position: relative;
@@ -1582,6 +1605,32 @@
   }
   .contact-fctrl:focus { outline: none; border-color: var(--color-primary); background: #fff; }
 
+  .form-response {
+    display: none;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: .85rem;
+    margin-bottom: 14px;
+  }
+  .form-response-success { background: #d1e7dd; color: #0f5132; display: block; }
+  .form-response-error { background: #f8d7da; color: #842029; display: block; }
+
+  .form-check-contact {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: .78rem;
+    color: var(--text-muted);
+  }
+  .form-check-contact input[type="checkbox"] {
+    margin-top: 3px;
+    flex-shrink: 0;
+    width: 15px;
+    height: 15px;
+    accent-color: var(--color-primary);
+  }
+  .form-check-contact label { cursor: pointer; line-height: 1.4; }
+
   /* ═══════════ FOOTER ══════════════════════════════════════════════════ */
   .site-footer { background: var(--text); color: rgba(255,255,255,.85); padding: 44px 40px 0; margin-top: 8px; }
   .footer-brand-name { font-size: 1.3rem; font-weight: 800; color: #fff; margin-bottom: 12px; }
@@ -1786,6 +1835,20 @@
       </div>
     </div>
   </nav>
+
+  {% if messages %}
+  <div class="django-messages">
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
+        {% if message.tags == 'success' %}<i class="bi bi-check-circle-fill me-2"></i>
+        {% elif message.tags == 'error' or message.tags == 'danger' %}<i class="bi bi-exclamation-triangle-fill me-2"></i>
+        {% else %}<i class="bi bi-info-circle-fill me-2"></i>{% endif %}
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fermer"></button>
+      </div>
+    {% endfor %}
+  </div>
+  {% endif %}
 
 
 <div class="vitrine">
@@ -2607,24 +2670,47 @@
             </div>
           </div>
           <div class="contact-form-card">
-            <form method="post" action="{% url 'portail:contact' %}">
+            <form id="contact-form" class="contact-form">
               {% csrf_token %}
+
+              <div class="form-response" id="form-message"></div>
+
               <div class="row g-3">
                 <div class="col-md-6">
-                  <label class="contact-flbl">Nom complet</label>
-                  <input type="text" name="nom" class="contact-fctrl" placeholder="Votre nom">
+                  <label class="contact-flbl"><i class="bi bi-person-fill me-1"></i>Nom complet *</label>
+                  <input type="text" id="nom" name="nom" class="contact-fctrl" placeholder="Votre nom" required>
                 </div>
                 <div class="col-md-6">
-                  <label class="contact-flbl">Email</label>
-                  <input type="email" name="email" class="contact-fctrl" placeholder="votre@email.com">
+                  <label class="contact-flbl"><i class="bi bi-envelope-fill me-1"></i>Adresse email *</label>
+                  <input type="email" id="email" name="email" class="contact-fctrl" placeholder="votre@email.com" required>
+                </div>
+                <div class="col-md-6">
+                  <label class="contact-flbl"><i class="bi bi-telephone-fill me-1"></i>Téléphone</label>
+                  <input type="tel" id="telephone" name="telephone" class="contact-fctrl" placeholder="+226 XX XX XX XX">
+                </div>
+                <div class="col-md-6">
+                  <label class="contact-flbl"><i class="bi bi-building me-1"></i>Société/Organisation</label>
+                  <input type="text" id="societe" name="societe" class="contact-fctrl" placeholder="Optionnel">
                 </div>
                 <div class="col-12">
-                  <label class="contact-flbl">Sujet</label>
-                  <input type="text" name="sujet" class="contact-fctrl" placeholder="Objet de votre message">
+                  <label class="contact-flbl"><i class="bi bi-bullseye me-1"></i>Sujet *</label>
+                  <select id="sujet" name="sujet" class="contact-fctrl" required>
+                    <option value="">-- Sélectionnez un sujet --</option>
+                    <option value="demande-reservation">Demande de réservation</option>
+                    <option value="info-tarif">Informations tarifaires</option>
+                    <option value="probleme-technique">Problème technique</option>
+                    <option value="autre">Autre</option>
+                  </select>
                 </div>
                 <div class="col-12">
-                  <label class="contact-flbl">Message</label>
-                  <textarea name="message" class="contact-fctrl" rows="4" placeholder="Votre message..."></textarea>
+                  <label class="contact-flbl"><i class="bi bi-chat-text-fill me-1"></i>Message *</label>
+                  <textarea id="message" name="message" class="contact-fctrl" rows="4" placeholder="Décrivez votre demande en détail..." required></textarea>
+                </div>
+                <div class="col-12">
+                  <div class="form-check-contact">
+                    <input type="checkbox" id="conditions" name="conditions" required>
+                    <label for="conditions">J'accepte que mes données soient traitées pour répondre à ma demande</label>
+                  </div>
                 </div>
                 <div class="col-12">
                   <button type="submit" class="hero-btn hero-btn-solidy" style="width:100%;justify-content:center;">
@@ -3077,6 +3163,58 @@
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') closeGalPop();
   });
+
+  // Auto-fermeture des messages Django après 6 secondes
+  document.querySelectorAll('.django-messages .alert').forEach((el) => {
+    setTimeout(() => {
+      const alert = bootstrap.Alert.getOrCreateInstance(el);
+      alert.close();
+    }, 6000);
+  });
+
+  // ═══════════ FORMULAIRE DE CONTACT (envoi AJAX) ═══════════
+  const contactForm = document.getElementById('contact-form');
+  if (contactForm) {
+    contactForm.addEventListener('submit', async function (e) {
+      e.preventDefault();
+
+      const form = e.target;
+      const btn = form.querySelector('button[type="submit"]');
+      const msgBox = document.getElementById('form-message');
+      const originalBtnHtml = btn.innerHTML;
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Envoi en cours...';
+      msgBox.className = 'form-response';
+      msgBox.style.display = 'none';
+
+      try {
+        const response = await fetch("{% url 'portail:contact_envoyer' %}", {
+          method: 'POST',
+          body: new FormData(form),
+          headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        });
+        const data = await response.json();
+
+        msgBox.style.display = 'block';
+        if (data.success) {
+          msgBox.classList.add('form-response-success');
+          msgBox.textContent = data.message;
+          form.reset();
+        } else {
+          msgBox.classList.add('form-response-error');
+          msgBox.textContent = data.error || "Une erreur est survenue.";
+        }
+      } catch (err) {
+        msgBox.style.display = 'block';
+        msgBox.classList.add('form-response-error');
+        msgBox.textContent = "Erreur réseau. Veuillez réessayer.";
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalBtnHtml;
+      }
+    });
+  }
 </script>
 
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>

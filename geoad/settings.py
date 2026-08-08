@@ -181,7 +181,8 @@ DESIGN_CONFIG = {
 }
 CONTACT_EMAIL1 = "reseau@promopub-integral.com"  # ou l'adresse que tu veux recevoir les demandes
 CONTACT_EMAIL = "support-it@promopub-integral.com"
-CONTACT_EMAIL2 = "secretariat@promopub-integral.com "
+CONTACT_EMAIL2 = "secretariat@promopub-integral.com"
+CONTACT_RECIPIENTS = [CONTACT_EMAIL, CONTACT_EMAIL1, CONTACT_EMAIL2]
 CONTACT_TEL1 = "+22658800909"
 CONTACT_TEL2 = "+22678873301"
 CONTACT_TEL3 = "+22658906695"
@@ -198,3 +199,9 @@ CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
 # settings.py
 DEFAULT_SUPPORT_PHOTO_URL = '/static/img/logo.jpg'
+
+from django.contrib.messages import constants as messages_constants
+
+MESSAGE_TAGS = {
+    messages_constants.ERROR: 'danger',
+}

@@ -159,13 +159,13 @@ VILLE_IMAGE_DEFAUT = 'img/villes/default.jpg'
 # }
 VILLE_FORMAT_IMAGES = {
     # À compléter : (nom_ville, code_format): 'img/formats/xxx.jpg',
-    ('Ouagadougou', '4x3'):    'img/formats/ouaga-4x3.png',
-    ('Ouagadougou', '4x5'): 'img/formats/4x5.png',
-    ('Ouagadougou', '8x5'): 'img/formats/8x5.png',
-    ('Ouagadougou', '10x4'): 'img/formats/10x4.png',
-    ('Ouagadougou', '12x4'): 'img/formats/12x4.png',
-    ('Ouagadougou', '6x4'): 'img/formats/ecran.png',
-    ('Bobo-Dioulasso', '4x3'): 'img/formats/ouaga-4x3.png',
+    ('Ouagadougou', '4x3'):    'img/formats/ouaga-4x3-removebg-preview.png',
+    ('Ouagadougou', '4x5'): 'img/formats/4x5-removebg-preview.png',
+    ('Ouagadougou', '8x5'): 'img/formats/8x5-removebg-preview.png',
+    ('Ouagadougou', '10x4'): 'img/formats/10x4-removebg-preview.png',
+    ('Ouagadougou', '12x4'): 'img/formats/12x4-removebg-preview.png',
+    ('Ouagadougou', '6x4'): 'img/formats/ecran-removebg-preview.png',
+    ('Bobo-Dioulasso', '4x3'): 'img/formats/ouaga-4x3-removebg-preview.png',
 }
 
 
@@ -391,6 +391,74 @@ class AccueilView(View):
             **compteurs,
             'oua_center': [12.3714, -1.5197],
         })
+        
+
+from django.conf import settings
+from django.core.mail import EmailMessage
+from django.http import JsonResponse
+from django.views import View
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class ContactFormView(View):
+    """Traite le formulaire de contact et envoie un email au staff."""
+
+    SUJETS_LABELS = {
+        'demande-reservation': 'Demande de réservation',
+        'info-tarif': 'Informations tarifaires',
+        'probleme-technique': 'Problème technique',
+        'autre': 'Autre',
+    }
+
+    def post(self, request):
+        nom        = request.POST.get('nom', '').strip()
+        email      = request.POST.get('email', '').strip()
+        telephone  = request.POST.get('telephone', '').strip()
+        societe    = request.POST.get('societe', '').strip()
+        sujet      = request.POST.get('sujet', '').strip()
+        message    = request.POST.get('message', '').strip()
+        conditions = request.POST.get('conditions')
+
+        if not all([nom, email, sujet, message, conditions]):
+            return JsonResponse(
+                {'success': False, 'error': "Veuillez remplir tous les champs obligatoires."},
+                status=400,
+            )
+
+        sujet_label = self.SUJETS_LABELS.get(sujet, sujet)
+
+        corps = (
+            f"Nouveau message reçu via le formulaire de contact\n\n"
+            f"Nom       : {nom}\n"
+            f"Société   : {societe or '—'}\n"
+            f"Email     : {email}\n"
+            f"Téléphone : {telephone or '—'}\n"
+            f"Sujet     : {sujet_label}\n\n"
+            f"Message :\n{message}\n"
+        )
+
+        try:
+            email_msg = EmailMessage(
+                subject=f"[Contact site] {sujet_label} — {nom}",
+                body=corps,
+                from_email=email,                  # ← expéditeur = email du visiteur
+                to=settings.CONTACT_RECIPIENTS,
+                reply_to=[email],
+            )
+            email_msg.send(fail_silently=False)
+        except Exception as exc:
+            logger.error("Email formulaire de contact échoué : %s", exc)
+            return JsonResponse(
+                {'success': False, 'error': "Une erreur est survenue lors de l'envoi. Veuillez réessayer."},
+                status=500,
+            )
+
+        return JsonResponse({'success': True, 'message': "Votre message a bien été envoyé. Merci !"})
+
+
+    
 class CatalogueView(View):
     template_name = 'portail/catalogue.html'
 
@@ -1351,72 +1419,3 @@ class ApiCheckDispoView(View):
             })
 
         return JsonResponse({'resultats': resultats})
-
-from django.conf import settings
-from django.core.mail import send_mail
-from django.http import JsonResponse
-from django.views import View
-from django.views.decorators.csrf import csrf_protect
-import logging
-
-logger = logging.getLogger(__name__)
-
-
-class ContactFormView(View):
-    """Traite le formulaire de contact et envoie un email au staff."""
-
-    def post(self, request):
-        nom        = request.POST.get('nom', '').strip()
-        email      = request.POST.get('email', '').strip()
-        telephone  = request.POST.get('telephone', '').strip()
-        societe    = request.POST.get('societe', '').strip()
-        sujet      = request.POST.get('sujet', '').strip()
-        message    = request.POST.get('message', '').strip()
-        conditions = request.POST.get('conditions')
-
-        # Validation minimale côté serveur (ne jamais faire confiance au JS seul)
-        if not all([nom, email, sujet, message, conditions]):
-            return JsonResponse(
-                {'success': False, 'error': "Veuillez remplir tous les champs obligatoires."},
-                status=400,
-            )
-
-        sujets_labels = {
-            'demande-reservation': 'Demande de réservation',
-            'info-tarif': 'Informations tarifaires',
-            'probleme-technique': 'Problème technique',
-            'autre': 'Autre',
-        }
-        sujet_label = sujets_labels.get(sujet, sujet)
-
-        corps = (
-            f"Nouveau message reçu via le formulaire de contact\n\n"
-            f"Nom       : {nom}\n"
-            f"Société   : {societe or '—'}\n"
-            f"Email     : {email}\n"
-            f"Téléphone : {telephone or '—'}\n"
-            f"Sujet     : {sujet_label}\n\n"
-            f"Message :\n{message}\n"
-        )
-
-        try:
-            send_mail(
-                subject=f"[Contact site] {sujet_label} — {nom}",
-                message=corps,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[settings.CONTACT_EMAIL],
-                fail_silently=False,
-                reply_to=[email],  # pour pouvoir répondre directement au visiteur
-            )
-        except Exception as exc:
-            logger.error("Email formulaire de contact échoué : %s", exc)
-            return JsonResponse(
-                {'success': False, 'error': "Une erreur est survenue lors de l'envoi. Veuillez réessayer."},
-                status=500,
-            )
-
-        return JsonResponse({'success': True, 'message': "Votre message a bien été envoyé. Merci !"})
-
-
-
-

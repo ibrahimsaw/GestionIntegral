@@ -824,6 +824,7 @@ class Campagne(models.Model):
     
     duree_passage = models.PositiveIntegerField(choices=DUREE_CHOICES, null=True, blank=True, verbose_name="Durée de passage (secondes)")
     frequence = models.PositiveIntegerField(choices=FREQUENCE_CHOICES, default=120, null=True, blank=True, verbose_name="Fréquence de diffusion")
+    nombre_visuels = models.PositiveIntegerField(default=1, verbose_name="Nombre de visuels", help_text="Nombre de visuels diffusés dans la boucle. Par défaut : 1.")
     tranches_horaires = models.CharField(max_length=500, default='08:00-12:00', blank=True, verbose_name="Tranches horaires de diffusion")
     
     notes        = models.TextField(blank=True)
@@ -866,6 +867,9 @@ class Campagne(models.Model):
             self.STATUT_ANNULEE:   'danger',
         }
         return badges.get(self.statut, 'secondary')
+
+    def get_nombre_visuels_effective(self):
+        return max(self.nombre_visuels or 1, 1)
 
     def nombre_supports(self):
         if not self.pk:
@@ -966,7 +970,7 @@ class Campagne(models.Model):
             if not self.frequence or not self.duree_passage:
                 return 0
 
-            spots_par_heure = 3600 / self.frequence
+            spots_par_heure = (3600 / self.frequence) * self.get_nombre_visuels_effective()
             heures_tranches = calculer_duree_tranches(self.tranches_horaires)
             spots_par_jour  = spots_par_heure * heures_tranches
 
@@ -980,7 +984,7 @@ class Campagne(models.Model):
 
     def diffusions_par_heure(self):
         if self.type_support == 'ecran' and self.frequence:
-            return 3600 / self.frequence
+            return (3600 / self.frequence) * self.get_nombre_visuels_effective()
         return 0
     
     def nombre_spots_jour(self):
@@ -1138,7 +1142,8 @@ class LigneCampagne(models.Model):
         date_debut = self.date_debut or self.campagne.date_debut
         date_fin   = self.date_fin   or self.campagne.date_fin
 
-        spots_par_heure = 3600 / frequence
+        nombre_visuels = self.campagne.get_nombre_visuels_effective() if self.campagne else 1
+        spots_par_heure = (3600 / frequence) * nombre_visuels
         heures_tranches = calculer_duree_tranches(tranches)
         spots_par_jour  = spots_par_heure * heures_tranches
 

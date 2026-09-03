@@ -110,6 +110,162 @@ def get_dynamic_format_choices_ecran():
     ]
 
 
+class Marche(models.Model):
+    """
+    Marché géré par la régie (ex: Marché de Sankaryaré, Grand Marché...).
+    Un marché regroupe un ensemble d'emplacements physiques précis
+    où peuvent être installés des panneaux (voir Emplacement).
+    """
+    nom       = models.CharField(max_length=200, unique=True, verbose_name="Nom du marché")
+    ville     = models.CharField(max_length=100, blank=True, default='Ouagadougou')
+    quartier  = models.CharField(max_length=100, blank=True)
+    adresse   = models.CharField(max_length=300, blank=True)
+
+    # Position de référence du marché (utile pour le zoom initial de la carte
+    # ET pour dessiner le périmètre — voir rayon_metres ci-dessous).
+    latitude  = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+    longitude = models.DecimalField(max_digits=10, decimal_places=7, null=True, blank=True)
+
+    rayon_metres = models.PositiveIntegerField(
+        default=100, verbose_name="Rayon du périmètre (mètres)",
+        help_text="Zone approximative occupée par le marché sur la carte. "
+                   "Les emplacements individuels n'ont pas de coordonnées propres : "
+                   "ils sont considérés comme situés dans ce périmètre."
+    )
+
+    description = models.TextField(blank=True)
+    actif       = models.BooleanField(default=True)
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL,
+        null=True, blank=True, related_name='marches_created'
+    )
+
+    class Meta:
+        verbose_name = "Marché"
+        verbose_name_plural = "Marchés"
+        ordering = ['nom']
+
+    def __str__(self):
+        return self.nom
+
+    @property
+    def nb_emplacements(self) -> int:
+        return self.emplacements.count()
+
+    @property
+    def nb_emplacements_libres(self) -> int:
+        return self.nb_emplacements - self.nb_emplacements_occupes
+
+    @property
+    def nb_emplacements_occupes(self) -> int:
+        return sum(1 for e in self.emplacements.all() if e.est_dans_campagne)
+
+    @property
+    def taux_occupation_pourcentage(self) -> float:
+        total = self.nb_emplacements
+        if total == 0:
+            return 0.0
+        return round(self.nb_emplacements_occupes / total * 100, 2)
+
+
+class Emplacement(models.Model):
+    """
+    Emplacement à l'intérieur d'un marché : juste un code/repère et une
+    description. Il n'a PAS de coordonnées GPS propres — il est considéré
+    comme situé dans le périmètre (voir Marche.rayon_metres) du marché
+    auquel il appartient. On peut y installer (au plus) un panneau.
+    """
+    marche = models.ForeignKey(
+        Marche, on_delete=models.CASCADE, related_name='emplacements',
+        verbose_name="Marché"
+    )
+    code = models.CharField(
+        max_length=30, verbose_name="Code / repère",
+        help_text="Ex: 'A-01', 'Allée 3 - Stand 12'"
+    )
+    notes = models.TextField(blank=True, verbose_name="Description")
+
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = [('marche', 'code')]
+        verbose_name = "Emplacement"
+        verbose_name_plural = "Emplacements"
+        ordering = ['marche', 'code']
+
+    def __str__(self):
+        return f"{self.marche.nom} — {self.code}"
+
+    def is_libre(self) -> bool:
+        """True si aucun panneau n'est actuellement rattaché à cet emplacement."""
+        return not hasattr(self, 'support_installe') or self.support_installe is None
+
+    @property
+    def est_dans_campagne(self) -> bool:
+        """
+        True si cet emplacement est actuellement engagé dans au moins une campagne
+        active (ni brouillon, ni annulée) dont la période n'est pas encore terminée.
+        Différent de is_libre() : un emplacement peut être "libre" de panneau physique
+        mais déjà réservé pour une campagne à venir (ou l'inverse).
+        """
+        aujourdhui = timezone.now().date()
+        return self.lignes_campagne.exclude(
+            campagne__statut__in=['brouillon', 'annulee']
+        ).filter(campagne__date_fin__gte=aujourdhui).exists()
+
+    @property
+    def nb_campagnes(self) -> int:
+        """Nombre total de campagnes (toutes périodes/statuts confondus) ayant déjà utilisé cet emplacement."""
+        return self.lignes_campagne.count()
+
+    def jours_disponibles_sur_periode(self, date_debut, date_fin, exclude_campagne_id=None):
+        """
+        Nombre de jours, sur [date_debut, date_fin], où cet EMPLACEMENT n'est pas
+        déjà réservé par une AUTRE campagne (type marché) sur une période chevauchante.
+
+        exclude_campagne_id : à passer avec le pk de la campagne pour laquelle on
+        calcule la disponibilité, afin qu'elle n'entre pas en conflit avec elle-même
+        (sinon un emplacement déjà réservé par CETTE campagne ressortirait à 0 jour
+        disponible, ce qui serait faux).
+
+        Contrairement à un Support physique (qui a des pannes/maintenances), un
+        emplacement de marché peut être réservé pour une campagne même s'il n'a
+        pas encore de panneau installé : sa disponibilité dépend uniquement des
+        réservations concurrentes d'autres campagnes sur ce même emplacement.
+        """
+        if not date_debut or not date_fin:
+            return 0
+        total_jours = (date_fin - date_debut).days + 1
+        if total_jours <= 0:
+            return 0
+
+        conflits = self.lignes_campagne.select_related('campagne').exclude(
+            campagne__statut__in=['brouillon', 'annulee']
+        )
+        if exclude_campagne_id is not None:
+            conflits = conflits.exclude(campagne_id=exclude_campagne_id)
+
+        jours_reserves = set()
+        for ligne in conflits:
+            c = ligne.campagne
+            if not c.date_debut or not c.date_fin:
+                continue
+            chevauchement_debut = max(date_debut, c.date_debut)
+            chevauchement_fin = min(date_fin, c.date_fin)
+            if chevauchement_debut > chevauchement_fin:
+                continue
+            jour = chevauchement_debut
+            while jour <= chevauchement_fin:
+                jours_reserves.add(jour)
+                jour += timedelta(days=1)
+
+        return max(total_jours - len(jours_reserves), 0)
+
+
 class Support(models.Model):
     """Support publicitaire géolocalisé (Panneau ou Écran)."""
     # FORMAT_CHOICES = staticmethod(get_dynamic_format_choices)
@@ -156,6 +312,15 @@ class Support(models.Model):
     ville       = models.CharField(max_length=100, blank=True, default='Ouagadougou')
     quartier    = models.CharField(max_length=100, blank=True)
 
+    # ── Marché (optionnel) ──────────────────────────────────────────────
+    # Rempli uniquement si ce support est posé sur un emplacement de marché.
+    # latitude/longitude restent la source utilisée partout (carte, filtres…) :
+    # elles sont synchronisées automatiquement depuis l'emplacement dans save().
+    emplacement = models.OneToOneField(
+        'Emplacement', on_delete=models.SET_NULL, null=True, blank=True,
+        related_name='support_installe', verbose_name="Emplacement (marché)"
+    )
+
     # État opérationnel
     etat        = models.CharField(max_length=20, choices=ETAT_CHOICES, default=ETAT_BON)
     date_installation = models.DateField(auto_now_add=True)
@@ -199,6 +364,14 @@ class Support(models.Model):
                 max_id=models.Max('id')
             )['max_id'] or 0
             self.code = f"{prefix}-{last_code + 1:03d}"
+
+        # Si le support est rattaché à un emplacement de marché, on aligne
+        # latitude/longitude sur celles du MARCHÉ (l'emplacement lui-même n'a
+        # pas de coordonnées propres — il est dans le périmètre du marché).
+        if self.emplacement_id and self.emplacement.marche.latitude and self.emplacement.marche.longitude:
+            self.latitude = self.emplacement.marche.latitude
+            self.longitude = self.emplacement.marche.longitude
+
         super().save(*args, **kwargs)
 
     def get_etat_color(self):
@@ -220,13 +393,16 @@ class Support(models.Model):
         """Retourne True si une campagne active couvre ce support aujourd'hui."""
         from campaigns.models import LigneCampagne
         today = timezone.now().date()
-        return LigneCampagne.objects.filter(
-            support=self,
-            campagne__date_debut__lte=today,
-            campagne__date_fin__gte=today,
-            # campagne__statut__in=['en_cours', 'a_venir'],
-            campagne__statut__in=['en_cours'],
-        ).exists()
+        filters = {
+            'campagne__date_debut__lte': today,
+            'campagne__date_fin__gte': today,
+            'campagne__statut__in': ['en_cours'],
+        }
+        if self.type_support == self.TYPE_PANNEAU:
+            filters['face__support'] = self
+        else:
+            filters['support'] = self
+        return LigneCampagne.objects.filter(**filters).exists()
 
     def disponibilite_json(self):
         """Retourne un dict résumant la disponibilité pour le popup carte."""
@@ -241,6 +417,8 @@ class Support(models.Model):
             'quartier': self.quartier,
             'color': self.get_etat_color(),
             'type_panneau': self.type_panneau if self.type_support == self.TYPE_PANNEAU else None,
+            'marche': self.marche.nom if self.is_dans_marche else None,
+            'emplacement_code': self.emplacement.code if self.is_dans_marche else None,
             # models.py
         }
 
@@ -307,6 +485,17 @@ class Support(models.Model):
     def type_panneau(self) -> str:
         """'Standard', 'Géant', 'Sucette', 'Marché', etc."""
         return self.format_detail['type']
+
+    # ── Marché ─────────────────────────────────────────────────────────
+    @property
+    def is_dans_marche(self) -> bool:
+        """True si ce support est posé sur un emplacement de marché."""
+        return self.emplacement_id is not None
+
+    @property
+    def marche(self):
+        """Retourne le Marché parent si le support est dans un marché, sinon None."""
+        return self.emplacement.marche if self.emplacement_id else None
  
     @property
     def surface_m2(self) -> str:
@@ -1218,7 +1407,3 @@ class Maintenance(models.Model):
             )
             nouvel_etat = derniere if derniere else ETAT_BON
             Support.objects.filter(pk=support.pk).update(etat=nouvel_etat)
-
-
-
-

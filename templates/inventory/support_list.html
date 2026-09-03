@@ -4,7 +4,7 @@
 {% block topbar_title %}<i class="bi bi-geo-alt me-2" style="color:var(--color-primary)"></i>Inventaire des Supports{% endblock %}
 {% block topbar_actions %}
   {% if user.is_staff_regie_role %}
-  <a href="{% url 'panneaux_report' %}" class="btn btn-outline-secondary btn-sm">
+  <a href="{% url 'supports_report' %}" class="btn btn-outline-secondary btn-sm">
     <i class="bi bi-file-earmark-bar-graph me-1"></i>
     <span class="d-none d-md-inline">Report Panneaux</span>
   </a>
@@ -23,7 +23,7 @@
         <label class="form-label">Recherche</label>
         <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Code, nom, adresse...">
       </div>
-      {% if desactif != 'ecran' and desactif != 'panneau' %}
+      {% if type_panneau_f != '1x2' and desactif != 'ecran' and desactif != 'panneau' %}
       <div class="col-md-2">
         <label class="form-label">Type</label>
         <select name="type" class="form-select">
@@ -61,6 +61,7 @@
           {% endfor %}
         </select>
       </div>
+      {% if type_panneau_f != '1x2' %}
       <div class="col-md-2">
         <label class="form-label">Format</label>
         <select name="type_panneau" class="form-select">
@@ -72,6 +73,7 @@
           {% endfor %}
         </select>
       </div>
+      {% endif %}
       <div class="col-md-2 d-flex gap-2">
         <button type="submit" class="btn btn-primary flex-fill"><i class="bi bi-search"></i></button>
         <a href="{% url 'support_list' %}" class="btn btn-outline-secondary"><i class="bi bi-x-lg"></i></a>
@@ -106,7 +108,7 @@
           {# Si la VILLE change, on affiche une ligne d'en-tête pour la ville #}
           {% ifchanged s.ville %}
             <tr class="table-dark">
-              <td colspan="7" class="fw-bold text-uppercase ps-3 py-2" style="letter-spacing: 1px; font-size: 0.9rem; background-color: var(--color-primary);">
+              <td colspan="{% if type_panneau_f == '1x2' %}6{% else %}7{% endif %}" class="fw-bold text-uppercase ps-3 py-2" style="letter-spacing: 1px; font-size: 0.9rem; background-color: var(--color-primary);">
                 <i class="bi bi-building me-2"></i>{{ s.ville|default:"Ville non spécifiée" }}
               </td>
             </tr>
@@ -115,7 +117,7 @@
           {# Si le QUARTIER change (ou si la ville a changé), on met une ligne pour le quartier #}
           {% ifchanged s.ville s.quartier %}
             <tr class="bg-light border-bottom">
-              <td colspan="7" class="fw-bold text-muted ps-4 py-2 text-uppercase" style="font-size: 0.8rem; color: var(--color-primary) !important; background-color: #f8f9fa;">
+              <td colspan="{% if type_panneau_f == '1x2' %}6{% else %}7{% endif %}" class="fw-bold text-muted ps-4 py-2 text-uppercase" style="font-size: 0.8rem; color: var(--color-primary) !important; background-color: #f8f9fa;">
                 <i class="bi bi-signpost-split me-2"></i>Quartier : {{ s.quartier|default:"Général / Non spécifié" }}
               </td>
             </tr>
@@ -128,15 +130,17 @@
             <td style="font-weight:600">
               <a href="{% url 'support_detail' s.uuid %}" style="color:var(--text);text-decoration:none">{{ s.nom }}</a>
             </td>
-            <td>
-              <span class="badge-status {% if s.type_support == 'panneau' %}bs-bientot{% else %}bs-en_cours{% endif %}">
-                {% if s.type_support == 'panneau' %}
-                  <i class="bi bi-sign-merge-right me-1"> {{ s.type_panneau }}</i>
+            {% if type_panneau_f != '1x2' %}<td>
+              <span class="badge-status {% if s.type_panneau == 'Marché' %} bs-maintenance {% elif s.type_support == 'panneau' %}bs-bientot{% else %}bs-en_cours{% endif %}">
+                {% if s.type_panneau == 'Marché'  %}
+                  <i class="bi bi-cart"></i>{{s.type_panneau}} 
+                {% elif s.type_support == 'panneau' %}
+                  <i class="bi bi-sign-merge-right me-1"></i>{{s.type_panneau}} 
                 {% else %}
                   <i class="bi bi-display me-1"></i>{{ s.get_type_support_display }}
                 {% endif %}
               </span>
-            </td>
+            </td>{% endif %}
             <td>
               <span class="badge-status {% if s.etat == 'bon' %}bs-disponible{% elif s.etat == 'maintenance' %}bs-occupe{% else %}bs-panne{% endif %}">
                 {{ s.get_etat_display }}
@@ -195,17 +199,4 @@
 {% endblock %}
 
 {% block extra_js %}
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/datatables/1.13.6/css/dataTables.bootstrap5.min.css">
-<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/datatables/1.13.6/js/jquery.dataTables.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/datatables/1.13.6/js/dataTables.bootstrap5.min.js"></script>
-<script>
-$(document).ready(function() {
-  $('#tableSupports').DataTable({
-    pageLength: 15,
-    lengthMenu: [10, 15, 25, 50, 100],
-    language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/fr-FR.json' }
-  });
-});
-</script>
 {% endblock %}

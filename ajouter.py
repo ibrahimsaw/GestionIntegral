@@ -199,8 +199,10 @@ def parse_kml(kml_path: str) -> list:
 
     records = []
     counters = {'OU': 0, 'BO': 0, 'ECR-OUA': 0, 'ECR-BOB': 0}
+    folders_found = False
 
     for folder in root.findall('.//kml:Folder', KML_NS):
+        folders_found = True
         folder_name_el = folder.find('kml:name', KML_NS)
         if folder_name_el is None:
             continue
@@ -256,6 +258,34 @@ def parse_kml(kml_path: str) -> list:
                 'folder':       folder_name,
             })
 
+    # Certains exports Google Earth placent les points directement sous
+    # Document, sans dossier. Ils sont importés ici comme sucettes 1x2.
+    if not folders_found:
+        for pm in root.findall('./kml:Document/kml:Placemark', KML_NS):
+            name_el = pm.find('kml:name', KML_NS)
+            nom = re.sub(r'\s+', ' ', name_el.text.strip() if name_el is not None else '')
+            coords_el = pm.find('.//kml:coordinates', KML_NS)
+            if coords_el is None:
+                continue
+            parts = coords_el.text.strip().split(',')
+            if len(parts) < 2:
+                continue
+
+            counters['OU'] += 1
+            records.append({
+                'code': f"OU-SUC-{counters['OU']:03d}",
+                'nom': nom,
+                'type_support': 'panneau',
+                'ville': 'Ouagadougou',
+                'quartier': detect_quartier(nom, 'Ouagadougou'),
+                'latitude': round(float(parts[1].strip()), 7),
+                'longitude': round(float(parts[0].strip()), 7),
+                'format': '1x2',
+                'faces': ['A', 'B'],
+                'eclairage': 'non',
+                'folder': 'OUAGADOUGOU SUCETTES NON ECLAIREES',
+            })
+
     return records
 
 
@@ -273,6 +303,18 @@ def import_records(records, dry_run=False, clear_existing=False):
         try:
             if dry_run:
                 print(f"  [DRY] {data['code']} — {data['nom'][:50]} ({data['ville']}) {data['faces']}")
+                continue
+
+            duplicate = Support.objects.filter(
+                nom=data['nom'],
+                ville=data['ville'],
+                latitude=data['latitude'],
+                longitude=data['longitude'],
+                format=data['format'],
+            ).first()
+            if duplicate:
+                skipped += 1
+                print(f"  ⚠️  Ignoré (doublon) : {duplicate.code}")
                 continue
 
             with transaction.atomic():
@@ -335,9 +377,11 @@ if __name__ == '__main__':
     args = sys.argv[1:]
     dry_run        = '--dry-run' in args
     clear_existing = '--clear'   in args
+    input_paths = [arg for arg in args if not arg.startswith('--')]
+    kml_path = input_paths[0] if input_paths else KML_PATH
 
     print("🚀 Lecture et traitement du fichier KML...")
-    extracted_data = parse_kml(KML_PATH)
+    extracted_data = parse_kml(kml_path)
     print(f"📋 {len(extracted_data)} enregistrements localisés.")
 
     import_records(extracted_data, dry_run=dry_run, clear_existing=clear_existing)

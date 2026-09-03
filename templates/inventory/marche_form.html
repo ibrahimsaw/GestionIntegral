@@ -1,0 +1,184 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}{{ title }} — Integral{% endblock %}
+{% block topbar_title %}<i class="bi bi-shop me-2" style="color:var(--color-primary)"></i>{{ title }}{% endblock %}
+
+{% block extra_head %}
+<style>
+    .form-section { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:20px; overflow:hidden; }
+    .form-section-hd { padding:13px 18px; border-bottom:1px solid var(--border); font-size:.84rem; font-weight:700; display:flex; align-items:center; gap:8px; }
+    .form-section-bd { padding:18px; }
+    #ref-map { height:280px; border-radius:8px; overflow:hidden; border:1px solid var(--border); margin-bottom:10px; }
+    .errorlist { color: #ef4444; font-size: 0.75rem; list-style: none; padding: 0; margin-top: 4px; }
+    .type-card { flex:1; padding:14px; border-radius:10px; border:2px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; transition:all .15s; text-align:center; font-weight:700; font-size:.84rem; text-decoration:none; display:block; }
+    .type-card:hover { border-color:var(--color-primary); }
+    .type-card.type-card-marche-active { border-color:#f97316; background:rgba(249,115,22,.08); color:#f97316; cursor:default; }
+    .type-card i { display:block; font-size:1.5rem; margin-bottom:5px; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-xl-8 col-lg-10">
+        <div class="d-flex align-items-center gap-3 mb-4">
+            <a href="javascript:void(0)" onclick="history.back()" class="btn btn-outline-secondary btn-sm">
+                <i class="bi bi-arrow-left"></i>
+            </a>
+            <h1 style="font-size:1.4rem;font-weight:800;margin:0">{{ title }}</h1>
+        </div>
+
+        {% if not object %}
+        <div class="form-section">
+            <div class="form-section-hd"><i class="bi bi-grid-1x2" style="color:var(--color-primary)"></i>Type de Support</div>
+            <div class="form-section-bd">
+                <div class="d-flex gap-3">
+                    <a href="{% url 'support_create' %}" class="type-card"><i class="bi bi-sign-merge-right"></i>Panneau Statique</a>
+                    <a href="{% url 'support_create' %}" class="type-card"><i class="bi bi-display"></i>Écran Numérique</a>
+                    <button type="button" class="type-card type-card-marche-active" disabled><i class="bi bi-shop"></i>Marché</button>
+                </div>
+                <p style="font-size:.72rem;color:var(--text-muted);margin:8px 0 0">
+                    <i class="bi bi-info-circle me-1"></i>Un marché n'est pas un support classique : il gère un ensemble d'emplacements dans un périmètre.
+                </p>
+            </div>
+        </div>
+        {% endif %}
+
+        <form method="post" id="marcheForm">
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+            {% endif %}
+
+            <div class="form-section">
+                <div class="form-section-hd"><i class="bi bi-info-circle" style="color:var(--color-primary)"></i>Informations générales</div>
+                <div class="form-section-bd">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">Nom du marché *</label>
+                            {{ form.nom }}
+                            {{ form.nom.errors }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Ville</label>
+                            {{ form.ville }}
+                            {{ form.ville.errors }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Quartier</label>
+                            {{ form.quartier }}
+                            {{ form.quartier.errors }}
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">Adresse</label>
+                            {{ form.adresse }}
+                            {{ form.adresse.errors }}
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">Description</label>
+                            {{ form.description }}
+                            {{ form.description.errors }}
+                        </div>
+                        <div class="col-12">
+                            <div class="form-check">
+                                {{ form.actif }}
+                                <label class="form-check-label" for="id_actif">Marché actif</label>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-section">
+                <div class="form-section-hd"><i class="bi bi-crosshair" style="color:var(--color-primary)"></i>Position et périmètre du marché</div>
+                <div class="form-section-bd">
+                    <p style="font-size:.78rem;color:var(--text-muted);margin-bottom:8px">
+                        <i class="bi bi-info-circle me-1"></i>Cliquez pour placer le marché, puis ajustez le rayon : le cercle représente sa zone. Les emplacements que vous créerez à l'intérieur n'auront pas besoin de coordonnées propres — ils seront considérés comme situés dans ce périmètre.
+                    </p>
+                    <div id="ref-map"></div>
+                    <div class="row g-2 mt-2">
+                        <div class="col-4">
+                            <label class="form-label">Latitude</label>
+                            {{ form.latitude }}
+                            {{ form.latitude.errors }}
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label">Longitude</label>
+                            {{ form.longitude }}
+                            {{ form.longitude.errors }}
+                        </div>
+                        <div class="col-4">
+                            <label class="form-label">Rayon du périmètre (m)</label>
+                            {{ form.rayon_metres }}
+                            {{ form.rayon_metres.errors }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-flex gap-3 justify-content-end mt-4">
+                <a href="{% url 'marche_list' %}" class="btn btn-outline-secondary">Annuler</a>
+                <button type="submit" class="btn btn-primary px-5 shadow-sm">
+                    <i class="bi bi-cloud-arrow-up me-2"></i>{% if object %}Mettre à jour{% else %}Créer le marché{% endif %}
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('#marcheForm input:not([type=checkbox]), #marcheForm select, #marcheForm textarea').forEach(el => {
+            if (el.tagName === 'SELECT') el.classList.add('form-select');
+            else el.classList.add('form-control');
+        });
+
+        const latInput = document.getElementById('id_latitude');
+        const lngInput = document.getElementById('id_longitude');
+        const rayonInput = document.getElementById('id_rayon_metres');
+        // Le champ peut afficher "12,3714" (virgule, format FR) selon les paramètres régionaux :
+        // on le rend robuste en normalisant vers un point décimal avant parseFloat.
+        const parseCoord = v => parseFloat(String(v || '').replace(',', '.'));
+        const initLat = parseCoord(latInput.value) || 12.3714;
+        const initLng = parseCoord(lngInput.value) || -1.5197;
+        const initRayon = parseInt(rayonInput.value) || 100;
+
+        const rmap = L.map('ref-map');
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(rmap);
+
+        let rmarker = null;
+        let rcircle = null;
+        function placeRefMarker(lat, lng) {
+            if (rmarker) rmap.removeLayer(rmarker);
+            rmarker = L.marker([lat, lng], { draggable: true }).addTo(rmap);
+            rmarker.on('dragend', e => {
+                const ll = e.target.getLatLng();
+                updateRefCoords(ll.lat, ll.lng);
+                if (rcircle) rcircle.setLatLng(ll);
+            });
+            updateRefCoords(lat, lng);
+            drawCircle(lat, lng);
+        }
+        function drawCircle(lat, lng) {
+            const rayon = parseInt(rayonInput.value) || 100;
+            if (rcircle) rmap.removeLayer(rcircle);
+            rcircle = L.circle([lat, lng], {
+                radius: rayon, color: '#f97316', fillColor: '#f97316', fillOpacity: 0.15, weight: 2
+            }).addTo(rmap);
+        }
+        function updateRefCoords(lat, lng) {
+            latInput.value = lat.toFixed(7);
+            lngInput.value = lng.toFixed(7);
+        }
+        rmap.on('click', e => placeRefMarker(e.latlng.lat, e.latlng.lng));
+        rayonInput.addEventListener('input', () => {
+            if (rmarker) drawCircle(rmarker.getLatLng().lat, rmarker.getLatLng().lng);
+        });
+        rmap.setView([initLat, initLng], latInput.value ? 15 : 13);
+        if (latInput.value && lngInput.value) placeRefMarker(initLat, initLng);
+        setTimeout(() => rmap.invalidateSize(), 150);
+    });
+</script>
+{% endblock %}

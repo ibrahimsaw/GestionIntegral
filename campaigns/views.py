@@ -20,7 +20,7 @@ from accounts.models import AuditLog
 from accounts.decorators import *
 from accounts.audit import log_action
 from .models import *
-from inventory.models import Support, FacePanneau, EcranNumerique, FormatSupport
+from inventory.models import Support, FacePanneau, EcranNumerique, FormatSupport, Emplacement, Marche
 from .forms import ClientForm, ContratForm, CampagneForm, LigneCampagneForm
 # from .mixins import *
 from datetime import datetime, date  # ← Ajouter 'date' ici
@@ -1017,22 +1017,34 @@ def _to_decimal(val):
 
 def build_support_rows(campagne, lignes):
     """
-    Regroupe les lignes par support et calcule, pour chaque support :
-    - quantite (spots pour écran, nb de faces pour panneau)
+    Regroupe les lignes par support (ou par MARCHÉ si campagne.type_support == 'marche')
+    et calcule, pour chaque groupe :
+    - quantite (spots pour écran, nb de faces pour panneau, nb d'emplacements pour marché)
     - prix / affichage / impression unitaires et totaux
     - total_support = prix_total + affichage_total + impression_total
     Retourne (rows, totaux_campagne)
     """
     grouped = {}
     order = []
-    for ligne in lignes:
-        support = ligne.face.support if ligne.face else ligne.support
-        if support is None:
-            continue
-        if support.pk not in grouped:
-            grouped[support.pk] = {'support': support, 'lignes': []}
-            order.append(support.pk)
-        grouped[support.pk]['lignes'].append(ligne)
+
+    if campagne.type_support == 'marche':
+        for ligne in lignes:
+            if not ligne.emplacement_id:
+                continue
+            marche = ligne.emplacement.marche
+            if marche.pk not in grouped:
+                grouped[marche.pk] = {'support': marche, 'lignes': []}
+                order.append(marche.pk)
+            grouped[marche.pk]['lignes'].append(ligne)
+    else:
+        for ligne in lignes:
+            support = ligne.face.support if ligne.face else ligne.support
+            if support is None:
+                continue
+            if support.pk not in grouped:
+                grouped[support.pk] = {'support': support, 'lignes': []}
+                order.append(support.pk)
+            grouped[support.pk]['lignes'].append(ligne)
 
     prix_u = campagne.prix or Decimal('0.00')
     aff_u = campagne.prix_affichage or Decimal('0.00')
@@ -1095,12 +1107,16 @@ class CampagneDetailView(ClientStaffRequiredMixin, DetailView):
         campagne = self.object
 
         lignes = campagne.lignes.select_related(
-            'support__ecran_info', 'face__support'
+            'support__ecran_info', 'face__support', 'emplacement__marche'
         ).all()
 
         for ligne in lignes:
-            if campagne.type_support == 'ecran' and hasattr(ligne.support, 'ecran_info'):
+            if campagne.type_support == 'ecran' and ligne.support and hasattr(ligne.support, 'ecran_info'):
                 ligne.spots_calcules = ligne.support.ecran_info.calculer_nombre_spots_campagne(campagne)
+            elif campagne.type_support == 'marche' and ligne.emplacement:
+                total_jours = campagne.duree_jours()
+                jours_dispo = ligne.emplacement.jours_disponibles_sur_periode(campagne.date_debut, campagne.date_fin)
+                ligne.spots_calcules = round(jours_dispo / total_jours, 2) if total_jours else 0
             elif campagne.type_support != 'ecran' and ligne.face:
                 ligne.spots_calcules = ligne.face.calculer_nombre_spots_campagne(campagne)
             else:
@@ -1230,6 +1246,18 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
         context['title'] = f"Modifier — {self.object.nom}" if self.object else "Nouvelle Campagne"
         if self.object:
             context['obj'] = self.object
+
+        # Regroupement des formats de panneaux par catégorie (Standard, Géant, Sucette, Marché...),
+        # pour le sélecteur en cascade Catégorie → Format dans campagne_form.html.
+        formats_par_categorie = {}
+        for f in FormatSupport.hors_ecran().order_by('categorie', 'code'):
+            cat = f.categorie or 'Autre'
+            formats_par_categorie.setdefault(cat, []).append({
+                'code': f.code,
+                'label': f"{f.dimensions} ({f.superficie:g}m²)" if f.superficie else f.dimensions,
+            })
+        context['formats_par_categorie'] = formats_par_categorie
+        context['categories_format'] = list(formats_par_categorie.keys())
         return context
     # def get(self, request, *args, **kwargs):
     #     self.object = self.get_object()
@@ -1380,6 +1408,37 @@ class SupportBulkActionView(StaffRequiredMixin, View):
                     'ligne': ligne_existante,
                 })
 
+        elif type_support == 'marche':
+            # Marché : on sélectionne des EMPLACEMENTS (pas des supports physiques).
+            # Un emplacement reste sélectionnable même sans panneau installé.
+            emplacements_qs = Emplacement.objects.select_related('marche', 'support_installe').order_by('marche__nom', 'code')
+            if ville:
+                emplacements_qs = emplacements_qs.filter(marche__ville=ville)
+
+            selectionnes = list(campagne.lignes.filter(emplacement__isnull=False).values_list('emplacement_id', flat=True))
+
+            emplacements_enrichis = []
+            for emplacement in emplacements_qs:
+                emplacements_enrichis.append({
+                    'emplacement': emplacement,
+                    'marche': emplacement.marche,
+                    'a_un_panneau': not emplacement.is_libre(),
+                    'jours_dispo': emplacement.jours_disponibles_sur_periode(campagne.date_debut, campagne.date_fin),
+                })
+
+            return render(request, self.template_name, {
+                'campagne': campagne,
+                'mode_marche': True,
+                'selectionnes': selectionnes,
+                'mode_title': mode_title,
+                'is_modification': is_modification,
+                'emplacements_enrichis': emplacements_enrichis,
+                'ville_filtree': ville,
+                'villes_disponibles': (
+                    Marche.objects.exclude(ville__exact='').values_list('ville', flat=True).distinct().order_by('ville')
+                ),
+            })
+
         else:
             # Panneaux : on ne garde que les panneaux du format ciblé, éventuellement de la ville ciblée.
             supports_qs = Support.objects.filter(
@@ -1422,6 +1481,24 @@ class SupportBulkActionView(StaffRequiredMixin, View):
     def post(self, request, campagne_pk):
         campagne = self.get_campagne(campagne_pk)
         type_support = campagne.type_support
+
+        if type_support == 'marche':
+            emplacement_ids = request.POST.getlist('emplacements')
+
+            campagne.lignes.filter(emplacement__isnull=False).exclude(emplacement_id__in=emplacement_ids).delete()
+
+            for emplacement_id in emplacement_ids:
+                emplacement = get_object_or_404(Emplacement, pk=emplacement_id)
+                ligne, created = LigneCampagne.objects.get_or_create(
+                    campagne=campagne,
+                    emplacement=emplacement,
+                )
+                if created:
+                    log_action(request, AuditLog.ACTION_UPDATE, 'campaign', obj=campagne,
+                               detail=f"Ajout emplacement {emplacement.marche.nom} — {emplacement.code}")
+
+            messages.success(request, "Mise à jour des emplacements effectuée.")
+            return redirect('campagne_detail', pk=campagne_pk)
 
         if type_support != 'ecran':
             face_ids = request.POST.getlist('faces')

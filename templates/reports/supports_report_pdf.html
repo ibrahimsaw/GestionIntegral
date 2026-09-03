@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>État des panneaux — {{ today|date:"d/m/Y" }} — </title>
+    <title>État des supports — {{ today|date:"d/m/Y" }} — </title>
     <style>
         /* ── Variables ── */
         :root {
@@ -123,6 +123,22 @@
             text-transform: uppercase;
             letter-spacing: 2px;
         }
+        .section-count {
+            font-size: 7pt;
+            font-weight: normal;
+            letter-spacing: 0;
+            text-transform: none;
+            opacity: .8;
+        }
+        .empty-report {
+            padding: 18px;
+            margin-bottom: 10px;
+            color: var(--gray-tx);
+            text-align: center;
+            font-style: italic;
+            background: #f8fafc;
+            border: 1px solid var(--border);
+        }
 
         /* ── Tableau ── */
         table {
@@ -132,7 +148,8 @@
             background: #fff;
         }
         col.c-code     { width: 90px; }
-        col.c-nom      { width: 220px; }
+        col.c-nom      { width: 190px; }
+        col.c-type     { width: 80px; }
         col.c-ville    { width: 100px; }
         col.c-quartier { width: 100px; }
         col.c-adresse  { width: 160px; }
@@ -303,7 +320,7 @@
 
     <!-- ══ BARRE ACTIONS (écran seulement) ══ -->
     <div class="print-bar">
-        <span>Remplissez les champs des faces libres, puis imprimez ou exportez en PDF.</span>
+        <span>Consultez l’état du réseau par catégorie, puis imprimez ou exportez le rapport.</span>
         <button class="btn-print">
             🖨 Imprimer / Exporter PDF
         </button>
@@ -314,7 +331,7 @@
         <img src="{% static 'img/logo.png' %}" alt="Logo" class="doc-logo">
         <div class="doc-center">
             <div class="doc-brand">Integral — Régie Publicitaire</div>
-            <div class="doc-title">État des Panneaux</div>
+            <div class="doc-title">État du Réseau Publicitaire</div>
             <div class="doc-meta">Rapport au <strong>{{ today|date:"d/m/Y" }}</strong></div>
         </div>
         <div class="doc-right">
@@ -328,7 +345,7 @@
     <!-- ══ KPI ══ -->
     <div class="kpi-row">
         <div class="kpi-box k-primary">
-            <div class="kpi-label">Panneaux</div>
+            <div class="kpi-label">Supports</div>
             <div class="kpi-val">{{ total_panneaux }}</div>
         </div>
         <div class="kpi-box k-primary">
@@ -349,18 +366,17 @@
         </div>
     </div>
 
-    <!-- ══ SECTION ══ -->
-    <div class="section-header">◆ &nbsp; Inventaire des Panneaux &nbsp; ◆</div>
-
-    <!-- ══ TABLEAU ══ -->
-    <table>
+    <!-- ══ TABLEAUX PAR CATÉGORIE ══ -->
+    {% for section in categories_sections %}
+    <div class="section-header">◆ &nbsp; {{ section.nom }} <span class="section-count">({{ section.total }} support{{ section.total|pluralize }}, {{ section.unites }} unité{{ section.unites|pluralize }})</span> &nbsp; ◆</div>
+    <table class="category-table category-{{ section.nom|slugify }}">
         <colgroup>
             <col class="c-code">
             <col class="c-nom">
             <col class="c-ville">
             <col class="c-quartier">
             <col class="c-adresse">
-            <col class="c-statut">
+            {% if afficher_etat %}<col class="c-statut">{% endif %}
             <col class="c-faces">
         </colgroup>
         <thead>
@@ -370,57 +386,56 @@
                 <th>VILLE</th>
                 <th>QUARTIER</th>
                 <th class="left">ADRESSE</th>
-                <th>ÉTAT</th>
-                <th class="left">FACES</th>
+                {% if afficher_etat %}<th>ÉTAT</th>{% endif %}
+                        <th class="left">{% if section.nom == "Écran" %}STATUT ÉCRAN{% elif section.nom == "Marché" %}EMPLACEMENTS{% else %}FACES{% endif %}</th>
             </tr>
         </thead>
         <tbody>
-            {% for panneau in panneaux %}
+            {% for panneau in section.items %}
             <tr class="{% if panneau.etat_raw == 'panne' %}row-panne{% else %}row-normal{% endif %}">
                 <td><strong>{{ panneau.code }}</strong></td>
                 <td class="left">{{ panneau.nom }}</td>
                 <td>{{ panneau.ville|default:"—" }}</td>
                 <td>{{ panneau.quartier|default:"—" }}</td>
-                <td class="left" style="font-size:7pt;">{{ panneau.adresse|default:"—" }}</td>
-                <td>
+                <td class="left" style="font-size:7pt;">{% if panneau.adresse %}{{ panneau.adresse }}{% elif panneau.localisation %}{{ panneau.localisation }}{% else %}—{% endif %}</td>
+                {% if afficher_etat %}<td>
                     {% if panneau.etat_raw == 'panne' %}
                         <span class="badge badge-panne">En panne</span>
                     {% else %}
                         <span class="badge badge-bon">Bon état</span>
                     {% endif %}
-                </td>
+                </td>{% endif %}
                 <td class="left">
                     <div class="faces-list">
-                        {% if panneau.etat_raw == 'panne' %}
+                        {% if section.nom == "Écran" %}
+                            {% for face in panneau.faces %}
+                                {% if afficher_etat %}{% if face.statut == 'panne' %}<span class="face-tag panne">⚠ Écran en panne</span>{% elif face.statut == 'occupe' %}<span class="face-tag occupe">● Écran occupé</span>{% else %}<span class="face-tag libre">○ Écran libre</span>{% endif %}{% else %}<span class="face-tag libre">Écran</span>{% endif %}
+                            {% endfor %}
+                        {% elif section.nom == "Marché" %}
+                            {% for emplacement in panneau.faces %}
+                                {% if emplacement.occupee %}
+                                    <span class="face-tag occupe">● {{ emplacement.label }}{% if emplacement.support_code %} — {{ emplacement.support_code }}{% endif %}{% if afficher_etat %} — Occupé{% endif %}</span>
+                                {% else %}
+                                    <span class="face-tag libre">○ {{ emplacement.label }}{% if emplacement.support_code %} — {{ emplacement.support_code }}{% endif %}{% if afficher_etat %} — Libre{% endif %}</span>
+                                {% endif %}
+                            {% empty %}
+                                <span class="face-tag libre">Aucun emplacement enregistré</span>
+                            {% endfor %}
+                        {% elif panneau.etat_raw == 'panne' %}
                             <span class="face-tag panne">⚠ Inactif</span>
                         {% else %}
                             {% for face in panneau.faces %}
                                 {% if face.statut == 'occupe' %}
-                                    {% for camp in face.campagnes %}
-                                    <span class="face-tag occupe">
-                                        ● Face {{ face.label }} — {{ camp.client.nom }} — occupée
-                                    </span>
-                                    {% endfor %}
+                                    {% if afficher_client %}
+                                        {% for camp in face.campagnes %}<span class="face-tag occupe">● Face {{ face.label }} — {{ camp.client.nom }}{% if afficher_etat %} — occupée{% endif %}</span>{% empty %}<span class="face-tag occupe">● Face {{ face.label }}{% if afficher_etat %} — occupée{% endif %}</span>{% endfor %}
+                                    {% else %}<span class="face-tag occupe">● Face {{ face.label }}{% if afficher_etat %} — occupée{% endif %}</span>
+                                    {% endif %}
                                 {% elif face.statut == 'reserve' %}
-                                    <span class="face-tag reserve">
-                                        ◷ Face {{ face.label }} — {{ face.face.lignes_client.first.client.nom }} — Réservée
-                                    </span>
+                                    <span class="face-tag reserve">◷ Face {{ face.label }}{% if afficher_client and face.face.lignes_client.first.client %} — {{ face.face.lignes_client.first.client.nom }}{% endif %}{% if afficher_etat %} — Réservée{% endif %}</span>
                                 {% elif face.statut == 'panne' %}
-                                    <span class="face-tag panne">
-                                        Face {{ face.label }} — En Panne
-                                    </span>
+                                    <span class="face-tag panne">Face {{ face.label }}{% if afficher_etat %} — En Panne{% endif %}</span>
                                 {% else %}
-                                    {# Face libre : champ de saisie #}
-                                    <div class="face-input-wrap">
-                                        <span class="face-input-label">○ Face {{ face.label }}</span>
-                                        <input
-                                            type="text"
-                                            class="face-input"
-                                            name="face_{{ panneau.code }}_{{ face.label }}"
-                                            placeholder="Saisir le client..."
-                                            autocomplete="off"
-                                        >
-                                    </div>
+                                    <span class="face-tag libre">○ Face {{ face.label }}{% if afficher_etat %} — Libre{% endif %}</span>
                                 {% endif %}
                             {% empty %}
                                 <span style="color:var(--gray-tx);">—</span>
@@ -429,19 +444,16 @@
                     </div>
                 </td>
             </tr>
-            {% empty %}
-            <tr>
-                <td colspan="7" style="text-align:center; color:var(--gray-tx); padding:20px; font-style:italic;">
-                    Aucun panneau trouvé.
-                </td>
-            </tr>
             {% endfor %}
         </tbody>
     </table>
+    {% empty %}
+    <div class="empty-report">Aucun support trouvé.</div>
+    {% endfor %}
 
     <!-- ══ LÉGENDE ══ -->
     <div class="legend">
-        <span class="face-tag" style="background:var(--gray-bg); color:var(--gray-tx);">○ Libre (saisissable)</span>
+        <span class="face-tag" style="background:var(--gray-bg); color:var(--gray-tx);">○ Libre</span>
         <span class="face-tag reserve">◷ Réservée</span>
         <span class="face-tag occupe">● Occupée</span>
         <span class="face-tag panne">⚠ En panne</span>
@@ -449,7 +461,7 @@
 
     <!-- ══ PIED DE PAGE ══ -->
     <div class="doc-footer">
-        Document confidentiel — État des panneaux au {{ today|date:"d/m/Y" }}
+        Document confidentiel — État du réseau publicitaire au {{ today|date:"d/m/Y" }}
     </div>
 
 </div>

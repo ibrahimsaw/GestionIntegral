@@ -110,6 +110,31 @@ class SupportForm(forms.ModelForm):
         return nb_faces
 
 
+class MarcheForm(forms.ModelForm):
+    """
+    Formulaire de création/édition d'un Marché.
+    Utilisé avec prefix='marche' dans support_form.html (branche fusionnée
+    Panneau/Écran/Marché) pour éviter toute collision de noms de champs
+    avec SupportForm (nom, ville, quartier, adresse, latitude, longitude
+    existent dans les deux modèles).
+    """
+
+    class Meta:
+        model = Marche
+        fields = ['nom', 'ville', 'quartier', 'adresse', 'latitude', 'longitude', 'rayon_metres', 'description', 'actif']
+        widgets = {
+            'nom':      forms.TextInput(attrs=W),
+            'ville':    forms.TextInput(attrs=W),
+            'quartier': forms.TextInput(attrs=W),
+            'adresse':  forms.TextInput(attrs=W),
+            'latitude':  forms.NumberInput(attrs={**W, 'step': '0.0000001'}),
+            'longitude': forms.NumberInput(attrs={**W, 'step': '0.0000001'}),
+            'rayon_metres': forms.NumberInput(attrs=W),
+            'description':  forms.Textarea(attrs={**W, 'rows': 3}),
+            'actif':    forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+
+
 class FacePanneauForm(forms.ModelForm):
     """
     Formulaire d'une face de panneau.

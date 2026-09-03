@@ -165,7 +165,7 @@ DESIGN_CONFIG = {
     'COLOR_RESERVE_BG':     "#f2eaff",   
     'COLOR_PANNE_BG': '#ffe6e6',  
     
-    'COLOR_MAINTENANCE': '#dc2626',
+    'COLOR_MAINTENANCE':  '#f97316',   # Orange — support en maintenance
     'COLOR_BIENTOT':     '#7c3aed',   # Violet — campagne à venir
     # Identité visuelle de l'application (Charte Promo Pub Integral)
     'COLOR_PRIMARY':     "#932E2BFF",   # Marron / Rouge bordeaux — couleur principale UI

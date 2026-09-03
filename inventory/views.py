@@ -66,6 +66,279 @@ class FormatSupportDeleteView(LoginRequiredMixin, DeleteView):
 
 
 
+# ── MARCHÉS ────────────────────────────────────────────────────────────────
+
+class MarcheListView(LoginRequiredMixin, ListView):
+    model = Marche
+    template_name = 'inventory/marche_list.html'
+    context_object_name = 'marches'
+
+    def get_queryset(self):
+        qs = Marche.objects.all()
+        q = self.request.GET.get('q', '')
+        if q:
+            qs = qs.filter(Q(nom__icontains=q) | Q(ville__icontains=q) | Q(quartier__icontains=q))
+        return qs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['q'] = self.request.GET.get('q', '')
+        return context
+
+
+class MarcheDetailView(LoginRequiredMixin, DetailView):
+    model = Marche
+    template_name = 'inventory/marche_detail.html'
+    context_object_name = 'marche'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        emplacements = self.object.emplacements.select_related('support_installe').order_by('code')
+        context['emplacements'] = emplacements
+        context['title'] = self.object.nom
+        return context
+
+
+class MarcheCreateView(StaffRequiredMixin, CreateView):
+    model = Marche
+    fields = ['nom', 'ville', 'quartier', 'adresse', 'latitude', 'longitude', 'rayon_metres', 'description', 'actif']
+    template_name = 'inventory/marche_form.html'
+
+    def form_valid(self, form):
+        form.instance.created_by = self.request.user
+        response = super().form_valid(form)
+        log_action(self.request, AuditLog.ACTION_CREATE, 'inventory', obj=self.object, detail=f"Création marché: {self.object.nom}")
+        messages.success(self.request, f'Marché "{self.object.nom}" créé. Vous pouvez maintenant y ajouter des emplacements.')
+        return response
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = 'Nouveau marché'
+        return context
+
+    def get_success_url(self):
+        return reverse('marche_detail', kwargs={'pk': self.object.pk})
+
+
+class MarcheUpdateView(StaffRequiredMixin, UpdateView):
+    model = Marche
+    fields = ['nom', 'ville', 'quartier', 'adresse', 'latitude', 'longitude', 'rayon_metres', 'description', 'actif']
+    template_name = 'inventory/marche_form.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['title'] = f'Modifier — {self.object.nom}'
+        return context
+
+    def get_success_url(self):
+        return reverse('marche_detail', kwargs={'pk': self.object.pk})
+
+
+class MarcheDeleteView(StaffRequiredMixin, DeleteView):
+    model = Marche
+    template_name = 'partials/confirm_delete.html'
+    context_object_name = 'obj'
+    success_url = reverse_lazy('marche_list')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        marche = self.object
+        context.update({
+            'title': 'Supprimer le marché',
+            'header': 'Suppression de marché',
+            'message_title': 'Supprimer ce marché ?',
+            'message_body': f"Vous êtes sur le point de supprimer le marché {marche.nom}",
+            'hint': "Cette opération supprimera aussi tous ses emplacements. Les panneaux qui y sont installés seront détachés (mais pas supprimés).",
+            'confirm_label': 'Supprimer le marché',
+            'cancel_url': reverse('marche_detail', kwargs={'pk': marche.pk}),
+        })
+        return context
+
+
+# ── EMPLACEMENTS ──────────────────────────────────────────────────────────
+
+class EmplacementDetailView(LoginRequiredMixin, DetailView):
+    model = Emplacement
+    template_name = 'inventory/emplacement_detail.html'
+    context_object_name = 'emplacement'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['marche'] = self.object.marche
+        context['title'] = f'{self.object.marche.nom} — {self.object.code}'
+        # Campagnes rattachées (relation inverse depuis campaigns.LigneCampagne,
+        # pas d'import direct nécessaire dans ce fichier).
+        context['campagnes_liees'] = (
+            self.object.lignes_campagne.select_related('campagne', 'campagne__client').order_by('-campagne__date_debut')
+        )
+        return context
+
+
+class EmplacementCreateView(StaffRequiredMixin, CreateView):
+    model = Emplacement
+    fields = ['code', 'notes']
+    template_name = 'inventory/emplacement_form.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        self.marche = get_object_or_404(Marche, pk=kwargs['marche_pk'])
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_initial(self):
+        initial = super().get_initial()
+        initial['code'] = generer_prochain_code_emplacement(self.marche)
+        return initial
+
+    def form_valid(self, form):
+        form.instance.marche = self.marche
+        response = super().form_valid(form)
+        messages.success(self.request, f'Emplacement "{self.object.code}" ajouté au marché {self.marche.nom}.')
+        return response
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['marche'] = self.marche
+        context['title'] = f'Nouvel emplacement — {self.marche.nom}'
+        return context
+
+    def get_success_url(self):
+        return reverse('marche_detail', kwargs={'pk': self.marche.pk})
+
+
+class EmplacementUpdateView(StaffRequiredMixin, UpdateView):
+    model = Emplacement
+    fields = ['code', 'notes']
+    template_name = 'inventory/emplacement_form.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['marche'] = self.object.marche
+        context['title'] = f'Modifier — {self.object.marche.nom} / {self.object.code}'
+        # Campagnes actuellement rattachées à cet emplacement (relation inverse
+        # depuis campaigns.LigneCampagne, aucun import direct nécessaire ici).
+        context['campagnes_liees'] = (
+            self.object.lignes_campagne.select_related('campagne', 'campagne__client').all()
+        )
+        return context
+
+    def get_success_url(self):
+        return reverse('marche_detail', kwargs={'pk': self.object.marche.pk})
+
+
+class EmplacementDeleteView(StaffRequiredMixin, DeleteView):
+    model = Emplacement
+    template_name = 'partials/confirm_delete.html'
+    context_object_name = 'obj'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        emplacement = self.object
+        context.update({
+            'title': 'Supprimer l\'emplacement',
+            'header': 'Suppression d\'emplacement',
+            'message_title': 'Supprimer cet emplacement ?',
+            'message_body': f"Vous êtes sur le point de supprimer l'emplacement {emplacement.code} ({emplacement.marche.nom})",
+            'hint': "Si un panneau y est actuellement installé, il sera détaché (mais pas supprimé).",
+            'confirm_label': 'Supprimer l\'emplacement',
+            'cancel_url': reverse('marche_detail', kwargs={'pk': emplacement.marche.pk}),
+        })
+        return context
+
+    def get_success_url(self):
+        return reverse('marche_detail', kwargs={'pk': self.object.marche.pk})
+
+
+class ApiMarchesGeojsonView(LoginRequiredMixin, View):
+    """Retourne les marchés en GeoJSON (position de référence), pour l'affichage sur la carte globale."""
+    def get(self, request, *args, **kwargs):
+        features = []
+        for m in Marche.objects.filter(actif=True):
+            if m.latitude is None or m.longitude is None:
+                continue
+            features.append({
+                'type': 'Feature',
+                'geometry': {'type': 'Point', 'coordinates': [float(m.longitude), float(m.latitude)]},
+                'properties': {
+                    'id': m.pk,
+                    'nom': m.nom,
+                    'nb_emplacements': m.nb_emplacements,
+                    'nb_libres': m.nb_emplacements_libres,
+                    'rayon_metres': m.rayon_metres,
+                },
+            })
+        return JsonResponse({'type': 'FeatureCollection', 'features': features})
+
+
+api_marches_geojson = ApiMarchesGeojsonView.as_view()
+
+
+class ApiMarchePopupView(LoginRequiredMixin, View):
+    """Données complètes d'un marché pour le side panel de la carte."""
+    def get(self, request, pk, *args, **kwargs):
+        marche = get_object_or_404(Marche, pk=pk)
+        emplacements = marche.emplacements.select_related('support_installe').order_by('code')
+
+        data = {
+            'id': marche.pk,
+            'nom': marche.nom,
+            'ville': marche.ville,
+            'quartier': marche.quartier,
+            'adresse': marche.adresse,
+            'description': marche.description,
+            'nb_emplacements': marche.nb_emplacements,
+            'nb_libres': marche.nb_emplacements_libres,
+            'nb_occupes': marche.nb_emplacements_occupes,
+            'taux_occupation': marche.taux_occupation_pourcentage,
+            'rayon_metres': marche.rayon_metres,
+            'url_detail': reverse('marche_detail', kwargs={'pk': marche.pk}),
+            'emplacements': [
+                {
+                    'code': e.code,
+                    'libre': e.is_libre(),
+                    'support_code': getattr(e, 'support_installe', None).code if not e.is_libre() else None,
+                }
+                for e in emplacements
+            ],
+        }
+        return JsonResponse(data)
+
+
+api_marche_popup = ApiMarchePopupView.as_view()
+
+
+class ApiEmplacementsMarcheView(LoginRequiredMixin, View):
+    """Retourne les emplacements d'un marché (JSON), pour le select en cascade du formulaire support.
+    Les emplacements n'ont pas de coordonnées propres : on renvoie la position du MARCHÉ lui-même,
+    utilisée pour positionner le support sur la carte GPS du formulaire."""
+    def get(self, request, pk, *args, **kwargs):
+        marche = get_object_or_404(Marche, pk=pk)
+        current_support_id = request.GET.get('current_support', '')
+
+        emplacements = []
+        for e in marche.emplacements.select_related('support_installe').order_by('code'):
+            support_installe = getattr(e, 'support_installe', None)
+            occupe_par_autre = (
+                support_installe is not None
+                and str(support_installe.pk) != str(current_support_id)
+            )
+            emplacements.append({
+                'id': e.pk,
+                'code': e.code,
+                'notes': e.notes,
+                'libre': not occupe_par_autre,
+                'support_code': support_installe.code if (support_installe and occupe_par_autre) else None,
+            })
+
+        return JsonResponse({
+            'marche_latitude': str(marche.latitude) if marche.latitude is not None else None,
+            'marche_longitude': str(marche.longitude) if marche.longitude is not None else None,
+            'rayon_metres': marche.rayon_metres,
+            'emplacements': emplacements,
+        })
+
+
+api_emplacements_marche = ApiEmplacementsMarcheView.as_view()
+
+
 # ── API GeoJSON pour Leaflet ──────────────────────────────────────────────────
 
 class ApiGeojsonView(View):
@@ -139,6 +412,8 @@ class ApiSupportPopupView(LoginRequiredMixin, View):
             'ville':             support.ville,
             'quartier':          support.quartier,
             'date_installation': support.date_installation.strftime('%d/%m/%Y') if support.date_installation else None,
+            'marche':            support.marche.nom if support.is_dans_marche else None,
+            'emplacement_code':  support.emplacement.code if support.is_dans_marche else None,
             'url_detail':        f'/gestion/inventory/{support.uuid}/',
             'url_edit':          f'/gestion/inventory/{support.uuid}/modifier/',
             'photo':             support.photo_principale.url if support.photo_principale else None,
@@ -303,6 +578,28 @@ api_faces_support = ApiFacesSupportView.as_view()
 from django.http import JsonResponse
 from .models import Support
 import re
+
+def generer_prochain_code_emplacement(marche):
+    """
+    Prochain code disponible pour un emplacement de ce marché, au format 'A-01'.
+    Cherche le plus grand numéro utilisé (peu importe la lettre de série) et incrémente.
+    Reste éditable par l'utilisateur : c'est juste une suggestion de départ.
+    """
+    existing = marche.emplacements.values_list('code', flat=True)
+    nums = []
+    pattern = re.compile(r'-(\d+)$')
+    for code in existing:
+        m = pattern.search(code or '')
+        if m:
+            nums.append(int(m.group(1)))
+    next_num = (max(nums) + 1) if nums else 1
+    return f"A-{str(next_num).zfill(2)}"
+
+
+def emplacement_next_code(request, marche_pk):
+    marche = get_object_or_404(Marche, pk=marche_pk)
+    return JsonResponse({'code': generer_prochain_code_emplacement(marche)})
+
 
 def support_next_code(request):
     prefix = request.GET.get('prefix', 'PAN').upper()[:3]
@@ -577,6 +874,14 @@ class SupportDetailView(ClientStaffRequiredMixin, DetailView):
             ('Installation', support.date_installation.strftime('%d/%m/%Y') if support.date_installation else '—'),
         ]
 
+        if support.is_dans_marche:
+            marche_link = mark_safe(
+                f'<a href="{reverse("marche_detail", kwargs={"pk": support.marche.pk})}" '
+                f'style="color:var(--color-primary);font-weight:700;text-decoration:none">{support.marche.nom}</a>'
+            )
+            info_rows.append(('Marché', marche_link))
+            info_rows.append(('Emplacement', support.emplacement.code))
+
         # ── Maintenances ──────────────────────────────────────────────────
         maintenances = support.maintenances.order_by('-date_intervention')[:4]
 
@@ -694,6 +999,7 @@ class SupportCreateView(StaffRequiredMixin, CreateView):
         
         context['face_form'] = FacePanneauForm() # Pour le template dynamique
         context['title'] = "Nouveau Support"
+        context['marches'] = Marche.objects.filter(actif=True).order_by('nom')
         return context
 
     def form_valid(self, form):
@@ -705,6 +1011,14 @@ class SupportCreateView(StaffRequiredMixin, CreateView):
             self.object = form.save(commit=False)
             self.object.created_by = self.request.user
             self.object.save()
+
+            # 1bis. Rattachement à un emplacement de marché (optionnel)
+            emplacement_id = self.request.POST.get('emplacement')
+            if emplacement_id:
+                emplacement = Emplacement.objects.filter(pk=emplacement_id).first()
+                if emplacement and emplacement.is_libre():
+                    self.object.emplacement = emplacement
+                    self.object.save()
 
             # 2. Logique selon le type
             type_support = self.object.type_support
@@ -766,6 +1080,7 @@ class SupportUpdateView(StaffRequiredMixin, UpdateView):
         context['face_form'] = FacePanneauForm()
         context['title'] = f'Modifier — {support.code}'
         context['existing_faces'] = support.faces.all()
+        context['marches'] = Marche.objects.filter(actif=True).order_by('nom')
         return context
 
     def form_valid(self, form):
@@ -781,6 +1096,19 @@ class SupportUpdateView(StaffRequiredMixin, UpdateView):
         with transaction.atomic():
             # 1. Sauvegarde du support principal
             support = form.save()
+
+            # 1bis. Rattachement / détachement d'un emplacement de marché
+            emplacement_id = self.request.POST.get('emplacement')
+            if emplacement_id:
+                emplacement = Emplacement.objects.filter(pk=emplacement_id).first()
+                occupant = getattr(emplacement, 'support_installe', None) if emplacement else None
+                if emplacement and (occupant is None or occupant.pk == support.pk):
+                    support.emplacement = emplacement
+                    support.save()
+            elif support.emplacement_id:
+                # Le champ a été vidé côté formulaire → on détache le support du marché
+                support.emplacement = None
+                support.save()
 
             # 2. Cas ÉCRAN : Validation et sauvegarde
             if support.type_support == 'ecran' and ecran_form:

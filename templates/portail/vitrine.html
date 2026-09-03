@@ -1,11 +1,15 @@
-{% extends 'portail/base_portail.html' %}
 {% load static %}
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image" href="{% static 'img/Logo-Integral-2-768x768.png' %}" />
+  <title>Accueil — Vitrine Régie Publicitaire</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
-{% block title %}Accueil — Vitrine Régie Publicitaire{% endblock %}
-
-{% block topbar_title %}<i class="bi bi-house-door-fill"></i> Accueil{% endblock %}
-
-{% block extra_head %}
 <style>
   /* ════════════════════════════════════════════════════════════════
      Refonte "Furni" — pas qu'une palette : hero image/blob organique,
@@ -15,14 +19,19 @@
      ════════════════════════════════════════════════════════════════ */
 
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
-
+  :root {
+    --color-secondary: {{ DESIGN.COLOR_SECONDARY }}; /* Ou une valeur hexa directe comme #1a1a1a */
+    --color-primary: {{ DESIGN.COLOR_PRIMARY }};
+  }
   .vitrine {
     --vt-tight: -0.02em;
     --color-primary:   {{ DESIGN.COLOR_PRIMARY }};
     --color-secondary: {{ DESIGN.COLOR_SECONDARY }};
     --text:             #000000;
-    --text-muted:        #6a6a6a;
-    --border:            #e6e2d8;
+    --textb:              #ffffff;
+    --text-muted:        #000000;
+    --border:            var(--color-primary);
+    --borders:            var(--color-secondary);
     --bg-card:            #ffffff;
     --bg-card2:            #f8f6f1;
     --radius:               5px;
@@ -42,12 +51,116 @@
     pointer-events: none;
     z-index: 0;
   }
+  /* ===================== SECTION COMMONS ===================== */
+  section {
+    padding: 88px 0;
+  }
+  .slbl {
+    font-family: "Dancing Script", cursive;
+    font-size: 1.35rem;
+    color: var(--color-primary);
+    display: block;
+    margin-bottom: 4px;
+  }
+  .stitle {
+    font-size: clamp(1rem, 2vw, 1.5rem);
+    font-weight: 900;
+    line-height: 1.2;
+    margin-bottom: 12px;
+  }
+  .stitle span {
+    color: var(--color-primary);
+  }
+  .sline {
+    width: 58px;
+    height: 4px;
+    border-radius: 4px;
+    background: linear-gradient(90deg, var(--color-secondary), var(--color-secondary));
+    margin: 0 auto 12px;
+  }
+  .sline.lft {
+    margin-left: 0;
+  }
+  .sdesc {
+    color: #000;
+    font-size: 0.93rem;
+    line-height: 1.8;
+  }
+  .btn-red {
+    background: linear-gradient(135deg, var(--color-primary), var(--color-secondary));
+    color: #fff;
+    border: none;
+    border-radius: 50px;
+    padding: 14px 32px;
+    font-weight: 600;
+    font-size: 0.93rem;
+    box-shadow: 0 8px 24px rgba(232, 40, 26, 0.35);
+    transition: 0.3s;
+    display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    cursor: pointer;
+    font-family: "Poppins", sans-serif;
+  }
+  .btn-red:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 14px 34px rgba(232, 40, 26, 0.45);
+    color: #fff;
+  }
+
+
+  /* ═══════════════════ DJANGO MESSAGES ══════════════════════════════ */
+  .django-messages {
+    position: fixed;
+    top: 90px;
+    right: 20px;
+    z-index: 2000;
+    width: min(380px, calc(100% - 40px));
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .django-messages .alert {
+    box-shadow: 0 10px 30px rgba(0,0,0,.18);
+    border: none;
+    border-radius: 10px;
+    font-size: .88rem;
+    display: flex;
+    align-items: center;
+  }
+  @media (max-width: 600px) {
+    .django-messages { top: 74px; right: 10px; left: 10px; width: auto; }
+  }
 
   /* ═══════════════════ HERO ═══════════════════════════════════════ */
+  /*
   .hero-section {
     position: relative;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
+    background-color: color-mix(in srgb, var(--color-secondary) 65%, transparent);
+    border-top: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 3.2rem 3rem;
+    margin-bottom: 28px;
+    overflow: hidden;
+    display: grid;
+    grid-template-columns: 1.05fr .95fr;
+    gap: 2.5rem;
+    align-items: center;
+    width: 100%;
+    min-height: 100vh;
+    background-image: url('{% static "img/fond/bg (3).png" %}');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+  }
+  */
+  .hero-section {
+    position: relative;
+    /*
+    background-color: 
+    color-mix(in srgb, var(--color-secondary) 65%, transparent);
+    */
+
     /* border-radius: var(--radius); */
     padding: 3.2rem 3rem;
     margin-bottom: 28px;
@@ -56,7 +169,18 @@
     grid-template-columns: 1.05fr .95fr;
     gap: 2.5rem;
     align-items: center;
+    width: 100%;
+    min-height: 100vh;
   }
+  .herosection {
+    border-top: 1px solid var(--border);
+    background-image: url('{% static "img/fond/bg (3).png" %}');
+    background-size: 400px;
+    background-position: center;
+    background-repeat: repeat;
+    }
+
+
   .hero-eyebrow {
     display: inline-flex; align-items: center; gap: 8px;
     font-size: .72rem; font-weight: 700; letter-spacing: .12em;
@@ -93,6 +217,8 @@
   }
   .hero-btn:hover { transform: translateY(-1px); }
   .hero-btn-solid { background: var(--color-primary); color: #fff; }
+  .hero-btn-solids { background: #fff; color: #000; }
+  .hero-btn-solidy { background: var(--color-secondary); color: #000; border: 1.5px solid var(--color-secondary); }
   .hero-btn-solid:hover { background: var(--color-primary); color: #fff; }
   .hero-btn-outline { background: transparent; color: var(--text); border: 1.5px solid var(--border); }
   .hero-btn-outline:hover { border-color: var(--color-primary); color: var(--color-primary); }
@@ -135,6 +261,14 @@
     align-items: center;
     justify-content: center;
     min-height: 340px;
+    background: rgba(255,255,255,.35);
+    /*
+    border: 1px solid rgba(255,255,255,.4);
+    */
+    border-radius: var(--radius-sm, 16px);
+    backdrop-filter: blur(14px) saturate(160%);
+    -webkit-backdrop-filter: blur(14px) saturate(160%);
+    box-shadow: 0 8px 32px rgba(31,46,40,.10);
   }
   .hero-blob {
     position: absolute;
@@ -151,7 +285,7 @@
     50%  { border-radius: 58% 42% 40% 60% / 55% 60% 40% 45%; }
     100% { border-radius: 42% 58% 65% 35% / 45% 45% 55% 55%; }
   }
-  .hero-visual .dots-deco { color: var(--color-secondary); opacity: .55; z-index: 1; }
+  .hero-visual .dots-deco { color: var(--color-primary); opacity: .55; z-index: 1; }
   .hero-visual .dots-tl { top: -6px; left: -10px; width: 90px; height: 90px; }
   .hero-visual .dots-br { bottom: -10px; right: 4px; width: 100px; height: 100px; }
   .hero-illustration {
@@ -210,12 +344,14 @@
   .section-header {
     display: flex;
     align-items: flex-end;
-    justify-content: space-between;
+    justify-content: center;
     flex-wrap: wrap;
     gap: 16px;
+    /*
     margin-bottom: 22px;
     padding-bottom: 14px;
     border-bottom: 1px solid var(--border);
+    */
   }
   .section-title {
     font-size: 1.5rem;
@@ -232,7 +368,7 @@
     font-size: .72rem; font-weight: 700; letter-spacing: .1em;
     text-transform: uppercase; color: var(--color-primary);
   }
-  .section-header-left { display: flex; align-items: center; gap: 14px; }
+  .section-header-left { display: flex; align-items: center; gap: 14px;}
   .section-icon-chip {
     width: 46px; height: 46px; border-radius: 50%; flex-shrink: 0;
     background: linear-gradient(155deg, var(--color-primary) 0%, var(--color-primary) 100%);
@@ -635,11 +771,16 @@
 
   .format-card {
     position: relative;
-    background: var(--bg-card);
-    border: 1px solid var(--border);
+    background: rgba(255,255,255,.72);
+    /*
+    border: 1px solid rgba(255,255,255,.5);
+    */
     border-radius: var(--radius);
     overflow: visible;
-    transition: box-shadow .2s ease, transform .2s ease;
+    backdrop-filter: blur(16px) saturate(160%);
+    -webkit-backdrop-filter: blur(16px) saturate(160%);
+    box-shadow: 0 8px 32px rgba(31,46,40,.12);
+    transition: box-shadow .2s ease, transform .2s ease, background .2s ease;
     display: flex;
     flex-direction: column;
   }
@@ -650,7 +791,9 @@
   }
 
   .format-image {
-    height: 190px;
+    /*
+    height: 290px;
+    */
     position: relative;
     overflow: hidden;
     background: var(--bg-card2);
@@ -828,9 +971,25 @@
   }
   .cta-final-btn:hover { transform: translateY(-1px); background: #e8ac16; }
 
+  /* ── HERO : responsive progressif ────────────────────────────────────── */
   @media (max-width: 992px) {
-    .hero-section { grid-template-columns: 1fr; padding: 2.6rem 2rem; }
-    .hero-visual { min-height: 260px; margin-top: 1.5rem; }
+    .hero-section {
+      display: flex;
+      flex-direction: column;
+      min-height: auto;
+      overflow: visible;
+      padding: 2.4rem 1.8rem;
+    }
+    /* Le visuel passe AVANT le texte et devient plus imposant/visible */
+    .hero-visual {
+      order: -1;
+      width: 100%;
+      min-height: 300px;
+      margin-top: 0;
+      margin-bottom: 1.8rem;
+      flex-shrink: 0;
+    }
+    .hero-illustration { max-width: 260px; }
     .city-acc-inner,
     .city-acc.alt-right .city-acc-inner { grid-template-columns: 1fr; }
     .city-acc.alt-right .city-acc-img,
@@ -839,394 +998,3154 @@
     .process-track { grid-template-columns: 1fr; gap: 28px; }
     .process-track::before { display: none; }
   }
+
+  @media (max-width: 768px) {
+    .hero-section { padding: 2rem 1.4rem; }
+    .hero-visual { min-height: 260px; margin-bottom: 1.5rem; }
+    .hero-illustration { max-width: 220px; }
+    .hero-section .stitle { font-size: clamp(1.7rem, 5.5vw, 2.3rem) !important; }
+    .hero-subtitle { font-size: .92rem; max-width: 100%; margin-bottom: 1.4rem; }
+    .hero-btn { padding: 10px 20px; font-size: .8rem; }
+    .hero-mini-num { font-size: 1.25rem; }
+    .hero-mini-lbl { font-size: .68rem; }
+    .hero-mini-stats { gap: 18px; }
+    .hero-mini-stats > div + div { padding-left: 18px; }
+  }
+
+  @media (max-width: 480px) {
+    .hero-section { padding: 1.6rem 1.1rem; }
+    .hero-visual { min-height: 210px; margin-bottom: 1.2rem; }
+    .hero-illustration { max-width: 175px; }
+    .hero-float-card { padding: 9px 13px; gap: 8px; left: 0; bottom: 8px; }
+    .hero-float-icon { width: 28px; height: 28px; font-size: .85rem; }
+    .hero-float-num { font-size: .92rem; }
+    .hero-float-label { font-size: .62rem; }
+    .hero-section .stitle { font-size: clamp(1.4rem, 7vw, 1.9rem) !important; }
+    .hero-subtitle { font-size: .85rem; margin-bottom: 1.2rem; }
+    .hero-actions { gap: 8px; }
+    .hero-btn { padding: 9px 16px; font-size: .74rem; }
+    .hero-mini-stats { gap: 12px; flex-wrap: wrap; row-gap: 10px; }
+    .hero-mini-num { font-size: 1.1rem; }
+    .hero-mini-lbl { font-size: .64rem; }
+    .hero-mini-stats > div + div { padding-left: 12px; }
+  }
   @media (max-width: 600px) {
     .cta-final { flex-direction: column; text-align: center; padding: 32px 24px; }
   }
+  /* ===================== MARQUEE ===================== */
+  .mqsec {
+    background: var(--color-primary);
+    padding: 13px 0;
+    overflow: hidden;
+    margin-bottom: 36px;
+  }
+  .mqtrack {
+    display: flex;
+    gap: 38px;
+    white-space: nowrap;
+    animation: mqrun 22s linear infinite;
+  }
+  .mqitem {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    color: #fff;
+    font-size: 0.86rem;
+    font-weight: 500;
+  }
+  .mqitem i {
+    color: rgba(255, 255, 255, 0.55);
+    font-size: 0.55rem;
+  }
+  @keyframes mqrun {
+    from {
+      transform: translateX(0);
+    }
+    to {
+      transform: translateX(-50%);
+    }
+  }
+      /* ── LIVE TICKER (MARQUEE) ───────────────────────────────────────── */
+    .ticker-bar-stream {
+      background: linear-gradient(90deg, #090e17 0%, var(--color-primary) 50%, #090e17 100%);
+      padding: 12px 0;
+      overflow: hidden;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .ticker-stream-track {
+      display: flex;
+      gap: 45px;
+      white-space: nowrap;
+      animation: tickerMarquee 30s linear infinite;
+    }
+
+    .ticker-stream-unit {
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      color: #ffffff;
+      font-size: 0.84rem;
+      font-weight: 600;
+    }
+
+    .ticker-city-badge {
+      background: var(--color-secondary);
+      color: #111827;
+      padding: 3px 9px;
+      border-radius: 6px;
+      font-size: 0.72rem;
+      font-weight: 800;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    @keyframes tickerMarquee {
+      from { transform: translateX(0); }
+      to { transform: translateX(-50%); }
+    }
+
+  /* ── FILTRES VILLE ────────────────────────────────────────────────────── */
+  .rn-filters {
+    display: flex; flex-wrap: wrap; gap: 8px; justify-content: center;
+  }
+  .rn-filtbtn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 9px 16px; border-radius: var(--radius-sm);
+    border: 1.5px solid var(--border, #e6e2d8);
+    background: var(--bg-card, #fff); color: var(--text-muted, #6a6a6a);
+    font-size: .8rem; font-weight: 700; cursor: pointer; transition: all .18s;
+  }
+  .rn-filtbtn:hover { border-color: var(--color-primary, #3b5d50); color: var(--color-primary, #3b5d50); }
+  .rn-filtbtn.active {
+    background: var(--color-primary, #3b5d50); border-color: var(--color-primary, #3b5d50); color: #fff;
+  }
+  .rn-filtbtn-dot {
+    width: 7px; height: 7px; border-radius: 50%; background: #10b981; display: inline-block;
+  }
+  .rn-filtbtn.active .rn-filtbtn-dot { background: #fff; }
+
+  /* ── CARTES ───────────────────────────────────────────────────────────── */
+  .rn-wrap.gone { display: none; }
+  .rn-group-cta.gone { display: none; }
+  .rn-ville-heading.gone { display: none; }
+
+  .rn-ville-heading-title {
+    display: flex; align-items: center; justify-content: center; gap: 16px;
+    text-align: center; margin: 8px 0 4px;
+    font-size: 1.15rem; font-weight: 800; letter-spacing: .03em;
+    color: var(--color-primary, #3b5d50);
+  }
+  .rn-ville-heading-title i { font-size: 1rem; }
+  .rn-ville-heading-title::before,
+  .rn-ville-heading-title::after {
+    content: ''; flex: 1; height: 2px; max-width: 260px;
+    background: linear-gradient(90deg, transparent, var(--color-primary, #3b5d50) 30%, var(--color-primary, #3b5d50) 70%, transparent);
+    opacity: .45;
+  }
+  .rn-ville-heading.gone { display: none; }
+  .rn-card {
+    /*
+    background: var(--bg-card, #fff); 
+    */
+    /*
+    border: 1px solid var(--border, #e6e2d8);
+    */
+    border-radius: var(--radius-lg, 12px); overflow: hidden; cursor: pointer;
+    /*
+    box-shadow: var(--shadow-sm, 0 1px 3px rgba(31,46,40,.07));
+    */
+    box-shadow: 3px 12px 20px 20px rgba(31, 46, 40, .07);
+    transition: transform .2s, box-shadow .2s; height: 100%;
+    display: flex; flex-direction: column;
+  }
+  .rn-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-md, 0 10px 24px rgba(31,46,40,.12));
+  }
+  .rn-img { position: relative; aspect-ratio: 4 / 3; overflow: hidden; background: #f4f1e8; }
+  .rn-img img { display: block; width: 100%; height: 100%; object-fit: cover; transition: transform .4s; }
+  .rn-card:hover .rn-img img { transform: scale(1.06); }
+
+  .rn-bdg {
+    position: absolute; top: 10px; right: 10px;
+    padding: 4px 10px; border-radius: 20px; font-size: .68rem; font-weight: 700;
+    display: flex; align-items: center; gap: 4px; color: #fff;
+  }
+  .rn-bdg.available { background: #10b981; }
+  .rn-bdg.full { background: #ef4444; }
+
+  .rn-ville-pill {
+    position: absolute; bottom: 10px; left: 10px;
+    padding: 4px 10px; border-radius: 20px; font-size: .68rem; font-weight: 700;
+    background: rgba(0,0,0,.55); color: #fff; display: flex; align-items: center; gap: 4px;
+    backdrop-filter: blur(2px);
+  }
+
+  .rn-body { padding: 14px 16px 16px; display: flex; flex-direction: column; flex: 1; background-color: var(--color-secondary);}
+  .rn-cat {
+    font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em;
+    color: var(--color-primary, #3b5d50); margin-bottom: 4px;
+  }
+  .rn-tit { font-size: 1rem; font-weight: 800; color: var(--text, #000); margin-bottom: 4px; }
+  .rn-desc { font-size: .78rem; color: var(--text-muted, #6a6a6a); line-height: 1.4; margin-bottom: 12px; flex: 1; }
+
+  .rn-foot {
+    display: flex; align-items: center; justify-content: space-between;
+    padding-top: 10px; border-top: 1px solid var(--border, #e6e2d8);
+  }
+  .rn-stars { display: flex; align-items: center; gap: 5px; font-size: .76rem; color: var(--text-muted, #6a6a6a); }
+  .rn-stars i { color: var(--color-primary, #3b5d50); }
+
+  .rn-add {
+    width: auto; height: 34px; border-radius: 20px;
+    border: none; background: var(--color-primary, #3b5d50); color: #fff;
+    display: flex; align-items: center; justify-content: center; gap: 6px;
+    padding: 0 16px; font-size: .78rem; font-weight: 700; white-space: nowrap;
+    cursor: pointer; transition: background .15s, transform .15s;
+    flex-shrink: 0;
+  }
+  .rn-add:hover { background: #fff; transform: scale(1.04); color: var(--color-primary); }
+
+  /* ── POPUP DÉTAIL ─────────────────────────────────────────────────────── */
+  .rn-pop {
+    position: fixed; inset: 0; z-index: 9999;
+    background: rgba(15,23,42,.55);
+    display: none; align-items: center; justify-content: center; padding: 20px;
+  }
+  .rn-pop.open { display: flex; }
+  .rn-pop-box {
+    /*
+    background: rgba(255,255,255,.82); 
+    */
+    /*
+    border: 1px solid rgba(255,255,255,.5);
+    */
+    border-radius: 16px; overflow: hidden;
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    max-width: 480px; 
+    width: 100%; 
+    /*
+    max-height: 90vh; 
+    */
+    overflow-y: auto;
+    box-shadow: 0 20px 60px rgba(0,0,0,.3); position: relative;
+    animation: rnPopIn .2s ease-out;
+  }
+  @keyframes rnPopIn { from { opacity:0; transform: scale(.95); } to { opacity:1; transform: scale(1); } }
+
+  .rn-pop-close {
+    position: absolute; top: 12px; right: 12px; z-index: 2;
+    width: 34px; height: 34px; border-radius: 50%; border: none;
+    background: rgba(0,0,0,.5); color: #fff; display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+  }
+  .rn-pop-img { width: 100%; /* height: 320px; */}
+  .rn-pop-img img { width: 100%; height: 100%; object-fit: cover; }
+
+  .rn-pop-content { padding: 20px 22px 24px; background-color: var(--color-secondary); }
+  .rn-pop-cat-row {
+    display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;
+  }
+  .rn-pop-cat {
+    font-size: .7rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em;
+    color: var(--color-primary, #3b5d50); margin-bottom: 0;
+  }
+  .rn-pop-instant {
+    font-size: .68rem; font-weight: 700; color: var(--text-muted, #6a6a6a);
+    display: inline-flex; align-items: center; gap: 4px; text-transform: none; letter-spacing: 0;
+  }
+  .rn-pop-title { font-size: 1.3rem; font-weight: 800; color: var(--text, #000); margin-bottom: 10px; }
+  .rn-pop-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
+  .rn-pop-meta .rn-tag {
+    font-size: .74rem; font-weight: 700; padding: 5px 12px; border-radius: 20px;
+    background: var(--bg-card2, #f8f6f1); color: var(--text, #000); display: flex; align-items: center; gap: 5px;
+  }
+  .rn-pop-desc { font-size: .84rem; color: var(--text-muted, #6a6a6a); line-height: 1.6; margin-bottom: 18px; }
+
+  .rn-pop-btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    width: 100%; padding: 13px; border-radius: 8px;
+    background: var(--color-primary, #3b5d50); color: #fff;
+    font-weight: 800; font-size: .88rem; text-decoration: none;
+    transition: background .15s;
+  }
+  .rn-pop-btn:hover { background: #2f4a40; color: #fff; }
+  .rn-pop-btn.disabled {
+    background: #cbd5e1; pointer-events: none; cursor: not-allowed;
+  }
+  .rn-pop-fullmsg {
+    margin-top: 10px; font-size: .74rem; color: #92400e; background: #fef9c3;
+    padding: 8px 12px; border-radius: 8px; display: flex; align-items: center; gap: 6px;
+  }
+
+  /* ═══════════ À PROPOS ═════════════════════════════════════════════ */
+  .apropos-grid {
+    display: grid; grid-template-columns: .95fr 1.05fr; gap: 40px; align-items: center;
+  }
+  @media (max-width: 992px) { .apropos-grid { grid-template-columns: 1fr; } }
+  .apropos-stack { position: relative; }
+  .apropos-badge {
+    position: absolute; top: -18px; left: -18px; z-index: 2;
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    box-shadow: var(--shadow-md); padding: 16px 20px; text-align: center;
+  }
+  .apropos-badge-num { font-size: 1.6rem; font-weight: 800; color: var(--color-primary); line-height: 1; }
+  .apropos-badge-lbl { font-size: .68rem; color: var(--text-muted); font-weight: 700; margin-top: 3px; }
+  .apropos-img {
+    border-radius: var(--radius-sm); overflow: hidden; box-shadow: var(--shadow-md);
+    aspect-ratio: 4/3.1; background: var(--bg-card2);
+  }
+  .apropos-img img { width: 100%; height: 100%; object-fit: cover; }
+  .apropos-points { display: flex; flex-direction: column; gap: 14px; margin-top: 20px; }
+  .apropos-point { display: flex; gap: 12px; align-items: flex-start; }
+  .apropos-point-icon {
+    width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
+    background: var(--bg-card2); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--color-primary); font-size: 1rem;
+  }
+  .apropos-point-title { font-weight: 800; font-size: .92rem; color: var(--text); margin-bottom: 2px; }
+  .apropos-point-desc { font-size: .82rem; color: var(--text-muted); line-height: 1.5; }
+
+  /* ═══════════ NOTRE ÉQUIPE ══════════════════════════════════════════ */
+  .team-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 24px;
+  }
+  .team-card {
+    background: rgba(255,255,255,.72); border: 1px solid rgba(255,255,255,.5); border-radius: var(--radius);
+    backdrop-filter: blur(16px) saturate(160%); -webkit-backdrop-filter: blur(16px) saturate(160%);
+    box-shadow: 0 8px 32px rgba(31,46,40,.12);
+    padding: 28px 20px; text-align: center; transition: transform .2s, box-shadow .2s, background .2s;
+  }
+  .team-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); }
+  .team-avatar {
+    width: 84px; height: 84px; border-radius: 50%; margin: 0 auto 16px;
+    background: linear-gradient(155deg, var(--color-primary) 0%, var(--color-primary) 100%);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 2rem;
+  }
+  .team-name { font-weight: 800; font-size: 1rem; color: var(--text); margin-bottom: 2px; }
+  .team-role { font-size: .76rem; color: var(--color-primary); font-weight: 700; margin-bottom: 10px; }
+  .team-desc { font-size: .8rem; color: var(--text-muted); line-height: 1.5; }
+
+  /* ═══════════ AVIS CLIENTS (Swiper) ═════════════════════════════════ */
+  .testi-card {
+    background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius);
+    padding: 26px 24px; height: 100%; display: flex; flex-direction: column;
+  }
+  .testi-stars { color: var(--color-secondary); font-size: .85rem; margin-bottom: 12px; }
+  .testi-text { font-size: .88rem; color: var(--text); line-height: 1.6; flex: 1; margin-bottom: 18px; font-style: italic; }
+  .testi-author { display: flex; align-items: center; gap: 12px; }
+  .testi-avatar {
+    width: 42px; height: 42px; border-radius: 50%; flex-shrink: 0;
+    background: var(--bg-card2); border: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--color-primary); font-weight: 800;
+  }
+  .testi-name { font-weight: 800; font-size: .85rem; color: var(--text); }
+  .testi-role { font-size: .72rem; color: var(--text-muted); }
+  .testiSwiper { padding-bottom: 46px !important; }
+  .testiSwiper .swiper-pagination-bullet { background: var(--color-primary); opacity: .3; }
+  .testiSwiper .swiper-pagination-bullet-active { opacity: 1; }
+
+  /* ═══════════ CATEGORY (cartes de navigation rapide) ═════════════════ */
+  .cat-grid {
+    display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 16px;
+  }
+  .cat-card {
+    position: relative; overflow: hidden;
+    background: rgba(255,255,255,.72); border: 1px solid rgba(255,255,255,.7); border-radius: var(--radius);
+    backdrop-filter: blur(16px) saturate(160%); -webkit-backdrop-filter: blur(16px) saturate(160%);
+    box-shadow: 0 8px 28px rgba(31,46,40,.1), inset 0 1px 0 rgba(255,255,255,.75);
+    padding: 24px 14px 20px; text-align: center; cursor: pointer;
+    transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease, background .2s ease;
+  }
+  .cat-card::before {
+    content: ''; position: absolute; top: 0; left: 18%; right: 18%; height: 3px;
+    background: var(--color-secondary); transform: scaleX(.35); transform-origin: center;
+    transition: transform .2s ease;
+  }
+  .cat-card:hover, .cat-card.active {
+    border-color: var(--color-primary); box-shadow: var(--shadow-md); transform: translateY(-4px);
+    background: rgba(255,255,255,.85);
+  }
+  .cat-card:hover::before, .cat-card.active::before { transform: scaleX(1); }
+  .cat-card-icon {
+    width: 56px; height: 56px; margin: 0 auto 14px; border-radius: 14px;
+    background: color-mix(in srgb, var(--color-primary) 8%, white); border: 1px solid color-mix(in srgb, var(--color-primary) 28%, white);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.35rem; color: var(--color-primary); transition: all .2s ease;
+    box-shadow: 0 6px 14px rgba(31,46,40,.08);
+  }
+  .cat-card:hover .cat-card-icon, .cat-card.active .cat-card-icon {
+    background: var(--color-primary); color: #fff; border-color: var(--color-primary);
+    transform: translateY(-2px) rotate(-3deg);
+  }
+  .cat-card-name { font-weight: 800; font-size: .88rem; color: var(--text); margin-bottom: 8px; }
+  .cat-card-count { display: inline-block; font-size: .7rem; color: var(--text-muted); font-weight: 700; background: var(--bg-card2); border-radius: 20px; padding: 4px 9px; }
+
+  /* ═══════════ CONFIANCE & SIMULATEUR ═══════════════════════════════ */
+  .trust-brands-section { background: rgba(255,255,255,.72); padding: 36px 0; border-bottom: 1px solid rgba(31,46,40,.1); }
+  .trust-pill-tag { color: var(--text); font-size: .8rem; font-weight: 800; letter-spacing: .04em; margin-bottom: 20px; }
+  .trust-brands-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 12px; }
+  .trust-brand-badge { min-height: 74px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 7px; color: #64748b; font-size: .78rem; font-weight: 800; text-align: center; padding: 10px 8px; background: rgba(255,255,255,.82); border: 1px solid rgba(31,46,40,.1); border-radius: 8px; box-shadow: 0 5px 16px rgba(31,46,40,.06); transition: color .2s, transform .2s, border-color .2s, box-shadow .2s; }
+  .trust-brand-badge i { font-size: 1.25rem; line-height: 1; }
+  .trust-brand-badge:hover { color: var(--color-primary); transform: translateY(-3px); border-color: var(--color-primary); box-shadow: 0 10px 22px rgba(31,46,40,.12); }
+  .simulator-container { background: linear-gradient(135deg, #090e17 0%, var(--color-primary) 100%); border-radius: var(--radius); padding: clamp(24px, 4vw, 44px); color: #fff; box-shadow: 0 18px 38px rgba(9,14,23,.2); border: 1px solid #1e293b; }
+  .sim-control-label { display: block; color: #cbd5e1; font-size: .74rem; font-weight: 800; letter-spacing: .06em; margin-bottom: 7px; text-transform: uppercase; }
+  .sim-select-custom { width: 100%; padding: 11px 14px; border-radius: 7px; background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.22); color: #fff; font-size: .86rem; font-weight: 600; outline: none; }
+  .sim-select-custom option { background: #090e17; color: #fff; }
+  .sim-results-card { background: rgba(255,255,255,.08); border: 1px solid color-mix(in srgb, var(--color-secondary) 55%, transparent); border-radius: 10px; padding: 24px 20px; text-align: center; }
+  .sim-impact-val { color: var(--color-secondary); font-size: 2.5rem; font-weight: 800; line-height: 1.1; }
+  .clarity-grid { display: grid; grid-template-columns: minmax(260px, .85fr) minmax(0, 1.5fr); gap: 28px; align-items: stretch; }
+  .clarity-panel { background: rgba(255,255,255,.72); border: 1px solid rgba(255,255,255,.75); border-radius: var(--radius); padding: 24px; box-shadow: 0 8px 28px rgba(31,46,40,.08); }
+  .clarity-panel h3 { color: var(--text); font-size: 1.15rem; font-weight: 800; margin-bottom: 18px; }
+  .clarity-item { border-bottom: 1px solid rgba(31,46,40,.12); padding: 13px 0; }
+  .clarity-item:last-child { border-bottom: 0; }
+  .clarity-item summary { color: var(--text); cursor: pointer; font-size: .84rem; font-weight: 800; list-style: none; }
+  .clarity-item summary::-webkit-details-marker { display: none; }
+  .clarity-item summary::after { content: '+'; float: right; color: var(--color-primary); font-size: 1.1rem; }
+  .clarity-item[open] summary::after { content: '-'; }
+  .clarity-item p { color: var(--text-muted); font-size: .8rem; line-height: 1.6; margin: 9px 0 0; }
+  @media (max-width: 800px) { .clarity-grid { grid-template-columns: 1fr; } }
+  @media (max-width: 700px) { .trust-brands-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+  .whatsapp-float { 
+    position: fixed; 
+    right: 22px; 
+    bottom: 100px; 
+    z-index: 1100; width: 44px; height: 44px; display: flex; align-items: center; justify-content: center; color: #fff; background: #25d366; border: 0; border-radius: 50%; box-shadow: 0 6px 18px rgba(37,211,102,.35); font-size: 1.35rem; text-decoration: none; transition: transform .2s, box-shadow .2s; }
+  .whatsapp-float:hover { color: #fff; transform: translateY(-4px) scale(1.04); box-shadow: 0 12px 28px rgba(37,211,102,.48); }
+
+  /* ═══════════ SPECIAL OFFER ═══════════════════════════════════════════ */
+  .special-block {
+    position: relative; overflow: hidden;
+    background: linear-gradient(135deg, var(--sb-1, var(--color-primary)) 0%, var(--sb-1, var(--color-primary)) 100%);
+    border-radius: var(--radius); padding: clamp(20px, 4vw, 40px) clamp(20px, 5vw, 44px); color: var(--pack-b2);
+    transition: background .4s ease;
+  }
+
+  .giraffe-spots {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    overflow: hidden;
+    pointer-events: none;
+  }
+
+  .spot {
+    position: absolute;
+    background: color-mix(in srgb, var(--sb-2, var(--color-secondary)) 12%, transparent);
+    animation: blobMorph 14s ease-in-out infinite;
+    transition: background .4s ease;
+  }
+
+  /* --- grandes taches --- */
+  .spot-1 {
+    top: -5%; left: 3%; width: 150px; height: 130px;
+    border-radius: 42% 58% 65% 35% / 45% 45% 55% 55%;
+    animation-duration: 16s; animation-delay: 0s;
+  }
+  .spot-2 {
+    top: 5%; left: 78%; width: 170px; height: 150px;
+    border-radius: 60% 40% 30% 70% / 55% 35% 65% 45%;
+    animation-duration: 19s; animation-delay: -4s;
+  }
+  .spot-3 {
+    top: 55%; left: 88%; width: 120px; height: 110px;
+    border-radius: 35% 65% 55% 45% / 60% 40% 60% 40%;
+    animation-duration: 15s; animation-delay: -8s;
+  }
+  .spot-4 {
+    top: 70%; left: 8%; width: 140px; height: 125px;
+    border-radius: 55% 45% 40% 60% / 40% 60% 45% 55%;
+    animation-duration: 18s; animation-delay: -2s;
+  }
+
+  /* --- taches moyennes --- */
+  .spot-5 {
+    top: 30%; left: 35%; width: 80px; height: 70px;
+    border-radius: 50% 50% 40% 60% / 55% 45% 55% 45%;
+    animation-duration: 13s; animation-delay: -6s;
+  }
+  .spot-6 {
+    top: 60%; left: 55%; width: 90px; height: 80px;
+    border-radius: 45% 55% 60% 40% / 50% 50% 40% 60%;
+    animation-duration: 17s; animation-delay: -10s;
+  }
+
+  /* --- petites taches --- */
+  .spot-7 {
+    top: 15%; left: 55%; width: 40px; height: 36px;
+    border-radius: 55% 45% 50% 50% / 45% 55% 45% 55%;
+    animation-duration: 11s; animation-delay: -3s;
+  }
+  .spot-8 {
+    top: 82%; left: 40%; width: 32px; height: 28px;
+    border-radius: 50% 50% 55% 45% / 50% 50% 40% 60%;
+    animation-duration: 12s; animation-delay: -7s;
+  }
+
+  @keyframes blobMorph {
+    0%   { border-radius: 42% 58% 65% 35% / 45% 45% 55% 55%; transform: translate(0, 0) scale(1); }
+    25%  { border-radius: 58% 42% 35% 65% / 55% 60% 40% 45%; transform: translate(10px, -8px) scale(1.06); }
+    50%  { border-radius: 50% 50% 55% 45% / 40% 55% 45% 60%; transform: translate(-6px, 6px) scale(0.94); }
+    75%  { border-radius: 65% 35% 45% 55% / 55% 40% 60% 45%; transform: translate(8px, 4px) scale(1.03); }
+    100% { border-radius: 42% 58% 65% 35% / 45% 45% 55% 55%; transform: translate(0, 0) scale(1); }
+  }
+
+  .special-grid { position: relative; z-index: 1; display: grid; grid-template-columns: 1.1fr .9fr; gap: 36px; align-items: center; }
+  @media (max-width: 900px) { .special-grid { grid-template-columns: 1fr; } }
+  .special-tag {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.25);
+    backdrop-filter: blur(10px) saturate(160%); -webkit-backdrop-filter: blur(10px) saturate(160%);
+    padding: 6px 14px; border-radius: 20px;
+    font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em;
+    margin-bottom: 14px;
+  }
+  .special-title { font-size: 1.7rem; font-weight: 800; line-height: 1.2; margin-bottom: 12px; }
+  .special-title span { color: var(--sb-2, var(--color-secondary)); transition: color .4s ease; }
+  .special-desc { font-size: .92rem; opacity: .88; line-height: 1.6; margin-bottom: 22px; max-width: 460px; }
+  .cd-wrap { display: flex; gap: 14px; margin-bottom: 24px; }
+  .cd-item {
+    background: rgba(255,255,255,.12); border: 1px solid rgba(255,255,255,.25);
+    backdrop-filter: blur(10px) saturate(160%); -webkit-backdrop-filter: blur(10px) saturate(160%);
+    border-radius: 10px; padding: 12px 18px; text-align: center; min-width: 72px;
+  }
+  .cd-num { display: block; font-size: 1.5rem; font-weight: 800; font-variant-numeric: tabular-nums; }
+  .cd-lbl { font-size: .66rem; opacity: .75; text-transform: uppercase; letter-spacing: .06em; }
+  .special-visual {
+    background: rgba(255,255,255,.1); border: 1.5px dashed rgba(255,255,255,.3);
+    backdrop-filter: blur(12px) saturate(160%); -webkit-backdrop-filter: blur(12px) saturate(160%);
+    border-radius: var(--radius-sm); padding: 30px; text-align: center;
+  }
+  .special-visual-num { font-size: 2.6rem; font-weight: 800; color: var(--color-secondary); line-height: 1; }
+  .special-visual-lbl { font-size: .82rem; opacity: .85; margin-top: 8px; }
+
+  /* ═══════════ PACKS — carrousel vertical intégré au bloc offre ═════════════
+     Les 3 formules défilent en boucle à la place du visuel "-15%" fixe ; le
+     texte à gauche (titre, description, CTA) suit la carte affichée, et
+     l'accent de couleur (primary/secondary) s'inverse une carte sur deux.
+     --pack-* est défini ici, sur TOUTE la section (#packSpecialBlock), pas sur
+     .pack-visual-slide seul — ainsi .pack-dyn-cta (à gauche, hors du carrousel)
+     y a accès aussi, et le JS n'a qu'un seul endroit à mettre à jour. ══════ */
+  #packSpecialBlock {
+    --pack-a: var(--color-primary); --pack-b: var(--color-secondary);
+    --pack-a2: var(--text); --pack-b2: var(--textb);
+  }
+  .pack-visual-wrap {
+    position: relative;
+    background: rgba(17, 24, 39, .22); border: 1px solid rgba(255,255,255,.28);
+    backdrop-filter: blur(12px) saturate(160%); -webkit-backdrop-filter: blur(12px) saturate(160%);
+    border-radius: var(--radius-sm);
+    height: 360px;
+    overflow: hidden;
+    box-shadow: 0 18px 36px rgba(0,0,0,.16), inset 0 1px 0 rgba(255,255,255,.12);
+  }
+  .pack-visual-track { display: flex; flex-direction: column; transition: transform .7s cubic-bezier(.65,0,.35,1); }
+  .pack-visual-slide {
+    position: relative; height: 360px; flex-shrink: 0; padding: 34px 34px 42px;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center;
+    isolation: isolate;
+  }
+  .pack-visual-slide::before {
+    content: ''; position: absolute; inset: 18px; z-index: -1;
+    border: 1px solid rgba(255,255,255,.14); border-radius: 14px;
+    background: rgba(255,255,255,.06);
+  }
+  .pack-visual-icon {
+    width: 62px; height: 62px; border-radius: 16px; margin-bottom: 18px;
+    display: flex; align-items: center; justify-content: center; font-size: 1.4rem; color: var(--pack-a2);
+    background: var(--pack-b);
+    box-shadow: 0 10px 24px rgba(0,0,0,.22), 0 0 0 6px color-mix(in srgb, var(--pack-b) 16%, transparent);
+    transform: rotate(-3deg);
+  }
+  .pack-visual-name { font-size: 1.3rem; font-weight: 800; color: var(--pack-b2); margin-bottom: 8px; letter-spacing: .01em; }
+  .pack-visual-tag {
+    display: inline-flex; align-items: center; gap: 6px; margin-bottom: 16px;
+    font-size: .74rem; font-weight: 700; color: var(--pack-b2); background: color-mix(in srgb, var(--pack-b) 10%, transparent);
+    border: 1px solid color-mix(in srgb, var(--pack-b2) 42%, transparent); border-radius: 30px; padding: 6px 14px;
+  }
+  .pack-visual-mini { list-style: none; padding: 0; margin: 0; text-align: left; }
+  .pack-visual-mini li { display: flex; gap: 9px; font-size: .8rem; color: var(--pack-b2); padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,.1); }
+  .pack-visual-mini li:last-child { border-bottom: 0; }
+  .pack-visual-mini li i { color: var(--pack-b); margin-top: 2px; flex-shrink: 0; }
+  .pack-visual-dots { position: absolute; bottom: 14px; left: 50%; transform: translateX(-50%); display: flex; gap: 7px; z-index: 2; }
+  .pack-visual-dots span {
+    width: 7px; height: 7px; border-radius: 50%; 
+    /* Si la variable inclut déjà les virgules */
+    background: color-mix(in srgb, var(--pack-b) 35%, transparent);
+    transition: .25s; cursor: pointer;
+  }
+  .pack-visual-dots span.active { background: var(--pack-b); width: 20px; border-radius: 5px; }
+
+  .pack-dyn-cta {
+    display: inline-flex; align-items: center; gap: 9px; text-decoration: none;
+    border-radius: 50px; padding: 13px 26px; font-weight: 700; font-size: .88rem;
+    font-family: "Poppins", sans-serif; transition: background .35s, color .35s, transform .2s, box-shadow .2s;
+    background: var(--pack-dyn-a, var(--color-secondary)); color: var(--pack-a2);
+  }
+  .pack-dyn-cta:hover { transform: translateY(-2px); color: var(--text); }
+  .pack-dyn-fade { transition: opacity .25s ease; }
+  .pack-dyn-fade.out { opacity: 0; }
+
+  /* ═══════════ GALLERY ═══════════════════════════════════════════════ */
+  .gal-grid {
+    display: grid; grid-template-columns: repeat(4, 1fr); grid-auto-rows: 260px; gap: 12px;
+  }
+  @media (max-width: 900px) { .gal-grid { grid-template-columns: repeat(2, 1fr); } }
+  .gal-item {
+    position: relative; border-radius: 14px; overflow: hidden; cursor: pointer;
+    background: rgba(255,255,255,.35); border: 1px solid rgba(255,255,255,.4);
+    backdrop-filter: blur(10px) saturate(160%); -webkit-backdrop-filter: blur(10px) saturate(160%);
+    box-shadow: 0 8px 28px rgba(31,46,40,.10);
+    padding: 6px;
+  }
+  .gal-item:nth-child(1) { grid-column: span 2; grid-row: span 2; }
+  .gal-item img { width: 100%; height: 100%; object-fit: cover; transition: transform .4s; display: block; border-radius: 9px; }
+  .gal-item:hover img { transform: scale(1.08); }
+  .gal-overlay {
+    position: absolute; 
+    inset: 6px; 
+    border-radius: 9px; 
+    background: linear-gradient(
+      to top, 
+      color-mix(in srgb, var(--color-primary) 65%, transparent), 
+      transparent 55%
+    );
+    display: flex; 
+    align-items: flex-end; 
+    padding: 12px 14px;
+    opacity: 0; 
+    transition: opacity .25s;
+  }
+  .gal-item:hover .gal-overlay { opacity: 1; }
+  .gal-overlay span { color: #fff; font-weight: 700; font-size: .82rem; display: flex; align-items: center; gap: 6px; }
+
+  .gal-pop {
+    position: fixed; inset: 0; z-index: 9999; background: rgba(15,23,42,.7);
+    display: none; align-items: center; justify-content: center; padding: 20px;
+  }
+  .gal-pop.open { display: flex; }
+  .gal-pop-box {
+    background: var(--bg-card); border-radius: 14px; overflow: hidden; max-width: 640px; width: 100%;
+  }
+  .gal-pop-img { width: 100%; height: 320px; }
+  .gal-pop-img img { width: 100%; height: 100%; object-fit: cover; }
+  .gal-pop-cap { padding: 20px 24px; background-color: var(--color-secondary); }
+  .gal-pop-cap h5 { font-weight: 800; margin-bottom: 8px; }
+  .gal-pop-cap p { font-size: .85rem; color: var(--text-muted); line-height: 1.6; margin-bottom: 0; }
+  .gal-pop-close {
+    position: absolute; top: 14px; right: 14px; z-index: 2;
+    width: 34px; height: 34px; border-radius: 50%; border: none;
+    background: rgba(0,0,0,.5); color: #fff; display: flex; align-items: center; justify-content: center; cursor: pointer;
+  }
+  .gal-pop-nav { display: flex; justify-content: space-between; padding: 0 24px 20px; background-color: var(--color-secondary); }
+  .gal-pop-nav button {
+    background: var(--bg-card2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 16px; font-size: .78rem; font-weight: 700; color: var(--text); cursor: pointer;
+  }
+  .gal-pop-nav button:hover { border-color: var(--color-primary); color: var(--color-primary); }
+
+  /* ═══════════ HISTORY (timeline) ═════════════════════════════════════ */
+  .hist-timeline { position: relative; max-width: 760px; margin: 0 auto; }
+  .hist-timeline::before {
+    content: ''; position: absolute; left: 20px; top: 6px; bottom: 6px; width: 2px; background: var(--border);
+  }
+  @media (min-width: 768px) { .hist-timeline::before { left: 50%; transform: translateX(-1px); } }
+  .hist-item { position: relative; padding-left: 52px; margin-bottom: 34px; }
+  @media (min-width: 768px) {
+    .hist-item { width: 50%; padding-left: 0; padding-right: 40px; text-align: right; }
+    .hist-item:nth-child(even) { margin-left: 50%; padding-right: 0; padding-left: 40px; text-align: left; }
+  }
+  .hist-dot {
+    position: absolute; left: 12px; top: 4px; width: 18px; height: 18px; border-radius: 50%;
+    background: var(--color-primary); border: 3px solid var(--bg-card2); box-shadow: 0 0 0 2px var(--color-primary);
+  }
+  @media (min-width: 768px) {
+    .hist-item .hist-dot { left: auto; right: -9px; }
+    .hist-item:nth-child(even) .hist-dot { left: -9px; right: auto; }
+  }
+  .hist-year { display: inline-block; font-size: .78rem; font-weight: 800; color: var(--color-primary); background: var(--bg-card2); padding: 3px 12px; border-radius: 20px; margin-bottom: 8px; }
+  .hist-item h5 { font-weight: 800; font-size: 1rem; margin-bottom: 6px; color: var(--text); }
+  .hist-item p { font-size: .84rem; color: var(--text-muted); line-height: 1.6; margin: 0; }
+
+  /* ═══════════ HOURS / FIND US ═════════════════════════════════════════ */
+  .hours-block {
+    position: relative; overflow: hidden;
+    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary) 100%);
+    border-radius: var(--radius); padding: clamp(20px, 4vw, 40px) clamp(20px, 5vw, 44px); color: #fff;
+  }
+
+  .hours-grid { position: relative; z-index: 1; display: grid; gap: 32px; }
+  @media (max-width: 900px) { .hours-grid { grid-template-columns: 1fr; } }
+  .hours-row {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,.14); font-size: .86rem;
+  }
+  .hours-row:last-child { border-bottom: none; }
+  .hours-day { display: flex; align-items: center; gap: 8px; opacity: .92; }
+  .hours-dot { width: 8px; height: 8px; border-radius: 50%; background: #4ade80; }
+  .hours-dot.off { background: #f87171; }
+  .hours-card-white {
+    position: relative; z-index: 1;
+    background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.25);
+    backdrop-filter: blur(12px) saturate(160%); -webkit-backdrop-filter: blur(12px) saturate(160%);
+    border-radius: var(--radius-sm); padding: 26px;
+  }
+  .hours-card-white h5 { font-size: .9rem; font-weight: 800; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .hours-info-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 15px;
+      flex-wrap: wrap;
+      padding: 9px 0;
+      border-bottom: 1px solid rgba(255,255,255,.14);
+      font-size: .82rem;
+  }
+
+  .hours-info-row > :first-child {
+      flex: 0 0 130px; /* largeur du titre */
+      font-weight: 600;
+  }
+
+  .hours-info-row > :last-child {
+      flex: 1;
+      min-width: 200px;
+  }
+  .hours-info-row:last-child { border-bottom: none; }
+  .hours-info-row span:first-child { opacity: .8; display: flex; align-items: center; gap: 7px; }
+
+  /* ═══════════ BLOG / CONSEILS ═════════════════════════════════════════ */
+  .blog-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 24px; }
+  .blog-card {
+    background: rgba(255,255,255,.72); /*border: 1px solid rgba(255,255,255,.5); */border-radius: var(--radius);
+    backdrop-filter: blur(16px) saturate(160%); -webkit-backdrop-filter: blur(16px) saturate(160%);
+    box-shadow: 0 8px 32px rgba(31,46,40,.12);
+    overflow: hidden; transition: transform .2s, box-shadow .2s, background .2s;
+  }
+  .blog-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); }
+  .blog-img { height: 170px; position: relative; overflow: hidden; }
+  .blog-img img { width: 100%; height: 100%; object-fit: cover; }
+  .blog-date-bdg {
+    position: absolute; top: 12px; left: 12px; background: var(--color-secondary); color: var(--text);
+    border-radius: 8px; padding: 6px 10px; text-align: center; line-height: 1.1;
+  }
+  .blog-date-bdg .bd { display: block; font-weight: 800; font-size: 1rem; }
+  .blog-date-bdg .bm { display: block; font-size: .62rem; text-transform: uppercase; font-weight: 700; }
+  .blog-body { padding: 18px 20px; }
+  .blog-tag { font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: var(--color-primary); margin-bottom: 6px; }
+  .blog-title { font-size: .96rem; font-weight: 800; color: var(--text); line-height: 1.4; margin-bottom: 10px; }
+  .blog-title a { color: inherit; text-decoration: none; }
+  .blog-title a:hover { color: var(--color-primary); }
+  .blog-meta { display: flex; gap: 14px; font-size: .72rem; color: var(--text-muted); margin-bottom: 12px; }
+  .blog-meta span { display: flex; align-items: center; gap: 5px; }
+  .blog-more { font-size: .78rem; font-weight: 700; color: var(--color-primary); text-decoration: none; display: inline-flex; align-items: center; gap: 6px; }
+  .blog-more:hover { gap: 9px; color: var(--color-primary); }
+
+  /* ═══════════ CONTACT SECTION ═════════════════════════════════════════ */
+  .contact-grid { display: grid; grid-template-columns: .85fr 1.15fr; gap: 28px; }
+  @media (max-width: 900px) { .contact-grid { grid-template-columns: 1fr; } }
+  .contact-dark {
+    background: var(--text); color: #fff; border-radius: var(--radius); padding: 32px 28px;
+  }
+  .contact-dark h4 { font-weight: 800; margin-bottom: 6px; }
+  .contact-dark .sub { font-size: .82rem; opacity: .7; margin-bottom: 22px; }
+  .contact-item { display: flex; gap: 12px; margin-bottom: 18px; }
+  .contact-item-icon {
+    width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0;
+    background: rgba(255,255,255,.1); display: flex; align-items: center; justify-content: center;
+    color: var(--color-secondary);
+  }
+  .contact-item strong { display: block; font-size: .82rem; margin-bottom: 2px; }
+  .contact-item span { font-size: .8rem; opacity: .78; }
+  .contact-soc-row { display: flex; gap: 10px; margin-top: 18px; }
+  .contact-soc-row a {
+    width: 36px; height: 36px; border-radius: 50%; background: rgba(255,255,255,.1);
+    display: flex; align-items: center; justify-content: center; color: #fff; text-decoration: none;
+  }
+  .contact-soc-row a:hover { background: var(--color-secondary); color: var(--text); }
+  .contact-form-card { 
+    display: grid;
+    background: var(--bg-card);
+    /*
+    border: 1px solid var(--border);
+    */
+    border-radius: var(--radius);
+    padding: 28px;
+    align-content: center;
+  }
+
+  .contact-flbl { font-size: .78rem; font-weight: 700; color: var(--text); margin-bottom: 6px; display: block; }
+  .contact-fctrl {
+    width: 100%; padding: 11px 14px; border: 1.5px solid var(--borders); border-radius: 8px;
+    background: var(--bg-card2); font-size: .86rem; font-family: inherit; box-sizing: border-box;
+  }
+  .contact-fctrl:focus { outline: none; border-color: var(--color-primary); background: #fff; }
+
+  .form-response {
+    display: none;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: .85rem;
+    margin-bottom: 14px;
+  }
+  .form-response-success { background: #d1e7dd; color: #0f5132; display: block; }
+  .form-response-error { background: #f8d7da; color: #842029; display: block; }
+
+  .form-check-contact {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    font-size: .78rem;
+    color: var(--text-muted);
+  }
+  .form-check-contact input[type="checkbox"] {
+    margin-top: 3px;
+    flex-shrink: 0;
+    width: 15px;
+    height: 15px;
+    accent-color: var(--color-primary);
+  }
+  .form-check-contact label { cursor: pointer; line-height: 1.4; }
+
+  /* ═══════════ FOOTER ══════════════════════════════════════════════════ */
+  .site-footer { background: var(--text); color: rgba(255,255,255,.85); padding: 44px 40px 0; margin-top: 8px; }
+  .footer-brand-name { font-size: 1.3rem; font-weight: 800; color: #fff; margin-bottom: 12px; }
+  .footer-brand-name span { color: var(--color-secondary); }
+  .footer-desc { font-size: .82rem; opacity: .7; line-height: 1.6; margin-bottom: 18px; }
+  .footer-soc { display: flex; gap: 10px; }
+  .footer-soc a {
+    width: 34px; height: 34px; border-radius: 50%; background: rgba(255,255,255,.08);
+    display: flex; align-items: center; justify-content: center; color: #fff; text-decoration: none;
+  }
+  .footer-soc a:hover { background: var(--color-secondary); color: var(--text); }
+  .footer-title { font-size: .82rem; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; color: #fff; margin-bottom: 16px; }
+  .footer-links { list-style: none; padding: 0; margin: 0; }
+  .footer-links li { margin-bottom: 10px; }
+  .footer-links a {
+    color: rgba(255,255,255,.7); text-decoration: none; font-size: .84rem;
+    display: flex; align-items: center; gap: 8px; transition: color .15s;
+  }
+  .footer-links a:hover { color: var(--color-secondary); }
+  .footer-links a i { font-size: .65rem; }
+  .footer-ci { display: flex; gap: 10px; margin-bottom: 16px; }
+  .footer-ci-icon { color: var(--color-secondary); flex-shrink: 0; margin-top: 2px; }
+  .footer-ci div { font-size: .84rem; opacity: .8; line-height: 1.4; }
+  .footer-ci strong { display: block; color: #fff; font-size: .82rem; margin-bottom: 2px; }
+  .footer-bottom {
+    border-top: 1px solid rgba(255,255,255,.12); margin-top: 34px; padding: 18px 0;
+    display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;
+    font-size: .78rem; opacity: .65;
+  }
+  .footer-bottom a { color: rgba(255,255,255,.8); text-decoration: none; margin-left: 16px; }
+  .footer-bottom a:hover { color: var(--color-secondary); }
+
+  /* ═══════════ NAVBAR ═══════════════════════════════════════════════════ */
+  html { scroll-behavior: smooth; }
+  body {
+    font-family: 'Inter', sans-serif;
+    background-color: #F8F8F9;
+    margin: 0;
+    position: relative;
+  }
+  /*
+  body::before {
+    content: '';
+    position: fixed;
+    inset: -20px;
+    z-index: -1;
+    background-image: url('{% static "img/fond/bg (1).png" %}');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    # filter: blur(6px);
+    transform: scale(1.03); 
+  }
+  */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: -20px;
+    z-index: -1;
+    background-image: url('{% static "img/fond/bg (1).png" %}');
+    background-size: 400px;
+    /* background-size: cover; */
+    background-position: center;
+    background-repeat: repeat;
+    /* filter: blur(6px); */
+    transform: scale(1.03);
+  }
+
+  #nav {
+    background-color: color-mix(in srgb, var(--color-secondary) 65%, transparent);
+    position: sticky;
+    top: 0;
+    z-index: 1200;
+    box-shadow: 0 2px 20px rgba(var(--color-secondary),.07);
+    transition: .4s;
+
+    background-image: url('{% static "img/fond/bg (3).png" %}');
+    background-size: cover;
+    background-position: center;
+    background-repeat: no-repeat;
+    
+  }
+  #nav.scrolled { box-shadow: 0 4px 30px rgba(0,0,0,.14); }
+
+  .blogo { display: flex; align-items: center; gap: 10px; }
+  .blogo-img { height: 42px; }
+  .bname {
+    font-size: 1.15rem; font-weight: 800; color: #000;
+  }
+  .bname span { color: {{ DESIGN.COLOR_PRIMARY }}; }
+
+  .navbar-nav .nav-link {
+    font-size: .84rem; font-weight: 700;
+    color: #4a4a4a !important;
+    padding: 26px 13px !important;
+    position: relative;
+  }
+  .navbar-nav .nav-link::after {
+    content: '';
+    position: absolute; bottom: 0; left: 50%; transform: translateX(-50%);
+    width: 0; height: 3px; background: {{ DESIGN.COLOR_PRIMARY }};
+    border-radius: 3px 3px 0 0; transition: .3s;
+  }
+  .navbar-nav .nav-link:hover::after,
+  .navbar-nav .nav-link.active::after { width: 55%; }
+  .navbar-nav .nav-link:hover,
+  .navbar-nav .nav-link.active { color: {{ DESIGN.COLOR_PRIMARY }} !important; }
+
+  #navSearchBtn {
+    background: none; border: none; cursor: pointer;
+    color: #555; font-size: 1rem; padding: 8px 10px;
+    border-radius: 8px; transition: .3s;
+  }
+  #navSearchBtn:hover {
+    background: rgba(0,0,0,.06);
+    color: {{ DESIGN.COLOR_PRIMARY }};
+  }
+
+  .nav-cta {
+    background: {{ DESIGN.COLOR_PRIMARY }};
+    color: #fff !important;
+    border-radius: 8px;
+    padding: 10px 20px !important;
+    font-size: .82rem !important;
+    font-weight: 700 !important;
+    margin-left: 6px;
+    transition: transform .15s, box-shadow .15s;
+  }
+  .nav-cta::after { display: none !important; }
+  .nav-cta:hover {
+    transform: translateY(-2px);
+    color: #fff !important;
+  }
+
+  @media (max-width: 991px) {
+    .navbar-nav .nav-link { padding: 12px 14px !important; }
+    .navbar-nav .nav-link::after { display: none; }
+    .d-flex.align-items-center.gap-1 { margin-top: 10px; }
+    .nav-cta { justify-content: center; }
+  }
+
+  /* Bouton retour en haut */
+  #btt {
+    position: fixed; right: 22px; bottom: 22px; z-index: 1100;
+    width: 44px; height: 44px; border-radius: 50%;
+    background: {{ DESIGN.COLOR_PRIMARY }}; color: #fff;
+    display: none; align-items: center; justify-content: center;
+    text-decoration: none; box-shadow: 0 6px 18px rgba(0,0,0,.18);
+    transition: transform .15s;
+  }
+  #btt.show { display: flex; }
+  #btt:hover { transform: translateY(-2px); color: #fff; }
+  .type-card-icon {
+    width: 42px; 
+    height: 42px;
+    margin: 0 auto 10px;
+    border-radius: 50%;
+    background: var(--color-primary);
+    display: flex; 
+    align-items: center; 
+    justify-content: center;
+    box-shadow: 0 4px 10px -4px rgba(47, 74, 64, 0.4);
+  }
+
+  .type-card-icon svg { 
+    width: 16px; 
+    height: 16px; 
+    fill: #fff; 
+  }
+
+  /* ── Lisibilité du texte sur les cartes "verre" (fond flouté derrière) ── */
+  .format-title, .format-desc, .format-usage,
+  .team-name, .team-role, .team-desc,
+  .cat-card-name, .cat-card-count,
+  .blog-title, .blog-meta, .blog-tag,
+  .rn-pop-title, .rn-pop-desc, .rn-pop-meta {
+    text-shadow: 0 1px 2px rgba(255,255,255,.55);
+  }
+
+
+
+
+
+
+
+
+
+    /* ── TOPBAR MICRO-BAR ────────────────────────────────────────────── */
+    .topbar-info {
+      background: #090e17;
+      color: #94a3b8;
+      font-size: 0.76rem;
+      padding: 7px 0;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .topbar-info a {
+      color: #cbd5e1;
+      text-decoration: none;
+      transition: color 0.2s;
+    }
+
+    .topbar-info a:hover {
+      color: var(--color-secondary);
+    }
+
+      /* Widget de Recherche Rapide dans le Hero */
+    .hero-search-box {
+      background: #ffffff;
+      border: 1.5px solid var(--color-border);
+      border-radius: var(--radius-sm);
+      padding: 12px 14px;
+      box-shadow: var(--shadow-lg);
+      margin-bottom: 34px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .search-field-unit {
+      flex: 1;
+      min-width: 150px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 6px 12px;
+      background: #e0e0e0;
+      border-radius: var(--radius-sm);
+      border: 1px solid var(--color-border-light);
+    }
+
+    .search-field-unit i {
+      color: var(--color-primary);
+      font-size: 1.1rem;
+    }
+
+    .search-field-unit select {
+      width: 100%;
+      border: none;
+      background: transparent;
+      font-size: 0.85rem;
+      font-weight: 700;
+      color: var(--color-dark);
+      outline: none;
+      cursor: pointer;
+    }
+        /* Vitrine Billboard Interactive (Hero Right) */
+    .billboard-showcase-frame {
+      position: relative;
+      background: #090e17;
+      border-radius: var(--radius-sm);
+      padding: 16px;
+      box-shadow: var(--shadow-lg);
+      border: 1px solid #1e293b;
+      overflow: hidden;
+    }
+
+    .billboard-topbar {
+      display: flex;
+      justify-content: flex-start;
+      align-items: center;
+      padding-bottom: 12px;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+      margin-bottom: 12px;
+    }
+
+    .billboard-topbar .mode-pill {
+      font-size: 0.72rem;
+      font-weight: 700;
+      color: #94a3b8;
+      background: rgba(255, 255, 255, 0.08);
+      padding: 4px 10px;
+      border-radius: var(--radius-sm);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .billboard-screen-box {
+      position: relative;
+      border-radius: var(--radius-sm);
+      overflow: hidden;
+      height: 330px;
+      background: #000000;
+      border: 2px solid rgba(255, 255, 255, 0.15);
+    }
+
+    .billboard-screen-box img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: opacity 0.45s ease, transform 0.7s ease;
+    }
+
+    .billboard-screen-box img.is-changing {
+      opacity: 0;
+      transform: scale(1.03);
+    }
+
+    .billboard-screen-box.night-mode img {
+      filter: brightness(1.25) contrast(1.15) saturate(1.2);
+      box-shadow: inset 0 0 60px rgba(253, 221, 72, 0.4);
+    }
+
+    .night-spotlight-glow {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      height: 60px;
+      background: linear-gradient(180deg, rgba(253, 221, 72, 0.35) 0%, transparent 100%);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.4s ease;
+    }
+
+    .billboard-screen-box.night-mode .night-spotlight-glow {
+      opacity: 1;
+    }
+
+    .hero-floating-rating {
+      position: absolute;
+      bottom: 24px;
+      right: 24px;
+      background: #ffffff;
+      border-radius: var(--radius-sm);
+      padding: 12px 18px;
+      box-shadow: var(--shadow-xl);
+      border: 1px solid var(--color-border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      animation: floatWidget 4s ease-in-out infinite alternate;
+      z-index: 3;
+    }
+
+    @keyframes floatWidget {
+      0% { transform: translateY(0); }
+      100% { transform: translateY(-7px); }
+    }
+    .pulse-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #10b981;
+      box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+      animation: pulseGreen 1.8s infinite;
+    }
+    
+    @keyframes pulseGreen {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(1.3); }
+    }
+    /* Barre de recherche instantanée inventaire */
+    .inventory-search-bar {
+      max-width: 480px;
+      margin: 0 auto 24px;
+      position: relative;
+    }
+
+    .inventory-search-bar input {
+      width: 100%;
+      padding: 11px 18px 11px 44px;
+      border-radius: var(--radius-sm);
+      border: 1.5px solid var(--color-border);
+      background: var(--color-secondary);
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--color-dark);
+      box-shadow: var(--shadow-sm);
+      outline: none;
+      transition: var(--transition-fast);
+    }
+
+    .inventory-search-bar input:focus {
+      border-color: var(--color-primary);
+      box-shadow: 0 0 0 3px var(--color-primary-soft);
+    }
+
+    .inventory-search-bar i {
+      position: absolute;
+      left: 16px;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--color-muted);
+      font-size: 1.05rem;
+    }
+        /* ── VUE DU RÉSEAU (GRILLE & CARTE INTERACTIVE) ──────────────────── */
+    .view-switcher-box {
+      display: inline-flex;
+      background: #ffffff;
+      border: 1.5px solid var(--color-border);
+      padding: 4px;
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-sm);
+      margin-bottom: 24px;
+    }
+
+    .view-tab-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 8px 20px;
+      border-radius: var(--radius-sm);
+      border: none;
+      background: transparent;
+      color: var(--color-slate);
+      font-size: 0.84rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: var(--transition-fast);
+    }
+
+    .view-tab-btn.active {
+      background: var(--color-primary);
+      color: #ffffff;
+      box-shadow: 0 4px 12px rgba(147, 46, 43, 0.25);
+    }
 </style>
-{% endblock %}
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
 
-{% block header %}
-  <!-- ═══════════ HERO ═══════════ -->
-  <div class="hero-section">
-    <div>
-      <div class="hero-eyebrow">Réseau d'affichage national</div>
-      <h1 class="hero-title">Donnez à votre marque la visibilité qu'elle mérite.</h1>
-      <p class="hero-subtitle">
-        Avec plus de 400 faces publicitaires réparties dans les principales villes du Burkina Faso, Integral accompagne les entreprises dans leurs campagnes d'affichage grâce à des emplacements stratégiques, des panneaux grand format et des écrans numériques LED.
-      </p>
-      <div class="hero-actions">
-        <a href="#reseau" class="hero-btn hero-btn-solid">
-          <i class="bi bi-geo-alt-fill"></i> Découvrir nos emplacements
-        </a>
-        <a href="{% url 'portail:suivi_demande' %}" class="hero-btn hero-btn-outline">
-          <i class="bi bi-search"></i> Suivre une autre demande
-        </a>
+</head>
+<body>
+    <!-- ══════════════════════════════════════════════════════════════════
+       TOPBAR D'INFORMATIONS RAPIDES
+       ══════════════════════════════════════════════════════════════════ -->
+  <div class="topbar-info d-none d-md-block">
+    <div class="container d-flex justify-content-between align-items-center">
+      <div class="d-flex align-items-center gap-3">
+        <span><i class="bi bi-geo-alt-fill text-warning me-1"></i> Réseau d'affichage n°1 au Burkina Faso</span>
+        <span><i class="bi bi-shield-check text-success me-1"></i> Disponibilités certifiées en temps réel</span>
       </div>
-
-      <div class="hero-mini-stats">
-        <div class="hero-mini-stat">
-          <span class="hero-mini-num">400+</span>
-          <span class="hero-mini-lbl">
-            Face{{ total_faces_reseau|pluralize:",s" }} publicitaire{{ total_faces_reseau|pluralize:",s" }}
-          </span>
-        </div>
-        <div class="hero-mini-stat">
-          <span class="hero-mini-num">{{ nb_formats }}</span>
-          <span class="hero-mini-lbl">
-            Format{{ nb_formats|pluralize:",s" }} d'affichage
-          </span>
-        </div>
-        <div class="hero-mini-stat">
-          <span class="hero-mini-num">{{ nb_villes }}</span>
-          <span class="hero-mini-lbl">
-            Grande{{ nb_villes|pluralize:",s" }} ville{{ nb_villes|pluralize:",s" }}
-          </span>
-        </div>
-      </div>
-    </div>
-
-    <div class="hero-visual">
-      <div class="hero-blob"></div>
-      <div class="dots-deco dots-tl"></div>
-      <div class="dots-deco dots-br"></div>
-      
-      <svg class="hero-illustration" viewBox="0 0 320 320" xmlns="http://www.w3.org/2000/svg">
-        <rect x="24" y="150" width="34" height="120" rx="6" fill="#ffffff" opacity=".14"/>
-        <rect x="64" y="110" width="30" height="160" rx="6" fill="#ffffff" opacity=".22"/>
-        <rect x="240" y="130" width="30" height="140" rx="6" fill="#ffffff" opacity=".18"/>
-        <rect x="272" y="170" width="26" height="100" rx="6" fill="#ffffff" opacity=".14"/>
-        <rect x="150" y="230" width="8" height="60" rx="3" fill="#ffffff" opacity=".55"/>
-        <rect x="176" y="230" width="8" height="60" rx="3" fill="#ffffff" opacity=".55"/>
-        <rect x="90" y="70" width="150" height="120" rx="16" fill="#ffffff"/>
-        <rect x="106" y="86" width="118" height="60" rx="10" fill="#f9bf29"/>
-        <path d="M106 146 L142 106 L166 130 L196 92 L224 146 Z" fill="#3b5d50" opacity=".85"/>
-        <rect x="106" y="156" width="70" height="10" rx="5" fill="#e6e2d8"/>
-        <rect x="106" y="172" width="46" height="10" rx="5" fill="#e6e2d8"/>
-        <circle cx="252" cy="60" r="9" fill="#f9bf29"/>
-        <circle cx="46" cy="90" r="5" fill="#f9bf29" opacity=".8"/>
-      </svg>
-
-      <div class="hero-float-card">
-        <div class="hero-float-icon"><i class="bi bi-graph-up-arrow"></i></div>
-        <div>
-          <div class="hero-float-num">
-            {{ categories_stats|length }} catégorie{{ categories_stats|length|pluralize:",s" }}
-          </div>
-          <div class="hero-float-label">
-            {% for cat in categories_stats %}
-              {{ cat.categorie }}{% if not forloop.last %}, {% endif %}
-            {% endfor %}
-          </div>
-        </div>
+      <div class="d-flex align-items-center gap-3">
+        <a href="tel:{{ CONTACT_TEL01|default:'+22658800909' }}"><i class="bi bi-telephone-fill text-warning me-1"></i> {{ CONTACT_TEL01|default:"+226 58 80 09 09" }}</a>
+        <a href="tel:{{ CONTACT_TEL02|default:'+22658800909' }}"><i>|</i> {{ CONTACT_TEL02|default:"+226 58 80 09 09" }}</a>
+        <a href="mailto:{{ CONTACT_EMAIL|default:'contact@promopub-integral.com' }}"><i class="bi bi-envelope-fill text-warning me-1"></i> {{ CONTACT_EMAIL1|default:"contact@promopub-integral.com" }}</a>
       </div>
     </div>
   </div>
-{% endblock %}
+  <!-- ═══════════ NAVBAR ═══════════ -->
+  <nav class="navbar navbar-expand-lg" id="nav">
+    <div class="container">
+      <a class="navbar-brand" href="#">
+        <div class="blogo">
+          <img src="{% static 'img/logo.png' %}" alt="Integral" class="blogo-img">
+        </div>
+      </a>
 
+      <button class="navbar-toggler border-0" type="button" data-bs-toggle="collapse" data-bs-target="#navmenu">
+        <i class="bi bi-list" style="color:{{ DESIGN.COLOR_PRIMARY }};font-size:1.35rem;"></i>
+      </button>
 
-{% block content %}
-<div class="vitrine">
+      <div class="collapse navbar-collapse" id="navmenu">
+        <ul class="navbar-nav mx-auto">
+          <!--
+          <li class="nav-item"><a class="nav-link" href="#category">Formats</a></li>
+          -->
+          <li class="nav-item"><a class="nav-link" href="#special">Offre</a></li>
+          <li class="nav-item"><a class="nav-link" href="#reseau">Réseau</a></li>
+          <li class="nav-item"><a class="nav-link" href="#about">À propos</a></li>
+          <li class="nav-item"><a class="nav-link" href="#gallery">Galerie</a></li>
+          <li class="nav-item"><a class="nav-link" href="#blog">Actualités</a></li>
+          <li class="nav-item"><a class="nav-link" href="#contact-section">Contact</a></li>
+        </ul>
+        <div class="d-flex align-items-center gap-1">
+          <a href="{% url 'portail:suivi_demande' %}" class="hero-btn hero-btn-solids">
+            <i class="bi bi-search"></i> Suivre une demande
+          </a>
+          <a href="{% url 'portail:reserver_etape1' %}" class="nav-link nav-cta">
+            <i class="bi bi-calendar-check me-1"></i> Faire une demande
+          </a>
+        </div>
+      </div>
+    </div>
+  </nav>
 
-  <!-- ═══════════ NAV VILLES (pastilles) ═══════════ -->
-  <div class="section-tag" style="    font-size: 1rem;text-transform: none;margin-bottom: 10px !important;">Choisir une ville pour consulter les disponibilités</div>
-  <div class="city-nav">
-    {% for ville in villes_stats %}
-    <a href="#ville-{{ forloop.counter }}" class="city-pill" onclick="
-      event.preventDefault();
-      document.querySelectorAll('.city-acc.is-open').forEach(o => o.classList.remove('is-open'));
-      const target = document.getElementById('ville-{{ forloop.counter }}');
-      if (target) {
-        target.classList.add('is-open');
-        target.scrollIntoView({behavior:'smooth', block:'start'});
-      }
-    ">
-      <span class="city-pill-dot {% if ville.faces_libres > 0 %}ok{% else %}full{% endif %}"></span>
-      {{ ville.nom }}
-    </a>
-    {% empty %}
-    <p style="color:var(--text-muted);">Aucune ville disponible.</p>
+  {% if messages %}
+  <div class="django-messages">
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
+        {% if message.tags == 'success' %}<i class="bi bi-check-circle-fill me-2"></i>
+        {% elif message.tags == 'error' or message.tags == 'danger' %}<i class="bi bi-exclamation-triangle-fill me-2"></i>
+        {% else %}<i class="bi bi-info-circle-fill me-2"></i>{% endif %}
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fermer"></button>
+      </div>
     {% endfor %}
   </div>
+  {% endif %}
 
-  <!-- ═══════════ RÉSEAU PAR VILLE ═══════════ -->
-  <div class="section" id="reseau">
-    <div class="section-header">
-      <div class="section-header-left">
-        <div class="section-icon-chip"><i class="bi bi-diagram-3-fill"></i></div>
+
+<div class="vitrine">
+
+  <!-- ═══════════ HERO ═══════════ -->
+
+  <div class="herosection">
+    <div class="container">
+      <div class="hero-section">
         <div>
-          <div class="section-tag">Réseau national</div>
-          <div class="section-title">Nos disponibilités par ville</div>
-        </div>
-      </div>
-      <span class="section-live-badge">
-        <span class="live-dot"></span> Disponibilités actualisées en temps réel
-      </span>
-    </div>
+          <span class="slbl">Réseau d'affichage national</span>
+          <h2 class="stitle" style="font-size: clamp(2.1rem, 3.6vw, 2.9rem);">Donnez à votre marque la visibilité <span>qu'elle mérite.</span></h2>
+          <!--
+          <div class="hero-eyebrow">Réseau d'affichage national</div>
+          <h1 class="hero-title">Donnez à votre marque la visibilité qu'elle mérite.</h1>
+          -->
+          <p class="hero-subtitle">
+            Avec plus de 400 faces publicitaires réparties dans les principales villes du Burkina Faso, Integral accompagne les entreprises dans leurs campagnes d'affichage grâce à des emplacements stratégiques, des panneaux grand format et des écrans numériques LED.
+          </p>
+              <div class="hero-search-box">
+                <div class="search-field-unit">
+                  <i class="bi bi-geo-alt-fill"></i>
+                  <select id="heroSelectVille">
+                    <option value="all">Toutes les villes</option>
+                    {% for ville in villes_stats %}
+                      <option value="{{ ville.nom|slugify }}">{{ ville.nom }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
 
-    <div class="city-list">
-      {% for ville in villes_stats %}
-      <div class="city-acc alt-right" id="ville-{{ forloop.counter }}">
-        <button class="city-acc-head" type="button" onclick="
-          const acc = this.closest('.city-acc');
-          const wasOpen = acc.classList.contains('is-open');
-          acc.closest('.city-list').querySelectorAll('.city-acc.is-open').forEach(o => o.classList.remove('is-open'));
-          if (!wasOpen) acc.classList.add('is-open');
-        ">
-          <div class="city-acc-head-left">
-            <span class="city-acc-avatar">{{ ville.nom|slice:":1" }}</span>
-            <div>
-              <div class="city-acc-name">{{ ville.nom }}</div>
-              <span class="city-acc-mini">
-                {% for cat in ville.supports %}
-                  {{ cat.total }} {% if not cat.categorie == "Écran" %} face{{ cat.total|pluralize:",s" }}
-                  {{ cat.categorie }} {% else %} {{ cat.categorie }}{{ cat.total|pluralize:",s" }} {% endif %} {% if not forloop.last %} <span>·</span>{% endif %}
-                {% endfor %}
+                <div class="search-field-unit">
+                  <i class="bi bi-layers-fill"></i>
+                  <select id="heroSelectCat">
+                    <option value="all">Tous les formats</option>
+                    {% for cat in categories_stats %}
+                      <option value="{{ cat.categorie|slugify }}">{{ cat.categorie }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+
+                <button class="nav-link nav-cta" id="heroSearchTrigger">
+                  <i class="bi bi-search"></i> Explorer
+                </button>
+              </div>
+
+          <div class="hero-mini-stats">
+            <div class="hero-mini-stat">
+              <span class="hero-mini-num">400+</span>
+              <span class="hero-mini-lbl">
+                Face{{ total_faces_reseau|pluralize:",s" }} publicitaire{{ total_faces_reseau|pluralize:",s" }}
+              </span>
+            </div>
+            <div class="hero-mini-stat">
+              <span class="hero-mini-num">{{ nb_formats }}</span>
+              <span class="hero-mini-lbl">
+                Format{{ nb_formats|pluralize:",s" }} d'affichage
+              </span>
+            </div>
+            <div class="hero-mini-stat">
+              <span class="hero-mini-num">{{ nb_villes }}</span>
+              <span class="hero-mini-lbl">
+                Grande{{ nb_villes|pluralize:",s" }} ville{{ nb_villes|pluralize:",s" }}
               </span>
             </div>
           </div>
-          <div class="city-acc-head-right">
-            {% if ville.faces_libres > 0 %}
-              <span class="city-badge-available"></span>
-            {% else %}
-              <span class="city-badge-full">Complet</span>
-            {% endif %}
-            <span class="city-acc-chevron"><i class="bi bi-chevron-down"></i></span>
-          </div>
-        </button>
+        </div>
+        <!--
+        <div class="hero-visual">
+          <div class="hero-blob"></div>
+          <div class="dots-deco dots-tl"></div>
+          <div class="dots-deco dots-br"></div>
+          
+          <svg class="hero-illustration" viewBox="0 0 320 320" xmlns="http://www.w3.org/2000/svg">
+            <rect x="24" y="150" width="34" height="120" rx="6" fill="#ffffff" opacity=".14"/>
+            <rect x="64" y="110" width="30" height="160" rx="6" fill="#ffffff" opacity=".22"/>
+            <rect x="240" y="130" width="30" height="140" rx="6" fill="#ffffff" opacity=".18"/>
+            <rect x="272" y="170" width="26" height="100" rx="6" fill="#ffffff" opacity=".14"/>
+            <rect x="150" y="230" width="8" height="60" rx="3" fill="#ffffff" opacity=".55"/>
+            <rect x="176" y="230" width="8" height="60" rx="3" fill="#ffffff" opacity=".55"/>
+            <rect x="90" y="70" width="150" height="120" rx="16" fill="#ffffff"/>
+            <rect x="106" y="86" width="118" height="60" rx="10" fill="#f9bf29"/>
+            <path d="M106 146 L142 106 L166 130 L196 92 L224 146 Z" fill="#3b5d50" opacity=".85"/>
+            <rect x="106" y="156" width="70" height="10" rx="5" fill="#e6e2d8"/>
+            <rect x="106" y="172" width="46" height="10" rx="5" fill="#e6e2d8"/>
+            <circle cx="252" cy="60" r="9" fill="#f9bf29"/>
+            <circle cx="46" cy="90" r="5" fill="#f9bf29" opacity=".8"/>
+          </svg>
 
-        <div class="city-acc-panel">
-          <div class="city-acc-inner">
-            <div class="city-acc-img">
-              <img src="{% static ville.image_url %}" alt="{{ ville.nom }}" loading="lazy">
-              <span class="city-acc-img-caption"><i class="bi bi-geo-alt-fill"></i> {{ ville.nom }}</span>
-            </div>
-            <div class="city-acc-content">
-              <div class="city-acc-grouptitle"><i class="bi bi-grid-fill"></i> Formats d'affichage</div>
-              <div class="support-types">
-                {% for cat in ville.supports %}
-                  <div class="category-block">
-                    <button type="button" class="category-tab" onclick="
-                      // On récupère l'événement pour vérifier si on a cliqué sur le bouton Tout voir
-                      if (event.target.closest('.category-tab-btn')) return;
-                      
-                      const block = this.closest('.category-block');
-                      const wasOpen = block.classList.contains('is-open');
-                      block.parentElement.querySelectorAll('.category-block.is-open').forEach(o => o.classList.remove('is-open'));
-                      if (!wasOpen) block.classList.add('is-open');
-                    ">
-                      <span class="category-tab-left">
-                        <i class="bi bi-tag-fill"></i> 
-                        {{ cat.categorie }} : 
-                        {{ cat.total }} 
-                        {% if cat.categorie == "Écran" %}
-                          écran{{ cat.total|pluralize:",s" }}
-                        {% else %}
-                          face{{ cat.total|pluralize:",s" }}
-                        {% endif %}
-                        dont {{ cat.libre }} disponible{{ cat.libre|pluralize:",s" }}
-                      </span>
-
-                      <!-- Ajout d'une classe spécifique et du stopPropagation pour éviter les conflits de clics -->
-                      <a href="{% url 'portail:reserver_etape1' %}?ville={{ ville.nom|urlencode }}&categorie={{ cat.categorie|urlencode }}" 
-                        class="category-tab-btn" 
-                        onclick="event.stopPropagation();">
-                        Tout voir
-                      </a>
-
-                      <i class="bi bi-chevron-down category-tab-chevron"></i>
-                    </button>
-                    
-                    <div class="category-panel-grid">
-                      {% comment %}                       
-                        {% if cat.liste|length > 1 %}
-                          <div class="type-card type-card-global">
-                            <div class="type-card-icon global-icon">
-                              <i class="bi bi-layers-half" style="color: #fff; font-size: 1.1rem;"></i>
-                            </div>
-                            
-                            <div class="type-card-name">
-                              <span class="superficie">Tous formats</span>
-                              <span class="dimensions">Choix flexible ({{ cat.categorie }})</span>
-                            </div>
-
-                            <div class="type-card-count">
-                              {{ cat.libre }} face{{ cat.libre|pluralize:",s" }} disponible{{ cat.libre|pluralize:",s" }}
-                            </div>
-                            <div class="type-card-sub">
-                              Disponibilité globale
-                            </div>
-
-                            {% if cat.libre > 0 %}
-                              <a href="{% url 'portail:reserver_etape1' %}?ville={{ ville.nom|urlencode }}&categorie={{ cat.categorie|urlencode }}" class="type-card-btn global-btn">
-                                Tout voir / Choisir
-                              </a>
-                            {% else %}
-                              <span class="type-card-btn disabled">Complet</span>
-                            {% endif %}
-                          </div>
-                        {% endif %}
-                      {% endcomment %}
-
-                      {% for support in cat.liste %}
-                      <div class="type-card">
-                        <div class="type-card-icon">
-                          <svg viewBox="0 0 16 16"><rect x="1" y="2" width="14" height="9" rx="1"/><rect x="6" y="11" width="4" height="3"/></svg>
-                        </div>
-                        
-                        <div class="type-card-name">
-                          {% if support.superficie %}
-                            <span class="superficie">{{ support.superficie }}</span>
-                          {% endif %}
-                          <span class="dimensions">{{ support.dimensions }}</span>
-                        </div>
-
-                        {% if cat.categorie != "Écran" and support.dimensions != "Écran Numérique" %}
-                          <div class="type-card-count">
-                            {{ support.libre }} face{{ support.libre|pluralize:",s" }} disponible{{ support.libre|pluralize:",s" }}
-                          </div>
-                          <div class="type-card-sub">
-                            Sur {{ support.count }} face{{ support.count|pluralize:",s" }}
-                          </div>
-                        {% else %}
-                          <div class="type-card-count">{{ support.count }}</div>
-                          <div class="type-card-sub">
-                            écran{{ support.count|pluralize:",s" }}
-                          </div>
-                        {% endif %}
-
-                        {% if support.libre > 0 and support.dimensions != "Écran Numérique" and cat.categorie != "Écran" %}
-                          <a href="{% url 'portail:reserver_etape1' %}?ville={{ ville.nom|urlencode }}&categorie={{ cat.categorie|urlencode }}&format={{ support.format|urlencode }}" class="type-card-btn">
-                            Choisir un emplacement
-                          </a>
-                        {% else %}
-                          <span class="type-card-btn disabled">Complet</span>
-                        {% endif %}
-                      </div>
-                      {% endfor %}
-
-                    </div>
-                  </div> 
-                {% empty %}
-                  <p style="color:var(--text-muted); font-size:.85rem;">Aucun support enregistré.</p>
+          <div class="hero-float-card">
+            <div class="hero-float-icon"><i class="bi bi-graph-up-arrow"></i></div>
+            <div>
+              <div class="hero-float-num">
+                {{ categories_stats|length }} catégorie{{ categories_stats|length|pluralize:",s" }}
+              </div>
+              <div class="hero-float-label">
+                {% for cat in categories_stats %}
+                  {{ cat.categorie }}{% if not forloop.last %}, {% endif %}
                 {% endfor %}
               </div>
             </div>
           </div>
         </div>
+        -->
+            <div class="hero-visual" data-aos="fade-left" data-aos-duration="900">
+              <div class="billboard-showcase-frame">
+                <div class="billboard-topbar">
+                  <div class="mode-pill">
+                    <i class="bi bi-broadcast text-danger"></i> En direct du réseau
+                  </div>
+                </div>
+
+                <div class="billboard-screen-box" id="heroBillboardScreen">
+                  <div class="night-spotlight-glow"></div>
+                  <img id="heroCycleImg" src="{% static 'img/villes/image1 (6).jfif' %}" alt="Panneaux Promo Pub Integral Ouagadougou">
+                </div>
+
+                <div class="hero-floating-rating">
+                  <div class="rounded-circle bg-warning text-dark p-2 d-flex align-items-center justify-content-center" style="width:36px;height:36px;">
+                    <i class="bi bi-stars"></i>
+                  </div>
+                  <div>
+                    <div class="fw-bold text-dark fs-6" style="line-height:1;">100% Stratégique</div>
+                    <small class="text-muted" style="font-size:0.7rem;">Carrefours & grands axes</small>
+                  </div>
+                </div>
+              </div>
+            </div>
       </div>
+    </div>
+  </div>
+  <!--
+  <div class="mqsec">
+    <div class="mqtrack"> 
+      {% for ville in villes_stats %}
+        <div class="mqitem">
+          <i class="bi bi-geo-alt-fill"></i> {{ ville.nom }} : 
+          {% for cat in ville.supports %}
+            {% for support in cat.liste %}
+              {{ support.superficie }} {{ support.dimensions }} {{ support.libre }} disponible{{ support.libre|pluralize:",s" }} {% if not forloop.last %}<i class="bi bi-circle"></i>{% endif %}
+            {% endfor %}
+          {% endfor %}
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+  -->
+  <div class="ticker-bar-stream">
+    <div class="ticker-stream-track">
+      {% for ville in villes_stats %}
+        <div class="ticker-stream-unit">
+          <span class="ticker-city-badge"><i class="bi bi-geo-alt-fill"></i> {{ ville.nom }}</span>
+          <span>{{ ville.faces_libres }} face{{ ville.faces_libres|pluralize:",s" }} disponible{{ ville.faces_libres|pluralize:",s" }} sur {{ ville.total_faces }}</span>
+        </div>
       {% empty %}
-      <p style="color:var(--text-muted); padding:2rem;">Aucune statistique disponible pour le moment.</p>
+        <div class="ticker-stream-unit">
+          <span class="ticker-city-badge"><i class="bi bi-broadcast"></i> Burkina Faso</span>
+          <span>Réseau d'affichage national — Réservations ouvertes pour vos campagnes 2026</span>
+        </div>
+      {% endfor %}
+      {% for ville in villes_stats %}
+        <div class="ticker-stream-unit">
+          <span class="ticker-city-badge"><i class="bi bi-geo-alt-fill"></i> {{ ville.nom }}</span>
+          <span>{{ ville.faces_libres }} face{{ ville.faces_libres|pluralize:",s" }} disponible{{ ville.faces_libres|pluralize:",s" }} sur {{ ville.total_faces }}</span>
+        </div>
       {% endfor %}
     </div>
   </div>
 
-  <!-- ═══════════ FORMATS DE SUPPORTS ═══════════ -->
-  <div class="section">
-    <div class="section-header">
-      <div>
-        <div class="section-tag">Nos Supports</div>
-        <div class="section-title">Choisissez le bon média pour donner de la puissance à votre marque</div>
-        <div class="section-subtitle">Trois familles de formats adaptées à chaque objectif média.</div>
+  <div  style="padding: 18px;">
+
+  <!-- ═══════════ SECTEURS QUI NOUS FONT CONFIANCE ═══════════ -->
+  <section class="trust-brands-section">
+    <div class="container text-center">
+      <div class="trust-pill-tag">Ils font confiance à notre réseau pour leurs campagnes nationales</div>
+      <div class="trust-brands-grid">
+        <div class="trust-brand-badge"><i class="bi bi-phone-fill fs-5 text-primary"></i> Téléphonie &amp; Numérique</div>
+        <div class="trust-brand-badge"><i class="bi bi-bank2 fs-5 text-warning"></i> Banques &amp; Assurances</div>
+        <div class="trust-brand-badge"><i class="bi bi-cup-hot-fill fs-5 text-danger"></i> Grande Consommation</div>
+        <div class="trust-brand-badge"><i class="bi bi-car-front-fill fs-5 text-primary"></i> Automobile &amp; Transport</div>
+        <div class="trust-brand-badge"><i class="bi bi-ticket-perforated-fill fs-5 text-success"></i> Événements &amp; Spectacles</div>
+      </div>
+    </div>
+  </section>
+
+        <!-- ═══════════ CATEGORY (navigation rapide par format) ═══════════ -->
+    <div class="section" id="category">
+      <div class="container">
+        <div class="section-header">
+          <!--
+          <div>
+            <div class="section-tag">Parcourir</div>
+            <div class="section-title">Trouvez le format qu'il vous faut</div>
+            <div class="section-subtitle">Cliquez sur une catégorie pour filtrer directement le réseau ci-dessus.</div>
+          </div>
+          -->
+          <div class="text-center" data-aos="fade-up">
+            <span class="slbl">Parcourir</span>
+            <h2 class="stitle">Trouvez le format <span>qu'il vous faut</span></h2>
+            <div class="sline"></div>
+            <p class="sdesc mx-auto" style="max-width:480px;">Cliquez sur une catégorie pour filtrer directement le réseau ci-dessus.</p>
+          </div>
+        </div>
+        <div class="cat-grid">
+          <!-- 
+          <div class="cat-card" onclick="rnFilterByCategorie('all')">
+            <div class="cat-card-icon"><i class="bi bi-grid-3x3-gap-fill"></i></div>
+            <div class="cat-card-name">Tous les formats</div>
+            <div class="cat-card-count">{{ total_faces_reseau }} face{{ total_faces_reseau|pluralize:",s" }}</div>
+          </div>
+          -->
+          {% for cat in categories_stats %}
+          <div class="cat-card" onclick="rnFilterByCategorie('{{ cat.categorie|slugify }}')">
+            <div class="cat-card-icon">
+              {% if cat.categorie == "Écran" %}<i class="bi bi-display-fill"></i>{% elif cat.categorie == "Marché" %}<i class="bi bi-shop-window"></i>{% else %}<i class="bi bi-signpost-split-fill"></i>{% endif %}
+            </div>
+            <div class="cat-card-name">{{ cat.categorie }}</div>
+            <div class="cat-card-count">{{ cat.libre }} disponible{{ cat.libre|pluralize:",s" }} / {{ cat.total }}</div>
+          </div>
+          {% endfor %}
+        </div>
       </div>
     </div>
 
-    <div class="formats-grid">
-
-      <div class="format-card">
-        <div class="format-image">
-          <img src="{% static 'img/formats/Gemini_Generated_Image_9l7hhk9l7hhk9l7h.jfif' %}" alt="Panneau 4x3">
+    <!-- ═══════════ PACKS + OFFRE DE LANCEMENT (fusionnés) ═══════════ -->
+    <div class="section" id="special">
+      <div class="container">
+        <div class="section-header text-center" style="justify-content:center; text-align:center; margin-bottom:40px;">
+          <div style="width:100%">
+            <span class="slbl">Solutions clé en main</span>
+            <h2 class="stitle">Packs & Formules <span>Recommandés</span></h2>
+            <div class="sline" style="margin-left:auto;margin-right:auto;"></div>
+            <p class="sdesc" style="max-width:540px;margin:0 auto;">
+              Trois formules pensées pour des objectifs différents — et les trois profitent
+              de l'offre de lancement ci-dessous.
+            </p>
+          </div>
         </div>
-        <div class="format-badge"><i class="bi bi-signpost-split-fill"></i></div>
-        <div class="format-body">
-          <div class="format-title">Panneaux 4×3 et Géants</div>
-          <p class="format-desc">Dominez le paysage urbain.</p>
-          <div class="format-usage">
-            <p>Votre marque bénéficie d'une visibilité exceptionnelle sur les principaux axes de circulation.</p>
-            <div class="usage-title">
-              <i class="bi bi-lightbulb-fill"></i> Idéal pour :
+
+        <div class="special-block" id="packSpecialBlock">
+          <div class="giraffe-spots" aria-hidden="true">
+            <span class="spot spot-1"></span>
+            <span class="spot spot-2"></span>
+            <span class="spot spot-3"></span>
+            <span class="spot spot-4"></span>
+            <span class="spot spot-5"></span>
+            <span class="spot spot-6"></span>
+            <span class="spot spot-7"></span>
+            <span class="spot spot-8"></span>
+          </div>
+          <div class="special-grid">
+            <div>
+              <div class="special-tag"><i class="bi bi-lightning-charge-fill"></i> Offre de lancement -15%</div>
+              <h2 class="special-title pack-dyn-fade" id="packDynTitle">Pack Lancement</h2>
+              <p class="special-desc pack-dyn-fade" id="packDynDesc">
+                Idéal pour promotions locales & PME : emplacement stratégique à Ouaga ou Bobo,
+                pose incluse, durée flexible de 1 à 3 mois.
+              </p>
+              <div class="cd-wrap">
+                <div class="cd-item"><span class="cd-num" id="cdJours">--</span><span class="cd-lbl">Jours</span></div>
+                <div class="cd-item"><span class="cd-num" id="cdHeures">--</span><span class="cd-lbl">Heures</span></div>
+                <div class="cd-item"><span class="cd-num" id="cdMinutes">--</span><span class="cd-lbl">Minutes</span></div>
+              </div>
+              <a href="{% url 'portail:reserver_etape1' %}?pack=lancement" class="pack-dyn-cta" id="packDynCta">
+                <i class="bi bi-calendar-check"></i> <span id="packDynCtaLabel">Choisir ce pack</span>
+              </a>
             </div>
-            <ul>
-              <li>Lancement de produit</li>
-              <li>Campagne nationale</li>
-              <li>Notoriété de marque</li>
-            </ul>
+
+            <div class="pack-visual-wrap" id="packVisualWrap">
+              <div class="pack-visual-track" id="packVisualTrack">
+                <div class="pack-visual-slide" data-pack="lancement">
+                  <div class="pack-visual-icon"><i class="bi bi-rocket-takeoff-fill"></i></div>
+                  <div class="pack-visual-name">Pack Lancement</div>
+                  <span class="pack-visual-tag"><i class="bi bi-grid-1x2"></i> 1 à 2 faces</span>
+                  <ul class="pack-visual-mini">
+                    <li><i class="bi bi-check-circle-fill"></i> Emplacement stratégique Ouaga/Bobo</li>
+                    <li><i class="bi bi-check-circle-fill"></i> Pose & contrôle technique inclus</li>
+                    <li><i class="bi bi-check-circle-fill"></i> Rapport photo certifié</li>
+                  </ul>
+                </div>
+                <div class="pack-visual-slide" data-pack="notoriete">
+                  <div class="pack-visual-icon"><i class="bi bi-star-fill"></i></div>
+                  <div class="pack-visual-name">Pack Notoriété</div>
+                  <span class="pack-visual-tag"><i class="bi bi-grid-3x3-gap"></i> 3 à 5 faces</span>
+                  <ul class="pack-visual-mini">
+                    <li><i class="bi bi-check-circle-fill"></i> Panneaux géants + écran LED</li>
+                    <li><i class="bi bi-check-circle-fill"></i> Visuel changé en cours de campagne</li>
+                    <li><i class="bi bi-check-circle-fill"></i> Suivi & reporting bi-mensuel</li>
+                  </ul>
+                </div>
+                <div class="pack-visual-slide" data-pack="domination">
+                  <div class="pack-visual-icon"><i class="bi bi-globe-americas"></i></div>
+                  <div class="pack-visual-name">Pack Domination</div>
+                  <span class="pack-visual-tag"><i class="bi bi-diagram-3"></i> 10+ faces</span>
+                  <ul class="pack-visual-mini">
+                    <li><i class="bi bi-check-circle-fill"></i> Déploiement Ouaga/Bobo/Koudougou</li>
+                    <li><i class="bi bi-check-circle-fill"></i> Priorité sur les carrefours n°1</li>
+                    <li><i class="bi bi-check-circle-fill"></i> Chargé de compte VIP dédié</li>
+                  </ul>
+                </div>
+                <!-- clone de la 1ère carte, pour boucler sans à-coup -->
+                <div class="pack-visual-slide" data-pack="lancement" aria-hidden="true">
+                  <div class="pack-visual-icon"><i class="bi bi-rocket-takeoff-fill"></i></div>
+                  <div class="pack-visual-name">Pack Lancement</div>
+                  <span class="pack-visual-tag"><i class="bi bi-grid-1x2"></i> 1 à 2 faces</span>
+                  <ul class="pack-visual-mini">
+                    <li><i class="bi bi-check-circle-fill"></i> Emplacement stratégique Ouaga/Bobo</li>
+                    <li><i class="bi bi-check-circle-fill"></i> Pose & contrôle technique inclus</li>
+                    <li><i class="bi bi-check-circle-fill"></i> Rapport photo certifié</li>
+                  </ul>
+                </div>
+              </div>
+              <div class="pack-visual-dots" id="packVisualDots">
+                <span class="active" data-i="0"></span>
+                <span data-i="1"></span>
+                <span data-i="2"></span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
+    </div>
 
-      <div class="format-card">
-        <div class="format-image">
-          <img src="{% static 'img/formats/Gemini_Generated_Image_sx89ybsx89ybsx891.png' %}" alt="Écran numérique">
-        </div>
-        <div class="format-badge"><i class="bi bi-display"></i></div>
-        <div class="format-body">
-          <div class="format-title">Écrans Numériques LED</div>
-          <p class="format-desc">Votre campagne prend vie.</p>
-          <div class="format-usage">
-            <p>Diffusez des contenus animés, programmés selon vos horaires et adaptés à vos objectifs.</p>
-            <div class="usage-title">
-              <i class="bi bi-lightbulb-fill"></i> Les avantages :
+    <!-- ═══════════ SIMULATEUR D'IMPACT ═══════════ -->
+    <div class="section" id="simulateur">
+      <div class="container" data-aos="zoom-in">
+        <div class="simulator-container">
+          <div class="row align-items-center g-4">
+            <div class="col-lg-7">
+              <span class="special-tag"><i class="bi bi-calculator-fill"></i> Simulateur d'Impact</span>
+              <h2 class="special-title mt-2">Estimez la portée de votre future campagne</h2>
+              <p class="special-desc">Sélectionnez vos critères pour estimer l'audience touchée et préparer votre réservation.</p>
+              <div class="row g-3">
+                <div class="col-md-6"><label class="sim-control-label" for="simVille">Ville ciblée</label><select class="sim-select-custom" id="simVille"><option value="ouaga">Ouagadougou (Grand trafic)</option><option value="bobo">Bobo-Dioulasso (Capitale économique)</option><option value="koudougou">Koudougou</option><option value="national">Couverture nationale</option></select></div>
+                <div class="col-md-6"><label class="sim-control-label" for="simFormat">Type de support</label><select class="sim-select-custom" id="simFormat"><option value="panneau">Panneaux 4x3 &amp; grands formats</option><option value="ecran">Écrans numériques LED</option><option value="sucette">Sucettes publicitaires</option></select></div>
+                <div class="col-md-6"><label class="sim-control-label" for="simFaces">Nombre de faces</label><select class="sim-select-custom" id="simFaces"><option value="1">1 face stratégique</option><option value="3" selected>3 faces (Pack Visibilité)</option><option value="5">5 faces (Campagne majeure)</option><option value="10">10+ faces (Domination urbaine)</option></select></div>
+                <div class="col-md-6"><label class="sim-control-label" for="simDuree">Durée de diffusion</label><select class="sim-select-custom" id="simDuree"><option value="1">1 mois</option><option value="3" selected>3 mois (-10% inclus)</option><option value="6">6 mois (-15% inclus)</option><option value="12">1 an (-20% annuel)</option></select></div>
+              </div>
             </div>
-            <ul>
-              <li>Diffusion dynamique</li>
-              <li>Changement instantané</li>
-              <li>Plusieurs messages dans une même campagne</li>
-            </ul>
+            <div class="col-lg-5"><div class="sim-results-card"><small class="text-white-50 text-uppercase fw-bold">Audience estimée</small><div class="sim-impact-val mt-2 mb-1" id="simResultViews">2.4M+</div><p class="text-white-50 small mb-4">Vues / contacts visuels estimés sur la période</p><div class="d-flex justify-content-between text-white-50 small border-top border-white-50 pt-3 mb-4"><span>Remise appliquée :</span><strong class="text-warning" id="simResultDiscount">-15% Offre Promo</strong></div><a href="{% url 'portail:reserver_etape1' %}" class="pack-dyn-cta w-100 justify-content-center"><i class="bi bi-lightning-charge-fill"></i> Lancer cette réservation</a></div></div>
           </div>
         </div>
       </div>
+    </div>
 
-      <div class="format-card">
-        <div class="format-image">
-          <img src="{% static 'img/formats/Gemini_Generated_Image_sx89ybsx89ybsx89.png' %}" alt="Sucette publicitaire">
+    <div class="section" id="reseau">
+      <div class="section-header">
+        <div class="text-center" data-aos="fade-up">
+          <span class="slbl">Réseau national</span>
+          <h2 class="stitle">Nos disponibilités par <span>ville</span></h2>
+          <div class="sline"></div>
+          <p class="sdesc mx-auto" style="max-width:480px;">Visualisez l'inventaire en mode cartes ou directement sur notre carte interactive Leaflet géolocalisée</p>
         </div>
-        <div class="format-badge"><i class="bi bi-lamp-fill"></i></div>
-        <div class="format-body">
-          <div class="format-title">Sucettes Publicitaires</div>
-          <p class="format-desc">Panneaux lumineux au cœur des trottoirs, à hauteur de regard.</p>
-          <div class="format-usage">
-            <div class="usage-title">
-              <i class="bi bi-lightbulb-fill"></i> Atout majeur :
+        <!--
+        <div class="section-header-left">
+          <div class="section-icon-chip"><i class="bi bi-diagram-3-fill"></i></div>
+          <div>
+            <div class="section-tag">Réseau national</div>
+            <div class="section-title">Nos disponibilités par ville</div>
+          </div>
+        </div>
+        <span class="section-live-badge">
+          <span class="live-dot"></span> Disponibilités actualisées en temps réel
+        </span>
+        -->
+      </div>
+      <div class="mt-3" style="display: flex;justify-content: center;">
+        <div class="view-switcher-box">
+          <button class="view-tab-btn active" id="btnViewGrid">
+            <i class="bi bi-grid-3x3-gap-fill"></i> Vue Grille des Formats
+          </button>
+          <button class="view-tab-btn" id="btnViewMap">
+            <i class="bi bi-map-fill"></i> Carte Interactive Leaflet
+          </button>
+        </div>
+      </div>
+      
+
+            <!-- Recherche instantanée textuelle -->
+      <div class="inventory-search-bar" data-aos="fade-up">
+        <i class="bi bi-search"></i>
+        <input type="text" id="inventoryInstantSearch" placeholder="Rechercher par ville, dimension, format...">
+      </div>
+
+      <!-- FILTRES PAR CATÉGORIE DE FORMAT -->
+      <div class="text-center mb-3 rn-filters" data-aos="fade-up">
+        <button class="rn-filtbtn rn-catbtn active" data-fc="all">
+          <i class="bi bi-collection-fill"></i> Tous les formats
+        </button>
+        {% for cat in categories_stats %}
+        <button class="rn-filtbtn rn-catbtn" data-fc="{{ cat.categorie|slugify }}" data-fc-name="{{ cat.categorie|escapejs }}">
+          {% if cat.categorie == "Écran" %}<i class="bi bi-display-fill"></i>{% elif cat.categorie == "Marché" %}<i class="bi bi-shop-window"></i>{% else %}<i class="bi bi-signpost-split-fill"></i>{% endif %}
+          {{ cat.categorie }}
+          {% if cat.libre > 0 %}<span class="rn-filtbtn-dot"></span>{% endif %}
+        </button>
+        {% endfor %}
+      </div>
+
+      <!-- FILTRES PAR VILLE -->
+      <div class="text-center mb-4 rn-filters" data-aos="fade-up">
+        <button class="rn-filtbtn rn-villebtn active" data-fv="all">
+          <i class="bi bi-grid-3x3-gap-fill"></i> Toutes les villes
+        </button>
+        {% for ville in villes_stats %}
+        <button class="rn-filtbtn rn-villebtn" data-fv="{{ ville.nom|slugify }}" data-fv-name="{{ ville.nom|escapejs }}">
+          <i class="bi bi-geo-alt-fill"></i> {{ ville.nom }}
+          {% if ville.faces_libres > 0 %}
+            <span class="pulse-dot" style="width:6px;height:6px;"></span>
+          {% endif %}
+        </button>
+        {% endfor %}
+      </div>
+
+      <!-- BOUTON RÉSERVATION GROUPÉE (visible si ville + format précis sélectionnés et plusieurs dispos) -->
+      <div id="rn-bulk-actions" class="text-center mb-4" style="display:none;">
+        <a href="#" id="rnReserveAllBtn" class="hero-btn hero-btn-solid">
+          <i class="bi bi-bag-check-fill"></i> <span id="rnReserveAllLabel">Réserver tous ces formats</span>
+        </a>
+      </div>
+      <div class="container">
+        <!-- GRILLE DE CARTES -->
+        <div class="row g-4" id="rn-grid">
+          {% for ville in villes_stats %}
+          <!-- Titre de la ville (répété à chaque section du réseau) -->
+            <div class="col-12 rn-ville-heading" data-v="{{ ville.nom|slugify }}">
+              <h3 class="rn-ville-heading-title">
+                <i class="bi bi-geo-alt-fill"></i> {{ ville.nom }}
+              </h3>
             </div>
-            <p>Visibilité piétonne maximale, idéale en centre-ville et dans les zones commerçantes.</p>
+            {% for cat in ville.supports %}
+              <!-- Tout réserver (affiché si ce groupe ville + catégorie a au moins 2 formats) -->
+              {% if cat.categorie != "Écran" and cat.liste|length >= 2 %}
+                <div class="col-12 rn-group-cta" data-v="{{ ville.nom|slugify }}" data-cat="{{ cat.categorie|slugify }}">
+                  <div class="text-center mb-2">
+                    <a href="{% url 'portail:reserver_etape1' %}?ville={{ ville.nom|urlencode }}&categorie={{ cat.categorie|urlencode }}" class="hero-btn hero-btn-solid" style="background:var(--color-secondary);color:var(--text);">
+                      <i class="bi bi-bag-check-fill"></i> Tout réserver — {{ cat.categorie }} à {{ ville.nom }}
+                    </a>
+                  </div>
+                </div>
+              {% endif %}
+
+              {% for support in cat.liste %}
+              <div class="col-sm-6 col-lg-4 rn-wrap" data-v="{{ ville.nom|slugify }}" data-cat="{{ cat.categorie|slugify }}" data-aos="fade-up">
+                <div class="rn-card"
+                  data-ville="{{ ville.nom|escapejs }}"
+                  data-img="{% static support.image_url %}"
+                  data-categorie="{{ cat.categorie|escapejs }}"
+                  data-dimensions="{{ support.dimensions|escapejs }}"
+                  data-superficie="{{ support.superficie|default:''|escapejs }}"
+                  data-libre="{{ support.libre|default:0 }}"
+                  data-count="{{ support.count }}"
+                  data-is-ecran="{% if cat.categorie == 'Écran' or support.dimensions == 'Écran Numérique' %}1{% else %}0{% endif %}"
+                  data-reserve-url="{% if support.libre > 0 and support.dimensions != 'Écran Numérique' and cat.categorie != 'Écran' %}{% url 'portail:reserver_etape1' %}?ville={{ ville.nom|urlencode }}&categorie={{ cat.categorie|urlencode }}&format={{ support.format|urlencode }}{% endif %}">
+
+                  <div class="rn-img">
+                    <img src="{% static support.image_url %}" alt="{{ ville.nom }} — {{ support.dimensions }}" loading="lazy">
+                    {% if support.libre > 0 %}
+                    <span class="pulse-dot" style="width:6px;height:6px;"></span>
+                      <div class="rn-bdg available"><i class="bi bi-check-circle-fill"></i> {{ support.libre }} libre{{ support.libre|pluralize:",s" }}</div>
+                    {% else %}
+                      <div class="rn-bdg full"><i class="bi bi-x-circle-fill"></i> Complet</div>
+                    {% endif %}
+                    <div class="rn-ville-pill"><i class="bi bi-geo-alt-fill"></i> {{ ville.nom }}</div>
+                  </div>
+
+                  <div class="rn-body">
+                    <div class="rn-cat">{{ cat.categorie }}</div>
+                    <div class="rn-tit">
+                      {% if cat.individuel %}
+                        {{ support.nom|default:support.code }}{% if support.face_label %} · {{ support.face_label }}{% endif %}{% if support.emplacement_code %} · {{ support.emplacement_code }}{% endif %}
+                      {% else %}
+                        {% if support.superficie %}{{ support.superficie }} · {% endif %}{{ support.dimensions }}
+                      {% endif %}
+                    </div>
+
+                    {% if cat.individuel %}
+                      <div class="rn-desc">
+                        Support {{ support.code }}{% if support.quartier %} · {{ support.quartier }}{% endif %}
+                        {% if support.libre > 0 %} · Disponible{% else %} · Occupé{% endif %}
+                      </div>
+                    {% elif cat.categorie != "Écran" and support.dimensions != "Écran Numérique" %}
+                      <div class="rn-desc">
+                        {{ support.libre }} face{{ support.libre|pluralize:",s" }} disponible{{ support.libre|pluralize:",s" }}
+                        sur {{ support.count }} face{{ support.count|pluralize:",s" }}
+                      </div>
+                    {% else %}
+                      <div class="rn-desc">
+                        {{ support.count }} écran{{ support.count|pluralize:",s" }} sur le réseau
+                      </div>
+                    {% endif %}
+
+                    <div class="rn-foot">
+                      <div class="rn-stars">
+                        <i class="bi bi-geo-alt-fill"></i>
+                        <span>{{ ville.nom }}</span>
+                      </div>
+                      <button class="rn-add" title="Voir les détails"><i class="bi bi-plus-lg"></i>Réserver</button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              {% endfor %}
+
+
+            {% endfor %}
+          {% empty %}
+            <p style="color:var(--text-muted); padding:2rem; text-align:center; width:100%;">
+              Aucune statistique disponible pour le moment.
+            </p>
+          {% endfor %}
+        </div>
+
+        <!-- MESSAGE AUCUN RÉSULTAT (affiché via JS si le filtre ville+format ne matche rien) -->
+        <div id="rn-empty" style="display:none; text-align:center; padding:3rem 1.5rem; color:var(--text-muted);">
+          <i class="bi bi-inboxes" style="font-size:2rem; display:block; margin-bottom:.75rem; color:var(--color-primary);"></i>
+          <div style="font-weight:700; color:var(--text); margin-bottom:.25rem;">Aucun emplacement disponible</div>
+          <div style="font-size:.9rem;">Aucun résultat ne correspond à ce format pour cette ville. Essayez une autre combinaison.</div>
+        </div>
+
+        <!-- CONTENEUR VUE CARTE (Leaflet) — masqué par défaut, affiché via btnViewMap -->
+        <div id="leafletMapContainer" style="display:none;">
+          <div id="portalLeafletMap" style="height:520px; border-radius:var(--radius, 12px); overflow:hidden;"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- POPUP DÉTAIL -->
+    <div class="rn-pop" id="rnPop">
+      <div class="rn-pop-box">
+        <button class="rn-pop-close" id="rnPopClose"><i class="bi bi-x-lg"></i></button>
+        <div class="rn-pop-img">
+          <img id="rnpImg" src="" alt="">
+        </div>
+        <div class="rn-pop-content">
+          <div class="rn-pop-cat-row">
+            <span class="rn-pop-cat" id="rnpCat"></span>
+            <span class="rn-pop-instant"><i class="bi bi-clock-fill"></i> à l'instant</span>
+          </div>
+          <div class="rn-pop-title" id="rnpTitle"></div>
+          <div class="rn-pop-meta" id="rnpMeta"></div>
+          <div class="rn-pop-desc" id="rnpDesc"></div>
+          <a href="#" id="rnpReserveBtn" class="rn-pop-btn">
+            <i class="bi bi-calendar-check"></i> Réserver cet emplacement
+          </a>
+          <div id="rnpFullMsg" class="rn-pop-fullmsg" style="display:none">
+            <i class="bi bi-info-circle"></i> Complet pour le moment — contactez-nous pour être notifié.
           </div>
         </div>
       </div>
+    </div>
 
+    <!-- ═══════════ FORMATS DE SUPPORTS ═══════════ -->
+    <div class="section">
+      <div class="section-header">
+        <!--
+        <div>
+          <div class="section-tag">Nos Supports</div>
+          <div class="section-title">Choisissez le bon média pour donner de la puissance à votre marque</div>
+          <div class="section-subtitle">Trois familles de formats adaptées à chaque objectif média.</div>
+        </div>
+        -->
+        <div class="text-center" data-aos="fade-up">
+          <span class="slbl">Nos Supports</span>
+          <h2 class="stitle">Choisissez le bon média pour donner de <span>la puissance à votre marque</span></h2>
+          <div class="sline"></div>
+          <p class="sdesc mx-auto" style="max-width:480px;">Trois familles de formats adaptées à chaque objectif média.</p>
+        </div>
+      </div>
+      <div class="container">
+        <div class="formats-grid">
+
+          <div class="format-card" style="cursor:pointer" onclick="rnFilterByCategorie('all')">
+            <div class="format-image">
+              <img src="{% static 'img/panneau 4x3 digitalVVV.png' %}" alt="Panneau 4x3">
+            </div>
+            <div class="format-badge"><i class="bi bi-signpost-split-fill"></i></div>
+            <div class="format-body">
+              <div class="format-title">Panneaux 4×3 et Géants</div>
+              <p class="format-desc">Dominez le paysage urbain.</p>
+              <div class="format-usage">
+                <p>Votre marque bénéficie d'une visibilité exceptionnelle sur les principaux axes de circulation.</p>
+                <div class="usage-title">
+                  <i class="bi bi-lightbulb-fill"></i> Idéal pour :
+                </div>
+                <ul>
+                  <li>Lancement de produit</li>
+                  <li>Campagne nationale</li>
+                  <li>Notoriété de marque</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="format-card" style="cursor:pointer" onclick="rnFilterByCategorie('ecran')">
+            <div class="format-image">
+              <img src="{% static 'img/Ecran LED digital.png' %}" alt="Écran numérique">
+            </div>
+            <div class="format-badge"><i class="bi bi-display"></i></div>
+            <div class="format-body">
+              <div class="format-title">Écrans Numériques LED</div>
+              <p class="format-desc">Votre campagne prend vie.</p>
+              <div class="format-usage">
+                <p>Diffusez des contenus animés, programmés selon vos horaires et adaptés à vos objectifs.</p>
+                <div class="usage-title">
+                  <i class="bi bi-lightbulb-fill"></i> Les avantages :
+                </div>
+                <ul>
+                  <li>Diffusion dynamique</li>
+                  <li>Changement instantané</li>
+                  <li>Plusieurs messages dans une même campagne</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+
+          <div class="format-card" style="cursor:pointer" onclick="rnFilterByCategorie('sucette')">
+            <div class="format-image">
+              <img src="{% static 'img/Sucette sur pied digital.png' %}" alt="Sucette publicitaire">
+            </div>
+            <div class="format-badge"><i class="bi bi-lamp-fill"></i></div>
+            <div class="format-body">
+              <div class="format-title">Sucettes Publicitaires</div>
+              <p class="format-desc">Panneaux lumineux au cœur des trottoirs, à hauteur de regard.</p>
+              <div class="format-usage">
+                <div class="usage-title">
+                  <i class="bi bi-lightbulb-fill"></i> Atout majeur :
+                </div>
+                <p>Visibilité piétonne maximale, idéale en centre-ville et dans les zones commerçantes.</p>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════ COMMENT ÇA MARCHE ═══════════ -->
+    <div class="section">
+      <div class="section-header">
+        <!--
+        <div>
+          <div class="section-tag">Processus</div>
+          <div class="section-title">Votre campagne en 3 étapes</div>
+          <div class="section-subtitle">Simple. Rapide. Efficace.</div>
+        </div>
+        -->
+        <div class="text-center" data-aos="fade-up">
+          <span class="slbl">Processus</span>
+          <h2 class="stitle">Votre campagne en <span>3 étapes</span></h2>
+          <div class="sline"></div>
+          <p class="sdesc mx-auto" style="max-width:480px;">Simple. Rapide. Efficace..</p>
+        </div>
+      </div>
+
+      <div class="process-track">
+        <div class="process-step">
+          <div class="process-index">1</div>
+          <h5>Sélectionnez vos emplacements</h5>
+          <p>Choisissez les villes, les supports et les emplacements qui correspondent à votre cible.</p>
+        </div>
+        <div class="process-step">
+          <div class="process-index">2</div>
+          <h5>Nous confirmons votre réservation</h5>
+          <p>Nos équipes vérifient les disponibilités et vous accompagnent jusqu'à la validation.</p>
+        </div>
+        <div class="process-step">
+          <div class="process-index">3</div>
+          <h5>Votre campagne est en ligne</h5>
+          <p>Nous assurons l'installation, la diffusion et le suivi de votre campagne avec un reporting complet.</p>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════ À PROPOS ═══════════ -->
+    <div class="section" id="about">
+      <div class="container">
+        <div class="apropos-grid">
+          <div class="apropos-stack">
+            <div class="apropos-badge">
+              <div class="apropos-badge-num">{{ nb_villes }}</div>
+              <div class="apropos-badge-lbl">Ville{{ nb_villes|pluralize:",s" }} couverte{{ nb_villes|pluralize:",s" }}</div>
+            </div>
+            <div class="apropos-img">
+              <img src="{% static 'img/Plan de travail 1szszszs.png' %}" alt="Réseau d'affichage Integral" loading="lazy">
+            </div>
+          </div>
+          <div>
+            <div class="text-center" data-aos="fade-up">
+              <span class="slbl">Qui sommes-nous</span>
+              <h2 class="stitle">Une régie publicitaire au service de <span>votre visibilité</span></h2>
+              <div class="sline"></div>
+            </div>
+            <p class="section-subtitle" style="font-size:.92rem;line-height:1.7;">
+              Integral conçoit, exploite et commercialise un réseau de supports publicitaires
+              extérieurs — panneaux grand format, écrans numériques LED et sucettes urbaines —
+              répartis dans les principales villes du Burkina Faso. Notre mission : offrir aux
+              marques des emplacements stratégiques et un accompagnement de bout en bout, de la
+              sélection de l'emplacement jusqu'au suivi de campagne.
+            </p>
+            <div class="apropos-points">
+              <div class="apropos-point">
+                <div class="apropos-point-icon"><i class="bi bi-geo-alt-fill"></i></div>
+                <div>
+                  <div class="apropos-point-title">Emplacements stratégiques</div>
+                  <div class="apropos-point-desc">Des supports positionnés sur les axes à plus fort trafic et dans les zones à forte affluence.</div>
+                </div>
+              </div>
+              <div class="apropos-point">
+                <div class="apropos-point-icon"><i class="bi bi-shield-check"></i></div>
+                <div>
+                  <div class="apropos-point-title">Disponibilités en temps réel</div>
+                  <div class="apropos-point-desc">Consultez l'état de chaque face publicitaire avant de faire votre demande de réservation.</div>
+                </div>
+              </div>
+              <div class="apropos-point">
+                <div class="apropos-point-icon"><i class="bi bi-headset"></i></div>
+                <div>
+                  <div class="apropos-point-title">Accompagnement personnalisé</div>
+                  <div class="apropos-point-desc">Une équipe dédiée vous accompagne du choix de l'emplacement jusqu'à la diffusion de votre campagne.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════ NOTRE ÉQUIPE ═══════════ -->
+    <div class="section" id="equipe">
+      <div class="section-header">
+        <!--
+        <div>
+          <div class="section-tag">Notre équipe</div>
+          <div class="section-title">Des experts à votre écoute</div>
+          <div class="section-subtitle">Une équipe engagée pour la réussite de vos campagnes d'affichage.</div>
+        </div>
+        -->
+        <div class="text-center" data-aos="fade-up">
+          <span class="slbl">Notre équipe</span>
+          <h2 class="stitle">Des experts à <span>votre écoute</span></h2>
+          <div class="sline"></div>
+          <p class="sdesc mx-auto" style="max-width:480px;">Une équipe engagée pour la réussite de vos campagnes d'affichage.</p>
+        </div>
+      </div>
+
+      <div class="container">
+        <div class="team-grid">
+          <div class="team-card">
+            <div class="team-avatar"><i class="bi bi-person-badge-fill"></i></div>
+            <div class="team-name">Service Commercial</div>
+            <div class="team-role">Conseil & Devis</div>
+            <div class="team-desc">Vous aide à choisir les emplacements adaptés à votre budget et à vos objectifs de campagne.</div>
+          </div>
+          <div class="team-card">
+            <div class="team-avatar"><i class="bi bi-tools"></i></div>
+            <div class="team-name">Équipe Technique</div>
+            <div class="team-role">Installation & Maintenance</div>
+            <div class="team-desc">Assure la pose, l'entretien et la remise en état rapide de tous nos supports d'affichage.</div>
+          </div>
+          <div class="team-card">
+            <div class="team-avatar"><i class="bi bi-person-lines-fill"></i></div>
+            <div class="team-name">Relation Client</div>
+            <div class="team-role">Suivi de campagne</div>
+            <div class="team-desc">Reste à votre écoute tout au long de votre campagne pour un suivi transparent et réactif.</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════ GALLERY ═══════════ -->
+    <div class="section" id="gallery">
+      <div class="section-header">
+        <!--
+        <div>
+          <div class="section-tag">En images</div>
+          <div class="section-title">Notre réseau sur le terrain</div>
+          <div class="section-subtitle">Un aperçu de nos supports installés à travers les villes.</div>
+        </div>
+        -->
+        <div class="text-center" data-aos="fade-up">
+          <span class="slbl">En images</span>
+          <h2 class="stitle">Notre réseau sur <span>le terrain</span></h2>
+          <div class="sline"></div>
+          <p class="sdesc mx-auto" style="max-width:480px;">Un aperçu de nos supports installés à travers les villes.</p>
+        </div>
+      </div>
+      <div class="container">
+        <div class="gal-grid">
+          <div class="gal-item" data-gi="0"
+            data-gimg="{% static 'img/villes/image1 (6).jfif' %}"
+            data-gtitle="Panneaux grand format — Ouagadougou"
+            data-gdesc="Nos panneaux 4x3 et géants positionnés sur les grands axes de la capitale, pour une visibilité maximale.">
+            <img src="{% static 'img/villes/image1 (6).jfif' %}" alt="Ouagadougou">
+            <div class="gal-overlay"><span><i class="bi bi-arrows-fullscreen"></i> Ouagadougou</span></div>
+          </div>
+          <div class="gal-item" data-gi="1"
+            data-gimg="{% static 'img/formats/Gemini_Generated_Image_sx89ybsx89ybsx891.png' %}"
+            data-gtitle="Écrans numériques LED"
+            data-gdesc="Diffusion dynamique et programmable, idéale pour des messages qui évoluent en temps réel.">
+            <img src="{% static 'img/formats/Gemini_Generated_Image_sx89ybsx89ybsx891.png' %}" alt="Écran numérique">
+            <div class="gal-overlay"><span><i class="bi bi-arrows-fullscreen"></i> Écrans LED</span></div>
+          </div>
+          <div class="gal-item" data-gi="2"
+            data-gimg="{% static 'img/villes/image1 (5).jfif' %}"
+            data-gtitle="Réseau — Bobo-Dioulasso"
+            data-gdesc="Des emplacements stratégiques dans la deuxième ville économique du pays.">
+            <img src="{% static 'img/villes/image1 (5).jfif' %}" alt="Bobo-Dioulasso">
+            <div class="gal-overlay"><span><i class="bi bi-arrows-fullscreen"></i> Bobo-Dioulasso</span></div>
+          </div>
+          <div class="gal-item" data-gi="3"
+            data-gimg="{% static 'img/formats/Gemini_Generated_Image_sx89ybsx89ybsx89.png' %}"
+            data-gtitle="Sucettes publicitaires"
+            data-gdesc="Visibilité piétonne au cœur des zones commerçantes et des trottoirs à forte affluence.">
+            <img src="{% static 'img/formats/Gemini_Generated_Image_sx89ybsx89ybsx89.png' %}" alt="Sucette publicitaire">
+            <div class="gal-overlay"><span><i class="bi bi-arrows-fullscreen"></i> Sucettes</span></div>
+          </div>
+          <div class="gal-item" data-gi="4"
+            data-gimg="{% static 'img/villes/image1 (1).jfif' %}"
+            data-gtitle="Réseau — Koudougou"
+            data-gdesc="Extension de notre réseau vers les villes secondaires à fort potentiel commercial.">
+            <img src="{% static 'img/villes/image1 (1).jfif' %}" alt="Koudougou">
+            <div class="gal-overlay"><span><i class="bi bi-arrows-fullscreen"></i> Koudougou</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- GALLERY POPUP -->
+    <div class="gal-pop" id="galPop">
+      <div class="gal-pop-box">
+        <button class="gal-pop-close" id="galPopClose"><i class="bi bi-x-lg"></i></button>
+        <div class="gal-pop-img"><img id="galpImg" src="" alt=""></div>
+        <div class="gal-pop-cap">
+          <h5 id="galpTitle"></h5>
+          <p id="galpDesc"></p>
+        </div>
+        <div class="gal-pop-nav">
+          <button id="galpPrev"><i class="bi bi-chevron-left me-1"></i> Précédent</button>
+          <button id="galpNext">Suivant <i class="bi bi-chevron-right ms-1"></i></button>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════ BLOG / CONSEILS ═══════════ -->
+    <div class="section" id="blog">
+      <div class="section-header">
+        <!-- 
+        <div>
+          <div class="section-tag">Actualités</div>
+          <div class="section-title">Conseils & actualités affichage</div>
+          <div class="section-subtitle">Nos derniers articles pour réussir vos campagnes d'affichage extérieur.</div>
+        </div>
+        -->
+        <div class="text-center" data-aos="fade-up">
+          <span class="slbl">Actualités</span>
+          <h2 class="stitle">Conseils & actualités <span>affichage</span></h2>
+          <div class="sline"></div>
+          <p class="sdesc mx-auto" style="max-width:480px;">Nos derniers articles pour réussir vos campagnes d'affichage extérieur.</p>
+        </div>
+      </div>
+      <div class="container">
+        <div class="blog-grid">
+          <div class="blog-card">
+            <div class="blog-img">
+              <img src="{% static 'img/villes/image1 (6).jfif' %}" alt="">
+              <div class="blog-date-bdg"><span class="bd">12</span><span class="bm">Juil</span></div>
+            </div>
+            <div class="blog-body">
+              <div class="blog-tag">Stratégie</div>
+              <div class="blog-title"><a href="#">Comment choisir le bon format d'affichage pour votre campagne</a></div>
+              <div class="blog-meta"><span><i class="bi bi-person"></i> Équipe Integral</span><span><i class="bi bi-calendar3"></i> 5 min de lecture</span></div>
+              <a href="#" class="blog-more">Lire la suite <i class="bi bi-arrow-right"></i></a>
+            </div>
+          </div>
+          <div class="blog-card">
+            <div class="blog-img">
+              <img src="{% static 'img/formats/Gemini_Generated_Image_sx89ybsx89ybsx891.png' %}" alt="">
+              <div class="blog-date-bdg"><span class="bd">28</span><span class="bm">Juin</span></div>
+            </div>
+            <div class="blog-body">
+              <div class="blog-tag">Digital</div>
+              <div class="blog-title"><a href="#">Pourquoi les écrans numériques transforment l'affichage urbain</a></div>
+              <div class="blog-meta"><span><i class="bi bi-person"></i> Équipe Integral</span><span><i class="bi bi-calendar3"></i> 4 min de lecture</span></div>
+              <a href="#" class="blog-more">Lire la suite <i class="bi bi-arrow-right"></i></a>
+            </div>
+          </div>
+          <div class="blog-card">
+            <div class="blog-img">
+              <img src="{% static 'img/villes/image1 (5).jfif' %}" alt="">
+              <div class="blog-date-bdg"><span class="bd">03</span><span class="bm">Juin</span></div>
+            </div>
+            <div class="blog-body">
+              <div class="blog-tag">Conseils</div>
+              <div class="blog-title"><a href="#">5 critères pour bien choisir l'emplacement de votre panneau</a></div>
+              <div class="blog-meta"><span><i class="bi bi-person"></i> Équipe Integral</span><span><i class="bi bi-calendar3"></i> 6 min de lecture</span></div>
+              <a href="#" class="blog-more">Lire la suite <i class="bi bi-arrow-right"></i></a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════ CONTACT SECTION ═══════════ -->
+    <div class="section" id="contact-section">
+      <div class="section-header">
+        <!--
+        <div>
+          <div class="section-tag">Contact</div>
+          <div class="section-title">Une question ? Parlons-en</div>
+          <div class="section-subtitle">Notre équipe vous répond sous 48h ouvrables.</div>
+        </div>
+        -->
+        <div class="text-center" data-aos="fade-up">
+          <span class="slbl">Contact</span>
+          <h2 class="stitle">Une question ? <span>Parlons-en</span></h2>
+          <div class="sline"></div>
+          <p class="sdesc mx-auto" style="max-width:480px;">Notre équipe vous répond sous 48h ouvrables.</p>
+        </div>
+      </div>
+      <div class="container">
+        <div class="contact-grid">
+          <div class="hours-block">
+            <div class="giraffe-spots" aria-hidden="true">
+              <span class="spot spot-1"></span>
+              <span class="spot spot-2"></span>
+              <span class="spot spot-3"></span>
+              <span class="spot spot-4"></span>
+              <span class="spot spot-5"></span>
+              <span class="spot spot-6"></span>
+              <span class="spot spot-7"></span>
+              <span class="spot spot-8"></span>
+            </div>
+            <div class="hours-grid">
+              <div>
+                <h3 style="color:#fff;font-weight:800;margin-bottom:18px;font-size:1.2rem;">
+                  <i class="bi bi-clock-fill" style="color:var(--color-secondary)"></i> Nos horaires
+                </h3>
+                <div class="hours-row">
+                  <span class="hours-day"><span class="hours-dot"></span> Lundi — Vendredi</span>
+                  <span>08h00 — 18h00</span>
+                </div>
+                <div class="hours-row">
+                  <span class="hours-day"><span class="hours-dot"></span> Samedi</span>
+                  <span>09h00 — 13h00</span>
+                </div>
+                <div class="hours-row">
+                  <span class="hours-day"><span class="hours-dot off"></span> Dimanche</span>
+                  <span style="color:#fca5a5;">Fermé</span>
+                </div>
+                <p style="font-size:.8rem;opacity:.75;margin-top:16px;margin-bottom:0;">
+                  Les demandes de réservation en ligne restent accessibles 24h/24 — notre équipe y répond sous 48h ouvrables.
+                </p>
+              </div>
+              <div class="hours-card-white">
+                <h5><i class="bi bi-geo-alt-fill"></i> Nous trouver</h5>
+                <div class="hours-info-row"><span><i class="bi bi-signpost-split"></i> Adresse</span><span>Ouagadougou, Burkina Faso</span></div>
+                <div class="hours-info-row"><span><i class="bi bi-telephone"></i> Téléphone</span>
+                  <div style="display: grid;">
+                    <span>{{ CONTACT_TEL01 }}</span>
+                    <span>{{ CONTACT_TEL02 }}</span>
+                    <span>{{ CONTACT_TEL03 }}</span>
+                  </div>
+                </div>
+                <div class="hours-info-row"><span><i class="bi bi-envelope"></i> Email</span>
+                  <div style="display: grid;">
+                    <span>{{ CONTACT_EMAIL }}</span>
+                    <span>{{ CONTACT_EMAIL1 }}</span>
+                    <span>{{ CONTACT_EMAIL2 }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="contact-form-card">
+            <form id="contact-form" class="contact-form">
+              {% csrf_token %}
+
+              <div class="form-response" id="form-message"></div>
+
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="contact-flbl"><i class="bi bi-person-fill me-1"></i>Nom complet *</label>
+                  <input type="text" id="nom" name="nom" class="contact-fctrl" placeholder="Votre nom" required>
+                </div>
+                <div class="col-md-6">
+                  <label class="contact-flbl"><i class="bi bi-envelope-fill me-1"></i>Adresse email *</label>
+                  <input type="email" id="email" name="email" class="contact-fctrl" placeholder="votre@email.com" required>
+                </div>
+                <div class="col-md-6">
+                  <label class="contact-flbl"><i class="bi bi-telephone-fill me-1"></i>Téléphone</label>
+                  <input type="tel" id="telephone" name="telephone" class="contact-fctrl" placeholder="+226 XX XX XX XX">
+                </div>
+                <div class="col-md-6">
+                  <label class="contact-flbl"><i class="bi bi-building me-1"></i>Société/Organisation</label>
+                  <input type="text" id="societe" name="societe" class="contact-fctrl" placeholder="Optionnel">
+                </div>
+                <div class="col-12">
+                  <label class="contact-flbl"><i class="bi bi-bullseye me-1"></i>Sujet *</label>
+                  <select id="sujet" name="sujet" class="contact-fctrl" required>
+                    <option value="">-- Sélectionnez un sujet --</option>
+                    <option value="demande-reservation">Demande de réservation</option>
+                    <option value="info-tarif">Informations tarifaires</option>
+                    <option value="probleme-technique">Problème technique</option>
+                    <option value="autre">Autre</option>
+                  </select>
+                </div>
+                <div class="col-12">
+                  <label class="contact-flbl"><i class="bi bi-chat-text-fill me-1"></i>Message *</label>
+                  <textarea id="message" name="message" class="contact-fctrl" rows="4" placeholder="Décrivez votre demande en détail..." required></textarea>
+                </div>
+                <div class="col-12">
+                  <button type="submit" class="hero-btn hero-btn-solidy" style="width:100%;justify-content:center;">
+                    <i class="bi bi-send-fill"></i> Envoyer le message
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════ RÉPONSES CLAIRES & AVIS CLIENTS ═══════════ -->
+    <div class="section" id="avis">
+      <div class="section-header">
+        <!--
+        <div>
+          <div class="section-tag">Témoignages</div>
+          <div class="section-title">Ce que disent nos clients</div>
+          <div class="section-subtitle">La confiance de nos annonceurs, notre meilleure référence.</div>
+        </div>
+        -->
+        <div class="text-center" data-aos="fade-up">
+          <span class="slbl">Réponses claires et témoignages</span>
+          <h2 class="stitle">Tout ce qu'il faut savoir, puis <span>la parole aux clients</span></h2>
+          <div class="sline"></div>
+          <p class="sdesc mx-auto" style="max-width:560px;">Des réponses simples sur nos campagnes, suivies par les retours de nos annonceurs.</p>
+        </div>
+      </div>
+
+      <div class="container">
+        <div class="clarity-grid mb-5">
+          <div class="clarity-panel">
+            <h3><i class="bi bi-question-circle-fill text-warning me-2"></i>Réponses claires</h3>
+            <details class="clarity-item" open><summary>Combien de temps à l'avance réserver ?</summary><p>Nous recommandons 2 à 3 semaines pour garantir l'emplacement et préparer votre visuel.</p></details>
+            <details class="clarity-item"><summary>Prenez-vous en charge l'impression ?</summary><p>Oui, nous pouvons gérer l'impression haute définition sur bâche résistante aux intempéries.</p></details>
+            <details class="clarity-item"><summary>Comment fonctionne un écran LED ?</summary><p>Vos spots sont diffusés en boucle selon une programmation adaptée à vos horaires de campagne.</p></details>
+          </div>
+          <div class="clarity-panel d-flex flex-column justify-content-center"><h3>Une campagne pensée pour vos objectifs</h3><p class="sdesc mb-0">Choisissez vos villes, vos supports et votre durée. Notre équipe vous accompagne ensuite avec une confirmation claire et un suivi de diffusion.</p></div>
+        </div>
+        <div class="swiper testiSwiper">
+          <div class="swiper-wrapper">
+            <div class="swiper-slide">
+              <div class="testi-card">
+                <div class="testi-stars">
+                  <i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i>
+                </div>
+                <p class="testi-text">« Grâce à Integral, notre campagne de lancement a bénéficié d'une visibilité exceptionnelle sur les grands axes de Ouagadougou. Un accompagnement sérieux du début à la fin. »</p>
+                <div class="testi-author">
+                  <div class="testi-avatar">SK</div>
+                  <div>
+                    <div class="testi-name">Salif K.</div>
+                    <div class="testi-role">Directeur Marketing</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="swiper-slide">
+              <div class="testi-card">
+                <div class="testi-stars">
+                  <i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i>
+                </div>
+                <p class="testi-text">« Les écrans numériques nous ont permis de faire évoluer notre message en temps réel selon nos promotions. Un vrai gain d'efficacité pour notre communication. »</p>
+                <div class="testi-author">
+                  <div class="testi-avatar">AT</div>
+                  <div>
+                    <div class="testi-name">Aïcha T.</div>
+                    <div class="testi-role">Responsable Communication</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="swiper-slide">
+              <div class="testi-card">
+                <div class="testi-stars">
+                  <i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-half"></i>
+                </div>
+                <p class="testi-text">« Processus de réservation simple et transparent : on voit exactement quelles faces sont disponibles avant de s'engager. Le suivi après validation est également très réactif. »</p>
+                <div class="testi-author">
+                  <div class="testi-avatar">RB</div>
+                  <div>
+                    <div class="testi-name">Rasmané B.</div>
+                    <div class="testi-role">Gérant, PME locale</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="swiper-slide">
+              <div class="testi-card">
+                <div class="testi-stars">
+                  <i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i>
+                </div>
+                <p class="testi-text">« Une équipe réactive qui a su nous proposer les meilleurs emplacements en fonction de notre budget. Le rapport visibilité/prix est excellent. »</p>
+                <div class="testi-author">
+                  <div class="testi-avatar">MO</div>
+                  <div>
+                    <div class="testi-name">Mariam O.</div>
+                    <div class="testi-role">Fondatrice, startup locale</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="swiper-slide">
+              <div class="testi-card">
+                <div class="testi-stars">
+                  <i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i>
+                </div>
+                <p class="testi-text">« Nous travaillons avec Integral depuis plus de deux ans. La qualité des supports et le respect des délais d'installation sont constants à chaque campagne. »</p>
+                <div class="testi-author">
+                  <div class="testi-avatar">HB</div>
+                  <div>
+                    <div class="testi-name">Hamed B.</div>
+                    <div class="testi-role">Directeur Général</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="swiper-slide">
+              <div class="testi-card">
+                <div class="testi-stars">
+                  <i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-fill"></i><i class="bi bi-star-half"></i>
+                </div>
+                <p class="testi-text">« La plateforme en ligne facilite énormément le suivi de nos réservations. On sait exactement où en est chaque demande sans avoir à relancer par téléphone. »</p>
+                <div class="testi-author">
+                  <div class="testi-avatar">FZ</div>
+                  <div>
+                    <div class="testi-name">Fatimata Z.</div>
+                    <div class="testi-role">Chargée de communication</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="swiper-pagination"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ═══════════ CTA FINAL ═══════════ -->
+    <div class="cta-final">
+      <div class="dots-deco"></div>
+      <div>
+        <h2>Faites la différence avec Integral</h2>
+        <p>Des emplacements stratégiques, des supports performants et un accompagnement personnalisé pour maximiser votre visibilité.</p>
+      </div>
+      <a href="mailto:contact@regie-urbana.com" class="cta-final-btn">
+        Obtenir un devis gratuit <i class="bi bi-arrow-right"></i>
+      </a>
     </div>
   </div>
 
-  <!-- ═══════════ COMMENT ÇA MARCHE ═══════════ -->
-  <div class="section">
-    <div class="section-header">
+  <!-- ═══════════ FOOTER ═══════════ -->
+  <footer class="site-footer">
+    <div class="row g-4">
+      <div class="col-lg-4">
+        <div class="footer-brand-name">Integral<span>.</span></div>
+        <p class="footer-desc">
+          Régie publicitaire spécialisée dans l'affichage extérieur — panneaux grand format,
+          écrans numériques LED et sucettes urbaines — dans les principales villes du Burkina Faso.
+        </p>
+        <div class="footer-soc">
+          <a href="#"><i class="bi bi-facebook"></i></a>
+          <a href="#"><i class="bi bi-instagram"></i></a>
+          <a href="#"><i class="bi bi-linkedin"></i></a>
+        </div>
+      </div>
+      <div class="col-6 col-lg-2">
+        <div class="footer-title">Navigation</div>
+        <ul class="footer-links">
+          <li><a href="#reseau"><i class="bi bi-chevron-right"></i> Nos disponibilités</a></li>
+          <li><a href="#category"><i class="bi bi-chevron-right"></i> Formats</a></li>
+          <li><a href="#about"><i class="bi bi-chevron-right"></i> Qui sommes-nous</a></li>
+          <!--
+          <li><a href="#history"><i class="bi bi-chevron-right"></i> Notre histoire</a></li>
+          <li><a href="#equipe"><i class="bi bi-chevron-right"></i> Notre équipe</a></li>
+          <li><a href="#gallery"><i class="bi bi-chevron-right"></i> Galerie</a></li>
+          <li><a href="#blog"><i class="bi bi-chevron-right"></i> Actualités</a></li>
+          <li><a href="#contact-section"><i class="bi bi-chevron-right"></i> Contact</a></li>
+          -->
+        </ul>
+      </div>
+      <div class="col-6 col-lg-2">
+        <div class="footer-title">Services</div>
+        <ul class="footer-links">
+          <li><a href="{% url 'portail:reserver_etape1' %}"><i class="bi bi-chevron-right"></i> Faire une demande</a></li>
+          <li><a href="{% url 'portail:suivi_demande' %}"><i class="bi bi-chevron-right"></i> Suivre une demande</a></li>
+          <li><a href="#blog"><i class="bi bi-chevron-right"></i> Actualités</a></li>
+          <li><a href="#contact-section"><i class="bi bi-chevron-right"></i> Contact</a></li>
+        </ul>
+      </div>
+      <div class="col-lg-4">
+        <div class="footer-title">Coordonnées</div>
+        <div class="footer-ci">
+          <div class="footer-ci-icon"><i class="bi bi-geo-alt-fill"></i></div>
+          <div><strong>Adresse</strong>Ouagadougou, Burkina Faso</div>
+        </div>
+        <div class="footer-ci">
+          <div class="footer-ci-icon"><i class="bi bi-telephone-fill"></i></div>
+          <div><strong>Téléphone</strong>{{ CONTACT_TEL01 }}<br>{{ CONTACT_TEL02 }}<br>{{ CONTACT_TEL03 }} </div>
+        </div>
+        <div class="footer-ci">
+          <div class="footer-ci-icon"><i class="bi bi-envelope-fill"></i></div>
+          <div><strong>Email</strong>{{ CONTACT_EMAIL }}<br>{{CONTACT_EMAIL1}}<br>{{CONTACT_EMAIL2}}</div>
+        </div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <span>&copy; {% now "Y" %} Promo Pub – Integral by <strong style="color:#fff;">Ibrahim SAWADOGO</strong>. All Rights Reserved</span>
       <div>
-        <div class="section-tag">Processus</div>
-        <div class="section-title">Votre campagne en 3 étapes</div>
-        <div class="section-subtitle">Simple. Rapide. Efficace.</div>
+        <a href="#">Mentions légales</a>
+        <a href="#">Politique de confidentialité</a>
       </div>
     </div>
-
-    <div class="process-track">
-      <div class="process-step">
-        <div class="process-index">1</div>
-        <h5>Sélectionnez vos emplacements</h5>
-        <p>Choisissez les villes, les supports et les emplacements qui correspondent à votre cible.</p>
-      </div>
-      <div class="process-step">
-        <div class="process-index">2</div>
-        <h5>Nous confirmons votre réservation</h5>
-        <p>Nos équipes vérifient les disponibilités et vous accompagnent jusqu'à la validation.</p>
-      </div>
-      <div class="process-step">
-        <div class="process-index">3</div>
-        <h5>Votre campagne est en ligne</h5>
-        <p>Nous assurons l'installation, la diffusion et le suivi de votre campagne avec un reporting complet.</p>
-      </div>
-    </div>
-  </div>
-
-
-
+  </footer>
 </div>
 
-{% endblock %}
+<a href="#reseau" id="btt"><i class="bi bi-arrow-up"></i></a>
+<a class="whatsapp-float" href="https://wa.me/{{ CONTACT_WHATSAPP|default:'22658800909' }}" target="_blank" rel="noopener" aria-label="Contacter Integral sur WhatsApp" title="Contacter Integral sur WhatsApp">
+  <i class="bi bi-whatsapp"></i>
+</a>
+
+<script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+<script>
+  // Rotation douce des visuels affiches dans le panneau d'accueil.
+  const heroCycleImg = document.getElementById('heroCycleImg');
+  const heroImages = [
+    {
+      src: "{% static 'img/villes/image1 (6).jfif' %}",
+      alt: 'Panneaux publicitaires a Ouagadougou',
+    },
+    {
+      src: "{% static 'img/formats/Gemini_Generated_Image_sx89ybsx89ybsx891.png' %}",
+      alt: 'Ecran numerique LED',
+    },
+    {
+      src: "{% static 'img/villes/image1 (5).jfif' %}",
+      alt: 'Reseau publicitaire a Bobo-Dioulasso',
+    },
+    {
+      src: "{% static 'img/villes/image1 (1).jfif' %}",
+      alt: 'Reseau publicitaire a Koudougou',
+    },
+  ];
+  let heroImageIndex = 0;
+
+  if (heroCycleImg && heroImages.length > 1) {
+    setInterval(() => {
+      heroImageIndex = (heroImageIndex + 1) % heroImages.length;
+      heroCycleImg.classList.add('is-changing');
+      setTimeout(() => {
+        heroCycleImg.src = heroImages[heroImageIndex].src;
+        heroCycleImg.alt = heroImages[heroImageIndex].alt;
+        heroCycleImg.classList.remove('is-changing');
+      }, 450);
+    }, 4200);
+  }
+
+  function updateSimulator() {
+    const ville = document.getElementById('simVille')?.value;
+    const format = document.getElementById('simFormat')?.value;
+    const faces = parseInt(document.getElementById('simFaces')?.value, 10) || 1;
+    const duree = parseInt(document.getElementById('simDuree')?.value, 10) || 1;
+    if (!ville || !format) return;
+
+    let baseViewsPerMonth = ville === 'ouaga' ? 550000 : ville === 'national' ? 900000 : 400000;
+    if (format === 'ecran') baseViewsPerMonth *= 1.3;
+    if (format === 'sucette') baseViewsPerMonth *= 0.8;
+    const totalViews = Math.round(baseViewsPerMonth * faces * duree);
+    document.getElementById('simResultViews').textContent = totalViews < 1000000
+      ? `${Math.round(totalViews / 1000)}K+`
+      : `${(totalViews / 1000000).toFixed(1)}M+`;
+
+    const discount = duree >= 12 ? '-20% Forfait annuel' : duree >= 6 ? '-15% Forfait semestriel' : duree >= 3 ? '-10% Forfait trimestriel' : '-15% Offre promo lancement';
+    document.getElementById('simResultDiscount').textContent = discount;
+  }
+
+  ['simVille', 'simFormat', 'simFaces', 'simDuree'].forEach((id) => {
+    document.getElementById(id)?.addEventListener('change', updateSimulator);
+  });
+  updateSimulator();
+
+  new Swiper('.testiSwiper', {
+    slidesPerView: 1,
+    spaceBetween: 22,
+    loop: true,
+    loopAdditionalSlides: 2,
+    autoplay: { delay: 4500, disableOnInteraction: false },
+    pagination: { el: '.swiper-pagination', clickable: true },
+    breakpoints: {
+      768: { slidesPerView: 2 },
+      1100: { slidesPerView: 3, spaceBetween: 28 },
+    },
+  });
+</script>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+      // ── GESTION VUE GRILLE / VUE CARTE LEAFLET ───────────────────────────
+    const btnViewGrid = document.getElementById('btnViewGrid');
+    const btnViewMap  = document.getElementById('btnViewMap');
+    const rnGrid      = document.getElementById('rn-grid');
+    const mapContainer = document.getElementById('leafletMapContainer');
+    let leafletMap = null;
+
+    if (btnViewGrid && btnViewMap && rnGrid && mapContainer) {
+    btnViewGrid.addEventListener('click', () => {
+      btnViewGrid.classList.add('active');
+      btnViewMap.classList.remove('active');
+      rnGrid.style.display = 'flex';
+      mapContainer.style.display = 'none';
+    });
+
+    btnViewMap.addEventListener('click', () => {
+      btnViewMap.classList.add('active');
+      btnViewGrid.classList.remove('active');
+      rnGrid.style.display = 'none';
+      mapContainer.style.display = 'block';
+
+      if (!leafletMap) {
+        initLeafletMap();
+      } else {
+        setTimeout(() => leafletMap.invalidateSize(), 200);
+      }
+    });
+    }
+
+    function initLeafletMap() {
+      leafletMap = L.map('portalLeafletMap').setView([12.3714, -1.5197], 12);
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors'
+      }).addTo(leafletMap);
+
+      fetch("{% url 'portail:api_geojson' %}")
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.features) {
+            L.geoJSON(data, {
+              pointToLayer: function (feature, latlng) {
+                const color = feature.properties.color || '#16a34a';
+                return L.circleMarker(latlng, {
+                  radius: 8,
+                  fillColor: color,
+                  color: '#ffffff',
+                  weight: 2,
+                  opacity: 1,
+                  fillOpacity: 0.9
+                });
+              },
+              onEachFeature: function (feature, layer) {
+                const p = feature.properties;
+                const popupContent = `
+                  <div style="font-family:sans-serif; min-width:180px;">
+                    <strong style="color:var(--color-primary); font-size:13px;">${p.nom || p.code}</strong>
+                    <div style="font-size:11px; color:#64748b; margin-top:2px;">${p.ville || ''} · ${p.quartier || ''}</div>
+                    <div style="font-size:11px; margin-top:4px;"><strong>Format:</strong> ${p.format || p.type_support}</div>
+                    <div style="margin-top:8px;">
+                      <a href="{% url 'portail:reserver_etape1' %}?ville=${encodeURIComponent(p.ville || '')}" style="display:inline-block; background:var(--color-primary); color:#fff; padding:4px 10px; border-radius:4px; font-size:11px; text-decoration:none; font-weight:bold;">Réserver</a>
+                    </div>
+                  </div>
+                `;
+                layer.bindPopup(popupContent);
+              }
+            }).addTo(leafletMap);
+          }
+        })
+        .catch(err => console.log('Info map geojson:', err));
+    }
+  // ── FILTRES COMBINÉS VILLE + CATÉGORIE ─────────────────────────────────
+  let rnActiveVille = 'all';
+  let rnActiveCat   = 'all';
+  const RN_RESERVE_BASE_URL = "{% url 'portail:reserver_etape1' %}";
+
+  function rnApplyFilters() {
+    document.querySelectorAll('.rn-villebtn').forEach(b => {
+      b.classList.toggle('active', b.getAttribute('data-fv') === rnActiveVille);
+    });
+    document.querySelectorAll('.rn-catbtn').forEach(b => {
+      b.classList.toggle('active', b.getAttribute('data-fc') === rnActiveCat);
+    });
+    let rnVisibleCount = 0;
+    let rnReservableCount = 0;
+    document.querySelectorAll('.rn-wrap').forEach(w => {
+      const matchVille = rnActiveVille === 'all' || w.getAttribute('data-v') === rnActiveVille;
+      const matchCat    = rnActiveCat === 'all'   || w.getAttribute('data-cat') === rnActiveCat;
+      if (matchVille && matchCat) {
+        rnVisibleCount++;
+        const card = w.querySelector('.rn-card');
+        if (card) {
+          const reserveUrl = card.getAttribute('data-reserve-url');
+          const libre = parseInt(card.getAttribute('data-libre'), 10) || 0;
+          if (reserveUrl && libre > 0) rnReservableCount++;
+        }
+        w.classList.remove('gone');
+        w.style.opacity = '0';
+        w.style.transform = 'translateY(14px)';
+        setTimeout(() => {
+          w.style.transition = 'opacity .35s, transform .35s';
+          w.style.opacity = '1';
+          w.style.transform = 'translateY(0)';
+        }, 30);
+      } else {
+        w.classList.add('gone');
+      }
+    });
+
+    const rnEmpty = document.getElementById('rn-empty');
+    if (rnEmpty) {
+      rnEmpty.style.display = rnVisibleCount === 0 ? 'block' : 'none';
+    }
+
+    document.querySelectorAll('.rn-group-cta').forEach(g => {
+      const matchVille = rnActiveVille === 'all' || g.getAttribute('data-v') === rnActiveVille;
+      const matchCat    = rnActiveCat === 'all'   || g.getAttribute('data-cat') === rnActiveCat;
+      g.classList.toggle('gone', !(matchVille && matchCat));
+    });
+
+    // Titre de ville : masqué si aucune carte de cette ville n'est visible
+    // après le filtrage en cours (ex: ville sans support dans la catégorie choisie).
+    document.querySelectorAll('.rn-ville-heading').forEach(h => {
+      const v = h.getAttribute('data-v');
+      const hasVisible = document.querySelector('.rn-wrap[data-v="' + v + '"]:not(.gone)');
+      h.classList.toggle('gone', !hasVisible);
+    });
+
+    const instantSearchInput = document.getElementById('inventoryInstantSearch');
+    if (instantSearchInput) {
+      instantSearchInput.addEventListener('input', (e) => {
+        rnSearchQuery = e.target.value;
+        rnApplyFilters();
+      });
+    }
+
+    // Bouton "Réserver tout" : uniquement quand une ville ET un format précis
+    // sont sélectionnés (pas "Toutes/Tous"), et qu'il y a plusieurs dispos.
+    const rnBulk = document.getElementById('rn-bulk-actions');
+    const rnBulkBtn = document.getElementById('rnReserveAllBtn');
+    const rnBulkLabel = document.getElementById('rnReserveAllLabel');
+    if (rnBulk && rnBulkBtn) {
+      if (rnActiveVille !== 'all' && rnActiveCat !== 'all' && rnReservableCount > 1) {
+        const villeBtn = document.querySelector('.rn-villebtn[data-fv="' + rnActiveVille + '"]');
+        const catBtn   = document.querySelector('.rn-catbtn[data-fc="' + rnActiveCat + '"]');
+        const villeName = villeBtn ? villeBtn.getAttribute('data-fv-name') : '';
+        const catName   = catBtn ? catBtn.getAttribute('data-fc-name') : '';
+        rnBulkBtn.href = RN_RESERVE_BASE_URL + '?ville=' + encodeURIComponent(villeName) + '&categorie=' + encodeURIComponent(catName);
+        if (rnBulkLabel) rnBulkLabel.textContent = 'Réserver les ' + rnReservableCount + ' emplacements disponibles';
+        rnBulk.style.display = 'block';
+      } else {
+        rnBulk.style.display = 'none';
+      }
+    }
+  }
+
+  document.querySelectorAll('.rn-villebtn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      rnActiveVille = btn.getAttribute('data-fv');
+      rnApplyFilters();
+    });
+  });
+  document.querySelectorAll('.rn-catbtn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      rnActiveCat = btn.getAttribute('data-fc');
+      rnApplyFilters();
+    });
+  });
+
+  // Permet aux cartes "Nos Formats" (plus bas dans la page) de filtrer
+  // directement la grille du réseau par catégorie + scroller vers elle.
+  function rnFilterByCategorie(catSlug) {
+    rnActiveVille = 'all';
+    rnActiveCat = catSlug;
+    rnApplyFilters();
+    document.getElementById('reseau').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  // ── POPUP DÉTAIL ────────────────────────────────────────────────────────
+  const rnPop = document.getElementById('rnPop');
+
+  function openRnPop(card) {
+    const ville       = card.getAttribute('data-ville');
+    const img         = card.getAttribute('data-img');
+    const categorie   = card.getAttribute('data-categorie');
+    const dimensions  = card.getAttribute('data-dimensions');
+    const superficie  = card.getAttribute('data-superficie');
+    const libre       = parseInt(card.getAttribute('data-libre'), 10) || 0;
+    const count       = parseInt(card.getAttribute('data-count'), 10) || 0;
+    const isEcran     = card.getAttribute('data-is-ecran') === '1';
+    const reserveUrl  = card.getAttribute('data-reserve-url');
+
+    document.getElementById('rnpImg').setAttribute('src', img);
+    document.getElementById('rnpCat').textContent = categorie;
+    document.getElementById('rnpTitle').textContent = superficie ? `${superficie} · ${dimensions}` : dimensions;
+
+    let metaHtml = `<span class="rn-tag"><i class="bi bi-geo-alt-fill"></i>${ville}</span>`;
+    if (isEcran) {
+      metaHtml += `<span class="rn-tag"><i class="bi bi-display-fill"></i>${count} écran${count > 1 ? 's' : ''}</span>`;
+    } else {
+      const detailIcon = categorie === 'Marché' ? 'bi-shop-window' : 'bi-layout-split';
+      metaHtml += `<span class="rn-tag"><i class="bi ${detailIcon}"></i>${count} face${count > 1 ? 's' : ''} au total</span>`;
+      metaHtml += `<span class="rn-tag" style="color:${libre > 0 ? '#10b981' : '#ef4444'}"><i class="bi bi-check-circle-fill"></i>${libre} disponible${libre > 1 ? 's' : ''}</span>`;
+    }
+    document.getElementById('rnpMeta').innerHTML = metaHtml;
+
+    document.getElementById('rnpDesc').textContent = isEcran
+      ? `Réseau d'écrans numériques à ${ville}. Contactez-nous pour connaître les disponibilités précises et lancer votre campagne digitale.`
+      : `Emplacement ${categorie.toLowerCase()} situé à ${ville}. ${libre > 0 ? 'Réservez dès maintenant votre créneau.' : 'Actuellement complet — contactez-nous pour être notifié dès qu\'une place se libère.'}`;
+
+    const btn = document.getElementById('rnpReserveBtn');
+    const fullMsg = document.getElementById('rnpFullMsg');
+    if (reserveUrl) {
+      btn.href = reserveUrl;
+      btn.classList.remove('disabled');
+      btn.style.display = 'flex';
+      fullMsg.style.display = 'none';
+    } else {
+      btn.style.display = 'none';
+      fullMsg.style.display = 'flex';
+    }
+
+    rnPop.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  document.querySelectorAll('.rn-card').forEach(card => {
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.rn-add')) return; // évite double-trigger, le bouton fait la même action de toute façon
+      openRnPop(card);
+    });
+  });
+  document.querySelectorAll('.rn-add').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      openRnPop(btn.closest('.rn-card'));
+    });
+  });
+
+  document.getElementById('rnPopClose').addEventListener('click', closeRnPop);
+  rnPop.addEventListener('click', (e) => { if (e.target === rnPop) closeRnPop(); });
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeRnPop(); });
+
+  function closeRnPop() {
+    rnPop.classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  // ── OFFRE SPÉCIALE : compte à rebours réel jusqu'à la fin du mois ──────
+  function updateOfferCountdown() {
+    const now = new Date();
+    const finMois = new Date(now.getFullYear(), now.getMonth() + 1, 1); // 1er du mois suivant, 00h00
+    let diff = finMois - now;
+    if (diff < 0) diff = 0;
+
+    const jours   = Math.floor(diff / (1000 * 60 * 60 * 24));
+    const heures  = Math.floor((diff / (1000 * 60 * 60)) % 24);
+    const minutes = Math.floor((diff / (1000 * 60)) % 60);
+
+    const elJ = document.getElementById('cdJours');
+    const elH = document.getElementById('cdHeures');
+    const elM = document.getElementById('cdMinutes');
+    if (elJ) elJ.textContent = String(jours).padStart(2, '0');
+    if (elH) elH.textContent = String(heures).padStart(2, '0');
+    if (elM) elM.textContent = String(minutes).padStart(2, '0');
+  }
+  updateOfferCountdown();
+  setInterval(updateOfferCountdown, 60000);
+
+  // ── PACKS : carrousel vertical (à la place du visuel "-15%" fixe) ──────────
+  // Défile en boucle sur les 3 formules ; le panneau de texte à gauche et
+  // l'accent de couleur du bloc (primary ↔ secondary) suivent la carte active.
+  (function () {
+    const PACKS = [
+      {
+        title: 'Pack Lancement',
+        desc: "Idéal pour promotions locales & PME : emplacement stratégique à Ouaga ou Bobo, pose incluse, durée flexible de 1 à 3 mois.",
+        ctaLabel: 'Choisir ce pack',
+        ctaHref: "{% url 'portail:reserver_etape1' %}?pack=lancement",
+        swap: false,
+      },
+      {
+        title: 'Pack Notoriété',
+        desc: "Couverture urbaine et forte mémorisation : mix panneaux géants + écran LED, remise -15% appliquée, changement de visuel offert en cours de campagne.",
+        ctaLabel: 'Réserver ce pack',
+        ctaHref: "{% url 'portail:reserver_etape1' %}?pack=notoriete",
+        swap: true,
+      },
+      {
+        title: 'Pack Domination',
+        desc: "Présence nationale multi-villes 360° : déploiement Ouaga, Bobo-Dioulasso et Koudougou, priorité sur les carrefours n°1, chargé de compte VIP dédié.",
+        ctaLabel: "Contacter l'équipe VIP",
+        ctaHref: "{% url 'portail:reserver_etape1' %}?pack=domination",
+        swap: false,
+      },
+    ];
+
+    const track    = document.getElementById('packVisualTrack');
+    const wrap     = document.getElementById('packVisualWrap');
+    const dotsWrap = document.getElementById('packVisualDots');
+    const dyTitle  = document.getElementById('packDynTitle');
+    const dyDesc   = document.getElementById('packDynDesc');
+    const dyCta    = document.getElementById('packDynCta');
+    const dyLabel  = document.getElementById('packDynCtaLabel');
+    const block    = document.getElementById('packSpecialBlock');
+    if (!track || !wrap || !dyTitle) return;
+
+    const dots  = dotsWrap ? Array.from(dotsWrap.children) : [];
+    const total = PACKS.length;
+    let slideIndex  = 0;              // avance jusqu'à `total` (= clone de la 1ère carte), puis revient à 0
+    let slideHeight = wrap.offsetHeight;
+    let timer = null;
+
+    function applyBlockSwap(swap) {
+      if (!block) return;
+      if (swap) {
+        block.style.setProperty('--sb-1', 'var(--color-secondary)');
+        block.style.setProperty('--sb-2', 'var(--color-primary)');
+        block.style.setProperty('--pack-a', 'var(--color-secondary)');
+        block.style.setProperty('--pack-b', 'var(--color-primary)');
+        block.style.setProperty('--pack-a2', 'var(--textb)');
+        block.style.setProperty('--pack-b2', 'var(--text)');
+      } else {
+        block.style.removeProperty('--sb-1');
+        block.style.removeProperty('--sb-2');
+        block.style.removeProperty('--pack-a');
+        block.style.removeProperty('--pack-b');
+        block.style.removeProperty('--pack-a2');
+        block.style.removeProperty('--pack-b2');
+      }
+    }
+
+    function setLeftInstant(pack) {
+      if (dyTitle) dyTitle.textContent = pack.title;
+      if (dyDesc)  dyDesc.textContent  = pack.desc;
+      if (dyLabel) dyLabel.textContent = pack.ctaLabel;
+      if (dyCta) {
+        dyCta.href = pack.ctaHref;
+        dyCta.style.setProperty('--pack-dyn-a', pack.swap ? 'var(--color-primary)' : 'var(--color-secondary)');
+      }
+    }
+
+    function applyLeft(pack) {
+      [dyTitle, dyDesc].forEach(el => el && el.classList.add('out'));
+      setTimeout(() => {
+        setLeftInstant(pack);
+        [dyTitle, dyDesc].forEach(el => el && el.classList.remove('out'));
+      }, 250);
+    }
+
+    function updateDots(realIndex) {
+      dots.forEach((d, i) => d.classList.toggle('active', i === realIndex));
+    }
+
+    function goToSlide(i, withTransition) {
+      if (withTransition === false) {
+        track.style.transition = 'none';
+        track.style.transform = `translateY(-${i * slideHeight}px)`;
+        track.offsetHeight; // force le reflow avant de réactiver la transition
+        track.style.transition = '';
+      } else {
+        track.style.transform = `translateY(-${i * slideHeight}px)`;
+      }
+    }
+
+    function next() {
+      slideIndex++;
+      const realIndex = slideIndex % total;
+      goToSlide(slideIndex);
+      applyLeft(PACKS[realIndex]);
+      applyBlockSwap(PACKS[realIndex].swap);
+      updateDots(realIndex);
+
+      if (slideIndex === total) {
+        // On vient d'afficher le clone (identique à la carte 0) : une fois la
+        // transition terminée, retour instantané au vrai index 0 — invisible à l'œil.
+        setTimeout(() => {
+          slideIndex = 0;
+          goToSlide(0, false);
+        }, 720);
+      }
+    }
+
+    function resetTimer() {
+      if (timer) clearInterval(timer);
+      timer = setInterval(next, 4200);
+    }
+
+    function goToDot(realIndex) {
+      slideIndex = realIndex;
+      goToSlide(slideIndex);
+      applyLeft(PACKS[realIndex]);
+      applyBlockSwap(PACKS[realIndex].swap);
+      updateDots(realIndex);
+      resetTimer();
+    }
+
+    dots.forEach((d, i) => d.addEventListener('click', () => goToDot(i)));
+
+    window.addEventListener('resize', () => {
+      slideHeight = wrap.offsetHeight;
+      goToSlide(slideIndex, false);
+    });
+
+    setLeftInstant(PACKS[0]);
+    applyBlockSwap(PACKS[0].swap);
+    updateDots(0);
+    resetTimer();
+  })();
+
+  // ── GALLERY POPUP ────────────────────────────────────────────────────────
+  const galPop = document.getElementById('galPop');
+  const galItems = document.querySelectorAll('.gal-item');
+  let galIdx = 0;
+
+  function openGalPop(i) {
+    galIdx = i;
+    const item = galItems[i];
+    document.getElementById('galpImg').setAttribute('src', item.getAttribute('data-gimg'));
+    document.getElementById('galpTitle').textContent = item.getAttribute('data-gtitle');
+    document.getElementById('galpDesc').textContent = item.getAttribute('data-gdesc');
+    galPop.classList.add('open');
+    document.body.style.overflow = 'hidden';
+  }
+
+  galItems.forEach((item, i) => {
+    item.addEventListener('click', () => openGalPop(i));
+  });
+
+  document.getElementById('galPopClose').addEventListener('click', closeGalPop);
+  galPop.addEventListener('click', (e) => { if (e.target === galPop) closeGalPop(); });
+  document.getElementById('galpPrev').addEventListener('click', () => {
+    openGalPop((galIdx - 1 + galItems.length) % galItems.length);
+  });
+  document.getElementById('galpNext').addEventListener('click', () => {
+    openGalPop((galIdx + 1) % galItems.length);
+  });
+
+  function closeGalPop() {
+    galPop.classList.remove('open');
+    document.body.style.overflow = '';
+  }
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeGalPop();
+  });
+
+  // Auto-fermeture des messages Django après 6 secondes
+  document.querySelectorAll('.django-messages .alert').forEach((el) => {
+    setTimeout(() => {
+      const alert = bootstrap.Alert.getOrCreateInstance(el);
+      alert.close();
+    }, 6000);
+  });
+
+  // ═══════════ FORMULAIRE DE CONTACT (envoi AJAX) ═══════════
+  const contactForm = document.getElementById('contact-form');
+  if (contactForm) {
+    contactForm.addEventListener('submit', async function (e) {
+      e.preventDefault();
+
+      const form = e.target;
+      const btn = form.querySelector('button[type="submit"]');
+      const msgBox = document.getElementById('form-message');
+      const originalBtnHtml = btn.innerHTML;
+
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> Envoi en cours...';
+      msgBox.className = 'form-response';
+      msgBox.style.display = 'none';
+
+      try {
+        const response = await fetch("{% url 'portail:contact_envoyer' %}", {
+          method: 'POST',
+          body: new FormData(form),
+          headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        });
+        const data = await response.json();
+
+        msgBox.style.display = 'block';
+        if (data.success) {
+          msgBox.classList.add('form-response-success');
+          msgBox.textContent = data.message;
+          form.reset();
+        } else {
+          msgBox.classList.add('form-response-error');
+          msgBox.textContent = data.error || "Une erreur est survenue.";
+        }
+      } catch (err) {
+        msgBox.style.display = 'block';
+        msgBox.classList.add('form-response-error');
+        msgBox.textContent = "Erreur réseau. Veuillez réessayer.";
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalBtnHtml;
+      }
+    });
+  }
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+  // ── NAVBAR : scroll shadow + lien actif au scroll + fermeture mobile ───
+  const siteNav = document.getElementById('nav');
+  const navMenu = document.getElementById('navmenu');
+
+  window.addEventListener('scroll', function () {
+    siteNav.classList.toggle('scrolled', window.scrollY > 20);
+    const btt = document.getElementById('btt');
+    if (btt) btt.classList.toggle('show', window.scrollY > 400);
+
+    document.querySelectorAll('.vitrine [id]').forEach(function (sec) {
+      if (!sec.offsetHeight) return;
+      const top = sec.offsetTop - 110;
+      const bot = top + sec.offsetHeight;
+      if (window.scrollY >= top && window.scrollY < bot) {
+        document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+        const lnk = document.querySelector('.nav-link[href="#' + sec.id + '"]');
+        if (lnk) lnk.classList.add('active');
+      }
+    });
+  });
+
+  // Ferme le menu mobile (Bootstrap Collapse) après clic sur un lien
+  document.querySelectorAll('#navmenu .nav-link[href^="#"]').forEach(function (a) {
+    a.addEventListener('click', function () {
+      if (navMenu.classList.contains('show')) {
+        const bsCollapse = bootstrap.Collapse.getInstance(navMenu);
+        if (bsCollapse) {
+          bsCollapse.hide();
+        } else {
+          navMenu.classList.remove('show');
+        }
+      }
+    });
+  });
+</script>
+</body>
+</html>

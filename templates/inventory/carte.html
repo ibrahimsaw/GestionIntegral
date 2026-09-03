@@ -539,6 +539,12 @@
       <button class="f-btn" onclick="setFilter('type_panneau','Marché',this)">
         <span class="f-type-dot" style="background:#34d399"></span>Marché
       </button>
+
+      <hr class="f-divider">
+
+      <button class="f-btn" id="f-marches" onclick="toggleMarches(this)">
+        <i class="bi bi-shop" style="color:#f97316;font-size:.85rem"></i>Afficher les marchés
+      </button>
     </div>
 
     <!-- ── Légende ───────────────────────────────────────── -->
@@ -691,7 +697,8 @@
 
   let curType='', curEtat=''; curTypePanneau = '';
   function setFilter(k, v, btn) {
-    document.querySelectorAll('.f-btn').forEach(b => b.classList.remove('on'));
+    // #f-marches est un calque indépendant (toggle), pas un filtre exclusif : on ne le touche pas ici.
+    document.querySelectorAll('.f-btn:not(#f-marches)').forEach(b => b.classList.remove('on'));
     btn.classList.add('on');
     if (k==='type')      { curType=v; curEtat=''; curTypePanneau=''; }
     else if (k==='etat') { curEtat=v; curType=''; curTypePanneau=''; }
@@ -713,6 +720,124 @@
         m.setIcon(mkIcon(props.type, props.color, 'white'));
       }
     });
+  }
+
+  // ── Marqueurs "Marché" (calque indépendant, distinct des supports) ──
+  let marcheLayer = L.layerGroup();
+  let marchesLoaded = false;
+
+  function mkMarcheIcon(nbLibres, nbTotal) {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="34" height="34" viewBox="0 0 34 34">
+      <defs><filter id="shmarche"><feDropShadow dx="0" dy="1.5" stdDeviation="2" flood-opacity=".3"/></filter></defs>
+      <rect x="3" y="8" width="28" height="22" rx="4" fill="#f97316" filter="url(#shmarche)"/>
+      <path d="M3 8 L8 2 H26 L31 8 Z" fill="#fb923c"/>
+      <svg x="9" y="12" width="16" height="16" viewBox="0 0 16 16" fill="white"><path d="M0 1.5A.5.5 0 0 1 .5 1H2a.5.5 0 0 1 .485.379L2.89 3H14.5a.5.5 0 0 1 .491.592l-1.5 8A.5.5 0 0 1 13 12H4a.5.5 0 0 1-.491-.408L2.01 3.607 1.61 2H.5a.5.5 0 0 1-.5-.5M3.102 4l1.313 7h8.17l1.313-7zM5 12a2 2 0 1 0 0 4 2 2 0 0 0 0-4m7 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4m-7 1a1 1 0 1 1 0 2 1 1 0 0 1 0-2m7 0a1 1 0 1 1 0 2 1 1 0 0 1 0-2"/></svg>
+    </svg>`;
+    return L.divIcon({ html: svg, iconSize: [34, 34], iconAnchor: [17, 30], popupAnchor: [0, -32], className: '' });
+  }
+
+  function renderMarchesGeoJSON(data) {
+    marcheLayer.clearLayers();
+    data.features.forEach(f => {
+      const p = f.properties;
+      const [lng, lat] = f.geometry.coordinates;
+
+      // Le périmètre du marché (les emplacements sont "dans" cette zone, sans coordonnées propres)
+      const circle = L.circle([lat, lng], {
+        radius: p.rayon_metres || 100,
+        color: '#f97316', fillColor: '#f97316', fillOpacity: 0.10, weight: 2, dashArray: '4,4'
+      });
+      circle.on('click', () => { map.flyTo([lat, lng], 16, { duration: 0.5 }); openMarchePanel(p.id); });
+      marcheLayer.addLayer(circle);
+
+      const marker = L.marker([lat, lng], { icon: mkMarcheIcon(p.nb_libres, p.nb_emplacements) });
+      marker.on('click', () => {
+        map.flyTo(marker.getLatLng(), 16, { duration: 0.5 });
+        openMarchePanel(p.id);
+      });
+      marcheLayer.addLayer(marker);
+    });
+  }
+
+  function loadMarches() {
+    fetch('/gestion/inventory/api/marches/geojson/')
+      .then(r => r.json())
+      .then(data => { renderMarchesGeoJSON(data); marchesLoaded = true; });
+  }
+
+  function toggleMarches(btn) {
+    if (map.hasLayer(marcheLayer)) {
+      map.removeLayer(marcheLayer);
+      btn.classList.remove('on');
+    } else {
+      if (!marchesLoaded) loadMarches();
+      map.addLayer(marcheLayer);
+      btn.classList.add('on');
+    }
+  }
+
+  // ── Marchés visibles par défaut au chargement (avec ou sans panneau) ──
+  loadMarches();
+  map.addLayer(marcheLayer);
+  const fMarchesBtn = document.getElementById('f-marches');
+  if (fMarchesBtn) fMarchesBtn.classList.add('on');
+
+  // ── Side panel — Marché (adapté : pas les mêmes infos qu'un support) ──
+  function openMarchePanel(id) {
+    document.getElementById('side-panel').classList.add('open');
+    document.getElementById('sp-loading').style.display = 'block';
+    document.getElementById('sp-content').innerHTML = '';
+    document.getElementById('sp-code').textContent = '';
+    document.getElementById('sp-title').textContent = 'Chargement…';
+    fetch(`/gestion/inventory/api/marches/${id}/popup/`)
+      .then(r => r.json())
+      .then(d => {
+        document.getElementById('sp-loading').style.display = 'none';
+        document.getElementById('sp-type').textContent = '🏬 Marché';
+        document.getElementById('sp-code').textContent = d.ville || '';
+        document.getElementById('sp-title').textContent = d.nom;
+        renderMarchePanel(d);
+      });
+  }
+
+  function renderMarchePanel(d) {
+    let html = '';
+
+    if (d.adresse || d.quartier) {
+      html += `<div style="font-size:.75rem;color:var(--map-muted);margin-bottom:9px;display:flex;align-items:center;gap:5px">
+        <i class="bi bi-geo-alt"></i>${d.adresse || d.quartier}
+      </div>`;
+    }
+
+    html += `<div class="sp-section">Occupation</div>
+    <div class="info-grid">
+      <div class="info-cell"><div class="ic-label">Emplacements</div><div class="ic-value">${d.nb_emplacements}</div></div>
+      <div class="info-cell"><div class="ic-label">Libres</div><div class="ic-value" style="color:#059669">${d.nb_libres}</div></div>
+      <div class="info-cell"><div class="ic-label">Occupés</div><div class="ic-value" style="color:#dc2626">${d.nb_occupes}</div></div>
+      <div class="info-cell"><div class="ic-label">Taux d'occupation</div><div class="ic-value">${d.taux_occupation}%</div></div>
+    </div>`;
+
+    if (d.description) {
+      html += `<div class="sp-section">Description</div>
+      <div style="font-size:.82rem;color:var(--map-muted);margin-bottom:10px">${d.description}</div>`;
+    }
+
+    if (d.emplacements && d.emplacements.length) {
+      html += `<div class="sp-section">Emplacements</div><div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:12px">`;
+      d.emplacements.forEach(e => {
+        const bg = e.libre ? '#22c55e22' : '#ef444422';
+        const fg = e.libre ? '#16a34a' : '#dc2626';
+        const title = e.libre ? 'Libre' : `Occupé — ${e.support_code}`;
+        html += `<span title="${title}" style="background:${bg};color:${fg};font-size:.72rem;font-weight:700;padding:3px 8px;border-radius:6px">${e.code}</span>`;
+      });
+      html += `</div>`;
+    }
+
+    html += `<a href="${d.url_detail}" class="btn btn-primary btn-sm w-100 mt-2">
+      <i class="bi bi-grid-3x3-gap me-1"></i>Voir le plan complet du marché
+    </a>`;
+
+    document.getElementById('sp-content').innerHTML = html;
   }
 
   // ── Side panel ────────────────────────────────────────────
@@ -791,6 +916,7 @@
       <div class="info-cell"><div class="ic-label">Ville</div><div class="ic-value">${d.ville || '—'}</div></div>
       <div class="info-cell"><div class="ic-label">Quartier</div><div class="ic-value">${d.quartier || '—'}</div></div>
       <div class="info-cell"><div class="ic-label">Installation</div><div class="ic-value">${d.date_installation || '—'}</div></div>
+      ${d.marche ? `<div class="info-cell"><div class="ic-label">Marché</div><div class="ic-value">${d.marche} — ${d.emplacement_code}</div></div>` : ''}
     </div>`;
 
     // ── Faces panneau ──

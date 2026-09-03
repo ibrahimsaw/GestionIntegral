@@ -1,5 +1,5 @@
 """
-Rapport d'état des panneaux — vue, contexte et export PDF/Excel.
+Rapport d'état des supports — vue, contexte et export PDF/Excel.
 """
 
 from datetime import date, datetime
@@ -94,7 +94,6 @@ def _build_context_panneaux(filters: dict) -> dict:
     # ── Base queryset ────────────────────────────────────────────
     qs = (
         Support.objects
-        .filter(type_support="panneau")
         .prefetch_related("faces__lignes_campagne__campagne__client")
         .order_by("ville", "quartier", "nom")
     )
@@ -105,6 +104,24 @@ def _build_context_panneaux(filters: dict) -> dict:
     statut    = filters.get("statut",    "").strip()
     q         = filters.get("q",         "").strip()
     client_pk = filters.get("client_pk", "")
+    categories = filters.get("categories", [])
+    if isinstance(categories, str):
+        categories = [categories] if categories else []
+
+    if categories:
+        non_market_filters = Q()
+        if "Panneau" in categories:
+            non_market_filters |= Q(type_support=Support.TYPE_PANNEAU, emplacement__isnull=True) & ~Q(format="1x2")
+        if "Sucette" in categories:
+            non_market_filters |= Q(type_support=Support.TYPE_PANNEAU, format="1x2", emplacement__isnull=True)
+        if "Écran" in categories:
+            non_market_filters |= Q(type_support=Support.TYPE_ECRAN)
+        qs = qs.filter(non_market_filters) if non_market_filters else qs.none()
+    else:
+        qs = qs.exclude(emplacement__isnull=False)
+    include_markets = not categories or "Marché" in categories
+    if categories and categories == ["Marché"]:
+        qs = qs.none()
 
     if ville:
         qs = qs.filter(ville__iexact=ville)
@@ -148,7 +165,20 @@ def _build_context_panneaux(filters: dict) -> dict:
     for support in qs:
         faces_data = []
 
-        for face in support.faces.all():
+        support_faces = list(support.faces.all())
+        if support.type_support == Support.TYPE_ECRAN:
+            statut_ecran = 'panne' if support.etat == Support.ETAT_PANNE else 'occupe' if support.is_occupe() else 'libre'
+            faces_data.append({
+                "face": None,
+                "label": "Écran",
+                "statut": statut_ecran,
+                "occupee": statut_ecran == 'occupe',
+                "reservee": False,
+                "en_panne": statut_ecran == 'panne',
+                "campagnes": [],
+            })
+
+        for face in support_faces:
             campagnes_list = list(
                 Campagne.objects
                 .filter(lignes__face=face, date_fin__gte=today)
@@ -189,9 +219,11 @@ def _build_context_panneaux(filters: dict) -> dict:
             "support"     : support,
             "code"        : support.code,
             "nom"         : support.nom,
+            "type"        : "Écran" if support.type_support == Support.TYPE_ECRAN else "Sucette" if support.format == "1x2" else "Marché" if support.is_dans_marche else "Panneau",
             "ville"       : support.ville,
             "quartier"    : support.quartier,
             "adresse"     : support.adresse,
+            "localisation": f"GPS : {support.latitude}, {support.longitude}" if not support.adresse and support.latitude is not None and support.longitude is not None else "",
             "statut"      : support.get_etat_display() if hasattr(support, "get_etat_display") else support.etat,
             "etat_raw"    : support.etat,
             "nb_faces"    : nb_faces_total,
@@ -203,8 +235,83 @@ def _build_context_panneaux(filters: dict) -> dict:
             "faces"       : faces_data,
         })
 
+    # Un marché peut exister avant l'installation de son premier support.
+    # On le garde visible dans le rapport pour suivre aussi les emplacements
+    # encore disponibles à développer.
+    marches = Marche.objects.filter(actif=True).prefetch_related("emplacements__support_installe__faces")
+    if not include_markets:
+        marches = marches.none()
+    for marche in marches:
+        faces_marche = []
+        for emplacement in marche.emplacements.all():
+            support_installe = getattr(emplacement, "support_installe", None)
+            statut_emplacement = "occupe" if emplacement.est_dans_campagne else "libre"
+            faces_marche.append({
+                "face": None,
+                "label": emplacement.code,
+                "statut": statut_emplacement,
+                "occupee": statut_emplacement == "occupe",
+                "reservee": False,
+                "en_panne": False,
+                "campagnes": [],
+                "support_code": support_installe.code if support_installe else None,
+            })
+        occupation_marche = _occupation_label(faces_marche)
+        if not _match_filter(occupation_marche, filter_occupation):
+            continue
+        marche_occupees = sum(1 for face in faces_marche if face["occupee"])
+        marche_libres = sum(1 for face in faces_marche if face["statut"] == "libre")
+        supports_connectes = Support.objects.filter(emplacement__marche=marche).count()
+        total_faces += len(faces_marche)
+        total_occupees += marche_occupees
+        total_libres += marche_libres
+        panneaux.append({
+            "support": None,
+            "code": f"MAR-{marche.pk:03d}",
+            "nom": marche.nom,
+            "type": "Marché",
+            "ville": marche.ville,
+            "quartier": marche.quartier,
+            "adresse": marche.adresse,
+            "localisation": f"GPS : {marche.latitude}, {marche.longitude}" if not marche.adresse and marche.latitude is not None and marche.longitude is not None else "",
+            "statut": "Actif" if marche.actif else "Inactif",
+            "etat_raw": "bon" if marche.actif else "panne",
+            "nb_faces": len(faces_marche),
+            "nb_occupees": marche_occupees,
+            "nb_reservees": 0,
+            "nb_en_panne": 0,
+            "nb_libres": marche_libres,
+            "occupation": occupation_marche,
+            "faces": faces_marche,
+            "supports_connectes": supports_connectes,
+        })
+
+    category_order = {"Panneau": 0, "Écran": 1, "Marché": 2, "Sucette": 3}
+    panneaux.sort(key=lambda item: (
+        category_order.get(item["type"], 99),
+        item["ville"] or "",
+        item["quartier"] or "",
+        item["nom"] or "",
+    ))
+    categories_counts = {
+        category: sum(item["nb_faces"] for item in panneaux if item["type"] == category)
+        for category in category_order
+    }
+    for item in panneaux:
+        item["categorie_count"] = categories_counts[item["type"]]
+    categories_sections = [
+        {
+            "nom": category,
+            "items": [item for item in panneaux if item["type"] == category],
+            "total": sum(1 for item in panneaux if item["type"] == category),
+            "unites": categories_counts[category],
+        }
+        for category in category_order
+        if any(item["type"] == category for item in panneaux)
+    ]
+
     # ── Données pour les <select> de filtres ────────────────────
-    all_supports = Support.objects.filter(type_support="panneau")
+    all_supports = Support.objects.all()
 
     villes    = sorted({v.strip() for v in all_supports.values_list("ville",    flat=True) if v and v.strip()})
     quartiers = sorted({q.strip() for q in all_supports.values_list("quartier", flat=True) if q and q.strip()})
@@ -215,6 +322,11 @@ def _build_context_panneaux(filters: dict) -> dict:
         "panneaux"          : panneaux,
         "today"             : today,
         "filters"           : filters,
+        "categories_selectionnees": categories,
+        "afficher_etat": filters.get("afficher_etat", "1") == "1",
+        "afficher_client": filters.get("afficher_client", "1") == "1",
+        "categories_rapport": ["Panneau", "Écran", "Marché", "Sucette"],
+        "categories_sections": categories_sections,
         "villes"            : villes,
         "quartiers"         : quartiers,
         "statuts"           : statuts,
@@ -237,22 +349,25 @@ def _filters_from_request(request) -> dict:
         "occupation": request.GET.get("occupation",""),
         "client_pk" : request.GET.get("client_pk", ""),
         "q"         : request.GET.get("q",         ""),
+        "categories": request.GET.getlist("categorie"),
+        "afficher_etat": request.GET.get("afficher_etat", "1"),
+        "afficher_client": request.GET.get("afficher_client", "1"),
     }
 
 # ══════════════════════════════════════════════════════════════════
 # VUES
 # ══════════════════════════════════════════════════════════════════
 
-class PanneauxReportView(ClientStaffRequiredMixin, View):
+class SupportsReportView(ClientStaffRequiredMixin, View):
     """Aperçu HTML du rapport — inclut les filtres."""
 
     def get(self, request):
         filters = _filters_from_request(request)
         context = _build_context_panneaux(filters)
-        return render(request, "reports/apercu_panneaux.html", context)
+        return render(request, "reports/apercu_supports.html", context)
 
 
-class ExportPanneauxPdfView(ClientStaffRequiredMixin, View):
+class ExportSupportsPdfView(ClientStaffRequiredMixin, View):
     """Télécharge le rapport filtré en PDF."""
 
     def get(self, request):
@@ -260,7 +375,7 @@ class ExportPanneauxPdfView(ClientStaffRequiredMixin, View):
         context = _build_context_panneaux(filters)
 
         html_string = render_to_string(
-            "reports/panneaux_report_pdf.html",
+            "reports/supports_report_pdf.html",
             context,
             request=request,
         )
@@ -270,7 +385,7 @@ class ExportPanneauxPdfView(ClientStaffRequiredMixin, View):
         ).write_pdf()
 
         # Nom de fichier reflétant les filtres actifs
-        parts = ["etat_panneaux"]
+        parts = ["etat_supports"]
         if filters.get("ville"):      parts.append(filters["ville"].replace(" ", "_"))
         if filters.get("quartier"):   parts.append(filters["quartier"].replace(" ", "_"))
         if filters.get("occupation"): parts.append(filters["occupation"])
@@ -310,7 +425,7 @@ def _thin_border(color="E2E8F0"):
     return Border(left=side, right=side, top=side, bottom=side)
 
 
-class ExportPanneauxExcelView(ClientStaffRequiredMixin, View):
+class ExportSupportsExcelView(ClientStaffRequiredMixin, View):
 
     def get(self, request):
         filters = _filters_from_request(request)
@@ -435,13 +550,13 @@ class ExportPanneauxExcelView(ClientStaffRequiredMixin, View):
         with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
 
             # ════════════════════════════════
-            # SHEET PRINCIPAL — État Panneaux
+            # SHEET PRINCIPAL — État Supports
             # ════════════════════════════════
-            df.to_excel(writer, index=False, sheet_name="État Panneaux", startrow=2)
-            ws = writer.sheets["État Panneaux"]
+            df.to_excel(writer, index=False, sheet_name="État Supports", startrow=2)
+            ws = writer.sheets["État Supports"]
 
             # Titre ligne 1
-            titre_parts = [f"État des panneaux — généré le {date.today():%d/%m/%Y}"]
+            titre_parts = [f"État des supports — généré le {date.today():%d/%m/%Y}"]
             if filters.get("ville"):      titre_parts.append(f"Ville : {filters['ville']}")
             if filters.get("quartier"):   titre_parts.append(f"Quartier : {filters['quartier']}")
             if filters.get("occupation"): titre_parts.append(f"Occupation : {filters['occupation']}")
@@ -544,7 +659,7 @@ class ExportPanneauxExcelView(ClientStaffRequiredMixin, View):
                 ws_c = writer.sheets[sheet_name]
 
                 # Titre
-                ws_c["A1"] = f"Panneaux de {client_nom} — {date.today():%d/%m/%Y}"
+                ws_c["A1"] = f"Supports de {client_nom} — {date.today():%d/%m/%Y}"
                 ws_c["A1"].font = titre_font
 
                 # En-têtes
@@ -590,7 +705,7 @@ class ExportPanneauxExcelView(ClientStaffRequiredMixin, View):
 
         buffer.seek(0)
 
-        parts = ["etat_panneaux"]
+        parts = ["etat_supports"]
         if filters.get("ville"):      parts.append(filters["ville"].replace(" ", "_"))
         if filters.get("quartier"):   parts.append(filters["quartier"].replace(" ", "_"))
         if filters.get("occupation"): parts.append(filters["occupation"])

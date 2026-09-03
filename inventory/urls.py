@@ -27,4 +27,23 @@ urlpatterns = [
     path('formats/ajouter/', FormatSupportCreateView.as_view(), name='format_create'),
     path('formats/<int:pk>/modifier/', FormatSupportUpdateView.as_view(), name='format_update'),
     path('formats/<int:pk>/supprimer/', FormatSupportDeleteView.as_view(), name='format_delete'),
+
+    # Marchés
+    path('marches/', MarcheListView.as_view(), name='marche_list'),
+    path('marches/ajouter/', MarcheCreateView.as_view(), name='marche_create'),
+    path('marches/<int:pk>/', MarcheDetailView.as_view(), name='marche_detail'),
+    path('marches/<int:pk>/modifier/', MarcheUpdateView.as_view(), name='marche_update'),
+    path('marches/<int:pk>/supprimer/', MarcheDeleteView.as_view(), name='marche_delete'),
+
+    # Emplacements (rattachés à un marché)
+    path('marches/<int:marche_pk>/emplacements/ajouter/', EmplacementCreateView.as_view(), name='emplacement_create'),
+    path('marches/<int:marche_pk>/emplacements/next-code/', emplacement_next_code, name='emplacement_next_code'),
+    path('emplacements/<int:pk>/', EmplacementDetailView.as_view(), name='emplacement_detail'),
+    path('emplacements/<int:pk>/modifier/', EmplacementUpdateView.as_view(), name='emplacement_update'),
+    path('emplacements/<int:pk>/supprimer/', EmplacementDeleteView.as_view(), name='emplacement_delete'),
+
+    # API
+    path('api/marches/<int:pk>/emplacements/', api_emplacements_marche, name='api_emplacements_marche'),
+    path('api/marches/geojson/', api_marches_geojson, name='api_marches_geojson'),
+    path('api/marches/<int:pk>/popup/', api_marche_popup, name='api_marche_popup'),
 ]

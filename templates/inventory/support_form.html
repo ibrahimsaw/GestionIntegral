@@ -12,11 +12,14 @@
     .form-section { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); margin-bottom:20px; overflow:hidden; }
     .form-section-hd { padding:13px 18px; border-bottom:1px solid var(--border); font-size:.84rem; font-weight:700; display:flex; align-items:center; gap:8px; }
     .form-section-bd { padding:18px; }
-    #gps-map { height:300px; border-radius:8px; overflow:hidden; border:1px solid var(--border); margin-bottom:10px; }
+    #gps-map, #ref-map { height:300px; border-radius:8px; overflow:hidden; border:1px solid var(--border); margin-bottom:10px; }
     .coord-box { display:flex; gap:8px; align-items:center; padding:8px 12px; background:var(--bg-card2); border:1px solid rgba(0,212,255,.3); border-radius:8px; font-family:var(--mono); font-size:.8rem; color:var(--color-primary); }
-    .type-card { flex:1; padding:14px; border-radius:10px; border:2px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; transition:all .15s; text-align:center; font-weight:700; font-family:var(--font); font-size:.84rem; }
+    .type-card { flex:1; padding:14px; border-radius:10px; border:2px solid var(--border); background:transparent; color:var(--text-muted); cursor:pointer; transition:all .15s; text-align:center; font-weight:700; font-family:var(--font); font-size:.84rem; text-decoration:none; display:block; }
     .type-card.sel-panneau { border-color:var(--color-primary);; background:rgba(167,139,250,.08); color:var(--color-primary); }
     .type-card.sel-ecran   { border-color:var(--color-primary); background:rgba(0,212,255,.08); color:var(--color-primary); }
+    .type-card.type-card-marche { border-color:#f9731655; color:#f97316; }
+    .type-card.type-card-marche:hover { border-color:#f97316; background:rgba(249,115,22,.08); }
+    .type-card.type-card-marche.sel-marche { border-color:#f97316; background:rgba(249,115,22,.08); color:#f97316; }
     .type-card i { display:block; font-size:1.5rem; margin-bottom:5px; }
     .panel { display:none; }
     .panel.show { display:block; }
@@ -34,157 +37,287 @@
             <h1 style="font-size:1.4rem;font-weight:800;margin:0">{{ title }}</h1>
         </div>
 
-        <form method="post" enctype="multipart/form-data" id="mainSupportForm">
+        <form method="post" enctype="multipart/form-data" id="mainSupportForm" novalidate>
             {% csrf_token %}
-                {% if form.non_field_errors %}
-                    <div class="alert alert-danger">{{ form.non_field_errors }}</div>
-                {% endif %}
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+            {% endif %}
+            {% if marche_form.non_field_errors %}
+                <div class="alert alert-danger">{{ marche_form.non_field_errors }}</div>
+            {% endif %}
 
-            <div class="row g-3">
+            <!-- Champ technique : pilote côté serveur quelle branche traiter (support ou marché) -->
+            <input type="hidden" name="type_choice" id="type_choice" value="{{ initial_type_choice|default:'panneau' }}">
 
-                <div class="col-lg-5">
-                    <div class="form-section">
-                        <div class="form-section-hd"><i class="bi bi-crosshair" style="color:var(--color-primary)"></i>Positionnement GPS</div>
-                        <div class="form-section-bd">
-                            <p style="font-size:.78rem;color:var(--text-muted);margin-bottom:8px"><i class="bi bi-cursor me-1"></i>Cliquez sur la carte ou déplacez le curseur</p>
-                            <div id="gps-map"></div>
-                            <div class="coord-box"><i class="bi bi-geo-alt"></i><span id="coord-txt">{{ form.latitude.value|default:"—" }}, {{ form.longitude.value|default:"—" }}</span></div>
-                            <div class="row g-2 mt-2">
-                                <div class="col-6">
-                                    <label class="form-label">Latitude</label>
-                                    {{ form.latitude }}
-                                    {{ form.latitude.errors }}
-                                </div>
-                                <div class="col-6">
-                                    <label class="form-label">Longitude</label>
-                                    {{ form.longitude }}
-                                    {{ form.longitude.errors }}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="col-lg-7">
-                    <div class="form-section">
-                        <div class="form-section-hd"><i class="bi bi-grid-1x2" style="color:var(--color-primary)"></i>Type de Support</div>
-                        <div class="form-section-bd">
-                            <div class="d-flex gap-3 mb-3">
-                                <button type="button"
-                                        class="type-card {% if object %}pe-none opacity-75{% endif %}"
-                                        id="btn-panneau"
-                                        {% if not object %}onclick="selectType('panneau')"{% endif %}>
-                                    <i class="bi bi-sign-merge-right"></i>Panneau Statique
-                                </button>
-
-                                <button type="button"
-                                        class="type-card {% if object %}pe-none opacity-75{% endif %}"
-                                        id="btn-ecran"
-                                        {% if not object %}onclick="selectType('ecran')"{% endif %}>
-                                    <i class="bi bi-display"></i>Écran Numérique
-                                </button>
-                            </div>
-                            <div style="display:none">{{ form.type_support }}</div>
-                        </div>
-                    </div>
-
-                    <div class="form-section">
-                        <div class="form-section-hd"><i class="bi bi-info-circle" style="color:var(--color-primary)"></i>Informations Générales</div>
-                        <div class="form-section-bd">
-                            <div class="row g-3">
-                                <div class="col-md-6">
-                                    <label class="form-label" >Code *</label>
-                                    {{ form.code }}
-                                    {{ form.code.errors }}
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label" >Code externe</label>
-                                    {{ form.code_ext }}
-                                    {{ form.code_ext.errors }}
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">Nom du support *</label>
-                                    {{ form.nom }}
-                                    {{ form.nom.errors }}
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">Adresse physique</label>
-                                    {{ form.adresse }}
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">Ville</label>
-                                    {{ form.ville }}
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">Quartier</label>
-                                    {{ form.quartier }}
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">État de marche</label>
-                                    {{ form.etat }}
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">Photo du support</label>
-
-                                    <div class="mb-2">
-                                        <img id="image-preview"
-                                            src="{% if form.instance.photo_principale %}{{ form.instance.photo_principale.url }}{% else %}{% static 'img/logo.png' %}{% endif %}"
-                                            alt="Aperçu"
-                                            class="img-thumbnail {% if not form.instance.photo_principale %}d-none{% endif %}"
-                                            style="height: 120px; width: 180px; object-fit: cover; border-radius: 8px; border: 2px solid var(--color-primary);">
-                                    </div>
-                                    <div>
-                                        {{ form.photo_principale }}
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="form-section panel" id="panel-panneau">
-                        <div class="form-section-hd"><i class="bi bi-layers" style="color:#a78bfa"></i>Configuration des Faces</div>
-                        <div class="form-section-bd">
-                            <div class="row g-3 align-items-end mb-3">
-                                <div class="col-md-6">
-                                    <label class="form-label">Nombre de faces</label>
-                                    {{ form.nb_faces }}
-                                </div>
-                                <div class="col-md-6 small text-muted pb-2 italic">
-                                    <i class="bi bi-info-circle me-1"></i>Les faces seront nommées A, B, C...
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="form-label">Format</label>
-                                    {{ form.format }}
-                                    {{ form.format.errors }}
-                                </div>
-                            </div>
-
-                            <div id="faces-container"></div>
-                        </div>
-                    </div>
-
-                    <div class="form-section panel" id="panel-ecran">
-                        <div class="form-section-hd"><i class="bi bi-cpu" style="color:var(--color-primary)"></i>Spécifications Techniques Écran</div>
-                        <div class="form-section-bd">
-                            <div class="row g-3">
-                                {% for field in ecran_form %}
-                                <div class="col-md-6">
-                                    <label class="form-label">{{ field.label }}</label>
-                                    {{ field }}
-                                    {{ field.errors }}
-                                </div>
-                                {% endfor %}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="d-flex gap-3 justify-content-end mt-4">
-                        <a href="{% url 'support_list' %}" class="btn btn-outline-secondary">Annuler</a>
-                        <button type="submit" class="btn btn-primary px-5 shadow-sm">
-                            <i class="bi bi-cloud-arrow-up me-2"></i>{% if object %}Mettre à jour{% else %}Créer le support{% endif %}
+            <div class="form-section">
+                <div class="form-section-hd"><i class="bi bi-grid-1x2" style="color:var(--color-primary)"></i>Type de Support</div>
+                <div class="form-section-bd">
+                    <div class="d-flex gap-3 mb-3">
+                        <button type="button"
+                                class="type-card {% if object %}pe-none opacity-75{% endif %}"
+                                id="btn-panneau"
+                                {% if not object %}onclick="selectType('panneau')"{% endif %}>
+                            <i class="bi bi-sign-merge-right"></i>Panneau Statique
                         </button>
+
+                        <button type="button"
+                                class="type-card {% if object %}pe-none opacity-75{% endif %}"
+                                id="btn-ecran"
+                                {% if not object %}onclick="selectType('ecran')"{% endif %}>
+                            <i class="bi bi-display"></i>Écran Numérique
+                        </button>
+
+                        {% if not object %}
+                        <button type="button" class="type-card type-card-marche" id="btn-marche" onclick="selectType('marche')">
+                            <i class="bi bi-shop"></i>Marché
+                        </button>
+                        {% endif %}
                     </div>
+                    {% if not object %}
+                    <p style="font-size:.72rem;color:var(--text-muted);margin:0 0 4px">
+                        <i class="bi bi-info-circle me-1"></i>Un marché n'est pas un support classique : il gère un ensemble d'emplacements dans un périmètre. Le formulaire ci-dessous s'adapte selon votre choix.
+                    </p>
+                    {% endif %}
+                    <div style="display:none">{{ form.type_support }}</div>
                 </div>
+            </div>
+
+            <!-- ══════════════════ BRANCHE SUPPORT (Panneau / Écran) ══════════════════ -->
+            <div id="support-wrapper">
+                <div class="row g-3">
+
+                    <div class="col-lg-5">
+                        <div class="form-section">
+                            <div class="form-section-hd"><i class="bi bi-crosshair" style="color:var(--color-primary)"></i>Positionnement GPS</div>
+                            <div class="form-section-bd">
+                                <p style="font-size:.78rem;color:var(--text-muted);margin-bottom:8px"><i class="bi bi-cursor me-1"></i>Cliquez sur la carte ou déplacez le curseur</p>
+                                <div id="gps-map"></div>
+                                <div class="coord-box"><i class="bi bi-geo-alt"></i><span id="coord-txt">{{ form.latitude.value|default:"—" }}, {{ form.longitude.value|default:"—" }}</span></div>
+                                <div class="row g-2 mt-2">
+                                    <div class="col-6">
+                                        <label class="form-label">Latitude</label>
+                                        {{ form.latitude }}
+                                        {{ form.latitude.errors }}
+                                    </div>
+                                    <div class="col-6">
+                                        <label class="form-label">Longitude</label>
+                                        {{ form.longitude }}
+                                        {{ form.longitude.errors }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-7">
+                        <div class="form-section">
+                            <div class="form-section-hd"><i class="bi bi-info-circle" style="color:var(--color-primary)"></i>Informations Générales</div>
+                            <div class="form-section-bd">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label" >Code *</label>
+                                        {{ form.code }}
+                                        {{ form.code.errors }}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label" >Code externe</label>
+                                        {{ form.code_ext }}
+                                        {{ form.code_ext.errors }}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Nom du support *</label>
+                                        {{ form.nom }}
+                                        {{ form.nom.errors }}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Adresse physique</label>
+                                        {{ form.adresse }}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Ville</label>
+                                        {{ form.ville }}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Quartier</label>
+                                        {{ form.quartier }}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">État de marche</label>
+                                        {{ form.etat }}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Photo du support</label>
+
+                                        <div class="mb-2">
+                                            <img id="image-preview"
+                                                src="{% if form.instance.photo_principale %}{{ form.instance.photo_principale.url }}{% else %}{% static 'img/logo.png' %}{% endif %}"
+                                                alt="Aperçu"
+                                                class="img-thumbnail {% if not form.instance.photo_principale %}d-none{% endif %}"
+                                                style="height: 120px; width: 180px; object-fit: cover; border-radius: 8px; border: 2px solid var(--color-primary);">
+                                        </div>
+                                        <div>
+                                            {{ form.photo_principale }}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-section">
+                            <div class="form-section-hd"><i class="bi bi-shop" style="color:var(--color-primary)"></i>Marché (optionnel)</div>
+                            <div class="form-section-bd">
+                                <p style="font-size:.78rem;color:var(--text-muted);margin-bottom:12px">
+                                    <i class="bi bi-info-circle me-1"></i>Si ce support est posé dans un marché, choisissez le marché puis l'emplacement (juste un code). Les coordonnées GPS seront alignées automatiquement sur la position du marché — les emplacements individuels n'ont pas de position propre.
+                                </p>
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Marché</label>
+                                        <select id="id_marche_select" class="form-select">
+                                            <option value="">— Support autonome (hors marché) —</option>
+                                            {% for m in marches %}
+                                            <option value="{{ m.pk }}" {% if object.marche.pk == m.pk %}selected{% endif %}>{{ m.nom }}</option>
+                                            {% endfor %}
+                                        </select>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Emplacement</label>
+                                        <select id="id_emplacement" name="emplacement" class="form-select" disabled>
+                                            <option value="">---------</option>
+                                        </select>
+                                        <div style="font-size:.7rem;color:var(--text-muted);margin-top:4px" id="emplacement-help"></div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-section panel" id="panel-panneau">
+                            <div class="form-section-hd"><i class="bi bi-layers" style="color:#a78bfa"></i>Configuration des Faces</div>
+                            <div class="form-section-bd">
+                                <div class="row g-3 align-items-end mb-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Nombre de faces</label>
+                                        {{ form.nb_faces }}
+                                    </div>
+                                    <div class="col-md-6 small text-muted pb-2 italic">
+                                        <i class="bi bi-info-circle me-1"></i>Les faces seront nommées A, B, C...
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Format</label>
+                                        {{ form.format }}
+                                        {{ form.format.errors }}
+                                    </div>
+                                </div>
+
+                                <!-- Champ technique attendu par le JS (updateFaces) : pas un vrai formset Django,
+                                     juste un compteur maintenu côté client pour rester cohérent avec le nommage form-N-xxx -->
+                                <input type="hidden" name="form-TOTAL_FORMS" id="id_form-TOTAL_FORMS" value="0">
+                                <div id="faces-container"></div>
+                            </div>
+                        </div>
+
+                        <div class="form-section panel" id="panel-ecran">
+                            <div class="form-section-hd"><i class="bi bi-cpu" style="color:var(--color-primary)"></i>Spécifications Techniques Écran</div>
+                            <div class="form-section-bd">
+                                <div class="row g-3">
+                                    {% for field in ecran_form %}
+                                    <div class="col-md-6">
+                                        <label class="form-label">{{ field.label }}</label>
+                                        {{ field }}
+                                        {{ field.errors }}
+                                    </div>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+
+            {% if not object %}
+            <!-- ══════════════════ BRANCHE MARCHÉ (nouveau) ══════════════════ -->
+            <div id="marche-wrapper" style="display:none">
+                <div class="row g-3">
+
+                    <div class="col-lg-5">
+                        <div class="form-section">
+                            <div class="form-section-hd"><i class="bi bi-crosshair" style="color:#f97316"></i>Position et périmètre du marché</div>
+                            <div class="form-section-bd">
+                                <p style="font-size:.78rem;color:var(--text-muted);margin-bottom:8px">
+                                    <i class="bi bi-info-circle me-1"></i>Cliquez pour placer le marché, puis ajustez le rayon : le cercle représente sa zone. Les emplacements que vous créerez à l'intérieur n'auront pas besoin de coordonnées propres.
+                                </p>
+                                <div id="ref-map"></div>
+                                <div class="row g-2 mt-2">
+                                    <div class="col-4">
+                                        <label class="form-label">Latitude</label>
+                                        {{ marche_form.latitude }}
+                                        {{ marche_form.latitude.errors }}
+                                    </div>
+                                    <div class="col-4">
+                                        <label class="form-label">Longitude</label>
+                                        {{ marche_form.longitude }}
+                                        {{ marche_form.longitude.errors }}
+                                    </div>
+                                    <div class="col-4">
+                                        <label class="form-label">Rayon du périmètre (m)</label>
+                                        {{ marche_form.rayon_metres }}
+                                        {{ marche_form.rayon_metres.errors }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-lg-7">
+                        <div class="form-section">
+                            <div class="form-section-hd"><i class="bi bi-info-circle" style="color:#f97316"></i>Informations du Marché</div>
+                            <div class="form-section-bd">
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label">Nom du marché *</label>
+                                        {{ marche_form.nom }}
+                                        {{ marche_form.nom.errors }}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Ville</label>
+                                        {{ marche_form.ville }}
+                                        {{ marche_form.ville.errors }}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Quartier</label>
+                                        {{ marche_form.quartier }}
+                                        {{ marche_form.quartier.errors }}
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label">Adresse</label>
+                                        {{ marche_form.adresse }}
+                                        {{ marche_form.adresse.errors }}
+                                    </div>
+                                    <div class="col-12">
+                                        <label class="form-label">Description</label>
+                                        {{ marche_form.description }}
+                                        {{ marche_form.description.errors }}
+                                    </div>
+                                    <div class="col-12">
+                                        <div class="form-check">
+                                            {{ marche_form.actif }}
+                                            <label class="form-check-label" for="id_marche-actif">Marché actif</label>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+            {% endif %}
+
+            <div class="d-flex gap-3 justify-content-end mt-4">
+                <a href="{% url 'support_list' %}" class="btn btn-outline-secondary">Annuler</a>
+                <button type="submit" class="btn btn-primary px-5 shadow-sm">
+                    <i class="bi bi-cloud-arrow-up me-2"></i>{% if object %}Mettre à jour{% else %}Créer{% endif %}
+                </button>
             </div>
         </form>
     </div>
@@ -211,17 +344,24 @@
     const EXISTING_FACES = document.getElementById('existing-faces') ? JSON.parse(document.getElementById('existing-faces').textContent) : null;
 
     const typeField = document.getElementById('id_type_support');
+    const typeChoiceInput = document.getElementById('type_choice');
     const codeInput = document.getElementById('id_code');
     const nbFacesInput = document.getElementById('id_nb_faces');
     const facesContainer = document.getElementById('faces-container');
     const totalFormsInput = document.getElementById('id_form-TOTAL_FORMS');
 
-    // ── CARTE GPS (Leaflet) ──────────────────────────────────────
+    const supportWrapper = document.getElementById('support-wrapper');
+    const marcheWrapper = document.getElementById('marche-wrapper');
+
+    // Normalise "12,3714" (virgule, format FR) → "12.3714" avant parseFloat.
+    const parseCoord = v => parseFloat(String(v || '').replace(',', '.'));
+
+    // ── CARTE GPS SUPPORT (Leaflet) ────────────────────────────────
     const latInput = document.getElementById('id_latitude');
     const lngInput = document.getElementById('id_longitude');
     const coordTxt = document.getElementById('coord-txt');
-    const initLat = parseFloat(latInput.value) || 12.3714;
-    const initLng = parseFloat(lngInput.value) || -1.5197;
+    const initLat = parseCoord(latInput.value) || 12.3714;
+    const initLng = parseCoord(lngInput.value) || -1.5197;
 
     const gmap = L.map('gps-map');
     L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(gmap);
@@ -248,6 +388,52 @@
     gmap.on('click', e => placeMarker(e.latlng.lat, e.latlng.lng));
     gmap.setView([initLat, initLng], latInput.value ? 16 : 13);
     if (latInput.value && lngInput.value) placeMarker(initLat, initLng);
+
+    // ── CARTE MARCHÉ : position + périmètre (Leaflet) ──────────────
+    // N'existe que sur la vue de création (support_create) : id_marche-latitude etc.
+    // proviennent du MarcheForm rendu avec prefix='marche'.
+    const mLatInput = document.getElementById('id_marche-latitude');
+    const mLngInput = document.getElementById('id_marche-longitude');
+    const mRayonInput = document.getElementById('id_marche-rayon_metres');
+    let marcheMap = null, mMarker = null, mCircle = null;
+
+    if (mLatInput && mLngInput && mRayonInput) {
+        const mInitLat = parseCoord(mLatInput.value) || 12.3714;
+        const mInitLng = parseCoord(mLngInput.value) || -1.5197;
+
+        marcheMap = L.map('ref-map');
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(marcheMap);
+
+        var placeMarcheMarker = function(lat, lng) {
+            if (mMarker) marcheMap.removeLayer(mMarker);
+            mMarker = L.marker([lat, lng], { draggable: true }).addTo(marcheMap);
+            mMarker.on('dragend', e => {
+                const ll = e.target.getLatLng();
+                updateMarcheCoords(ll.lat, ll.lng);
+                if (mCircle) mCircle.setLatLng(ll);
+            });
+            updateMarcheCoords(lat, lng);
+            drawMarcheCircle(lat, lng);
+        };
+        var drawMarcheCircle = function(lat, lng) {
+            const rayon = parseInt(mRayonInput.value) || 100;
+            if (mCircle) marcheMap.removeLayer(mCircle);
+            mCircle = L.circle([lat, lng], {
+                radius: rayon, color: '#f97316', fillColor: '#f97316', fillOpacity: 0.15, weight: 2
+            }).addTo(marcheMap);
+        };
+        var updateMarcheCoords = function(lat, lng) {
+            mLatInput.value = lat.toFixed(7);
+            mLngInput.value = lng.toFixed(7);
+        };
+
+        marcheMap.on('click', e => placeMarcheMarker(e.latlng.lat, e.latlng.lng));
+        mRayonInput.addEventListener('input', () => {
+            if (mMarker) drawMarcheCircle(mMarker.getLatLng().lat, mMarker.getLatLng().lng);
+        });
+        marcheMap.setView([mInitLat, mInitLng], mLatInput.value ? 15 : 13);
+        if (mLatInput.value && mLngInput.value) placeMarcheMarker(mInitLat, mInitLng);
+    }
 
     // ── GÉNÉRATION AUTO DU CODE ─────────────────────────────────
     function generateAutoCode() {
@@ -308,13 +494,29 @@
         });
     }
 
-    // ── SÉLECTEUR DE TYPE ────────────────────────────────────────
+    // ── SÉLECTEUR DE TYPE (Panneau / Écran / Marché) ─────────────
     function selectType(t) {
-        typeField.value = t;
+        typeChoiceInput.value = t;
 
         // UI : Mise à jour des boutons
         document.getElementById('btn-panneau').className = 'type-card' + (t === 'panneau' ? ' sel-panneau' : '');
         document.getElementById('btn-ecran').className   = 'type-card' + (t === 'ecran'   ? ' sel-ecran'   : '');
+        const btnMarche = document.getElementById('btn-marche');
+        if (btnMarche) btnMarche.className = 'type-card type-card-marche' + (t === 'marche' ? ' sel-marche' : '');
+
+        if (t === 'marche') {
+            // Bascule vers la branche Marché : le formulaire Support reste dans le DOM
+            // (masqué) mais n'est pas validé côté serveur (voir type_choice).
+            supportWrapper.style.display = 'none';
+            if (marcheWrapper) marcheWrapper.style.display = 'block';
+            setTimeout(() => { if (marcheMap) marcheMap.invalidateSize(); }, 150);
+            return;
+        }
+
+        // Panneau / Écran
+        supportWrapper.style.display = 'block';
+        if (marcheWrapper) marcheWrapper.style.display = 'none';
+        typeField.value = t;
 
         // UI : Affichage des panels correspondants
         document.getElementById('panel-panneau').classList.toggle('show', t === 'panneau');
@@ -323,6 +525,7 @@
         // Logique métier
         generateAutoCode();
         if (t === 'panneau') updateFaces();
+        setTimeout(() => gmap.invalidateSize(), 150);
     }
 
     // ── GESTION DYNAMIQUE DES FACES ──────────────────────────────
@@ -408,13 +611,73 @@
         });
     }
 
+    // ── MARCHÉ → EMPLACEMENT (cascade) ───────────────────────────
+    // Les emplacements n'ont pas de coordonnées propres : dès qu'un marché est
+    // choisi, le support est positionné sur le marché lui-même (son périmètre).
+    // L'emplacement n'est qu'un identifiant (code + description) à l'intérieur.
+    const marcheSelect = document.getElementById('id_marche_select');
+    const emplacementSelect = document.getElementById('id_emplacement');
+    const emplacementHelp = document.getElementById('emplacement-help');
+    const CURRENT_SUPPORT_ID = "{{ object.pk|default:'' }}";
+    const CURRENT_EMPLACEMENT_ID = "{{ object.emplacement_id|default:'' }}";
+    const API_EMPLACEMENTS_TEMPLATE = "{% url 'api_emplacements_marche' pk=999999 %}";
+
+    function chargerEmplacements(marcheId, preselect = null) {
+        emplacementSelect.innerHTML = '<option value="">---------</option>';
+        if (!marcheId) {
+            emplacementSelect.disabled = true;
+            emplacementHelp.textContent = '';
+            return Promise.resolve();
+        }
+        emplacementSelect.disabled = false;
+        emplacementHelp.textContent = 'Chargement des emplacements...';
+
+        const url = API_EMPLACEMENTS_TEMPLATE.replace('999999', marcheId) + `?current_support=${CURRENT_SUPPORT_ID}`;
+        return fetch(url)
+            .then(r => r.json())
+            .then(data => {
+                const emplacements = data.emplacements || [];
+                emplacements.forEach(e => {
+                    const opt = document.createElement('option');
+                    opt.value = e.id;
+                    if (e.libre) {
+                        opt.textContent = e.code;
+                    } else {
+                        opt.textContent = `${e.code} (occupé — ${e.support_code})`;
+                        opt.disabled = true;
+                    }
+                    if (preselect && String(e.id) === String(preselect)) opt.selected = true;
+                    emplacementSelect.appendChild(opt);
+                });
+                const nbLibres = emplacements.filter(e => e.libre).length;
+                emplacementHelp.textContent = `${nbLibres} emplacement(s) libre(s) sur ${emplacements.length} — situés dans le périmètre du marché`;
+
+                // Le support se positionne sur le marché lui-même (pas d'emplacement précis)
+                if (data.marche_latitude && data.marche_longitude) {
+                    const lat = parseFloat(String(data.marche_latitude).replace(',', '.'));
+                    const lng = parseFloat(String(data.marche_longitude).replace(',', '.'));
+                    placeMarker(lat, lng);
+                    gmap.setView([lat, lng], 16);
+                }
+            });
+    }
+
+    if (marcheSelect) {
+        marcheSelect.addEventListener('change', () => chargerEmplacements(marcheSelect.value));
+
+        // Pré-remplissage en modification : le marché est déjà sélectionné côté template
+        if (marcheSelect.value) {
+            chargerEmplacements(marcheSelect.value, CURRENT_EMPLACEMENT_ID);
+        }
+    }
+
     // ── INITIALISATION AU CHARGEMENT ─────────────────────────────
     document.addEventListener('DOMContentLoaded', function() {
         const isEdit = {% if object %}true{% else %}false{% endif %};
-        const savedType = typeField.value || 'panneau';
 
         if (isEdit) {
             // En modification : on applique le style visuel sans écraser le code
+            const savedType = typeField.value || 'panneau';
             document.getElementById('btn-panneau').className = 'type-card' + (savedType === 'panneau' ? ' sel-panneau' : '');
             document.getElementById('btn-ecran').className   = 'type-card' + (savedType === 'ecran'   ? ' sel-ecran'   : '');
             document.getElementById('panel-panneau').classList.toggle('show', savedType === 'panneau');
@@ -426,8 +689,10 @@
 
             if (savedType === 'panneau') updateFaces();
         } else {
-            // En création : comportement dynamique standard
-            selectType(savedType);
+            // En création : le type initial peut être imposé par le serveur
+            // (ex : re-affichage après une erreur de validation sur le formulaire Marché).
+            const initialChoice = "{{ initial_type_choice|default:'panneau' }}";
+            selectType(initialChoice);
         }
     });
 

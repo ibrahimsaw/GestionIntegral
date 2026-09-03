@@ -1,0 +1,238 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load l10n %}
+
+{% block title %}{{ marche.nom }} — Integral{% endblock %}
+{% block topbar_title %}<i class="bi bi-shop me-2" style="color:var(--color-primary)"></i>{{ marche.nom }}{% endblock %}
+{% block topbar_actions %}
+  {% if user.is_staff_regie_role %}
+  <a href="{% url 'emplacement_create' marche.pk %}" class="btn btn-primary btn-sm">
+    <i class="bi bi-plus-lg me-1"></i>
+    <span class="d-none d-md-inline">Ajouter un emplacement</span>
+  </a>
+  <a href="{% url 'marche_update' marche.pk %}" class="btn btn-outline-secondary btn-sm">
+    <i class="bi bi-pencil"></i>
+  </a>
+  {% endif %}
+  {% if user.is_admin %}
+  <a href="{% url 'marche_delete' marche.pk %}" class="btn btn-sm" style="background:rgba(239,68,68,.1);color:#f87171;border:1px solid #ef444444">
+    <i class="bi bi-trash"></i>
+  </a>
+  {% endif %}
+{% endblock %}
+
+{% block extra_head %}
+<style>
+    #plan-map { height:320px; border-radius:var(--radius); overflow:hidden; border:1px solid var(--border); }
+    .stall-grid { display:flex; flex-wrap:wrap; gap:10px; padding:18px; }
+    .stall {
+        width:86px; padding:10px 8px; border-radius:10px; text-align:center;
+        font-size:.78rem; font-weight:700; border:1px solid transparent; transition:transform .1s;
+        text-decoration:none; display:block;
+    }
+    .stall:hover { transform:translateY(-2px); }
+    .stall-libre { background:#22c55e18; color:#16a34a; border-color:#22c55e33; }
+    .stall-occupe { background:#ef444418; color:#dc2626; border-color:#ef444433; }
+    .stall small { display:block; font-weight:500; font-size:.65rem; margin-top:3px; opacity:.85; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="d-flex align-items-center gap-3 mb-4">
+    <a href="{% url 'marche_list' %}" class="btn btn-outline-secondary btn-sm">
+        <i class="bi bi-arrow-left"></i>
+    </a>
+    <div>
+        <p style="color:var(--text-muted);font-size:.85rem;margin:0">
+            <i class="bi bi-geo-alt me-1"></i>{{ marche.quartier|default:"—" }}{% if marche.quartier and marche.ville %}, {% endif %}{{ marche.ville }}
+            {% if marche.adresse %} — {{ marche.adresse }}{% endif %}
+            {% if marche.rayon_metres %} · <span style="color:#f97316">périmètre {{ marche.rayon_metres }} m</span>{% endif %}
+        </p>
+    </div>
+</div>
+
+<!-- KPI -->
+<div class="row g-3 mb-4">
+  <div class="col-6 col-md-3">
+    <div class="card text-center p-3">
+      <div style="font-size:1.6rem;font-weight:800">{{ marche.nb_emplacements }}</div>
+      <div style="font-size:.75rem;color:var(--text-muted)">Emplacements</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center p-3">
+      <div style="font-size:1.6rem;font-weight:800;color:#059669">{{ marche.nb_emplacements_libres }}</div>
+      <div style="font-size:.75rem;color:var(--text-muted)">Libres</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center p-3">
+      <div style="font-size:1.6rem;font-weight:800;color:var(--color-primary)">{{ marche.nb_emplacements_occupes }}</div>
+      <div style="font-size:.75rem;color:var(--text-muted)">Occupés</div>
+    </div>
+  </div>
+  <div class="col-6 col-md-3">
+    <div class="card text-center p-3">
+      <div style="font-size:1.6rem;font-weight:800">{{ marche.taux_occupation_pourcentage }}%</div>
+      <div style="font-size:.75rem;color:var(--text-muted)">Taux d'occupation</div>
+    </div>
+  </div>
+</div>
+
+{% if marche.description %}
+<div class="card mb-4">
+  <div class="card-body" style="font-size:.85rem;color:var(--text-secondary)">{{ marche.description }}</div>
+</div>
+{% endif %}
+
+<!-- Localisation & périmètre -->
+<div class="card mb-4">
+  <div class="card-header"><i class="bi bi-map me-2"></i>Localisation et périmètre du marché</div>
+  <div class="card-body p-0">
+    <div id="plan-map"></div>
+  </div>
+  <div class="card-body py-2" style="font-size:.75rem;color:var(--text-muted)">
+    <i class="bi bi-info-circle me-1"></i>Les emplacements n'ont pas de position propre : ils sont considérés comme situés dans ce périmètre.
+  </div>
+</div>
+
+<!-- Plan visuel des emplacements (grille, sans coordonnées) -->
+<div class="card mb-4">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-grid-3x3-gap me-2"></i>Plan des emplacements</span>
+  </div>
+  <div class="card-body p-0">
+    {% if emplacements %}
+    <div class="stall-grid">
+      {% for e in emplacements %}
+        {% if e.support_installe %}
+          <a href="{% url 'emplacement_detail' e.pk %}" class="stall stall-occupe" title="Occupé — {{ e.support_installe.code }}{% if e.est_dans_campagne %} — en campagne{% endif %}">
+            {{ e.code }}{% if e.est_dans_campagne %} <i class="bi bi-megaphone-fill" style="font-size:.65rem"></i>{% endif %}
+            <small>{{ e.support_installe.code }}</small>
+          </a>
+        {% else %}
+          <a href="{% url 'emplacement_detail' e.pk %}" class="stall stall-libre" title="Libre — {{ e.notes|default:'' }}{% if e.est_dans_campagne %} — réservé pour une campagne{% endif %}">
+            {{ e.code }}{% if e.est_dans_campagne %} <i class="bi bi-megaphone-fill" style="font-size:.65rem"></i>{% endif %}
+            <small>Libre</small>
+          </a>
+        {% endif %}
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-4" style="color:var(--text-muted)">Aucun emplacement pour l'instant.</div>
+    {% endif %}
+  </div>
+</div>
+
+<!-- Tableau des emplacements -->
+<div class="card">
+  <div class="card-header d-flex justify-content-between align-items-center">
+    <span><i class="bi bi-list-ul me-2"></i>{{ emplacements|length }} emplacement(s)</span>
+  </div>
+  <div class="table-responsive">
+    <table class="table table-hover mb-0" style="font-size:.85rem">
+      <thead class="table-light">
+        <tr>
+          <th class="ps-3">Code</th>
+          <th>Statut</th>
+          <th>Support installé</th>
+          <th>Description</th>
+          <th class="text-end pe-3">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in emplacements %}
+        <tr>
+          <td class="ps-3">
+            <a href="{% url 'emplacement_detail' e.pk %}" style="text-decoration:none">
+              <code style="color:var(--color-primary);font-weight:700">{{ e.code }}</code>
+            </a>
+          </td>
+          <td>
+            {% if e.support_installe %}
+              <span class="badge-status bs-occupe"><i class="bi bi-broadcast me-1"></i>Occupé</span>
+            {% else %}
+              <span class="badge-status bs-disponible"><i class="bi bi-check2 me-1"></i>Libre</span>
+            {% endif %}
+            {% if e.est_dans_campagne %}
+              <span class="badge" style="background:#f9731622;color:#ea580c;font-size:.68rem;margin-left:4px" title="Réservé pour une campagne en cours ou à venir">
+                <i class="bi bi-megaphone-fill me-1"></i>Campagne
+              </span>
+            {% endif %}
+          </td>
+          <td>
+            {% if e.support_installe %}
+              <a href="{% url 'support_detail' e.support_installe.uuid %}" style="font-weight:600;color:var(--color-primary);text-decoration:none">
+                {{ e.support_installe.code }}
+              </a>
+              <div style="font-size:.72rem;color:var(--text-muted)">{{ e.support_installe.nom }}</div>
+            {% else %}
+              <span style="color:var(--text-muted)">—</span>
+            {% endif %}
+          </td>
+          <td style="max-width:280px;color:var(--text-secondary)">{{ e.notes|default:"—"|truncatechars:80 }}</td>
+          <td class="text-end pe-3">
+            <div class="d-flex gap-1 justify-content-end">
+              <a href="{% url 'emplacement_detail' e.pk %}" class="btn btn-outline-secondary btn-sm" title="Détail"><i class="bi bi-eye"></i></a>
+              {% if user.is_staff_regie_role %}
+              <a href="{% url 'emplacement_update' e.pk %}" class="btn btn-outline-secondary btn-sm" title="Modifier"><i class="bi bi-pencil"></i></a>
+              {% endif %}
+              {% if user.is_admin and not e.support_installe %}
+              <a href="{% url 'emplacement_delete' e.pk %}" class="btn btn-outline-danger btn-sm" title="Supprimer"><i class="bi bi-trash"></i></a>
+              {% endif %}
+              {% if not e.support_installe and user.is_staff_regie_role %}
+              <a href="{% url 'support_create' %}?marche={{ marche.pk }}&emplacement={{ e.pk }}" class="btn btn-outline-primary btn-sm" title="Installer un panneau ici"><i class="bi bi-plus-lg"></i></a>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="5" class="text-center py-5" style="color:var(--text-muted)">
+            <i class="bi bi-grid-3x3-gap d-block mb-2" style="font-size:2rem"></i>
+            Aucun emplacement enregistré pour ce marché.
+            {% if user.is_staff_regie_role %}
+              <br><a href="{% url 'emplacement_create' marche.pk %}">Ajouter le premier emplacement</a>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const refLat = {{ marche.latitude|unlocalize|default:"12.3714" }};
+    const refLng = {{ marche.longitude|unlocalize|default:"-1.5197" }};
+    const rayon  = {{ marche.rayon_metres|unlocalize|default:"100" }};
+
+    // Il faut une vue initiale (setView) AVANT d'ajouter des layers, sinon
+    // circle.getBounds() plante (le cercle n'a pas encore de projection).
+    const map = L.map('plan-map').setView([refLat, refLng], 15);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png').addTo(map);
+
+    const icon = L.divIcon({
+        html: `<svg width="30" height="30" viewBox="0 0 34 34"><rect x="3" y="8" width="28" height="22" rx="4" fill="#f97316"/><path d="M3 8 L8 2 H26 L31 8 Z" fill="#fb923c"/><svg x="9" y="12" width="16" height="16" viewBox="0 0 16 16" fill="white"><path d="M0 1.5A.5.5 0 0 1 .5 1H2a.5.5 0 0 1 .485.379L2.89 3H14.5a.5.5 0 0 1 .491.592l-1.5 8A.5.5 0 0 1 13 12H4a.5.5 0 0 1-.491-.408L2.01 3.607 1.61 2H.5a.5.5 0 0 1-.5-.5M3.102 4l1.313 7h8.17l1.313-7zM5 12a2 2 0 1 0 0 4 2 2 0 0 0 0-4m7 0a2 2 0 1 0 0 4 2 2 0 0 0 0-4m-7 1a1 1 0 1 1 0 2 1 1 0 0 1 0-2m7 0a1 1 0 1 1 0 2 1 1 0 0 1 0-2"/></svg></svg>`,
+        iconSize: [30, 30], iconAnchor: [15, 26], className: ''
+    });
+    L.marker([refLat, refLng], { icon }).addTo(map).bindPopup(`<b>{{ marche.nom|escapejs }}</b>`);
+
+    const circle = L.circle([refLat, refLng], {
+        radius: rayon, color: '#f97316', fillColor: '#f97316', fillOpacity: 0.12, weight: 2
+    }).addTo(map);
+
+    setTimeout(() => {
+        map.invalidateSize();
+        try {
+            map.fitBounds(circle.getBounds(), { padding: [20, 20], maxZoom: 17 });
+        } catch (e) {
+            map.setView([refLat, refLng], 15);
+        }
+    }, 150);
+});
+</script>
+{% endblock %}

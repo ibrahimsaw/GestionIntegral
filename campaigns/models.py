@@ -900,10 +900,15 @@ class Campagne(models.Model):
             spots = self.calculer_nombre_spots()
             return (prix * Decimal(str(spots))).quantize(Decimal('0.01'))
 
+        if self.type_support == 'marche':
+            emplacements = self.nombre_emplacements()
+            return (prix * Decimal(emplacements)).quantize(Decimal('0.01'))
+
         faces = self.nombre_faces()
         return (prix * Decimal(faces)).quantize(Decimal('0.01'))
     
     def montant_total_affichage(self):
+        print(self.type_support)
         prix = self.prix_affichage or Decimal('0.00')
 
         if self.est_mere:
@@ -915,6 +920,10 @@ class Campagne(models.Model):
         if self.type_support == 'ecran':
             spots = self.calculer_nombre_spots()
             return (prix * Decimal(str(spots))).quantize(Decimal('0.01'))
+
+        if self.type_support == 'marche':
+            emplacements = self.nombre_emplacements()
+            return (prix * Decimal(emplacements)).quantize(Decimal('0.01'))
 
         faces = self.nombre_faces()
         return (prix * Decimal(faces)).quantize(Decimal('0.01'))
@@ -935,7 +944,11 @@ class Campagne(models.Model):
         if self.type_support == 'ecran':
             spots = self.calculer_nombre_spots()
             return (prix * Decimal(str(spots))).quantize(Decimal('0.01'))
-        
+
+        if self.type_support == 'marche':
+            emplacements = self.nombre_emplacements()
+            return (prix * Decimal(emplacements)).quantize(Decimal('0.01'))
+
         faces = self.nombre_faces()
         return (prix * Decimal(faces)).quantize(Decimal('0.01'))
     
@@ -955,6 +968,15 @@ class Campagne(models.Model):
         total_jours = self.duree_jours()
         if total_jours == 0:
             return 0
+
+        if self.type_support == 'marche':
+            total = 0
+            for ligne in self.lignes.filter(emplacement__isnull=False).select_related('emplacement'):
+                jours_dispo = ligne.emplacement.jours_disponibles_sur_periode(
+                    self.date_debut, self.date_fin, exclude_campagne_id=self.pk
+                )
+                total += jours_dispo / total_jours
+            return round(total, 2)
 
         if self.type_support and self.type_support != 'ecran':
             total = 0
@@ -998,8 +1020,25 @@ class Campagne(models.Model):
     def calculer_duree_tranches(self):
         return calculer_duree_tranches(self.tranches_horaires)
     
+    def nombre_emplacements(self):
+        if not self.pk:
+            return 0
+        return self.lignes.filter(emplacement__isnull=False).values('emplacement').distinct().count()
+
     def calculer_nombre_spots(self):
-        
+        if self.type_support == 'marche':
+            total_jours = self.duree_jours()
+            if total_jours == 0:
+                return 0
+            total = 0
+            for ligne in self.lignes.filter(emplacement__isnull=False).select_related('emplacement'):
+                jours_dispo = ligne.emplacement.jours_disponibles_sur_periode(
+                    self.date_debut, self.date_fin, exclude_campagne_id=self.pk
+                )
+                print(f"Support {ligne.emplacement} : {jours_dispo} jours dispo sur {total_jours} jours")
+                total += jours_dispo / total_jours
+            return round(total, 2)
+
         if self.type_support and self.type_support != 'ecran':
             total_jours = self.duree_jours()
             if total_jours == 0:
@@ -1099,10 +1138,16 @@ class CampagneVisuel(models.Model):
 
 
 class LigneCampagne(models.Model):
-    """Lien entre une campagne et un support avec ses surcharges spécifiques."""
+    """Lien entre une campagne et un support (ou un emplacement de marché) avec ses surcharges spécifiques."""
     campagne = models.ForeignKey(Campagne, on_delete=models.CASCADE, related_name='lignes')
-    support = models.ForeignKey('inventory.Support', on_delete=models.PROTECT, related_name='lignes_campagne')
+    support = models.ForeignKey('inventory.Support', on_delete=models.PROTECT, related_name='lignes_campagne', null=True, blank=True)
     face = models.ForeignKey('inventory.FacePanneau', on_delete=models.SET_NULL, null=True, blank=True, related_name='lignes_campagne', verbose_name="Face (Panneau)")
+    emplacement = models.ForeignKey(
+        'inventory.Emplacement', on_delete=models.PROTECT, null=True, blank=True,
+        related_name='lignes_campagne', verbose_name="Emplacement (Marché)",
+        help_text="Renseigné uniquement pour les campagnes de type Marché — l'emplacement "
+                   "peut être réservé même s'il n'a pas encore de panneau installé."
+    )
     visuel = models.FileField(upload_to='visuels/', blank=True, null=True, verbose_name="Visuel / Média")
     ordre_dans_boucle = models.PositiveIntegerField(default=0, verbose_name="Priorité/Ordre")
     notes = models.TextField(blank=True, verbose_name="Notes internes")
@@ -1118,7 +1163,16 @@ class LigneCampagne(models.Model):
         verbose_name_plural = "Lignes de campagne"
 
     def __str__(self):
+        if self.emplacement_id:
+            return f"{self.campagne.nom} -> {self.emplacement.code} ({self.emplacement.marche.nom})"
         return f"{self.campagne.nom} -> {self.support.code}"
+
+    def clean(self):
+        super().clean()
+        if not self.support_id and not self.emplacement_id:
+            raise ValidationError("Une ligne de campagne doit référencer soit un support, soit un emplacement de marché.")
+        if self.support_id and self.emplacement_id:
+            raise ValidationError("Une ligne de campagne ne peut pas référencer à la fois un support et un emplacement.")
     
     def get_duree_passage_effective(self):
         return self.duree_passage or self.campagne.duree_passage

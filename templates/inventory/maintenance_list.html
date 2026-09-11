@@ -1,32 +1,76 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}Liste des Maintenances{% endblock %}
+{% block title %}Liste des Maintenances — Integral{% endblock %}
 {% block topbar_title %}
-  <i class="bi bi-tools me-2" style="color:#fbbf24"></i>Maintenances
+  <i class="bi bi-tools me-2" style="color:#fbbf24"></i>Interventions de Maintenance
+{% endblock %}
+{% block topbar_actions %}
+  <div class="d-flex flex-wrap gap-2">
+    <a href="{% url 'periodes_panne_liste' %}" class="btn btn-outline-danger btn-sm rounded-pill px-3 shadow-sm d-flex align-items-center gap-1">
+      <i class="bi bi-exclamation-triangle-fill"></i>
+      <span class="d-none d-md-inline">Périodes de panne</span>
+    </a>
+    <a href="{% url 'maintenance_create' %}" class="btn btn-primary btn-sm rounded-pill px-3 shadow-sm d-flex align-items-center gap-1">
+      <i class="bi bi-plus-lg"></i>
+      <span class="d-none d-md-inline">Nouvelle maintenance</span>
+    </a>
+  </div>
 {% endblock %}
 
 {% block content %}
+<style>
+  .filter-card {
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--bg-card);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.02);
+  }
+  .table-custom-card {
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--bg-card);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.02);
+    overflow: hidden;
+  }
+  .table-maintenances thead th {
+    background-color: #f8fafc;
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    padding: 14px 16px;
+    border-bottom: 2px solid var(--border);
+    white-space: nowrap;
+  }
+  .table-maintenances tbody td {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  .table-maintenances tbody tr:hover {
+    background-color: rgba(245, 158, 11, 0.02);
+  }
+</style>
+
+<!-- Titre & Statistiques -->
 <div class="d-flex justify-content-between align-items-center mb-4">
   <div>
-    <h1 style="font-size:1.3rem;font-weight:800;margin:0">Interventions de maintenance</h1>
-    <p style="color:var(--text-muted);font-size:.8rem;margin:0">{{ page_obj.paginator.count }} intervention(s) au total</p>
+    <h1 style="font-size:1.4rem;font-weight:800;margin:0">Historique des Maintenances & Réparations</h1>
+    <p style="color:var(--text-muted);font-size:.82rem;margin:2px 0 0">
+      <span class="badge bg-light text-dark border font-monospace">{{ page_obj.paginator.count }} intervention{{ page_obj.paginator.count|pluralize }} répertoriée{{ page_obj.paginator.count|pluralize }}</span>
+    </p>
   </div>
-  <a href="{% url 'periodes_panne_liste' %}" class="btn btn-outline-danger btn-sm">
-    <i class="bi bi-exclamation-triangle-fill me-1"></i>Périodes de panne
-  </a>
-  <a href="{% url 'maintenance_create' %}" class="btn btn-primary btn-sm">
-    <i class="bi bi-plus-lg me-1"></i>Nouvelle maintenance
-  </a>
 </div>
 
 <!-- Filtres -->
-<div class="card mb-4">
-  <div class="card-body py-2">
-    <form method="get" class="row g-2 align-items-end">
-      <div class="col-md-3">
-        <label class="form-label" style="font-size:.75rem;color:var(--text-muted)">Support</label>
-        <select name="support" class="form-select form-select-sm">
+<div class="card filter-card mb-4">
+  <div class="card-body p-3 p-lg-4">
+    <form method="get" class="row g-3 align-items-end">
+      <div class="col-md-3 col-sm-6">
+        <label class="form-label" style="font-size:.72rem;font-weight:700;text-transform:uppercase;color:var(--text-muted)">Support</label>
+        <select name="support" class="form-select form-select-sm rounded-3">
           <option value="">Tous les supports</option>
           {% for s in supports %}
             <option value="{{ s.pk }}" {% if request.GET.support == s.pk|stringformat:"s" %}selected{% endif %}>
@@ -35,9 +79,9 @@
           {% endfor %}
         </select>
       </div>
-      <div class="col-md-2">
-        <label class="form-label" style="font-size:.75rem;color:var(--text-muted)">Face</label>
-        <select name="face" class="form-select form-select-sm">
+      <div class="col-md-2 col-sm-6">
+        <label class="form-label" style="font-size:.72rem;font-weight:700;text-transform:uppercase;color:var(--text-muted)">Face</label>
+        <select name="face" class="form-select form-select-sm rounded-3">
           <option value="">Toutes les faces</option>
           {% for f in faces %}
             <option value="{{ f.pk }}" {% if request.GET.face == f.pk|stringformat:"s" %}selected{% endif %}>
@@ -46,9 +90,9 @@
           {% endfor %}
         </select>
       </div>
-      <div class="col-md-2">
-        <label class="form-label" style="font-size:.75rem;color:var(--text-muted)">État</label>
-        <select name="etat" class="form-select form-select-sm">
+      <div class="col-md-2 col-sm-6">
+        <label class="form-label" style="font-size:.72rem;font-weight:700;text-transform:uppercase;color:var(--text-muted)">État</label>
+        <select name="etat" class="form-select form-select-sm rounded-3">
           <option value="">Tous les états</option>
           {% for val, label in etat_choices %}
             <option value="{{ val }}" {% if request.GET.etat == val %}selected{% endif %}>{{ label }}</option>
@@ -56,9 +100,9 @@
         </select>
       </div>
       {% if not request.user.is_technicien %}
-      <div class="col-md-3">
-        <label class="form-label" style="font-size:.75rem;color:var(--text-muted)">Technicien</label>
-        <select name="technicien" class="form-select form-select-sm">
+      <div class="col-md-3 col-sm-6">
+        <label class="form-label" style="font-size:.72rem;font-weight:700;text-transform:uppercase;color:var(--text-muted)">Technicien</label>
+        <select name="technicien" class="form-select form-select-sm rounded-3">
           <option value="">Tous les techniciens</option>
           {% for t in techniciens %}
             <option value="{{ t.pk }}" {% if request.GET.technicien == t.pk|stringformat:"s" %}selected{% endif %}>
@@ -68,104 +112,105 @@
         </select>
       </div>
       {% endif %}
-      <div class="col-md-2 d-flex gap-2">
-        <button type="submit" class="btn btn-primary flex-fill"><i class="bi bi-search"></i></button>
-        <a href="{% url 'maintenance_list' %}" class="btn btn-outline-secondary"><i class="bi bi-x-lg"></i></a>
+      <div class="col-md-2 col-sm-6 d-flex gap-2">
+        <button type="submit" class="btn btn-primary btn-sm flex-fill rounded-3 shadow-sm d-flex align-items-center justify-content-center gap-1">
+          <i class="bi bi-funnel-fill"></i>
+          <span>Filtrer</span>
+        </button>
+        {% if request.GET.support or request.GET.face or request.GET.etat or request.GET.technicien %}
+        <a href="{% url 'maintenance_list' %}" class="btn btn-outline-secondary btn-sm rounded-3" title="Réinitialiser">
+          <i class="bi bi-arrow-counterclockwise"></i>
+        </a>
+        {% endif %}
       </div>
     </form>
   </div>
 </div>
 
-<!-- Liste -->
+<!-- Liste des Maintenances -->
 {% if maintenances %}
-  <div class="card">
+  <div class="table-custom-card">
     <div class="table-responsive">
-      <table class="table table-hover mb-0" style="font-size:.85rem">
-        <thead style="background:var(--bg-card);border-bottom:2px solid var(--border)">
+      <table class="table table-maintenances mb-0 align-middle" style="font-size:.85rem">
+        <thead>
           <tr>
-            <th style="font-size:.7rem;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);font-weight:700;padding:.75rem 1rem">Support</th>
-            <th style="font-size:.7rem;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);font-weight:700">Face</th>
-            <th style="font-size:.7rem;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);font-weight:700">Date</th>
-            <th style="font-size:.7rem;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);font-weight:700">Technicien</th>
-            <th style="font-size:.7rem;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);font-weight:700">État enregistré</th>
-            <th style="font-size:.7rem;text-transform:uppercase;letter-spacing:1px;color:var(--text-muted);font-weight:700">Description</th>
-            <th></th>
+            <th class="ps-4">Support</th>
+            <th>Face</th>
+            <th>Date & Heure</th>
+            <th>Technicien</th>
+            <th>État après intervention</th>
+            <th>Description & Travaux</th>
+            <th class="text-end pe-4">Actions</th>
           </tr>
         </thead>
         <tbody>
           {% for m in maintenances %}
           <tr>
             <!-- Support -->
-            <td style="padding:.75rem 1rem">
-              <a href="{% url 'support_detail' m.support.uuid %}" style="font-weight:700;color:var(--color-primary);text-decoration:none">
+            <td class="ps-4">
+              <a href="{% url 'support_detail' m.support.uuid %}" class="font-monospace fw-bold text-primary text-decoration-none">
                 {{ m.support.code }}
               </a>
-              <div style="font-size:.72rem;color:var(--text-muted)">{{ m.support.nom }}</div>
+              <div class="text-muted small">{{ m.support.nom }}</div>
             </td>
 
-            <!-- Face (colonne dédiée) -->
+            <!-- Face -->
             <td>
               {% if m.face %}
-                <span class="badge" style="background:var(--bs-primary-bg-subtle,#cfe2ff);color:var(--bs-primary-text-emphasis,#052c65);font-size:.72rem;font-weight:600;letter-spacing:.5px">
-                  {% comment %} <i class="bi bi-grid-1x2 me-1" style="font-size:.65rem"></i> {% endcomment %}Face {{ m.face.label }}
+                <span class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace px-2.5 py-1">
+                  Face {{ m.face.label }}
                 </span>
                 {% if m.face.orientation %}
-                  <div style="font-size:.68rem;color:var(--text-muted);margin-top:2px">{{ m.face.orientation }}</div>
+                  <div class="text-muted small" style="font-size:.68rem">{{ m.face.orientation }}</div>
                 {% endif %}
               {% else %}
-                <span style="color:var(--text-muted);font-size:.8rem">—</span>
+                <span class="text-muted">—</span>
               {% endif %}
             </td>
 
             <!-- Date -->
             <td>
-              <div style="font-weight:600">{{ m.date_intervention|date:"d/m/Y" }}</div>
-              <div style="font-size:.72rem;color:var(--text-muted)">{{ m.date_intervention|date:"H:i" }}</div>
+              <div class="fw-bold">{{ m.date_intervention|date:"d/m/Y" }}</div>
+              <div class="text-muted font-monospace small" style="font-size:.72rem">{{ m.date_intervention|date:"H:i" }}</div>
             </td>
 
             <!-- Technicien -->
             <td>
               {% if m.effectue_par %}
-                <div style="font-weight:600">{{ m.effectue_par.get_full_name|default:m.effectue_par.username }}</div>
-                <div style="font-size:.72rem;color:var(--text-muted)">{{ m.effectue_par.get_role_display }}</div>
+                <div class="fw-bold text-dark"><i class="bi bi-person me-1 text-muted"></i>{{ m.effectue_par.get_full_name|default:m.effectue_par.username }}</div>
+                <div class="text-muted small" style="font-size:.72rem">{{ m.effectue_par.get_role_display }}</div>
               {% else %}
-                <span style="color:var(--text-muted);font-size:.8rem">—</span>
+                <span class="text-muted">—</span>
               {% endif %}
             </td>
 
             <!-- État -->
             <td>
               {% if m.etat_apres == 'bon' %}
-                <span class="badge" style="background:#22c55e22;color:#16a34a;font-size:.72rem">
-                  <i class="bi bi-circle-fill me-1" style="font-size:.5rem"></i>Opérationnel
-                </span>
+                <span class="badge-status bs-disponible">Opérationnel</span>
               {% elif m.etat_apres == 'maintenance' %}
-                <span class="badge" style="background:#f9731622;color:#ea580c;font-size:.72rem">
-                  <i class="bi bi-circle-fill me-1" style="font-size:.5rem"></i>Maintenance
-                </span>
+                <span class="badge-status bs-occupe">En Maintenance</span>
               {% elif m.etat_apres == 'panne' %}
-                <span class="badge" style="background:#ef444422;color:#dc2626;font-size:.72rem">
-                  <i class="bi bi-circle-fill me-1" style="font-size:.5rem"></i>En panne
-                </span>
+                <span class="badge-status bs-panne">En Panne</span>
               {% else %}
-                <span style="color:var(--text-muted);font-size:.8rem">—</span>
+                <span class="text-muted">—</span>
               {% endif %}
             </td>
 
             <!-- Description -->
-            <td style="max-width:200px">
-              <div style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text-secondary)">
+            <td style="max-width:260px">
+              <div class="text-secondary small text-truncate">
                 {{ m.description|default:"—" }}
               </div>
             </td>
 
             <!-- Actions -->
-            <td class="text-end" style="padding-right:1rem">
-              <div class="d-flex gap-1 justify-content-end">
-                <a href="{% url 'maintenance_detail' m.pk %}" class="btn btn-outline-secondary btn-sm" title="Détail">
+            <td class="text-end pe-4">
+              <div class="d-inline-flex gap-1 justify-content-end">
+                <a href="{% url 'maintenance_detail' m.pk %}" class="btn btn-outline-secondary btn-sm btn-action-icon rounded-3" title="Voir le détail">
                   <i class="bi bi-eye"></i>
                 </a>
-                <a href="{% url 'maintenance_update' m.pk %}" class="btn btn-outline-primary btn-sm" title="Modifier">
+                <a href="{% url 'maintenance_update' m.pk %}" class="btn btn-outline-primary btn-sm btn-action-icon rounded-3" title="Modifier">
                   <i class="bi bi-pencil"></i>
                 </a>
               </div>
@@ -179,23 +224,23 @@
 
   <!-- Pagination -->
   {% if page_obj.has_other_pages %}
-  <nav class="mt-3">
+  <nav class="mt-4">
     <ul class="pagination pagination-sm justify-content-center">
       {% if page_obj.has_previous %}
         <li class="page-item">
-          <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if request.GET.support %}&support={{ request.GET.support }}{% endif %}{% if request.GET.face %}&face={{ request.GET.face }}{% endif %}{% if request.GET.etat %}&etat={{ request.GET.etat }}{% endif %}{% if request.GET.technicien %}&technicien={{ request.GET.technicien }}{% endif %}">
+          <a class="page-link rounded-circle mx-1 d-flex align-items-center justify-content-center" style="width:32px;height:32px" href="?page={{ page_obj.previous_page_number }}{% if request.GET.support %}&support={{ request.GET.support }}{% endif %}{% if request.GET.face %}&face={{ request.GET.face }}{% endif %}{% if request.GET.etat %}&etat={{ request.GET.etat }}{% endif %}{% if request.GET.technicien %}&technicien={{ request.GET.technicien }}{% endif %}">
             <i class="bi bi-chevron-left"></i>
           </a>
         </li>
       {% endif %}
       {% for num in page_obj.paginator.page_range %}
         <li class="page-item {% if page_obj.number == num %}active{% endif %}">
-          <a class="page-link" href="?page={{ num }}{% if request.GET.support %}&support={{ request.GET.support }}{% endif %}{% if request.GET.face %}&face={{ request.GET.face }}{% endif %}{% if request.GET.etat %}&etat={{ request.GET.etat }}{% endif %}{% if request.GET.technicien %}&technicien={{ request.GET.technicien }}{% endif %}">{{ num }}</a>
+          <a class="page-link rounded-circle mx-1 d-flex align-items-center justify-content-center" style="width:32px;height:32px" href="?page={{ num }}{% if request.GET.support %}&support={{ request.GET.support }}{% endif %}{% if request.GET.face %}&face={{ request.GET.face }}{% endif %}{% if request.GET.etat %}&etat={{ request.GET.etat }}{% endif %}{% if request.GET.technicien %}&technicien={{ request.GET.technicien }}{% endif %}">{{ num }}</a>
         </li>
       {% endfor %}
       {% if page_obj.has_next %}
         <li class="page-item">
-          <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if request.GET.support %}&support={{ request.GET.support }}{% endif %}{% if request.GET.face %}&face={{ request.GET.face }}{% endif %}{% if request.GET.etat %}&etat={{ request.GET.etat }}{% endif %}{% if request.GET.technicien %}&technicien={{ request.GET.technicien }}{% endif %}">
+          <a class="page-link rounded-circle mx-1 d-flex align-items-center justify-content-center" style="width:32px;height:32px" href="?page={{ page_obj.next_page_number }}{% if request.GET.support %}&support={{ request.GET.support }}{% endif %}{% if request.GET.face %}&face={{ request.GET.face }}{% endif %}{% if request.GET.etat %}&etat={{ request.GET.etat }}{% endif %}{% if request.GET.technicien %}&technicien={{ request.GET.technicien }}{% endif %}">
             <i class="bi bi-chevron-right"></i>
           </a>
         </li>
@@ -205,15 +250,17 @@
   {% endif %}
 
 {% else %}
-  <div class="card">
-    <div class="card-body text-center py-5" style="color:var(--text-muted)">
-      <i class="bi bi-tools" style="font-size:2.5rem;opacity:.3"></i>
-      <p class="mt-3 mb-0">Aucune maintenance enregistrée</p>
-      <a href="{% url 'maintenance_create' %}" class="btn btn-primary btn-sm mt-3">
-        <i class="bi bi-plus-lg me-1"></i>Ajouter une maintenance
+  <div class="card border-0 shadow-sm rounded-4">
+    <div class="card-body text-center py-5 text-muted">
+      <i class="bi bi-tools d-block mb-3 fs-1 opacity-25"></i>
+      <h6 class="fw-bold text-dark mb-1">Aucune intervention enregistrée</h6>
+      <p class="small text-muted mb-3">Aucune maintenance ne correspond à vos critères de recherche.</p>
+      <a href="{% url 'maintenance_create' %}" class="btn btn-primary btn-sm rounded-pill px-4 shadow-sm">
+        <i class="bi bi-plus-lg me-1"></i>Enregistrer une maintenance
       </a>
     </div>
   </div>
 {% endif %}
 
+{% endblock %}
 {% endblock %}

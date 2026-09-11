@@ -552,10 +552,68 @@
     {% endif %}
   </div>
 
-  {% regroup lignes by support as support_list %}
+  {% if campagne.type_support == 'marche' %}
+    {% regroup lignes by emplacement.marche as marche_list %}
+  {% else %}
+    {% regroup lignes by support as support_list %}
+  {% endif %}
   {% endif %}
   <div class="row g-4 mb-5">
-    {% if support_list %}
+    {% if campagne.type_support == 'marche' %}
+      {% if marche_list %}
+        {% for group in marche_list %}
+          {% with marche=group.grouper %}
+          <div class="col-md-6 col-xl-4">
+            <div class="card h-100 border-0 shadow-sm rounded-4 overflow-hidden support-card">
+              <div class="card-body">
+                <div class="d-flex gap-3">
+                  <div class="bg-light rounded-3 d-flex align-items-center justify-content-center border" style="width: 48px; height: 48px; flex-shrink: 0;">
+                    <i class="bi bi-shop text-warning fs-4"></i>
+                  </div>
+                  <div class="min-width-0">
+                    <h6 class="fw-bold mb-0">
+                      <a href="{% url 'marche_detail' marche.pk %}" class="text-dark text-decoration-none stretched-link">
+                        {{ marche.nom }}
+                      </a>
+                    </h6>
+                    <small class="text-muted d-block text-truncate">{{ marche.quartier|default:"—" }}, {{ marche.ville }}</small>
+                  </div>
+                </div>
+
+                <div class="mt-3 d-flex flex-wrap gap-1">
+                  {% for ligne in group.list %}
+                    <span class="badge {% if ligne.emplacement.is_libre %}bg-success-subtle text-success border-success-subtle{% else %}bg-primary-subtle text-primary border-primary-subtle{% endif %} border rounded-pill font-monospace" style="font-size: 0.68rem;" title="{% if not ligne.emplacement.is_libre %}Panneau installé : {{ ligne.emplacement.support_installe.code }}{% else %}Emplacement libre (sans panneau){% endif %}">
+                      {{ ligne.emplacement.code }}
+                      {% if not ligne.emplacement.is_libre %}<i class="bi bi-check-circle-fill ms-1"></i>{% else %}<i class="bi bi-dash-circle ms-1"></i>{% endif %}
+                    </span>
+                  {% endfor %}
+                </div>
+
+                <div class="mt-2 text-muted" style="font-size: 0.72rem;">
+                  {{ group.list|length }} emplacement{{ group.list|length|pluralize }} réservé{{ group.list|length|pluralize }} sur ce marché
+                </div>
+              </div>
+            </div>
+          </div>
+          {% endwith %}
+        {% endfor %}
+      {% else %}
+        {% if not campagne.est_mere %}
+          {% if not request.user.is_client %}
+            <div class="col-12">
+              <div class="card border-0 shadow-sm rounded-4 p-4 text-center bg-white">
+                <i class="bi bi-shop text-muted fs-1"></i>
+                <h6 class="fw-bold mt-3 mb-0" style="color:var(--text-muted);">Aucun emplacement associé à cette campagne</h6>
+                <p class="text-muted small mt-2">Ajoutez des emplacements de marché à votre campagne pour les voir apparaître ici.</p>
+                <a href="{% url 'supports_add_bulk' campagne.pk %}?type_support={{ campagne.type_support }}&ville={{ campagne.lieu }}" class="btn btn-primary btn-sm rounded-pill px-4 mt-3 shadow-sm">
+                  <i class="bi bi-plus-lg me-1"></i>Ajouter des emplacements
+                </a>
+              </div>
+            </div>
+          {% endif %}
+        {% endif %}
+      {% endif %}
+    {% elif support_list %}
       {% for group in support_list %}
         {% with support=group.grouper %}
         <div class="col-md-6 col-xl-4">
@@ -684,7 +742,7 @@
           {% for row in support_rows %}
           <tr>
             <td>
-              <a href="{% url 'support_detail' row.support.uuid %}" class="text-decoration-none fw-bold text-dark">
+              <a href="" class="text-decoration-none fw-bold text-dark">
                 {{ row.support.code }} — {{ row.support.nom }}
               </a>
             </td>

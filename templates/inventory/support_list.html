@@ -4,39 +4,190 @@
 {% block topbar_title %}<i class="bi bi-geo-alt me-2" style="color:var(--color-primary)"></i>Inventaire des Supports{% endblock %}
 {% block topbar_actions %}
   {% if user.is_staff_regie_role %}
-  <a href="{% url 'panneaux_report' %}" class="btn btn-outline-secondary btn-sm">
-    <i class="bi bi-file-earmark-bar-graph me-1"></i>
-    <span class="d-none d-md-inline">Report Panneaux</span>
-  </a>
-  <a href="{% url 'support_create' %}" class="btn btn-primary btn-sm">
-    <i class="bi bi-plus-lg me-1"></i>
-    <span class="d-none d-md-inline">Ajouter</span>
-  </a>
+  <div class="d-flex gap-2">
+    <a href="{% url 'supports_report' %}" class="btn btn-outline-secondary btn-sm shadow-sm rounded-pill px-3">
+      <i class="bi bi-file-earmark-bar-graph me-1"></i>
+      <span class="d-none d-md-inline">Report Panneaux</span>
+    </a>
+    <a href="{% url 'support_create' %}{% if type_panneau_f == 'Marché' or type_panneau_f == 'marche' %}?type_support=marche{% elif type_f %}?type_support={{ type_f }}{% endif %}" class="btn btn-primary btn-sm shadow-sm rounded-pill px-3">
+      <i class="bi bi-plus-lg me-1"></i>
+      <span class="d-none d-md-inline">{% if type_panneau_f == 'Marché' or type_panneau_f == 'marche' %}Ajouter un marché{% elif type_f == 'ecran' %}Ajouter un écran{% elif type_f == 'panneau' %}Ajouter un panneau{% else %}Ajouter un support{% endif %}</span>
+    </a>
+  </div>
   {% endif %}
 {% endblock %}
 
 {% block content %}
-<div class="card mb-4">
-  <div class="card-body">
-    <form method="get" class="row g-2 align-items-end">
-      <div class="col-md-2">
-        <label class="form-label">Recherche</label>
-        <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Code, nom, adresse...">
+<style>
+  .filter-card {
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--bg-card);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  }
+  .filter-card:hover {
+    box-shadow: 0 8px 28px rgba(0,0,0,0.06);
+    border-color: rgba(13, 110, 253, 0.2);
+  }
+  .filter-label {
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+    margin-bottom: 5px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+  .table-custom-card {
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    background: var(--bg-card);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+    overflow: hidden;
+  }
+  .table-supports thead th {
+    background-color: #f8fafc;
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    padding: 14px 16px;
+    border-bottom: 2px solid var(--border);
+    white-space: nowrap;
+  }
+  .table-supports tbody td {
+    padding: 14px 16px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  .table-supports tbody tr.support-row {
+    transition: background-color 0.15s ease;
+  }
+  .table-supports tbody tr.support-row:hover {
+    background-color: rgba(13, 110, 253, 0.02);
+  }
+  .ville-separator-row td {
+    padding: 11px 20px !important;
+    background: linear-gradient(90deg, var(--color-primary) 0%, #1e40af 100%);
+    color: #ffffff !important;
+    font-weight: 800;
+    font-size: 0.86rem;
+    letter-spacing: 0.8px;
+    border: none !important;
+  }
+  .quartier-separator-row td {
+    padding: 9px 20px 9px 32px !important;
+    background: #f1f5f9 !important;
+    color: var(--color-primary) !important;
+    font-weight: 700;
+    font-size: 0.76rem;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    border-bottom: 1px solid var(--border) !important;
+  }
+  .code-badge {
+    font-family: var(--mono, monospace);
+    font-weight: 700;
+    font-size: 0.82rem;
+    color: var(--color-primary);
+    background: rgba(13, 110, 253, 0.08);
+    padding: 4px 9px;
+    border-radius: 8px;
+    display: inline-block;
+    border: 1px solid rgba(13, 110, 253, 0.18);
+  }
+  .code-mairie-text {
+    font-family: var(--mono, monospace);
+    font-size: 0.82rem;
+    color: var(--text-muted);
+    font-weight: 600;
+  }
+  .support-name-link {
+    font-weight: 700;
+    color: var(--text);
+    text-decoration: none;
+    transition: color 0.15s ease;
+    font-size: 0.9rem;
+  }
+  .support-name-link:hover {
+    color: var(--color-primary);
+    text-decoration: underline;
+  }
+  .btn-action-icon {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+    font-size: 0.85rem;
+    transition: all 0.15s ease;
+  }
+  .btn-action-icon:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 3px 8px rgba(0,0,0,0.1);
+  }
+  .active-filter-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: rgba(13, 110, 253, 0.08);
+    color: var(--color-primary);
+    border: 1px solid rgba(13, 110, 253, 0.2);
+    border-radius: 20px;
+    font-size: 0.74rem;
+    font-weight: 600;
+  }
+  .active-filter-pill a {
+    color: var(--color-primary);
+    text-decoration: none;
+    opacity: 0.7;
+    margin-left: 2px;
+  }
+  .active-filter-pill a:hover {
+    opacity: 1;
+  }
+</style>
+
+{# ── Déterminer si le type est filtré ── #}
+{% with is_type_filtered=type_f|default:type_panneau_f %}
+
+{# ── SECTION FILTRES ── #}
+<div class="card filter-card mb-4">
+  <div class="card-body p-3 p-lg-4">
+    <form method="get" class="row g-3 align-items-end">
+      
+      {# Recherche textuelle #}
+      <div class="col-xl-2 col-lg-3 col-md-4 col-sm-6">
+        <label class="filter-label"><i class="bi bi-search"></i>Recherche</label>
+        <div class="input-group input-group-sm">
+          <input type="text" name="q" value="{{ q }}" class="form-control rounded-3" placeholder="Code, nom, adresse...">
+        </div>
       </div>
-      {% if desactif != 'ecran' and desactif != 'panneau' %}
-      <div class="col-md-2">
-        <label class="form-label">Type</label>
-        <select name="type" class="form-select">
+
+      {# Type de support (Panneau / Écran) #}
+      {% if type_panneau_f != '1x2' and desactif != 'ecran' and desactif != 'panneau' %}
+      <div class="col-xl-2 col-lg-3 col-md-4 col-sm-6">
+        <label class="filter-label"><i class="bi bi-grid"></i>Type</label>
+        <select name="type" class="form-select form-select-sm rounded-3">
           <option value="">Tous les types</option>
           <option value="panneau" {% if type_f == 'panneau' %}selected{% endif %}>Panneaux</option>
           <option value="ecran"   {% if type_f == 'ecran'   %}selected{% endif %}>Écrans</option>
         </select>
       </div>
       {% endif %}
+
+      {# Ville #}
       {% if desactif != 'ville' %}
-      <div class="col-md-2">
-        <label class="form-label">Ville</label>
-        <select name="ville" class="form-select">
+      <div class="col-xl-2 col-lg-3 col-md-4 col-sm-6">
+        <label class="filter-label"><i class="bi bi-geo-alt"></i>Ville</label>
+        <select name="ville" class="form-select form-select-sm rounded-3">
           <option value="">Toutes les villes</option>
           {% for ville in villes %}
             <option value="{{ ville }}" {% if ville_f == ville %}selected{% endif %}>{{ ville }}</option>
@@ -44,27 +195,34 @@
         </select>
       </div>
       {% endif %}
-      <div class="col-md-2">
-        <label class="form-label">État</label>
-        <select name="etat" class="form-select">
+
+      {# État technique #}
+      <div class="col-xl-2 col-lg-3 col-md-4 col-sm-6">
+        <label class="filter-label"><i class="bi bi-activity"></i>État</label>
+        <select name="etat" class="form-select form-select-sm rounded-3">
           <option value="">Tous les états</option>
-          <option value="bon"         {% if etat_f == 'bon'         %}selected{% endif %}>Bon état</option>
-          <option value="panne"       {% if etat_f == 'panne'       %}selected{% endif %}>En panne</option>
+          <option value="bon"   {% if etat_f == 'bon'   %}selected{% endif %}>Bon état</option>
+          <option value="panne" {% if etat_f == 'panne' %}selected{% endif %}>En panne</option>
         </select>
       </div>
-      <div class="col-md-2">
-        <label class="form-label">Occupation</label>
-        <select name="occupation" class="form-select">
-          <option value="">Tous états</option>
+
+      {# Occupation commerciale #}
+      <div class="col-xl-2 col-lg-3 col-md-4 col-sm-6">
+        <label class="filter-label"><i class="bi bi-pie-chart"></i>Occupation</label>
+        <select name="occupation" class="form-select form-select-sm rounded-3">
+          <option value="">Toutes occupations</option>
           {% for value, label in occupation_choices.items %}
             <option value="{{ value }}" {% if occupation_f == value %}selected{% endif %}>{{ label }}</option>
           {% endfor %}
         </select>
       </div>
-      <div class="col-md-2">
-        <label class="form-label">Format</label>
-        <select name="type_panneau" class="form-select">
-          <option value="">Tous les types</option>
+
+      {# Format #}
+      {% if type_panneau_f != '1x2' %}
+      <div class="col-xl-2 col-lg-3 col-md-4 col-sm-6">
+        <label class="filter-label"><i class="bi bi-aspect-ratio"></i>Format</label>
+        <select name="type_panneau" class="form-select form-select-sm rounded-3">
+          <option value="">Tous les formats</option>
           {% for code, libelle in type_panneau_choices %}
             <option value="{{ code }}" {% if type_panneau_f == code %}selected{% endif %}>
               {{ libelle }}
@@ -72,41 +230,92 @@
           {% endfor %}
         </select>
       </div>
-      <div class="col-md-2 d-flex gap-2">
-        <button type="submit" class="btn btn-primary flex-fill"><i class="bi bi-search"></i></button>
-        <a href="{% url 'support_list' %}" class="btn btn-outline-secondary"><i class="bi bi-x-lg"></i></a>
+      {% endif %}
+
+      {# Boutons Filtrer / Réinitialiser #}
+      <div class="col-xl-2 col-lg-3 col-md-4 col-sm-6 d-flex gap-2">
+        <button type="submit" class="btn btn-primary btn-sm flex-fill rounded-3 shadow-sm d-flex align-items-center justify-content-center gap-1">
+          <i class="bi bi-funnel-fill"></i>
+          <span>Filtrer</span>
+        </button>
+        {% if q or type_f or ville_f or etat_f or occupation_f or type_panneau_f %}
+        <a href="{% url 'support_list' %}" class="btn btn-outline-secondary btn-sm rounded-3" title="Réinitialiser tous les filtres">
+          <i class="bi bi-arrow-counterclockwise"></i>
+        </a>
+        {% endif %}
       </div>
+
     </form>
+
+    {# ── Badges des filtres actifs ── #}
+    {% if q or type_f or ville_f or etat_f or occupation_f or type_panneau_f %}
+    <div class="d-flex flex-wrap gap-2 align-items-center mt-3 pt-3 border-top">
+      <span class="small text-muted fw-bold me-1" style="font-size: 0.72rem;">Filtres actifs :</span>
+      {% if q %}
+        <span class="active-filter-pill"><i class="bi bi-search"></i>"{{ q }}"</span>
+      {% endif %}
+      {% if type_f %}
+        <span class="active-filter-pill"><i class="bi bi-grid"></i>Type: {{ type_f|title }}</span>
+      {% endif %}
+      {% if ville_f %}
+        <span class="active-filter-pill"><i class="bi bi-geo-alt"></i>{{ ville_f }}</span>
+      {% endif %}
+      {% if etat_f %}
+        <span class="active-filter-pill"><i class="bi bi-activity"></i>État: {{ etat_f|title }}</span>
+      {% endif %}
+      {% if occupation_f %}
+        <span class="active-filter-pill"><i class="bi bi-pie-chart"></i>{{ occupation_f|title }}</span>
+      {% endif %}
+      {% if type_panneau_f %}
+        <span class="active-filter-pill"><i class="bi bi-aspect-ratio"></i>Format: {{ type_panneau_f }}</span>
+      {% endif %}
+      <a href="{% url 'support_list' %}" class="small text-danger text-decoration-none ms-2 fw-semibold" style="font-size: 0.75rem;">
+        <i class="bi bi-x-circle me-1"></i>Effacer tout
+      </a>
+    </div>
+    {% endif %}
+
   </div>
 </div>
 
-<div class="card">
-  <div class="card-header d-flex align-items-center">
-    <span>{{ supports|length }} support(s) trouvé(s)</span>
-    <a href="{% url 'carte' %}" class="btn btn-sm btn-outline-secondary ms-auto"><i class="bi bi-map me-1"></i>Voir carte</a>
+{# ── SECTION TABLEAU DES SUPPORTS ── #}
+<div class="card table-custom-card">
+  <div class="card-header bg-white py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-2 border-bottom">
+    <div class="d-flex align-items-center gap-2">
+      <h6 class="mb-0 fw-bold text-dark">Résultats</h6>
+      <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-2.5 py-1 font-monospace" style="font-size: 0.75rem;">
+        {{ supports|length }} support{{ supports|length|pluralize }}
+      </span>
+    </div>
+    <a href="{% url 'carte' %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}" class="btn btn-sm btn-outline-primary rounded-pill px-3 shadow-sm d-flex align-items-center gap-1">
+      <i class="bi bi-map-fill"></i>
+      <span>Afficher sur la carte</span>
+    </a>
   </div>
-  <div class="card-body p-0 table-responsive">
-    
-    {# ─── UN SEUL TABLEAU ET UN SEUL THEAD ─── #}
-    <table id="tableSupports" class="table mb-0 align-middle">
-      <thead class="table-light">
+
+  <div class="table-responsive">
+    <table id="tableSupports" class="table table-supports mb-0 align-middle">
+      <thead>
         <tr>
           <th>{% sortable_th sort_links sort_key sort_dir 'code' 'Code' %}</th>
           <th>{% sortable_th sort_links sort_key sort_dir 'code_mairie' 'Code Mairie' %}</th>
           <th>{% sortable_th sort_links sort_key sort_dir 'nom' 'Nom' %}</th>
-          <th>{% sortable_th sort_links sort_key sort_dir 'type_support' 'Type' %}</th>
+          {# Afficher la colonne Type UNIQUEMENT si le type n'est pas filtré #}
+          {% if not is_type_filtered %}
+            <th>{% sortable_th sort_links sort_key sort_dir 'type_support' 'Type' %}</th>
+          {% endif %}
           <th>{% sortable_th sort_links sort_key sort_dir 'etat' 'État' %}</th>
           <th>{% sortable_th sort_links sort_key sort_dir 'occupation' 'Occupation' %}</th>
-          <th>{% sortable_th sort_links sort_key sort_dir 'actions' 'Actions' %}
+          <th class="text-end pe-4">{% sortable_th sort_links sort_key sort_dir 'actions' 'Actions' %}</th>
         </tr>
       </thead>
       <tbody>
         {% for s in supports %}
           
-          {# Si la VILLE change, on affiche une ligne d'en-tête pour la ville #}
+          {# Si la VILLE change, on affiche une ligne de séparation pour la ville #}
           {% ifchanged s.ville %}
-            <tr class="table-dark">
-              <td colspan="7" class="fw-bold text-uppercase ps-3 py-2" style="letter-spacing: 1px; font-size: 0.9rem; background-color: var(--color-primary);">
+            <tr class="ville-separator-row">
+              <td colspan="{% if is_type_filtered %}6{% else %}7{% endif %}" class="ps-3 py-2">
                 <i class="bi bi-building me-2"></i>{{ s.ville|default:"Ville non spécifiée" }}
               </td>
             </tr>
@@ -114,63 +323,93 @@
 
           {# Si le QUARTIER change (ou si la ville a changé), on met une ligne pour le quartier #}
           {% ifchanged s.ville s.quartier %}
-            <tr class="bg-light border-bottom">
-              <td colspan="7" class="fw-bold text-muted ps-4 py-2 text-uppercase" style="font-size: 0.8rem; color: var(--color-primary) !important; background-color: #f8f9fa;">
-                <i class="bi bi-signpost-split me-2"></i>Quartier : {{ s.quartier|default:"Général / Non spécifié" }}
+            <tr class="quartier-separator-row">
+              <td colspan="{% if is_type_filtered %}6{% else %}7{% endif %}">
+                <i class="bi bi-signpost-split me-1"></i>Quartier : {{ s.quartier|default:"Général / Non spécifié" }}
               </td>
             </tr>
           {% endifchanged %}
 
           {# Ligne standard du support #}
-          <tr class="{% if s.etat == 'panne' %}table-danger{% endif %}">
-            <td class="mono ps-4" style="font-size:.8rem;color:var(--color-primary)">{{ s.code }}</td>
-            <td class="mono" style="font-size:1rem;color:var(--color-primary);">{{ s.code_ext|default:"--" }}</td>
-            <td style="font-weight:600">
-              <a href="{% url 'support_detail' s.uuid %}" style="color:var(--text);text-decoration:none">{{ s.nom }}</a>
+          <tr class="support-row {% if s.etat == 'panne' %}table-danger bg-opacity-25{% endif %}">
+            <td class="ps-3">
+              <span class="code-badge">{{ s.code }}</span>
             </td>
             <td>
-              <span class="badge-status {% if s.type_support == 'panneau' %}bs-bientot{% else %}bs-en_cours{% endif %}">
-                {% if s.type_support == 'panneau' %}
-                  <i class="bi bi-sign-merge-right me-1"> {{ s.type_panneau }}</i>
+              <span class="code-mairie-text">{{ s.code_ext|default:"—" }}</span>
+            </td>
+            <td>
+              <a href="{% url 'support_detail' s.uuid %}" class="support-name-link">
+                {{ s.nom }}
+              </a>
+              {% if s.adresse %}
+                <small class="text-muted d-block text-truncate" style="max-width: 250px; font-size: 0.72rem;">
+                  <i class="bi bi-geo-alt me-1"></i>{{ s.adresse }}
+                </small>
+              {% endif %}
+            </td>
+
+            {# Cellule Type : affichée UNIQUEMENT si non filtré #}
+            {% if not is_type_filtered %}
+            <td style="min-width: 130px;">
+              <span class="badge-status {% if s.type_panneau == 'Marché' %} bs-maintenance {% elif s.type_support == 'panneau' %}bs-bientot{% else %}bs-en_cours{% endif %}">
+                {% if s.type_panneau == 'Marché'  %}
+                  <i class="bi bi-shop me-1"></i>{{ s.type_panneau }}
+                {% elif s.type_support == 'panneau' %}
+                  <i class="bi bi-sign-merge-right me-1"></i>{% if s.type_panneau == 'Standard' %}12m²{% else %}{{ s.type_panneau|default:"Panneau" }}{% endif %}
                 {% else %}
                   <i class="bi bi-display me-1"></i>{{ s.get_type_support_display }}
                 {% endif %}
               </span>
             </td>
+            {% endif %}
+
             <td>
               <span class="badge-status {% if s.etat == 'bon' %}bs-disponible{% elif s.etat == 'maintenance' %}bs-occupe{% else %}bs-panne{% endif %}">
                 {{ s.get_etat_display }}
               </span>
             </td>
+
             <td>
               {% if s.type_support == 'ecran' %}
                 {% if s.is_occupe %}
-                  <span class="badge-status bs-occupe"><i class="bi bi-broadcast me-1"></i>Occupé {{s.taux_occupation_pourcentage}}%</span>
+                  <span class="badge-status bs-occupe"><i class="bi bi-broadcast me-1"></i>Occupé {{ s.taux_occupation_pourcentage }}%</span>
                 {% else %}
                   <span class="badge-status bs-disponible"><i class="bi bi-check2 me-1"></i>Libre</span>
                 {% endif %}
               {% else %}
-                {% for face in s.faces.all %}
-                  {% if face.get_statut == 'libre' %}
-                    <span class="badge-status bs-disponible"><i class="bi bi-check2 me-1"></i>Libre {{face.label}}</span>
-                  {% elif face.get_statut == 'occupe' %}
-                    <span class="badge-status bs-occupe"><i class="bi bi-broadcast me-1"></i>Occupé {{face.label}}</span>
-                  {% elif face.get_statut == 'reserve' %}
-                    <span class="badge-status bs-reserve"><i class="bi bi-clock me-1"></i>Réservé {{face.label}}</span>
-                  {% else %}
-                    <span class="badge-status bs-panne"><i class="bi bi-clock me-1"></i>En Panne {{face.label}}</span>
-                  {% endif %}
-                {% endfor %}
+                <div class="d-flex flex-wrap gap-1">
+                  {% for face in s.faces.all %}
+                    {% if face.get_statut == 'libre' %}
+                      <span class="badge-status bs-disponible" title="Face {{ face.label }} : Libre"><i class="bi bi-check2 me-1"></i>{{ face.label }}</span>
+                    {% elif face.get_statut == 'occupe' %}
+                      <span class="badge-status bs-occupe" title="Face {{ face.label }} : Occupée"><i class="bi bi-broadcast me-1"></i>{{ face.label }}</span>
+                    {% elif face.get_statut == 'reserve' %}
+                      <span class="badge-status bs-reserve" title="Face {{ face.label }} : Réservée"><i class="bi bi-clock me-1"></i>{{ face.label }}</span>
+                    {% else %}
+                      <span class="badge-status bs-panne" title="Face {{ face.label }} : En Panne"><i class="bi bi-exclamation-triangle me-1"></i>{{ face.label }}</span>
+                    {% endif %}
+                  {% empty %}
+                    <span class="text-muted small italic" style="font-size: 0.72rem;">Aucune face</span>
+                  {% endfor %}
+                </div>
               {% endif %}
             </td>
-            <td>
-              <div class="d-flex gap-1">
+
+            <td class="text-end pe-3">
+              <div class="d-inline-flex gap-1">
                 {% if user.is_staff_regie_role %}
-                  <a href="{% url 'support_detail' s.uuid %}" class="btn btn-sm btn-outline-secondary" title="Détail"><i class="bi bi-eye"></i></a>
-                  <a href="{% url 'support_edit' s.uuid %}" class="btn btn-sm btn-outline-secondary" title="Modifier"><i class="bi bi-pencil"></i></a>
+                  <a href="{% url 'support_detail' s.uuid %}" class="btn btn-sm btn-outline-primary btn-action-icon" title="Voir le détail">
+                    <i class="bi bi-eye"></i>
+                  </a>
+                  <a href="{% url 'support_edit' s.uuid %}" class="btn btn-sm btn-outline-secondary btn-action-icon" title="Modifier">
+                    <i class="bi bi-pencil"></i>
+                  </a>
                 {% endif %}
                 {% if user.is_technicien_role or user.is_staff_regie_role %}
-                  <a href="{% url 'maintenance_create' s.pk %}" class="btn btn-sm btn-outline-secondary" title="Maintenance" style="color:#fbbf24;border-color:#fbbf2444"><i class="bi bi-tools"></i></a>
+                  <a href="{% url 'maintenance_create' s.pk %}" class="btn btn-sm btn-outline-warning btn-action-icon" title="Créer une maintenance">
+                    <i class="bi bi-tools"></i>
+                  </a>
                 {% endif %}
               </div>
             </td>
@@ -178,34 +417,37 @@
 
         {% empty %}
           <tr>
-            <td colspan="7" class="text-center py-5" style="color:var(--text-muted)">
-              <i class="bi bi-geo-alt d-block mb-2" style="font-size:2rem"></i>
-              Aucun support trouvé. <a href="{% url 'support_create' %}">Créer le premier</a>
+            <td colspan="{% if is_type_filtered %}6{% else %}7{% endif %}" class="text-center py-5" style="color:var(--text-muted)">
+              <div class="py-4">
+                <i class="bi bi-geo-alt text-muted d-block mb-3" style="font-size: 2.5rem; opacity: 0.4;"></i>
+                <h6 class="fw-bold text-dark mb-1">Aucun support trouvé</h6>
+                <p class="text-muted small mb-3">Aucun résultat ne correspond aux filtres sélectionnés.</p>
+                {% if q or type_f or ville_f or etat_f or occupation_f or type_panneau_f %}
+                  <a href="{% url 'support_list' %}" class="btn btn-outline-primary btn-sm rounded-pill px-3">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i>Réinitialiser les filtres
+                  </a>
+                {% else %}
+                  <a href="{% url 'support_create' %}" class="btn btn-primary btn-sm rounded-pill px-3">
+                    <i class="bi bi-plus-lg me-1"></i>Créer le premier support
+                  </a>
+                {% endif %}
+              </div>
             </td>
           </tr>
         {% endfor %}
       </tbody>
     </table>
-
   </div>
 </div>
 
-{% pagination_nav %}
+{% endwith %}
+
+<div class="mt-4">
+  {% pagination_nav %}
+</div>
 
 {% endblock %}
 
 {% block extra_js %}
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/datatables/1.13.6/css/dataTables.bootstrap5.min.css">
-<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/datatables/1.13.6/js/jquery.dataTables.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/datatables/1.13.6/js/dataTables.bootstrap5.min.js"></script>
-<script>
-$(document).ready(function() {
-  $('#tableSupports').DataTable({
-    pageLength: 15,
-    lengthMenu: [10, 15, 25, 50, 100],
-    language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/fr-FR.json' }
-  });
-});
-</script>
+{% endblock %}
 {% endblock %}

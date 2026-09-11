@@ -79,10 +79,23 @@
               <div class="form-text">Laisser vide pour créer une campagne autonome.</div>
             </div>
             <!-- TYPE SUPPORT -->
-            <div class="col-md-6">
-              <label class="form-label">Type / format</label>
-              {{ form.type_support }}
-              <div class="form-text">Choisissez « Écran » ou un format de panneau.</div>
+            <div class="col-md-3" id="col-categorie">
+              <label class="form-label">Catégorie</label>
+              <select id="id_categorie_support" class="form-control">
+                <option value="">— Choisir —</option>
+                <option value="ecran">Écran</option>
+                {% for cat in categories_format %}
+                <option value="{{ cat }}">{{ cat }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            <div class="col-md-3" id="col-format">
+              <label class="form-label">Format</label>
+              <select id="id_format_support" class="form-control" disabled>
+                <option value="">---------</option>
+              </select>
+              <div class="form-text" id="format-help">Choisissez d'abord une catégorie.</div>
+              <div style="display:none">{{ form.type_support }}</div>
             </div>
 
 
@@ -142,6 +155,12 @@
             <div class="col-md-6 ecran-fields d-none">
               <label class="form-label">Fréquence de diffusion *</label>
               {{ form.frequence }}
+            </div>
+
+            <div class="col-md-6 ecran-fields d-none">
+              <label class="form-label">Nombre de visuels</label>
+              {{ form.nombre_visuels }}
+              <div class="form-text">Par défaut : 1. Le calcul des spots l’intègre automatiquement.</div>
             </div>
 
             <div class="col-12 ecran-fields d-none">
@@ -217,10 +236,95 @@
 </div>
 {% endblock %}
 {% block extra_js %}
+{{ formats_par_categorie|json_script:"formats-par-categorie" }}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
 
     const typeSupport = document.getElementById('id_type_support');
+    const categorieSelect = document.getElementById('id_categorie_support');
+    const formatSelect = document.getElementById('id_format_support');
+    const formatHelp = document.getElementById('format-help');
+    const FORMATS_PAR_CATEGORIE = JSON.parse(document.getElementById('formats-par-categorie').textContent);
+
+    /* =========================
+       CASCADE CATÉGORIE → FORMAT
+       (le vrai champ soumis reste le select caché id_type_support,
+       synchronisé ici avec le choix catégorie+format)
+    ========================= */
+    function remplirFormats(categorie, preselect) {
+        formatSelect.innerHTML = '';
+        const colFormat = document.getElementById('col-format');
+
+        if (!categorie || categorie === 'ecran') {
+            colFormat.style.display = '';
+            formatSelect.disabled = true;
+            formatSelect.innerHTML = '<option value="">---------</option>';
+            formatHelp.textContent = categorie === 'ecran' ? 'Écran : aucun format à choisir.' : "Choisissez d'abord une catégorie.";
+            return;
+        }
+
+        const formats = FORMATS_PAR_CATEGORIE[categorie] || [];
+
+        // Catégorie à format unique (ex: Personnalisé, 12m2, Marché) : la catégorie
+        // EST le format, il n'y a rien à choisir de plus → on saute l'étape "Format".
+        if (formats.length === 1) {
+            typeSupport.value = formats[0].code;
+            colFormat.style.display = 'none';
+            formatSelect.disabled = true;
+            formatSelect.innerHTML = `<option value="${formats[0].code}" selected>${formats[0].label}</option>`;
+            return;
+        }
+
+        colFormat.style.display = '';
+        formatSelect.disabled = false;
+        formatSelect.appendChild(new Option('---------', ''));
+        formats.forEach(f => {
+            const opt = new Option(f.label, f.code);
+            if (preselect && f.code === preselect) opt.selected = true;
+            formatSelect.appendChild(opt);
+        });
+        formatHelp.textContent = `${formats.length} format(s) disponible(s) dans cette catégorie`;
+    }
+
+    function onCategorieChange() {
+        const cat = categorieSelect.value;
+        if (cat === 'ecran') {
+            typeSupport.value = 'ecran';
+            remplirFormats('ecran');
+        } else {
+            typeSupport.value = '';
+            remplirFormats(cat);
+        }
+        typeSupport.dispatchEvent(new Event('change'));
+    }
+
+    function onFormatChange() {
+        typeSupport.value = formatSelect.value;
+        typeSupport.dispatchEvent(new Event('change'));
+    }
+
+    if (categorieSelect) categorieSelect.addEventListener('change', onCategorieChange);
+    if (formatSelect) formatSelect.addEventListener('change', onFormatChange);
+
+    // Pré-remplissage en modification : on retrouve la catégorie à partir
+    // de la valeur actuelle de type_support (soit 'ecran', soit un code de format).
+    (function initCascadeFromValue() {
+        const valeurActuelle = typeSupport.value;
+        if (!valeurActuelle) return;
+        if (valeurActuelle === 'ecran') {
+            categorieSelect.value = 'ecran';
+            remplirFormats('ecran');
+            return;
+        }
+        for (const [cat, formats] of Object.entries(FORMATS_PAR_CATEGORIE)) {
+            if (formats.some(f => f.code === valeurActuelle)) {
+                categorieSelect.value = cat;
+                remplirFormats(cat, valeurActuelle);
+                return;
+            }
+        }
+    })();
+
     const clientSelect = document.getElementById('id_client');
     const prix = document.getElementById('id_prix');
     const prixAffichage = document.getElementById('id_prix_affichage');
@@ -268,16 +372,16 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (typeSupport) {
             if (isMere) {
-                typeSupport.parentElement.style.display = 'none';
+                document.getElementById('col-categorie').style.display = 'none';
+                document.getElementById('col-format').style.display = 'none';
                 typeSupport.value = '';
                 typeSupport.disabled = true;
-                typeSupport.style.background = 'var(--bg-card2)';
-                typeSupport.style.cursor = 'not-allowed';
+                if (categorieSelect) categorieSelect.value = '';
+                if (formatSelect) { formatSelect.innerHTML = '<option value="">---------</option>'; formatSelect.disabled = true; }
             } else {
-                typeSupport.parentElement.style.display = '';
+                document.getElementById('col-categorie').style.display = '';
+                document.getElementById('col-format').style.display = '';
                 typeSupport.disabled = false;
-                typeSupport.style.background = '';
-                typeSupport.style.cursor = '';
             }
         }
 

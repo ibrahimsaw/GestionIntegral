@@ -124,6 +124,17 @@
         border-right: 3px solid var(--color-primary);
         padding-left: 7px;
       }
+      .nav-submenu { margin-bottom: 2px; }
+      .nav-submenu summary {
+        list-style: none; cursor: pointer;
+      }
+      .nav-submenu summary::-webkit-details-marker { display: none; }
+      .nav-submenu summary .submenu-chevron {
+        margin-left: auto; font-size: .7rem; transition: transform .15s;
+      }
+      .nav-submenu[open] summary .submenu-chevron { transform: rotate(180deg); }
+      .nav-submenu-items { padding-left: 14px; border-left: 1px solid var(--border); margin-left: 19px; }
+      .nav-submenu-items .nav-link { font-size: .8rem; padding-top: 6px; padding-bottom: 6px; }
       .sidebar-footer {
         padding: 12px 14px; border-top: 2px solid var(--border);
         background: var(--bg-card2); font-size: .75rem; color: var(--text-muted);
@@ -176,7 +187,7 @@
       .bs-disponible  { background: var(--color-disponible_bg); color: var(--color-disponible) }
       .bs-occupe      { background: var(--color-occupe_bg); color: var(--color-occupe) }
       .bs-reserve     { background: var(--color-reserve_bg); color: var(--color-reserve) }
-      .bs-maintenance { background: #fee2e2; color: #b91c1c; }
+      .bs-maintenance { background: #fee2e2; color: var(--color-maintenance); }
       .bs-panne       { background: var(--color-panne_bg); color: var(--color-panne); }
       .bs-bientot     { background: #ede9fe; color: #6d28d9; }
       .bs-brouillon   { background: #f1f5f9; color: #475569; }
@@ -398,6 +409,16 @@
         transition: all 0.3s ease; box-shadow: 0 2px 6px rgba(37,99,235,0.2); cursor: pointer;
       }
       .support-ecran:hover { transform: scale(1.1) rotate(-5deg); box-shadow: 0 4px 12px rgba(37,99,235,0.3); }
+
+      .support-marche {
+        font-size: 1.4rem; color: var(--color-maintenance);
+        border: 2px solid var(--color-maintenance); border-radius: 50%;
+        width: 40px; height: 40px;
+        display: inline-flex; align-items: center; justify-content: center;
+        transition: all 0.3s ease; box-shadow: 0 2px 6px rgba(220,53,69,0.2); cursor: pointer;
+      }
+      .support-marche:hover { transform: scale(1.1) rotate(-5deg); box-shadow: 0 4px 12px rgba(220,53,69,0.3); }
+
       .support-mere {
         font-size: 1.4rem; color: var(--color-disponible);
         border: 2px solid var(--color-disponible); border-radius: 50%;
@@ -490,28 +511,41 @@
             </a>
             
             <div class="nav-label">Inventaire</div>
-            <a href="{% url 'support_list' %}" class="nav-link {% if 'support' in request.resolver_match.url_name and not request.GET.type %}active{% endif %}">
+            <a href="{% url 'support_list' %}" class="nav-link {% if request.resolver_match.url_name == 'support_list' and not request.GET.type and not request.GET.type_panneau and not request.GET.ville %}active{% endif %}">
               <i class="bi bi-collection"></i>Tous les Supports
             </a>
-            <a href="{% url 'support_list' %}?type=panneau&desactif=panneau" class="nav-link {% if request.GET.type == 'panneau' and not request.GET.ville %}active{% endif %}">
-              <i class="bi bi-sign-merge-right"></i>Panneaux
+            <a href="{% url 'marche_list' %}" class="nav-link {% if request.resolver_match.url_name == 'marche_list' %}active{% endif %}">
+              <i class="bi bi-cart"></i>Marchés
             </a>
-            <a href="{% url 'format_list' %}" class="nav-link {% if request.resolver_match.url_name == 'format_list' %}active{% endif %}"">
+            <a href="{% url 'format_list' %}" class="nav-link {% if request.resolver_match.url_name == 'format_list' %}active{% endif %}">
               <i class="bi bi-grid-1x2 me-2"></i>Format
             </a>
-            {% if inventory_villes %}
-              <div class="nav-label">Panneaux par ville</div>
-              {% for ville in inventory_villes %}
-                <a href="{% url 'support_list' %}?type=panneau&ville={{ ville|urlencode }}&desactif=ville" class="nav-link {% if request.GET.type == 'panneau' and request.GET.ville == ville %}active{% endif %}">
-                  <i class="bi bi-geo-alt"></i>{{ ville }}
-                </a>
-              {% endfor %}
-            {% endif %}
-            <a href="{% url 'support_list' %}?type=ecran&desactif=ecran" class="nav-link {% if request.GET.type == 'ecran' %}active{% endif %}">
-              <i class="bi bi-display"></i>Écrans
-            </a>
-            <a href="{% url 'panneaux_report' %}" class="nav-link {% if request.resolver_match.url_name == 'panneaux_report' %}active{% endif %}">
-              <i class="bi bi-file-earmark-bar-graph-fill"></i>Report Panneaux
+            {% for category in inventory_categories %}
+              <details class="nav-submenu"
+                {% if category.key == 'panneau' and request.GET.type == 'panneau' and request.GET.type_panneau != '1x2' %}open{% endif %}
+                {% if category.key == 'ecran' and request.GET.type == 'ecran' %}open{% endif %}
+                {% if category.key == 'sucette' and request.GET.type == 'panneau' and request.GET.type_panneau == '1x2' %}open{% endif %}>
+                <summary class="nav-link
+                  {% if category.key == 'panneau' and request.GET.type == 'panneau' and request.GET.type_panneau != '1x2' and not request.GET.ville %}active{% endif %}
+                  {% if category.key == 'ecran' and request.GET.type == 'ecran' and not request.GET.ville %}active{% endif %}
+                  {% if category.key == 'sucette' and request.GET.type == 'panneau' and request.GET.type_panneau == '1x2' and not request.GET.ville %}active{% endif %}">
+                  <i class="bi {{ category.icon }}"></i>{{ category.label }}
+                  <i class="bi bi-chevron-down submenu-chevron"></i>
+                </summary>
+                <div class="nav-submenu-items">
+                  <a href="{% url 'support_list' %}?type={{ category.type }}{% if category.format %}&type_panneau={{ category.format }}{% endif %}" class="nav-link {% if request.GET.type == category.type and not request.GET.ville %}{% if not category.format and request.GET.type_panneau != '1x2' or category.format and request.GET.type_panneau == category.format %}active{% endif %}{% endif %}">
+                    <i class="bi bi-grid"></i>Tous
+                  </a>
+                  {% for ville in category.villes %}
+                    <a href="{% url 'support_list' %}?type={{ category.type }}{% if category.format %}&type_panneau={{ category.format }}{% endif %}&ville={{ ville|urlencode }}&desactif=ville" class="nav-link {% if request.GET.type == category.type and request.GET.ville == ville %}{% if not category.format or request.GET.type_panneau == category.format %}active{% endif %}{% endif %}">
+                      <i class="bi bi-pin-map"></i>{{ ville }}
+                    </a>
+                  {% endfor %}
+                </div>
+              </details>
+            {% endfor %}
+            <a href="{% url 'supports_report' %}" class="nav-link {% if request.resolver_match.url_name == 'supports_report' %}active{% endif %}">
+              <i class="bi bi-file-earmark-bar-graph-fill"></i>Rapport Supports
             </a>
             <a href="{% url 'maintenance_list' %}" class="nav-link {% if 'maintenance' in request.resolver_match.url_name %}active{% endif %}">
               <i class="bi bi-tools"></i>Maintenances

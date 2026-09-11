@@ -165,10 +165,10 @@ DESIGN_CONFIG = {
     'COLOR_RESERVE_BG':     "#f2eaff",   
     'COLOR_PANNE_BG': '#ffe6e6',  
     
-    'COLOR_MAINTENANCE': '#dc2626',
+    'COLOR_MAINTENANCE':  '#f97316',   # Orange — support en maintenance
     'COLOR_BIENTOT':     '#7c3aed',   # Violet — campagne à venir
     # Identité visuelle de l'application (Charte Promo Pub Integral)
-    'COLOR_PRIMARY':     '#932E2B',   # Marron / Rouge bordeaux — couleur principale UI
+    'COLOR_PRIMARY':     "#932E2BFF",   # Marron / Rouge bordeaux — couleur principale UI
     'COLOR_SECONDARY':   '#FDDD48',   # Jaune — accent secondaire
     'COLOR_NOIR':        '#231f20',   # Noir — texte principal
     # Fonds et surfaces (thème CLAIR)
@@ -181,10 +181,14 @@ DESIGN_CONFIG = {
 }
 CONTACT_EMAIL1 = "reseau@promopub-integral.com"  # ou l'adresse que tu veux recevoir les demandes
 CONTACT_EMAIL = "support-it@promopub-integral.com"
-CONTACT_EMAIL2 = "secretariat@promopub-integral.com "
+CONTACT_EMAIL2 = "secretariat@promopub-integral.com"
+CONTACT_RECIPIENTS = [CONTACT_EMAIL, CONTACT_EMAIL1, CONTACT_EMAIL2]
 CONTACT_TEL1 = "+22658800909"
 CONTACT_TEL2 = "+22678873301"
 CONTACT_TEL3 = "+22658906695"
+CONTACT_TEL01 = "+226 58 80 09 09"
+CONTACT_TEL02 = "+226 78 87 33 01"
+CONTACT_TEL03 = "+226 58 90 66 95"
 
 # Horaires de diffusion par défaut pour le planning des panneaux
 DIFFUSION_HEURE_DEBUT = 6    # 06:00
@@ -195,3 +199,9 @@ CRISPY_ALLOWED_TEMPLATE_PACKS = "bootstrap5"
 CRISPY_TEMPLATE_PACK = "bootstrap5"
 # settings.py
 DEFAULT_SUPPORT_PHOTO_URL = '/static/img/logo.jpg'
+
+from django.contrib.messages import constants as messages_constants
+
+MESSAGE_TAGS = {
+    messages_constants.ERROR: 'danger',
+}

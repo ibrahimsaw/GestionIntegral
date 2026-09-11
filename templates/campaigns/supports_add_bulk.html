@@ -67,6 +67,8 @@
                 <div class="fw-bold small">
                   {% if campagne.type_support == 'ecran' %}
                     <i class="bi bi-display text-primary me-1"></i>Écrans
+                  {% elif mode_marche %}
+                    <i class="bi bi-shop text-warning me-1"></i>Marché
                   {% else %}
                     <i class="bi bi-sign-merge-right text-warning me-1"></i>{{campagne.type_support}}
                   {% endif %}
@@ -132,12 +134,15 @@
         {% csrf_token %}
         <div class="card-header bg-transparent border-bottom py-3 d-flex justify-content-between align-items-center">
           <div class="fw-bold">
-            <i class="bi bi-check2-square me-2 text-success"></i>Sélectionner les supports
-            <span class="badge bg-light text-dark border ms-2 fw-normal">{{ supports|length }} disponible(s)</span>
+            <i class="bi bi-check2-square me-2 text-success"></i>
+            {% if mode_marche %}Sélectionner les emplacements{% else %}Sélectionner les supports{% endif %}
+            <span class="badge bg-light text-dark border ms-2 fw-normal">
+              {% if mode_marche %}{{ emplacements_enrichis|length }}{% else %}{{ supports|length }}{% endif %} disponible(s)
+            </span>
           </div>
         </div>
 
-        {% if supports %}
+        {% if supports or emplacements_enrichis %}
           <div class="card-footer bg-light p-3 d-flex justify-content-end gap-2">
             <a href="{% url 'campagne_detail' campagne.pk %}" class="btn btn-light border px-4">Annuler</a>
             <button type="submit" class="btn btn-primary px-4 shadow-sm">
@@ -148,7 +153,100 @@
         {% endif %}
 
         <div class="card-body">
-          {% if supports_enrichis or supports %}
+          {% if mode_marche %}
+            {% if emplacements_enrichis %}
+
+              {# 1. Regroupement par VILLE (via le marché) #}
+              {% regroup emplacements_enrichis by marche.ville as ville_list %}
+
+              {% for ville in ville_list %}
+                <div class="ville-section mb-5">
+                  <h2 class="h4 fw-bold text-uppercase border-bottom pb-2 mb-4" style="color: var(--color-primary);">
+                    <i class="bi bi-geo-alt-fill me-2"></i>{{ ville.grouper|default:"Ville non spécifiée" }}
+                  </h2>
+
+                  {# 2. Regroupement par MARCHÉ (au sein de cette ville) #}
+                  {% regroup ville.list by marche as marche_group_list %}
+
+                  {% for marche_group in marche_group_list %}
+                    {% with marche=marche_group.grouper %}
+                    <div class="quartier-section mb-4 ms-md-3">
+                      <h3 class="h6 fw-bold text-muted mb-3 text-uppercase">
+                        <i class="bi bi-shop me-2"></i>{{ marche.nom }}
+                        <span class="badge bg-light text-dark border fw-normal ms-2">{{ marche.quartier|default:"Général" }}</span>
+                      </h3>
+
+                      <div class="row g-2">
+                        {% for item in marche_group.list %}
+                          {% with emplacement=item.emplacement %}
+                            <div class="col-md-6 col-xl-4">
+                              {% if item.jours_dispo >= campagne.duree_jours or emplacement.pk in selectionnes %}
+                                {# ── Emplacement libre (ou déjà sélectionné dans cette campagne) : cliquable ── #}
+                                <div class="position-relative">
+                                  <input type="checkbox" name="emplacements" value="{{ emplacement.pk }}" id="emp_{{ emplacement.pk }}"
+                                        class="btn-check emplacement-checkbox" autocomplete="off"
+                                        {% if emplacement.pk in selectionnes %}checked{% endif %}>
+                                  <label class="btn w-100 text-start p-3 d-flex justify-content-between align-items-center rounded-3 bs-disponible"
+                                        for="emp_{{ emplacement.pk }}">
+                                    <span class="d-flex align-items-center">
+                                      <i class="bi {% if emplacement.pk in selectionnes %}bi-check-circle-fill{% else %}bi-circle{% endif %} fs-5 me-2 check-icon"></i>
+                                      <span>
+                                        <strong class="d-block">{{ emplacement.code }}</strong>
+                                        <small class="opacity-75">{{ emplacement.notes|default:"—"|truncatechars:40 }}</small>
+                                      </span>
+                                    </span>
+                                    <span class="d-flex flex-column align-items-end gap-1">
+                                      {% if item.a_un_panneau %}
+                                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle" style="font-size:.65rem;" title="Panneau installé : {{ emplacement.support_installe.code }}">
+                                          <i class="bi bi-sign-merge-right me-1"></i>{{ emplacement.support_installe.code }}
+                                        </span>
+                                      {% else %}
+                                        <span class="badge bg-secondary-subtle text-secondary border" style="font-size:.65rem;">
+                                          <i class="bi bi-dash-circle me-1"></i>Sans panneau
+                                        </span>
+                                      {% endif %}
+                                      <span class="badge border bs-disponible" style="font-size:.62rem;">Disponible</span>
+                                    </span>
+                                  </label>
+                                </div>
+                              {% elif item.jours_dispo == 0 %}
+                                {# ── Bloqué : intégralement réservé par une autre campagne ── #}
+                                <div class="d-flex justify-content-between align-items-center p-3 border rounded-3 bs-occupe opacity-50" style="cursor: not-allowed;">
+                                  <span class="small fw-bold text-danger-emphasis">
+                                    <i class="bi bi-lock-fill me-2"></i>{{ emplacement.code }}
+                                    <small class="d-block fw-normal opacity-75">{{ emplacement.notes|default:"—"|truncatechars:40 }}</small>
+                                  </span>
+                                  <span class="badge border bs-occupe" style="font-size:.62rem;">Déjà réservé</span>
+                                </div>
+                              {% else %}
+                                {# ── Bloqué : partiellement réservé (dispo < durée totale de la campagne) ── #}
+                                <div class="d-flex justify-content-between align-items-center p-3 border bs-reserve rounded-3 opacity-75" style="cursor: not-allowed;">
+                                  <span class="small fw-bold">
+                                    <i class="bi bi-clock-history me-2"></i>{{ emplacement.code }}
+                                    <small class="d-block fw-normal opacity-75">{{ emplacement.notes|default:"—"|truncatechars:40 }}</small>
+                                  </span>
+                                  <span class="badge border bs-reserve" style="font-size:.62rem;">{{ item.jours_dispo }}/{{ campagne.duree_jours }}j</span>
+                                </div>
+                              {% endif %}
+                            </div>
+                          {% endwith %}
+                        {% endfor %}
+                      </div>
+                    </div>
+                    {% endwith %}
+                  {% endfor %}
+                </div>
+              {% endfor %}
+
+            {% else %}
+              <div class="text-center py-5">
+                <i class="bi bi-shop text-muted" style="font-size: 3rem; opacity: 0.3;"></i>
+                <h5 class="mt-3 fw-bold text-muted">Aucun emplacement disponible</h5>
+                <p class="text-muted small">Créez d'abord des marchés et leurs emplacements dans la section Marchés de l'inventaire.</p>
+              </div>
+            {% endif %}
+
+          {% elif supports_enrichis or supports %}
             
             {# 1. Premier niveau : Regroupement par VILLE #}
             {% regroup supports_enrichis by support.ville as ville_list %}

@@ -824,6 +824,7 @@ class Campagne(models.Model):
     
     duree_passage = models.PositiveIntegerField(choices=DUREE_CHOICES, null=True, blank=True, verbose_name="Durée de passage (secondes)")
     frequence = models.PositiveIntegerField(choices=FREQUENCE_CHOICES, default=120, null=True, blank=True, verbose_name="Fréquence de diffusion")
+    nombre_visuels = models.PositiveIntegerField(default=1, verbose_name="Nombre de visuels", help_text="Nombre de visuels diffusés dans la boucle. Par défaut : 1.")
     tranches_horaires = models.CharField(max_length=500, default='08:00-12:00', blank=True, verbose_name="Tranches horaires de diffusion")
     
     notes        = models.TextField(blank=True)
@@ -867,6 +868,9 @@ class Campagne(models.Model):
         }
         return badges.get(self.statut, 'secondary')
 
+    def get_nombre_visuels_effective(self):
+        return max(self.nombre_visuels or 1, 1)
+
     def nombre_supports(self):
         if not self.pk:
             return 0
@@ -896,10 +900,15 @@ class Campagne(models.Model):
             spots = self.calculer_nombre_spots()
             return (prix * Decimal(str(spots))).quantize(Decimal('0.01'))
 
+        if self.type_support == 'marche':
+            emplacements = self.nombre_emplacements()
+            return (prix * Decimal(emplacements)).quantize(Decimal('0.01'))
+
         faces = self.nombre_faces()
         return (prix * Decimal(faces)).quantize(Decimal('0.01'))
     
     def montant_total_affichage(self):
+        print(self.type_support)
         prix = self.prix_affichage or Decimal('0.00')
 
         if self.est_mere:
@@ -911,6 +920,10 @@ class Campagne(models.Model):
         if self.type_support == 'ecran':
             spots = self.calculer_nombre_spots()
             return (prix * Decimal(str(spots))).quantize(Decimal('0.01'))
+
+        if self.type_support == 'marche':
+            emplacements = self.nombre_emplacements()
+            return (prix * Decimal(emplacements)).quantize(Decimal('0.01'))
 
         faces = self.nombre_faces()
         return (prix * Decimal(faces)).quantize(Decimal('0.01'))
@@ -931,7 +944,11 @@ class Campagne(models.Model):
         if self.type_support == 'ecran':
             spots = self.calculer_nombre_spots()
             return (prix * Decimal(str(spots))).quantize(Decimal('0.01'))
-        
+
+        if self.type_support == 'marche':
+            emplacements = self.nombre_emplacements()
+            return (prix * Decimal(emplacements)).quantize(Decimal('0.01'))
+
         faces = self.nombre_faces()
         return (prix * Decimal(faces)).quantize(Decimal('0.01'))
     
@@ -952,6 +969,15 @@ class Campagne(models.Model):
         if total_jours == 0:
             return 0
 
+        if self.type_support == 'marche':
+            total = 0
+            for ligne in self.lignes.filter(emplacement__isnull=False).select_related('emplacement'):
+                jours_dispo = ligne.emplacement.jours_disponibles_sur_periode(
+                    self.date_debut, self.date_fin, exclude_campagne_id=self.pk
+                )
+                total += jours_dispo / total_jours
+            return round(total, 2)
+
         if self.type_support and self.type_support != 'ecran':
             total = 0
             for ligne in self.lignes.select_related('face__support').all():
@@ -966,7 +992,7 @@ class Campagne(models.Model):
             if not self.frequence or not self.duree_passage:
                 return 0
 
-            spots_par_heure = 3600 / self.frequence
+            spots_par_heure = (3600 / self.frequence) * self.get_nombre_visuels_effective()
             heures_tranches = calculer_duree_tranches(self.tranches_horaires)
             spots_par_jour  = spots_par_heure * heures_tranches
 
@@ -980,7 +1006,7 @@ class Campagne(models.Model):
 
     def diffusions_par_heure(self):
         if self.type_support == 'ecran' and self.frequence:
-            return 3600 / self.frequence
+            return (3600 / self.frequence) * self.get_nombre_visuels_effective()
         return 0
     
     def nombre_spots_jour(self):
@@ -994,8 +1020,25 @@ class Campagne(models.Model):
     def calculer_duree_tranches(self):
         return calculer_duree_tranches(self.tranches_horaires)
     
+    def nombre_emplacements(self):
+        if not self.pk:
+            return 0
+        return self.lignes.filter(emplacement__isnull=False).values('emplacement').distinct().count()
+
     def calculer_nombre_spots(self):
-        
+        if self.type_support == 'marche':
+            total_jours = self.duree_jours()
+            if total_jours == 0:
+                return 0
+            total = 0
+            for ligne in self.lignes.filter(emplacement__isnull=False).select_related('emplacement'):
+                jours_dispo = ligne.emplacement.jours_disponibles_sur_periode(
+                    self.date_debut, self.date_fin, exclude_campagne_id=self.pk
+                )
+                print(f"Support {ligne.emplacement} : {jours_dispo} jours dispo sur {total_jours} jours")
+                total += jours_dispo / total_jours
+            return round(total, 2)
+
         if self.type_support and self.type_support != 'ecran':
             total_jours = self.duree_jours()
             if total_jours == 0:
@@ -1095,10 +1138,16 @@ class CampagneVisuel(models.Model):
 
 
 class LigneCampagne(models.Model):
-    """Lien entre une campagne et un support avec ses surcharges spécifiques."""
+    """Lien entre une campagne et un support (ou un emplacement de marché) avec ses surcharges spécifiques."""
     campagne = models.ForeignKey(Campagne, on_delete=models.CASCADE, related_name='lignes')
-    support = models.ForeignKey('inventory.Support', on_delete=models.PROTECT, related_name='lignes_campagne')
+    support = models.ForeignKey('inventory.Support', on_delete=models.PROTECT, related_name='lignes_campagne', null=True, blank=True)
     face = models.ForeignKey('inventory.FacePanneau', on_delete=models.SET_NULL, null=True, blank=True, related_name='lignes_campagne', verbose_name="Face (Panneau)")
+    emplacement = models.ForeignKey(
+        'inventory.Emplacement', on_delete=models.PROTECT, null=True, blank=True,
+        related_name='lignes_campagne', verbose_name="Emplacement (Marché)",
+        help_text="Renseigné uniquement pour les campagnes de type Marché — l'emplacement "
+                   "peut être réservé même s'il n'a pas encore de panneau installé."
+    )
     visuel = models.FileField(upload_to='visuels/', blank=True, null=True, verbose_name="Visuel / Média")
     ordre_dans_boucle = models.PositiveIntegerField(default=0, verbose_name="Priorité/Ordre")
     notes = models.TextField(blank=True, verbose_name="Notes internes")
@@ -1114,7 +1163,16 @@ class LigneCampagne(models.Model):
         verbose_name_plural = "Lignes de campagne"
 
     def __str__(self):
+        if self.emplacement_id:
+            return f"{self.campagne.nom} -> {self.emplacement.code} ({self.emplacement.marche.nom})"
         return f"{self.campagne.nom} -> {self.support.code}"
+
+    def clean(self):
+        super().clean()
+        if not self.support_id and not self.emplacement_id:
+            raise ValidationError("Une ligne de campagne doit référencer soit un support, soit un emplacement de marché.")
+        if self.support_id and self.emplacement_id:
+            raise ValidationError("Une ligne de campagne ne peut pas référencer à la fois un support et un emplacement.")
     
     def get_duree_passage_effective(self):
         return self.duree_passage or self.campagne.duree_passage
@@ -1138,7 +1196,8 @@ class LigneCampagne(models.Model):
         date_debut = self.date_debut or self.campagne.date_debut
         date_fin   = self.date_fin   or self.campagne.date_fin
 
-        spots_par_heure = 3600 / frequence
+        nombre_visuels = self.campagne.get_nombre_visuels_effective() if self.campagne else 1
+        spots_par_heure = (3600 / frequence) * nombre_visuels
         heures_tranches = calculer_duree_tranches(tranches)
         spots_par_jour  = spots_par_heure * heures_tranches
 

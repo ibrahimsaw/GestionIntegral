@@ -6,6 +6,7 @@ from datetime import date, timedelta
 from django.conf import settings
 from django.contrib import messages
 from django.core.cache import cache
+from django.core.exceptions import PermissionDenied
 from django.core.mail import send_mail
 from django.core.paginator import Paginator
 from django.db.models import Count, Prefetch, Q
@@ -146,10 +147,50 @@ VILLE_IMAGES = {
 }
 VILLE_IMAGE_DEFAUT = 'img/villes/default.jpg'
 
+# ── NOUVEAU : image spécifique par couple (ville, code_format) ─────────────
+# Clé = (nom_ville, code_format) → chemin de l'image (relatif à /static/).
+# Si un couple n'est pas défini ici, on retombe sur VILLE_IMAGES[ville],
+# puis sur VILLE_IMAGE_DEFAUT en dernier recours.
+#
+# Exemples (à compléter avec vos vraies images) :
+# VILLE_FORMAT_IMAGES = {
+#     ('Ouagadougou', '4x3'):    'img/formats/ouaga-4x3.jpg',
+#     ('Ouagadougou', 'gm-5x4'): 'img/formats/ouaga-geant.jpg',
+#     ('Bobo-Dioulasso', '4x3'): 'img/formats/bobo-4x3.jpg',
+# }
+VILLE_FORMAT_IMAGES = {
+    # À compléter : (nom_ville, code_format): 'img/formats/xxx.jpg',
+    ('Ouagadougou', '4x3'):    'img/formats/ouaga-4x3-removebg-preview.png',
+    ('Ouagadougou', '4x5'): 'img/formats/4x5-removebg-preview.png',
+    ('Ouagadougou', '8x5'): 'img/formats/8x5-removebg-preview.png',
+    ('Ouagadougou', '10x4'): 'img/formats/10x4-removebg-preview.png',
+    #('Ouagadougou', '12x4'): 'img/formats/12x4-removebg-preview.png',
+    ('Ouagadougou', '6x4'): 'img/formats/ecran-removebg-preview.png',
+    ('Bobo-Dioulasso', '4x3'): 'img/formats/ouaga-4x3-removebg-preview.png',
+}
+
+
+def get_support_image(ville: str, format_code: str) -> str:
+    """
+    Retourne l'image la plus précise disponible pour ce couple ville/format :
+    1) l'image spécifique au (ville, format) si définie,
+    2) sinon l'image générique de la ville,
+    3) sinon l'image par défaut.
+    """
+    cle = (ville, format_code or '')
+    if cle in VILLE_FORMAT_IMAGES:
+        return VILLE_FORMAT_IMAGES[cle]
+    return VILLE_IMAGES.get(ville, VILLE_IMAGE_DEFAUT)
+
 
 from collections import defaultdict
 from django.views import View
 from django.shortcuts import render
+
+# Catégories pour lesquelles on liste les supports individuellement
+# (au lieu de les regrouper par format/dimensions)
+CATEGORIES_INDIVIDUELLES = {'Écran', 'Marché'}
+
 
 def _label_support(support: Support, formats_map: dict) -> tuple[str, dict]:
     """
@@ -159,6 +200,22 @@ def _label_support(support: Support, formats_map: dict) -> tuple[str, dict]:
     - 'dimensions' : ex "9x5" ou "Écran Numérique"
     - 'valeur_tri' : float pour trier du plus petit au plus grand
     """
+    if support.type_support == Support.TYPE_ECRAN:
+        label_data = {
+            'superficie': "",
+            'dimensions': support.nom or support.code,
+            'valeur_tri': 0.0
+        }
+        return 'Écran', label_data
+
+    if support.is_dans_marche:
+        label_data = {
+            'superficie': "",
+            'dimensions': support.nom or support.code,
+            'valeur_tri': 0.0
+        }
+        return 'Marché', label_data
+
     if support.type_support == Support.TYPE_PANNEAU:
         if support.format:
             fs = formats_map.get(support.format)
@@ -166,34 +223,26 @@ def _label_support(support: Support, formats_map: dict) -> tuple[str, dict]:
                 categorie = fs.categorie or 'Autres'
                 superficie_str = f"{fs.superficie:g}m²" if fs.superficie else ""
                 valeur_tri = float(fs.superficie) if fs.superficie else 0.0
-                
+
                 label_data = {
                     'superficie': superficie_str,
                     'dimensions': f"({fs.code})",
                     'valeur_tri': valeur_tri
                 }
                 return categorie, label_data
-                
+
         label_data = {
             'superficie': "",
             'dimensions': "Panneau (format non défini)",
             'valeur_tri': 0.0
         }
         return 'Autres', label_data
-        
-    label_data = {
-        'superficie': "",
-        'dimensions': "Écran Numérique",
-        'valeur_tri': 0.0 # Les écrans se placeront au début du tri (0m²)
-    }
-    return 'Écran', label_data
-
 
 def _get_compteurs() -> dict:
     supports = (
         Support.objects
         .filter(actif=True)
-        .select_related('ecran_info')
+        .select_related('ecran_info', 'emplacement__marche')
         .prefetch_related('faces')
     )
 
@@ -202,21 +251,17 @@ def _get_compteurs() -> dict:
     villes = defaultdict(lambda: {
         'total_faces': 0,
         'faces_libres': 0,
-        # On utilise une clé sérialisée (JSON/string) pour le regroupement dans le defaultdict :
         'categories': defaultdict(lambda: defaultdict(lambda: {'total': 0, 'libre': 0, 'code': ''})),
+        # Pour les catégories "Écran" / "Marché" : liste de supports individuels
+        'categories_individuelles': defaultdict(list),
     })
 
     formats_utilises = set()
 
-    # Pour pouvoir utiliser le dictionnaire label_data comme clé de dictionnaire,
-    # on le convertit temporairement en tuple nommé ou on stocke une référence.
     for support in supports:
         ville = support.ville or 'Non renseignée'
         data = villes[ville]
         categorie, label_data = _label_support(support, formats_map)
-
-        # Clé unique pour grouper par format physique précis
-        group_key = (label_data['superficie'], label_data['dimensions'], label_data['valeur_tri'])
 
         if support.type_support == Support.TYPE_PANNEAU:
             code_format = support.format
@@ -226,39 +271,65 @@ def _get_compteurs() -> dict:
         if code_format:
             formats_utilises.add(code_format)
 
-        if support.type_support == Support.TYPE_PANNEAU:
-            faces = list(support.faces.all())
-            if not faces:
-                data['total_faces'] += 1
-                entry = data['categories'][categorie][group_key]
-                entry['total'] += 1
-                entry['code'] = code_format
-                continue
+        # ── Cas spécial : Écran ou Marché → liste individuelle des supports ──
+        if support.type_support == Support.TYPE_ECRAN or support.is_dans_marche:
+            if support.type_support == Support.TYPE_ECRAN:
+                entries = [(None, not support.is_occupe() and support.etat == Support.ETAT_BON)]
+            else:
+                faces = list(support.faces.all())
+                entries = [
+                    (face, face.etat == Support.ETAT_BON and face.is_disponibles())
+                    for face in faces
+                ] or [(None, False)]
 
-            for face in faces:
+            for face, support_libre in entries:
                 data['total_faces'] += 1
-                entry = data['categories'][categorie][group_key]
-                entry['total'] += 1
-                entry['code'] = code_format
-
-                face_libre = (
-                    face.etat == Support.ETAT_BON
-                    and face.is_disponibles()
-                )
-                if face_libre:
+                if support_libre:
                     data['faces_libres'] += 1
-                    entry['libre'] += 1
-        else:
+
+                face_label = face.get_label_display() if face else ''
+                data['categories_individuelles'][categorie].append({
+                    'id': face.pk if face else support.pk,
+                    'code': support.code,
+                    'nom': support.nom,
+                    'quartier': support.quartier,
+                    'adresse': support.adresse,
+                    'marche': support.marche.nom if support.is_dans_marche else None,
+                    'emplacement_code': support.emplacement.code if support.is_dans_marche else None,
+                    'face_label': face_label,
+                    'total': 1,
+                    'count': 1,
+                    'libre': 1 if support_libre else 0,
+                    'occupe': 0 if support_libre else 1,
+                    'dimensions': support.nom or support.code,
+                    'superficie': '',
+                    'format': '',
+                    'image_url': get_support_image(ville, code_format),
+                })
+            continue
+
+        # ── Cas général : regroupement par format ──────────────────────────
+        group_key = (label_data['superficie'], label_data['dimensions'], label_data['valeur_tri'])
+
+        faces = list(support.faces.all())
+        if not faces:
+            data['total_faces'] += 1
+            entry = data['categories'][categorie][group_key]
+            entry['total'] += 1
+            entry['code'] = code_format
+            continue
+
+        for face in faces:
             data['total_faces'] += 1
             entry = data['categories'][categorie][group_key]
             entry['total'] += 1
             entry['code'] = code_format
 
-            support_libre = (
-                support.etat == Support.ETAT_BON
-                and not support.is_occupe()
+            face_libre = (
+                face.etat == Support.ETAT_BON
+                and face.is_disponibles()
             )
-            if support_libre:
+            if face_libre:
                 data['faces_libres'] += 1
                 entry['libre'] += 1
 
@@ -266,12 +337,17 @@ def _get_compteurs() -> dict:
     total_faces_reseau = 0
     total_faces_libres_reseau = 0
 
+    # ── Stats globales par catégorie (groupées + individuelles) ────────────
     categories_globales = defaultdict(lambda: {'total': 0, 'libre': 0})
     for data in villes.values():
         for categorie, group_keys in data['categories'].items():
             for group_key, counts in group_keys.items():
                 categories_globales[categorie]['total'] += counts['total']
                 categories_globales[categorie]['libre'] += counts['libre']
+        for categorie, items in data['categories_individuelles'].items():
+            for item in items:
+                categories_globales[categorie]['total'] += item['total']
+                categories_globales[categorie]['libre'] += item['libre']
 
     categories_stats = [
         {
@@ -287,36 +363,58 @@ def _get_compteurs() -> dict:
 
     for nom_ville, data in villes.items():
         supports_list = []
-        categories_triees = sorted(
-            data['categories'].items(),
-            key=lambda kv: -sum(v['total'] for v in kv[1].values())
-        )
-        for categorie, group_keys in categories_triees:
-            liste = []
-            for group_key, counts in group_keys.items():
-                superficie_val, dimensions_val, valeur_tri = group_key
-                total = counts['total']
-                libre = counts['libre']
-                liste.append({
-                    'superficie': superficie_val,
-                    'dimensions': dimensions_val,
-                    'valeur_tri': valeur_tri,       # Servira au tri
-                    'format': counts['code'],
-                    'count': total,
-                    'libre': libre,
-                    'occupe': total - libre,
-                })
-            
-            # ── TRI DES FORMATS DE LA PLUS PETITE À LA PLUS GRANDE SUPERFICIE ──
-            liste.sort(key=lambda item: item['valeur_tri'])
 
-            supports_list.append({
-                'categorie': categorie,
-                'total': sum(c['total'] for c in group_keys.values()),
-                'libre': sum(c['libre'] for c in group_keys.values()),
-                'occupe': sum(c['total'] - c['libre'] for c in group_keys.values()),
-                'liste': liste,
-            })
+        # On rassemble catégories groupées + individuelles pour un tri global cohérent
+        toutes_categories = [
+            (categorie, sum(v['total'] for v in group_keys.values()), 'groupe')
+            for categorie, group_keys in data['categories'].items()
+        ] + [
+            (categorie, sum(item['total'] for item in items), 'individuel')
+            for categorie, items in data['categories_individuelles'].items()
+        ]
+        toutes_categories.sort(key=lambda c: -c[1])
+
+        for categorie, _, mode in toutes_categories:
+            if mode == 'groupe':
+                group_keys = data['categories'][categorie]
+                liste = []
+                for group_key, counts in group_keys.items():
+                    superficie_val, dimensions_val, valeur_tri = group_key
+                    total = counts['total']
+                    libre = counts['libre']
+                    liste.append({
+                        'superficie': superficie_val,
+                        'dimensions': dimensions_val,
+                        'valeur_tri': valeur_tri,
+                        'format': counts['code'],
+                        'count': total,
+                        'libre': libre,
+                        'occupe': total - libre,
+                        'image_url': get_support_image(nom_ville, counts['code']),
+                    })
+                liste.sort(key=lambda item: item['valeur_tri'])
+
+                supports_list.append({
+                    'categorie': categorie,
+                    'individuel': False,
+                    'total': sum(c['total'] for c in group_keys.values()),
+                    'libre': sum(c['libre'] for c in group_keys.values()),
+                    'occupe': sum(c['total'] - c['libre'] for c in group_keys.values()),
+                    'liste': liste,
+                })
+            else:
+                items = sorted(
+                    data['categories_individuelles'][categorie],
+                    key=lambda it: it['code']
+                )
+                supports_list.append({
+                    'categorie': categorie,
+                    'individuel': True,
+                    'total': sum(it['total'] for it in items),
+                    'libre': sum(it['libre'] for it in items),
+                    'occupe': sum(it['occupe'] for it in items),
+                    'liste': items,
+                })
 
         villes_stats.append({
             'nom': nom_ville,
@@ -339,9 +437,23 @@ def _get_compteurs() -> dict:
         'total_faces_occupees_reseau': total_faces_reseau - total_faces_libres_reseau,
         'nb_villes': len(villes_stats),
         'nb_formats': len(formats_utilises),
+        'formats_utilises': sorted(formats_utilises),
     }
 
+
 class AccueilView(View):
+    """Page d'accueil — vitrine publique de la régie publicitaire."""
+    template_name = 'portail/vitrine1.html'
+
+    def get(self, request):
+        compteurs = _get_compteurs()
+        return render(request, self.template_name, {
+            **compteurs,
+            'oua_center': [12.3714, -1.5197],
+        })
+
+
+class AccueilViews(View):
     """Page d'accueil — vitrine publique de la régie publicitaire."""
     template_name = 'portail/vitrine.html'
 
@@ -351,6 +463,72 @@ class AccueilView(View):
             **compteurs,
             'oua_center': [12.3714, -1.5197],
         })
+
+from django.conf import settings
+from django.core.mail import EmailMessage
+from django.http import JsonResponse
+from django.views import View
+import logging
+
+logger = logging.getLogger(__name__)
+
+
+class ContactFormView(View):
+    """Traite le formulaire de contact et envoie un email au staff."""
+
+    SUJETS_LABELS = {
+        'demande-reservation': 'Demande de réservation',
+        'info-tarif': 'Informations tarifaires',
+        'probleme-technique': 'Problème technique',
+        'autre': 'Autre',
+    }
+
+    def post(self, request):
+        nom        = request.POST.get('nom', '').strip()
+        email      = request.POST.get('email', '').strip()
+        telephone  = request.POST.get('telephone', '').strip()
+        societe    = request.POST.get('societe', '').strip()
+        sujet      = request.POST.get('sujet', '').strip()
+        message    = request.POST.get('message', '').strip()
+
+        if not all([nom, email, sujet, message]):
+            return JsonResponse(
+                {'success': False, 'error': "Veuillez remplir tous les champs obligatoires."},
+                status=400,
+            )
+
+        sujet_label = self.SUJETS_LABELS.get(sujet, sujet)
+
+        corps = (
+            f"Nouveau message reçu via le formulaire de contact\n\n"
+            f"Nom       : {nom}\n"
+            f"Société   : {societe or '—'}\n"
+            f"Email     : {email}\n"
+            f"Téléphone : {telephone or '—'}\n"
+            f"Sujet     : {sujet_label}\n\n"
+            f"Message :\n{message}\n"
+        )
+
+        try:
+            email_msg = EmailMessage(
+                subject=f"[Contact site] {sujet_label} — {nom}",
+                body=corps,
+                from_email=email,                  # ← expéditeur = email du visiteur
+                to=settings.CONTACT_RECIPIENTS,
+                reply_to=[email],
+            )
+            email_msg.send(fail_silently=False)
+        except Exception as exc:
+            logger.error("Email formulaire de contact échoué : %s", exc)
+            return JsonResponse(
+                {'success': False, 'error': "Une erreur est survenue lors de l'envoi. Veuillez réessayer."},
+                status=500,
+            )
+
+        return JsonResponse({'success': True, 'message': "Votre message a bien été envoyé. Merci !"})
+
+
+    
 class CatalogueView(View):
     template_name = 'portail/catalogue.html'
 
@@ -1311,72 +1489,3 @@ class ApiCheckDispoView(View):
             })
 
         return JsonResponse({'resultats': resultats})
-
-from django.conf import settings
-from django.core.mail import send_mail
-from django.http import JsonResponse
-from django.views import View
-from django.views.decorators.csrf import csrf_protect
-import logging
-
-logger = logging.getLogger(__name__)
-
-
-class ContactFormView(View):
-    """Traite le formulaire de contact et envoie un email au staff."""
-
-    def post(self, request):
-        nom        = request.POST.get('nom', '').strip()
-        email      = request.POST.get('email', '').strip()
-        telephone  = request.POST.get('telephone', '').strip()
-        societe    = request.POST.get('societe', '').strip()
-        sujet      = request.POST.get('sujet', '').strip()
-        message    = request.POST.get('message', '').strip()
-        conditions = request.POST.get('conditions')
-
-        # Validation minimale côté serveur (ne jamais faire confiance au JS seul)
-        if not all([nom, email, sujet, message, conditions]):
-            return JsonResponse(
-                {'success': False, 'error': "Veuillez remplir tous les champs obligatoires."},
-                status=400,
-            )
-
-        sujets_labels = {
-            'demande-reservation': 'Demande de réservation',
-            'info-tarif': 'Informations tarifaires',
-            'probleme-technique': 'Problème technique',
-            'autre': 'Autre',
-        }
-        sujet_label = sujets_labels.get(sujet, sujet)
-
-        corps = (
-            f"Nouveau message reçu via le formulaire de contact\n\n"
-            f"Nom       : {nom}\n"
-            f"Société   : {societe or '—'}\n"
-            f"Email     : {email}\n"
-            f"Téléphone : {telephone or '—'}\n"
-            f"Sujet     : {sujet_label}\n\n"
-            f"Message :\n{message}\n"
-        )
-
-        try:
-            send_mail(
-                subject=f"[Contact site] {sujet_label} — {nom}",
-                message=corps,
-                from_email=settings.DEFAULT_FROM_EMAIL,
-                recipient_list=[settings.CONTACT_EMAIL],
-                fail_silently=False,
-                reply_to=[email],  # pour pouvoir répondre directement au visiteur
-            )
-        except Exception as exc:
-            logger.error("Email formulaire de contact échoué : %s", exc)
-            return JsonResponse(
-                {'success': False, 'error': "Une erreur est survenue lors de l'envoi. Veuillez réessayer."},
-                status=500,
-            )
-
-        return JsonResponse({'success': True, 'message': "Votre message a bien été envoyé. Merci !"})
-
-
-
-

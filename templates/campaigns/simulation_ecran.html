@@ -1,14 +1,443 @@
 {% extends 'base.html' %}
 {% load duree_filters %}
-{% block title %}Simulation Campagne Écran — Integral{% endblock %}
+{% block title %}Simulateur DOOH & Campagnes Écrans — Integral{% endblock %}
 
 {% block topbar_title %}
-  <i class="bi bi-calculator me-2 text-primary"></i>Simulation de campagne écran
+  <div class="d-flex align-items-center gap-2">
+    <div class="rounded-3 d-flex align-items-center justify-content-center" style="width:36px;height:36px;background:var(--color-primary-soft);color:var(--color-primary);">
+      <i class="bi bi-display fs-5"></i>
+    </div>
+    <div>
+      <div class="fw-bold fs-6 lh-1">Simulateur DOOH & Écrans Numériques</div>
+      <small class="text-muted" style="font-size:0.75rem;">Calculs précis de diffusion, part de voix et saturation du parc</small>
+    </div>
+  </div>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  :root {
+    --transition-fast: 0.15s ease;
+    --transition-base: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    --radius-md: 10px;
+    --shadow-sm: 0 1px 3px rgba(0,0,0,0.08);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.08);
+    --shadow-lg: 0 8px 24px rgba(0,0,0,0.12);
+  }
+
+  /* ── Cartes & Conteneurs ─────────────────────────────── */
+  .sim-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--bg-card);
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow var(--transition-base), border-color var(--transition-base);
+    overflow: hidden;
+  }
+  .sim-card:hover {
+    box-shadow: var(--shadow-md);
+    border-color: rgba(var(--color-primary-rgb), 0.15);
+  }
+  .sim-card-header {
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, var(--bg-card2) 0%, rgba(0,0,0,0.02) 100%);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  /* ── Form Controls & Inputs ──────────────────────────── */
+  .sim-card .form-control,
+  .sim-card .form-select {
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    font-size: 0.85rem;
+    padding: 0.5rem 0.75rem;
+    background-color: #fff;
+    transition: all var(--transition-fast);
+    font-weight: 500;
+  }
+  .sim-card .form-control::placeholder {
+    color: #94a3b8;
+    font-weight: 400;
+  }
+  .sim-card .form-control:focus,
+  .sim-card .form-select:focus {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.1);
+    background-color: #fff;
+  }
+  .sim-card .input-group-text {
+    border-radius: 8px;
+    border: 1px solid var(--border);
+    font-size: 0.8rem;
+    background: var(--bg-card2);
+    color: #64748b;
+    font-weight: 600;
+  }
+
+  /* ── KPI Metric Cards ────────────────────────────────── */
+  .sim-metric-card {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--bg-card);
+    padding: 1.25rem;
+    position: relative;
+    overflow: hidden;
+    transition: all var(--transition-base);
+    height: 100%;
+  }
+  .sim-metric-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
+    border-color: rgba(var(--color-primary-rgb), 0.2);
+  }
+  .sim-metric-card::before {
+    content: "";
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 4px;
+    background: currentColor;
+    opacity: 0.85;
+  }
+  .sim-metric-card .metric-label {
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: #64748b;
+    display: block;
+    margin-bottom: 0.5rem;
+  }
+  .sim-metric-card .metric-value {
+    font-size: 1.75rem;
+    font-weight: 800;
+    line-height: 1.2;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
+  .sim-metric-card .metric-sub {
+    font-size: 0.75rem;
+    color: #94a3b8;
+    margin-top: 0.4rem;
+  }
+
+  /* ── Pills rapides (durée / fréquence / tranche) ─────── */
+  .preset-pill {
+    cursor: pointer;
+    font-size: 0.74rem;
+    font-weight: 600;
+    border: 1px solid var(--border);
+    border-radius: 22px;
+    padding: 0.35rem 0.8rem;
+    background: var(--bg-card2);
+    color: #475569;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    transition: all var(--transition-fast);
+    user-select: none;
+    white-space: nowrap;
+  }
+  .preset-pill:hover {
+    background: var(--color-primary-soft);
+    border-color: var(--color-primary);
+    color: var(--color-primary);
+    transform: translateY(-2px);
+    box-shadow: 0 2px 8px rgba(var(--color-primary-rgb), 0.15);
+  }
+  .preset-pill.active {
+    background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: #fff;
+    font-weight: 700;
+    box-shadow: 0 4px 12px rgba(var(--color-primary-rgb), 0.25);
+  }
+
+  /* ── Formulaire : Blocs de configuration ─────────────── */
+  .config-section {
+    border: 1.5px solid var(--border);
+    border-radius: 10px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    background: #ffffff;
+    transition: all var(--transition-base);
+  }
+  .config-section:hover {
+    border-color: var(--border);
+    box-shadow: var(--shadow-sm);
+  }
+  .config-section.primary-section {
+    border-color: rgba(var(--color-primary-rgb), 0.3);
+    background: linear-gradient(135deg, var(--color-primary-soft) 0%, rgba(var(--color-primary-rgb), 0.03) 100%);
+  }
+  .config-section.success-section {
+    border-color: rgba(16, 185, 129, 0.3);
+    background: linear-gradient(135deg, var(--color-disponible_bg) 0%, rgba(16, 185, 129, 0.03) 100%);
+  }
+  .config-section.info-section {
+    border-color: rgba(14, 165, 233, 0.3);
+    background: linear-gradient(135deg, #f0f9ff 0%, rgba(14, 165, 233, 0.03) 100%);
+  }
+  .config-section.neutral-section {
+    background: var(--bg-card2);
+  }
+
+  /* ── Timeline 24h ────────────────────────────────────── */
+  .timeline-24h {
+    display: flex;
+    width: 100%;
+    height: 60px;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid var(--border);
+    background: linear-gradient(180deg, #f8fafc 0%, #f1f5f9 100%);
+    box-shadow: var(--shadow-sm);
+  }
+  .timeline-hour {
+    flex: 1;
+    border-right: 1px solid rgba(203,213,225,0.3);
+    position: relative;
+    font-size: 8px;
+    color: #cbd5e1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: flex-end;
+    padding-bottom: 5px;
+    transition: all var(--transition-fast);
+    cursor: default;
+  }
+  .timeline-hour:last-child { border-right: none; }
+  .timeline-hour span { line-height: 1; font-weight: 700; }
+  .timeline-hour:not([data-hour="0"]):not([data-hour="3"]):not([data-hour="6"]):not([data-hour="9"]):not([data-hour="12"]):not([data-hour="15"]):not([data-hour="18"]):not([data-hour="21"]) span { display: none; }
+  .timeline-hour::before {
+    content: '';
+    position: absolute;
+    bottom: 16px; left: 1px; right: 1px;
+    height: 6px;
+    border-radius: 3px;
+    background: #e2e8f0;
+    transition: all var(--transition-fast);
+  }
+  .timeline-hour.active-hour {
+    background: linear-gradient(180deg, var(--color-primary-soft), rgba(var(--color-primary-rgb), 0.08));
+    border-right-color: rgba(37,99,235,0.15);
+  }
+  .timeline-hour.active-hour span { display: flex !important; color: var(--color-primary); font-weight: 800; }
+  .timeline-hour.active-hour::before { background: var(--color-primary); opacity: 0.8; }
+
+  /* ── Checklist écrans ────────────────────────────────── */
+  .screen-checklist {
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.5rem 0.75rem;
+    background: var(--bg-card2);
+  }
+  .screen-checklist::-webkit-scrollbar {
+    width: 6px;
+  }
+  .screen-checklist::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .screen-checklist::-webkit-scrollbar-thumb {
+    background: rgba(0,0,0,0.1);
+    border-radius: 3px;
+  }
+  .screen-checklist label {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-size: 0.82rem;
+    padding: 0.4rem 0.25rem;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    font-weight: 500;
+    color: #334155;
+  }
+  .screen-checklist label:hover {
+    color: var(--color-primary);
+  }
+  .screen-checklist label input {
+    cursor: pointer;
+  }
+
+  /* ── Progress bar taux d'occupation ─────────────────── */
+  .taux-progress {
+    height: 8px;
+    border-radius: 4px;
+    background: #e2e8f0;
+    overflow: hidden;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.05);
+  }
+  .taux-progress-bar {
+    height: 100%;
+    border-radius: 4px;
+    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    background: linear-gradient(90deg, var(--color-primary) 0%, #1e40af 100%);
+  }
+
+  /* ── Bannière de résultats ───────────────────────────── */
+  .result-banner {
+    background: linear-gradient(135deg, var(--color-primary) 0%, #1e40af 100%);
+    border-radius: 12px;
+    color: #fff;
+    padding: 2rem;
+    margin-bottom: 2rem;
+    margin-top: 2rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 2rem;
+    box-shadow: 0 12px 32px rgba(37,99,235,0.3);
+    border: 1px solid rgba(255,255,255,0.15);
+  }
+  .result-banner > div:first-child {
+    flex: 1;
+    min-width: 280px;
+  }
+  .result-banner .result-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    background: rgba(255,255,255,0.2);
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 8px;
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-bottom: 0.8rem;
+  }
+  .result-banner .result-badge i {
+    font-size: 0.9rem;
+  }
+  .result-banner .result-value {
+    font-size: 2.5rem;
+    font-weight: 800;
+    line-height: 1;
+    letter-spacing: -0.03em;
+    margin-bottom: 0.5rem;
+    font-family: 'Monaco', 'Courier New', monospace;
+    text-shadow: 0 2px 8px rgba(0,0,0,0.1);
+  }
+  .result-banner .result-sub {
+    font-size: 0.95rem;
+    opacity: 0.95;
+    font-weight: 500;
+    line-height: 1.5;
+  }
+  .result-banner .result-sub strong {
+    font-weight: 700;
+    color: rgba(255,255,255,1);
+  }
+  .result-banner .btn-creer {
+    background: rgba(255,255,255,0.25);
+    backdrop-filter: blur(10px);
+    border: 1.5px solid rgba(255,255,255,0.4);
+    color: #fff;
+    border-radius: 10px;
+    padding: 0.8rem 1.6rem;
+    font-size: 0.9rem;
+    font-weight: 700;
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    transition: all var(--transition-base);
+    text-decoration: none;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .result-banner .btn-creer:hover {
+    background: rgba(255,255,255,0.35);
+    border-color: rgba(255,255,255,0.6);
+    color: #fff;
+    transform: translateY(-3px);
+    box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+  }
+  .result-banner .btn-creer:active {
+    transform: translateY(-1px);
+  }
+  .result-banner .btn-creer i {
+    font-size: 1.1rem;
+  }
+
+  /* ── Bouton Simuler ──────────────────────────────────── */
+  .btn-simuler {
+    background: linear-gradient(135deg, var(--color-primary) 0%, #1e40af 100%);
+    border: none;
+    border-radius: 10px;
+    color: #fff;
+    font-weight: 700;
+    font-size: 0.95rem;
+    padding: 0.8rem 1.2rem;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    transition: all var(--transition-base);
+    box-shadow: 0 4px 16px rgba(37,99,235,0.3);
+    cursor: pointer;
+  }
+  .btn-simuler:hover {
+    opacity: 0.95;
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px rgba(37,99,235,0.35);
+    color: #fff;
+  }
+  .btn-simuler:active {
+    transform: translateY(0);
+  }
+
+  /* ── Tableaux modernes ───────────────────────────────── */
+  .sim-table {
+    font-size: 0.83rem;
+  }
+  .sim-table thead th {
+    background: var(--bg-card2);
+    font-weight: 700;
+    font-size: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: #475569;
+    border-bottom: 2px solid var(--border);
+    padding: 0.75rem;
+  }
+  .sim-table tbody td {
+    padding: 0.75rem;
+    border-bottom: 1px solid var(--border-subtle);
+    vertical-align: middle;
+    font-weight: 500;
+  }
+  .sim-table tbody tr:hover {
+    background: rgba(var(--color-primary-rgb), 0.05);
+  }
+</style>
 {% endblock %}
 
 {% block content %}
 <div class="row g-3">
 
+  {# ────────────────────────────────────────────────────────────────────────── #}
+  {#  COLONNE GAUCHE : FORMULAIRE DE PARAMÈTRES                                 #}
+  {# ────────────────────────────────────────────────────────────────────────── #}
+  <div class="col-12 col-xl-4 col-lg-5">
+    <div class="sim-card mb-3">
+      <div class="p-3 border-bottom d-flex align-items-center justify-content-between bg-light rounded-top-3">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-sliders2-vertical" style="color:var(--color-primary)"></i>
+          <span class="fw-bold text-dark">Paramètres de simulation</span>
+        </div>
+        <a href="{% url 'simulation_ecran' %}" class="btn btn-sm btn-outline-secondary py-0 px-2" title="Réinitialiser" style="font-size:0.75rem;">
+          <i class="bi bi-arrow-counterclockwise me-1"></i>Effacer
+        </a>
+      </div>
+
+      <div class="p-3">
   {# ── FORMULAIRE ─────────────────────────────────────────────────────────── #}
   <div class="col-12 col-lg-4">
     <div class="card">
@@ -16,14 +445,54 @@
       <div class="card-body">
         <form method="get" id="sim-form">
 
+          {# 1. Durée du spot avec sélecteurs rapides #}
           <div class="mb-3">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+              <label class="form-label mb-0 fw-semibold" style="font-size:0.85rem;">
+                <i class="bi bi-stopwatch me-1" style="color:var(--color-primary)"></i>Durée du spot
+              </label>
+              <div class="d-flex gap-1" id="duree-pills">
+                <span class="preset-pill duree-pill" data-val="5">5s</span>
+                <span class="preset-pill duree-pill" data-val="10">10s</span>
+                <span class="preset-pill duree-pill" data-val="15">15s</span>
+                <span class="preset-pill duree-pill" data-val="20">20s</span>
+                <span class="preset-pill duree-pill" data-val="30">30s</span>
+              </div>
+            </div>
             <label class="form-label">Durée du spot</label>
             {{ form.duree_passage }}
           </div>
 
+          {# 2. Période de diffusion #}
+          <div class="config-section neutral-section">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+              <span class="fw-semibold text-secondary" style="font-size:0.82rem;">
+                <i class="bi bi-calendar3 me-1"></i>Période de diffusion
+              </span>
+              <span class="badge bg-secondary-subtle text-secondary-emphasis" style="font-size:0.7rem;">Automatique</span>
+            </div>
           <hr>
           <p class="nav-label mb-2">Période <small class="text-muted fw-normal">(au moins un des trois)</small></p>
 
+            <div class="row g-2">
+              <div class="col-6">
+                <label class="form-label small mb-1 text-muted">Date début</label>
+                {{ form.date_debut }}
+              </div>
+              <div class="col-6">
+                <label class="form-label small mb-1 text-muted">Date fin</label>
+                {{ form.date_fin }}
+              </div>
+              <div class="col-12">
+                <div class="input-group input-group-sm">
+                  <span class="input-group-text bg-white"><i class="bi bi-calendar-event me-1"></i>Nb de jours</span>
+                  {{ form.nb_jours }}
+                </div>
+                <div class="form-text mt-1" style="font-size:0.72rem;">
+                  Indiquez les dates <strong>OU</strong> le nombre de jours (le système synchronise automatiquement).
+                </div>
+              </div>
+            </div>
           <div class="mb-2">
             <label class="form-label">Date de début</label>
             {{ form.date_debut }}
@@ -38,69 +507,263 @@
             <div class="form-text">{{ form.nb_jours.help_text }}</div>
           </div>
 
+          {# 3. Bloc Principal #}
+          <div class="config-section primary-section">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+              <div class="d-flex align-items-center gap-1.5">
+                <span class="badge rounded-circle p-1 d-inline-flex align-items-center justify-content-center text-white" style="background:var(--color-primary);width:20px;height:20px;font-size:11px;">1</span>
+                <strong class="text-dark" style="font-size:0.88rem;">Bloc Principal</strong>
+              </div>
+              <span class="badge bg-primary-subtle text-primary-emphasis" style="font-size:0.7rem;">Obligatoire</span>
           <hr>
-          <p class="nav-label mb-2">Diffusion <small class="text-muted fw-normal">(laisser vide pour propositions)</small></p>
+          <div class="border rounded p-3 mb-3" style="background:linear-gradient(135deg, rgba(147,46,43,.08), rgba(255,255,255,.95)); border-color: rgba(147,46,43,.18)!important;">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <i class="bi bi-1-circle-fill text-primary"></i>
+              <strong>Bloc principal</strong>
+            </div>
+            <p class="nav-label mb-2 small text-muted">Diffusion <small class="fw-normal">(laisser vide pour propositions)</small></p>
 
-          <div class="mb-2">
-            <label class="form-label">Fréquence</label>
-            {{ form.frequence }}
-          </div>
+            <div class="mb-2">
+              <div class="d-flex justify-content-between align-items-center mb-1">
+                <label class="form-label small mb-0 text-muted">Fréquence d'apparition</label>
+                <div class="d-flex gap-1" id="freq-pills">
+                  <span class="preset-pill freq-pill" data-val="60">1 min</span>
+                  <span class="preset-pill freq-pill" data-val="120">2 min</span>
+                  <span class="preset-pill freq-pill" data-val="180">3 min</span>
+                  <span class="preset-pill freq-pill" data-val="300">5 min</span>
+                </div>
+              </div>
+              <label class="form-label">Fréquence</label>
+              {{ form.frequence }}
+            </div>
 
-          <div class="mb-2">
-            <label class="form-label">Tranches horaires</label>
-            {{ form.tranches_horaires }}
-            <div class="form-text">{{ form.tranches_horaires.help_text }}</div>
-            {% if form.tranches_horaires.errors %}
-              <div class="text-danger small mt-1">{{ form.tranches_horaires.errors.0 }}</div>
-            {% endif %}
-          </div>
-
-          <div class="d-flex align-items-center gap-2 my-2">
-            <hr class="flex-grow-1 m-0">
-            <span class="text-muted small">OU</span>
-            <hr class="flex-grow-1 m-0">
-          </div>
-
-          <div class="row g-2 mb-3">
-            <div class="col-6">
-              <label class="form-label">Heure de début</label>
-              {{ form.heure_debut_diffusion }}
-              {% if form.heure_debut_diffusion.errors %}
-                <div class="text-danger small mt-1">{{ form.heure_debut_diffusion.errors.0 }}</div>
+            <div class="mb-2">
+              <label class="form-label small mb-1 text-muted">Tranches horaires de diffusion</label>
+              <label class="form-label">Tranches horaires principales</label>
+              {{ form.tranches_horaires }}
+              <div class="form-text">{{ form.tranches_horaires.help_text }}</div>
+              {% if form.tranches_horaires.errors %}
+                <div class="text-danger small mt-1">{{ form.tranches_horaires.errors.0 }}</div>
               {% endif %}
             </div>
-            <div class="col-6">
-              <label class="form-label">Durée (heures)</label>
-              {{ form.duree_diffusion_heures }}
-              {% if form.duree_diffusion_heures.errors %}
-                <div class="text-danger small mt-1">{{ form.duree_diffusion_heures.errors.0 }}</div>
-              {% endif %}
+
+              {# Presets de tranches rapides #}
+              <div class="mt-2">
+                <div class="text-muted small mb-1" style="font-size:0.72rem;">Presets rapides en 1 clic :</div>
+                <div class="d-flex flex-wrap gap-1" id="tranche-presets">
+                  <span class="preset-pill tranche-preset" data-tranche="06:00-23:00" title="17h/jour">⚡ Plein temps (06h-23h)</span>
+                  <span class="preset-pill tranche-preset" data-tranche="07:00-21:00" title="14h/jour">🏢 Journée (07h-21h)</span>
+                  <span class="preset-pill tranche-preset" data-tranche="07:00-09:30,17:00-20:00" title="5h30/jour">🚗 Pointes (Matin & Soir)</span>
+                  <span class="preset-pill tranche-preset" data-tranche="08:00-18:00" title="10h/jour">💼 Bureaux (08h-18h)</span>
+                  <span class="preset-pill tranche-preset" data-tranche="12:00-14:30,18:00-21:00" title="5h30/jour">🍽️ Midi & Soir</span>
+                  <span class="preset-pill tranche-preset" data-tranche="18:00-22:30" title="4h30/jour">🌙 Soirée</span>
+                </div>
+              </div>
+            <div class="mb-2">
+              <label class="form-label">Écrans ciblés du bloc principal</label>
+              {{ form.ecrans }}
+              <div class="form-text">{{ form.ecrans.help_text }}</div>
             </div>
-            <div class="col-12">
-              <div class="form-text">{{ form.duree_diffusion_heures.help_text }}</div>
-              <div id="tranche-preview" class="small mt-1 fw-semibold" style="display:none;">
-                <i class="bi bi-arrow-right-circle me-1"></i>Tranche calculée : <span id="tranche-preview-val"></span>
+          </div>
+
+            {# Calculatrice d'horaire début + durée #}
+            <div class="mt-2 pt-2 border-top">
+              <div class="d-flex align-items-center justify-content-between mb-1" style="cursor:pointer;" data-bs-toggle="collapse" data-bs-target="#custom-time-calc">
+                <span class="small text-muted" style="font-size:0.75rem;"><i class="bi bi-clock-history me-1"></i>Ou saisir : Heure début + Durée</span>
+                <i class="bi bi-chevron-down text-muted" style="font-size:0.75rem;"></i>
+              </div>
+              <div class="collapse {% if form.heure_debut_diffusion.value or form.duree_diffusion_heures.value %}show{% endif %}" id="custom-time-calc">
+                <div class="row g-2 mt-1">
+                  <div class="col-6">
+                    <label class="form-label small mb-1 text-muted" style="font-size:0.7rem;">Heure début</label>
+                    {{ form.heure_debut_diffusion }}
+                  </div>
+                  <div class="col-6">
+                    <label class="form-label small mb-1 text-muted" style="font-size:0.7rem;">Durée (heures)</label>
+                    {{ form.duree_diffusion_heures }}
+                  </div>
+                  <div class="col-12">
+                    <div id="tranche-preview" class="small mt-1 fw-semibold text-success" style="display:none; font-size:0.75rem;">
+                      <i class="bi bi-arrow-right-circle me-1"></i>Tranche : <span id="tranche-preview-val"></span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+          <div class="border rounded p-3 mb-3" style="background:linear-gradient(135deg, rgba(22,163,74,.08), rgba(255,255,255,.95)); border-color: rgba(22,163,74,.18)!important;">
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <i class="bi bi-2-circle-fill text-success"></i>
+              <strong>Bloc additionnel</strong>
+            </div>
+
+            {# Écrans du bloc principal #}
+            <div class="mt-3">
+              <div class="d-flex align-items-center justify-content-between mb-1">
+                <label class="form-label small mb-0 fw-semibold text-dark">
+                  <i class="bi bi-display me-1" style="color:var(--color-primary)"></i>Écrans ciblés
+                </label>
+                <div class="d-flex gap-1">
+                  <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none" id="btn-select-all-ecrans" style="font-size:0.72rem;color:var(--color-primary);">Tout</button>
+                  <span class="text-muted" style="font-size:0.72rem;">|</span>
+                  <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none text-muted" id="btn-deselect-all-ecrans" style="font-size:0.72rem;">Aucun</button>
+                </div>
+              </div>
+              <div class="screen-checklist">
+                {{ form.ecrans }}
+              </div>
+              <div class="form-text" style="font-size:0.72rem;">Si aucun n'est coché, l'ensemble des écrans actifs du parc est sélectionné.</div>
+            <div class="mb-2">
+              <label class="form-label">Jours supplémentaires à ajouter</label>
+              {{ form.jours_ajout }}
+              <div class="form-text">{{ form.jours_ajout.help_text }}</div>
+            </div>
+          </div>
+
+          {# 4. Bloc Additionnel (Second Bloc) #}
+          <div class="config-section success-section">
+            <div class="d-flex align-items-center justify-content-between mb-2" style="cursor:pointer;" data-bs-toggle="collapse" data-bs-target="#bloc-2-body">
+              <div class="d-flex align-items-center gap-1.5">
+                <span class="badge rounded-circle p-1 d-inline-flex align-items-center justify-content-center text-white bg-success" style="width:20px;height:20px;font-size:11px;">2</span>
+                <strong class="text-dark" style="font-size:0.88rem;">Bloc Additionnel (Optionnel)</strong>
+              </div>
+              <i class="bi bi-chevron-down text-success"></i>
+            <div class="mb-2">
+              <label class="form-label">Fréquence pour les jours ajoutés</label>
+              {{ form.frequence_jours_ajout }}
+              <div class="form-text">{{ form.frequence_jours_ajout.help_text }}</div>
+            </div>
+
+            <div class="collapse {% if form.jours_ajout.value and form.jours_ajout.value > 0 %}show{% endif %}" id="bloc-2-body">
+              <div class="mb-2">
+                <label class="form-label small mb-1 text-muted">Jours supplémentaires à ajouter</label>
+                {{ form.jours_ajout }}
+              </div>
+            <div class="mb-2">
+              <label class="form-label">Tranches horaires pour les jours ajoutés</label>
+              {{ form.tranches_horaires_jours_ajout }}
+              <div class="form-text">{{ form.tranches_horaires_jours_ajout.help_text }}</div>
+            </div>
+
+              <div class="mb-2">
+                <label class="form-label small mb-1 text-muted">Fréquence pour les jours ajoutés</label>
+                {{ form.frequence_jours_ajout }}
+              </div>
+            <div class="mb-2">
+              <label class="form-label">Écrans ciblés du bloc 2</label>
+              {{ form.ecrans_jours_ajout }}
+              <div class="form-text">{{ form.ecrans_jours_ajout.help_text }}</div>
+              <div class="form-text text-muted">Si vous ne sélectionnez rien ici, les écrans du bloc principal sont réutilisés par défaut.</div>
+            </div>
+          </div>
+
+              <div class="mb-2">
+                <label class="form-label small mb-1 text-muted">Tranches horaires pour les jours ajoutés</label>
+                {{ form.tranches_horaires_jours_ajout }}
+          <div class="border-top pt-3 mt-3">
+            <div class="small text-muted fw-semibold mb-2">Alternative de tranche (optionnelle)</div>
+            <div class="row g-2 mb-3">
+              <div class="col-6">
+                <label class="form-label">Heure de début</label>
+                {{ form.heure_debut_diffusion }}
+                {% if form.heure_debut_diffusion.errors %}
+                  <div class="text-danger small mt-1">{{ form.heure_debut_diffusion.errors.0 }}</div>
+                {% endif %}
+              </div>
+
+              <div class="mb-2">
+                <div class="d-flex align-items-center justify-content-between mb-1">
+                  <label class="form-label small mb-0 text-muted">Écrans spécifiques bloc 2</label>
+                  <div class="d-flex gap-1">
+                    <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none text-success" id="btn-select-all-ecrans-ajout" style="font-size:0.72rem;">Tout</button>
+                    <span class="text-muted" style="font-size:0.72rem;">|</span>
+                    <button type="button" class="btn btn-link btn-sm p-0 text-decoration-none text-muted" id="btn-deselect-all-ecrans-ajout" style="font-size:0.72rem;">Aucun</button>
+                  </div>
+              <div class="col-6">
+                <label class="form-label">Durée de diffusion (heures)</label>
+                {{ form.duree_diffusion_heures }}
+                {% if form.duree_diffusion_heures.errors %}
+                  <div class="text-danger small mt-1">{{ form.duree_diffusion_heures.errors.0 }}</div>
+                {% endif %}
+              </div>
+              <div class="col-12">
+                <div class="form-text">{{ form.duree_diffusion_heures.help_text }}</div>
+                <div id="tranche-preview" class="small mt-1 fw-semibold" style="display:none;">
+                  <i class="bi bi-arrow-right-circle me-1"></i>Tranche calculée : <span id="tranche-preview-val"></span>
+                </div>
+                <div class="screen-checklist">
+                  {{ form.ecrans_jours_ajout }}
+                </div>
+                <div class="form-text text-muted" style="font-size:0.72rem;">Vide = réutilise les écrans du bloc principal.</div>
               </div>
             </div>
           </div>
 
+          {# 5. Multivisuels & Objectif de spots #}
+          <div class="row g-2 mb-3">
+            <div class="col-6">
+              <label class="form-label small mb-1 fw-semibold text-dark">
+                <i class="bi bi-images me-1 text-primary"></i>Nb Visuels
+              </label>
+              {{ form.nombre_visuels }}
+            </div>
+            <div class="col-6">
+              <label class="form-label small mb-1 fw-semibold text-dark">
+                <i class="bi bi-bullseye me-1 text-info"></i>Spots Cible
+              </label>
+              {{ form.nb_spots_cible }}
+            </div>
           <hr>
           <div class="mb-2">
-            <label class="form-label">Écrans ciblés</label>
-            {{ form.ecrans }}
-            <div class="form-text">{{ form.ecrans.help_text }}</div>
+            <label class="form-label">Nombre de visuels</label>
+            {{ form.nombre_visuels }}
+            <div class="form-text">{{ form.nombre_visuels.help_text }}</div>
           </div>
 
+          {# 6. Mode Propositions (Mode B) #}
+          <div id="mode-b-box" class="config-section info-section">
+            <div class="d-flex align-items-center justify-content-between mb-1">
+              <div class="d-flex align-items-center gap-1.5">
+                <i class="bi bi-lightbulb-fill text-primary"></i>
+                <strong style="font-size:0.85rem;">Mode Propositions</strong>
+              </div>
+              <span id="mode-b-badge" class="badge bg-secondary" style="font-size:0.7rem;">inactif</span>
           <div class="mb-3">
             <label class="form-label">Spots souhaités <span class="text-muted fw-normal">(optionnel)</span></label>
             {{ form.nb_spots_cible }}
             <div class="form-text">{{ form.nb_spots_cible.help_text }}</div>
           </div>
 
+          <div id="mode-b-box" class="border rounded p-3 mb-3" style="background:linear-gradient(135deg, rgba(13,110,253,.06), rgba(255,255,255,.95)); border-color: rgba(13,110,253,.18)!important;">
+            <div class="d-flex align-items-center gap-2 mb-1">
+              <i class="bi bi-signpost-split-fill text-primary"></i>
+              <strong>Mode Propositions</strong>
+              <span id="mode-b-badge" class="badge bg-secondary ms-auto">inactif</span>
+            </div>
+            <p id="mode-b-hint" class="small text-muted mb-2" style="font-size:0.75rem;"></p>
+            <div>
+              <label class="form-label small mb-1 text-muted">Créneaux autorisés à tester</label>
+            <p id="mode-b-hint" class="small text-muted mb-2"></p>
+
+            <div class="mb-0">
+              <label class="form-label">Créneaux à tester</label>
+              {{ form.tranches_horaires_alternatives }}
+              <div class="form-text">
+                Restreint les créneaux essayés par le système pour approcher l'objectif de spots.
+                Laissé vide, il testera automatiquement tous les créneaux entre 06:00 et 23:00.
+              </div>
+              {% if form.tranches_horaires_alternatives.errors %}
+                <div class="text-danger small mt-1">{{ form.tranches_horaires_alternatives.errors.0 }}</div>
+              {% endif %}
+            </div>
+          </div>
+
           {% if form.non_field_errors %}
+          <div class="alert alert-danger py-2 small mb-3">{{ form.non_field_errors }}</div>
           <div class="alert alert-danger py-2 small">{{ form.non_field_errors }}</div>
           {% endif %}
 
+          <button type="submit" class="btn-simuler mt-1">
+            <i class="bi bi-calculator-fill"></i>
+            Lancer la simulation
           <button type="submit" class="btn btn-primary w-100">
             <i class="bi bi-play-fill me-1"></i>Simuler
           </button>
@@ -109,9 +772,18 @@
     </div>
   </div>
 
+  {# ────────────────────────────────────────────────────────────────────────── #}
+  {#  COLONNE DROITE : RÉSULTATS & TABLEAUX DE BORD                             #}
+  {# ────────────────────────────────────────────────────────────────────────── #}
+  <div class="col-12 col-xl-8 col-lg-7">
   {# ── RÉSULTATS ───────────────────────────────────────────────────────────── #}
   <div class="col-12 col-lg-8">
 
+    {# ── ÉTAT INITIAL : AUCUNE SIMULATION LANCÉE ── #}
+    {% if not resultats and not propositions and not tranche_optimale and not erreur %}
+    <div class="sim-card p-5 text-center">
+      <div class="mx-auto rounded-circle d-flex align-items-center justify-content-center mb-3" style="width:72px;height:72px;background:var(--color-primary-soft);color:var(--color-primary);">
+        <i class="bi bi-display fs-1"></i>
     {# Vide #}
     {% if not resultats and not propositions and not erreur %}
     <div class="card">
@@ -123,43 +795,562 @@
           <strong>Propositions</strong> — renseignez un nombre de spots cible et laissez fréquence/tranches libres.
         </p>
       </div>
+      <h5 class="fw-bold text-dark mb-2">Simulateur de Diffusion & Planification DOOH</h5>
+      <p class="text-muted mx-auto mb-4" style="max-width:520px;font-size:0.9rem;">
+        Configurez votre campagne d'écrans numériques pour calculer immédiatement le nombre exact de spots,
+        le temps d'antenne réel, la part de voix et la faisabilité technique sur le parc.
+      </p>
+
+      <div class="row g-3 justify-content-center text-start">
+        <div class="col-12 col-md-6">
+          <div class="p-3 border rounded-3 h-100" style="background:var(--color-primary-soft);border-color:var(--color-primary-mid)!important;">
+            <div class="d-flex align-items-center gap-2 mb-2 fw-semibold" style="color:var(--color-primary);">
+              <i class="bi bi-calculator"></i> Mode A : Calcul Direct
+            </div>
+            <div class="small text-muted">
+              Renseignez la fréquence (ex: 2 min) et les tranches horaires (ex: 07h-21h) pour obtenir le bilan complet et le taux d'occupation des écrans.
+            </div>
+          </div>
+        </div>
+        <div class="col-12 col-md-6">
+          <div class="p-3 border rounded-3 h-100" style="background:#f0fdf4;border-color:rgba(16,185,129,0.2)!important;">
+            <div class="d-flex align-items-center gap-2 mb-2 fw-semibold text-success">
+              <i class="bi bi-bullseye"></i> Mode B : Objectif Cible
+            </div>
+            <div class="small text-muted">
+              Renseignez un nombre de spots souhaité (ex: 5 000 spots). Le simulateur résoudra automatiquement la meilleure combinaison horaire et fréquence.
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
 
+    {# ── ALERTE ERREUR ── #}
     {# Erreur #}
     {% elif erreur %}
+    <div class="alert alert-danger d-flex align-items-center gap-2 rounded-3 shadow-sm mb-3">
+      <i class="bi bi-exclamation-octagon-fill fs-5"></i>
+      <div>{{ erreur }}</div>
     <div class="alert alert-danger">
       <i class="bi bi-exclamation-triangle-fill me-2"></i>{{ erreur }}
     </div>
+    {% endif %}
 
+    {# ──────────────────────────────────────────────────────────────────────── #}
+    {#  MODE A : RÉSULTATS DU CALCUL DIRECT                                     #}
+    {# ──────────────────────────────────────────────────────────────────────── #}
+    {% if resultats %}
     {# ── MODE A : calcul direct ──────────────────────────────────────────── #}
     {% elif resultats %}
 
+    {# 1. Bannière dégradée résultats #}
+    <div class="result-banner">
+      <div>
+        <div class="result-badge">
+          <i class="bi bi-check2-circle"></i>
+          Simulation réussie
+        </div>
+        {% if resultats.jours_ajout and resultats.jours_ajout > 0 %}
+        <div class="result-badge" style="margin-left: 0.5rem;">
+          <i class="bi bi-layers"></i>
+          2 blocs
+        </div>
+        {% endif %}
+        
+        <div class="result-value">
+          {{ resultats.spots_total_tous|format_number_fr }}
+        </div>
+        
+        <div class="result-sub">
+          <strong>spots prévus</strong> · <strong>{{ resultats.nb_ecrans }}</strong> écran{{ resultats.nb_ecrans|pluralize }} · <strong>{{ resultats.nb_jours }}</strong> jour{{ resultats.nb_jours|pluralize }}
+        </div>
+      </div>
+      {% if resultats.url_creer_campagne %}
+      <a href="{{ resultats.url_creer_campagne }}" class="btn-creer">
+        <i class="bi bi-plus-circle"></i>
+        <span>Créer la campagne</span>
+      </a>
+      {% endif %}
+    </div>
+
+    {# 2. Cartes KPIs / Indicateurs Clés #}
+    <div class="row g-2.5 mb-3">
+      {# Total Spots #}
     <div class="row g-3 mb-3">
       <div class="col-6 col-md-3">
+        <div class="sim-metric-card" style="color:var(--color-primary); background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);">
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <span class="metric-label">Volume Total</span>
+            <div style="width:30px;height:30px;border-radius:8px;background:var(--color-primary-soft);display:flex;align-items:center;justify-content:center;">
+              <i class="bi bi-play-fill text-primary fs-5"></i>
+            </div>
+          </div>
+          <div class="metric-value text-dark">{{ resultats.spots_total_tous|format_number_fr }}</div>
+          <div class="metric-sub">
+            <strong>{{ resultats.spots_par_jour_total|format_number_fr }}</strong> spots / jour
+          </div>
         <div class="stat-card text-center">
           <div class="stat-num text-primary">{{ resultats.spots_total_tous|floatformat:0 }}</div>
           <div class="stat-lbl">Spots total</div>
         </div>
       </div>
+
+      {# Spots / Jour / Écran #}
       <div class="col-6 col-md-3">
+        <div class="sim-metric-card" style="color:var(--color-disponible); background: linear-gradient(180deg, #ffffff 0%, #f0fdf4 100%);">
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <span class="metric-label">Par écran / jour</span>
+            <div style="width:30px;height:30px;border-radius:8px;background:#ecfdf5;display:flex;align-items:center;justify-content:center;">
+              <i class="bi bi-display text-success fs-6"></i>
+            </div>
+          </div>
+          <div class="metric-value text-success">{{ resultats.spots_par_jour_ecran|format_number_fr }}</div>
+          <div class="metric-sub">
+            <strong>{{ resultats.spots_par_heure }}</strong> spots / heure
+          </div>
         <div class="stat-card text-center">
           <div class="stat-num text-success">{{ resultats.spots_par_jour_ecran }}</div>
           <div class="stat-lbl">Spots / jour / écran</div>
         </div>
       </div>
+
+      {# Part de voix (Share of Voice) #}
       <div class="col-6 col-md-3">
+        <div class="sim-metric-card" style="color:#0891b2; background: linear-gradient(180deg, #ffffff 0%, #ecfeff 100%);">
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <span class="metric-label">Part de Voix</span>
+            <div style="width:30px;height:30px;border-radius:8px;background:#cffafe;display:flex;align-items:center;justify-content:center;">
+              <i class="bi bi-pie-chart-fill text-info fs-6"></i>
+            </div>
+          </div>
+          <div class="metric-value text-info">{{ resultats.part_de_voix_pct }} %</div>
+          <div class="metric-sub">
+            {{ resultats.temps_pub_par_heure_sec|format_secondes }} / heure
+          </div>
         <div class="stat-card text-center">
           <div class="stat-num text-info">{{ resultats.heures_antenne }}</div>
           <div class="stat-lbl">Heures d'antenne</div>
         </div>
       </div>
+
+      {# Temps d'antenne total #}
       <div class="col-6 col-md-3">
+        <div class="sim-metric-card" style="color:#d97706; background: linear-gradient(180deg, #ffffff 0%, #fffbeb 100%);">
+          <div class="d-flex justify-content-between align-items-center mb-1">
+            <span class="metric-label">Temps d'antenne</span>
+            <div style="width:30px;height:30px;border-radius:8px;background:#fef3c7;display:flex;align-items:center;justify-content:center;">
+              <i class="bi bi-clock-history text-warning fs-6"></i>
+            </div>
+          </div>
+          <div class="metric-value text-dark">{{ resultats.heures_antenne|format_temps }}</div>
+          <div class="metric-sub">
+            Spot de <strong>{{ resultats.duree_passage }}s</strong>
+          </div>
         <div class="stat-card text-center">
           <div class="stat-num text-secondary">{{ resultats.nb_jours }}</div>
           <div class="stat-lbl">Jours</div>
         </div>
       </div>
     </div>
+
+    {# 3. Calendrier de diffusion 24h & Rythme #}
+    <div class="sim-card p-3 mb-3">
+    {% if resultats.jours_ajout and resultats.jours_ajout > 0 %}
+    <div class="alert alert-success mb-3">
+      <i class="bi bi-arrow-up-circle-fill me-2"></i>
+      <strong>Gain du bloc additionnel :</strong> {{ resultats.gain|floatformat:0 }} spots supplémentaires grâce au second bloc.
+    </div>
+    {% endif %}
+
+      {# En-tête avec tranche horaire explicite #}
+      <div class="d-flex align-items-center justify-content-between mb-3">
+        <div class="d-flex align-items-center gap-2">
+          <div style="width:32px;height:32px;border-radius:8px;background:var(--color-primary-soft);display:flex;align-items:center;justify-content:center;">
+            <i class="bi bi-clock-fill" style="color:var(--color-primary);font-size:0.9rem;"></i>
+          </div>
+          <div>
+            <div class="fw-bold text-dark" style="font-size:0.9rem;line-height:1.1;">Calendrier de diffusion</div>
+            <div class="text-muted" style="font-size:0.75rem;">Créneau : <strong class="text-dark">{{ resultats.tranches_val }}</strong></div>
+          </div>
+        </div>
+        <div class="text-end">
+          <div class="fw-bold text-dark" style="font-size:1.1rem;">{{ resultats.heures_tranches }}h</div>
+          <div class="text-muted" style="font-size:0.7rem;">actives / jour</div>
+        </div>
+      </div>
+    {% if resultats.manque and resultats.manque > 0 %}
+    <div class="alert alert-warning mb-3">
+      <i class="bi bi-exclamation-triangle-fill me-2"></i>
+      <strong>Il manque {{ resultats.manque }} spots</strong> pour atteindre l'objectif de {{ resultats.nb_spots_cible }} spots.
+    </div>
+    {% endif %}
+
+      {# Barre chronologique 24h #}
+      <div class="timeline-24h mb-1" id="sim-timeline">
+        {% for slot in resultats.timeline_hours %}
+          <div class="timeline-hour {{ slot.cls }}" data-hour="{{ slot.h }}" title="{{ slot.h }}h00">
+            <span>{{ slot.h }}h</span>
+          </div>
+        {% endfor %}
+    {% if resultats.combinaisons_complement %}
+    {{ resultats.combinaisons_complement|json_script:"combos-manque-data" }}
+    <div class="card mb-3 border-warning">
+      <div class="card-header bg-warning-subtle">
+        <i class="bi bi-lightbulb me-2"></i>Combinaisons possibles pour combler les {{ resultats.manque }} spots manquants
+      </div>
+
+      {# Légende #}
+      <div class="d-flex align-items-center gap-3 mb-3" style="font-size:0.72rem;color:#64748b;">
+        <div class="d-flex align-items-center gap-1">
+          <div style="width:12px;height:8px;border-radius:2px;background:var(--color-primary-mid);"></div>
+          <span>Diffusion active</span>
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm table-hover mb-0 align-middle" style="font-size:.85rem;">
+            <thead class="table-light">
+              <tr>
+                <th>#</th>
+                <th>Jours ajoutés</th>
+                <th>Écrans ajoutés</th>
+                <th>Fréquence</th>
+                <th>Tranche horaire</th>
+                <th>Spots obtenus</th>
+                <th>Écart</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for combo in resultats.combinaisons_complement %}
+              <tr>
+                <td class="text-muted">{{ forloop.counter }}</td>
+                <td><span class="badge bg-primary-subtle text-primary-emphasis">+{{ combo.jours_ajout }} jour{{ combo.jours_ajout|pluralize }}</span></td>
+                <td><span class="badge bg-info-subtle text-info-emphasis">+{{ combo.ecrans_ajout }} écran{{ combo.ecrans_ajout|pluralize }}</span></td>
+                <td>{{ combo.frequence_label }}</td>
+                <td>{{ combo.tranche_label }}</td>
+                <td class="fw-semibold">{{ combo.spots_obtenus }}</td>
+                <td>
+                  {% if combo.ecart >= 0 %}
+                    <span class="text-success">+{{ combo.ecart }}</span>
+                  {% else %}
+                    <span class="text-danger">{{ combo.ecart }}</span>
+                  {% endif %}
+                  <span class="text-muted">({{ combo.ecart_pct }}%)</span>
+                </td>
+                <td>
+                  <button type="button" class="btn btn-sm btn-outline-primary apply-combo-btn"
+                          data-source="combos-manque-data" data-index="{{ forloop.counter0 }}">
+                    <i class="bi bi-check2-circle me-1"></i>Appliquer
+                  </button>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <div class="d-flex align-items-center gap-1">
+          <div style="width:12px;height:8px;border-radius:2px;background:#e2e8f0;"></div>
+          <span>Hors diffusion</span>
+        </div>
+      </div>
+
+      {# 3 indicateurs de rythme #}
+      <div class="row g-2">
+        <div class="col-4">
+          <div style="background:var(--color-primary-soft);border-radius:var(--radius-sm);padding:0.6rem 0.75rem;text-align:center;border:1px solid rgba(37,99,235,0.1);">
+            <div style="font-size:0.68rem;color:var(--color-primary);font-weight:600;text-transform:uppercase;letter-spacing:0.03em;margin-bottom:3px;">
+              <i class="bi bi-stopwatch me-1"></i>Fréquence
+            </div>
+            <div class="fw-bold text-dark" style="font-size:0.9rem;">{{ resultats.frequence_label }}</div>
+          </div>
+        </div>
+        <div class="col-4">
+          <div style="background:#f0fdf4;border-radius:var(--radius-sm);padding:0.6rem 0.75rem;text-align:center;border:1px solid rgba(16,185,129,0.15);">
+            <div style="font-size:0.68rem;color:var(--color-disponible);font-weight:600;text-transform:uppercase;letter-spacing:0.03em;margin-bottom:3px;">
+              <i class="bi bi-arrow-repeat me-1"></i>Rotation / visuel
+            </div>
+            <div class="fw-bold text-dark" style="font-size:0.9rem;">
+              {{ resultats.rotation_visuel_str }}
+              {% if resultats.nombre_visuels > 1 %}
+                <span class="text-muted" style="font-size:0.75rem;">× {{ resultats.nombre_visuels }}</span>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+        <div class="col-4">
+          <div style="background:#fffbeb;border-radius:var(--radius-sm);padding:0.6rem 0.75rem;text-align:center;border:1px solid rgba(245,158,11,0.15);">
+            <div style="font-size:0.68rem;color:#b45309;font-weight:600;text-transform:uppercase;letter-spacing:0.03em;margin-bottom:3px;">
+              <i class="bi bi-collection-play me-1"></i>Spots / visuel
+            </div>
+            <div class="fw-bold text-dark" style="font-size:0.9rem;">{{ resultats.spots_par_visuel|format_number_fr }}</div>
+          </div>
+        </div>
+      <div class="card-footer small text-muted">
+        <i class="bi bi-info-circle me-1"></i>Chaque ligne est une alternative indépendante — cliquez "Appliquer" pour remplir automatiquement le formulaire et relancer le calcul.
+      </div>
+    </div>
+    {% elif resultats.combinaisons_complement_erreur %}
+    <div class="alert alert-secondary mb-3">
+      <i class="bi bi-info-circle me-2"></i>{{ resultats.combinaisons_complement_erreur }}
+    </div>
+    {% endif %}
+
+    {% if resultats.depassement and resultats.depassement > 0 %}
+    <div class="alert alert-info mb-3">
+      <i class="bi bi-arrow-down-circle-fill me-2"></i>
+      <strong>Vos paramètres dépassent l'objectif de {{ resultats.depassement }} spots</strong>
+      (objectif : {{ resultats.nb_spots_cible }} — obtenu : {{ resultats.spots_total_tous|floatformat:0 }}).
+    </div>
+    {% endif %}
+
+    {# 4. Objectif Cible (si renseigné) : Jauge et Scénarios d'ajustement #}
+    {% if resultats.nb_spots_cible %}
+    <div class="sim-card p-3 mb-3 {% if resultats.manque and resultats.manque > 0 %}border-warning{% elif resultats.depassement and resultats.depassement > 0 %}border-info{% else %}border-success{% endif %}">
+      <div class="d-flex align-items-center justify-content-between mb-2">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-bullseye fs-5 {% if resultats.manque and resultats.manque > 0 %}text-warning{% elif resultats.depassement and resultats.depassement > 0 %}text-info{% else %}text-success{% endif %}"></i>
+          <span class="fw-bold text-dark">Objectif : {{ resultats.nb_spots_cible|format_number_fr }} spots</span>
+        </div>
+        <span class="badge {% if resultats.manque and resultats.manque > 0 %}bg-warning text-dark{% elif resultats.depassement and resultats.depassement > 0 %}bg-info text-dark{% else %}bg-success text-white{% endif %} rounded-pill px-2.5 py-1">
+          {{ resultats.pct_realisation_cible }}% atteint
+        </span>
+    {% if resultats.reduction_jours %}
+    {{ resultats.reduction_jours|json_script:"reduction-data" }}
+    <div class="card mb-3 border-info">
+      <div class="card-header bg-info-subtle d-flex justify-content-between align-items-center">
+        <span><i class="bi bi-calendar-minus me-2"></i>Étape 1 — Réduire le nombre de jours principaux</span>
+        {% if not resultats.reduction_jours.cas_particulier and not resultats.combinaisons_ajustement %}
+        <button type="button" id="apply-reduction-only-btn" class="btn btn-sm btn-info text-white">
+          <i class="bi bi-check2-circle me-1"></i>Appliquer cette réduction
+        </button>
+        {% endif %}
+      </div>
+
+      <div class="progress mb-2" style="height:8px; border-radius:4px; background:#e2e8f0;">
+        <div class="progress-bar {% if resultats.manque and resultats.manque > 0 %}bg-warning{% elif resultats.depassement and resultats.depassement > 0 %}bg-info{% else %}bg-success{% endif %}"
+             style="width:{{ resultats.pct_realisation_cible|default:0 }}%; border-radius:4px;"></div>
+      </div>
+
+      {% if resultats.manque and resultats.manque > 0 %}
+        <div class="small text-muted mb-2">
+          <i class="bi bi-info-circle me-1"></i>Il manque <strong>{{ resultats.manque|format_number_fr }} spots</strong> pour atteindre la cible. Choisissez une solution ci-dessous pour combler l'écart en 1 clic :
+      <div class="card-body">
+        {% if resultats.reduction_jours.cas_particulier %}
+        <div class="alert alert-secondary mb-0">
+          <i class="bi bi-info-circle me-2"></i>{{ resultats.reduction_jours.cas_particulier }}
+        </div>
+      {% elif resultats.depassement and resultats.depassement > 0 %}
+        <div class="small text-muted mb-2">
+          <i class="bi bi-info-circle me-1"></i>Vos paramètres actuels produisent un surplus de <strong>{{ resultats.depassement|format_number_fr }} spots</strong> par rapport à la cible.
+        </div>
+      {% else %}
+        <div class="small text-success fw-semibold">
+          <i class="bi bi-check-circle-fill me-1"></i>Objectif parfaitement atteint !
+        </div>
+      {% endif %}
+
+      {# Scénarios d'ajout pour combler le manque #}
+      {% if resultats.combinaisons_complement %}
+      {{ resultats.combinaisons_complement|json_script:"combos-manque-data" }}
+      <div class="table-responsive mt-3 border rounded-3 overflow-hidden">
+        <table class="table table-sm table-hover mb-0 align-middle sim-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Jours ajoutés</th>
+              <th>Écrans ajoutés</th>
+              <th>Fréquence</th>
+              <th>Tranche</th>
+              <th>Spots obtenus</th>
+              <th>Écart</th>
+              <th class="text-end">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for combo in resultats.combinaisons_complement %}
+            <tr>
+              <td class="text-muted">{{ forloop.counter }}</td>
+              <td><span class="badge bg-primary-subtle text-primary-emphasis">+{{ combo.jours_ajout }} j</span></td>
+              <td><span class="badge bg-info-subtle text-info-emphasis">+{{ combo.ecrans_ajout }} écran{{ combo.ecrans_ajout|pluralize }}</span></td>
+              <td>{{ combo.frequence_label }}</td>
+              <td>{{ combo.tranche_label }}</td>
+              <td class="fw-bold">{{ combo.spots_obtenus|format_number_fr }}</td>
+              <td>
+                <span class="{% if combo.ecart >= 0 %}text-success{% else %}text-danger{% endif %} fw-semibold">
+                  {% if combo.ecart >= 0 %}+{% endif %}{{ combo.ecart }}
+                </span>
+                <span class="text-muted small">({{ combo.ecart_pct }}%)</span>
+              </td>
+              <td class="text-end">
+                <button type="button" class="btn btn-sm btn-outline-primary apply-combo-btn py-0 px-2 rounded-pill"
+                        data-source="combos-manque-data" data-index="{{ forloop.counter0 }}" style="font-size:0.75rem;">
+                  <i class="bi bi-check-lg me-1"></i>Appliquer
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      {% endif %}
+
+      {# Scénarios de réduction de jours si dépassement #}
+      {% if resultats.reduction_jours %}
+      {{ resultats.reduction_jours|json_script:"reduction-data" }}
+      <div class="mt-3 p-3 rounded-3 bg-light border">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <span class="fw-semibold text-dark small"><i class="bi bi-calendar-minus me-1 text-info"></i>Réduction recommandée des jours</span>
+          {% if not resultats.reduction_jours.cas_particulier and not resultats.combinaisons_ajustement %}
+          <button type="button" id="apply-reduction-only-btn" class="btn btn-sm btn-info text-white py-0.5 px-2.5 rounded-pill" style="font-size:0.75rem;">
+            <i class="bi bi-check2 me-1"></i>Appliquer la réduction ({{ resultats.reduction_jours.nb_jours_reduit }} jours)
+          </button>
+          {% endif %}
+        </div>
+        <div class="row g-2 align-items-center text-center">
+          <div class="col-4">
+        {% else %}
+        <div class="row g-3 align-items-center">
+          <div class="col-6 col-md-3 text-center">
+            <div class="small text-muted">Jours actuels</div>
+            <div class="fw-bold text-dark fs-5">{{ resultats.reduction_jours.nb_jours_original }}</div>
+            <div class="display-6">{{ resultats.reduction_jours.nb_jours_original }}</div>
+          </div>
+          <div class="col-4">
+            <div class="small text-muted">Jours conseillés</div>
+            <div class="fw-bold text-info fs-5">{{ resultats.reduction_jours.nb_jours_reduit }}</div>
+          <div class="col-6 col-md-1 text-center">
+            <i class="bi bi-arrow-right fs-3 text-muted"></i>
+          </div>
+          <div class="col-4">
+            <div class="small text-muted">Spots obtenus</div>
+            <div class="fw-bold text-success fs-5">{{ resultats.reduction_jours.spots_avec_jours_reduits|format_number_fr }}</div>
+          <div class="col-6 col-md-3 text-center">
+            <div class="small text-muted">Jours proposés</div>
+            <div class="display-6 text-info">{{ resultats.reduction_jours.nb_jours_reduit }}</div>
+            {% if resultats.reduction_jours.date_debut and resultats.reduction_jours.date_fin_reduite %}
+            <div class="small text-muted">{{ resultats.reduction_jours.date_debut|date:"d M" }} → {{ resultats.reduction_jours.date_fin_reduite|date:"d M Y" }}</div>
+            {% endif %}
+          </div>
+          <div class="col-12 col-md-5">
+            <div class="small text-muted">Spots obtenus avec {{ resultats.reduction_jours.nb_jours_reduit }} jour{{ resultats.reduction_jours.nb_jours_reduit|pluralize }} (mêmes réglages)</div>
+            <div class="fs-4 fw-semibold text-info">{{ resultats.reduction_jours.spots_avec_jours_reduits }} spots</div>
+            <div class="small text-muted">({{ resultats.reduction_jours.jours_retires }} jour{{ resultats.reduction_jours.jours_retires|pluralize }} économisé{{ resultats.reduction_jours.jours_retires|pluralize }})</div>
+          </div>
+        </div>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+    {% endif %}
+
+      {% if resultats.combinaisons_ajustement %}
+      {{ resultats.combinaisons_ajustement|json_script:"combos-ajustement-data" }}
+      <div class="table-responsive mt-2 border rounded-3 overflow-hidden">
+        <table class="table table-sm table-hover mb-0 align-middle sim-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Ajustement complémentaire</th>
+              <th>Fréquence</th>
+              <th>Tranche</th>
+              <th>Total final</th>
+              <th>Écart cible</th>
+              <th class="text-end">Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for combo in resultats.combinaisons_ajustement %}
+            <tr>
+              <td class="text-muted">{{ forloop.counter }}</td>
+              <td>+{{ combo.jours_ajout }}j, +{{ combo.ecrans_ajout }} écrans</td>
+              <td>{{ combo.frequence_label }}</td>
+              <td>{{ combo.tranche_label }}</td>
+              <td class="fw-bold text-dark">{{ combo.total_final|format_number_fr }}</td>
+              <td>
+                <span class="{% if combo.ecart_final >= 0 %}text-success{% else %}text-danger{% endif %} fw-semibold">
+                  {% if combo.ecart_final >= 0 %}+{% endif %}{{ combo.ecart_final }}
+                </span>
+              </td>
+              <td class="text-end">
+                <button type="button" class="btn btn-sm btn-outline-success apply-combo-btn py-0 px-2 rounded-pill"
+                        data-source="combos-ajustement-data" data-index="{{ forloop.counter0 }}" data-with-reduction="true" style="font-size:0.75rem;">
+                  <i class="bi bi-check-lg me-1"></i>Appliquer
+                </button>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+    {% if resultats.combinaisons_ajustement %}
+    {{ resultats.combinaisons_ajustement|json_script:"combos-ajustement-data" }}
+    <div class="card mb-3 border-success">
+      <div class="card-header bg-success-subtle">
+        <i class="bi bi-sliders me-2"></i>Étape 2 — Ajuster pour combler les {{ resultats.reduction_jours.manque_apres_reduction }} spots restants
+      </div>
+      {% endif %}
+      <div class="card-body p-0">
+        <div class="table-responsive">
+          <table class="table table-sm table-hover mb-0 align-middle" style="font-size:.85rem;">
+            <thead class="table-light">
+              <tr>
+                <th>#</th>
+                <th>Jours ajoutés</th>
+                <th>Écrans ajoutés</th>
+                <th>Fréquence</th>
+                <th>Tranche horaire</th>
+                <th>Spots obtenus</th>
+                <th>Total final</th>
+                <th>Écart / objectif</th>
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for combo in resultats.combinaisons_ajustement %}
+              <tr>
+                <td class="text-muted">{{ forloop.counter }}</td>
+                <td><span class="badge bg-primary-subtle text-primary-emphasis">+{{ combo.jours_ajout }} jour{{ combo.jours_ajout|pluralize }}</span></td>
+                <td><span class="badge bg-info-subtle text-info-emphasis">+{{ combo.ecrans_ajout }} écran{{ combo.ecrans_ajout|pluralize }}</span></td>
+                <td>{{ combo.frequence_label }}</td>
+                <td>{{ combo.tranche_label }}</td>
+                <td>{{ combo.spots_obtenus }}</td>
+                <td class="fw-semibold">{{ combo.total_final }}</td>
+                <td>
+                  {% if combo.ecart_final >= 0 %}
+                    <span class="text-success">+{{ combo.ecart_final }}</span>
+                  {% else %}
+                    <span class="text-danger">{{ combo.ecart_final }}</span>
+                  {% endif %}
+                </td>
+                <td>
+                  <button type="button" class="btn btn-sm btn-outline-success apply-combo-btn"
+                          data-source="combos-ajustement-data" data-index="{{ forloop.counter0 }}"
+                          data-with-reduction="true">
+                    <i class="bi bi-check2-circle me-1"></i>Appliquer
+                  </button>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="card-footer small text-muted">
+        <i class="bi bi-info-circle me-1"></i>"Appliquer" remplit le formulaire avec la réduction de jours (étape 1) + cette ligne d'ajustement (étape 2), puis relance le calcul.
+      </div>
+    </div>
+    {% elif resultats.combinaisons_ajustement_erreur %}
+    <div class="alert alert-secondary mb-3">
+      <i class="bi bi-info-circle me-2"></i>{{ resultats.combinaisons_ajustement_erreur }}
+    </div>
+    {% endif %}
+
+    {# 5. Synthèse des 2 Blocs (si actif) #}
+    {% if resultats.jours_ajout and resultats.jours_ajout > 0 %}
+    <div class="sim-card p-3 mb-3 border-success">
+      <div class="d-flex align-items-center justify-content-between mb-2">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-layers-fill text-success"></i>
+          <span class="fw-bold text-dark">Répartition & Gain du Second Bloc</span>
+
 
     <div class="card mb-3">
       <div class="card-header"><i class="bi bi-info-circle me-2"></i>Paramètres utilisés</div>
@@ -170,18 +1361,96 @@
           <div class="col-6 col-md-4"><span class="text-muted">Tranches</span><br><strong>{{ resultats.heures_tranches }}h/j</strong></div>
           <div class="col-6 col-md-4"><span class="text-muted">Spots/heure/écran</span><br><strong>{{ resultats.spots_par_heure }}</strong></div>
           <div class="col-6 col-md-4"><span class="text-muted">Spots/écran (total)</span><br><strong>{{ resultats.spots_total_ecran }}</strong></div>
-          <div class="col-6 col-md-4"><span class="text-muted">Écrans</span><br><strong>{{ resultats.nb_ecrans }}</strong></div>
+          <div class="col-6 col-md-4"><span class="text-muted">Écrans principal</span><br><strong>{{ resultats.nb_ecrans_principal|default:resultats.nb_ecrans }}</strong></div>
+          <div class="col-6 col-md-4"><span class="text-muted">Écrans ajoutés</span><br><strong>{{ resultats.nb_ecrans_ajout|default:0 }}</strong></div>
+          <div class="col-6 col-md-4"><span class="text-muted">Écrans total</span><br><strong>{{ resultats.nb_ecrans_total|default:resultats.nb_ecrans }}</strong></div>
+          <div class="col-6 col-md-4"><span class="text-muted">Visuels</span><br><strong>{{ resultats.nombre_visuels }}</strong></div>
         </div>
+        <span class="badge bg-success text-white rounded-pill px-2.5 py-1">+{{ resultats.gain_spots|format_number_fr }} spots (+{{ resultats.gain_pct }}%)</span>
       </div>
     </div>
 
+      <div class="row g-2 text-center">
+        <div class="col-12 col-md-4">
+          <div class="p-2.5 rounded-3 bg-light border h-100">
+            <div class="badge bg-primary text-white mb-1">Bloc 1 : Principal</div>
+            <div class="fs-5 fw-bold text-dark">{{ resultats.spots_principal|format_number_fr }}</div>
+            <div class="small text-muted">{{ resultats.nb_jours }} jours · {{ resultats.nb_ecrans_principal }} écran{{ resultats.nb_ecrans_principal|pluralize }}</div>
+    {% if resultats.jours_ajout and resultats.jours_ajout > 0 %}
+    <div class="card mb-3 border-primary">
+      <div class="card-header bg-primary text-white"><i class="bi bi-stack me-2"></i>Répartition en 2 blocs</div>
+      <div class="card-body">
+        <div class="row g-3">
+          <div class="col-12 col-md-6">
+            <div class="border rounded p-3 h-100">
+              <div class="fw-semibold mb-2">Bloc 1 — Période principale</div>
+              <div class="small text-muted">Jours : {{ resultats.nb_jours }} · Écrans : {{ resultats.nb_ecrans_principal|default:resultats.nb_ecrans }} · Fréquence : {{ resultats.frequence_label }} · Tranches : {{ resultats.heures_tranches }}h/j</div>
+              <div class="display-6 mt-2 text-primary">{{ resultats.spots_principal|default:resultats.spots_total_tous|floatformat:0 }}</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-12 col-md-4">
+          <div class="p-2.5 rounded-3 bg-light border h-100">
+            <div class="badge bg-success text-white mb-1">Bloc 2 : Additionnel</div>
+            <div class="fs-5 fw-bold text-success">+{{ resultats.spots_ajout|format_number_fr }}</div>
+            <div class="small text-muted">+{{ resultats.jours_ajout }} jour{{ resultats.jours_ajout|pluralize }} · {{ resultats.nb_ecrans_ajout }} écran{{ resultats.nb_ecrans_ajout|pluralize }}</div>
+          <div class="col-12 col-md-6">
+            <div class="border rounded p-3 h-100">
+              <div class="fw-semibold mb-2">Bloc 2 — Jours ajoutés</div>
+              <div class="small text-muted">Jours : {{ resultats.jours_ajout }} · Écrans : {{ resultats.nb_ecrans_ajout|default:0 }} · Fréquence : {{ resultats.frequence_ajout }}s · Tranches : {{ resultats.tranches_ajout }}</div>
+              <div class="display-6 mt-2 text-success">{{ resultats.spots_ajout|floatformat:0 }}</div>
+            </div>
+          </div>
+        </div>
+        <div class="col-12 col-md-4">
+          <div class="p-2.5 rounded-3 bg-white border border-success h-100">
+            <div class="badge bg-dark text-white mb-1">Total Combiné</div>
+            <div class="fs-5 fw-bold text-primary">{{ resultats.spots_total_tous|format_number_fr }}</div>
+            <div class="small text-muted">{{ resultats.heures_antenne|format_temps }} d'antenne</div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+
+    {# 6. Détail & Taux d'Occupation par Écran #}
     {% if resultats.details_ecrans %}
+    <div class="sim-card mb-3 overflow-hidden">
+      <div class="p-3 border-bottom d-flex flex-wrap align-items-center justify-content-between gap-2 bg-light">
+        <div class="d-flex align-items-center gap-2">
+          <i class="bi bi-display" style="color:var(--color-primary)"></i>
+          <span class="fw-bold text-dark">Impact & Saturation du Parc d'Écrans ({{ resultats.details_ecrans|length }})</span>
+        </div>
+        <div class="d-flex gap-2 small">
+          {% if resultats.taux_moyen_actuel is not None %}
+            <span class="badge bg-white text-dark border">Taux moyen actuel : <strong>{{ resultats.taux_moyen_actuel }}%</strong></span>
+            <span class="badge bg-white text-primary border border-primary-subtle">Taux moyen projeté : <strong>{{ resultats.taux_moyen_apres }}%</strong></span>
+          {% endif %}
+        </div>
     <div class="card">
-      <div class="card-header"><i class="bi bi-display me-2"></i>Détail par écran</div>
+      <div class="card-header d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <span><i class="bi bi-display me-2"></i>Détail par écran</span>
+        {% if resultats.jours_ajout and resultats.jours_ajout > 0 %}
+        <span class="small">
+          <span class="badge bg-primary-subtle text-primary-emphasis me-1"><i class="bi bi-circle-fill" style="font-size:.5rem;"></i> Principal</span>
+          <span class="badge bg-success-subtle text-success-emphasis"><i class="bi bi-plus-circle-fill me-1"></i>Ajout</span>
+        </span>
+        {% endif %}
+      </div>
+
       <div class="table-responsive">
+        <table class="table table-sm table-hover mb-0 align-middle sim-table">
         <table class="table mb-0">
           <thead>
             <tr>
+              {% if resultats.jours_ajout and resultats.jours_ajout > 0 %}<th>Bloc</th>{% endif %}
+              <th>Code</th>
+              <th>Nom & Emplacement</th>
+              <th class="text-end">Spots / j</th>
+              <th class="text-end">Total</th>
+              <th style="min-width:130px;">Taux actuel</th>
+              <th style="min-width:130px;">Taux après</th>
+              <th class="text-center">Statut</th>
               <th>Code</th><th>Nom</th>
               <th class="text-end">Spots/j</th><th class="text-end">Total</th>
               <th>Occ. actuelle</th><th>Occ. après</th><th>Statut</th>
@@ -189,27 +1458,73 @@
           </thead>
           <tbody>
             {% for d in resultats.details_ecrans %}
-            <tr>
+            <tr class="{% if d.bloc == 'ajout' %}table-success bg-opacity-10{% endif %}">
+            <tr class="{% if d.bloc == 'ajout' %}table-success bg-opacity-25{% endif %}">
+              {% if resultats.jours_ajout and resultats.jours_ajout > 0 %}
+              <td>
+                {% if d.bloc == 'ajout' %}
+                  <span class="badge bg-success-subtle text-success-emphasis">Bloc 2</span>
+                  <span class="badge bg-success"><i class="bi bi-plus-circle-fill me-1"></i>Ajout</span>
+                {% else %}
+                  <span class="badge bg-primary-subtle text-primary-emphasis">Bloc 1</span>
+                  <span class="badge bg-primary">Principal</span>
+                {% endif %}
+              </td>
+              {% endif %}
+              <td><code class="fw-bold" style="color:var(--color-primary); background:var(--color-primary-soft); padding:2px 6px; border-radius:4px;">{{ d.support.code }}</code></td>
               <td><code>{{ d.support.code }}</code></td>
               <td>{{ d.support.nom }}</td>
               <td class="text-end fw-semibold">{{ d.spots_par_jour }}</td>
               <td class="text-end fw-semibold">{{ d.spots_total }}</td>
               <td>
+                <div class="fw-semibold text-dark">{{ d.support.nom }}</div>
+                <small class="text-muted">{{ d.support.ville }}{% if d.support.quartier %} · {{ d.support.quartier }}{% endif %}</small>
+              </td>
+              <td class="text-end fw-semibold">{{ d.spots_par_jour|format_number_fr }}</td>
+              <td class="text-end fw-bold text-primary">{{ d.spots_total|format_number_fr }}</td>
+              <td>
                 {% if d.taux_actuel is not None %}
+                  <div class="d-flex align-items-center gap-2">
+                    <div class="taux-progress flex-grow-1">
+                      <div class="taux-progress-bar {% if d.taux_actuel >= 85 %}bg-danger{% elif d.taux_actuel >= 60 %}bg-warning{% else %}bg-success{% endif %}"
+                           style="width:{{ d.taux_actuel }}%;"></div>
+                    </div>
+                    <span class="small fw-semibold text-muted" style="width:38px;">{{ d.taux_actuel }}%</span>
                   <div class="taux-bar" style="width:90px;">
                     <div class="taux-fill {% if d.taux_actuel >= 80 %}bg-danger{% elif d.taux_actuel >= 50 %}bg-warning{% else %}bg-success{% endif %}" style="width:{{ d.taux_actuel }}%;"></div>
                   </div>
+                {% else %}
+                  <span class="text-muted small">—</span>
+                {% endif %}
                   <small class="text-muted">{{ d.taux_actuel }}%</small>
                 {% else %}<span class="text-muted">—</span>{% endif %}
               </td>
               <td>
                 {% if d.taux_apres is not None %}
+                  <div class="d-flex align-items-center gap-2">
+                    <div class="taux-progress flex-grow-1">
+                      <div class="taux-progress-bar {% if d.taux_apres >= 100 %}bg-danger{% elif d.taux_apres >= 80 %}bg-warning{% else %}bg-success{% endif %}"
+                           style="width:{{ d.taux_apres }}%;"></div>
+                    </div>
+                    <span class="small fw-bold {% if d.taux_apres >= 100 %}text-danger{% elif d.taux_apres >= 80 %}text-warning{% else %}text-success{% endif %}" style="width:38px;">
+                      {{ d.taux_apres }}%
+                    </span>
                   <div class="taux-bar" style="width:90px;">
                     <div class="taux-fill {% if d.taux_apres >= 80 %}bg-danger{% elif d.taux_apres >= 50 %}bg-warning{% else %}bg-success{% endif %}" style="width:{{ d.taux_apres }}%;"></div>
                   </div>
+                {% else %}
+                  <span class="text-muted small">—</span>
+                {% endif %}
                   <small class="{% if d.taux_apres >= 100 %}text-danger fw-bold{% else %}text-muted{% endif %}">{{ d.taux_apres }}%</small>
                 {% else %}<span class="text-muted">—</span>{% endif %}
               </td>
+              <td class="text-center">
+                {% if d.peut_accueillir is None %}
+                  <span class="badge bg-secondary-subtle text-secondary rounded-pill">N/A</span>
+                {% elif d.peut_accueillir %}
+                  <span class="badge bg-success-subtle text-success-emphasis rounded-pill px-2.5 py-1"><i class="bi bi-check-circle-fill me-1"></i>Fluide</span>
+                {% else %}
+                  <span class="badge bg-danger-subtle text-danger-emphasis rounded-pill px-2.5 py-1" title="{{ d.message_dispo }}"><i class="bi bi-x-circle-fill me-1"></i>Saturé</span>
               <td>
                 {% if d.peut_accueillir is None %}<span class="badge-status bs-brouillon">N/A</span>
                 {% elif d.peut_accueillir %}<span class="badge-status bs-disponible"><i class="bi bi-check-circle-fill me-1"></i>OK</span>
@@ -219,14 +1534,39 @@
             </tr>
             {% endfor %}
           </tbody>
+          {% if resultats.jours_ajout and resultats.jours_ajout > 0 %}
+          <tfoot>
+            <tr class="table-light fw-semibold">
+              <td colspan="4">Total principal ({{ resultats.nb_ecrans_principal|default:resultats.nb_ecrans }} écran{{ resultats.nb_ecrans_principal|default:resultats.nb_ecrans|pluralize }})</td>
+              <td colspan="3" class="text-primary">{{ resultats.spots_principal|default:resultats.spots_total_tous }} spots</td>
+            </tr>
+            <tr class="table-light fw-semibold">
+              <td colspan="4">Total ajout ({{ resultats.nb_ecrans_ajout|default:0 }} écran{{ resultats.nb_ecrans_ajout|default:0|pluralize }})</td>
+              <td colspan="3" class="text-success">+{{ resultats.spots_ajout }} spots</td>
+            </tr>
+          </tfoot>
+          {% endif %}
         </table>
       </div>
     </div>
     {% endif %}
 
+    {% endif %}
     {# ── MODE B : propositions ───────────────────────────────────────────── #}
     {% elif propositions %}
 
+    {# ──────────────────────────────────────────────────────────────────────── #}
+    {#  MODE B : PROPOSITIONS MULTIPLES                                         #}
+    {# ──────────────────────────────────────────────────────────────────────── #}
+    {% if propositions %}
+    <div class="sim-card p-3 mb-3 bg-white border-start border-4 border-info">
+      <div class="d-flex align-items-center gap-2 mb-1">
+        <span class="badge bg-info text-white"><i class="bi bi-lightbulb-fill me-1"></i>Mode Propositions</span>
+        <span class="badge bg-light text-dark border">Objectif : {{ nb_spots_cible|format_number_fr }} spots (±5%)</span>
+      </div>
+      <div class="text-muted small">
+        Voici les meilleures combinaisons de diffusion pour atteindre votre objectif sur {{ nb_jours }} jours et {{ nb_ecrans }} écran{{ nb_ecrans|pluralize }}.
+      </div>
     <div class="alert alert-primary d-flex align-items-center gap-2 mb-3">
       <i class="bi bi-lightbulb-fill"></i>
       <span>
@@ -240,6 +1580,16 @@
     <div class="row g-3">
       {% for p in propositions %}
       <div class="col-12">
+        <div class="sim-card p-3 position-relative">
+          <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 pb-2 mb-2 border-bottom">
+            <div class="d-flex align-items-center gap-2">
+              <span class="badge rounded-circle p-1 d-inline-flex align-items-center justify-content-center text-white bg-primary" style="width:24px;height:24px;">#{{ forloop.counter }}</span>
+              <strong class="text-dark">{{ p.frequence_label }}</strong>
+              <span class="text-muted">·</span>
+              <span class="text-secondary fw-semibold">{{ p.tranches_label }}</span>
+            </div>
+            <span class="badge {% if p.abs_ecart <= 1 %}bg-success{% elif p.abs_ecart <= 3 %}bg-warning text-dark{% else %}bg-secondary{% endif %} rounded-pill px-2.5 py-1">
+              {% if p.ecart_pct >= 0 %}+{% endif %}{{ p.ecart_pct }}% écart
         <div class="card border-{% if p.ecart_pct >= 0 %}success{% else %}info{% endif %}">
           <div class="card-header d-flex align-items-center justify-content-between">
             <span>
@@ -252,6 +1602,11 @@
               {% if p.ecart_pct >= 0 %}+{% endif %}{{ p.ecart_pct }}%
             </span>
           </div>
+
+          <div class="row g-2 text-center my-2">
+            <div class="col-4 col-md-2">
+              <div class="small text-muted">Total spots</div>
+              <div class="fw-bold text-primary fs-5">{{ p.spots_total|format_number_fr }}</div>
           <div class="card-body py-3">
             <div class="row g-3 text-center">
               <div class="col-4 col-md-2">
@@ -279,6 +1634,9 @@
                 <div class="stat-lbl">Fréquence</div>
               </div>
             </div>
+            <div class="col-4 col-md-2">
+              <div class="small text-muted">Spots/jour</div>
+              <div class="fw-bold text-dark fs-5">{{ p.spots_par_jour|format_number_fr }}</div>
             {# Bouton pour appliquer cette proposition dans le formulaire #}
             <div class="mt-3 text-end">
               <a href="?duree_passage={{ duree_passage }}&frequence={{ p.frequence }}&tranches_horaires={{ p.tranches_val|urlencode }}&nb_jours={{ nb_jours }}&nb_spots_cible={{ nb_spots_cible }}"
@@ -286,16 +1644,170 @@
                 <i class="bi bi-calculator me-1"></i>Calculer en détail
               </a>
             </div>
+            <div class="col-4 col-md-2">
+              <div class="small text-muted">Spots/j/écran</div>
+              <div class="fw-bold text-success fs-5">{{ p.spots_par_jour_ecran|format_number_fr }}</div>
+            </div>
+            <div class="col-4 col-md-2">
+              <div class="small text-muted">Part de voix</div>
+              <div class="fw-bold text-info fs-5">{{ p.part_de_voix_pct }}%</div>
+            </div>
+            <div class="col-4 col-md-2">
+              <div class="small text-muted">H. antenne</div>
+              <div class="fw-bold text-dark fs-5">{{ p.heures_antenne|format_temps }}</div>
+            </div>
+            <div class="col-4 col-md-2">
+              <div class="small text-muted">Heures/j</div>
+              <div class="fw-bold text-secondary fs-5">{{ p.heures_tranches|format_temps }}</div>
+            </div>
+          </div>
+
+          <div class="d-flex justify-content-end mt-2 pt-2 border-top">
+            <a href="?duree_passage={{ duree_passage }}&frequence={{ p.frequence }}&tranches_horaires={{ p.tranches_val|urlencode }}&nb_jours={{ nb_jours }}&nb_spots_cible={{ nb_spots_cible }}"
+               class="btn btn-outline-primary btn-sm px-3 fw-semibold rounded-pill">
+              <i class="bi bi-calculator me-1"></i>Sélectionner et calculer en détail
+            </a>
           </div>
         </div>
       </div>
       {% endfor %}
     </div>
+    {% endif %}
+
+    {# ──────────────────────────────────────────────────────────────────────── #}
+    {#  MODE B PRÉCIS : TRANCHE OPTIMALE UNIQUE                                 #}
+    {# ──────────────────────────────────────────────────────────────────────── #}
+    {% if tranche_optimale %}
+    <div class="sim-card p-3 mb-3 bg-white border-start border-4 border-primary">
+      <div class="d-flex align-items-center gap-2 mb-1">
+        <span class="badge bg-primary text-white"><i class="bi bi-clock-fill me-1"></i>Tranche Optimale Calculée</span>
+        <span class="badge bg-light text-dark border">Objectif : {{ nb_spots_cible|format_number_fr }} spots</span>
+      </div>
+      <div class="text-muted small">
+        Avec <strong>{{ tranche_optimale.frequence_label }}</strong>, <strong>{{ nb_jours }} jours</strong> et <strong>{{ nb_ecrans }} écran{{ nb_ecrans|pluralize }}</strong> fixés,
+        la durée quotidienne exacte nécessaire est de <strong>{{ tranche_optimale.tranche_label }}</strong>.
+      </div>
+    {# ── MODE B PRÉCIS : fréquence+jours+écrans fixés -> 1 seule tranche exacte ─ #}
+    {% elif tranche_optimale %}
+
+    <div class="alert alert-primary d-flex align-items-center gap-2 mb-3">
+      <i class="bi bi-bullseye"></i>
+      <span>
+        Objectif : <strong>{{ nb_spots_cible|floatformat:0 }} spots</strong> avec
+        <strong>{{ tranche_optimale.frequence_label }}</strong>,
+        <strong>{{ nb_jours }} jour{{ nb_jours|pluralize }}</strong> et
+        <strong>{{ nb_ecrans }} écran{{ nb_ecrans|pluralize }}</strong> fixés —
+        seule la tranche horaire est à déterminer.
+      </span>
+    </div>
+
+    {% if tranche_optimale.hors_plage %}
+    <div class="alert alert-warning d-flex align-items-center gap-2 mb-3 rounded-3">
+      <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+      <div>
+        {% if tranche_optimale.hors_plage == 'trop_grand' %}
+          La durée nécessaire dépasserait l'amplitude maximale de la journée (17h). Pensez à augmenter le nombre d'écrans ou de jours.
+    <div class="alert alert-warning mb-3">
+      <i class="bi bi-exclamation-triangle-fill me-2"></i>
+      {% if tranche_optimale.hors_plage == 'trop_grand' %}
+        La tranche nécessaire dépasserait l'amplitude maximale possible (17h, 06:00-23:00).
+        Le calcul ci-dessous utilise l'amplitude maximale — pour atteindre l'objectif exact,
+        ajoutez des jours ou des écrans plutôt que d'allonger encore la tranche.
+      {% else %}
+        La tranche nécessaire est très courte (moins de 15 min) — le calcul ci-dessous utilise
+        le minimum affichable. Réduisez le nombre de jours ou d'écrans si vous voulez viser
+        l'objectif plus précisément.
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <div class="card border-{% if tranche_optimale.ecart == 0 %}success{% else %}primary{% endif %} mb-3">
+      <div class="card-header d-flex align-items-center justify-content-between">
+        <span><i class="bi bi-clock-fill me-2"></i>Tranche horaire nécessaire</span>
+        {% if tranche_optimale.ecart == 0 %}
+          <span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i>Exact</span>
+        {% elif tranche_optimale.ecart_pct <= 2 and tranche_optimale.ecart_pct >= -2 %}
+          <span class="badge bg-success">
+            {% if tranche_optimale.ecart >= 0 %}+{% endif %}{{ tranche_optimale.ecart }} spots ({{ tranche_optimale.ecart_pct }}%)
+          </span>
+        {% else %}
+          La durée nécessaire est très courte (moins de 15 min). Pensez à réduire le nombre d'écrans ou de jours pour un créneau plus large.
+          <span class="badge bg-warning text-dark">
+            {% if tranche_optimale.ecart >= 0 %}+{% endif %}{{ tranche_optimale.ecart }} spots ({{ tranche_optimale.ecart_pct }}%)
+          </span>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
+    <div class="sim-card p-3 mb-3">
+      <div class="row g-2 text-center mb-3">
+        <div class="col-6 col-md-3">
+          <div class="small text-muted">Durée de tranche</div>
+          <div class="fs-4 fw-bold text-primary">{{ tranche_optimale.tranche_label }}</div>
+      <div class="card-body">
+        <div class="row g-3 text-center mb-3">
+          <div class="col-6 col-md-3">
+            <div class="stat-num" style="font-size:1.6rem;color:var(--color-primary);">{{ tranche_optimale.tranche_label }}</div>
+            <div class="stat-lbl">Durée de tranche</div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="stat-num" style="font-size:1.6rem;">{{ tranche_optimale.spots_obtenus }}</div>
+            <div class="stat-lbl">Spots obtenus</div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="stat-num" style="font-size:1.6rem;color:#0891b2;">{{ tranche_optimale.spots_par_jour }}</div>
+            <div class="stat-lbl">Spots/jour</div>
+          </div>
+          <div class="col-6 col-md-3">
+            <div class="stat-num" style="font-size:1.6rem;color:#7c3aed;">{{ tranche_optimale.heures_antenne|format_temps }}</div>
+            <div class="stat-lbl">H. antenne totale</div>
+          </div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="small text-muted">Spots obtenus</div>
+          <div class="fs-4 fw-bold text-dark">{{ tranche_optimale.spots_obtenus|format_number_fr }}</div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="small text-muted">Spots / jour</div>
+          <div class="fs-4 fw-bold text-success">{{ tranche_optimale.spots_par_jour|format_number_fr }}</div>
+        </div>
+        <div class="col-6 col-md-3">
+          <div class="small text-muted">Part de voix</div>
+          <div class="fs-4 fw-bold text-info">{{ tranche_optimale.part_de_voix_pct }} %</div>
+        </div>
+      </div>
+
+      <div class="p-2.5 rounded-3 bg-light border">
+        <div class="small fw-semibold text-dark mb-2">
+          <i class="bi bi-clock me-1"></i>Choisissez un horaire de départ pour générer le détail complet :
+        <div class="small text-muted mb-2">
+          <i class="bi bi-info-circle me-1"></i>Choisissez un horaire de départ (même durée, même résultat) et cliquez pour calculer le détail complet :
+        </div>
+        <div class="d-flex flex-wrap gap-1.5">
+        <div class="d-flex flex-wrap gap-2">
+          {% for v in tranche_optimale.variantes_horaires %}
+          <a href="?duree_passage={{ duree_passage }}&frequence={{ tranche_optimale.frequence }}&tranches_horaires={{ v.tranche_val|urlencode }}&nb_jours={{ nb_jours }}&nb_spots_cible={{ nb_spots_cible }}"
+             class="btn btn-outline-primary btn-sm rounded-pill">
+            <i class="bi bi-play-circle me-1"></i>{{ v.tranche_val }}
+             class="btn btn-outline-primary btn-sm">
+            <i class="bi bi-clock me-1"></i>{{ v.tranche_val }}
+          </a>
+          {% empty %}
+          <span class="text-muted small">Ajustez manuellement la tranche dans le formulaire pour lancer le calcul.</span>
+          <span class="text-muted small">Aucun horaire de départ standard ne convient pour cette durée — ajustez manuellement la tranche dans le formulaire.</span>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
 
     {% endif %}
+
   </div>
 </div>
+{% endblock %}
 
+{% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
   const heureDebutInput = document.getElementById('id_heure_debut_diffusion');
@@ -303,6 +1815,15 @@ document.addEventListener('DOMContentLoaded', function () {
   const previewBox       = document.getElementById('tranche-preview');
   const previewVal       = document.getElementById('tranche-preview-val');
 
+  // 1. Initialisation des Pills de durée de spot
+  const dureeSelect = document.getElementById('id_duree_passage');
+  const dureePills = document.querySelectorAll('.duree-pill');
+  if (dureeSelect && dureePills.length > 0) {
+    function syncDureePills() {
+      const val = dureeSelect.value;
+      dureePills.forEach(p => {
+        p.classList.toggle('active', p.dataset.val === val);
+      });
   if (!heureDebutInput || !dureeInput) return;
 
   function updatePreview() {
@@ -313,7 +1834,25 @@ document.addEventListener('DOMContentLoaded', function () {
       previewBox.style.display = 'none';
       return;
     }
+    dureePills.forEach(p => {
+      p.addEventListener('click', function () {
+        dureeSelect.value = this.dataset.val;
+        syncDureePills();
+      });
+    });
+    dureeSelect.addEventListener('change', syncDureePills);
+    syncDureePills();
+  }
 
+  // 2. Initialisation des Pills de Fréquence
+  const freqSelect = document.getElementById('id_frequence');
+  const freqPills = document.querySelectorAll('.freq-pill');
+  if (freqSelect && freqPills.length > 0) {
+    function syncFreqPills() {
+      const val = freqSelect.value;
+      freqPills.forEach(p => {
+        p.classList.toggle('active', p.dataset.val === val);
+      });
     const [h, m] = heureStr.split(':').map(Number);
     const dureeHeures = parseFloat(dureeStr);
     const totalMinutesDebut = h * 60 + m;
@@ -328,16 +1867,280 @@ document.addEventListener('DOMContentLoaded', function () {
       previewBox.style.display = 'block';
       return;
     }
+    freqPills.forEach(p => {
+      p.addEventListener('click', function () {
+        freqSelect.value = this.dataset.val;
+        syncFreqPills();
+        if (typeof refreshModeIndicator === 'function') refreshModeIndicator();
+      });
+    });
+    freqSelect.addEventListener('change', syncFreqPills);
+    syncFreqPills();
+  }
 
+  // 3. Initialisation des Presets de Tranches Horaires
+  const trancheInput = document.getElementById('id_tranches_horaires');
+  const tranchePresets = document.querySelectorAll('.tranche-preset');
+  if (trancheInput && tranchePresets.length > 0) {
+    function syncTranchePresets() {
+      const val = trancheInput.value.trim();
+      tranchePresets.forEach(p => {
+        p.classList.toggle('active', p.dataset.tranche === val);
+      });
+    }
+    tranchePresets.forEach(p => {
+      p.addEventListener('click', function () {
+        trancheInput.value = this.dataset.tranche;
+        syncTranchePresets();
+        if (typeof refreshModeIndicator === 'function') refreshModeIndicator();
+      });
+    });
+    trancheInput.addEventListener('input', syncTranchePresets);
+    syncTranchePresets();
     const finStr = `${String(finH).padStart(2, '0')}:${String(finM).padStart(2, '0')}`;
     previewVal.textContent = `${heureStr}-${finStr}`;
     previewBox.className = 'small mt-1 fw-semibold text-success';
     previewBox.style.display = 'block';
   }
 
+  // 4. Sélection / Désélection en masse des écrans
+  function setupBulkCheckboxes(btnSelectAllId, btnDeselectAllId, checkboxName) {
+    const btnAll = document.getElementById(btnSelectAllId);
+    const btnNone = document.getElementById(btnDeselectAllId);
+    if (!btnAll || !btnNone) return;
   heureDebutInput.addEventListener('input', updatePreview);
   dureeInput.addEventListener('input', updatePreview);
   updatePreview(); // état initial si valeurs déjà présentes (retour arrière)
 });
+
+    btnAll.addEventListener('click', function () {
+      document.querySelectorAll(`input[name="${checkboxName}"]`).forEach(cb => cb.checked = true);
+    });
+    btnNone.addEventListener('click', function () {
+      document.querySelectorAll(`input[name="${checkboxName}"]`).forEach(cb => cb.checked = false);
+    });
+// ═══════════ APPLIQUER UNE COMBINAISON PROPOSÉE ═══════════
+(function () {
+  const form = document.getElementById('sim-form');
+  if (!form) return;
+
+  function setFieldValue(name, value) {
+    const el = form.querySelector(`[name="${name}"]`);
+    if (el) el.value = value;
+  }
+  setupBulkCheckboxes('btn-select-all-ecrans', 'btn-deselect-all-ecrans', 'ecrans');
+  setupBulkCheckboxes('btn-select-all-ecrans-ajout', 'btn-deselect-all-ecrans-ajout', 'ecrans_jours_ajout');
+
+  // 5. Calculatrice d'horaire début + durée -> Tranche
+  const heureDebutInput = document.getElementById('id_heure_debut_diffusion');
+  const dureeInput = document.getElementById('id_duree_diffusion_heures');
+  const previewBox = document.getElementById('tranche-preview');
+  const previewVal = document.getElementById('tranche-preview-val');
+  function cocherPremiersEcrans(name, n) {
+    const boxes = form.querySelectorAll(`input[name="${name}"]`);
+    boxes.forEach((box, i) => { box.checked = i < n; });
+  }
+
+  if (heureDebutInput && dureeInput && previewBox && previewVal) {
+    function updateTrancheCalc() {
+      const heureStr = heureDebutInput.value;
+      const dureeStr = dureeInput.value;
+  function appliquerReduction(reduction) {
+    const dateDebutInput = form.querySelector('[name="date_debut"]');
+    const dateFinInput = form.querySelector('[name="date_fin"]');
+    const nbJoursInput = form.querySelector('[name="nb_jours"]');
+
+      if (!heureStr || !dureeStr || isNaN(parseFloat(dureeStr))) {
+        previewBox.style.display = 'none';
+        return;
+      }
+    if (reduction.date_fin_reduite && dateDebutInput && dateDebutInput.value) {
+      // Période définie par dates -> on raccourcit la date de fin
+      if (dateFinInput) dateFinInput.value = reduction.date_fin_reduite;
+      if (nbJoursInput) nbJoursInput.value = '';
+    } else if (nbJoursInput) {
+      // Période définie par nombre de jours -> on réduit directement
+      nbJoursInput.value = reduction.nb_jours_reduit;
+    }
+  }
+
+      const [h, m] = heureStr.split(':').map(Number);
+      const dureeHeures = parseFloat(dureeStr);
+      const totalMinutesDebut = h * 60 + m;
+      const totalMinutesFin = totalMinutesDebut + Math.round(dureeHeures * 60);
+  function appliquerCombo(combo) {
+    setFieldValue('jours_ajout', combo.jours_ajout);
+    setFieldValue('frequence_jours_ajout', combo.frequence);
+    setFieldValue('tranches_horaires_jours_ajout', combo.tranche_val);
+    cocherPremiersEcrans('ecrans_jours_ajout', combo.ecrans_ajout);
+  }
+
+      const finH = Math.floor(totalMinutesFin / 60);
+      const finM = totalMinutesFin % 60;
+  document.querySelectorAll('.apply-combo-btn').forEach((btn) => {
+    btn.addEventListener('click', function () {
+      const sourceEl = document.getElementById(this.dataset.source);
+      if (!sourceEl) return;
+      const combos = JSON.parse(sourceEl.textContent);
+      const combo = combos[parseInt(this.dataset.index, 10)];
+      if (!combo) return;
+
+      if (finH > 23 || (finH === 23 && finM > 0)) {
+        previewVal.textContent = `dépasse 23:00 (fin calculée ${String(finH).padStart(2,'0')}:${String(finM).padStart(2,'0')})`;
+        previewBox.className = 'small mt-1 fw-semibold text-danger';
+        previewBox.style.display = 'block';
+        return;
+      if (this.dataset.withReduction === 'true') {
+        const reductionEl = document.getElementById('reduction-data');
+        if (reductionEl) appliquerReduction(JSON.parse(reductionEl.textContent));
+      }
+
+      const finStr = `${String(finH).padStart(2, '0')}:${String(finM).padStart(2, '0')}`;
+      const res = `${heureStr}-${finStr}`;
+      previewVal.textContent = res;
+      previewBox.className = 'small mt-1 fw-semibold text-success';
+      previewBox.style.display = 'block';
+      appliquerCombo(combo);
+      form.submit();
+    });
+  });
+
+      // Met à jour la tranche principale si vide
+      if (trancheInput && !trancheInput.value.trim()) {
+        trancheInput.value = res;
+        if (typeof syncTranchePresets === 'function') syncTranchePresets();
+      }
+    }
+    heureDebutInput.addEventListener('input', updateTrancheCalc);
+    dureeInput.addEventListener('input', updateTrancheCalc);
+  const applyReductionOnlyBtn = document.getElementById('apply-reduction-only-btn');
+  if (applyReductionOnlyBtn) {
+    applyReductionOnlyBtn.addEventListener('click', function () {
+      const reductionEl = document.getElementById('reduction-data');
+      if (!reductionEl) return;
+      appliquerReduction(JSON.parse(reductionEl.textContent));
+      form.submit();
+    });
+  }
+
+  // 6. Indicateur Mode A vs Mode B (anciennement section 7)
+})();
+// ═══════════ INDICATEUR DYNAMIQUE MODE A / MODE B ═══════════
+(function () {
+  const trancheInput = document.querySelector('[name="tranches_horaires"]');
+  const freqSelect = document.querySelector('[name="frequence"]');
+  const modeBBox = document.getElementById('mode-b-box');
+  const modeBBadge = document.getElementById('mode-b-badge');
+  const modeBHint = document.getElementById('mode-b-hint');
+  const altInput = document.getElementById('id_tranches_horaires_alternatives');
+  const altInput = document.querySelector('[name="tranches_horaires_alternatives"]');
+  if (!trancheInput || !modeBBox) return;
+
+  function refreshModeIndicator() {
+    if (!trancheInput || !freqSelect || !modeBBox) return;
+    const modeADirectActif = !!(trancheInput.value.trim() && freqSelect.value);
+
+    if (modeADirectActif) {
+      modeBBox.style.opacity = '0.5';
+      if (modeBBadge) {
+        modeBBadge.textContent = 'inactif';
+        modeBBadge.className = 'badge bg-secondary';
+      }
+      if (modeBHint) {
+        modeBHint.textContent = 'Calcul direct actif (fréquence + tranches renseignées). Laissez vide pour déclencher les propositions.';
+      }
+      modeBBox.style.opacity = '0.45';
+      modeBBadge.textContent = 'ignoré';
+      modeBBadge.className = 'badge bg-secondary ms-auto';
+      modeBHint.textContent = 'Calcul direct actif (fréquence + tranche principale remplies) — ce champ n\'a aucun effet tant que la tranche principale est renseignée.';
+      if (altInput) altInput.disabled = true;
+    } else {
+      modeBBox.style.opacity = '1';
+      if (modeBBadge) {
+        modeBBadge.textContent = 'actif';
+        modeBBadge.className = 'badge bg-primary';
+      }
+      if (modeBHint) {
+        modeBHint.textContent = 'Tranche principale vide : le simulateur testera les créneaux pour approcher vos "Spots Cibles".';
+      }
+      modeBBadge.textContent = 'actif';
+      modeBBadge.className = 'badge bg-primary ms-auto';
+      modeBHint.textContent = 'Tranche principale vide -> le système va générer des propositions pour atteindre "Spots souhaités". Ce champ restreint les créneaux testés.';
+      if (altInput) altInput.disabled = false;
+    }
+  }
+  if (trancheInput && freqSelect) {
+    trancheInput.addEventListener('input', refreshModeIndicator);
+    freqSelect.addEventListener('change', refreshModeIndicator);
+    refreshModeIndicator();
+  }
+
+  // 8. Application des combinaisons d'ajustement
+  const form = document.getElementById('sim-form');
+  if (form) {
+    function setFieldValue(name, value) {
+      const el = form.querySelector(`[name="${name}"]`);
+      if (el) el.value = value;
+    }
+
+    function cocherPremiersEcrans(name, n) {
+      const boxes = form.querySelectorAll(`input[name="${name}"]`);
+      boxes.forEach((box, i) => { box.checked = i < n; });
+    }
+
+    function appliquerReduction(reduction) {
+      const dateDebutInput = form.querySelector('[name="date_debut"]');
+      const dateFinInput = form.querySelector('[name="date_fin"]');
+      const nbJoursInput = form.querySelector('[name="nb_jours"]');
+
+      if (reduction.date_fin_reduite && dateDebutInput && dateDebutInput.value) {
+        if (dateFinInput) dateFinInput.value = reduction.date_fin_reduite;
+        if (nbJoursInput) nbJoursInput.value = '';
+      } else if (nbJoursInput) {
+        nbJoursInput.value = reduction.nb_jours_reduit;
+      }
+    }
+
+    function appliquerCombo(combo) {
+      setFieldValue('jours_ajout', combo.jours_ajout);
+      setFieldValue('frequence_jours_ajout', combo.frequence);
+      setFieldValue('tranches_horaires_jours_ajout', combo.tranche_val);
+      cocherPremiersEcrans('ecrans_jours_ajout', combo.ecrans_ajout);
+    }
+
+    document.querySelectorAll('.apply-combo-btn').forEach(btn => {
+      btn.addEventListener('click', function () {
+        const sourceEl = document.getElementById(this.dataset.source);
+        if (!sourceEl) return;
+        const combos = JSON.parse(sourceEl.textContent);
+        const combo = combos[parseInt(this.dataset.index, 10)];
+        if (!combo) return;
+
+        if (this.dataset.withReduction === 'true') {
+          const reductionEl = document.getElementById('reduction-data');
+          if (reductionEl) appliquerReduction(JSON.parse(reductionEl.textContent));
+        }
+
+        appliquerCombo(combo);
+        form.submit();
+      });
+    });
+
+    const applyReductionOnlyBtn = document.getElementById('apply-reduction-only-btn');
+    if (applyReductionOnlyBtn) {
+      applyReductionOnlyBtn.addEventListener('click', function () {
+        const reductionEl = document.getElementById('reduction-data');
+        if (!reductionEl) return;
+        appliquerReduction(JSON.parse(reductionEl.textContent));
+        form.submit();
+      });
+    }
+  }
+
+});
+  trancheInput.addEventListener('input', refreshModeIndicator);
+  freqSelect.addEventListener('change', refreshModeIndicator);
+  refreshModeIndicator();
+})();
 </script>
 {% endblock %}

@@ -109,7 +109,7 @@ class CampagneForm(forms.ModelForm):
         fields = [
             'client', 'nom', 'prix', 'prix_affichage', 'prix_impression', 'campagne_parente', 'est_mere',
             'date_debut', 'date_fin', 'statut', 'lieu',
-            'type_support', 'duree_passage', 'frequence',
+            'type_support', 'duree_passage', 'frequence', 'nombre_visuels',
             'tranches_horaires', 'notes', 'contrat'
         ]
         widgets = {
@@ -127,6 +127,7 @@ class CampagneForm(forms.ModelForm):
             'type_support': forms.Select(attrs=S),
             'duree_passage': forms.Select(attrs=S),
             'frequence': forms.Select(attrs=S),
+            'nombre_visuels': forms.NumberInput(attrs={**W, 'min': 1}),
             'tranches_horaires': forms.TextInput(attrs=W),
             'notes': forms.Textarea(attrs={**W, 'rows': 3}),
             'contrat': forms.Select(attrs=S),

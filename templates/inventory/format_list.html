@@ -4,16 +4,44 @@
 {% block title %}Formats de Support — Integral{% endblock %}
 
 {% block topbar_title %}
-    Formats de Support
+    <i class="bi bi-aspect-ratio me-2" style="color:var(--color-primary)"></i>Formats de Support
+{% endblock %}
+
+{% block topbar_actions %}
+    <a href="{% url 'format_create' %}" class="btn btn-primary btn-sm rounded-pill px-3 shadow-sm d-flex align-items-center gap-1">
+        <i class="bi bi-plus-lg"></i>
+        <span class="d-none d-md-inline">Ajouter un format</span>
+    </a>
 {% endblock %}
 
 {% block extra_head %}
 <style>
-    .form-section { background:var(--bg-card); border:1px solid var(--border); border-radius:var(--radius); overflow:hidden; }
-    .table-responsive { padding: 0; margin: 0; }
-    .table th { font-size: .78rem; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700; color: var(--text-muted); background: var(--bg-card2); border-bottom: 1px solid var(--border); }
-    .table td { font-size: .84rem; vertical-align: middle; border-bottom: 1px solid var(--border); }
-    .badge-cat { padding: 5px 10px; border-radius: 6px; font-size: 0.72rem; font-weight: 700; }
+    .format-table-card {
+        background: var(--bg-card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        overflow: hidden;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.02);
+    }
+    .table th {
+        font-size: .72rem;
+        text-transform: uppercase;
+        letter-spacing: 0.6px;
+        font-weight: 800;
+        color: var(--text-muted);
+        background: #f8fafc;
+        border-bottom: 2px solid var(--border);
+        padding: 14px 18px;
+    }
+    .table td {
+        font-size: .85rem;
+        vertical-align: middle;
+        border-bottom: 1px solid var(--border);
+        padding: 14px 18px;
+    }
+    .table tr:hover td {
+        background-color: rgba(13, 110, 253, 0.02);
+    }
 </style>
 {% endblock %}
 
@@ -21,48 +49,56 @@
 <div class="row justify-content-center">
     <div class="col-xl-12">
         <div class="d-flex justify-content-between align-items-center mb-4">
-            <h1 style="font-size:1.4rem;font-weight:800;margin:0">Gestion des Formats</h1>
-            <a href="{% url 'format_create' %}" class="btn btn-primary btn-sm px-3 shadow-sm">
-                <i class="bi bi-plus-lg"></i>
-                <span class="d-none d-md-inline ms-1">Ajouter un format</span>
-            </a>
+            <div>
+                <h1 style="font-size:1.4rem;font-weight:800;margin:0">Gestion des Formats Publicitaires</h1>
+                <p style="color:var(--text-muted);font-size:0.82rem;margin:2px 0 0">Gérez les gabarits, dimensions et catégories de vos panneaux</p>
+            </div>
+            <span class="badge bg-light text-dark border font-monospace px-3 py-2 rounded-pill">{{ formats|length }} format{{ formats|length|pluralize }}</span>
         </div>
 
-        <div class="form-section shadow-sm">
+        <div class="format-table-card">
             <div class="table-responsive">
                 <table class="table table-hover mb-0 align-middle">
                     <thead>
                         <tr>
-                            <th class="ps-4" style="width: 150px;">Code</th>
-                            <th style="width: 180px;">Catégorie</th>
-                            {% comment %} <th>Description / Libellé</th> {% endcomment %}
-                            <th style="width: 150px;">Dimensions</th>
-                            <th style="width: 150px;">Superficie</th>
-                            <th class="text-end pe-4" style="width: 120px;">Actions</th>
+                            <th class="ps-4" style="width: 180px;">Code Format</th>
+                            <th style="width: 200px;">Catégorie</th>
+                            <th style="width: 180px;">Dimensions</th>
+                            <th style="width: 180px;">Superficie</th>
+                            <th class="text-end pe-4" style="width: 140px;">Actions</th>
                         </tr>
                     </thead>
                     <tbody>
                         {% for format in formats %}
                         <tr>
-                            <td class="ps-4"><code style="color: var(--color-primary); font-weight: 700;">{{ format.code }}</code></td>
-                            <td>
-                                <span class="badge-cat bg-light text-dark border">{{ format.categorie }}</span>
+                            <td class="ps-4">
+                                <span class="font-monospace fw-bold text-primary px-2.5 py-1 rounded-2" style="background:rgba(13,110,253,0.08);border:1px solid rgba(13,110,253,0.18)">
+                                    {{ format.code }}
+                                </span>
                             </td>
-                            {% comment %} <td class="fw-semibold">{{ format.libelle }}</td> {% endcomment %}
-                            <td class="text-muted">{{ format.dimensions|default:"—" }}</td>
+                            <td>
+                                <span class="badge-status {% if format.categorie == 'Marché' %}bs-maintenance{% elif format.categorie == 'Géant' %}bs-occupe{% elif format.categorie == 'Sucette' %}bs-reserve{% else %}bs-disponible{% endif %}">
+                                    {{ format.categorie }}
+                                </span>
+                            </td>
+                            <td class="text-secondary fw-semibold font-monospace small">
+                                <i class="bi bi-arrows-angle-expand me-1 text-muted"></i>{{ format.dimensions|default:"—" }}
+                            </td>
                             <td>
                                 {% if format.superficie %}
-                                    <span class="text-primary fw-bold">{{ format.superficie }} m²</span>
+                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace px-2.5 py-1">
+                                        {{ format.superficie }} m²
+                                    </span>
                                 {% else %}
                                     <span class="text-muted">—</span>
                                 {% endif %}
                             </td>
                             <td class="text-end pe-4">
-                                <div class="d-flex gap-2 justify-content-end">
-                                    <a href="{% url 'format_update' format.pk %}" class="btn btn-outline-warning btn-sm" title="Modifier">
+                                <div class="d-inline-flex gap-1 justify-content-end">
+                                    <a href="{% url 'format_update' format.pk %}" class="btn btn-outline-secondary btn-sm btn-action-icon rounded-3" title="Modifier">
                                         <i class="bi bi-pencil"></i>
                                     </a>
-                                    <a href="{% url 'format_delete' format.pk %}" class="btn btn-outline-danger btn-sm" title="Supprimer">
+                                    <a href="{% url 'format_delete' format.pk %}" class="btn btn-outline-danger btn-sm btn-action-icon rounded-3" title="Supprimer">
                                         <i class="bi bi-trash"></i>
                                     </a>
                                 </div>
@@ -70,9 +106,14 @@
                         </tr>
                         {% empty %}
                         <tr>
-                            <td colspan="6" class="text-center py-5 text-muted">
-                                <i class="bi bi-folder-x d-block fs-2 mb-2" style="color: var(--text-muted)"></i>
+                            <td colspan="5" class="text-center py-5 text-muted">
+                                <i class="bi bi-folder-x d-block fs-2 mb-2 opacity-30"></i>
                                 Aucun format enregistré en base de données.
+                                <div class="mt-2">
+                                    <a href="{% url 'format_create' %}" class="btn btn-primary btn-sm rounded-pill px-3">
+                                        <i class="bi bi-plus-lg me-1"></i>Créer le premier format
+                                    </a>
+                                </div>
                             </td>
                         </tr>
                         {% endfor %}
@@ -83,3 +124,4 @@
     </div>
 </div>
 {% endblock %}
+

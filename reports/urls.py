@@ -1,6 +1,6 @@
 from django.urls import path
 from . import views
-from .panneau_report_view import *
+from .supports_report_view import *
 
 urlpatterns = [
     path('', views.ReportsIndexView.as_view(), name='reports_index'),
@@ -12,7 +12,7 @@ urlpatterns = [
     path('client/<int:pk>/pdf/', views.ExportClientPdfView.as_view(), name='export_client_pdf'),
     path('client/<int:pk>/excel/', views.ExportClientExcelView.as_view(), name='export_client_excel'),
     path('client/<int:pk>/preview/', views.PreviewClientPdfView.as_view(), name='preview_client_pdf'),
-    path("panneaux/",PanneauxReportView.as_view(),name="panneaux_report",),
-    path("panneaux/export/pdf/",ExportPanneauxPdfView.as_view(),name="panneaux_export_pdf",),
-    path("panneaux/export/excel/",ExportPanneauxExcelView.as_view(),name="panneaux_export_excel",),
+    path("supports/", SupportsReportView.as_view(), name="supports_report"),
+    path("supports/export/pdf/", ExportSupportsPdfView.as_view(), name="supports_export_pdf"),
+    path("supports/export/excel/", ExportSupportsExcelView.as_view(), name="supports_export_excel"),
 ]

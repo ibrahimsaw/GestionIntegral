@@ -10,6 +10,10 @@ urlpatterns = [
     path('',
          views.AccueilView.as_view(),
          name='accueil'),
+    
+    path('s',
+             views.AccueilViews.as_view(),
+             name='accueils'),
 
     path('catalogue/',
          views.CatalogueView.as_view(),

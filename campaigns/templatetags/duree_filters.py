@@ -70,3 +70,54 @@ def format_minutes(valeur):
         parts.append(f"{secondes}s")
 
     return " ".join(parts) if parts else "0s"
+
+
+@register.filter
+def format_number_fr(valeur):
+    """
+    Formate un nombre en notation française avec espace comme séparateur de milliers.
+    Ex : 1500     -> "1 500"
+         12345.6  -> "12 345,6"
+         None     -> ""
+    """
+    try:
+        v = float(valeur)
+    except (TypeError, ValueError):
+        return valeur if valeur is not None else ""
+
+    if v == int(v):
+        # Nombre entier — pas de décimale
+        return f"{int(v):,}".replace(",", " ")
+    else:
+        # Nombre décimal — virgule française
+        entier = int(v)
+        decimal = str(round(v - entier, 6)).lstrip("0").lstrip(".")
+        return f"{entier:,}".replace(",", " ") + "," + decimal
+
+
+@register.filter
+def format_secondes(valeur):
+    """
+    Convertit un nombre de secondes (int ou float) en chaîne lisible.
+    Ex : 90   -> "1min 30s"
+         3600 -> "1h"
+         45   -> "45s"
+         None -> ""
+    """
+    try:
+        total_sec = round(float(valeur))
+    except (TypeError, ValueError):
+        return valeur if valeur is not None else ""
+
+    heures, reste = divmod(total_sec, 3600)
+    minutes, secondes = divmod(reste, 60)
+
+    parts = []
+    if heures:
+        parts.append(f"{heures}h")
+    if minutes:
+        parts.append(f"{minutes}min")
+    if secondes:
+        parts.append(f"{secondes}s")
+
+    return " ".join(parts) if parts else "0s"

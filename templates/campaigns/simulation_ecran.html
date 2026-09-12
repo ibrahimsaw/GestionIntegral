@@ -1458,7 +1458,6 @@
           </thead>
           <tbody>
             {% for d in resultats.details_ecrans %}
-            <tr class="{% if d.bloc == 'ajout' %}table-success bg-opacity-10{% endif %}">
             <tr class="{% if d.bloc == 'ajout' %}table-success bg-opacity-25{% endif %}">
               {% if resultats.jours_ajout and resultats.jours_ajout > 0 %}
               <td>
@@ -1472,10 +1471,6 @@
               </td>
               {% endif %}
               <td><code class="fw-bold" style="color:var(--color-primary); background:var(--color-primary-soft); padding:2px 6px; border-radius:4px;">{{ d.support.code }}</code></td>
-              <td><code>{{ d.support.code }}</code></td>
-              <td>{{ d.support.nom }}</td>
-              <td class="text-end fw-semibold">{{ d.spots_par_jour }}</td>
-              <td class="text-end fw-semibold">{{ d.spots_total }}</td>
               <td>
                 <div class="fw-semibold text-dark">{{ d.support.nom }}</div>
                 <small class="text-muted">{{ d.support.ville }}{% if d.support.quartier %} · {{ d.support.quartier }}{% endif %}</small>
@@ -1490,14 +1485,10 @@
                            style="width:{{ d.taux_actuel }}%;"></div>
                     </div>
                     <span class="small fw-semibold text-muted" style="width:38px;">{{ d.taux_actuel }}%</span>
-                  <div class="taux-bar" style="width:90px;">
-                    <div class="taux-fill {% if d.taux_actuel >= 80 %}bg-danger{% elif d.taux_actuel >= 50 %}bg-warning{% else %}bg-success{% endif %}" style="width:{{ d.taux_actuel }}%;"></div>
                   </div>
                 {% else %}
                   <span class="text-muted small">—</span>
                 {% endif %}
-                  <small class="text-muted">{{ d.taux_actuel }}%</small>
-                {% else %}<span class="text-muted">—</span>{% endif %}
               </td>
               <td>
                 {% if d.taux_apres is not None %}
@@ -1509,26 +1500,18 @@
                     <span class="small fw-bold {% if d.taux_apres >= 100 %}text-danger{% elif d.taux_apres >= 80 %}text-warning{% else %}text-success{% endif %}" style="width:38px;">
                       {{ d.taux_apres }}%
                     </span>
-                  <div class="taux-bar" style="width:90px;">
-                    <div class="taux-fill {% if d.taux_apres >= 80 %}bg-danger{% elif d.taux_apres >= 50 %}bg-warning{% else %}bg-success{% endif %}" style="width:{{ d.taux_apres }}%;"></div>
                   </div>
                 {% else %}
                   <span class="text-muted small">—</span>
                 {% endif %}
-                  <small class="{% if d.taux_apres >= 100 %}text-danger fw-bold{% else %}text-muted{% endif %}">{{ d.taux_apres }}%</small>
-                {% else %}<span class="text-muted">—</span>{% endif %}
               </td>
               <td class="text-center">
                 {% if d.peut_accueillir is None %}
                   <span class="badge bg-secondary-subtle text-secondary rounded-pill">N/A</span>
                 {% elif d.peut_accueillir %}
-                  <span class="badge bg-success-subtle text-success-emphasis rounded-pill px-2.5 py-1"><i class="bi bi-check-circle-fill me-1"></i>Fluide</span>
+                  <span class="badge bg-success-subtle text-success-emphasis rounded-pill px-2 py-1"><i class="bi bi-check-circle-fill me-1"></i>Fluide</span>
                 {% else %}
-                  <span class="badge bg-danger-subtle text-danger-emphasis rounded-pill px-2.5 py-1" title="{{ d.message_dispo }}"><i class="bi bi-x-circle-fill me-1"></i>Saturé</span>
-              <td>
-                {% if d.peut_accueillir is None %}<span class="badge-status bs-brouillon">N/A</span>
-                {% elif d.peut_accueillir %}<span class="badge-status bs-disponible"><i class="bi bi-check-circle-fill me-1"></i>OK</span>
-                {% else %}<span class="badge-status bs-annulee" title="{{ d.message_dispo }}"><i class="bi bi-x-circle-fill me-1"></i>Saturé</span>
+                  <span class="badge bg-danger-subtle text-danger-emphasis rounded-pill px-2 py-1" title="{{ d.message_dispo }}"><i class="bi bi-x-circle-fill me-1"></i>Saturé</span>
                 {% endif %}
               </td>
             </tr>
@@ -1567,14 +1550,6 @@
       <div class="text-muted small">
         Voici les meilleures combinaisons de diffusion pour atteindre votre objectif sur {{ nb_jours }} jours et {{ nb_ecrans }} écran{{ nb_ecrans|pluralize }}.
       </div>
-    <div class="alert alert-primary d-flex align-items-center gap-2 mb-3">
-      <i class="bi bi-lightbulb-fill"></i>
-      <span>
-        Objectif : <strong>{{ nb_spots_cible|floatformat:0 }} spots</strong> —
-        {{ nb_jours }} jours — {{ nb_ecrans }} écran{{ nb_ecrans|pluralize }} —
-        spot de {{ duree_passage }}s —
-        tolérance ±5 %
-      </span>
     </div>
 
     <div class="row g-3">
@@ -1588,61 +1563,18 @@
               <span class="text-muted">·</span>
               <span class="text-secondary fw-semibold">{{ p.tranches_label }}</span>
             </div>
-            <span class="badge {% if p.abs_ecart <= 1 %}bg-success{% elif p.abs_ecart <= 3 %}bg-warning text-dark{% else %}bg-secondary{% endif %} rounded-pill px-2.5 py-1">
+            <span class="badge {% if p.abs_ecart <= 1 %}bg-success{% elif p.abs_ecart <= 3 %}bg-warning text-dark{% else %}bg-secondary{% endif %} rounded-pill px-2 py-1">
               {% if p.ecart_pct >= 0 %}+{% endif %}{{ p.ecart_pct }}% écart
-        <div class="card border-{% if p.ecart_pct >= 0 %}success{% else %}info{% endif %}">
-          <div class="card-header d-flex align-items-center justify-content-between">
-            <span>
-              <span class="badge bg-primary me-2">#{{ forloop.counter }}</span>
-              <strong>{{ p.frequence_label }}</strong>
-              <span class="text-muted mx-2">—</span>
-              {{ p.tranches_label }}
-            </span>
-            <span class="badge {% if p.abs_ecart <= 1 %}bg-success{% elif p.abs_ecart <= 3 %}bg-warning text-dark{% else %}bg-secondary{% endif %}">
-              {% if p.ecart_pct >= 0 %}+{% endif %}{{ p.ecart_pct }}%
             </span>
           </div>
-
-          <div class="row g-2 text-center my-2">
+          <div class="row g-2 text-center mb-2">
             <div class="col-4 col-md-2">
               <div class="small text-muted">Total spots</div>
               <div class="fw-bold text-primary fs-5">{{ p.spots_total|format_number_fr }}</div>
-          <div class="card-body py-3">
-            <div class="row g-3 text-center">
-              <div class="col-4 col-md-2">
-                <div class="stat-num" style="font-size:1.4rem;">{{ p.spots_total|floatformat:0 }}</div>
-                <div class="stat-lbl">Spots total</div>
-              </div>
-              <div class="col-4 col-md-2">
-                <div class="stat-num" style="font-size:1.4rem;color:var(--color-primary);">{{ p.spots_par_jour }}</div>
-                <div class="stat-lbl">Spots/jour</div>
-              </div>
-              <div class="col-4 col-md-2">
-                <div class="stat-num" style="font-size:1.4rem;color:#0891b2;">{{ p.spots_par_jour_ecran }}</div>
-                <div class="stat-lbl">Spots/j/écran</div>
-              </div>
-              <div class="col-4 col-md-2">
-                <div class="stat-num" style="font-size:1.4rem;color:#7c3aed;">{{ p.heures_antenne|format_temps }}</div>
-                <div class="stat-lbl">H. antenne</div>
-              </div>
-              <div class="col-4 col-md-2">
-                <div class="stat-num" style="font-size:1.4rem;color:#059669;">{{ p.heures_tranches|format_temps }}</div>
-                <div class="stat-lbl">Tranches/jour</div>
-              </div>
-              <div class="col-4 col-md-2">
-                <div class="stat-num" style="font-size:1.4rem;color:#d97706;">{% widthratio p.frequence 60 1 %} min</div>
-                <div class="stat-lbl">Fréquence</div>
-              </div>
             </div>
             <div class="col-4 col-md-2">
               <div class="small text-muted">Spots/jour</div>
               <div class="fw-bold text-dark fs-5">{{ p.spots_par_jour|format_number_fr }}</div>
-            {# Bouton pour appliquer cette proposition dans le formulaire #}
-            <div class="mt-3 text-end">
-              <a href="?duree_passage={{ duree_passage }}&frequence={{ p.frequence }}&tranches_horaires={{ p.tranches_val|urlencode }}&nb_jours={{ nb_jours }}&nb_spots_cible={{ nb_spots_cible }}"
-                 class="btn btn-outline-primary btn-sm">
-                <i class="bi bi-calculator me-1"></i>Calculer en détail
-              </a>
             </div>
             <div class="col-4 col-md-2">
               <div class="small text-muted">Spots/j/écran</div>
@@ -1661,7 +1593,6 @@
               <div class="fw-bold text-secondary fs-5">{{ p.heures_tranches|format_temps }}</div>
             </div>
           </div>
-
           <div class="d-flex justify-content-end mt-2 pt-2 border-top">
             <a href="?duree_passage={{ duree_passage }}&frequence={{ p.frequence }}&tranches_horaires={{ p.tranches_val|urlencode }}&nb_jours={{ nb_jours }}&nb_spots_cible={{ nb_spots_cible }}"
                class="btn btn-outline-primary btn-sm px-3 fw-semibold rounded-pill">
@@ -1674,95 +1605,35 @@
     </div>
     {% endif %}
 
-    {# ──────────────────────────────────────────────────────────────────────── #}
-    {#  MODE B PRÉCIS : TRANCHE OPTIMALE UNIQUE                                 #}
-    {# ──────────────────────────────────────────────────────────────────────── #}
+    {# ── MODE B PRÉCIS : TRANCHE OPTIMALE UNIQUE ── #}
     {% if tranche_optimale %}
     <div class="sim-card p-3 mb-3 bg-white border-start border-4 border-primary">
-      <div class="d-flex align-items-center gap-2 mb-1">
+      <div class="d-flex align-items-center gap-2 mb-2">
         <span class="badge bg-primary text-white"><i class="bi bi-clock-fill me-1"></i>Tranche Optimale Calculée</span>
         <span class="badge bg-light text-dark border">Objectif : {{ nb_spots_cible|format_number_fr }} spots</span>
       </div>
-      <div class="text-muted small">
+      <div class="text-muted small mb-3">
         Avec <strong>{{ tranche_optimale.frequence_label }}</strong>, <strong>{{ nb_jours }} jours</strong> et <strong>{{ nb_ecrans }} écran{{ nb_ecrans|pluralize }}</strong> fixés,
         la durée quotidienne exacte nécessaire est de <strong>{{ tranche_optimale.tranche_label }}</strong>.
       </div>
-    {# ── MODE B PRÉCIS : fréquence+jours+écrans fixés -> 1 seule tranche exacte ─ #}
-    {% elif tranche_optimale %}
 
-    <div class="alert alert-primary d-flex align-items-center gap-2 mb-3">
-      <i class="bi bi-bullseye"></i>
-      <span>
-        Objectif : <strong>{{ nb_spots_cible|floatformat:0 }} spots</strong> avec
-        <strong>{{ tranche_optimale.frequence_label }}</strong>,
-        <strong>{{ nb_jours }} jour{{ nb_jours|pluralize }}</strong> et
-        <strong>{{ nb_ecrans }} écran{{ nb_ecrans|pluralize }}</strong> fixés —
-        seule la tranche horaire est à déterminer.
-      </span>
-    </div>
-
-    {% if tranche_optimale.hors_plage %}
-    <div class="alert alert-warning d-flex align-items-center gap-2 mb-3 rounded-3">
-      <i class="bi bi-exclamation-triangle-fill fs-5"></i>
-      <div>
-        {% if tranche_optimale.hors_plage == 'trop_grand' %}
-          La durée nécessaire dépasserait l'amplitude maximale de la journée (17h). Pensez à augmenter le nombre d'écrans ou de jours.
-    <div class="alert alert-warning mb-3">
-      <i class="bi bi-exclamation-triangle-fill me-2"></i>
-      {% if tranche_optimale.hors_plage == 'trop_grand' %}
-        La tranche nécessaire dépasserait l'amplitude maximale possible (17h, 06:00-23:00).
-        Le calcul ci-dessous utilise l'amplitude maximale — pour atteindre l'objectif exact,
-        ajoutez des jours ou des écrans plutôt que d'allonger encore la tranche.
-      {% else %}
-        La tranche nécessaire est très courte (moins de 15 min) — le calcul ci-dessous utilise
-        le minimum affichable. Réduisez le nombre de jours ou d'écrans si vous voulez viser
-        l'objectif plus précisément.
-      {% endif %}
-    </div>
-    {% endif %}
-
-    <div class="card border-{% if tranche_optimale.ecart == 0 %}success{% else %}primary{% endif %} mb-3">
-      <div class="card-header d-flex align-items-center justify-content-between">
-        <span><i class="bi bi-clock-fill me-2"></i>Tranche horaire nécessaire</span>
-        {% if tranche_optimale.ecart == 0 %}
-          <span class="badge bg-success"><i class="bi bi-check-circle-fill me-1"></i>Exact</span>
-        {% elif tranche_optimale.ecart_pct <= 2 and tranche_optimale.ecart_pct >= -2 %}
-          <span class="badge bg-success">
-            {% if tranche_optimale.ecart >= 0 %}+{% endif %}{{ tranche_optimale.ecart }} spots ({{ tranche_optimale.ecart_pct }}%)
-          </span>
-        {% else %}
-          La durée nécessaire est très courte (moins de 15 min). Pensez à réduire le nombre d'écrans ou de jours pour un créneau plus large.
-          <span class="badge bg-warning text-dark">
-            {% if tranche_optimale.ecart >= 0 %}+{% endif %}{{ tranche_optimale.ecart }} spots ({{ tranche_optimale.ecart_pct }}%)
-          </span>
-        {% endif %}
+      {% if tranche_optimale.hors_plage %}
+      <div class="alert alert-warning d-flex align-items-center gap-2 mb-3 rounded-3">
+        <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+        <div>
+          {% if tranche_optimale.hors_plage == 'trop_grand' %}
+            La durée nécessaire dépasserait l'amplitude maximale de la journée (17h). Pensez à augmenter le nombre d'écrans ou de jours.
+          {% else %}
+            La durée nécessaire est très courte (moins de 15 min). Pensez à réduire le nombre de jours ou d'écrans.
+          {% endif %}
+        </div>
       </div>
-    </div>
-    {% endif %}
+      {% endif %}
 
-    <div class="sim-card p-3 mb-3">
       <div class="row g-2 text-center mb-3">
         <div class="col-6 col-md-3">
           <div class="small text-muted">Durée de tranche</div>
           <div class="fs-4 fw-bold text-primary">{{ tranche_optimale.tranche_label }}</div>
-      <div class="card-body">
-        <div class="row g-3 text-center mb-3">
-          <div class="col-6 col-md-3">
-            <div class="stat-num" style="font-size:1.6rem;color:var(--color-primary);">{{ tranche_optimale.tranche_label }}</div>
-            <div class="stat-lbl">Durée de tranche</div>
-          </div>
-          <div class="col-6 col-md-3">
-            <div class="stat-num" style="font-size:1.6rem;">{{ tranche_optimale.spots_obtenus }}</div>
-            <div class="stat-lbl">Spots obtenus</div>
-          </div>
-          <div class="col-6 col-md-3">
-            <div class="stat-num" style="font-size:1.6rem;color:#0891b2;">{{ tranche_optimale.spots_par_jour }}</div>
-            <div class="stat-lbl">Spots/jour</div>
-          </div>
-          <div class="col-6 col-md-3">
-            <div class="stat-num" style="font-size:1.6rem;color:#7c3aed;">{{ tranche_optimale.heures_antenne|format_temps }}</div>
-            <div class="stat-lbl">H. antenne totale</div>
-          </div>
         </div>
         <div class="col-6 col-md-3">
           <div class="small text-muted">Spots obtenus</div>
@@ -1778,33 +1649,30 @@
         </div>
       </div>
 
-      <div class="p-2.5 rounded-3 bg-light border">
+      <div class="p-3 rounded-3 bg-light border">
         <div class="small fw-semibold text-dark mb-2">
           <i class="bi bi-clock me-1"></i>Choisissez un horaire de départ pour générer le détail complet :
-        <div class="small text-muted mb-2">
-          <i class="bi bi-info-circle me-1"></i>Choisissez un horaire de départ (même durée, même résultat) et cliquez pour calculer le détail complet :
         </div>
-        <div class="d-flex flex-wrap gap-1.5">
         <div class="d-flex flex-wrap gap-2">
           {% for v in tranche_optimale.variantes_horaires %}
           <a href="?duree_passage={{ duree_passage }}&frequence={{ tranche_optimale.frequence }}&tranches_horaires={{ v.tranche_val|urlencode }}&nb_jours={{ nb_jours }}&nb_spots_cible={{ nb_spots_cible }}"
              class="btn btn-outline-primary btn-sm rounded-pill">
             <i class="bi bi-play-circle me-1"></i>{{ v.tranche_val }}
-             class="btn btn-outline-primary btn-sm">
-            <i class="bi bi-clock me-1"></i>{{ v.tranche_val }}
           </a>
           {% empty %}
-          <span class="text-muted small">Ajustez manuellement la tranche dans le formulaire pour lancer le calcul.</span>
-          <span class="text-muted small">Aucun horaire de départ standard ne convient pour cette durée — ajustez manuellement la tranche dans le formulaire.</span>
+          <span class="text-muted small">Aucun horaire de départ standard ne convient — ajustez manuellement la tranche dans le formulaire.</span>
           {% endfor %}
         </div>
       </div>
     </div>
+    {% endif %}{# /tranche_optimale #}
 
-    {% endif %}
+    {% endif %}{# /resultats.nb_spots_cible #}
 
   </div>
 </div>
+{% endif %}{# /resultats #}
+{% endif %}{# /bloc principal if not resultats #}
 {% endblock %}
 
 {% block extra_js %}

@@ -232,12 +232,29 @@
         color: var(--color-primary);
       }
 
+      /* Style parent quand une sous-rubrique (Tous ou Ville) est active */
+      .nav-submenu-header.parent-active {
+        color: var(--color-primary);
+        font-weight: 700;
+        background: rgba(147, 46, 43, 0.05);
+      }
+      .nav-submenu-header.parent-active i:not(.submenu-chevron) {
+        color: var(--color-primary);
+      }
+      .nav-submenu-header.parent-active .submenu-chevron {
+        color: var(--color-primary);
+      }
+
       .nav-submenu-items {
-        padding-left: 14px;
-        margin-left: 20px;
-        border-left: 1.5px solid #e2e8f0;
+        padding-left: 10px;
+        margin-left: 16px;
+        border-left: 2px solid #e2e8f0;
         margin-top: 3px;
         margin-bottom: 6px;
+        transition: border-color 0.2s ease;
+      }
+      .nav-submenu[open] .nav-submenu-items {
+        border-left-color: rgba(147, 46, 43, 0.25);
       }
       .nav-submenu-items .nav-link {
         font-size: 0.81rem;
@@ -246,6 +263,18 @@
       }
       .nav-submenu-items .nav-link i {
         font-size: 0.95rem;
+      }
+      .nav-submenu-items .nav-link.active {
+        color: var(--color-primary);
+        background: rgba(147, 46, 43, 0.12);
+        font-weight: 700;
+      }
+      .nav-submenu-items .nav-link.active::before {
+        left: -12px;
+        width: 3px;
+        top: 4px;
+        bottom: 4px;
+        background: var(--color-primary);
       }
 
       /* Profil utilisateur en bas de Sidebar */
@@ -724,10 +753,10 @@
                 {% if category.key == 'panneau' and request.GET.type == 'panneau' and request.GET.type_panneau != '1x2' %}open{% endif %}
                 {% if category.key == 'ecran' and request.GET.type == 'ecran' %}open{% endif %}
                 {% if category.key == 'sucette' and request.GET.type == 'panneau' and request.GET.type_panneau == '1x2' %}open{% endif %}>
-                <summary class="nav-link
-                  {% if category.key == 'panneau' and request.GET.type == 'panneau' and request.GET.type_panneau != '1x2' and not request.GET.ville %}active{% endif %}
-                  {% if category.key == 'ecran' and request.GET.type == 'ecran' and not request.GET.ville %}active{% endif %}
-                  {% if category.key == 'sucette' and request.GET.type == 'panneau' and request.GET.type_panneau == '1x2' and not request.GET.ville %}active{% endif %}">
+                <summary class="nav-link nav-submenu-header
+                  {% if category.key == 'panneau' and request.GET.type == 'panneau' and request.GET.type_panneau != '1x2' %}parent-active{% endif %}
+                  {% if category.key == 'ecran' and request.GET.type == 'ecran' %}parent-active{% endif %}
+                  {% if category.key == 'sucette' and request.GET.type == 'panneau' and request.GET.type_panneau == '1x2' %}parent-active{% endif %}">
                   <i class="bi {{ category.icon }}"></i>{{ category.label }}
                   <i class="bi bi-chevron-down submenu-chevron"></i>
                 </summary>
@@ -736,7 +765,7 @@
                     <i class="bi bi-grid"></i>Tous
                   </a>
                   {% for ville in category.villes %}
-                    <a href="{% url 'support_list' %}?type={{ category.type }}{% if category.format %}&type_panneau={{ category.format }}{% endif %}&ville={{ ville|urlencode }}&desactif=ville" class="nav-link {% if request.GET.type == category.type and request.GET.ville == ville %}{% if not category.format or request.GET.type_panneau == category.format %}active{% endif %}{% endif %}">
+                    <a href="{% url 'support_list' %}?type={{ category.type }}{% if category.format %}&type_panneau={{ category.format }}{% endif %}&ville={{ ville|urlencode }}&desactif=ville" class="nav-link {% if request.GET.type == category.type and request.GET.ville == ville %}{% if not category.format and request.GET.type_panneau != '1x2' or category.format and request.GET.type_panneau == category.format %}active{% endif %}{% endif %}">
                       <i class="bi bi-pin-map"></i>{{ ville }}
                     </a>
                   {% endfor %}

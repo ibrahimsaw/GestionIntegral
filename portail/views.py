@@ -443,7 +443,7 @@ def _get_compteurs() -> dict:
 
 class AccueilView(View):
     """Page d'accueil — vitrine publique de la régie publicitaire."""
-    template_name = 'portail/vitrine1.html'
+    template_name = 'portail/vitrine.html'
 
     def get(self, request):
         compteurs = _get_compteurs()
@@ -455,7 +455,7 @@ class AccueilView(View):
 
 class AccueilViews(View):
     """Page d'accueil — vitrine publique de la régie publicitaire."""
-    template_name = 'portail/vitrine.html'
+    template_name = 'portail/vitrine1.html'
 
     def get(self, request):
         compteurs = _get_compteurs()

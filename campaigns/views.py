@@ -23,7 +23,7 @@ from .models import *
 from inventory.models import Support, FacePanneau, EcranNumerique, FormatSupport, Emplacement, Marche
 from .forms import ClientForm, ContratForm, CampagneForm, LigneCampagneForm
 # from .mixins import *
-from datetime import datetime, date  # ← Ajouter 'date' ici
+from datetime import datetime, date, timedelta
 today = timezone.now().date()
 from core.mixins import SortableListMixin
 
@@ -1196,6 +1196,21 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
                     initial['client'] = mere.client_id
                 except Campagne.DoesNotExist:
                     pass
+
+        # Préremplissage depuis le simulateur écran.
+        for field in (
+            'nom', 'date_debut', 'date_fin', 'type_support',
+            'duree_passage', 'frequence', 'nombre_visuels',
+            'tranches_horaires',
+        ):
+            value = self.request.GET.get(field)
+            if value not in (None, ''):
+                if field in ('date_debut', 'date_fin'):
+                    try:
+                        value = datetime.strptime(value, '%Y-%m-%d').date()
+                    except ValueError:
+                        continue
+                initial[field] = value
         return initial
 
     @transaction.atomic
@@ -1209,6 +1224,67 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
             form.instance.actif = False
         
         self.object = form.save()
+
+        # Lorsqu'une campagne vient du simulateur, reprendre les écrans choisis.
+        if is_create and self.object.type_support == 'ecran':
+            support_ids = {
+                int(value)
+                for value in self.request.GET.get('supports', '').split(',')
+                if value.isdigit()
+            }
+            support_ids_bloc2 = {
+                int(value)
+                for value in self.request.GET.get('supports_bloc2', '').split(',')
+                if value.isdigit()
+            }
+            supports = Support.objects.filter(
+                pk__in=support_ids,
+                type_support='ecran',
+                actif=True,
+            )
+            lignes_principal = [
+                LigneCampagne(
+                    campagne=self.object,
+                    support=support,
+                    date_debut=self.object.date_debut,
+                    date_fin=(
+                        datetime.strptime(self.request.GET['date_fin_principal'], '%Y-%m-%d').date()
+                        if self.request.GET.get('date_fin_principal') else self.object.date_fin
+                    ),
+                    duree_passage=self.object.duree_passage,
+                    frequence=self.object.frequence,
+                    tranches_horaires=self.object.tranches_horaires,
+                )
+                for support in supports
+            ]
+            LigneCampagne.objects.bulk_create(lignes_principal)
+
+            jours_ajout = int(self.request.GET.get('jours_ajout') or 0)
+            frequence_ajout = self.request.GET.get('frequence_ajout')
+            tranches_ajout = self.request.GET.get('tranches_ajout')
+            if jours_ajout and frequence_ajout and tranches_ajout and support_ids_bloc2:
+                date_fin_principal = (
+                    datetime.strptime(self.request.GET['date_fin_principal'], '%Y-%m-%d').date()
+                    if self.request.GET.get('date_fin_principal') else self.object.date_fin - timedelta(days=jours_ajout)
+                )
+                date_debut_bloc2 = date_fin_principal + timedelta(days=1)
+                supports_bloc2 = Support.objects.filter(
+                    pk__in=support_ids_bloc2,
+                    type_support='ecran',
+                    actif=True,
+                )
+                LigneCampagne.objects.bulk_create([
+                    LigneCampagne(
+                        campagne=self.object,
+                        support=support,
+                        date_debut=date_debut_bloc2,
+                        date_fin=self.object.date_fin,
+                        duree_passage=self.object.duree_passage,
+                        frequence=int(frequence_ajout),
+                        tranches_horaires=tranches_ajout,
+                    )
+                    for support in supports_bloc2
+                ])
         
         # Fichiers nouvellement uploadés
         fichiers = form.cleaned_data.get('visuels_multiples', [])

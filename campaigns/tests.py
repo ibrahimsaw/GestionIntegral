@@ -5,6 +5,7 @@ from django.test import SimpleTestCase
 
 from campaigns.models import Campagne, LigneCampagne
 from campaigns.simulation_view import (
+    _enrich_resultat_metriques,
     _spots,
     calculer_repartition_blocs,
     calculer_suggestions_objectif,
@@ -95,3 +96,35 @@ class NombreVisuelsSpotsTests(SimpleTestCase):
         )
 
         self.assertEqual(total, 9360.0)
+
+    def test_enrich_resultat_metriques_calculates_required_template_values(self):
+        resultats = {
+            "spots_total_tous": 15000,
+            "heures_tranches": 8,
+            "frequence": 120,
+            "nombre_visuels": 2,
+            "nb_ecrans": 3,
+            "nb_jours": 5,
+            "duree_passage": 10,
+            "spots_ajout": 3000,
+            "spots_principal": 12000,
+        }
+
+        normalise = _enrich_resultat_metriques(
+            resultats,
+            nb_jours=5,
+            nb_ecrans=3,
+            nombre_visuels=2,
+            duree_passage=10,
+            frequence=120,
+            nb_spots_cible=16000,
+        )
+
+        self.assertEqual(normalise["spots_par_jour_total"], 3000)
+        self.assertEqual(normalise["spots_par_visuel"], 7500)
+        self.assertEqual(normalise["part_de_voix_pct"], 11.6)
+        self.assertEqual(normalise["temps_pub_par_heure_sec"], 300.0)
+        self.assertEqual(normalise["rotation_visuel_str"], "2 min")
+        self.assertEqual(normalise["gain_spots"], 3000)
+        self.assertEqual(normalise["gain_pct"], 25.0)
+        self.assertEqual(normalise["pct_realisation_cible"], 93.8)

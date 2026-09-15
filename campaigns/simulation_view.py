@@ -15,11 +15,14 @@ Champ nb_jours co-existe avec date_debut/date_fin :
 from __future__ import annotations
 
 import itertools
+import re
 from datetime import timedelta
+from urllib.parse import urlencode
 
 from django import forms
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.shortcuts import render
+from django.urls import reverse
 from django.views.generic import FormView
 
 from inventory.models import Support
@@ -412,6 +415,28 @@ def _format_duree_heures(heures: float) -> str:
     return f"{m}min"
 
 
+def _construire_timeline_heures(tranches_horaires: str) -> list[dict]:
+    """Construit les 24 créneaux horaires attendus par la timeline du template."""
+    actives = set()
+    for tranche in (tranches_horaires or "").split(","):
+        correspondance = re.fullmatch(r"\s*(\d{1,2}):\d{2}\s*-\s*(\d{1,2}):\d{2}\s*", tranche)
+        if not correspondance:
+            continue
+        debut, fin = (int(valeur) for valeur in correspondance.groups())
+        if not (0 <= debut <= 23 and 0 <= fin <= 24) or debut == fin:
+            continue
+        if fin > debut:
+            actives.update(range(debut, fin))
+        else:
+            actives.update(range(debut, 24))
+            actives.update(range(0, fin))
+
+    return [
+        {"h": heure, "cls": "active-hour" if heure in actives else ""}
+        for heure in range(24)
+    ]
+
+
 def _tranche_val_depuis_duree(heures: float, heure_debut: str = "06:00") -> str:
     """Construit une plage 'HH:MM-HH:MM' concrète (utilisable par le formulaire) à partir d'une durée."""
     debut_dt = datetime.strptime(heure_debut, "%H:%M")
@@ -628,6 +653,10 @@ def calculer_tranche_optimale_frequence_fixe(
             "tranche_val": f"{depart_dt.strftime('%H:%M')}-{fin_dt.strftime('%H:%M')}",
         })
 
+    total = round(spots_obtenus)
+    total_heur = max(nb_jours, 1)
+    part_de_voix = round((total * max(duree_passage, 1)) / (total_heur * 24 * 3600 * max(nb_ecrans, 1)) * 100, 1)
+
     return {
         "frequence":              frequence,
         "frequence_label":        f"toutes les {frequence}s ({frequence // 60} min)",
@@ -645,6 +674,11 @@ def calculer_tranche_optimale_frequence_fixe(
         "heures_antenne":          round((spots_obtenus * duree_passage) / 3600, 2),
         "spots_par_jour":          round(spots_obtenus / nb_jours),
         "spots_par_jour_ecran":    round(spots_obtenus / nb_jours / nb_ecrans),
+        "spots_par_jour_total":    round(spots_obtenus / nb_jours),
+        "spots_par_visuel":        round(spots_obtenus / max(nombre_visuels, 1)),
+        "rotation_visuel_str":     f"{frequence // 60} min" if frequence >= 60 else f"{frequence}s",
+        "temps_pub_par_heure_sec": round((3600 / max(frequence, 1)) * max(duree_passage, 1), 1) if frequence else 0,
+        "part_de_voix_pct":       part_de_voix,
     }
 
 
@@ -689,6 +723,7 @@ def _generer_propositions(
         ecart    = ((spots - nb_spots_cible) / nb_spots_cible) * 100
 
         if borne_min <= spots <= borne_max:
+            part_de_voix = round((spots * max(duree_passage, 1)) / (max(nb_jours, 1) * 24 * 3600 * max(nb_ecrans, 1)) * 100, 1)
             resultats.append({
                 "frequence":            freq,
                 "frequence_label":      f"toutes les {freq}s ({freq//60} min)",
@@ -698,6 +733,11 @@ def _generer_propositions(
                 "spots_total":          round(spots),
                 "spots_par_jour":       round(spots / nb_jours),
                 "spots_par_jour_ecran": round(spots / nb_jours / nb_ecrans),
+                "spots_par_jour_total": round(spots / nb_jours),
+                "spots_par_visuel":     round(spots / max(nombre_visuels, 1)),
+                "rotation_visuel_str":  f"{freq // 60} min" if freq >= 60 else f"{freq}s",
+                "temps_pub_par_heure_sec": round((3600 / max(freq, 1)) * max(duree_passage, 1), 1) if freq else 0,
+                "part_de_voix_pct":     part_de_voix,
                 "ecart_pct":            round(ecart, 2),
                 "abs_ecart":            abs(ecart),
                 "heures_antenne":       round((spots * duree_passage) / 3600, 2),
@@ -768,6 +808,47 @@ def _construire_details_ecrans(
     return details
 
 
+def _enrich_resultat_metriques(
+    resultats: dict,
+    nb_jours: int,
+    nb_ecrans: int,
+    nombre_visuels: int,
+    duree_passage: int,
+    frequence: int,
+    nb_spots_cible: int | None = None,
+) -> dict:
+    """Ajoute les métriques attendues par le template du simulateur."""
+    total = int(resultats.get("spots_total_tous", 0) or 0)
+    if total == 0 and nb_ecrans > 0:
+        total = int(resultats.get("spots_total_ecran", 0) or 0) * max(nb_ecrans, 1)
+
+    resultats["spots_par_jour_total"] = round(total / max(nb_jours, 1))
+    resultats["spots_par_visuel"] = round(total / max(nombre_visuels, 1))
+    resultats["rotation_visuel_str"] = f"{frequence // 60} min" if frequence >= 60 else f"{frequence}s"
+    resultats["temps_pub_par_heure_sec"] = round((3600 / max(frequence, 1)) * max(duree_passage, 1), 1) if frequence else 0
+
+    if nb_jours and nb_ecrans:
+        window_seconds = max(nb_jours * 24 * 3600 * max(nb_ecrans, 1), 1)
+        resultats["part_de_voix_pct"] = round((total * max(duree_passage, 1)) / window_seconds * 100, 1)
+    else:
+        resultats["part_de_voix_pct"] = 0
+
+    if nb_spots_cible:
+        resultats["pct_realisation_cible"] = round(min(100.0, (total / max(nb_spots_cible, 1)) * 100), 1)
+    else:
+        resultats["pct_realisation_cible"] = 100 if total else 0
+
+    resultats["gain_spots"] = int(resultats.get("spots_ajout", 0) or 0)
+    if resultats["gain_spots"] and total:
+        resultats["gain_pct"] = round((resultats["gain_spots"] / max(total - resultats["gain_spots"], 1)) * 100, 1)
+    else:
+        resultats["gain_pct"] = 0
+
+    resultats["taux_moyen_actuel"] = resultats.get("taux_moyen_actuel")
+    resultats["taux_moyen_apres"] = resultats.get("taux_moyen_apres")
+    return resultats
+
+
 def _calcul_direct(
     frequence: int,
     tranches_horaires: str,
@@ -788,7 +869,7 @@ def _calcul_direct(
         duree_passage, date_debut, nombre_visuels, bloc_label="principal",
     )
 
-    return {
+    resultats = {
         "mode":                  "direct",
         "frequence":             frequence,
         "frequence_label":       f"toutes les {frequence}s ({frequence//60} min)",
@@ -796,14 +877,24 @@ def _calcul_direct(
         "heures_tranches":       round(heures, 2),
         "nb_jours":              nb_jours,
         "nb_ecrans":             nb_ecrans,
+        "duree_passage":         duree_passage,
         "spots_par_heure":       round(3600 / frequence, 2),
         "spots_par_jour_ecran":  spots_par_jour_ecran,
         "spots_total_ecran":     round(spots_total / max(nb_ecrans, 1)),
         "spots_total_tous":      round(spots_total),
         "heures_antenne":        round((spots_total * duree_passage) / 3600, 2),
+        "timeline_hours":        _construire_timeline_heures(tranches_horaires),
         "details_ecrans":        details_ecrans,
         "nombre_visuels":        max(nombre_visuels, 1),
     }
+    return _enrich_resultat_metriques(
+        resultats,
+        nb_jours=nb_jours,
+        nb_ecrans=nb_ecrans,
+        nombre_visuels=max(nombre_visuels, 1),
+        duree_passage=duree_passage,
+        frequence=frequence,
+    )
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -888,6 +979,15 @@ class SimulationCampagneEcranView(LoginRequiredMixin, FormView):
                     )
                     resultats["details_ecrans"] = resultats["details_ecrans"] + details_ajout
             if nb_spots_cible is not None:
+                resultats = _enrich_resultat_metriques(
+                    resultats,
+                    nb_jours=nb_jours,
+                    nb_ecrans=nb_ecrans,
+                    nombre_visuels=nombre_visuels,
+                    duree_passage=duree_passage,
+                    frequence=frequence,
+                    nb_spots_cible=int(nb_spots_cible),
+                )
                 total_actuel = int(resultats["spots_total_tous"])
                 cible = int(nb_spots_cible)
                 ecart_objectif = cible - total_actuel  # positif = manque, négatif = dépassement
@@ -958,6 +1058,39 @@ class SimulationCampagneEcranView(LoginRequiredMixin, FormView):
                             resultats["combinaisons_ajustement"] = []
                 else:
                     resultats["manque"] = 0
+
+            creation_params = {
+                "nom": "Campagne écran simulée",
+                "type_support": "ecran",
+                "duree_passage": duree_passage,
+                "frequence": frequence,
+                "nombre_visuels": nombre_visuels,
+                "tranches_horaires": tranches,
+                "supports": ",".join(
+                    str(support_id) for support_id in ecrans_qs.values_list("pk", flat=True)
+                ),
+            }
+            if jours_ajout > 0 and frequence_ajout and tranches_ajout:
+                creation_params.update({
+                    "jours_ajout": jours_ajout,
+                    "frequence_ajout": frequence_ajout,
+                    "tranches_ajout": tranches_ajout,
+                    "supports_bloc2": ",".join(
+                        str(support_id) for support_id in ecrans_ajout_qs.values_list("pk", flat=True)
+                    ),
+                })
+            if date_debut:
+                creation_params["date_debut"] = date_debut.isoformat()
+            if data.get("date_fin"):
+                creation_params["date_fin"] = data["date_fin"].isoformat()
+                if jours_ajout > 0:
+                    creation_params["date_fin_principal"] = data["date_fin"].isoformat()
+                    creation_params["date_fin"] = (
+                        data["date_fin"] + timedelta(days=jours_ajout)
+                    ).isoformat()
+            resultats["url_creer_campagne"] = (
+                f"{reverse('campagne_create')}?{urlencode(creation_params)}"
+            )
             context["resultats"] = resultats
 
         # ── Mode B : propositions vers cible ─────────────────────────────────

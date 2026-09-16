@@ -1,204 +1,513 @@
 {% extends 'base.html' %}
 {% load static %}
-{% block title %}Dashboard — Integral{% endblock %}
-{% block topbar_title %}<i class="bx bx-tachometer me-2" style="color:var(--color-primary)"></i>Tableau de Bord{% endblock %}
+{% block title %}Tableau de Bord — Integral{% endblock %}
+
+{% block topbar_title %}
+  <div class="d-flex align-items-center gap-2">
+    <div class="d-inline-flex align-items-center justify-content-center rounded-3 p-2" style="background: rgba(147, 46, 43, 0.08); color: var(--color-primary);">
+      <i class="bi bi-grid-1x2-fill fs-5"></i>
+    </div>
+    <div>
+      <span class="fw-bold">Tableau de Bord</span>
+      <span class="d-none d-sm-inline-block text-muted ms-2 fw-normal fs-6">| Vue d'ensemble & KPIs</span>
+    </div>
+  </div>
+{% endblock %}
+
 {% block topbar_actions %}
-  <a href="{% url 'campagne_create' %}" class="btn btn-primary btn-sm">
-    <i class="bx bx-plus me-1"></i>
-    <span class="d-none d-md-inline">Nouvelle Campagne</span>
-  </a>
+  <div class="d-flex align-items-center gap-2">
+    <a href="{% url 'planning_calendrier' %}" class="btn btn-outline-secondary btn-sm d-none d-md-inline-flex">
+      <i class="bi bi-calendar3 me-1"></i>Planning
+    </a>
+    <a href="{% url 'campagne_create' %}" class="btn btn-primary btn-sm shadow-sm">
+      <i class="bi bi-plus-lg me-1"></i>
+      <span>Nouvelle Campagne</span>
+    </a>
+  </div>
 {% endblock %}
 
 {% block extra_head %}
 <style>
-  .m-card {
+  /* ══════════════════════════════════════════════════════════════════
+     DASHBOARD STYLES & KPI CARDS
+     ══════════════════════════════════════════════════════════════════ */
+  .dash-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .dash-section-title {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-bottom: 0;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  /* Filtres par ville */
+  .city-filter-container {
+    background: #ffffff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 6px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    overflow-x: auto;
+    box-shadow: var(--shadow-xs);
+    margin-bottom: 20px;
+  }
+  .city-filter-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    border-radius: var(--radius-sm);
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: #64748b;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: all 0.16s ease;
+  }
+  .city-filter-link:hover {
+    color: var(--color-primary);
+    background: rgba(147, 46, 43, 0.05);
+  }
+  .city-filter-link.active {
+    color: #ffffff;
+    background: var(--color-primary);
+    box-shadow: 0 2px 6px rgba(147, 46, 43, 0.25);
+  }
+
+  /* Cartes Métriques KPIs */
+  .kpi-card {
     background: var(--bg-card);
     border: 1px solid var(--border);
-    border-radius: var(--radius);
-    padding: 16px 18px;
+    border-radius: var(--radius-lg);
+    padding: 18px 20px;
     height: 100%;
+    position: relative;
+    box-shadow: var(--shadow-sm);
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.2s ease, border-color 0.2s ease;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
   }
-  .m-card .m-lbl {
-    font-size: .7rem; font-weight: 700; letter-spacing: .07em;
-    text-transform: uppercase; color: var(--text-muted); margin-bottom: 6px;
+  .kpi-card.interactive {
+    cursor: pointer;
   }
-  .m-card .m-val { font-size: 2rem; font-weight: 800; line-height: 1; }
-  .m-card .m-sub { font-size: .72rem; color: var(--text-muted); margin-top: 5px; }
-  .m-bar { height: 3px; border-radius: 2px; background: var(--border); margin-top: 12px; overflow: hidden; }
-  .m-bar-fill { height: 100%; border-radius: 2px; }
+  .kpi-card.interactive:hover {
+    transform: translateY(-3px);
+    box-shadow: var(--shadow-md);
+    border-color: #cbd5e1;
+  }
+  .kpi-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+  .kpi-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .kpi-icon-box {
+    width: 38px;
+    height: 38px;
+    border-radius: var(--radius-md);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.15rem;
+    flex-shrink: 0;
+  }
+  .kpi-value {
+    font-size: 1.95rem;
+    font-weight: 800;
+    line-height: 1.1;
+    letter-spacing: -0.03em;
+    color: var(--text-dark);
+    margin-bottom: 4px;
+  }
+  .kpi-subtitle {
+    font-size: 0.74rem;
+    color: var(--text-muted);
+    font-weight: 500;
+  }
+  .kpi-progress {
+    height: 4px;
+    border-radius: 4px;
+    background: #f1f5f9;
+    margin-top: 12px;
+    overflow: hidden;
+  }
+  .kpi-progress-bar {
+    height: 100%;
+    border-radius: 4px;
+  }
 
-  .alerte-item {
-    display: flex; align-items: center; gap: 10px;
-    padding: 11px 16px; border-radius: var(--radius); border: 1px solid;
-    margin-bottom: 8px; font-size: .84rem; text-decoration: none; transition: opacity .15s;
+  /* Cartes d'Actions Rapides */
+  .quick-action-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 16px 12px;
+    background: #ffffff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    text-decoration: none;
+    color: var(--text-dark);
+    box-shadow: var(--shadow-xs);
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    height: 100%;
+    min-height: 95px;
   }
-  .alerte-item:hover { opacity: .85; }
-  .alerte-item.warning { background:#fffbeb; border-color:#fcd34d; color:#92400e; }
-  .alerte-item.danger  { background:#fef2f2; border-color:#fca5a5; color:#991b1b; }
-  .alerte-item.info    { background:#eff6ff; border-color:#93c5fd; color:#1e40af; }
-  .alerte-item.success { background:#f0fdf4; border-color:#86efac; color:#166534; }
-
-  .sec-lbl {
-    font-size: .7rem; font-weight: 700; letter-spacing: .08em;
-    text-transform: uppercase; color: var(--text-muted); margin-bottom: 10px;
+  .quick-action-btn:hover {
+    transform: translateY(-3px);
+    border-color: var(--color-primary);
+    box-shadow: var(--shadow-md);
+    color: var(--color-primary);
+  }
+  .quick-action-icon {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    transition: transform 0.2s ease;
+  }
+  .quick-action-btn:hover .quick-action-icon {
+    transform: scale(1.1);
+  }
+  .quick-action-btn span {
+    font-size: 0.8rem;
+    font-weight: 700;
   }
 
-  .chart-card {
-    background: var(--bg-card); border: 1px solid var(--border);
-    border-radius: var(--radius); padding: 18px; height: 100%;
+  /* Cartes du Parc & Formats */
+  .format-card {
+    background: #ffffff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    padding: 18px 20px;
+    height: 100%;
+    box-shadow: var(--shadow-sm);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    border-top: 3.5px solid var(--format-accent, var(--color-primary));
   }
-  .ch-title {
-    font-size: .82rem; font-weight: 700; color: var(--text-muted);
-    margin-bottom: 14px; display: flex; align-items: center; justify-content: space-between;
+  .format-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
   }
 
-  .dash-table { width:100%; border-collapse:collapse; font-size:.83rem; }
-  .dash-table th {
-    font-size:.7rem; font-weight:700; letter-spacing:.05em; text-transform:uppercase;
-    color:var(--text-muted); padding:0 12px 10px; border-bottom:1px solid var(--border); text-align:left;
+  /* Tableau moderne */
+  .dash-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
   }
-  .dash-table td { padding:10px 12px; border-bottom:1px solid var(--border); vertical-align:middle; }
-  .dash-table tr:last-child td { border-bottom:none; }
-  .dash-table tr:hover td { background:var(--bg-card2, rgba(0,0,0,.02)); }
-
-  .pill { font-size:.68rem; font-weight:700; padding:3px 9px; border-radius:20px; display:inline-block; }
-  .pill-cours   { background:#d1fae5; color:#065f46; }
-  .pill-venir   { background:#dbeafe; color:#1e40af; }
-  .pill-termine { background:#f3f4f6; color:#6b7280; }
-  .pill-pause   { background:#fef3c7; color:#92400e; }
-
-  .qa-card {
-    display:flex; flex-direction:column; align-items:center; justify-content:center;
-    gap:8px; padding:18px; background:var(--bg-card); border:1px solid var(--border);
-    border-radius:var(--radius); text-decoration:none; color:var(--text-primary);
-    transition:border-color .15s, background .15s; min-height:90px; height:100%;
+  .dash-table thead th {
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding: 12px 16px;
+    border-bottom: 1.5px solid var(--border);
+    background: #f8fafc;
+    text-align: left;
   }
-  .qa-card:hover { border-color:var(--color-primary); background:rgba(99,102,241,.04); color:var(--color-primary); }
-  .qa-card i    { font-size:1.6rem; }
-  .qa-card span { font-size:.78rem; font-weight:700; text-align:center; }
-</style>
-<style>
-  /* ... votre CSS existant ... */
+  .dash-table tbody td {
+    padding: 12px 16px;
+    border-bottom: 1px solid #f1f5f9;
+    vertical-align: middle;
+  }
+  .dash-table tbody tr:last-child td {
+    border-bottom: none;
+  }
+  .dash-table tbody tr {
+    transition: background-color 0.14s ease;
+  }
+  .dash-table tbody tr:hover {
+    background-color: rgba(147, 46, 43, 0.02);
+  }
 
+  /* Listes des Top Campagnes & Faces */
+  .top-item-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 11px 14px;
+    border-radius: var(--radius-md);
+    background: #f8fafc;
+    border: 1px solid var(--border-subtle);
+    transition: all 0.15s ease;
+  }
+  .top-item-row:hover {
+    background: #ffffff;
+    border-color: var(--border);
+    box-shadow: var(--shadow-xs);
+  }
+  .rank-badge {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.72rem;
+    font-weight: 800;
+    flex-shrink: 0;
+  }
+  .rank-1 { background: #fef3c7; color: #b45309; border: 1px solid #fde68a; }
+  .rank-2 { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
+  .rank-3 { background: #ffedd5; color: #c2410c; border: 1px solid #fed7aa; }
+  .rank-n { background: #ffffff; color: #94a3b8; border: 1px solid #e2e8f0; }
+
+  /* Modal AJAX */
   .custom-modal-overlay {
-    position: fixed; inset: 0; background: rgba(0,0,0,0.55);
-    display: flex; align-items: center; justify-content: center;
-    z-index: 1050; padding: 20px;
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1060;
+    padding: 20px;
+    animation: fadeIn 0.18s ease;
   }
   .custom-modal-box {
-    background: var(--bg-card, #fff); border-radius: 12px;
-    width: 100%; max-width: 640px; max-height: 85vh;
-    display: flex; flex-direction: column; overflow: hidden;
-    box-shadow: 0 10px 40px rgba(0,0,0,.25);
+    background: #ffffff;
+    border-radius: var(--radius-xl);
+    width: 100%;
+    max-width: 620px;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: var(--shadow-xl);
+    border: 1px solid var(--border);
+    animation: scaleIn 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
   }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes scaleIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
   .custom-modal-header {
-    padding: 16px 20px; border-bottom: 1px solid var(--border, #e5e7eb);
-    display: flex; justify-content: space-between; align-items: center;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #ffffff;
   }
-  .custom-modal-header h5 { margin: 0; }
+  .custom-modal-header h5 {
+    margin: 0;
+    font-weight: 700;
+    font-size: 1.05rem;
+    color: var(--text-dark);
+  }
   .custom-modal-close {
-    background: none; border: none; font-size: 1.4rem; line-height: 1;
-    color: var(--text-muted, #888); cursor: pointer; padding: 0 4px;
+    background: #f1f5f9;
+    border: none;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    font-size: 1.1rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s ease;
   }
-  .custom-modal-close:hover { color: #ef4444; }
-  .custom-modal-body { padding: 18px 20px; overflow-y: auto; }
+  .custom-modal-close:hover {
+    background: #fee2e2;
+    color: #ef4444;
+  }
+  .custom-modal-body {
+    padding: 18px 20px;
+    overflow-y: auto;
+  }
 </style>
 {% endblock %}
 
 {% block content %}
+<!-- Modal dynamique AJAX -->
 <div id="custom-modal-overlay" class="custom-modal-overlay" style="display:none;" onclick="if(event.target === this) closeCustomModal()">
   <div class="custom-modal-box">
     <div class="custom-modal-header">
-      <h5 id="custom-modal-title" class="fw-bold"></h5>
+      <h5 id="custom-modal-title"></h5>
       <button type="button" class="custom-modal-close" onclick="closeCustomModal()">&times;</button>
     </div>
     <div id="custom-modal-body" class="custom-modal-body"></div>
   </div>
 </div>
-<!-- Filtre villes -->
-<ul class="nav nav-pills mb-3 nav-fill d-none d-sm-flex" role="tablist" id="filtre-villes">
-  <li class="nav-item">
-    <a class="nav-link {% if not ville_active %}active{% endif %}" href="?">
-      <i class="bx bx-globe me-1"></i>Toutes les villes
-    </a>
-  </li>
-  {% for ville in villes %}
-  <li class="nav-item">
-    <a class="nav-link {% if ville_active == ville %}active{% endif %}" href="?ville={{ ville }}">
-      <i class="bx bx-map me-1"></i>{{ ville }}
-    </a>
-  </li>
-  {% endfor %}
-</ul>
 
-<!-- Métriques commerciales -->
-<div class="d-flex align-items-end justify-content-between">
-  <p class="sec-lbl">Activité commerciale</p>
-  <span class="sec-lbl"><i class="bx bx-time me-1"></i>Aujourd'hui</span>
+<!-- ══════════════════════════════════════════════════════════════════
+     FILTRE PAR VILLE
+     ══════════════════════════════════════════════════════════════════ -->
+<div class="city-filter-container d-none d-sm-flex" data-aos="fade-up">
+  <a class="city-filter-link {% if not ville_active %}active{% endif %}" href="?">
+    <i class="bi bi-globe2"></i>Toutes les villes
+  </a>
+  {% for ville in villes %}
+  <a class="city-filter-link {% if ville_active == ville %}active{% endif %}" href="?ville={{ ville }}">
+    <i class="bi bi-geo-alt-fill"></i>{{ ville }}
+  </a>
+  {% endfor %}
 </div>
-<div class="row g-3 mb-4">
-<div class="col-6 col-md-3">
-  <div class="m-card" style="cursor:pointer;"
-       onclick="loadModalContent('{% url 'api_dashboard_clients_actifs' %}?ville={{ ville_active }}', 'Clients actifs')">
-    <div class="m-lbl">Clients actifs</div>
-    <div class="m-val" style="color:#a78bfa">{{ total_clients }}</div>
-    <div class="m-bar"><div class="m-bar-fill" style="width:100%;background:#a78bfa"></div></div>
-  </div>
+
+<!-- ══════════════════════════════════════════════════════════════════
+     SECTION 1 : ACTIVITÉ COMMERCIALE & KPIS
+     ══════════════════════════════════════════════════════════════════ -->
+<div class="dash-section-header" data-aos="fade-up">
+  <h6 class="dash-section-title">
+    <i class="bi bi-graph-up-arrow" style="color:var(--color-primary)"></i>Activité Commerciale
+  </h6>
+  <span class="badge bg-white border text-muted fw-semibold px-2 py-1" style="font-size:0.72rem;">
+    <i class="bi bi-clock me-1"></i>En temps réel
+  </span>
 </div>
-<div class="col-6 col-md-3">
-  <div class="m-card" style="cursor:pointer;"
-       onclick="loadModalContent('{% url 'api_dashboard_campagnes' 'en_cours' %}?ville={{ ville_active }}', 'Campagnes en cours')">
-    <div class="m-lbl">Campagnes en cours</div>
-    <div class="m-val" style="color:var(--color-disponible)">{{ campagnes_actives }}</div>
-    <div class="m-sub">actives maintenant</div>
-  </div>
-</div>
-<div class="col-6 col-md-3">
-  <div class="m-card" style="cursor:pointer;"
-       onclick="loadModalContent('{% url 'api_dashboard_campagnes' 'a_venir' %}?ville={{ ville_active }}', 'Campagnes à venir')">
-    <div class="m-lbl">À venir</div>
-    <div class="m-val" style="color:#60a5fa">{{ campagnes_a_venir }}</div>
-    <div class="m-sub">dans les 30 jours</div>
-  </div>
-</div>
-  <div class="col-6 col-md-3">
-    <div class="m-card">
-      <div class="m-lbl">Revenu actif</div>
-      <div class="m-val" style="color:#16a34a">{{ revenu_actif|floatformat:0 }} FCFA</div>
-      <div class="m-sub">campagnes en cours</div>
+
+<div class="row g-3 mb-4" data-aos="fade-up" data-aos-delay="50">
+  <!-- Clients Actifs -->
+  <div class="col-6 col-lg-3">
+    <div class="kpi-card interactive" onclick="loadModalContent('{% url 'api_dashboard_clients_actifs' %}?ville={{ ville_active }}', 'Clients actifs')">
+      <div>
+        <div class="kpi-top">
+          <span class="kpi-title">Clients Actifs</span>
+          <div class="kpi-icon-box" style="background:#f3e8ff; color:#7c3aed;">
+            <i class="bi bi-people-fill"></i>
+          </div>
+        </div>
+        <div class="kpi-value" style="color:#7c3aed;">{{ total_clients }}</div>
+        <div class="kpi-subtitle">Comptes avec campagnes actives</div>
+      </div>
+      <div class="kpi-progress">
+        <div class="kpi-progress-bar" style="width:100%; background:#7c3aed;"></div>
+      </div>
     </div>
   </div>
-  <div class="col-6 col-md-3">
-    <div class="m-card">
-      <div class="m-lbl">Revenu à venir</div>
-      <div class="m-val" style="color:#0ea5e9">{{ revenu_a_venir|floatformat:0 }} FCFA</div>
-      <div class="m-sub">campagnes futures</div>
+
+  <!-- Campagnes en cours -->
+  <div class="col-6 col-lg-3">
+    <div class="kpi-card interactive" onclick="loadModalContent('{% url 'api_dashboard_campagnes' 'en_cours' %}?ville={{ ville_active }}', 'Campagnes en cours')">
+      <div>
+        <div class="kpi-top">
+          <span class="kpi-title">Campagnes en cours</span>
+          <div class="kpi-icon-box" style="background:#e8f8ee; color:#16a34a;">
+            <i class="bi bi-play-circle-fill"></i>
+          </div>
+        </div>
+        <div class="kpi-value" style="color:#16a34a;">{{ campagnes_actives }}</div>
+        <div class="kpi-subtitle">Actives en ce moment</div>
+      </div>
+      <div class="kpi-progress">
+        <div class="kpi-progress-bar" style="width:100%; background:#16a34a;"></div>
+      </div>
     </div>
   </div>
-  {% comment %} <div class="col-6 col-md-3">
-    <div class="m-card">
-      <div class="m-lbl">Campagnes mère</div>
-      <div class="m-val" style="color:#fb923c">{{ campagnes_meres_count }}</div>
-      <div class="m-sub">conteneurs actifs</div>
+
+  <!-- Campagnes à venir -->
+  <div class="col-6 col-lg-3">
+    <div class="kpi-card interactive" onclick="loadModalContent('{% url 'api_dashboard_campagnes' 'a_venir' %}?ville={{ ville_active }}', 'Campagnes à venir')">
+      <div>
+        <div class="kpi-top">
+          <span class="kpi-title">À venir</span>
+          <div class="kpi-icon-box" style="background:#dbeafe; color:#2563eb;">
+            <i class="bi bi-calendar-event-fill"></i>
+          </div>
+        </div>
+        <div class="kpi-value" style="color:#2563eb;">{{ campagnes_a_venir }}</div>
+        <div class="kpi-subtitle">Dans les 30 prochains jours</div>
+      </div>
+      <div class="kpi-progress">
+        <div class="kpi-progress-bar" style="width:100%; background:#2563eb;"></div>
+      </div>
     </div>
-  </div> {% endcomment %}
-  <div class="col-8 col-md-6">
+  </div>
+
+  <!-- Revenu Actif -->
+  <div class="col-6 col-lg-3">
+    <div class="kpi-card">
+      <div>
+        <div class="kpi-top">
+          <span class="kpi-title">Revenu Actif</span>
+          <div class="kpi-icon-box" style="background:rgba(147, 46, 43, 0.08); color:var(--color-primary);">
+            <i class="bi bi-cash-stack"></i>
+          </div>
+        </div>
+        <div class="kpi-value text-truncate" style="color:var(--color-primary);" title="{{ revenu_actif|floatformat:0 }} FCFA">
+          {{ revenu_actif|floatformat:0 }} <span style="font-size:0.95rem; font-weight:700;">FCFA</span>
+        </div>
+        <div class="kpi-subtitle">Campagnes en cours</div>
+      </div>
+      <div class="kpi-progress">
+        <div class="kpi-progress-bar" style="width:100%; background:var(--color-primary);"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Revenu à venir & Raccourcis -->
+  <div class="col-12 col-lg-6">
+    <div class="kpi-card">
+      <div>
+        <div class="kpi-top">
+          <span class="kpi-title">Revenu Futur Engagé</span>
+          <div class="kpi-icon-box" style="background:#e0f2fe; color:#0284c7;">
+            <i class="bi bi-graph-up"></i>
+          </div>
+        </div>
+        <div class="kpi-value" style="color:#0284c7;">
+          {{ revenu_a_venir|floatformat:0 }} <span style="font-size:0.95rem; font-weight:700;">FCFA</span>
+        </div>
+        <div class="kpi-subtitle">Généré par les campagnes futures programmées</div>
+      </div>
+      <div class="kpi-progress">
+        <div class="kpi-progress-bar" style="width:100%; background:#0284c7;"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="col-12 col-lg-6">
     <div class="row g-2 h-100">
       <div class="col-4">
-        <a href="{% url 'planning_calendrier' %}" class="qa-card">
-          <i class="bx bx-calendar" style="color:var(--color-primary)"></i>
+        <a href="{% url 'planning_calendrier' %}" class="quick-action-btn">
+          <div class="quick-action-icon" style="background:rgba(147, 46, 43, 0.08); color:var(--color-primary);">
+            <i class="bi bi-calendar3"></i>
+          </div>
           <span>Planning</span>
         </a>
       </div>
       <div class="col-4">
-        <a href="{% url 'reports_index' %}" class="qa-card">
-          <i class="bx bx-file" style="color:#34d399"></i>
+        <a href="{% url 'reports_index' %}" class="quick-action-btn">
+          <div class="quick-action-icon" style="background:#e8f8ee; color:#16a34a;">
+            <i class="bi bi-file-earmark-bar-graph-fill"></i>
+          </div>
           <span>Rapports</span>
         </a>
       </div>
       <div class="col-4">
-        <a href="{% url 'simulation_ecran' %}" class="qa-card">
-          <i class="bx bx-calculator" style="color:#f59e0b"></i>
+        <a href="{% url 'simulation_ecran' %}" class="quick-action-btn">
+          <div class="quick-action-icon" style="background:#fef3c7; color:#d97706;">
+            <i class="bi bi-calculator-fill"></i>
+          </div>
           <span>Simulateur</span>
         </a>
       </div>
@@ -206,79 +515,88 @@
   </div>
 </div>
 
-
-<!-- Cases détaillées par type avec mini charts -->
-<div class="d-flex align-items-end justify-content-between">
-  <p class="sec-lbl">Parc publicitaire</p>
-  <span class="sec-lbl">{{ total_faces }} faces/{{ total_supports }} supports</span>
+<!-- ══════════════════════════════════════════════════════════════════
+     SECTION 2 : PARC PUBLICITAIRE & FORMATS
+     ══════════════════════════════════════════════════════════════════ -->
+<div class="dash-section-header" data-aos="fade-up">
+  <h6 class="dash-section-title">
+    <i class="bi bi-display" style="color:var(--color-primary)"></i>Parc Publicitaire & Disponibilités
+  </h6>
+  <span class="badge bg-white border text-dark fw-bold px-2 py-1" style="font-size:0.75rem;">
+    {{ total_faces }} Faces / {{ total_supports }} Supports
+  </span>
 </div>
-<div class="row g-3 mb-4">
- 
+
+<div class="row g-3 mb-4" data-aos="fade-up" data-aos-delay="100">
+  <!-- Carte Écrans LED -->
   {% if nb_ecrans > 0 %}
-  <div class="col-12 col-md-6 col-lg">
-    <div class="card border-0 shadow-sm h-100" style="border-radius:14px;border:3px solid #06b6d4 !important;">
-      <div class="card-body p-3">
-        <div class="d-flex align-items-center justify-content-between mb-2">
-          <span class="fw-bold" style="font-size:.85rem;">Écrans</span>
-          <span class="rounded-2 p-2 d-flex" style="background:#e0f9ff;">
-            <i class="bx bx-desktop" style="color:#06b6d4;font-size:1.2rem;"></i>
-          </span>
+  <div class="col-12 col-md-6 col-xl-3">
+    <div class="format-card" style="--format-accent: #06b6d4;">
+      <div class="d-flex align-items-center justify-content-between mb-2">
+        <span class="fw-bold" style="font-size:0.88rem;">Écrans Numériques</span>
+        <div class="d-inline-flex p-2 rounded-2" style="background:#e0f9ff; color:#06b6d4;">
+          <i class="bi bi-display-fill"></i>
         </div>
-        <div class="fw-bold mb-1" style="font-size:2rem;line-height:1;color:#06b6d4;">{{ nb_ecrans_bon }}</div>
-        <div class="small text-muted mb-3">{{ nb_ecrans }} total</div>
-        <div class="d-flex align-items-center gap-3">
-          <div style="width:80px;height:80px;flex-shrink:0;">
-            <canvas id="chartEcrans" width="80" height="80"></canvas>
+      </div>
+      <div class="fw-bold mb-1" style="font-size:1.8rem; line-height:1; color:#06b6d4;">
+        {{ nb_ecrans_bon }} <span style="font-size:0.8rem; font-weight:600; color:var(--text-muted);">actifs</span>
+      </div>
+      <div class="small text-muted mb-3">{{ nb_ecrans }} écran{{ nb_ecrans|pluralize:",s" }} au total</div>
+      
+      <div class="d-flex align-items-center gap-3">
+        <div style="width:75px; height:75px; flex-shrink:0;">
+          <canvas id="chartEcrans" width="75" height="75"></canvas>
+        </div>
+        <div class="flex-grow-1 d-flex flex-column gap-1" style="font-size:0.78rem;">
+          <div class="d-flex justify-content-between">
+            <span class="d-flex align-items-center gap-1.5"><span style="width:7px;height:7px;border-radius:50%;background:#10b981;display:inline-block;"></span>Bon état</span>
+            <strong>{{ nb_ecrans_bon }}</strong>
           </div>
-          <div class="flex-grow-1 d-flex flex-column gap-1" style="font-size:.78rem;">
-            <div class="d-flex justify-content-between">
-              <span class="d-flex align-items-center gap-1"><span style="width:7px;height:7px;border-radius:50%;background:#10b981;display:inline-block;"></span>Bon état</span>
-              <strong>{{ nb_ecrans_bon }}</strong>
-            </div>
-            <div class="d-flex justify-content-between">
-              <span class="d-flex align-items-center gap-1"><span style="width:7px;height:7px;border-radius:50%;background:#94a3b8;display:inline-block;"></span>En panne</span>
-              <strong>{{ nb_ecrans_panne }}</strong>
-            </div>
+          <div class="d-flex justify-content-between">
+            <span class="d-flex align-items-center gap-1.5"><span style="width:7px;height:7px;border-radius:50%;background:#94a3b8;display:inline-block;"></span>En panne</span>
+            <strong>{{ nb_ecrans_panne }}</strong>
           </div>
         </div>
       </div>
     </div>
   </div>
   {% endif %}
- 
+
+  <!-- Cartes Formats Statiques -->
   {% for cat in format_categories %}
-  <div class="col-12 col-md-6 col-lg">
-    <div class="card border-0 shadow-sm h-100" style="border-radius:14px;border:3px solid {{ cat.color }} !important;">
-      <div class="card-body p-3">
-        <div class="d-flex align-items-center justify-content-between mb-2">
-          <span class="fw-bold" style="font-size:.85rem;">{{ cat.label }}</span>
-          <span class="rounded-2 p-2 d-flex" style="background:rgba(229,231,235,.4);">
-            <i class="bx bx-chart" style="color:{{ cat.color }};font-size:1.2rem;"></i>
-          </span>
+  <div class="col-12 col-md-6 col-xl-3">
+    <div class="format-card" style="--format-accent: {{ cat.color }};">
+      <div class="d-flex align-items-center justify-content-between mb-2">
+        <span class="fw-bold" style="font-size:0.88rem;">{{ cat.label }}</span>
+        <div class="d-inline-flex p-2 rounded-2" style="background:rgba(226, 232, 240, 0.5); color:{{ cat.color }};">
+          <i class="bi bi-pie-chart-fill"></i>
         </div>
-        <div class="fw-bold mb-1" style="font-size:2rem;line-height:1;color:{{ cat.color }};">{{ cat.nb_faces }} faces</div>
-        <div class="small text-muted mb-3">{{ cat.nb_supports }} supports</div>
-        <div class="d-flex align-items-center gap-3">
-          <div style="width:80px;height:80px;flex-shrink:0;">
-            <canvas id="chart-{{ cat.slug }}" width="80" height="80"></canvas>
+      </div>
+      <div class="fw-bold mb-1" style="font-size:1.8rem; line-height:1; color:{{ cat.color }};">
+        {{ cat.nb_faces }} <span style="font-size:0.8rem; font-weight:600; color:var(--text-muted);">faces</span>
+      </div>
+      <div class="small text-muted mb-3">{{ cat.nb_supports }} support{{ cat.nb_supports|pluralize:",s" }}</div>
+
+      <div class="d-flex align-items-center gap-3">
+        <div style="width:75px; height:75px; flex-shrink:0;">
+          <canvas id="chart-{{ cat.slug }}" width="75" height="75"></canvas>
+        </div>
+        <div class="flex-grow-1 d-flex flex-column gap-1" style="font-size:0.76rem;">
+          <div class="d-flex justify-content-between">
+            <span class="d-flex align-items-center gap-1"><span style="width:6px;height:6px;border-radius:50%;background:#ef4444;display:inline-block;"></span>Occupées</span>
+            <strong>{{ cat.nb_occupe }}</strong>
           </div>
-          <div class="flex-grow-1 d-flex flex-column gap-1" style="font-size:.78rem;">
-            <div class="d-flex justify-content-between">
-              <span class="d-flex align-items-center gap-1"><span style="width:7px;height:7px;border-radius:50%;background:#ef4444;display:inline-block;"></span>Occupées</span>
-              <strong>{{ cat.nb_occupe }}</strong>
-            </div>
-            <div class="d-flex justify-content-between">
-              <span class="d-flex align-items-center gap-1"><span style="width:7px;height:7px;border-radius:50%;background:#f59e0b;display:inline-block;"></span>Réservées</span>
-              <strong>{{ cat.nb_reserve }}</strong>
-            </div>
-            <div class="d-flex justify-content-between">
-              <span class="d-flex align-items-center gap-1"><span style="width:7px;height:7px;border-radius:50%;background:#10b981;display:inline-block;"></span>Libres</span>
-              <strong>{{ cat.nb_libre }}</strong>
-            </div>
-            <div class="d-flex justify-content-between">
-              <span class="d-flex align-items-center gap-1"><span style="width:7px;height:7px;border-radius:50%;background:#94a3b8;display:inline-block;"></span>En panne</span>
-              <strong>{{ cat.nb_panne }}</strong>
-            </div>
+          <div class="d-flex justify-content-between">
+            <span class="d-flex align-items-center gap-1"><span style="width:6px;height:6px;border-radius:50%;background:#f59e0b;display:inline-block;"></span>Réservées</span>
+            <strong>{{ cat.nb_reserve }}</strong>
+          </div>
+          <div class="d-flex justify-content-between">
+            <span class="d-flex align-items-center gap-1"><span style="width:6px;height:6px;border-radius:50%;background:#10b981;display:inline-block;"></span>Libres</span>
+            <strong>{{ cat.nb_libre }}</strong>
+          </div>
+          <div class="d-flex justify-content-between">
+            <span class="d-flex align-items-center gap-1"><span style="width:6px;height:6px;border-radius:50%;background:#94a3b8;display:inline-block;"></span>En panne</span>
+            <strong>{{ cat.nb_panne }}</strong>
           </div>
         </div>
       </div>
@@ -287,68 +605,58 @@
   {% endfor %}
 </div>
 
-<!-- Graphiques -->
-<div class="row g-3 mb-4">
-  <div class="col-lg-6">
-    <div class="card border-0 shadow-sm h-100" style="border-radius:14px;">
-      <div class="card-header bg-transparent border-bottom py-3 px-4">
-        <div class="d-flex align-items-center justify-content-between">
-          <span class="fw-bold"><i class="bx bx-line-chart me-2" style="color:var(--color-primary)"></i>Top campagnes par revenu</span>
-          <span class="small text-muted">Campagnes actives & à venir</span>
-        </div>
+<!-- ══════════════════════════════════════════════════════════════════
+     SECTION 3 : TOP PERFORMERS (CAMPAGNES & FACES)
+     ══════════════════════════════════════════════════════════════════ -->
+<div class="row g-3 mb-4" data-aos="fade-up" data-aos-delay="150">
+  <!-- Top Campagnes -->
+  <div class="col-12 col-lg-6">
+    <div class="card h-100">
+      <div class="card-header justify-content-between">
+        <span class="fw-bold"><i class="bi bi-trophy-fill me-2" style="color:#f59e0b;"></i>Top Campagnes par Revenu</span>
+        <span class="badge bg-light text-muted border">Actives & À venir</span>
       </div>
-      <div class="card-body p-4">
-        <div id="topCampaignsList" class="d-flex flex-column gap-3"></div>
+      <div class="card-body">
+        <div id="topCampaignsList" class="d-flex flex-column gap-2"></div>
       </div>
     </div>
   </div>
-  <div class="col-lg-6">
-    <div class="card border-0 shadow-sm h-100" style="border-radius:14px;">
-      <div class="card-header bg-transparent border-bottom py-3 px-4">
-        <div class="d-flex align-items-center justify-content-between">
-          <span class="fw-bold"><i class="bx bx-trending-up me-2" style="color:var(--color-primary)"></i>Faces les plus productives</span>
-          <span class="small text-muted">Par revenu et utilisation</span>
-        </div>
+
+  <!-- Top Faces -->
+  <div class="col-12 col-lg-6">
+    <div class="card h-100">
+      <div class="card-header justify-content-between">
+        <span class="fw-bold"><i class="bi bi-star-fill me-2" style="color:var(--color-primary);"></i>Faces les Plus Rentables</span>
+        <span class="badge bg-light text-muted border">Performance globale</span>
       </div>
-      <div class="card-body p-4">
-        <div id="topFacesList" class="d-flex flex-column gap-3"></div>
+      <div class="card-body">
+        <div id="topFacesList" class="d-flex flex-column gap-2"></div>
       </div>
     </div>
   </div>
 </div>
 
-<!-- Graphiques -->
-<div class="row g-3 mb-4">
-
+<!-- ══════════════════════════════════════════════════════════════════
+     SECTION 4 : GRAPHIQUES D'OCCUPATION & RÉPARTITION
+     ══════════════════════════════════════════════════════════════════ -->
+<div class="row g-3 mb-4" data-aos="fade-up" data-aos-delay="200">
   <!-- Occupation par format -->
-  <div class="col-lg-7">
-    <div class="card border-0 shadow-sm h-100" style="border-radius:14px;">
-      <div class="card-header bg-transparent border-bottom py-3 px-4"style="flex-wrap:wrap">
-        <div class="d-flex align-items-center justify-content-between" >
-          <span class="fw-bold"><i class="bx bx-bar-chart-alt-2 me-2" style="color:var(--color-primary)"></i>Occupation par format</span>
-          <span class="small text-muted">faces par statut</span>
+  <div class="col-12 col-lg-7">
+    <div class="card h-100">
+      <div class="card-header flex-column align-items-stretch">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+          <span class="fw-bold"><i class="bi bi-bar-chart-fill me-2" style="color:var(--color-primary);"></i>Occupation par Format</span>
+          <span class="small text-muted">Faces selon le statut</span>
         </div>
-        <div class="d-flex flex-wrap gap-3 mt-2">
-          <span class="small d-flex align-items-center gap-1">
-            <span style="width:10px;height:10px;border-radius:2px;background:#ef4444;display:inline-block;"></span>
-            {{ total_faces_occupe }} Occupées
-          </span>
-          <span class="small d-flex align-items-center gap-1">
-            <span style="width:10px;height:10px;border-radius:2px;background:#f59e0b;display:inline-block;"></span>
-            {{ total_faces_reserve }} Réservées
-          </span>
-          <span class="small d-flex align-items-center gap-1">
-            <span style="width:10px;height:10px;border-radius:2px;background:#10b981;display:inline-block;"></span>
-            {{ total_faces_libre }} Libres
-          </span>
-          <span class="small d-flex align-items-center gap-1">
-            <span style="width:10px;height:10px;border-radius:2px;background:#94a3b8;display:inline-block;"></span>
-            {{ total_faces_panne }} En panne
-          </span>
+        <div class="d-flex flex-wrap gap-2 pt-2 border-top">
+          <span class="badge-status bs-occupe">{{ total_faces_occupe }} Occupées</span>
+          <span class="badge-status bs-reserve">{{ total_faces_reserve }} Réservées</span>
+          <span class="badge-status bs-disponible">{{ total_faces_libre }} Libres</span>
+          <span class="badge-status bs-panne">{{ total_faces_panne }} En panne</span>
         </div>
       </div>
-      <div class="card-body p-4">
-        <div style="position:relative;height:240px;">
+      <div class="card-body">
+        <div style="position:relative; height:260px;">
           <canvas id="chartOccupation" role="img" aria-label="Taux d'occupation par format"></canvas>
         </div>
       </div>
@@ -356,150 +664,161 @@
   </div>
 
   <!-- Répartition du parc -->
-  <div class="col-lg-5">
-    <div class="card border-0 shadow-sm h-100" style="border-radius:14px;">
-      <div class="card-header bg-transparent border-bottom py-3 px-4">
-        <div class="d-flex align-items-center justify-content-between">
-          <span class="fw-bold"><i class="bx bx-pie-chart-alt-2 me-2" style="color:var(--color-primary)"></i>Répartition du parc</span>
-          <span class="small text-muted">{{ total_supports }} supports</span>
-        </div>
+  <div class="col-12 col-lg-5">
+    <div class="card h-100">
+      <div class="card-header justify-content-between">
+        <span class="fw-bold"><i class="bi bi-pie-chart-fill me-2" style="color:var(--color-primary);"></i>Répartition du Parc</span>
+        <span class="badge bg-light text-dark border">{{ total_supports }} supports</span>
       </div>
-      <div class="card-body p-4">
+      <div class="card-body">
         <div class="d-flex align-items-center gap-4 mb-4">
-          <div style="width:120px;height:120px;flex-shrink:0;">
-            <canvas id="chartTypes" width="120" height="120" role="img" aria-label="Répartition du parc"></canvas>
+          <div style="width:115px; height:115px; flex-shrink:0;">
+            <canvas id="chartTypes" width="115" height="115" role="img" aria-label="Répartition du parc"></canvas>
           </div>
-          <div class="flex-grow-1 d-flex flex-column gap-2" style="font-size:.82rem;">
-            <div class="d-flex align-items-center justify-content-between">
+          <div class="flex-grow-1 d-flex flex-column gap-2" style="font-size:0.83rem;">
+            <div class="d-flex align-items-center justify-content-between pb-1 border-bottom">
               <span class="d-flex align-items-center gap-2">
-                <span style="width:10px;height:10px;border-radius:50%;background:var(--color-primary);flex-shrink:0;display:inline-block;"></span>
+                <span style="width:9px; height:9px; border-radius:50%; background:var(--color-primary);"></span>
                 Panneaux statiques
               </span>
               <strong>{{ nb_panneaux_bon }}</strong>
             </div>
-            <div class="d-flex align-items-center justify-content-between">
+            <div class="d-flex align-items-center justify-content-between pb-1 border-bottom">
               <span class="d-flex align-items-center gap-2">
-                <span style="width:10px;height:10px;border-radius:50%;background:#06b6d4;flex-shrink:0;display:inline-block;"></span>
-                Écrans numériques
+                <span style="width:9px; height:9px; border-radius:50%; background:#06b6d4;"></span>
+                Écrans LED
               </span>
               <strong>{{ nb_ecrans_bon }}</strong>
             </div>
             <div class="d-flex align-items-center justify-content-between">
               <span class="d-flex align-items-center gap-2">
-                <span style="width:10px;height:10px;border-radius:50%;background:#ef4444;flex-shrink:0;display:inline-block;"></span>
+                <span style="width:9px; height:9px; border-radius:50%; background:#ef4444;"></span>
                 En panne
               </span>
-              <strong>{{ supports_panne }}</strong>
+              <strong class="text-danger">{{ supports_panne }}</strong>
             </div>
           </div>
         </div>
 
-        <!-- Barres par format -->
-        <div class="d-flex flex-column gap-2">
+        <!-- Barres détaillées par format -->
+        <div class="d-flex flex-column gap-2.5 pt-2 border-top">
           {% if nb_standard > 0 %}
           <div>
             <div class="d-flex justify-content-between small mb-1">
-              <span class="d-flex align-items-center gap-1">
-                <span style="width:8px;height:8px;border-radius:50%;background:#10b981;display:inline-block;"></span>12m²
-              </span>
+              <span class="fw-semibold">Format 12m² (Standard)</span>
               <span class="text-muted">{{ nbt_std }} faces · {{ nb_standard }} supp.</span>
             </div>
-            <div class="progress" style="height:6px;border-radius:4px;">
-              <div class="progress-bar" style="width:{% if total_supports %}{% widthratio nb_standard total_supports 100 %}{% else %}0{% endif %}%;background:#10b981;"></div>
+            <div class="progress" style="height:6px; border-radius:4px;">
+              <div class="progress-bar bg-success" style="width:{% if total_supports %}{% widthratio nb_standard total_supports 100 %}{% else %}0{% endif %}%;"></div>
             </div>
           </div>
           {% endif %}
           {% if nb_geants > 0 %}
           <div>
             <div class="d-flex justify-content-between small mb-1">
-              <span class="d-flex align-items-center gap-1">
-                <span style="width:8px;height:8px;border-radius:50%;background:#f59e0b;display:inline-block;"></span>Géants
-              </span>
+              <span class="fw-semibold">Grands Formats & Géants</span>
               <span class="text-muted">{{ nbt_geo }} faces · {{ nb_geants }} supp.</span>
             </div>
-            <div class="progress" style="height:6px;border-radius:4px;">
-              <div class="progress-bar" style="width:{% if total_supports %}{% widthratio nb_geants total_supports 100 %}{% else %}0{% endif %}%;background:#f59e0b;"></div>
+            <div class="progress" style="height:6px; border-radius:4px;">
+              <div class="progress-bar bg-warning" style="width:{% if total_supports %}{% widthratio nb_geants total_supports 100 %}{% else %}0{% endif %}%;"></div>
             </div>
           </div>
           {% endif %}
           {% if nb_sucettes > 0 %}
           <div>
             <div class="d-flex justify-content-between small mb-1">
-              <span class="d-flex align-items-center gap-1">
-                <span style="width:8px;height:8px;border-radius:50%;background:#a78bfa;display:inline-block;"></span>Sucettes
-              </span>
+              <span class="fw-semibold">Sucettes / Urbain</span>
               <span class="text-muted">{{ nbt_suc }} faces · {{ nb_sucettes }} supp.</span>
             </div>
-            <div class="progress" style="height:6px;border-radius:4px;">
-              <div class="progress-bar" style="width:{% if total_supports %}{% widthratio nb_sucettes total_supports 100 %}{% else %}0{% endif %}%;background:#a78bfa;"></div>
+            <div class="progress" style="height:6px; border-radius:4px;">
+              <div class="progress-bar" style="width:{% if total_supports %}{% widthratio nb_sucettes total_supports 100 %}{% else %}0{% endif %}%; background:#8b5cf6;"></div>
             </div>
           </div>
           {% endif %}
           {% if nb_gm > 0 %}
           <div>
             <div class="d-flex justify-content-between small mb-1">
-              <span class="d-flex align-items-center gap-1">
-                <span style="width:8px;height:8px;border-radius:50%;background:#f97316;display:inline-block;"></span>Marché
-              </span>
+              <span class="fw-semibold">Marchés</span>
               <span class="text-muted">{{ nbt_gm }} faces · {{ nb_gm }} supp.</span>
             </div>
-            <div class="progress" style="height:6px;border-radius:4px;">
-              <div class="progress-bar" style="width:{% if total_supports %}{% widthratio nb_gm total_supports 100 %}{% else %}0{% endif %}%;background:#f97316;"></div>
+            <div class="progress" style="height:6px; border-radius:4px;">
+              <div class="progress-bar" style="width:{% if total_supports %}{% widthratio nb_gm total_supports 100 %}{% else %}0{% endif %}%; background:#f97316;"></div>
             </div>
           </div>
           {% endif %}
-          <div class="d-flex justify-content-between align-items-center pt-2 border-top small">
-            <span class="fw-bold">Total faces</span>
-            <strong>{{ total_faces }} / {{ total_supports }} supp.</strong>
-          </div>
         </div>
       </div>
     </div>
   </div>
-
 </div>
 
-<!-- Tableau campagnes -->
-<div class="chart-card">
-  <div class="ch-title">
-    <span><i class="bx bx-megaphone me-2" style="color:var(--color-primary)"></i>Campagnes récentes</span>
-    <a href="{% url 'campagne_list' %}" class="btn btn-sm btn-outline-secondary">Voir tout</a>
+<!-- ══════════════════════════════════════════════════════════════════
+     SECTION 5 : CAMPAGNES RÉCENTES
+     ══════════════════════════════════════════════════════════════════ -->
+<div class="card" data-aos="fade-up" data-aos-delay="250">
+  <div class="card-header justify-content-between">
+    <span class="fw-bold"><i class="bi bi-megaphone-fill me-2" style="color:var(--color-primary);"></i>Campagnes Récentes</span>
+    <a href="{% url 'campagne_list' %}" class="btn btn-sm btn-outline-secondary">
+      Voir toutes les campagnes <i class="bi bi-arrow-right ms-1"></i>
+    </a>
   </div>
-  <div style="overflow-x:auto;">
+  <div class="table-responsive">
     <table class="dash-table">
       <thead>
         <tr>
-          <th>Référence</th><th>Client</th><th>Campagne</th>
-          <th>Début</th><th>Fin</th><th>Supports</th><th>Statut</th><th></th>
+          <th>Réf.</th>
+          <th>Client</th>
+          <th>Campagne</th>
+          <th>Début</th>
+          <th>Fin</th>
+          <th class="text-center">Supports</th>
+          <th>Statut</th>
+          <th class="text-end">Action</th>
         </tr>
       </thead>
       <tbody>
         {% for c in campagnes_recentes %}
         <tr>
-          <td style="font-family:var(--mono);font-size:.72rem;color:var(--text-muted)">{{ c.reference }}</td>
-          <td style="font-weight:700">{{ c.client.nom }}</td>
-          <td>{{ c.nom }}</td>
-          <td style="font-family:var(--mono);font-size:.78rem">{{ c.date_debut|date:"d/m/Y" }}</td>
-          <td style="font-family:var(--mono);font-size:.78rem">{{ c.date_fin|date:"d/m/Y" }}</td>
-          <td style="font-family:var(--mono);font-weight:700">{{ c.nb_supports }}</td>
+          <td class="fw-bold text-muted" style="font-size:0.78rem;">#{{ c.reference|default:c.pk }}</td>
           <td>
-            {% if c.statut == 'en_cours' %}<span class="pill pill-cours">En cours</span>
-            {% elif c.statut == 'a_venir' %}<span class="pill pill-venir">À venir</span>
-            {% elif c.statut == 'termine' %}<span class="pill pill-termine">Terminée</span>
-            {% else %}<span class="pill pill-pause">{{ c.get_statut_display }}</span>
-            {% endif %}
+            <div class="d-flex align-items-center gap-2">
+              <div class="d-inline-flex align-items-center justify-content-center rounded-circle fw-bold" style="width:28px;height:28px;background:rgba(147,46,43,0.08);color:var(--color-primary);font-size:0.75rem;">
+                {{ c.client.nom|first|upper }}
+              </div>
+              <span class="fw-bold">{{ c.client.nom }}</span>
+            </div>
+          </td>
+          <td><span class="fw-semibold text-dark">{{ c.nom }}</span></td>
+          <td class="text-muted"><i class="bi bi-calendar3 me-1"></i>{{ c.date_debut|date:"d/m/Y" }}</td>
+          <td class="text-muted"><i class="bi bi-calendar-check me-1"></i>{{ c.date_fin|date:"d/m/Y" }}</td>
+          <td class="text-center">
+            <span class="badge bg-light text-dark border px-2">{{ c.nb_supports }}</span>
           </td>
           <td>
-            <a href="{% url 'campagne_detail' c.pk %}" class="btn btn-sm btn-outline-secondary">
-              <i class="bx bx-show"></i>
+            {% if c.statut == 'en_cours' %}
+              <span class="badge-status bs-en_cours">En cours</span>
+            {% elif c.statut == 'a_venir' %}
+              <span class="badge-status bs-a_venir">À venir</span>
+            {% elif c.statut == 'termine' %}
+              <span class="badge-status bs-terminee">Terminée</span>
+            {% else %}
+              <span class="badge-status bs-brouillon">{{ c.get_statut_display }}</span>
+            {% endif %}
+          </td>
+          <td class="text-end">
+            <a href="{% url 'campagne_detail' c.pk %}" class="btn btn-sm btn-outline-secondary py-1 px-2" title="Voir le détail">
+              <i class="bi bi-eye"></i>
             </a>
           </td>
         </tr>
         {% empty %}
         <tr>
-          <td colspan="8" class="text-center py-5" style="color:var(--text-muted)">
-            <i class="bx bx-megaphone d-block mb-2" style="font-size:1.8rem"></i>
-            Aucune campagne. <a href="{% url 'campagne_create' %}">Créer la première</a>
+          <td colspan="8" class="text-center py-5 text-muted">
+            <i class="bi bi-megaphone fs-1 d-block mb-2 opacity-50"></i>
+            <p class="mb-2">Aucune campagne récente enregistrée.</p>
+            <a href="{% url 'campagne_create' %}" class="btn btn-sm btn-primary">
+              <i class="bi bi-plus-lg me-1"></i>Créer la première campagne
+            </a>
           </td>
         </tr>
         {% endfor %}
@@ -517,12 +836,10 @@
 {{ top_faces_json|json_script:"top-faces" }}
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
 (function () {
   const cs        = getComputedStyle(document.documentElement);
-  const C_PRIMARY = cs.getPropertyValue('--color-primary').trim() || '#6366f1';
+  const C_PRIMARY = cs.getPropertyValue('--color-primary').trim() || '#932e2b';
   const C_OCCUPE  = '#ef4444';
   const C_RESERVE = '#f59e0b';
   const C_LIBRE   = '#10b981';
@@ -543,7 +860,7 @@
   );
   const tStats = safeJSON('types-stats');
 
-  // ── Graphique occupation par format — barres horizontales ──
+  // ── 1. Graphique d'occupation par format — barres horizontales ──
   const ctxOcc = document.getElementById('chartOccupation');
   if (ctxOcc && fStats.length) {
     new Chart(ctxOcc, {
@@ -562,18 +879,23 @@
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11 }, padding: 12 } },
-          tooltip: { callbacks: { label: ctx => ` ${ctx.dataset.label} : ${ctx.parsed.x} face(s)` } },
+          legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 11, family: 'Inter' }, padding: 12 } },
+          tooltip: {
+            backgroundColor: '#0f172a',
+            padding: 10,
+            cornerRadius: 8,
+            callbacks: { label: ctx => ` ${ctx.dataset.label} : ${ctx.parsed.x} face(s)` }
+          },
         },
         scales: {
-          x: { grid: { color: 'rgba(0,0,0,.05)' }, ticks: { font: { size: 11 } } },
-          y: { grid: { display: false }, ticks: { font: { size: 11 } } },
+          x: { grid: { color: 'rgba(0,0,0,0.05)' }, ticks: { font: { size: 11, family: 'Inter' } } },
+          y: { grid: { display: false }, ticks: { font: { size: 11, family: 'Inter', weight: 600 } } },
         },
       },
     });
   }
 
-  // ── Graphique répartition du parc — donut ──
+  // ── 2. Graphique répartition du parc — donut ──
   const ctxTypes = document.getElementById('chartTypes');
   if (ctxTypes && tStats.length) {
     new Chart(ctxTypes, {
@@ -593,14 +915,18 @@
         cutout: '72%',
         plugins: {
           legend: { display: false },
-          tooltip: { callbacks: { label: ctx => ` ${ctx.label} : ${ctx.parsed}` } },
+          tooltip: {
+            backgroundColor: '#0f172a',
+            padding: 8,
+            cornerRadius: 6,
+            callbacks: { label: ctx => ` ${ctx.label} : ${ctx.parsed}` }
+          },
         },
       },
     });
   }
 
-  // ── Mini-donuts par catégorie (chart-{{ cat.slug }}) — générés dynamiquement,
-  //    au lieu d'IDs codés en dur qui ne correspondaient plus au HTML ──
+  // ── 3. Mini-donuts par format ──
   const MINI_OPTS = {
     responsive: false,
     cutout: '68%',
@@ -625,53 +951,66 @@
       [C_OCCUPE, C_RESERVE, C_LIBRE, C_PANNE]);
   });
 
-  miniDonut('chartEcrans', [{{ nb_ecrans_bon }}, {{ nb_ecrans_panne }}], ['#10b981', '#94a3b8']);
+  miniDonut('chartEcrans', [{{ nb_ecrans_bon|default:0 }}, {{ nb_ecrans_panne|default:0 }}], ['#10b981', '#94a3b8']);
 
-  // ── Listes top campagnes / top faces ──
+  // ── 4. Rendu des listes Top Campagnes & Top Faces ──
   const topCampaigns = safeJSON('top-campaigns');
   const topCampaignsList = document.getElementById('topCampaignsList');
   if (topCampaignsList && topCampaigns.length) {
-    topCampaigns.forEach(c => {
+    topCampaigns.forEach((c, idx) => {
+      const rankClass = idx === 0 ? 'rank-1' : idx === 1 ? 'rank-2' : idx === 2 ? 'rank-3' : 'rank-n';
       const item = document.createElement('div');
-      item.className = 'd-flex justify-content-between align-items-center gap-3 border-bottom pb-2';
+      item.className = 'top-item-row';
       item.innerHTML = `
-        <div class="flex-grow-1">
-          <div class="fw-bold">${c.label}</div>
-          <div class="small text-muted">${c.client} · ${c.type}</div>
+        <div class="d-flex align-items-center gap-2.5 min-width-0">
+          <div class="rank-badge ${rankClass}">#${idx + 1}</div>
+          <div class="text-truncate">
+            <div class="fw-bold text-dark text-truncate" style="font-size:0.86rem;">${c.label}</div>
+            <div class="small text-muted text-truncate">${c.client} · <span class="badge bg-light text-dark border px-1.5">${c.type}</span></div>
+          </div>
         </div>
-        <div class="text-end">
-          <div class="fw-bold">${c.revenu.toLocaleString('fr-FR')} FCFA</div>
-          <a href="/gestion/campaigns/campaigns/${c.pk}/" class="small text-decoration-none">Détail</a>
+        <div class="text-end flex-shrink-0">
+          <div class="fw-bold text-dark" style="font-size:0.88rem;">${c.revenu.toLocaleString('fr-FR')} <span class="small text-muted">FCFA</span></div>
+          <a href="/gestion/campaigns/campagnes/${c.pk}/" class="small fw-semibold text-primary">Détail →</a>
         </div>`;
       topCampaignsList.appendChild(item);
     });
+  } else if (topCampaignsList) {
+    topCampaignsList.innerHTML = '<p class="text-muted small text-center py-3 mb-0">Aucune campagne à afficher</p>';
   }
 
   const topFaces = safeJSON('top-faces');
   const topFacesList = document.getElementById('topFacesList');
   if (topFacesList && topFaces.length) {
-    topFaces.forEach(f => {
+    topFaces.forEach((f, idx) => {
+      const rankClass = idx === 0 ? 'rank-1' : idx === 1 ? 'rank-2' : idx === 2 ? 'rank-3' : 'rank-n';
       const item = document.createElement('div');
-      item.className = 'd-flex justify-content-between align-items-center gap-3 border-bottom pb-2';
+      item.className = 'top-item-row';
       item.innerHTML = `
-        <div class="flex-grow-1">
-          <div class="fw-bold">${f.label}</div>
-          <div class="small text-muted">${f.usage} campagne(s)</div>
+        <div class="d-flex align-items-center gap-2.5 min-width-0">
+          <div class="rank-badge ${rankClass}">#${idx + 1}</div>
+          <div class="text-truncate">
+            <div class="fw-bold text-dark text-truncate" style="font-size:0.86rem;">${f.label}</div>
+            <div class="small text-muted"><i class="bi bi-layers me-1"></i>${f.usage} campagne(s)</div>
+          </div>
         </div>
-        <div class="text-end">
-          <div class="fw-bold">${f.revenue.toLocaleString('fr-FR')} FCFA</div>
+        <div class="text-end flex-shrink-0">
+          <div class="fw-bold text-dark" style="font-size:0.88rem;">${f.revenue.toLocaleString('fr-FR')} <span class="small text-muted">FCFA</span></div>
         </div>`;
       topFacesList.appendChild(item);
     });
+  } else if (topFacesList) {
+    topFacesList.innerHTML = '<p class="text-muted small text-center py-3 mb-0">Aucune donnée disponible</p>';
   }
 })();
 </script>
 
 <script>
+/* ── Fonctions pour le Modal AJAX ── */
 function openCustomModal(title) {
     document.getElementById('custom-modal-title').textContent = title;
     document.getElementById('custom-modal-body').innerHTML =
-        '<div class="text-center py-4"><div class="spinner-border text-primary"></div></div>';
+        '<div class="text-center py-5"><div class="spinner-border text-primary" role="status"></div><p class="text-muted mt-2 small">Chargement...</p></div>';
     document.getElementById('custom-modal-overlay').style.display = 'flex';
     document.body.style.overflow = 'hidden';
 }
@@ -686,70 +1025,9 @@ function loadModalContent(url, title) {
         .then(html => { document.getElementById('custom-modal-body').innerHTML = html; })
         .catch(() => {
             document.getElementById('custom-modal-body').innerHTML =
-                '<p class="text-danger text-center py-3">Erreur de chargement.</p>';
+                '<p class="text-danger text-center py-4"><i class="bi bi-exclamation-triangle fs-3 d-block mb-2"></i>Erreur de chargement des données.</p>';
         });
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeCustomModal(); });
-</script>
-<script>
-(function () {
-  const OPTS = {
-    responsive: false,
-    cutout: '68%',
-    plugins: { legend: { display: false }, tooltip: { enabled: false } },
-    animation: { duration: 600 },
-  };
- 
-  function miniDonut(id, data, colors) {
-    const el = document.getElementById(id);
-    if (!el) return;
-    const total = data.reduce((a, b) => a + b, 0);
-    if (total === 0) return;
-    new Chart(el, {
-      type: 'doughnut',
-      data: {
-        datasets: [{
-          data,
-          backgroundColor: colors,
-          borderWidth: 2,
-          borderColor: '#fff',
-          hoverOffset: 4,
-        }],
-      },
-      options: OPTS,
-    });
-  }
- 
-  // Écrans
-  miniDonut('chartEcrans',
-    [{{ nb_ecrans_bon }}, {{ nb_ecrans_panne }}],
-    ['#10b981', '#94a3b8']
-  );
- 
-  // Standard
-  miniDonut('chartStandard',
-    [{{ nbo_std }}, {{ nbr_std }}, {{ nbl_std }}, {{ npt_std }}],
-    ['#ef4444', '#f59e0b', '#10b981', '#94a3b8']
-  );
- 
-  // Géants
-  miniDonut('chartGeants',
-    [{{ nbo_geo }}, {{ nbr_geo }}, {{ nbl_geo }}, {{ npt_geo }}],
-    ['#ef4444', '#f59e0b', '#10b981', '#94a3b8']
-  );
- 
-  // Sucettes
-  miniDonut('chartSucettes',
-    [{{ nbo_suc }}, {{ nbr_suc }}, {{ nbl_suc }}, {{ npt_suc }}],
-    ['#ef4444', '#f59e0b', '#10b981', '#94a3b8']
-  );
- 
-  // Marché
-  miniDonut('chartMarche',
-    [{{ nbo_gm }}, {{ nbr_gm }}, {{ nbl_gm }}, {{ npt_gm }}],
-    ['#ef4444', '#f59e0b', '#10b981', '#94a3b8']
-  );
- 
-})();
 </script>
 {% endblock %}

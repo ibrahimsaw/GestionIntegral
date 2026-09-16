@@ -1,230 +1,306 @@
 {% extends 'base.html' %}
 {% load static %}
-{% block title %}{{ support.code }} — Integral{% endblock %}
+{% block title %}{{ support.code }} — {{ support.nom }} — Integral{% endblock %}
+
 {% block topbar_title %}
-  <i class="bi {% if support.type_support == 'panneau' %}bi-sign-merge-right{% else %}bi-display{% endif %} me-2" style="color:var(--color-primary)"></i>
-  {{ support.code }} — {{ support.nom }}
+  <div class="d-flex align-items-center gap-2">
+    <div class="d-inline-flex align-items-center justify-content-center rounded-3 p-2" style="background: rgba(147, 46, 43, 0.08); color: var(--color-primary);">
+      <i class="bi {% if support.type_support == 'panneau' %}bi-sign-merge-right{% else %}bi-display{% endif %} fs-5"></i>
+    </div>
+    <div class="min-width-0">
+      <div class="d-flex align-items-center gap-2">
+        <span class="fw-bold text-truncate">{{ support.nom }}</span>
+        <span class="badge bg-light text-dark border font-monospace px-2 py-0.5" style="font-size:0.75rem;">{{ support.code }}</span>
+      </div>
+      <div class="text-muted d-none d-sm-block" style="font-size:0.75rem;">
+        <i class="bi bi-geo-alt me-1"></i>{{ support.quartier|default:"" }}{% if support.quartier and support.ville %}, {% endif %}{{ support.ville|default:"" }}
+      </div>
+    </div>
+  </div>
 {% endblock %}
+
 {% block topbar_actions %}
   <div class="d-flex flex-wrap gap-2">
-    <a href="{% url 'support_periodes_panne' support.pk %}" class="btn btn-outline-danger btn-sm rounded-pill px-3 shadow-sm">
+    <a href="{% url 'support_periodes_panne' support.pk %}" class="btn btn-outline-danger btn-sm shadow-sm">
       <i class="bi bi-clock-history me-1"></i>
       <span class="d-none d-md-inline">Périodes de panne</span>
     </a>
     {% if user.is_staff_regie_role %}
-    <a href="{% url 'support_edit' support.uuid %}" class="btn btn-outline-secondary btn-sm rounded-pill px-3 shadow-sm">
+    <a href="{% url 'support_edit' support.uuid %}" class="btn btn-outline-secondary btn-sm shadow-sm">
       <i class="bi bi-pencil me-1"></i>
       <span class="d-none d-md-inline">Modifier</span>
     </a>
     {% endif %}
     {% if user.is_technicien_role or user.is_staff_regie_role %}
-    <a href="{% url 'maintenance_create' support.pk %}" class="btn btn-outline-warning btn-sm rounded-pill px-3 shadow-sm text-dark fw-semibold" style="background: rgba(245, 158, 11, 0.1); border-color: rgba(245, 158, 11, 0.3);">
-      <i class="bi bi-tools text-warning me-1"></i>
+    <a href="{% url 'maintenance_create' support.pk %}" class="btn btn-warning btn-sm shadow-sm text-dark fw-semibold" style="background:#fef3c7; border-color:#fcd34d;">
+      <i class="bi bi-tools text-warning-emphasis me-1"></i>
       <span class="d-none d-md-inline">Maintenance</span>
     </a>
     {% endif %}
     {% if user.is_admin %}
-    <a href="{% url 'support_delete' support.uuid %}" class="btn btn-outline-danger btn-sm rounded-pill px-2.5 shadow-sm" title="Supprimer le support">
+    <a href="{% url 'support_delete' support.uuid %}" class="btn btn-outline-danger btn-sm shadow-sm px-2.5" title="Supprimer le support">
       <i class="bi bi-trash"></i>
     </a>
     {% endif %}
   </div>
 {% endblock %}
 
-{% block content %}
+{% block extra_head %}
 <style>
-  .detail-card {
+  /* ══════════════════════════════════════════════════════════════════
+     SUPPORT DETAIL — STYLES & THÈME
+     ══════════════════════════════════════════════════════════════════ */
+  .sd-card {
+    background: #ffffff;
     border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--bg-card);
-    box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+    border-radius: var(--radius-lg, 14px);
+    box-shadow: var(--shadow-sm);
     overflow: hidden;
-    margin-bottom: 20px;
-    transition: box-shadow 0.2s ease;
+    margin-bottom: 22px;
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
   }
-  .detail-card:hover {
-    box-shadow: 0 8px 24px rgba(0,0,0,0.06);
+  .sd-card:hover {
+    box-shadow: var(--shadow-md);
   }
-  .detail-card-hd {
-    padding: 14px 20px;
+  .sd-card-header {
+    padding: 14px 18px;
     border-bottom: 1px solid var(--border);
-    font-size: 0.85rem;
-    font-weight: 800;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
     background: #f8fafc;
-    letter-spacing: 0.3px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: var(--text-dark);
   }
-  .info-table-row {
+  .sd-card-header h2 {
+    font-size: 0.88rem;
+    font-weight: 700;
+    color: var(--text-dark);
+    margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  /* Table d'informations techniques */
+  .sd-spec-row {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 11px 20px;
-    border-bottom: 1px solid var(--border);
-    font-size: 0.85rem;
+    padding: 10px 18px;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 0.84rem;
   }
-  .info-table-row:last-child {
+  .sd-spec-row:last-child {
     border-bottom: none;
   }
-  .info-table-label {
+  .sd-spec-label {
     color: var(--text-muted);
-    font-size: 0.72rem;
-    font-family: var(--mono);
+    font-size: 0.76rem;
+    font-weight: 600;
     text-transform: uppercase;
-    letter-spacing: 0.6px;
-    font-weight: 700;
+    letter-spacing: 0.04em;
+    display: flex;
+    align-items: center;
+    gap: 6px;
   }
-  .info-table-val {
+  .sd-spec-value {
     font-weight: 600;
     text-align: right;
-    color: var(--text);
+    color: var(--text-dark);
   }
-  .face-box {
-    border-radius: 14px;
+
+  /* Cartes des Faces */
+  .face-card {
+    border-radius: var(--radius-md, 10px);
     border: 1px solid var(--border);
-    background: var(--bg-card);
+    background: #ffffff;
     overflow: hidden;
+    box-shadow: var(--shadow-xs);
     transition: transform 0.2s ease, box-shadow 0.2s ease;
-  }
-  .face-box:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 20px rgba(0,0,0,0.06);
-  }
-  .face-box-libre {
-    border-top: 4px solid #10b981;
-  }
-  .face-box-occupe {
-    border-top: 4px solid #ef4444;
-  }
-  .face-box-reserve {
-    border-top: 4px solid #f59e0b;
-  }
-  .metric-kpi-card {
-    background: #f8fafc;
-    border: 1px solid var(--border);
-    border-radius: 12px;
-    padding: 14px 16px;
+    height: 100%;
     display: flex;
     flex-direction: column;
-    gap: 6px;
-    transition: all 0.2s ease;
   }
-  .metric-kpi-card:hover {
-    background: #ffffff;
-    border-color: rgba(13, 110, 253, 0.3);
-    box-shadow: 0 4px 12px rgba(0,0,0,0.04);
+  .face-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
   }
-  .mc {
-    background: var(--bg-card);
+  .face-card.is-libre {
+    border-top: 4px solid #10b981;
+  }
+  .face-card.is-occupe {
+    border-top: 4px solid #ef4444;
+  }
+  .face-card.is-reserve {
+    border-top: 4px solid #f59e0b;
+  }
+  .face-media-frame {
+    width: 100%;
+    height: 170px;
+    background: #0f172a;
+    position: relative;
+    overflow: hidden;
+  }
+  .face-media-frame img, .face-media-frame video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    transition: transform 0.3s ease;
+  }
+  .face-card:hover .face-media-frame img {
+    transform: scale(1.03);
+  }
+
+  /* Cartes métriques pour écran */
+  .telemetry-kpi {
+    background: #f8fafc;
     border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 8px 14px;
-    display: inline-flex;
+    border-radius: var(--radius-md, 10px);
+    padding: 12px 14px;
+    display: flex;
     flex-direction: column;
-    min-width: 120px;
+    gap: 4px;
+    transition: all 0.16s ease;
   }
-  .ml {
-    font-size: 0.68rem;
-    font-family: var(--mono);
-    color: var(--text-muted);
-    text-transform: uppercase;
+  .telemetry-kpi:hover {
+    background: #ffffff;
+    border-color: #cbd5e1;
+    box-shadow: var(--shadow-xs);
   }
-  .mv {
-    font-size: 1.1rem;
-    font-weight: 800;
-    color: var(--color-primary);
+
+  /* Timeline canvas */
+  .frise-box {
+    background: #ffffff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md, 10px);
+    padding: 12px;
+    overflow-x: auto;
   }
-  .mu {
-    font-size: 0.75rem;
-    margin-left: 2px;
-    color: var(--text-muted);
+
+  /* Timeline maintenance */
+  .maintenance-timeline-item {
+    padding: 12px 18px;
+    border-bottom: 1px solid #f1f5f9;
+    transition: background-color 0.15s ease;
+  }
+  .maintenance-timeline-item:hover {
+    background-color: #f8fafc;
+  }
+  .maintenance-timeline-item:last-child {
+    border-bottom: none;
   }
 </style>
+{% endblock %}
 
-<div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
+{% block content %}
+<!-- ══════════════════════════════════════════════════════════════════
+     BANDEAU D'EN-TÊTE DU SUPPORT
+     ══════════════════════════════════════════════════════════════════ -->
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4" data-aos="fade-up">
   <div class="d-flex align-items-center gap-3">
-    <a href="javascript:void(0)" onclick="history.back()" class="btn btn-outline-secondary btn-sm rounded-circle d-flex align-items-center justify-content-center" style="width:36px;height:36px">
+    <a href="javascript:void(0)" onclick="history.back()" class="btn btn-outline-secondary btn-sm rounded-circle d-flex align-items-center justify-content-center" style="width:36px;height:36px;" title="Retour">
       <i class="bi bi-arrow-left"></i>
     </a>
     <div>
-      <div class="d-flex align-items-center gap-2">
-        <h1 style="font-size:1.4rem;font-weight:800;margin:0">{{ support.nom }}</h1>
-        <span class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace px-2.5 py-1 rounded-pill">{{ support.code }}</span>
+      <div class="d-flex align-items-center flex-wrap gap-2">
+        <h1 style="font-size:1.35rem; font-weight:800; margin:0; color:var(--text-dark);">{{ support.nom }}</h1>
+        <span class="badge bg-light text-dark border font-monospace px-2.5 py-1">{{ support.code }}</span>
+        <span class="badge-status {% if support.etat == 'bon' %}bs-disponible{% elif support.etat == 'maintenance' %}bs-occupe{% else %}bs-maintenance{% endif %}">
+          {{ support.get_etat_display }}
+        </span>
       </div>
-      <p style="color:var(--text-muted);font-size:.82rem;margin:2px 0 0">
-        <i class="bi bi-geo-alt me-1"></i>{{ support.adresse|default:"Adresse non renseignée" }}{% if support.quartier %}, {{ support.quartier }}{% endif %}{% if support.ville %} — {{ support.ville }}{% endif %}
+      <p class="text-muted mb-0 mt-1" style="font-size:0.84rem;">
+        <i class="bi bi-geo-alt-fill text-danger me-1"></i>{{ support.adresse|default:"Adresse non renseignée" }}{% if support.quartier %}, {{ support.quartier }}{% endif %}{% if support.ville %} — <strong>{{ support.ville }}</strong>{% endif %}
       </p>
     </div>
+  </div>
+
+  <div class="d-flex align-items-center gap-2">
+    <a href="{% url 'carte' %}?support={{ support.pk }}" class="btn btn-sm btn-primary shadow-sm">
+      <i class="bi bi-map-fill me-1"></i>Voir sur la carte
+    </a>
   </div>
 </div>
 
 <div class="row g-4">
-  <!-- Colonne Gauche -->
-  <div class="col-lg-4">
-    <!-- Photo Principale -->
+  <!-- ══════════════════════════════════════════════════════════════════
+       COLONNE GAUCHE (PHOTO, FICHE TECHNIQUE, LOCALISATION, MAINTENANCES)
+       ══════════════════════════════════════════════════════════════════ -->
+  <div class="col-12 col-lg-4" data-aos="fade-up" data-aos-delay="50">
+
+    <!-- 1. Photo Principale -->
     {% if support.photo_principale %}
-    <div class="detail-card">
-      <div class="card-body p-0 position-relative">
-        <img src="{{ support.photo_principale.url }}" alt="Photo principale du support {{ support.code }}" loading="lazy" style="width:100%;height:240px;object-fit:cover;display:block">
-        <div class="position-absolute bottom-0 start-0 end-0 p-2 d-flex justify-content-between align-items-end" style="background: linear-gradient(180deg, transparent 0%, rgba(0,0,0,0.6) 100%);">
+    <div class="sd-card">
+      <div class="position-relative overflow-hidden" style="height:230px; background:#0f172a;">
+        <img src="{{ support.photo_principale.url }}" alt="Support {{ support.code }}" loading="lazy" style="width:100%; height:100%; object-fit:cover; display:block;">
+        <div class="position-absolute bottom-0 start-0 end-0 p-2.5 d-flex justify-content-between align-items-end" style="background: linear-gradient(180deg, transparent 0%, rgba(15,23,42,0.75) 100%);">
           <span class="badge bg-dark bg-opacity-75 text-white font-monospace text-uppercase" style="font-size:0.7rem;">
-            <i class="bi bi-camera me-1"></i>Vue principale
+            <i class="bi bi-camera me-1"></i>Photo Principale
+          </span>
+          <span class="badge bg-light text-dark border font-monospace" style="font-size:0.7rem;">
+            {{ support.get_type_support_display }}
           </span>
         </div>
       </div>
     </div>
     {% endif %}
 
-    <!-- Fiche Technique -->
-    <div class="detail-card">
-      <div class="detail-card-hd">
-        <span><i class="bi bi-info-circle me-2 text-primary"></i>Fiche Technique</span>
+    <!-- 2. Fiche Technique -->
+    <div class="sd-card">
+      <div class="sd-card-header">
+        <h2><i class="bi bi-info-circle-fill text-primary"></i>Fiche Technique</h2>
         <span class="badge bg-light text-dark border">{{ support.get_type_support_display }}</span>
       </div>
-      <div class="card-body p-0">
+      <div>
         {% for label, value in info_rows %}
-        <div class="info-table-row">
-          <span class="info-table-label">{{ label }}</span>
-          <span class="info-table-val">{{ value }}</span>
+        <div class="sd-spec-row">
+          <span class="sd-spec-label">{{ label }}</span>
+          <span class="sd-spec-value">{{ value }}</span>
         </div>
         {% endfor %}
-        <div class="info-table-row">
-          <span class="info-table-label">État</span>
-          <span class="badge-status {% if support.etat == 'bon' %}bs-disponible{% elif support.etat == 'maintenance' %}bs-occupe{% else %}bs-maintenance{% endif %}">{{ support.get_etat_display }}</span>
+        <div class="sd-spec-row">
+          <span class="sd-spec-label">État Opérationnel</span>
+          <span class="badge-status {% if support.etat == 'bon' %}bs-disponible{% elif support.etat == 'maintenance' %}bs-occupe{% else %}bs-maintenance{% endif %}">
+            {{ support.get_etat_display }}
+          </span>
         </div>
         {% if support.type_support == 'ecran' %}
-        <div class="info-table-row">
-          <span class="info-table-label">Occupation</span>
+        <div class="sd-spec-row">
+          <span class="sd-spec-label">Taux d'Occupation</span>
           {% if support.is_occupe %}
-          <span class="badge-status bs-occupe"><i class="bi bi-broadcast me-1"></i>Occupé ({{ support.taux_occupation_pourcentage }}%)</span>
+            <span class="badge-status bs-occupe"><i class="bi bi-broadcast me-1"></i>{{ support.taux_occupation_pourcentage }}%</span>
           {% else %}
-          <span class="badge-status bs-disponible"><i class="bi bi-check2 me-1"></i>Disponible</span>
+            <span class="badge-status bs-disponible"><i class="bi bi-check2 me-1"></i>Disponible</span>
           {% endif %}
         </div>
         {% endif %}
       </div>
     </div>
 
-    <!-- Mini Carte & Localisation -->
-    <div class="detail-card">
-      <div class="detail-card-hd">
-        <span><i class="bi bi-pin-map me-2 text-danger"></i>Localisation</span>
-        <a href="{% url 'carte' %}?support={{ support.pk }}" class="btn btn-xs btn-outline-primary rounded-pill px-2 py-0.5" style="font-size:0.72rem;">Ouvrir la carte</a>
+    <!-- 3. Localisation GPS & Mini Carte -->
+    <div class="sd-card">
+      <div class="sd-card-header">
+        <h2><i class="bi bi-pin-map-fill text-danger"></i>Localisation GPS</h2>
+        <a href="{% url 'carte' %}?support={{ support.pk }}" class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size:0.72rem;">
+          Plein écran <i class="bi bi-arrow-up-right ms-1"></i>
+        </a>
       </div>
-      <div class="card-body p-0">
-        <div id="mini-map" style="height:210px;overflow:hidden;cursor:pointer"></div>
+      <div class="p-0 position-relative">
+        <div id="mini-map" style="height:210px; width:100%; cursor:pointer;"></div>
       </div>
-      <div class="p-3 bg-light border-top" style="font-size:.82rem">
+      <div class="p-3 bg-light border-top" style="font-size:0.82rem;">
         <div class="d-flex justify-content-between align-items-center">
           <div>
-            <div class="info-table-label mb-1">Coordonnées GPS</div>
-            <div class="font-monospace fw-semibold text-primary" style="font-size:0.8rem">
+            <div class="sd-spec-label mb-1">Coordonnées GPS</div>
+            <div class="font-monospace fw-bold text-primary" style="font-size:0.82rem;">
               {{ support.latitude|default:"—" }}, {{ support.longitude|default:"—" }}
             </div>
           </div>
           {% if support.marche %}
-          <a href="{% url 'marche_detail' support.marche.pk %}" class="btn btn-sm btn-outline-secondary rounded-pill">
+          <a href="{% url 'marche_detail' support.marche.pk %}" class="btn btn-sm btn-outline-secondary">
             <i class="bi bi-shop me-1 text-warning"></i>{{ support.marche.nom }}
           </a>
           {% endif %}
@@ -232,117 +308,122 @@
       </div>
     </div>
 
-    <!-- Historique des Maintenances -->
-    <div class="detail-card">
-      <div class="detail-card-hd">
-        <span><i class="bi bi-tools me-2 text-warning"></i>Historique des Maintenances</span>
-        <span class="badge bg-light text-dark border font-monospace">{{ maintenances|length }}</span>
+    <!-- 4. Historique des Maintenances -->
+    <div class="sd-card">
+      <div class="sd-card-header">
+        <h2><i class="bi bi-tools text-warning"></i>Maintenances Récentes</h2>
+        <span class="badge bg-light text-dark border">{{ maintenances|length }}</span>
       </div>
-      <div class="card-body p-0">
+      <div>
         {% for m in maintenances %}
-        <div class="p-3 border-bottom" style="font-size:.84rem">
+        <div class="maintenance-timeline-item">
           <div class="d-flex justify-content-between align-items-center mb-1">
             <span class="badge-status {% if m.etat_apres == 'bon' %}bs-disponible{% elif m.etat_apres == 'maintenance' %}bs-occupe{% else %}bs-panne{% endif %}">
               {{ m.get_etat_apres_display }}
             </span>
-            <span class="text-muted font-monospace" style="font-size:.72rem">{{ m.date_intervention|date:"d/m/Y H:i" }}</span>
+            <span class="text-muted font-monospace" style="font-size:0.72rem;">{{ m.date_intervention|date:"d/m/Y H:i" }}</span>
           </div>
-          <div class="text-secondary small mt-1">{{ m.description|default:"Intervention de routine" }}</div>
-          <div class="text-muted mt-1" style="font-size:.72rem">
+          <div class="text-dark small fw-semibold mt-1">{{ m.description|default:"Intervention technique de routine" }}</div>
+          <div class="text-muted small mt-1" style="font-size:0.72rem;">
             <i class="bi bi-person me-1"></i>{{ m.effectue_par.get_full_name|default:m.effectue_par.username }}
           </div>
         </div>
         {% empty %}
         <div class="text-center py-4 text-muted small">
-          <i class="bi bi-tools d-block mb-1" style="font-size:1.5rem;opacity:0.3"></i>
-          Aucune maintenance enregistrée.
+          <i class="bi bi-shield-check fs-2 d-block mb-1 text-success opacity-50"></i>
+          Aucune panne ou intervention enregistrée.
         </div>
         {% endfor %}
       </div>
     </div>
+
   </div>
 
-  <!-- Colonne Droite -->
-  <div class="col-lg-8">
+  <!-- ══════════════════════════════════════════════════════════════════
+       COLONNE DROITE (FACES PANNEAU, ÉCRAN NUMÉRIQUE, CAMPAGNES, PHOTOS)
+       ══════════════════════════════════════════════════════════════════ -->
+  <div class="col-12 col-lg-8" data-aos="fade-up" data-aos-delay="100">
 
-    <!-- Faces panneau -->
+    <!-- 1. Faces du Panneau Statique -->
     {% if support.type_support == 'panneau' %}
-    <div class="detail-card">
-      <div class="detail-card-hd">
-        <span><i class="bi bi-sign-merge-right me-2 text-primary"></i>Faces du Panneau</span>
-        <span class="badge bg-light text-dark border">{{ support.faces.count }} Face{{ support.faces.count|pluralize }}</span>
+    <div class="sd-card">
+      <div class="sd-card-header">
+        <h2><i class="bi bi-sign-merge-right-fill text-primary"></i>Faces du Panneau</h2>
+        <span class="badge bg-light text-dark border">{{ support.faces.count }} Face{{ support.faces.count|pluralize:",s" }}</span>
       </div>
-      <div class="card-body p-3 p-md-4">
+      <div class="p-3 p-md-4">
         <div class="row g-3">
           {% for face in support.faces.all %}
             {% with statut=face.get_statut %}
-            <div class="col-md-6">
-              <div class="face-box {% if statut == 'libre' %}face-box-libre{% elif statut == 'reserve' %}face-box-reserve{% else %}face-box-occupe{% endif %}">
-                {% with camp=face.get_campagne_active %}
-                  {% if camp %}
-                    {% with visuel=camp.visuels.first %}
-                      {% if visuel %}
-                        {% with visuel_name=visuel.fichier.name|lower %}
-                          {% if "mp4" in visuel_name %}
-                            <video controls playsinline style="width:100%;height:160px;object-fit:cover;display:block;background:#000">
-                              <source src="{{ visuel.fichier.url }}" type="video/mp4">
-                              Votre navigateur ne peut pas lire cette vidéo.
-                            </video>
-                          {% elif "webm" in visuel_name %}
-                            <video controls playsinline style="width:100%;height:160px;object-fit:cover;display:block;background:#000">
-                              <source src="{{ visuel.fichier.url }}" type="video/webm">
-                              Votre navigateur ne peut pas lire cette vidéo.
-                            </video>
-                          {% else %}
-                            <img src="{{ visuel.fichier.url }}" style="width:100%;height:160px;object-fit:cover;display:block">
-                          {% endif %}
-                        {% endwith %}
-                      {% elif face.photo %}
-                        <img src="{{ face.photo.url }}" alt="Photo face {{ face.label }}" loading="lazy" style="width:100%;height:160px;object-fit:cover;display:block">
-                      {% else %}
-                        <img src="{% static 'img/logo.png' %}" alt="Logo" loading="lazy" style="width:100%;height:160px;object-fit:cover;display:block">
-                      {% endif %}
-                    {% endwith %}
-                  {% elif face.photo %}
-                    <img src="{{ face.photo.url }}" alt="Photo face {{ face.label }}" loading="lazy" style="width:100%;height:160px;object-fit:cover;display:block">
-                  {% else %}
-                    <img src="{% static 'img/logo.png' %}" alt="Logo" loading="lazy" style="width:100%;height:160px;object-fit:cover;display:block">
-                  {% endif %}
-                {% endwith %}
-
-                <div class="p-3">
-                  <div class="d-flex justify-content-between align-items-center mb-2">
-                    <span class="fw-bold fs-6">Face {{ face.label }}</span>
-                    {% if statut == 'libre' %}
-                      <span class="badge-status bs-disponible">LIBRE</span>
-                    {% elif statut == 'reserve' %}
-                      <span class="badge-status bs-reserve">RÉSERVÉE</span>
+            <div class="col-12 col-md-6">
+              <div class="face-card {% if statut == 'libre' %}is-libre{% elif statut == 'reserve' %}is-reserve{% else %}is-occupe{% endif %}">
+                <div class="face-media-frame">
+                  {% with camp=face.get_campagne_active %}
+                    {% if camp %}
+                      {% with visuel=camp.visuels.first %}
+                        {% if visuel %}
+                          {% with visuel_name=visuel.fichier.name|lower %}
+                            {% if "mp4" in visuel_name %}
+                              <video controls playsinline>
+                                <source src="{{ visuel.fichier.url }}" type="video/mp4">
+                              </video>
+                            {% elif "webm" in visuel_name %}
+                              <video controls playsinline>
+                                <source src="{{ visuel.fichier.url }}" type="video/webm">
+                              </video>
+                            {% else %}
+                              <img src="{{ visuel.fichier.url }}" alt="Visuel {{ camp.nom }}">
+                            {% endif %}
+                          {% endwith %}
+                        {% elif face.photo %}
+                          <img src="{{ face.photo.url }}" alt="Face {{ face.label }}">
+                        {% else %}
+                          <img src="{% static 'img/logo.png' %}" alt="Integral Logo">
+                        {% endif %}
+                      {% endwith %}
+                    {% elif face.photo %}
+                      <img src="{{ face.photo.url }}" alt="Face {{ face.label }}">
                     {% else %}
-                      <span class="badge-status bs-occupe">OCCUPÉE</span>
+                      <img src="{% static 'img/logo.png' %}" alt="Integral Logo">
                     {% endif %}
-                  </div>
+                  {% endwith %}
+                </div>
 
-                  <div class="text-muted small mb-2 d-flex align-items-center gap-2">
-                    <span class="badge bg-light text-secondary border font-monospace">{{ support.get_format_display|default:"12m²" }}</span>
-                    {% if face.eclairage %}
-                      <span class="badge bg-light text-secondary border"><i class="bi bi-lightbulb me-1"></i>{{ face.get_eclairage_display }}</span>
-                    {% endif %}
+                <div class="p-3 flex-grow-1 d-flex flex-column justify-content-between">
+                  <div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                      <span class="fw-bold fs-6 text-dark">Face {{ face.label }}</span>
+                      {% if statut == 'libre' %}
+                        <span class="badge-status bs-disponible">LIBRE</span>
+                      {% elif statut == 'reserve' %}
+                        <span class="badge-status bs-reserve">RÉSERVÉE</span>
+                      {% else %}
+                        <span class="badge-status bs-occupe">OCCUPÉE</span>
+                      {% endif %}
+                    </div>
+
+                    <div class="d-flex align-items-center gap-2 mb-2">
+                      <span class="badge bg-light text-secondary border font-monospace">{{ support.get_format_display|default:"12m²" }}</span>
+                      {% if face.eclairage %}
+                        <span class="badge bg-light text-secondary border"><i class="bi bi-lightbulb me-1"></i>{{ face.get_eclairage_display }}</span>
+                      {% endif %}
+                    </div>
                   </div>
 
                   {% with camp=face.get_campagne_active %}
                   {% if camp %}
-                  <div class="p-2.5 rounded-3 bg-danger bg-opacity-10 border border-danger border-opacity-25 mt-2" style="font-size:0.78rem">
+                  <div class="p-2.5 rounded-3 bg-danger bg-opacity-10 border border-danger border-opacity-25 mt-2" style="font-size:0.8rem;">
                     <div class="d-flex align-items-center gap-1 text-danger fw-bold mb-1">
                       <i class="bi bi-broadcast"></i>
                       <span>Campagne en cours</span>
                     </div>
-                    <div><strong>{{ camp.client.nom }}</strong> — {{ camp.nom }}</div>
-                    <div class="text-muted font-monospace mt-1" style="font-size:0.72rem">
+                    <div class="fw-bold text-dark">{{ camp.client.nom }} — {{ camp.nom }}</div>
+                    <div class="text-muted font-monospace mt-1" style="font-size:0.72rem;">
                       {{ camp.date_debut|date:"d/m/Y" }} → {{ camp.date_fin|date:"d/m/Y" }}
                     </div>
                   </div>
                   {% elif statut == 'reserve' %}
-                  <div class="p-2.5 rounded-3 bg-warning bg-opacity-10 border border-warning border-opacity-25 mt-2" style="font-size:0.78rem">
+                  <div class="p-2.5 rounded-3 bg-warning bg-opacity-10 border border-warning border-opacity-25 mt-2" style="font-size:0.8rem;">
                     <div class="d-flex align-items-center gap-1 text-warning-emphasis fw-bold">
                       <i class="bi bi-calendar-check"></i>
                       <span>Réservée pour une prochaine campagne</span>
@@ -360,39 +441,39 @@
     </div>
     {% endif %}
 
-    <!-- Écran numérique & Télémétrie -->
+    <!-- 2. Écran Numérique & Frise Temporelle -->
     {% if ecran %}
-    <div class="detail-card">
-      <div class="detail-card-hd">
-        <span><i class="bi bi-cpu me-2 text-primary"></i>Statistiques & Frise de Diffusion</span>
-        <span class="badge bg-primary-subtle text-primary border border-primary-subtle">Écran Numérique</span>
+    <div class="sd-card">
+      <div class="sd-card-header">
+        <h2><i class="bi bi-cpu-fill text-primary"></i>Statistiques & Frise de Diffusion</h2>
+        <span class="badge bg-primary-subtle text-primary border border-primary-subtle">Écran Numérique LED</span>
       </div>
-      <div class="card-body p-3 p-md-4">
+      <div class="p-3 p-md-4">
         <!-- Métriques clés -->
         <div class="row g-3 mb-4">
           {% for label, icon, value, color in ecran_stats %}
           <div class="col-6 col-md-3">
-            <div class="metric-kpi-card">
-              <div class="d-flex align-items-center gap-2">
-                <i class="bi {{ icon }}" style="color:{{ color|default:'var(--color-primary)' }};font-size:0.95rem"></i>
-                <span class="info-table-label">{{ label }}</span>
+            <div class="telemetry-kpi">
+              <div class="d-flex align-items-center gap-1.5 text-muted small">
+                <i class="bi {{ icon }}" style="color:{{ color|default:'var(--color-primary)' }};"></i>
+                <span class="text-uppercase font-monospace" style="font-size:0.7rem; font-weight:700;">{{ label }}</span>
               </div>
-              <div style="font-size:1.15rem;font-weight:800;color:{{ color|default:'var(--text)' }}">{{ value }}</div>
+              <div class="fw-bold fs-5" style="color:{{ color|default:'var(--text-dark)' }};">{{ value }}</div>
             </div>
           </div>
           {% endfor %}
         </div>
 
-        <!-- Bloc frise -->
+        <!-- Frise chronologique -->
         <div class="p-3 rounded-3 border bg-light">
           <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
             <div class="d-flex align-items-center gap-2">
               <i class="bi bi-activity text-primary"></i>
-              <span class="fw-bold small text-uppercase font-monospace">Frise temporelle de continuité</span>
+              <span class="fw-bold small text-uppercase font-monospace text-dark">Frise temporelle de continuité</span>
             </div>
             <div class="d-flex align-items-center gap-2">
-              <label class="info-table-label mb-0">Échelle :</label>
-              <select id="viewdur" class="form-select form-select-sm rounded-pill px-3" style="width:auto;font-size:0.78rem">
+              <label class="sd-spec-label mb-0">Échelle :</label>
+              <select id="viewdur" class="form-select form-select-sm" style="width:auto; font-size:0.8rem;">
                 <option value="3600">1 heure</option>
                 <option value="86400" selected>1 jour</option>
                 <option value="604800">1 semaine</option>
@@ -401,38 +482,40 @@
             </div>
           </div>
           <div id="metrics" class="d-flex flex-wrap gap-2 mb-3"></div>
-          <div id="frise-container" class="w-100 overflow-x-auto border rounded-3 bg-white p-2">
+          <div id="frise-container" class="frise-box">
             <canvas id="frise-canvas" class="d-block"></canvas>
           </div>
-          <p id="frise-note" class="small text-muted font-monospace mt-2 mb-0" style="font-size:0.72rem"></p>
+          <p id="frise-note" class="small text-muted font-monospace mt-2 mb-0" style="font-size:0.72rem;"></p>
         </div>
       </div>
     </div>
     {% endif %}
 
-    <!-- Campagnes Actives -->
+    <!-- 3. Campagnes Actives -->
     {% if lignes_actives %}
-    <div class="detail-card">
-      <div class="detail-card-hd text-success">
-        <span><i class="bi bi-broadcast me-2"></i>Campagnes Actives</span>
-        <span class="badge bg-success-subtle text-success border border-success-subtle">{{ lignes_actives|length }} Active{{ lignes_actives|length|pluralize }}</span>
+    <div class="sd-card">
+      <div class="sd-card-header text-success">
+        <h2 class="text-success"><i class="bi bi-broadcast me-2"></i>Campagnes Actives en Diffusion</h2>
+        <span class="badge bg-success-subtle text-success border border-success-subtle">{{ lignes_actives|length }} Active{{ lignes_actives|length|pluralize:",s" }}</span>
       </div>
-      <div class="card-body p-0">
+      <div>
         {% for l in lignes_actives %}
         <div class="p-3 border-bottom d-flex align-items-center gap-3 flex-wrap">
-          <i class="bi bi-broadcast-pin text-success fs-4"></i>
-          <div class="flex-grow-1 min-w-0">
+          <div class="d-inline-flex p-2 rounded-circle bg-success bg-opacity-10 text-success">
+            <i class="bi bi-broadcast fs-5"></i>
+          </div>
+          <div class="flex-grow-1 min-width-0">
             <div class="fw-bold fs-6">
-              <a href="{% url 'campagne_detail' l.campagne.pk %}" class="text-dark text-decoration-none hover-primary">
+              <a href="{% url 'campagne_detail' l.campagne.pk %}" class="text-dark text-decoration-none">
                 {{ l.campagne.nom }}
               </a>
             </div>
-            <div class="text-muted small mt-0.5">
-              <strong>{{ l.campagne.client.nom }}</strong> · {{ l.campagne.date_debut|date:"d/m/Y" }} → {{ l.campagne.date_fin|date:"d/m/Y" }}
+            <div class="text-muted small">
+              <strong>{{ l.campagne.client.nom }}</strong> · <i class="bi bi-calendar3 me-1"></i>{{ l.campagne.date_debut|date:"d/m/Y" }} → {{ l.campagne.date_fin|date:"d/m/Y" }}
             </div>
           </div>
           <span class="badge-status bs-en_cours">En cours</span>
-          <a href="{% url 'campagne_detail' l.campagne.pk %}" class="btn btn-sm btn-outline-secondary rounded-circle" title="Voir la campagne">
+          <a href="{% url 'campagne_detail' l.campagne.pk %}" class="btn btn-sm btn-outline-secondary py-1 px-2" title="Voir la campagne">
             <i class="bi bi-arrow-right"></i>
           </a>
         </div>
@@ -441,20 +524,22 @@
     </div>
     {% endif %}
 
-    <!-- Réservations à venir -->
+    <!-- 4. Réservations à venir -->
     {% if reservations %}
-    <div class="detail-card">
-      <div class="detail-card-hd text-warning-emphasis">
-        <span><i class="bi bi-calendar-check me-2 text-warning"></i>Réservations à venir</span>
+    <div class="sd-card">
+      <div class="sd-card-header text-warning-emphasis">
+        <h2 class="text-warning-emphasis"><i class="bi bi-calendar-check-fill text-warning me-2"></i>Réservations à Venir</h2>
         <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">{{ reservations|length }}</span>
       </div>
-      <div class="card-body p-0">
+      <div>
         {% for resa in reservations %}
         <div class="p-3 border-bottom d-flex align-items-center gap-3">
-          <i class="bi bi-calendar-event text-warning fs-5"></i>
+          <div class="d-inline-flex p-2 rounded-circle bg-warning bg-opacity-10 text-warning">
+            <i class="bi bi-calendar-event fs-5"></i>
+          </div>
           <div class="flex-grow-1">
-            <div class="fw-bold small">{{ resa.client.nom }}</div>
-            <div class="text-muted font-monospace" style="font-size:0.75rem">
+            <div class="fw-bold small text-dark">{{ resa.client.nom }}</div>
+            <div class="text-muted font-monospace" style="font-size:0.78rem;">
               {{ resa.date_debut|date:"d/m/Y H:i" }} → {{ resa.date_fin|date:"d/m/Y H:i" }}
             </div>
           </div>
@@ -467,49 +552,49 @@
     </div>
     {% endif %}
 
-    <!-- Historique des Campagnes -->
+    <!-- 5. Historique des Campagnes Passées -->
     {% if historique %}
-    <div class="detail-card">
-      <div class="detail-card-hd">
-        <span><i class="bi bi-clock-history me-2 text-secondary"></i>Historique des Campagnes Passées</span>
+    <div class="sd-card">
+      <div class="sd-card-header">
+        <h2><i class="bi bi-clock-history text-secondary me-2"></i>Historique des Campagnes Passées</h2>
         <span class="badge bg-light text-dark border">{{ historique|length }}</span>
       </div>
-      <div class="card-body p-0">
+      <div>
         {% for l in historique %}
-        <div class="p-3 border-bottom d-flex align-items-center gap-3" style="font-size:0.84rem">
+        <div class="p-3 border-bottom d-flex align-items-center gap-3" style="font-size:0.85rem;">
           {% with visuel=l.campagne.visuels.first %}
           {% if visuel %}
-            <img src="{{ visuel.fichier.url }}" alt="Visuel" style="width:44px;height:44px;object-fit:cover;border-radius:8px;border:1px solid var(--border)">
+            <img src="{{ visuel.fichier.url }}" alt="Visuel" style="width:46px; height:46px; object-fit:cover; border-radius:8px; border:1px solid var(--border);">
           {% else %}
-            <img src="{% static 'img/logo.png' %}" alt="Logo" loading="lazy" style="width:44px;height:44px;object-fit:cover;border-radius:8px;border:1px solid var(--border)">
+            <img src="{% static 'img/logo.png' %}" alt="Logo" loading="lazy" style="width:46px; height:46px; object-fit:cover; border-radius:8px; border:1px solid var(--border);">
           {% endif %}
           {% endwith %}
 
-          <div class="flex-grow-1">
-            <div class="fw-bold">{{ l.campagne.client.nom }}</div>
+          <div class="flex-grow-1 min-width-0">
+            <div class="fw-bold text-dark">{{ l.campagne.client.nom }}</div>
             <div class="text-muted small">{{ l.campagne.nom }}</div>
           </div>
-          <span class="text-muted font-monospace small">{{ l.campagne.date_debut|date:"d/m/Y" }} → {{ l.campagne.date_fin|date:"d/m/Y" }}</span>
+          <span class="text-muted font-monospace small"><i class="bi bi-calendar3 me-1"></i>{{ l.campagne.date_debut|date:"d/m/Y" }} → {{ l.campagne.date_fin|date:"d/m/Y" }}</span>
         </div>
         {% endfor %}
       </div>
     </div>
     {% endif %}
 
-    <!-- Photos maintenance -->
+    <!-- 6. Galerie Photos d'Interventions -->
     {% if photos %}
-    <div class="detail-card">
-      <div class="detail-card-hd">
-        <span><i class="bi bi-camera me-2 text-warning"></i>Galerie Photos d'Interventions</span>
+    <div class="sd-card">
+      <div class="sd-card-header">
+        <h2><i class="bi bi-camera-fill text-warning me-2"></i>Galerie Photos d'Interventions</h2>
         <span class="badge bg-light text-dark border">{{ photos|length }}</span>
       </div>
-      <div class="card-body p-3">
+      <div class="p-3">
         <div class="row g-2">
           {% for p in photos %}
           <div class="col-6 col-md-4">
-            <div class="position-relative rounded-3 overflow-hidden border shadow-sm">
-              <img src="{{ p.photo.url }}" alt="Photo de maintenance" loading="lazy" style="width:100%;height:110px;object-fit:cover;display:block">
-              <div class="position-absolute bottom-0 start-0 end-0 p-1.5 bg-dark bg-opacity-75 text-white" style="font-size:0.65rem">
+            <div class="position-relative rounded-3 overflow-hidden border shadow-sm" style="height:120px;">
+              <img src="{{ p.photo.url }}" alt="Photo de maintenance" loading="lazy" style="width:100%; height:100%; object-fit:cover; display:block;">
+              <div class="position-absolute bottom-0 start-0 end-0 p-1.5 bg-dark bg-opacity-75 text-white" style="font-size:0.68rem;">
                 <div class="font-monospace text-truncate">{{ p.date_intervention|date:"d/m H:i" }} · {{ p.effectue_par.username }}</div>
               </div>
             </div>
@@ -531,32 +616,34 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!mapEl) return;
   mapEl.style.width = '100%';
   mapEl.style.height = '210px';
-  if (typeof L === 'undefined') {
-    console.error("Leaflet n'est pas chargé.");
-    return;
-  }
-  const miniMap = L.map('mini-map', { zoomControl: false, dragging: false, scrollWheelZoom: false });
-  window.buildSafeLeafletTiles(miniMap, {
-    attribution: '© OpenStreetMap contributors'
-  });
+
   const lat = parseFloat('{{ support.latitude }}'.replace(',', '.'));
   const lng = parseFloat('{{ support.longitude }}'.replace(',', '.'));
-  const color = '{{ support.get_etat_color }}' || '#2563eb';
-  const icon = L.divIcon({
-    html: `<div style="width:18px;height:18px;background:${color};border-radius:50%;border:3px solid white;box-shadow:0 0 0 4px ${color}44"></div>`,
-    iconSize: [18, 18], iconAnchor: [9, 9], className: ''
+  const color = '{{ support.get_etat_color }}' || 'var(--color-primary)';
+
+  const miniMap = window.initIntegralMap('mini-map', {
+    center: Number.isFinite(lat) && Number.isFinite(lng) ? [lat, lng] : [12.3714, -1.5197],
+    zoom: Number.isFinite(lat) && Number.isFinite(lng) ? 15 : 12,
+    zoomControl: false,
+    dragging: false,
+    scrollWheelZoom: false
   });
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-    miniMap.setView([12.3714, -1.5197], 3);
-  } else {
+
+  if (miniMap && Number.isFinite(lat) && Number.isFinite(lng)) {
+    const icon = L.divIcon({
+      html: `<div style="width:18px;height:18px;background:${color};border-radius:50%;border:3px solid white;box-shadow:0 0 0 4px ${color}44"></div>`,
+      iconSize: [18, 18],
+      iconAnchor: [9, 9],
+      className: ''
+    });
     L.marker([lat, lng], { icon }).addTo(miniMap);
-    miniMap.setView([lat, lng], 15);
   }
-  miniMap.invalidateSize(true);
-  setTimeout(() => miniMap.invalidateSize(true), 250);
-  miniMap.on('click', () => {
-    window.location.href = `{% url 'carte' %}?support={{ support.pk }}`;
-  });
+
+  if (miniMap) {
+    miniMap.on('click', () => {
+      window.location.href = `{% url 'carte' %}?support={{ support.pk }}`;
+    });
+  }
 });
 
 const COLORS = ['#378ADD', '#D85A30', '#1D9E75', '#7F77DD', '#BA7517', '#D4537E'];
@@ -591,10 +678,10 @@ function renderMetrics() {
   const pubView = pubH / 3600 * view;
   const pct = Math.round(pubView / view * 100);
   document.getElementById('metrics').innerHTML = `
-    <div class="mc"><div class="ml">Spots actifs</div><div class="mv">${spots.length}</div></div>
-    <div class="mc"><div class="ml">Pub totale / h</div><div class="mv">${Math.round(pubH / 60)}<span class="mu">min</span></div></div>
-    <div class="mc"><div class="ml">Pub totale / ${vl}</div><div class="mv">${Math.round(pubView / 60)}<span class="mu">min</span></div></div>
-    <div class="mc"><div class="ml">% antenne / ${vl}</div><div class="mv">${pct}<span class="mu">%</span></div></div>
+    <div class="telemetry-kpi"><div class="text-muted small text-uppercase font-monospace" style="font-size:0.68rem; font-weight:700;">Spots actifs</div><div class="fw-bold fs-5 text-primary">${spots.length}</div></div>
+    <div class="telemetry-kpi"><div class="text-muted small text-uppercase font-monospace" style="font-size:0.68rem; font-weight:700;">Pub totale / h</div><div class="fw-bold fs-5">${Math.round(pubH / 60)}<span class="small text-muted ms-1">min</span></div></div>
+    <div class="telemetry-kpi"><div class="text-muted small text-uppercase font-monospace" style="font-size:0.68rem; font-weight:700;">Pub totale / ${vl}</div><div class="fw-bold fs-5">${Math.round(pubView / 60)}<span class="small text-muted ms-1">min</span></div></div>
+    <div class="telemetry-kpi"><div class="text-muted small text-uppercase font-monospace" style="font-size:0.68rem; font-weight:700;">% antenne / ${vl}</div><div class="fw-bold fs-5 text-success">${pct}<span class="small text-muted ms-1">%</span></div></div>
   `;
 }
 

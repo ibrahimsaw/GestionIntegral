@@ -2242,6 +2242,33 @@
       color: #ffffff;
       box-shadow: 0 4px 12px rgba(147, 46, 43, 0.25);
     }
+
+    #leafletMapContainer {
+      margin-top: 20px;
+      padding: 12px;
+      background: linear-gradient(180deg, rgba(255,255,255,0.92), rgba(248,250,252,0.92));
+      border: 1px solid rgba(148, 163, 184, 0.28);
+      border-radius: 20px;
+      box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
+    }
+
+    #portalLeafletMap {
+      height: 520px;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      background: #edf4ff;
+    }
+
+    .leaflet-popup-content-wrapper,
+    .leaflet-popup-tip {
+      background: rgba(255,255,255,0.98);
+      border: 1px solid rgba(148, 163, 184, 0.2);
+      box-shadow: 0 20px 40px rgba(15, 23, 42, 0.12);
+    }
+    .leaflet-popup-content-wrapper { border-radius: 16px; }
+    .leaflet-popup-content { margin: 0; }
+    .leaflet-container a.leaflet-popup-close-button { color: var(--color-primary); }
 </style>
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.css" />
 
@@ -3534,15 +3561,16 @@
 </script>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="{% static 'js/integral_map.js' %}"></script>
 <script>
-      // ── GESTION VUE GRILLE / VUE CARTE LEAFLET ───────────────────────────
-    const btnViewGrid = document.getElementById('btnViewGrid');
-    const btnViewMap  = document.getElementById('btnViewMap');
-    const rnGrid      = document.getElementById('rn-grid');
-    const mapContainer = document.getElementById('leafletMapContainer');
-    let leafletMap = null;
+  // ── GESTION VUE GRILLE / VUE CARTE LEAFLET ───────────────────────────
+  const btnViewGrid = document.getElementById('btnViewGrid');
+  const btnViewMap  = document.getElementById('btnViewMap');
+  const rnGrid      = document.getElementById('rn-grid');
+  const mapContainer = document.getElementById('leafletMapContainer');
+  let leafletMap = null;
 
-    if (btnViewGrid && btnViewMap && rnGrid && mapContainer) {
+  if (btnViewGrid && btnViewMap && rnGrid && mapContainer) {
     btnViewGrid.addEventListener('click', () => {
       btnViewGrid.classList.add('active');
       btnViewMap.classList.remove('active');
@@ -3562,14 +3590,16 @@
         setTimeout(() => leafletMap.invalidateSize(), 200);
       }
     });
-    }
+  }
 
-    function initLeafletMap() {
-      leafletMap = L.map('portalLeafletMap').setView([12.3714, -1.5197], 12);
+  function initLeafletMap() {
+    if (leafletMap) return;
+    leafletMap = L.map('portalLeafletMap').setView([12.3714, -1.5197], 12);
 
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; OpenStreetMap contributors'
-      }).addTo(leafletMap);
+    window.buildSafeLeafletTiles(leafletMap, {
+      attribution: '&copy; OpenStreetMap contributors',
+      maxZoom: 19
+    });
 
       fetch("{% url 'portail:api_geojson' %}")
         .then(res => res.json())
@@ -3579,12 +3609,12 @@
               pointToLayer: function (feature, latlng) {
                 const color = feature.properties.color || '#16a34a';
                 return L.circleMarker(latlng, {
-                  radius: 8,
+                  radius: 9,
                   fillColor: color,
                   color: '#ffffff',
-                  weight: 2,
+                  weight: 2.5,
                   opacity: 1,
-                  fillOpacity: 0.9
+                  fillOpacity: 0.94
                 });
               },
               onEachFeature: function (feature, layer) {

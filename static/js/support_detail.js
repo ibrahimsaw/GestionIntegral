@@ -8,9 +8,9 @@ document.addEventListener('DOMContentLoaded', () => {
     return;
   }
   const miniMap = L.map('mini-map', { zoomControl:false, dragging:false, scrollWheelZoom:false });
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', {
-    attribution:'© CARTO', subdomains:'abcd'
-  }).addTo(miniMap);
+  window.buildSafeLeafletTiles(miniMap, {
+    attribution: '&copy; OpenStreetMap contributors'
+  });
   const lat = parseFloat('{{ support.latitude }}'.replace(',', '.'));
   const lng = parseFloat('{{ support.longitude }}'.replace(',', '.'));
   const color = '{{ support.get_etat_color }}' || 'var(--color-primary)';

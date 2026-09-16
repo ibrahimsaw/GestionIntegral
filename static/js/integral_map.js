@@ -1,24 +1,24 @@
 /**
  * ══════════════════════════════════════════════════════════════════
  * INTEGRAL MAP SYSTEM — MODULE CENTRALISÉ LEAFLET
- * Gère l'initialisation, les tuiles CartoDB / OSM (sans blocage 403),
- * les coordonnées par défaut et le redimensionnement automatique.
+ * Gère l'initialisation, les tuiles OSM France & Esri (100% gratuites,
+ * sans clé API et sans aucun blocage 403), le centrage et le redimensionnement.
  * ══════════════════════════════════════════════════════════════════
  */
 (function (window) {
   'use strict';
 
-  // Configuration par défaut optimisée pour le Burkina Faso et sans blocage "ACCESS BLOCKED"
+  // Configuration par défaut : OpenStreetMap France (100% gratuit, sans clé API)
   window.INTEGRAL_MAP_CONFIG = {
     defaultCenter: [12.3714, -1.5197], // Ouagadougou
     defaultZoom: 12,
     maxZoom: 19,
-    // Fournisseur CartoDB Voyager : aucun blocage "ACCESS BLOCKED", esthétique cartographique moderne
-    tileUrl: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
-    // Serveurs de secours en cas d'indisponibilité
-    fallbackTileUrl: 'https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png',
-    subdomains: ['a', 'b', 'c', 'd'],
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>'
+    // Fournisseur 1 : OpenStreetMap France (Aucune clé requise, gratuit, sans blocage)
+    tileUrl: 'https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png',
+    // Fournisseur 2 : Esri World Street Map (CDN haute disponibilité mondial, sans clé requise)
+    fallbackTileUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}',
+    subdomains: ['a', 'b', 'c'],
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> France'
   };
 
   window.INTEGRAL_MAP_DEFAULTS = {
@@ -27,7 +27,7 @@
   };
 
   /**
-   * Attache les tuiles de carte sans restriction "ACCESS BLOCKED"
+   * Attache les tuiles de carte sans aucune clé API requise
    * @param {L.Map} map - L'instance de carte Leaflet
    * @param {Object} options - Options de configuration des tuiles
    * @returns {L.TileLayer}
@@ -43,23 +43,22 @@
     const maxZoom = options.maxZoom || window.INTEGRAL_MAP_CONFIG.maxZoom;
     const subdomains = options.subdomains || window.INTEGRAL_MAP_CONFIG.subdomains;
 
-    // Création de la couche de tuiles haute disponibilité
+    // Création de la couche de tuiles OpenStreetMap France
     const tileLayer = L.tileLayer(tileUrl, {
       attribution: attribution,
       maxZoom: maxZoom,
       subdomains: subdomains
     });
 
-    // Basculement automatique sur le serveur de secours si une tuile échoue
+    // Basculement automatique sur Esri si une tuile OSM France échoue
     tileLayer.on('tileerror', function (error, tile) {
       if (window.INTEGRAL_MAP_CONFIG.fallbackTileUrl && tile && tile.src && !tile.dataset.fallbackTried) {
         tile.dataset.fallbackTried = 'true';
-        const sub = ['a', 'b', 'c'][Math.floor(Math.random() * 3)];
+        // Formatage Esri : {z}/{y}/{x}
         tile.src = window.INTEGRAL_MAP_CONFIG.fallbackTileUrl
-          .replace('{s}', sub)
           .replace('{z}', error.coords.z)
-          .replace('{x}', error.coords.x)
-          .replace('{y}', error.coords.y);
+          .replace('{y}', error.coords.y)
+          .replace('{x}', error.coords.x);
       }
     });
 
@@ -122,7 +121,7 @@
 
     el._leaflet_map = map;
 
-    // Ajout des tuiles fiables
+    // Ajout des tuiles fiables sans clé API
     window.buildSafeLeafletTiles(map, mapOptions);
 
     return map;

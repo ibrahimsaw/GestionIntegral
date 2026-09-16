@@ -1,141 +1,318 @@
 {% extends 'portail/base_portail.html' %}
 {% load static %}
-{% block title %}{{ support.code }} — Integral{% endblock %}
-{% block topbar_title %}
-  <i class="bi {% if support.type_support == 'panneau' %}bi-sign-merge-right{% else %}bi-display{% endif %} me-2" style="color:var(--color-primary)"></i>
-  {{ support.code }} — {{ support.nom }}
-{% endblock %}
-{% block topbar_actions %}
+{% block title %}{{ support.code }} — {{ support.nom }} — Integral{% endblock %}
 
+{% block topbar_title %}
+  <div class="d-flex align-items-center gap-2">
+    <div class="d-inline-flex align-items-center justify-content-center rounded-3 p-2" style="background: rgba(147, 46, 43, 0.08); color: var(--color-primary);">
+      <i class="bi {% if support.type_support == 'panneau' %}bi-sign-merge-right{% else %}bi-display{% endif %} fs-5"></i>
+    </div>
+    <div class="min-width-0">
+      <div class="d-flex align-items-center gap-2">
+        <span class="fw-bold text-truncate">{{ support.nom }}</span>
+        <span class="badge bg-light text-dark border font-monospace px-2 py-0.5" style="font-size:0.75rem;">{{ support.code }}</span>
+      </div>
+      <div class="text-muted d-none d-sm-block" style="font-size:0.75rem;">
+        <i class="bi bi-geo-alt me-1"></i>{{ support.quartier|default:"" }}{% if support.quartier and support.ville %}, {% endif %}{{ support.ville|default:"" }}
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* ══════════════════════════════════════════════════════════════════════════
+     PORTAIL SUPPORT DETAIL — DESIGN SAAS
+     ══════════════════════════════════════════════════════════════════════════ */
+  .portail-hero {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border-radius: var(--radius-xl, 16px);
+    color: #ffffff;
+    padding: 24px 28px;
+    margin-bottom: 24px;
+    box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.25);
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+  .portail-hero::after {
+    content: '';
+    position: absolute;
+    top: -50%;
+    right: -10%;
+    width: 300px;
+    height: 300px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(147, 46, 43, 0.25) 0%, rgba(147, 46, 43, 0) 70%);
+    pointer-events: none;
+  }
+
+  .portail-card {
+    background: #ffffff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg, 14px);
+    box-shadow: var(--shadow-xs);
+    margin-bottom: 22px;
+    overflow: hidden;
+    transition: box-shadow 0.2s ease;
+  }
+  .portail-card:hover {
+    box-shadow: var(--shadow-md);
+  }
+  .portail-card-header {
+    padding: 14px 18px;
+    background: #f8fafc;
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 0.9rem;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .portail-spec-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 11px 18px;
+    border-bottom: 1px solid #f1f5f9;
+    font-size: 0.85rem;
+  }
+  .portail-spec-row:last-child {
+    border-bottom: none;
+  }
+  .portail-spec-label {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .portail-spec-value {
+    font-weight: 600;
+    text-align: right;
+    color: var(--text);
+  }
+
+  /* Cartes des Faces */
+  .portail-face-card {
+    border-radius: var(--radius-md, 12px);
+    border: 1px solid var(--border);
+    background: #ffffff;
+    overflow: hidden;
+    box-shadow: var(--shadow-xs);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+  }
+  .portail-face-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-md);
+  }
+  .portail-face-card.is-libre { border-top: 4px solid #10b981; }
+  .portail-face-card.is-occupe { border-top: 4px solid #ef4444; }
+  .portail-face-card.is-reserve { border-top: 4px solid #f59e0b; }
+
+  .portail-face-thumb {
+    width: 100%;
+    height: 180px;
+    background: #0f172a;
+    position: relative;
+    overflow: hidden;
+  }
+  .portail-face-thumb img, .portail-face-thumb video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+</style>
 {% endblock %}
 
 {% block content %}
-<div class="row g-3">
-  <!-- Col gauche -->
-  <div class="col-md-4">
-    <!-- Photo principale -->
-    {% if support.photo_principale %}
-    <div class="card mb-3">
-      <div class="card-body p-0">
-        <img src="{{ support.photo_principale.url }}" alt="Photo principale du support {{ support.code }}" loading="lazy" style="width:100%;height:220px;object-fit:cover;border-radius:var(--radius)">
-      </div>
-    </div>
-    {% endif %}
+<div>
 
-    <!-- Infos -->
-    <div class="card mb-3">
-      <div class="card-header"><i class="bi bi-info-circle me-2"></i>Fiche Technique</div>
-      <div class="card-body p-0">
-        {% for label, value in info_rows %}
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);font-size:.84rem">
-          <span style="color:var(--text-muted);font-size:.72rem;font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px">{{ label }}</span>
-          <span style="font-weight:600;text-align:right">{{ value }}</span>
+  <!-- ══════════════════════════════════════════════════════════════════
+       HERO BANNER
+       ══════════════════════════════════════════════════════════════════ -->
+  <div class="portail-hero">
+    <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-3">
+      <div class="d-flex align-items-center gap-3">
+        <div class="d-flex align-items-center justify-content-center rounded-4 p-3" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15);">
+          <i class="bi {% if support.type_support == 'panneau' %}bi-sign-merge-right-fill{% else %}bi-display-fill{% endif %} fs-2 text-warning"></i>
         </div>
-        {% endfor %}
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);font-size:.84rem">
-          <span style="color:var(--text-muted);font-size:.72rem;font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px">État</span>
-          <span class="badge-status {% if support.etat == 'bon' %}bs-disponible{% elif support.etat == 'maintenance' %}bs-occupe{% else %}bs-maintenance{% endif %}">{{ support.get_etat_display }}</span>
-        </div>
-        {% if support.type_support == 'ecran' %}
-          <div style="padding:10px 16px;font-size:.84rem">
-            <span style="color:var(--text-muted);font-size:.72rem;font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:3px">Occupation</span>
-            {% if support.is_occupe %}
-            <span class="badge-status bs-occupe"><i class="bi bi-broadcast me-1"></i>Occupé</span>
-            {% else %}
-            <span class="badge-status bs-disponible"><i class="bi bi-check2 me-1"></i>Disponible</span>
-            {% endif %}
+        <div>
+          <div class="d-flex align-items-center flex-wrap gap-2 mb-1">
+            <span class="badge bg-white bg-opacity-20 text-white font-monospace">{{ support.code }}</span>
+            <span class="badge bg-white bg-opacity-15 text-white">{{ support.get_type_support_display }}</span>
+            <span class="badge-status {% if support.etat == 'bon' %}bs-disponible{% elif support.etat == 'maintenance' %}bs-occupe{% else %}bs-panne{% endif %}">
+              {{ support.get_etat_display }}
+            </span>
           </div>
-        {% endif %}
-      </div>
-    </div>
-
-    <!-- Mini carte -->
-    <div class="card mb-3">
-      <div class="card-header"><i class="bi bi-pin-map me-2"></i>Localisation</div>
-      <div class="card-body p-0">
-        <div id="mini-map" style="height:200px;border-radius:0 0 var(--radius) var(--radius);overflow:hidden;cursor:pointer"></div>
-      </div>
-      <div class="card-footer" style="font-size:.85rem;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:8px">
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:.72rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;font-family:var(--mono);margin-bottom:4px">Adresse</div>
-          <div style="font-weight:600;line-height:1.3;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">{{ support.adresse|default:'Adresse non renseignée' }}</div>
+          <h1 class="h3 fw-bold text-white mb-1">{{ support.nom }}</h1>
+          <div class="text-white-50 small">
+            <i class="bi bi-geo-alt-fill text-danger me-1"></i>{{ support.adresse|default:"Adresse non renseignée" }}{% if support.quartier %}, {{ support.quartier }}{% endif %}{% if support.ville %} (<strong>{{ support.ville }}</strong>){% endif %}
+          </div>
         </div>
-        <a href="{% url 'carte' %}?support={{ support.pk }}" class="btn btn-sm btn-outline-secondary" style="white-space:nowrap">Voir sur carte</a>
+      </div>
+
+      <div>
+        <a href="{% url 'carte' %}?support={{ support.pk }}" class="btn btn-light btn-sm fw-semibold shadow-sm">
+          <i class="bi bi-map-fill text-primary me-1"></i>Voir sur la carte
+        </a>
       </div>
     </div>
   </div>
 
-  <!-- Col droite -->
-  <div class="col-md-8">
-
-    <!-- Faces panneau -->
-    {% if support.type_support == 'panneau' %}
-    <div class="card mb-3">
-      <div class="card-header"><i class="bi bi-sign-merge-right me-2" style="color:#a78bfa"></i>Faces du Panneau</div>
-      <div class="card-body">
-        <div class="row g-3">
-          {% for face in support.faces.all %}
-            {% with statut=face.get_statut %}
-
-            <div class="col-md-6">
-              <div class="{% if statut == 'libre' %}card-libre{% elif statut == 'reserve' %}card-reserve{% else %}card-occupe{% endif %}">
-                <img src="{% static 'img/logo.png' %}" alt="Logo" loading="lazy" style="width:100%;height:160px;object-fit:cover;display:block">
-
-                <div style="padding:10px 12px">
-                  <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:4px">
-                    <span style="font-weight:700;font-size:.9rem">Face {{ face.label }}</span>
-
-                    {# CORRECTION : 3 états au lieu de 2 #}
-                    {% if statut == 'libre' %}
-                      <span style="color:var(--color-disponible);font-size:.68rem;font-weight:700;font-family:var(--mono)">LIBRE</span>
-                    {% elif statut == 'reserve' %}
-                      <span style="color:var(--color-reserve);font-size:.68rem;font-weight:700;font-family:var(--mono)">RÉSERVÉE</span>
-                    {% else %}
-                      <span style="color:var(--color-occupe);font-size:.68rem;font-weight:700;font-family:var(--mono)">OCCUPÉE</span>
-                    {% endif %}
-                  </div>
-
-                  {# CORRECTION : format est sur support, pas sur face #}
-                  <div style="font-size:.75rem;color:var(--text-muted)">{{ support.get_format_display }} — {{ face.get_eclairage_display }}</div>
-                </div>
-              </div>
-            </div>
-
-            {% endwith %}
-          {% endfor %}
+  <div class="row g-4">
+    <!-- Colonne Gauche -->
+    <div class="col-12 col-lg-4">
+      
+      <!-- Photo principale -->
+      {% if support.photo_principale %}
+      <div class="portail-card">
+        <div class="position-relative overflow-hidden" style="height:220px; background:#0f172a;">
+          <img src="{{ support.photo_principale.url }}" alt="Support {{ support.code }}" loading="lazy" style="width:100%; height:100%; object-fit:cover; display:block;">
         </div>
       </div>
+      {% endif %}
+
+      <!-- Fiche Technique -->
+      <div class="portail-card">
+        <div class="portail-card-header">
+          <span><i class="bi bi-info-circle-fill text-primary me-2"></i>Fiche Technique</span>
+          <span class="badge bg-light text-dark border">{{ support.code }}</span>
+        </div>
+        <div>
+          {% for label, value in info_rows %}
+          <div class="portail-spec-row">
+            <span class="portail-spec-label">{{ label }}</span>
+            <span class="portail-spec-value">{{ value }}</span>
+          </div>
+          {% endfor %}
+          <div class="portail-spec-row">
+            <span class="portail-spec-label">État</span>
+            <span class="badge-status {% if support.etat == 'bon' %}bs-disponible{% elif support.etat == 'maintenance' %}bs-occupe{% else %}bs-panne{% endif %}">
+              {{ support.get_etat_display }}
+            </span>
+          </div>
+          {% if support.type_support == 'ecran' %}
+          <div class="portail-spec-row">
+            <span class="portail-spec-label">Disponibilité</span>
+            {% if support.is_occupe %}
+              <span class="badge-status bs-occupe"><i class="bi bi-broadcast me-1"></i>Occupé</span>
+            {% else %}
+              <span class="badge-status bs-disponible"><i class="bi bi-check2 me-1"></i>Disponible</span>
+            {% endif %}
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      <!-- Mini-Carte -->
+      <div class="portail-card">
+        <div class="portail-card-header">
+          <span><i class="bi bi-pin-map-fill text-danger me-2"></i>Localisation</span>
+          <a href="{% url 'carte' %}?support={{ support.pk }}" class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size:0.75rem;">Plein écran</a>
+        </div>
+        <div class="p-0 position-relative">
+          <div id="mini-map" style="height:200px; width:100%; cursor:pointer;"></div>
+        </div>
+        <div class="p-3 bg-light border-top small">
+          <div class="text-muted small text-uppercase font-monospace mb-1" style="font-size:0.7rem;">Adresse</div>
+          <div class="fw-semibold text-dark text-truncate">{{ support.adresse|default:"Adresse non renseignée" }}</div>
+        </div>
+      </div>
+
     </div>
-    {% endif %}
 
-    <!-- Écran numérique -->
-    {% if ecran %}
-      <div class="card mb-3">
-        <div class="card-body">
+    <!-- Colonne Droite -->
+    <div class="col-12 col-lg-8">
 
-          <!-- Métriques clés -->
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px">
-            {% for label, icon, value, color in ecran_stats %}
-            <div style="background:var(--bg-card2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;display:flex;flex-direction:column;gap:6px">
-              <div style="display:flex;align-items:center;gap:6px">
-                <i class="bi {{ icon }}" style="color:{{ color|default:'var(--text-muted)' }};font-size:.85rem"></i>
-                <span style="font-size:.62rem;color:var(--text-muted);text-transform:uppercase;letter-spacing:.8px;font-family:var(--mono)">{{ label }}</span>
+      <!-- Faces du Panneau -->
+      {% if support.type_support == 'panneau' %}
+      <div class="portail-card">
+        <div class="portail-card-header">
+          <span><i class="bi bi-sign-merge-right-fill text-primary me-2"></i>Faces du Panneau</span>
+          <span class="badge bg-light text-dark border">{{ support.faces.count }} Face{{ support.faces.count|pluralize:",s" }}</span>
+        </div>
+        <div class="p-3 p-md-4">
+          <div class="row g-3">
+            {% for face in support.faces.all %}
+              {% with statut=face.get_statut %}
+              <div class="col-12 col-md-6">
+                <div class="portail-face-card {% if statut == 'libre' %}is-libre{% elif statut == 'reserve' %}is-reserve{% else %}is-occupe{% endif %}">
+                  <div class="portail-face-thumb">
+                    {% if face.photo %}
+                      <img src="{{ face.photo.url }}" alt="Face {{ face.label }}">
+                    {% else %}
+                      <img src="{% static 'img/logo.png' %}" alt="Integral">
+                    {% endif %}
+                    <div class="position-absolute top-0 start-0 m-2">
+                      <span class="badge bg-dark bg-opacity-75 text-white font-monospace">Face {{ face.label }}</span>
+                    </div>
+                  </div>
+                  <div class="p-3 flex-grow-1 d-flex flex-column justify-content-between">
+                    <div>
+                      <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="fw-bold fs-6 text-dark">Face {{ face.label }}</span>
+                        {% if statut == 'libre' %}
+                          <span class="badge-status bs-disponible">LIBRE</span>
+                        {% elif statut == 'reserve' %}
+                          <span class="badge-status bs-reserve">RÉSERVÉE</span>
+                        {% else %}
+                          <span class="badge-status bs-occupe">OCCUPÉE</span>
+                        {% endif %}
+                      </div>
+                      <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-light text-secondary border font-monospace">{{ support.get_format_display|default:"12m²" }}</span>
+                        {% if face.eclairage %}
+                          <span class="badge bg-light text-secondary border"><i class="bi bi-lightbulb me-1"></i>{{ face.get_eclairage_display }}</span>
+                        {% endif %}
+                      </div>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div style="font-size:1rem;font-weight:700;color:{{ color|default:'var(--text)' }}">{{ value }}</div>
+              {% endwith %}
+            {% endfor %}
+          </div>
+        </div>
+      </div>
+      {% endif %}
+
+      <!-- Écran numérique & Frise -->
+      {% if ecran %}
+      <div class="portail-card">
+        <div class="portail-card-header">
+          <span><i class="bi bi-cpu-fill text-primary me-2"></i>Statistiques & Frise de Diffusion</span>
+          <span class="badge bg-primary-subtle text-primary border border-primary-subtle">Écran LED</span>
+        </div>
+        <div class="p-3 p-md-4">
+          <div class="row g-3 mb-4">
+            {% for label, icon, value, color in ecran_stats %}
+            <div class="col-6 col-md-3">
+              <div class="p-3 bg-light border rounded-3">
+                <div class="d-flex align-items-center gap-1.5 text-muted small mb-1">
+                  <i class="bi {{ icon }}" style="color:{{ color|default:'var(--color-primary)' }};"></i>
+                  <span class="text-uppercase font-monospace" style="font-size:0.68rem; font-weight:700;">{{ label }}</span>
+                </div>
+                <div class="fw-bold fs-5" style="color:{{ color|default:'var(--text)' }};">{{ value }}</div>
+              </div>
             </div>
             {% endfor %}
           </div>
 
-          <!-- Bloc frise -->
-          <div style="background:var(--bg-card2);border:1px solid var(--border);border-radius:10px;padding:16px">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;flex-wrap:wrap;gap:8px">
-              <div style="display:flex;align-items:center;gap:8px">
-                <i class="bi bi-activity" style="color:var(--color-primary);font-size:.9rem"></i>
-                <span style="font-size:.8rem;font-weight:600;text-transform:uppercase;letter-spacing:.6px;font-family:var(--mono)">Frise de continuité</span>
+          <div class="p-3 rounded-3 border bg-light">
+            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+              <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-activity text-primary"></i>
+                <span class="fw-bold small text-uppercase font-monospace">Frise de Continuité</span>
               </div>
-              <div style="display:flex;align-items:center;gap:8px">
-                <label style="font-size:.72rem;color:var(--text-muted);font-family:var(--mono);text-transform:uppercase;letter-spacing:.5px">Échelle</label>
-                <select id="viewdur" style="font-size:.78rem;padding:4px 10px;border-radius:6px;border:1px solid var(--border);background:var(--bg-card);color:var(--text);cursor:pointer">
+              <div class="d-flex align-items-center gap-2">
+                <label class="text-muted small text-uppercase font-monospace mb-0" style="font-size:0.72rem;">Échelle</label>
+                <select id="viewdur" class="form-select form-select-sm" style="width:auto; font-size:0.8rem;">
                   <option value="3600">1 heure</option>
                   <option value="86400" selected>1 jour</option>
                   <option value="604800">1 semaine</option>
@@ -143,15 +320,17 @@
                 </select>
               </div>
             </div>
-            <div id="metrics" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px"></div>
-            <div id="frise-container" style="width:100%;overflow-x:auto;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);padding:10px">
-              <canvas id="frise-canvas" style="display:block"></canvas>
+            <div id="metrics" class="d-flex flex-wrap gap-2 mb-3"></div>
+            <div id="frise-container" class="p-2 border rounded-3 bg-white overflow-auto">
+              <canvas id="frise-canvas" class="d-block"></canvas>
             </div>
-            <p id="frise-note" style="font-size:.72rem;color:var(--text-muted);margin-top:8px;margin-bottom:0;font-family:var(--mono)"></p>
+            <p id="frise-note" class="small text-muted font-monospace mt-2 mb-0" style="font-size:0.72rem;"></p>
           </div>
         </div>
       </div>
-    {% endif %}
+      {% endif %}
+
+    </div>
   </div>
 </div>
 {% endblock %}
@@ -163,38 +342,40 @@ document.addEventListener('DOMContentLoaded', () => {
   if (!mapEl) return;
   mapEl.style.width = '100%';
   mapEl.style.height = '200px';
-  if (typeof L === 'undefined') {
-    console.error("Leaflet n'est pas chargé.");
-    return;
-  }
-  const miniMap = L.map('mini-map', { zoomControl: false, dragging: false, scrollWheelZoom: false });
-  window.buildSafeLeafletTiles(miniMap, {
-    attribution: '&copy; OpenStreetMap contributors'
-  });
+
   const lat = parseFloat('{{ support.latitude }}'.replace(',', '.'));
   const lng = parseFloat('{{ support.longitude }}'.replace(',', '.'));
   const color = '{{ support.get_etat_color }}' || 'var(--color-primary)';
-  const icon = L.divIcon({
-    html: `<div style="width:16px;height:16px;background:${color};border-radius:50%;border:3px solid white;box-shadow:0 0 0 4px ${color}44"></div>`,
-    iconSize: [16, 16], iconAnchor: [8, 8], className: ''
+
+  const miniMap = window.initIntegralMap('mini-map', {
+    center: Number.isFinite(lat) && Number.isFinite(lng) ? [lat, lng] : [12.3714, -1.5197],
+    zoom: Number.isFinite(lat) && Number.isFinite(lng) ? 15 : 12,
+    zoomControl: false,
+    dragging: false,
+    scrollWheelZoom: false
   });
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
-    miniMap.setView([12.3714, -1.5197], 3);
-  } else {
+
+  if (miniMap && Number.isFinite(lat) && Number.isFinite(lng)) {
+    const icon = L.divIcon({
+      html: `<div style="width:16px;height:16px;background:${color};border-radius:50%;border:3px solid white;box-shadow:0 0 0 4px ${color}44"></div>`,
+      iconSize: [16, 16],
+      iconAnchor: [8, 8],
+      className: ''
+    });
     L.marker([lat, lng], { icon }).addTo(miniMap);
-    miniMap.setView([lat, lng], 15);
   }
-  miniMap.invalidateSize(true);
-  setTimeout(() => miniMap.invalidateSize(true), 250);
-  miniMap.on('click', () => {
-    window.location.href = `{% url 'carte' %}?support={{ support.pk }}`;
-  });
+
+  if (miniMap) {
+    miniMap.on('click', () => {
+      window.location.href = `{% url 'carte' %}?support={{ support.pk }}`;
+    });
+  }
 });
 
 const COLORS = ['#378ADD', '#D85A30', '#1D9E75', '#7F77DD', '#BA7517', '#D4537E'];
-const spots = {{ spots_data|safe }};
+const spots = {{ spots_data|default:"[]"|safe }};
 
-function vd() { return parseInt(document.getElementById('viewdur').value); }
+function vd() { const el = document.getElementById('viewdur'); return el ? parseInt(el.value) : 86400; }
 
 function fmtRuler(t, viewDur) {
   if (viewDur <= 3600) { const m = Math.floor(t / 60); return m === 0 ? '0' : m + 'min'; }
@@ -217,26 +398,29 @@ function getCC() {
 }
 
 function renderMetrics() {
+  const el = document.getElementById('metrics');
+  if (!el) return;
   const view = vd(); const vl = viewLabel(view);
   const pubH = spots.reduce((a, sp) => a + (sp.dur / sp.interval) * 3600, 0);
   const pubView = pubH / 3600 * view;
   const pct = Math.round(pubView / view * 100);
-  document.getElementById('metrics').innerHTML = `
-    <div class="mc"><div class="ml">Spots actifs</div><div class="mv">${spots.length}</div></div>
-    <div class="mc"><div class="ml">Pub totale / heure</div><div class="mv">${Math.round(pubH / 60)}<span class="mu">min</span></div></div>
-    <div class="mc"><div class="ml">Pub totale / ${vl}</div><div class="mv">${Math.round(pubView / 60)}<span class="mu">min</span></div></div>
-    <div class="mc"><div class="ml">% antenne / ${vl}</div><div class="mv">${pct}<span class="mu">%</span></div></div>
+  el.innerHTML = `
+    <div class="p-2.5 bg-white border rounded-2 flex-grow-1"><div class="text-muted font-monospace" style="font-size:0.65rem; font-weight:700;">Spots actifs</div><div class="fw-bold fs-6 text-primary">${spots.length}</div></div>
+    <div class="p-2.5 bg-white border rounded-2 flex-grow-1"><div class="text-muted font-monospace" style="font-size:0.65rem; font-weight:700;">Pub totale / h</div><div class="fw-bold fs-6">${Math.round(pubH / 60)} min</div></div>
+    <div class="p-2.5 bg-white border rounded-2 flex-grow-1"><div class="text-muted font-monospace" style="font-size:0.65rem; font-weight:700;">Pub totale / ${vl}</div><div class="fw-bold fs-6">${Math.round(pubView / 60)} min</div></div>
+    <div class="p-2.5 bg-white border rounded-2 flex-grow-1"><div class="text-muted font-monospace" style="font-size:0.65rem; font-weight:700;">% antenne / ${vl}</div><div class="fw-bold fs-6 text-success">${pct}%</div></div>
   `;
 }
 
 function renderFrise() {
+  const canvas = document.getElementById('frise-canvas');
+  if (!canvas) return;
   if (!spots.length) {
-    document.getElementById('frise-note').textContent = 'Aucun spot actif sur ce support.';
-    const canvas = document.getElementById('frise-canvas');
+    const note = document.getElementById('frise-note');
+    if (note) note.textContent = 'Aucun spot actif sur ce support.';
     canvas.width = 0; canvas.height = 0;
     return;
   }
-  const canvas = document.getElementById('frise-canvas');
   const container = document.getElementById('frise-container');
   const viewDur = vd();
   const dpr = Math.min(window.devicePixelRatio || 1, 2);
@@ -304,13 +488,16 @@ function renderFrise() {
   ctx.strokeStyle = cc.gridMaj; ctx.lineWidth = 0.5;
   ctx.strokeRect(LPAD, RULER_H, chartW, H - RULER_H);
 
-  document.getElementById('frise-note').textContent =
-    hasDense ? "Barre pleine = diffusions si denses qu'elles se confondent à cette échelle." : '';
+  const note = document.getElementById('frise-note');
+  if (note) {
+    note.textContent = hasDense ? "Barre pleine = diffusions très denses à cette échelle." : '';
+  }
 }
 
 function render() { renderMetrics(); renderFrise(); }
 
-document.getElementById('viewdur').addEventListener('change', render);
+const viewDurEl = document.getElementById('viewdur');
+if (viewDurEl) viewDurEl.addEventListener('change', render);
 window.addEventListener('load', render);
 window.addEventListener('resize', renderFrise);
 </script>

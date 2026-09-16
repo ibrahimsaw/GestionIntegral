@@ -1,21 +1,24 @@
 /**
  * ══════════════════════════════════════════════════════════════════
  * INTEGRAL MAP SYSTEM — MODULE CENTRALISÉ LEAFLET
- * Gère l'initialisation, les tuiles OSM, les coordonnées par défaut
- * et le redimensionnement automatique sur toutes les pages.
+ * Gère l'initialisation, les tuiles CartoDB / OSM (sans blocage 403),
+ * les coordonnées par défaut et le redimensionnement automatique.
  * ══════════════════════════════════════════════════════════════════
  */
 (function (window) {
   'use strict';
 
-  // Configuration par défaut pour le Burkina Faso (Ouagadougou / Bobo-Dioulasso)
+  // Configuration par défaut optimisée pour le Burkina Faso et sans blocage "ACCESS BLOCKED"
   window.INTEGRAL_MAP_CONFIG = {
     defaultCenter: [12.3714, -1.5197], // Ouagadougou
     defaultZoom: 12,
     maxZoom: 19,
-    tileUrl: 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-    fallbackTileUrl: 'https://a.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png',
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a>'
+    // Fournisseur CartoDB Voyager : aucun blocage "ACCESS BLOCKED", esthétique cartographique moderne
+    tileUrl: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+    // Serveurs de secours en cas d'indisponibilité
+    fallbackTileUrl: 'https://{s}.tile.openstreetmap.fr/osmfr/{z}/{x}/{y}.png',
+    subdomains: ['a', 'b', 'c', 'd'],
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions" target="_blank" rel="noopener">CARTO</a>'
   };
 
   window.INTEGRAL_MAP_DEFAULTS = {
@@ -24,7 +27,7 @@
   };
 
   /**
-   * Attache les tuiles OpenStreetMap de manière sécurisée et performante.
+   * Attache les tuiles de carte sans restriction "ACCESS BLOCKED"
    * @param {L.Map} map - L'instance de carte Leaflet
    * @param {Object} options - Options de configuration des tuiles
    * @returns {L.TileLayer}
@@ -38,19 +41,22 @@
     const tileUrl = options.tileUrl || window.INTEGRAL_MAP_CONFIG.tileUrl;
     const attribution = options.attribution || window.INTEGRAL_MAP_CONFIG.attribution;
     const maxZoom = options.maxZoom || window.INTEGRAL_MAP_CONFIG.maxZoom;
+    const subdomains = options.subdomains || window.INTEGRAL_MAP_CONFIG.subdomains;
 
-    // Création de la couche de tuiles OpenStreetMap
+    // Création de la couche de tuiles haute disponibilité
     const tileLayer = L.tileLayer(tileUrl, {
       attribution: attribution,
       maxZoom: maxZoom,
-      subdomains: ['a', 'b', 'c']
+      subdomains: subdomains
     });
 
-    // Gestion du fallback si le serveur primaire échoue
+    // Basculement automatique sur le serveur de secours si une tuile échoue
     tileLayer.on('tileerror', function (error, tile) {
       if (window.INTEGRAL_MAP_CONFIG.fallbackTileUrl && tile && tile.src && !tile.dataset.fallbackTried) {
         tile.dataset.fallbackTried = 'true';
+        const sub = ['a', 'b', 'c'][Math.floor(Math.random() * 3)];
         tile.src = window.INTEGRAL_MAP_CONFIG.fallbackTileUrl
+          .replace('{s}', sub)
           .replace('{z}', error.coords.z)
           .replace('{x}', error.coords.x)
           .replace('{y}', error.coords.y);
@@ -116,7 +122,7 @@
 
     el._leaflet_map = map;
 
-    // Ajout des tuiles
+    // Ajout des tuiles fiables
     window.buildSafeLeafletTiles(map, mapOptions);
 
     return map;

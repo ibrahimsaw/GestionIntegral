@@ -919,7 +919,7 @@ class SupportDetailView(ClientStaffRequiredMixin, DetailView):
                 )
 
                 badge = mark_safe(
-                    f'<span class="badge-status {status_class}">'
+                    f'<span class="badge {status_class}">'
                     f'<i class="bi {status_icon} me-1"></i>{status_label}</span>'
                 )
                 notes     = f' — {face.notes}' if face.notes else ''

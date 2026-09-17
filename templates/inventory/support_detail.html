@@ -7,10 +7,10 @@
     <div class="d-inline-flex align-items-center justify-content-center rounded-3 p-2" style="background: rgba(147, 46, 43, 0.08); color: var(--color-primary);">
       <i class="bi {% if support.type_support == 'panneau' %}bi-sign-merge-right{% else %}bi-display{% endif %} fs-5"></i>
     </div>
-    <div class="min-width-0">
-      <div class="d-flex align-items-center gap-2">
-        <span class="fw-bold text-truncate">{{ support.nom }}</span>
-        <span class="badge bg-light text-dark border font-monospace px-2 py-0.5" style="font-size:0.75rem;">{{ support.code }}</span>
+    <div class="min-width-0" style="max-width: 100%;">
+      <div class="d-flex align-items-center gap-2" style="min-width: 0; max-width: 100%;">
+        <span class="fw-bold text-truncate" style="display: inline-block; max-width: min(42vw, 460px); min-width: 0; vertical-align: middle;">{{ support.nom }}</span>
+        <span class="badge bg-light text-dark border font-monospace px-2" style="font-size:0.75rem; flex-shrink: 0;">{{ support.code }}</span>
       </div>
       <div class="text-muted d-none d-sm-block" style="font-size:0.75rem;">
         <i class="bi bi-geo-alt me-1"></i>{{ support.quartier|default:"" }}{% if support.quartier and support.ville %}, {% endif %}{{ support.ville|default:"" }}
@@ -23,22 +23,22 @@
   <div class="d-flex flex-wrap gap-2">
     <a href="{% url 'support_periodes_panne' support.pk %}" class="btn btn-outline-danger btn-sm shadow-sm">
       <i class="bi bi-clock-history me-1"></i>
-      <span class="d-none d-md-inline">Périodes de panne</span>
+      <span class="d-none d-xxl-inline">Périodes de panne</span>
     </a>
     {% if user.is_staff_regie_role %}
     <a href="{% url 'support_edit' support.uuid %}" class="btn btn-outline-secondary btn-sm shadow-sm">
       <i class="bi bi-pencil me-1"></i>
-      <span class="d-none d-md-inline">Modifier</span>
+      <span class="d-none d-xxl-inline">Modifier</span>
     </a>
     {% endif %}
     {% if user.is_technicien_role or user.is_staff_regie_role %}
-    <a href="{% url 'maintenance_create' support.pk %}" class="btn btn-warning btn-sm shadow-sm text-dark fw-semibold" style="background:#fef3c7; border-color:#fcd34d;">
-      <i class="bi bi-tools text-warning-emphasis me-1"></i>
-      <span class="d-none d-md-inline">Maintenance</span>
+    <a href="{% url 'maintenance_create' support.pk %}" class="btn btn-warning btn-sm shadow-sm text-dark fw-semibold">
+      <i class="bi bi-tools me-1"></i>
+      <span class="d-none d-xxl-inline">Maintenance</span>
     </a>
     {% endif %}
     {% if user.is_admin %}
-    <a href="{% url 'support_delete' support.uuid %}" class="btn btn-outline-danger btn-sm shadow-sm px-2.5" title="Supprimer le support">
+    <a href="{% url 'support_delete' support.uuid %}" class="btn btn-outline-danger btn-sm shadow-sm px-2" title="Supprimer">
       <i class="bi bi-trash"></i>
     </a>
     {% endif %}
@@ -47,549 +47,938 @@
 
 {% block extra_head %}
 <style>
-  /* ══════════════════════════════════════════════════════════════════════════
-     SUPPORT DETAIL — DESIGN SAAS HAUTE DÉFINITION
-     ══════════════════════════════════════════════════════════════════════════ */
-  .sd-wrap {
-    --ink: #0f172a;
-    --ink-muted: #64748b;
-    --border-subtle: #e2e8f0;
-    --bg-surface: #ffffff;
-    --bg-elevated: #f8fafc;
+  /* ═══════════════════════════════════════════════════════════
+    SUPPORT DETAIL — PREMIUM UI v3
+    ═══════════════════════════════════════════════════════════ */
+
+  /* ── Responsive Mobile-first ── */
+  @media (max-width: 575.98px) {
+    /* Hero */
+    .sdp-hero { border-radius: 8px; min-height: auto; margin-bottom: 16px; }
+    .sdp-hero-content { padding: 18px 16px 16px; gap: 14px; }
+    .sdp-hero-icon { width: 48px; height: 48px; font-size: 1.4rem; border-radius: 13px; }
+    .sdp-hero h1 { font-size: 1.2rem !important; margin-bottom: 6px; }
+    .sdp-code-badge { font-size: 0.7rem; }
+    .sdp-pulse { font-size: 0.7rem; padding: 3px 9px; }
+    .sdp-hero-content > div:first-child { flex-direction: row; align-items: flex-start; gap: 12px; }
+    .sdp-hero-content > div:last-child { width: 100%; }
+    .sdp-hero-content > div:last-child .btn { width: 100%; justify-content: center; font-size: 0.82rem; }
+
+    /* KPI Strip : 2 colonnes sur mobile */
+    .sdp-kpi-strip { grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+    .sdp-kpi { padding: 13px 13px; gap: 10px; border-radius: 12px; }
+    .sdp-kpi-icon { width: 38px; height: 38px; font-size: 1.05rem; border-radius: 10px; }
+    .sdp-kpi-value { font-size: 0.98rem; }
+    .sdp-kpi-label { font-size: 0.62rem; }
+    .sdp-kpi-sub { font-size: 0.65rem; }
+
+    /* Tabs : icônes seulement sur mobile */
+    .sdp-tabs { padding: 5px 6px; gap: 3px; margin-bottom: 16px; border-radius: 12px; }
+    .sdp-tab { padding: 8px 10px; gap: 0; font-size: 0; border-radius: 9px; }
+    .sdp-tab i { font-size: 1rem; }
+    .sdp-tab-badge { display: none; }
+
+    /* Cards */
+    .sdp-card { border-radius: 12px; margin-bottom: 14px; }
+    .sdp-card-head { padding: 12px 14px; flex-wrap: wrap; gap: 8px; }
+    .sdp-card-head h2 { font-size: 0.84rem; }
+    .sdp-card-body { padding: 14px; }
+
+    /* Face cards */
+    .sdp-face { border-radius: 11px; }
+    .sdp-face-thumb { height: 170px; }
+
+    /* Timeline */
+    .sdp-timeline { padding: 4px 14px 14px; }
+    .sdp-tl-item { gap: 10px; padding-bottom: 16px; }
+    .sdp-tl-dot { width: 34px; height: 34px; font-size: 0.9rem; border-radius: 10px; }
+    .sdp-tl-item::before { left: 16px; top: 36px; }
+    .sdp-tl-body { padding: 10px 12px; border-radius: 10px; }
+
+    /* Galerie */
+    .sdp-gallery { grid-template-columns: repeat(3, 1fr); gap: 7px; }
+
+    /* Campagnes */
+    .sdp-camp-item { padding: 12px 14px; gap: 10px; flex-wrap: wrap; }
+    .sdp-camp-dot { width: 36px; height: 36px; border-radius: 10px; font-size: 0.95rem; }
+
+    /* Carte full-tab */
+    #full-tab-map { height: 280px !important; }
+    #mini-map { height: 160px !important; }
+
+    /* Empty state */
+    .sdp-empty { padding: 28px 14px; }
+    .sdp-empty-icon { font-size: 2rem; }
   }
 
-  /* ── Hero Banner Support ── */
-  .sd-hero {
-    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-    border-radius: var(--radius-xl, 16px);
-    color: #ffffff;
-    padding: 24px 28px;
-    margin-bottom: 24px;
-    box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.25), 0 8px 10px -6px rgba(15, 23, 42, 0.15);
-    position: relative;
-    overflow: hidden;
-    border: 1px solid rgba(255, 255, 255, 0.08);
+  @media (min-width: 576px) and (max-width: 767.98px) {
+    /* Hero */
+    .sdp-hero { border-radius: 8px; margin-bottom: 18px; }
+    .sdp-hero-content { padding: 22px 20px 18px; gap: 16px; }
+
+    /* KPI : 2 colonnes */
+    .sdp-kpi-strip { grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 18px; }
+
+    /* Tabs : texte court */
+    .sdp-tab { padding: 8px 13px; font-size: 0.78rem; }
+
+    /* Carte */
+    #full-tab-map { height: 340px !important; }
   }
-  .sd-hero::after {
-    content: '';
+
+  @media (min-width: 768px) and (max-width: 991.98px) {
+    /* KPI : 2 colonnes sur tablette portrait */
+    .sdp-kpi-strip { grid-template-columns: repeat(2, 1fr); }
+
+    /* Tabs */
+    .sdp-tab { padding: 8px 14px; font-size: 0.81rem; }
+  }
+
+  /* ── Fix global : empêche débordement horizontal ── */
+  .sdp-hero-content,
+  .sdp-kpi-strip,
+  .sdp-tabs { max-width: 100%; }
+
+  .sdp-camp-item .btn,
+  .sdp-camp-item a { flex-shrink: 0; }
+
+  /* Évite que les rows Bootstrap débordent */
+  @media (max-width: 575.98px) {
+    .row.g-4 { --bs-gutter-x: 0.75rem; --bs-gutter-y: 0.75rem; }
+    .sdp-card-head { flex-direction: column; align-items: flex-start; }
+    .sdp-card-head > * { flex-shrink: 0; }
+  }
+
+  /* ── Cinematic Hero ── */
+  .sdp-hero {
+    position: relative;
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 28px;
+    min-height: 220px;
+    background: #0f172a;
+    box-shadow: 0 20px 60px -10px rgba(15,23,42,0.35), 0 0 0 1px rgba(255,255,255,0.06);
+  }
+  .sdp-hero-bg {
     position: absolute;
-    top: -50%;
-    right: -10%;
-    width: 320px;
-    height: 320px;
+    inset: 0;
+    background-size: cover;
+    background-position: center;
+    filter: brightness(0.35) saturate(1.2);
+    transition: transform 8s ease;
+  }
+  .sdp-hero:hover .sdp-hero-bg { transform: scale(1.03); }
+  .sdp-hero-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg,
+      rgba(15,23,42,0.95) 0%,
+      rgba(15,23,42,0.7) 50%,
+      rgba(147,46,43,0.3) 100%);
+  }
+  .sdp-hero-glow {
+    position: absolute;
+    top: -60px; right: -60px;
+    width: 360px; height: 360px;
     border-radius: 50%;
-    background: radial-gradient(circle, rgba(147, 46, 43, 0.25) 0%, rgba(147, 46, 43, 0) 70%);
+    background: radial-gradient(circle, rgba(147,46,43,0.3) 0%, transparent 65%);
     pointer-events: none;
   }
+  .sdp-hero-content {
+    position: relative;
+    z-index: 2;
+    padding: 28px 32px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+  @media (min-width: 768px) {
+    .sdp-hero-content { flex-direction: row; align-items: center; justify-content: space-between; }
+  }
 
-  .sd-hero-code {
+  .sdp-hero-icon {
+    width: 62px; height: 62px;
+    border-radius: 18px;
+    background: rgba(255,255,255,0.1);
+    border: 1px solid rgba(255,255,255,0.18);
+    backdrop-filter: blur(8px);
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    font-size: 1.8rem;
+  }
+
+  .sdp-code-badge {
     font-family: var(--font-mono, monospace);
-    font-size: 0.82rem;
+    font-size: 0.78rem;
     font-weight: 700;
-    letter-spacing: 0.08em;
-    background: rgba(255, 255, 255, 0.12);
-    padding: 3px 10px;
-    border-radius: 6px;
-    border: 1px solid rgba(255, 255, 255, 0.18);
+    letter-spacing: 0.1em;
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.2);
+    color: rgba(255,255,255,0.9);
+    padding: 3px 11px;
+    border-radius: 7px;
     display: inline-block;
   }
 
-  /* ── KPIs Summary Bar ── */
-  .sd-kpi-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 16px;
-    margin-bottom: 24px;
+  .sdp-pulse {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    padding: 4px 12px;
+    border-radius: 8px;
   }
-  .sd-kpi-card {
-    background: var(--bg-surface);
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg, 14px);
-    padding: 16px 20px;
-    box-shadow: var(--shadow-xs);
+  .sdp-pulse.pulse-green {
+    background: rgba(16,185,129,0.2);
+    border: 1px solid rgba(16,185,129,0.35);
+    color: #6ee7b7;
+  }
+  .sdp-pulse.pulse-red {
+    background: rgba(239,68,68,0.2);
+    border: 1px solid rgba(239,68,68,0.35);
+    color: #fca5a5;
+  }
+  .sdp-pulse.pulse-amber {
+    background: rgba(245,158,11,0.2);
+    border: 1px solid rgba(245,158,11,0.35);
+    color: #fcd34d;
+  }
+  .sdp-pulse-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: pulse-blink 1.6s ease infinite;
+  }
+  @keyframes pulse-blink {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.4; transform: scale(0.75); }
+  }
+
+  /* ── KPI Strip ── */
+  .sdp-kpi-strip {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 14px;
+    margin-bottom: 26px;
+  }
+  .sdp-kpi {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 18px 20px;
     display: flex;
     align-items: center;
     gap: 14px;
-    transition: transform 0.18s ease, box-shadow 0.18s ease;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    cursor: default;
   }
-  .sd-kpi-card:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
+  .sdp-kpi:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 24px -4px rgba(0,0,0,0.12);
   }
-  .sd-kpi-icon {
-    width: 44px;
-    height: 44px;
-    border-radius: 12px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 1.25rem;
+  .sdp-kpi-icon {
+    width: 46px; height: 46px;
+    border-radius: 13px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.3rem;
     flex-shrink: 0;
   }
+  .sdp-kpi-label {
+    font-size: 0.60rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: #94a3b8;
+    margin-bottom: 3px;
+  }
+  .sdp-kpi-value {
+    font-size: 0.90rem;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.1;
+  }
+  .sdp-kpi-sub {
+    font-size: 0.72rem;
+    color: #94a3b8;
+    font-weight: 500;
+  }
 
-  /* ── Tabs de Navigation ── */
-  .sd-nav-tabs {
-    background: #ffffff;
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg, 14px);
-    padding: 6px;
+  /* ── Premium Tab Navigation ── */
+  .sdp-tabs {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 6px 8px;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
     overflow-x: auto;
-    margin-bottom: 22px;
-    box-shadow: var(--shadow-xs);
+    margin-bottom: 24px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+    scrollbar-width: none;
   }
-  .sd-nav-tab {
+  .sdp-tabs::-webkit-scrollbar { display: none; }
+
+  .sdp-tab {
     display: inline-flex;
     align-items: center;
-    gap: 8px;
-    padding: 8px 18px;
-    border-radius: var(--radius-md, 10px);
-    font-size: 0.85rem;
+    gap: 7px;
+    padding: 9px 18px;
+    border-radius: 11px;
+    font-size: 0.84rem;
     font-weight: 600;
-    color: var(--ink-muted);
-    text-decoration: none;
+    color: #64748b;
     white-space: nowrap;
     cursor: pointer;
     border: none;
     background: transparent;
-    transition: all 0.16s ease;
+    transition: color 0.15s ease, background 0.15s ease;
+    position: relative;
   }
-  .sd-nav-tab:hover {
-    color: var(--color-primary);
-    background: rgba(147, 46, 43, 0.05);
+  .sdp-tab:hover:not(.active) {
+    color: #1e293b;
+    background: #f1f5f9;
   }
-  .sd-nav-tab.active {
-    color: #ffffff;
-    background: var(--color-primary);
-    box-shadow: 0 4px 12px rgba(147, 46, 43, 0.28);
+  .sdp-tab.active {
+    color: #fff;
+    background: linear-gradient(135deg, #932e2b 0%, #7a1e1b 100%);
+    box-shadow: 0 4px 14px rgba(147,46,43,0.32);
+  }
+  .sdp-tab-badge {
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 1px 7px;
+    border-radius: 9px;
+    background: rgba(255,255,255,0.22);
+    color: rgba(255,255,255,0.9);
+  }
+  .sdp-tab:not(.active) .sdp-tab-badge {
+    background: #e2e8f0;
+    color: #475569;
   }
 
-  /* ── Cartes de Contenu ── */
-  .sd-card {
-    background: #ffffff;
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-lg, 14px);
-    box-shadow: var(--shadow-xs);
-    margin-bottom: 22px;
+  /* ── Section Containers ── */
+  .sdp-section { display: none; }
+  .sdp-section.active { display: block; }
+
+  /* ── Content Cards ── */
+  .sdp-card {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    margin-bottom: 20px;
     overflow: hidden;
-    transition: box-shadow 0.2s ease;
   }
-  .sd-card:hover {
-    box-shadow: var(--shadow-md);
-  }
-  .sd-card-header {
-    padding: 16px 20px;
+  .sdp-card-head {
+    padding: 16px 22px;
     background: #f8fafc;
-    border-bottom: 1px solid var(--border-subtle);
+    border-bottom: 1px solid #e2e8f0;
     display: flex;
     align-items: center;
     justify-content: space-between;
   }
-  .sd-card-header h2 {
+  .sdp-card-head h2 {
     font-size: 0.92rem;
     font-weight: 700;
-    color: var(--ink);
+    color: #0f172a;
     margin: 0;
     display: flex;
     align-items: center;
     gap: 8px;
   }
+  .sdp-card-body { padding: 22px; }
 
-  /* ── Spécifications Techniques ── */
-  .sd-specs-table {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 1px;
-    background: var(--border-subtle);
-  }
-  .sd-spec-item {
-    background: #ffffff;
-    padding: 14px 18px;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-  }
-  .sd-spec-item .label {
-    font-size: 0.72rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    color: var(--ink-muted);
-  }
-  .sd-spec-item .value {
-    font-size: 0.9rem;
-    font-weight: 600;
-    color: var(--ink);
-  }
-
-  /* ── Face Cards ── */
-  .sd-face-card {
-    border-radius: var(--radius-md, 12px);
-    border: 1px solid var(--border-subtle);
-    background: #ffffff;
+  /* ── Face Cards (premium) ── */
+  .sdp-face {
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
     overflow: hidden;
-    box-shadow: var(--shadow-xs);
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-    height: 100%;
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+    transition: transform 0.22s ease, box-shadow 0.22s ease;
     display: flex;
     flex-direction: column;
+    height: 100%;
   }
-  .sd-face-card:hover {
-    transform: translateY(-3px);
-    box-shadow: var(--shadow-md);
+  .sdp-face:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 12px 32px -4px rgba(0,0,0,0.14);
   }
-  .sd-face-card.is-libre { border-top: 4px solid #10b981; }
-  .sd-face-card.is-occupe { border-top: 4px solid #ef4444; }
-  .sd-face-card.is-reserve { border-top: 4px solid #f59e0b; }
+  .sdp-face.libre  { border-top: 4px solid #10b981; }
+  .sdp-face.occupe { border-top: 4px solid #ef4444; }
+  .sdp-face.reserve { border-top: 4px solid #f59e0b; }
 
-  .sd-face-thumb {
-    width: 100%;
-    height: 190px;
-    background: #0f172a;
+  .sdp-face-thumb {
     position: relative;
+    height: 200px;
+    background: #e4e4e4;
     overflow: hidden;
     cursor: zoom-in;
   }
-  .sd-face-thumb img, .sd-face-thumb video {
-    width: 100%;
-    height: 100%;
+  .sdp-face-thumb img,
+  .sdp-face-thumb video {
+    width: 100%; height: 100%;
+    object-fit: cover;
+    transition: transform 0.4s ease;
+    display: block;
+  }
+  .sdp-face:hover .sdp-face-thumb img,
+  .sdp-face:hover .sdp-face-thumb video {
+    transform: scale(1.06);
+  }
+  .sdp-face-thumb-overlay {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(180deg, transparent 50%, rgba(15,23,42,0.75) 100%);
+    display: flex;
+    align-items: flex-end;
+    padding: 14px;
+    gap: 6px;
+    opacity: 0;
+    transition: opacity 0.25s ease;
+  }
+  .sdp-face:hover .sdp-face-thumb-overlay { opacity: 1; }
+  .sdp-face-badge-top {
+    position: absolute;
+    top: 12px; left: 12px;
+  }
+  .sdp-face-badge-zoom {
+    position: absolute;
+    top: 12px; right: 12px;
+    background: rgba(0,0,0,0.55);
+    color: #fff;
+    border: none;
+    width: 34px; height: 34px;
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.9rem;
+    backdrop-filter: blur(4px);
+    cursor: pointer;
+    transition: background 0.2s ease;
+  }
+  .sdp-face-badge-zoom:hover { background: var(--color-primary); }
+  .sdp-face-info { padding: 16px; flex-grow: 1; display: flex; flex-direction: column; gap: 10px; }
+  .sdp-face-campaign {
+    border-radius: 10px;
+    padding: 11px 13px;
+    font-size: 0.8rem;
+  }
+  .sdp-face-campaign.active-camp {
+    background: rgba(239,68,68,0.07);
+    border: 1px solid rgba(239,68,68,0.18);
+  }
+  .sdp-face-campaign.free-camp {
+    background: rgba(16,185,129,0.07);
+    border: 1px solid rgba(16,185,129,0.18);
+  }
+  .sdp-face-campaign.reserved-camp {
+    background: rgba(245,158,11,0.07);
+    border: 1px solid rgba(245,158,11,0.2);
+  }
+
+  /* ── Tech Specs Grid ── */
+  .sdp-specs-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    gap: 1px;
+    background: #e2e8f0;
+  }
+  .sdp-spec {
+    background: #fff;
+    padding: 16px 20px;
+  }
+  .sdp-spec-label {
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: #94a3b8;
+    margin-bottom: 4px;
+  }
+  .sdp-spec-value {
+    font-size: 0.92rem;
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  /* ── Timeline Maintenance ── */
+  .sdp-timeline { padding: 6px 22px 22px; }
+  .sdp-tl-item {
+    display: flex;
+    gap: 16px;
+    position: relative;
+    padding-bottom: 22px;
+  }
+  .sdp-tl-item:last-child { padding-bottom: 0; }
+  .sdp-tl-item::before {
+    content: '';
+    position: absolute;
+    left: 20px;
+    top: 42px;
+    bottom: 0;
+    width: 2px;
+    background: linear-gradient(180deg, #e2e8f0 0%, transparent 100%);
+  }
+  .sdp-tl-item:last-child::before { display: none; }
+  .sdp-tl-dot {
+    width: 42px; height: 42px;
+    border-radius: 13px;
+    flex-shrink: 0;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.1rem;
+    margin-top: 2px;
+  }
+  .sdp-tl-body {
+    flex-grow: 1;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    padding: 13px 16px;
+  }
+  .sdp-tl-date {
+    font-size: 0.72rem;
+    font-weight: 700;
+    color: #94a3b8;
+    font-family: var(--font-mono, monospace);
+  }
+
+  /* ── Photo Gallery ── */
+  .sdp-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+    gap: 10px;
+  }
+  .sdp-gallery-item {
+    position: relative;
+    border-radius: 10px;
+    overflow: hidden;
+    aspect-ratio: 1;
+    cursor: zoom-in;
+    background: #0f172a;
+  }
+  .sdp-gallery-item img {
+    width: 100%; height: 100%;
     object-fit: cover;
     transition: transform 0.3s ease;
+    display: block;
   }
-  .sd-face-card:hover .sd-face-thumb img {
-    transform: scale(1.04);
+  .sdp-gallery-item:hover img { transform: scale(1.08); }
+  .sdp-gallery-caption {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    background: linear-gradient(transparent, rgba(15,23,42,0.85));
+    color: rgba(255,255,255,0.85);
+    font-size: 0.65rem;
+    padding: 8px 8px 5px;
+    font-family: var(--font-mono, monospace);
+    transform: translateY(100%);
+    transition: transform 0.25s ease;
   }
+  .sdp-gallery-item:hover .sdp-gallery-caption { transform: translateY(0); }
 
-  /* ── Télémétrie Canvas ── */
-  .telemetry-kpi {
-    background: #f8fafc;
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-md, 10px);
-    padding: 12px 14px;
+  /* ── Campaign List ── */
+  .sdp-camp-item {
     display: flex;
-    flex-direction: column;
-    gap: 4px;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 22px;
+    border-bottom: 1px solid #f1f5f9;
+    transition: background 0.15s ease;
+  }
+  .sdp-camp-item:last-child { border-bottom: none; }
+  .sdp-camp-item:hover { background: #f8fafc; }
+  .sdp-camp-dot {
+    width: 44px; height: 44px;
+    border-radius: 13px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.15rem;
+    flex-shrink: 0;
   }
 
-  /* ── Lightbox Modal ── */
-  .sd-lightbox {
+  /* ── Empty State ── */
+  .sdp-empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: #94a3b8;
+  }
+  .sdp-empty-icon {
+    font-size: 2.5rem;
+    margin-bottom: 12px;
+    opacity: 0.4;
+    display: block;
+  }
+
+  /* ── Lightbox ── */
+  .sdp-lb {
     position: fixed;
     inset: 0;
-    background: rgba(15, 23, 42, 0.9);
-    backdrop-filter: blur(8px);
+    background: rgba(2,6,23,0.92);
+    backdrop-filter: blur(10px);
     z-index: 9999;
     display: none;
     align-items: center;
     justify-content: center;
-    padding: 24px;
+    padding: 20px;
   }
-  .sd-lightbox.active {
-    display: flex;
-  }
-  .sd-lightbox-content {
-    max-width: 90vw;
+  .sdp-lb.open { display: flex; }
+  .sdp-lb-inner {
+    max-width: 92vw;
     max-height: 90vh;
-    border-radius: 12px;
-    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+    border-radius: 8px;
     overflow: hidden;
     position: relative;
-    background: #000;
+    box-shadow: 0 30px 80px rgba(0,0,0,0.6);
   }
-  .sd-lightbox-content img, .sd-lightbox-content video {
-    max-width: 100%;
-    max-height: 85vh;
+  .sdp-lb-inner img,
+  .sdp-lb-inner video {
+    max-width: 92vw;
+    max-height: 88vh;
     display: block;
     object-fit: contain;
   }
-  .sd-lightbox-close {
+  .sdp-lb-close {
     position: absolute;
-    top: 14px;
-    right: 14px;
-    background: rgba(0, 0, 0, 0.6);
+    top: 14px; right: 14px;
+    background: rgba(0,0,0,0.65);
     color: #fff;
     border: none;
-    width: 38px;
-    height: 38px;
+    width: 40px; height: 40px;
     border-radius: 50%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    display: flex; align-items: center; justify-content: center;
     cursor: pointer;
-    font-size: 1.2rem;
-    transition: background 0.2s ease;
+    font-size: 1.1rem;
+    transition: background 0.2s;
+    backdrop-filter: blur(4px);
   }
-  .sd-lightbox-close:hover {
-    background: #ef4444;
+  .sdp-lb-close:hover { background: #ef4444; }
+
+  /* ── Telemetry KPI ── */
+  .tlm-kpi {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 11px;
+    padding: 12px 16px;
+  }
+  .tlm-kpi-label {
+    font-size: 0.60rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: #94a3b8;
+    margin-bottom: 4px;
+  }
+  .tlm-kpi-value {
+    font-size: 0.90rem;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1;
   }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="sd-wrap">
+<div class="d-flex align-items-center gap-3 mb-4">
+  <a href="javascript:void(0)" onclick="history.back()" class="btn btn-outline-secondary btn-sm shadow-sm">
+    <i class="bi bi-arrow-left me-1"></i>Retour
+  </a>
+</div>
+<div>
 
-  <!-- ══════════════════════════════════════════════════════════════════
-       HERO BANNER DU SUPPORT
-       ══════════════════════════════════════════════════════════════════ -->
-  <div class="sd-hero" data-aos="fade-up">
-    <div class="d-flex flex-column flex-lg-row align-items-start align-items-lg-center justify-content-between gap-4">
-      <div class="d-flex align-items-start gap-3.5">
-        <div class="d-flex align-items-center justify-content-center rounded-4 p-3.5 flex-shrink-0" style="background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.15);">
-          <i class="bi {% if support.type_support == 'panneau' %}bi-sign-merge-right-fill{% else %}bi-display-fill{% endif %} fs-2 text-warning"></i>
+  <!-- ═══════════════════════════════════════════════════════
+       HERO CINÉMATIQUE
+       ═══════════════════════════════════════════════════════ -->
+  <div class="sdp-hero">
+    {% if support.photo_principale %}
+    <div class="sdp-hero-bg" style="background-image: url('{{ support.photo_principale.url }}');"></div>
+    {% else %}
+    <div class="sdp-hero-bg" style="background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%);"></div>
+    {% endif %}
+    <div class="sdp-hero-overlay"></div>
+    <div class="sdp-hero-glow"></div>
+
+    <div class="sdp-hero-content">
+      <!-- Info principale -->
+      <div class="d-flex align-items-start gap-4">
+        <div class="d-none d-lg-inline">
+          <div class="sdp-hero-icon">
+            <i class="bi {% if support.type_support == 'panneau' %}bi-sign-merge-right-fill{% else %}bi-display-fill{% endif %} text-warning"></i>
+          </div>
         </div>
+
         <div>
-          <div class="d-flex align-items-center flex-wrap gap-2 mb-1.5">
-            <span class="sd-hero-code">{{ support.code }}</span>
-            <span class="badge bg-white bg-opacity-20 text-white font-monospace text-uppercase" style="font-size:0.75rem;">
-              {{ support.get_type_support_display }}
+          <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
+            <span class="sdp-code-badge">{{ support.code }}</span>
+            <span style="font-size:0.78rem; font-weight:600; color:rgba(255,255,255,0.6); text-transform:uppercase; letter-spacing:0.06em;">
+              {{ support.get_type_support_display }}{% if support.format %} · {{ support.get_format_display }}{% endif %}
             </span>
-            {% if support.format %}
-              <span class="badge bg-white bg-opacity-15 text-white font-monospace" style="font-size:0.75rem;">
-                {{ support.get_format_display }}
-              </span>
-            {% endif %}
-            <span class="badge-status {% if support.etat == 'bon' %}bs-disponible{% elif support.etat == 'maintenance' %}bs-occupe{% else %}bs-panne{% endif %}">
-              <i class="bi bi-circle-fill me-1" style="font-size:0.5rem;"></i>{{ support.get_etat_display }}
+            <span class="sdp-pulse {% if support.etat == 'bon' %}pulse-green{% elif support.etat == 'maintenance' %}pulse-amber{% else %}pulse-red{% endif %}">
+              <span class="sdp-pulse-dot"></span>
+              {{ support.get_etat_display }}
             </span>
           </div>
-
-          <h1 class="h3 fw-bold text-white mb-2">{{ support.nom }}</h1>
-
-          <div class="d-flex align-items-center flex-wrap gap-3 text-white-50" style="font-size:0.85rem;">
-            <span><i class="bi bi-geo-alt-fill text-danger me-1"></i>{{ support.adresse|default:"Adresse non renseignée" }}{% if support.quartier %}, {{ support.quartier }}{% endif %}{% if support.ville %} (<strong>{{ support.ville }}</strong>){% endif %}</span>
+          <h1 style="font-size: clamp(1.4rem, 3vw, 1.9rem); font-weight: 800; color: #fff; margin: 0 0 10px; line-height: 1.15;">
+            {{ support.nom }}
+          </h1>
+          <div class="d-flex flex-wrap gap-2" style="font-size:0.82rem; color:rgba(255,255,255,0.55);">
+            <span style="word-break:break-word; min-width:0;">
+              <i class="bi bi-geo-alt-fill me-1" style="color:#f87171;"></i>
+              {{ support.adresse|default:"" }}{% if support.quartier %}, {{ support.quartier }}{% endif %}{% if support.ville %} <strong style="color:rgba(255,255,255,0.8);">— {{ support.ville }}</strong>{% endif %}
+            </span>
             {% if support.latitude and support.longitude %}
-            <span class="d-inline-flex align-items-center gap-1 font-monospace" style="cursor:pointer;" onclick="copyGps('{{ support.latitude }}, {{ support.longitude }}')" title="Cliquer pour copier">
-              <i class="bi bi-pin-map text-warning"></i>{{ support.latitude }}, {{ support.longitude }}
-              <i class="bi bi-clipboard ms-1 small opacity-75"></i>
+            <span class="font-monospace" style="cursor:pointer; color:rgba(255,255,255,0.45); word-break:break-all;" onclick="sdpCopyGps('{{ support.latitude }}, {{ support.longitude }}')" title="Copier les coordonnées">
+              <i class="bi bi-crosshair me-1" style="color:#fbbf24;"></i>{{ support.latitude }}, {{ support.longitude }}
+              <i class="bi bi-clipboard ms-1 opacity-50"></i>
             </span>
             {% endif %}
           </div>
         </div>
       </div>
 
-      <!-- Actions Rapides -->
-      <div class="d-flex flex-wrap gap-2 align-self-stretch align-self-lg-center justify-content-lg-end">
-        <a href="{% url 'carte' %}?support={{ support.pk }}" class="btn btn-light btn-sm fw-semibold shadow-sm d-inline-flex align-items-center gap-1.5">
-          <i class="bi bi-map-fill text-primary"></i>
-          <span>Ouvrir sur la carte</span>
+      <!-- Actions Hero -->
+      <div class="d-flex flex-wrap gap-2 align-self-center">
+        <a href="{% url 'carte' %}?support={{ support.pk }}" class="btn btn-light btn-sm fw-semibold d-inline-flex align-items-center gap-1" style="border-radius:10px; font-size:0.84rem;">
+          <i class="bi bi-map-fill text-primary"></i> <span>Voir sur la carte</span>
         </a>
         {% if user.is_staff_regie_role %}
-        <a href="{% url 'support_edit' support.uuid %}" class="btn btn-outline-light btn-sm shadow-sm d-inline-flex align-items-center gap-1.5">
-          <i class="bi bi-pencil"></i>
-          <span>Modifier</span>
+        <a href="{% url 'support_edit' support.uuid %}" class="btn btn-sm d-inline-flex align-items-center gap-1 fw-semibold" style="background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.2); color:#fff; border-radius:10px; font-size:0.84rem; backdrop-filter:blur(4px);">
+          <i class="bi bi-pencil-square"></i> <span>Modifier</span>
         </a>
         {% endif %}
       </div>
     </div>
   </div>
 
-  <!-- ══════════════════════════════════════════════════════════════════
-       KPI SUMMARY GRID
-       ══════════════════════════════════════════════════════════════════ -->
-  <div class="sd-kpi-grid" data-aos="fade-up" data-aos-delay="50">
-    <!-- Statut & Occupation -->
-    <div class="sd-kpi-card">
-      <div class="sd-kpi-icon" style="background: rgba(16, 185, 129, 0.1); color: #10b981;">
-        <i class="bi {% if support.type_support == 'panneau' %}bi-shield-check{% else %}bi-broadcast{% endif %}"></i>
+  <!-- ═══════════════════════════════════════════════════════
+       BANDE KPI
+       ═══════════════════════════════════════════════════════ -->
+  <div class="sdp-kpi-strip">
+
+    <!-- Statut Commercial -->
+    <div class="sdp-kpi">
+      <div class="sdp-kpi-icon" style="display:flex; align-items:center; justify-content:center; width:46px; height:46px; border-radius:13px; background: #b8e0d393; color:#059669; ">
+        <i class="bi bi-check-circle-fill"></i>
       </div>
       <div>
-        <div class="text-muted small text-uppercase font-monospace" style="font-size:0.7rem; font-weight:700;">Statut Commercial</div>
-        <div class="fw-bold fs-6 text-dark mt-0.5">
+        <div class="sdp-kpi-label">Statut Commercial</div>
+        <div class="sdp-kpi-value">
           {% if support.type_support == 'panneau' %}
             {{ support.faces.count }} Face{{ support.faces.count|pluralize:",s" }}
+          {% elif support.is_occupe %}
+            <span style="color:#ef4444;">Occupé</span>
           {% else %}
-            {% if support.is_occupe %}
-              <span class="text-danger">{{ support.taux_occupation_pourcentage }}% Occupé</span>
-            {% else %}
-              <span class="text-success">100% Disponible</span>
-            {% endif %}
+            <span style="color:#10b981;">Libre</span>
           {% endif %}
         </div>
+        {% if support.type_support == 'ecran' %}
+        <div class="sdp-kpi-sub">{{ support.taux_occupation_pourcentage }}% taux occup.</div>
+        {% endif %}
       </div>
     </div>
 
-    <!-- Dimensions & Surface -->
-    <div class="sd-kpi-card">
-      <div class="sd-kpi-icon" style="background: rgba(59, 130, 246, 0.1); color: #3b82f6;">
-        <i class="bi bi-aspect-ratio"></i>
+    <!-- Gabarit -->
+    <div class="sdp-kpi">
+      <div class="sdp-kpi-icon" style="background:rgba(59,130,246,0.1); color:#3b82f6;">
+        <i class="bi bi-aspect-ratio-fill"></i>
       </div>
       <div>
-        <div class="text-muted small text-uppercase font-monospace" style="font-size:0.7rem; font-weight:700;">Gabarit & Surface</div>
-        <div class="fw-bold fs-6 text-dark mt-0.5">
-          {{ support.dimensions|default:support.get_format_display|default:"Standard" }}
-          {% if support.surface_m2 %}<span class="text-muted small fw-normal">({{ support.surface_m2 }} m²)</span>{% endif %}
-        </div>
+        <div class="sdp-kpi-label">Gabarit & Surface</div>
+        <div class="sdp-kpi-value">{{ support.dimensions|default:support.get_format_display|default:"Standard" }}</div>
+        {% if support.surface_m2 %}<div class="sdp-kpi-sub">{{ support.surface_m2 }}</div>{% endif %}
       </div>
     </div>
 
-    <!-- Campagnes Actives -->
-    <div class="sd-kpi-card">
-      <div class="sd-kpi-icon" style="background: rgba(147, 46, 43, 0.1); color: var(--color-primary);">
-        <i class="bi bi-megaphone"></i>
+    <!-- Campagnes -->
+    <div class="sdp-kpi">
+      <div class="sdp-kpi-icon" style="background:rgba(147,46,43,0.1); color:#932e2b;">
+        <i class="bi bi-megaphone-fill"></i>
       </div>
       <div>
-        <div class="text-muted small text-uppercase font-monospace" style="font-size:0.7rem; font-weight:700;">Campagnes en cours</div>
-        <div class="fw-bold fs-6 text-dark mt-0.5">
-          {{ lignes_actives|length }} Campagne{{ lignes_actives|length|pluralize:",s" }}
-        </div>
+        <div class="sdp-kpi-label">Campagnes Actives</div>
+        <div class="sdp-kpi-value" style="color:#932e2b;">{{ lignes_actives|length }}</div>
+        <div class="sdp-kpi-sub">{{ historique|length }} passée{{ historique|length|pluralize }}</div>
       </div>
     </div>
 
-    <!-- Maintenances -->
-    <div class="sd-kpi-card">
-      <div class="sd-kpi-icon" style="background: rgba(245, 158, 11, 0.1); color: #f59e0b;">
-        <i class="bi bi-wrench-adjustable"></i>
+    <!-- Maintenance -->
+    <div class="sdp-kpi">
+      <div class="sdp-kpi-icon" style="background:rgba(245,158,11,0.1); color:#f59e0b;">
+        <i class="bi bi-wrench-adjustable-circle-fill"></i>
       </div>
       <div>
-        <div class="text-muted small text-uppercase font-monospace" style="font-size:0.7rem; font-weight:700;">Dernier Entretien</div>
-        <div class="fw-bold fs-6 text-dark mt-0.5">
-          {% if maintenances %}
-            {{ maintenances.0.date_intervention|date:"d/m/Y" }}
-          {% else %}
-            <span class="text-success">Aucune panne</span>
-          {% endif %}
+        <div class="sdp-kpi-label">Dernier Entretien</div>
+        <div class="sdp-kpi-value">
+          {% if maintenances %}{{ maintenances.0.date_intervention|date:"d/m/Y" }}{% else %}<span style="color:#10b981; font-size:0.95rem;">Aucun incident</span>{% endif %}
         </div>
+        <div class="sdp-kpi-sub">{{ maintenances|length }} intervention{{ maintenances|length|pluralize }}</div>
       </div>
     </div>
+
   </div>
 
-  <!-- ══════════════════════════════════════════════════════════════════
-       ONGLETS DE NAVIGATION SAAS
-       ══════════════════════════════════════════════════════════════════ -->
-  <div class="sd-nav-tabs" data-aos="fade-up" data-aos-delay="80">
-    <button class="sd-nav-tab active" onclick="switchTab('tab-vue-ensemble', this)">
+  <!-- ═══════════════════════════════════════════════════════
+       NAVIGATION PAR ONGLETS
+       ═══════════════════════════════════════════════════════ -->
+  <div class="sdp-tabs">
+    <button class="sdp-tab active" onclick="sdpTab('overview', this)">
       <i class="bi bi-grid-fill"></i>
-      <span>Vue d'ensemble & {% if support.type_support == 'panneau' %}Faces{% else %}Écran LED{% endif %}</span>
+      <span>{% if support.type_support == 'panneau' %}Faces & Visuels{% else %}Écran LED{% endif %}</span>
     </button>
-    <button class="sd-nav-tab" onclick="switchTab('tab-specs', this)">
+    <button class="sdp-tab" onclick="sdpTab('specs', this)">
       <i class="bi bi-sliders"></i>
       <span>Fiche Technique</span>
     </button>
-    <button class="sd-nav-tab" onclick="switchTab('tab-carte', this)">
+    <button class="sdp-tab" onclick="sdpTab('map', this)">
       <i class="bi bi-geo-alt-fill"></i>
       <span>Localisation GPS</span>
     </button>
-    <button class="sd-nav-tab" onclick="switchTab('tab-campagnes', this)">
+    <button class="sdp-tab" onclick="sdpTab('campaigns', this)">
       <i class="bi bi-calendar-range-fill"></i>
-      <span>Campagnes & Planning ({{ lignes_actives|length }})</span>
+      <span>Campagnes</span>
+      {% if lignes_actives %}<span class="sdp-tab-badge">{{ lignes_actives|length }}</span>{% endif %}
     </button>
-    <button class="sd-nav-tab" onclick="switchTab('tab-maintenance', this)">
+    <button class="sdp-tab" onclick="sdpTab('maintenance', this)">
       <i class="bi bi-tools"></i>
-      <span>Maintenance & Photos ({{ maintenances|length }})</span>
+      <span>Maintenance</span>
+      {% if maintenances %}<span class="sdp-tab-badge">{{ maintenances|length }}</span>{% endif %}
     </button>
   </div>
 
-  <!-- ══════════════════════════════════════════════════════════════════
-       SECTION 1 : VUE D'ENSEMBLE & FACES / ÉCRAN
-       ══════════════════════════════════════════════════════════════════ -->
-  <div id="tab-vue-ensemble" class="sd-tab-content">
+  <!-- ═══════════════════════════════════════════════════════
+       ONGLET 1 : VUE D'ENSEMBLE
+       ═══════════════════════════════════════════════════════ -->
+  <div id="sdp-overview" class="sdp-section active">
     <div class="row g-4">
 
-      <!-- Colonne Principale (Faces ou Écran) -->
+      <!-- Colonne principale -->
       <div class="col-12 col-lg-8">
 
         {% if support.type_support == 'panneau' %}
-        <!-- ── PANNEAU : FACES & VISUELS ── -->
-        <div class="sd-card">
-          <div class="sd-card-header">
-            <h2><i class="bi bi-sign-merge-right-fill text-primary"></i>Faces du Panneau & Visuels Actifs</h2>
-            <span class="badge bg-light text-dark border">{{ support.faces.count }} Face{{ support.faces.count|pluralize:",s" }}</span>
+        <!-- Faces Panneau -->
+        <div class="sdp-card">
+          <div class="sdp-card-head">
+            <h2><i class="bi bi-sign-merge-right-fill" style="color:#932e2b;"></i>Faces du Panneau</h2>
+            <span class="badge" style="background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; font-size:0.78rem;">
+              {{ support.faces.count }} face{{ support.faces.count|pluralize }}
+            </span>
           </div>
-          <div class="p-4">
+          <div class="sdp-card-body">
             <div class="row g-3">
               {% for face in support.faces.all %}
                 {% with statut=face.get_statut %}
-                <div class="col-12 col-md-6">
-                  <div class="sd-face-card {% if statut == 'libre' %}is-libre{% elif statut == 'reserve' %}is-reserve{% else %}is-occupe{% endif %}">
-                    
-                    <!-- Vignette Média Cliquable avec Lightbox -->
-                    <div class="sd-face-thumb" onclick="openLightbox('{% with camp=face.get_campagne_active %}{% if camp and camp.visuels.first %}{{ camp.visuels.first.fichier.url }}{% elif face.photo %}{{ face.photo.url }}{% else %}{% static 'img/logo.png' %}{% endif %}{% endwith %}')">
+                <div class="col-12 col-sm-6">
+                  <div class="sdp-face {% if statut == 'libre' %}libre{% elif statut == 'reserve' %}reserve{% else %}occupe{% endif %}">
+
+                    <!-- Miniature média -->
+                    <div class="sdp-face-thumb" onclick="sdpLightbox('{% with camp=face.get_campagne_active %}{% if camp and camp.visuels.first %}{{ camp.visuels.first.fichier.url }}{% elif face.photo %}{{ face.photo.url }}{% else %}{% static 'img/logo.png' %}{% endif %}{% endwith %}')">
                       {% with camp=face.get_campagne_active %}
                         {% if camp %}
                           {% with visuel=camp.visuels.first %}
                             {% if visuel %}
-                              {% with visuel_name=visuel.fichier.name|lower %}
-                                {% if "mp4" in visuel_name or "webm" in visuel_name %}
-                                  <video muted autoplay loop playsinline>
-                                    <source src="{{ visuel.fichier.url }}">
-                                  </video>
+                              {% with vn=visuel.fichier.name|lower %}
+                                {% if "mp4" in vn or "webm" in vn %}
+                                  <video muted autoplay loop playsinline><source src="{{ visuel.fichier.url }}"></video>
                                 {% else %}
-                                  <img src="{{ visuel.fichier.url }}" alt="Visuel {{ camp.nom }}">
+                                  <img src="{{ visuel.fichier.url }}" alt="{{ camp.nom }}" loading="lazy">
                                 {% endif %}
                               {% endwith %}
                             {% elif face.photo %}
-                              <img src="{{ face.photo.url }}" alt="Face {{ face.label }}">
+                              <img src="{{ face.photo.url }}" alt="Face {{ face.label }}" loading="lazy">
                             {% else %}
-                              <img src="{% static 'img/logo.png' %}" alt="Integral Logo">
+                              <img src="{% static 'img/logo.png' %}" alt="Logo">
                             {% endif %}
                           {% endwith %}
                         {% elif face.photo %}
-                          <img src="{{ face.photo.url }}" alt="Face {{ face.label }}">
+                          <img src="{{ face.photo.url }}" alt="Face {{ face.label }}" loading="lazy">
                         {% else %}
-                          <img src="{% static 'img/logo.png' %}" alt="Integral Logo">
+                          <img src="{% static 'img/logo.png' %}" alt="Logo">
                         {% endif %}
                       {% endwith %}
 
-                      <div class="position-absolute top-0 start-0 m-2.5">
-                        <span class="badge bg-dark bg-opacity-75 text-white font-monospace">Face {{ face.label }}</span>
-                      </div>
-
-                      <div class="position-absolute bottom-0 end-0 m-2.5">
-                        <span class="badge bg-dark bg-opacity-75 text-white" style="font-size:0.7rem;">
-                          <i class="bi bi-arrows-fullscreen me-1"></i>Agrandir
+                      <span class="sdp-face-badge-top">
+                        <span class="badge" style="background:rgba(0,0,0,0.6); color:#fff; font-size:0.7rem; font-family:var(--font-mono,monospace); backdrop-filter:blur(4px);">
+                          Face {{ face.label }}
+                        </span>
+                      </span>
+                      <button class="sdp-face-badge-zoom" title="Agrandir">
+                        <i class="bi bi-arrows-fullscreen"></i>
+                      </button>
+                      <div class="sdp-face-thumb-overlay">
+                        <span style="color:#fff; font-size:0.75rem; font-weight:600;">
+                          <i class="bi bi-zoom-in me-1"></i>Voir en HD
                         </span>
                       </div>
                     </div>
 
-                    <!-- Métadonnées de la Face -->
-                    <div class="p-3 flex-grow-1 d-flex flex-column justify-content-between">
-                      <div>
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                          <span class="fw-bold text-dark fs-6">Face {{ face.label }}</span>
-                          {% if statut == 'libre' %}
-                            <span class="badge-status bs-disponible">LIBRE</span>
-                          {% elif statut == 'reserve' %}
-                            <span class="badge-status bs-reserve">RÉSERVÉE</span>
-                          {% else %}
-                            <span class="badge-status bs-occupe">OCCUPÉE</span>
-                          {% endif %}
-                        </div>
+                    <!-- Infos face -->
+                    <div class="sdp-face-info">
+                      <div class="d-flex justify-content-between align-items-center">
+                        <span style="font-weight:800; font-size:0.98rem; color:#0f172a;">Face {{ face.label }}</span>
+                        {% if statut == 'libre' %}
+                          <span class="badge badge-status bs-disponible">LIBRE</span>
+                        {% elif statut == 'reserve' %}
+                          <span class="badge badge-status bs-reserve">RÉSERVÉE</span>
+                        {% else %}
+                          <span class="badge badge-status bs-occupe">OCCUPÉE</span>
+                        {% endif %}
+                      </div>
 
-                        <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
-                          <span class="badge bg-light text-secondary border font-monospace">{{ support.get_format_display|default:"12m²" }}</span>
-                          {% if face.eclairage %}
-                            <span class="badge bg-light text-secondary border"><i class="bi bi-lightbulb me-1"></i>{{ face.get_eclairage_display }}</span>
-                          {% endif %}
-                        </div>
+                      <div class="d-flex flex-wrap gap-2">
+                        <span class="badge" style="background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0; font-size:0.72rem;">
+                          {{ support.get_format_display|default:"Standard" }}
+                        </span>
+                        {% if face.eclairage %}
+                        <span class="badge" style="background:#fef3c7; color:#92400e; border:1px solid #fcd34d; font-size:0.72rem;">
+                          <i class="bi bi-lightbulb me-1"></i>{{ face.get_eclairage_display }}
+                        </span>
+                        {% endif %}
                       </div>
 
                       {% with camp=face.get_campagne_active %}
                       {% if camp %}
-                      <div class="p-2.5 rounded-3 bg-danger bg-opacity-10 border border-danger border-opacity-25 mt-2" style="font-size:0.8rem;">
-                        <div class="d-flex align-items-center justify-content-between text-danger fw-bold mb-1">
-                          <span><i class="bi bi-broadcast me-1"></i>Campagne Active</span>
-                          <a href="{% url 'campagne_detail' camp.pk %}" class="text-danger small text-decoration-underline">Détails</a>
+                        <div class="sdp-face-campaign active-camp">
+                          <div class="d-flex align-items-center justify-content-between mb-1">
+                            <span style="font-weight:700; color:#dc2626; font-size:0.78rem;">
+                              <i class="bi bi-broadcast me-1"></i>Diffusion Active
+                            </span>
+                            <a href="{% url 'campagne_detail' camp.pk %}" style="font-size:0.72rem; color:#dc2626;">Voir →</a>
+                          </div>
+                          <div style="font-weight:700; font-size:0.85rem; color:#0f172a;" class="text-truncate">
+                            {{ camp.client.nom }} — {{ camp.nom }}
+                          </div>
+                          <div style="font-size:0.72rem; color:#6b7280; font-family:var(--font-mono,monospace); margin-top:4px;">
+                            <i class="bi bi-calendar3 me-1"></i>{{ camp.date_debut|date:"d/m/Y" }} → {{ camp.date_fin|date:"d/m/Y" }}
+                          </div>
                         </div>
-                        <div class="fw-bold text-dark text-truncate">{{ camp.client.nom }} — {{ camp.nom }}</div>
-                        <div class="text-muted font-monospace mt-1" style="font-size:0.72rem;">
-                          <i class="bi bi-calendar3 me-1"></i>{{ camp.date_debut|date:"d/m/Y" }} → {{ camp.date_fin|date:"d/m/Y" }}
-                        </div>
-                      </div>
                       {% elif statut == 'reserve' %}
-                      <div class="p-2.5 rounded-3 bg-warning bg-opacity-10 border border-warning border-opacity-25 mt-2" style="font-size:0.8rem;">
-                        <div class="d-flex align-items-center gap-1 text-warning-emphasis fw-bold">
-                          <i class="bi bi-calendar-check"></i>
-                          <span>Réservée pour une prochaine diffusion</span>
+                        <div class="sdp-face-campaign reserved-camp">
+                          <span style="font-weight:600; font-size:0.8rem; color:#b45309;">
+                            <i class="bi bi-calendar-check me-1"></i>Réservée — diffusion à venir
+                          </span>
                         </div>
-                      </div>
+                      {% else %}
+                        <div class="sdp-face-campaign free-camp">
+                          <span style="font-weight:600; font-size:0.8rem; color:#059669;">
+                            <i class="bi bi-check-circle me-1"></i>Face disponible à la vente
+                          </span>
+                        </div>
                       {% endif %}
                       {% endwith %}
-
                     </div>
                   </div>
                 </div>
                 {% endwith %}
+              {% empty %}
+              <div class="col-12">
+                <div class="sdp-empty">
+                  <i class="sdp-empty-icon bi bi-sign-merge-right"></i>
+                  Aucune face enregistrée sur ce support.
+                </div>
+              </div>
               {% endfor %}
             </div>
           </div>
@@ -597,336 +986,401 @@
         {% endif %}
 
         {% if ecran %}
-        <!-- ── ÉCRAN NUMÉRIQUE : STATS & FRISE CANVAS ── -->
-        <div class="sd-card">
-          <div class="sd-card-header">
-            <h2><i class="bi bi-cpu-fill text-primary"></i>Statistiques & Frise de Continuité LED</h2>
-            <span class="badge bg-primary-subtle text-primary border border-primary-subtle">Écran Numérique DOOH</span>
+        <!-- Écran Numérique -->
+        <div class="sdp-card">
+          <div class="sdp-card-head">
+            <h2><i class="bi bi-cpu-fill" style="color:#6366f1;"></i>Statistiques Écran Numérique</h2>
+            <span class="badge" style="background:#ede9fe; color:#5b21b6; border:1px solid #c4b5fd; font-size:0.78rem;">
+              <i class="bi bi-broadcast me-1"></i>DOOH LED
+            </span>
           </div>
-          <div class="p-4">
-            <!-- Métriques clés -->
+          <div class="sdp-card-body">
             <div class="row g-3 mb-4">
               {% for label, icon, value, color in ecran_stats %}
               <div class="col-6 col-md-3">
-                <div class="telemetry-kpi">
-                  <div class="d-flex align-items-center gap-1.5 text-muted small">
-                    <i class="bi {{ icon }}" style="color:{{ color|default:'var(--color-primary)' }};"></i>
-                    <span class="text-uppercase font-monospace" style="font-size:0.7rem; font-weight:700;">{{ label }}</span>
+                <div class="tlm-kpi">
+                  <div class="tlm-kpi-label">
+                    <i class="bi {{ icon }} me-1" style="color:{{ color|default:'#932e2b' }};"></i>{{ label }}
                   </div>
-                  <div class="fw-bold fs-5" style="color:{{ color|default:'var(--text-dark)' }};">{{ value }}</div>
+                  <div class="tlm-kpi-value" style="color:{{ color|default:'#0f172a' }};">{{ value }}</div>
                 </div>
               </div>
               {% endfor %}
             </div>
 
-            <!-- Frise chronologique -->
-            <div class="p-3 rounded-3 border bg-light">
-              <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
-                <div class="d-flex align-items-center gap-2">
-                  <i class="bi bi-activity text-primary"></i>
-                  <span class="fw-bold small text-uppercase font-monospace text-dark">Frise temporelle de continuité</span>
+            <!-- Frise Premium -->
+            <div style="border-radius:16px; overflow:hidden; border:1px solid #e2e8f0; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+
+              <!-- En-tête sombre -->
+              <div style="background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%); padding:14px 18px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+                <div style="display:flex; align-items:center; gap:10px;">
+                  <div style="width:34px; height:34px; border-radius:10px; background:rgba(99,102,241,0.2); border:1px solid rgba(99,102,241,0.35); display:flex; align-items:center; justify-content:center;">
+                    <i class="bi bi-activity" style="color:#a5b4fc; font-size:1rem;"></i>
+                  </div>
+                  <div>
+                    <div style="font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:rgba(255,255,255,0.4); font-family:var(--font-mono,monospace); margin-bottom:1px;">Télémétrie de diffusion</div>
+                    <div style="font-size:0.88rem; font-weight:700; color:#fff;">Frise de continuité</div>
+                  </div>
                 </div>
-                <div class="d-flex align-items-center gap-2">
-                  <label class="text-muted small text-uppercase font-monospace mb-0" style="font-size:0.72rem;">Échelle :</label>
-                  <select id="viewdur" class="form-select form-select-sm" style="width:auto; font-size:0.8rem;">
-                    <option value="3600">1 heure</option>
-                    <option value="86400" selected>1 jour</option>
-                    <option value="604800">1 semaine</option>
-                    <option value="2592000">1 mois</option>
-                  </select>
+                <!-- Pills d'échelle -->
+                <div style="display:flex; align-items:center; gap:6px;">
+                  <span style="font-size:0.68rem; color:rgba(255,255,255,0.38); font-weight:600; text-transform:uppercase; letter-spacing:0.06em; margin-right:2px;">Échelle</span>
+                  <div style="display:flex; gap:3px; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.1); border-radius:10px; padding:3px;">
+                    <button onclick="setScale(3600,this)"    class="frise-pill" data-val="3600">1h</button>
+                    <button onclick="setScale(86400,this)"   class="frise-pill frise-pill-on" data-val="86400">1j</button>
+                    <button onclick="setScale(604800,this)"  class="frise-pill" data-val="604800">1sem</button>
+                    <button onclick="setScale(2592000,this)" class="frise-pill" data-val="2592000">1mois</button>
+                  </div>
+                </div>
+                <!-- Select caché pour le JS -->
+                <select id="viewdur" style="display:none;">
+                  <option value="3600">1 heure</option>
+                  <option value="86400" selected>1 jour</option>
+                  <option value="604800">1 semaine</option>
+                  <option value="2592000">1 mois</option>
+                </select>
+              </div>
+
+              <!-- Métriques -->
+              <div style="background:#fff; border-bottom:1px solid #f1f5f9; padding:12px 18px;">
+                <div id="metrics" style="display:flex; flex-wrap:wrap; gap:10px;"></div>
+              </div>
+
+              <!-- Canvas -->
+              <div style="background:#fff;">
+                <div id="frise-container" style="padding:12px 14px; overflow-x:auto; overflow-y:hidden; min-height:60px;"></div>
+                <div style="padding:7px 18px 10px; background:#f8fafc; border-top:1px solid #f1f5f9;">
+                  <p id="frise-note" style="font-size:0.7rem; color:#94a3b8; font-family:var(--font-mono,monospace); margin:0; display:flex; align-items:center; gap:5px;">
+                    <i class="bi bi-info-circle" style="flex-shrink:0; opacity:0.6;"></i><span></span>
+                  </p>
                 </div>
               </div>
-              <div id="metrics" class="d-flex flex-wrap gap-2 mb-3"></div>
-              <div id="frise-container" class="p-2 border rounded-3 bg-white overflow-auto">
-                <canvas id="frise-canvas" class="d-block"></canvas>
-              </div>
-              <p id="frise-note" class="small text-muted font-monospace mt-2 mb-0" style="font-size:0.72rem;"></p>
             </div>
+
+            <style>
+              .frise-pill {
+                background: transparent; border: none;
+                color: rgba(255,255,255,0.45);
+                font-size: 0.7rem; font-weight: 700;
+                padding: 4px 9px; border-radius: 7px;
+                cursor: pointer; transition: all 0.15s ease;
+                font-family: var(--font-mono, monospace);
+                letter-spacing: 0.04em; white-space: nowrap;
+              }
+              .frise-pill:hover { color: rgba(255,255,255,0.8); background: rgba(255,255,255,0.08); }
+              .frise-pill.frise-pill-on { background: #6366f1; color: #fff; box-shadow: 0 2px 8px rgba(99,102,241,0.4); }
+            </style>
           </div>
         </div>
         {% endif %}
 
       </div>
 
-      <!-- Colonne Latérale (Photo Principale & Mini-Carte) -->
+      <!-- Colonne latérale -->
       <div class="col-12 col-lg-4">
 
-        <!-- Photo Principale du Support -->
         {% if support.photo_principale %}
-        <div class="sd-card">
-          <div class="position-relative overflow-hidden" style="height:230px; background:#0f172a; cursor:zoom-in;" onclick="openLightbox('{{ support.photo_principale.url }}')">
-            <img src="{{ support.photo_principale.url }}" alt="Support {{ support.code }}" loading="lazy" style="width:100%; height:100%; object-fit:cover; display:block;">
-            <div class="position-absolute bottom-0 start-0 end-0 p-3 d-flex justify-content-between align-items-end" style="background: linear-gradient(180deg, transparent 0%, rgba(15,23,42,0.85) 100%);">
-              <span class="badge bg-dark bg-opacity-75 text-white font-monospace text-uppercase" style="font-size:0.7rem;">
-                <i class="bi bi-camera me-1"></i>Photo Principale
+        <!-- Photo principale -->
+        <div class="sdp-card" style="cursor:zoom-in;" onclick="sdpLightbox('{{ support.photo_principale.url }}')">
+          <div style="position:relative; height:220px; overflow:hidden; background:#0f172a;">
+            <img src="{{ support.photo_principale.url }}" alt="{{ support.code }}" loading="lazy"
+                 style="width:100%; height:100%; object-fit:cover; display:block; transition:transform 0.4s ease;"
+                 onmouseenter="this.style.transform='scale(1.05)'" onmouseleave="this.style.transform='scale(1)'">
+            <div style="position:absolute; inset:0; background:linear-gradient(180deg,transparent 55%,rgba(15,23,42,0.82) 100%); display:flex; align-items:flex-end; padding:14px; justify-content:space-between;">
+              <span class="badge" style="background:rgba(0,0,0,0.6); color:rgba(255,255,255,0.9); font-size:0.7rem; backdrop-filter:blur(4px);">
+                <i class="bi bi-camera me-1"></i>Photo principale
               </span>
-              <span class="badge bg-light text-dark border font-monospace" style="font-size:0.7rem;">
-                <i class="bi bi-arrows-fullscreen me-1"></i>Zoom
+              <span class="badge" style="background:rgba(255,255,255,0.15); color:#fff; font-size:0.7rem; backdrop-filter:blur(4px);">
+                <i class="bi bi-arrows-fullscreen me-1"></i>Zoom HD
               </span>
             </div>
           </div>
         </div>
         {% endif %}
 
-        <!-- Mini-Carte Interactive -->
-        <div class="sd-card">
-          <div class="sd-card-header">
-            <h2><i class="bi bi-pin-map-fill text-danger"></i>Localisation Rapide</h2>
-            <a href="{% url 'carte' %}?support={{ support.pk }}" class="btn btn-sm btn-outline-primary py-0 px-2" style="font-size:0.75rem;">
+        <!-- Mini-carte -->
+        <div class="sdp-card">
+          <div class="sdp-card-head">
+            <h2><i class="bi bi-pin-map-fill" style="color:#ef4444;"></i>Localisation</h2>
+            <a href="{% url 'carte' %}?support={{ support.pk %}" class="btn btn-sm" style="font-size:0.75rem; padding:3px 10px; border:1px solid #e2e8f0; border-radius:8px; color:#64748b;">
               Plein écran <i class="bi bi-arrow-up-right ms-1"></i>
             </a>
           </div>
-          <div class="p-0 position-relative">
-            <div id="mini-map" style="height:210px; width:100%; cursor:pointer;"></div>
-          </div>
-          <div class="p-3 bg-light border-top" style="font-size:0.84rem;">
+          <div id="mini-map" style="height:200px; cursor:pointer;"></div>
+          <div style="padding:14px 18px; background:#f8fafc; border-top:1px solid #e2e8f0;">
             <div class="d-flex justify-content-between align-items-center">
               <div>
-                <div class="text-muted small text-uppercase font-monospace" style="font-size:0.7rem;">Coordonnées GPS</div>
-                <div class="font-monospace fw-bold text-primary" style="font-size:0.84rem;">
+                <div style="font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:#94a3b8; margin-bottom:3px;">Coordonnées GPS</div>
+                <div class="font-monospace" style="font-size:0.85rem; font-weight:700; color:#932e2b;">
                   {{ support.latitude|default:"—" }}, {{ support.longitude|default:"—" }}
                 </div>
               </div>
               {% if support.marche %}
-              <a href="{% url 'marche_detail' support.marche.pk %}" class="btn btn-sm btn-outline-secondary">
-                <i class="bi bi-shop me-1 text-warning"></i>{{ support.marche.nom }}
+              <a href="{% url 'marche_detail' support.marche.pk %}" class="btn btn-sm" style="font-size:0.78rem; border:1px solid #fcd34d; background:#fef3c7; color:#92400e; border-radius:10px; font-weight:600;">
+                <i class="bi bi-shop me-1"></i>{{ support.marche.nom }}
               </a>
               {% endif %}
             </div>
           </div>
         </div>
 
-      </div>
+        <!-- Marché / Zone -->
+        {% if support.is_dans_marche %}
+        <div class="sdp-card">
+          <div class="sdp-card-body" style="padding:16px 18px;">
+            <div class="d-flex align-items-center gap-3">
+              <div style="width:42px; height:42px; border-radius:12px; background:rgba(245,158,11,0.1); color:#f59e0b; display:flex; align-items:center; justify-content:center; font-size:1.2rem; flex-shrink:0;">
+                <i class="bi bi-shop-window"></i>
+              </div>
+              <div>
+                <div style="font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:#94a3b8; margin-bottom:2px;">Zone de marché</div>
+                <div style="font-weight:700; font-size:0.92rem; color:#0f172a;">{{ support.marche.nom }}</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endif %}
 
+      </div>
     </div>
   </div>
 
-  <!-- ══════════════════════════════════════════════════════════════════
-       SECTION 2 : FICHE TECHNIQUE COMPLÈTE
-       ══════════════════════════════════════════════════════════════════ -->
-  <div id="tab-specs" class="sd-tab-content d-none">
-    <div class="sd-card">
-      <div class="sd-card-header">
-        <h2><i class="bi bi-sliders text-primary"></i>Fiche Technique Détaillée du Support</h2>
-        <span class="badge bg-light text-dark border">{{ support.code }}</span>
+  <!-- ═══════════════════════════════════════════════════════
+       ONGLET 2 : FICHE TECHNIQUE
+       ═══════════════════════════════════════════════════════ -->
+  <div id="sdp-specs" class="sdp-section">
+    <div class="sdp-card">
+      <div class="sdp-card-head">
+        <h2><i class="bi bi-sliders" style="color:#6366f1;"></i>Fiche Technique Complète</h2>
+        <span class="badge" style="background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; font-size:0.78rem; font-family:var(--font-mono,monospace);">{{ support.code }}</span>
       </div>
-      <div class="sd-specs-table">
+      <div class="sdp-specs-grid">
         {% for label, value in info_rows %}
-        <div class="sd-spec-item">
-          <span class="label">{{ label }}</span>
-          <span class="value">{{ value }}</span>
+        <div class="sdp-spec">
+          <div class="sdp-spec-label">{{ label }}</div>
+          <div class="sdp-spec-value">{{ value }}</div>
         </div>
         {% endfor %}
-        <div class="sd-spec-item">
-          <span class="label">État Opérationnel</span>
-          <span class="value">
-            <span class="badge-status {% if support.etat == 'bon' %}bs-disponible{% elif support.etat == 'maintenance' %}bs-occupe{% else %}bs-panne{% endif %}">
+        <div class="sdp-spec">
+          <div class="sdp-spec-label">État Opérationnel</div>
+          <div class="sdp-spec-value">
+            <span class="badge badge-status {% if support.etat == 'bon' %}bs-disponible{% elif support.etat == 'maintenance' %}bs-occupe{% else %}bs-panne{% endif %}">
               {{ support.get_etat_display }}
             </span>
-          </span>
+          </div>
         </div>
         {% if support.type_support == 'ecran' %}
-        <div class="sd-spec-item">
-          <span class="label">Taux d'Occupation</span>
-          <span class="value">
+        <div class="sdp-spec">
+          <div class="sdp-spec-label">Taux d'Occupation</div>
+          <div class="sdp-spec-value">
             {% if support.is_occupe %}
-              <span class="badge-status bs-occupe"><i class="bi bi-broadcast me-1"></i>{{ support.taux_occupation_pourcentage }}%</span>
+              <span class="badge badge-status bs-occupe"><i class="bi bi-broadcast me-1"></i>{{ support.taux_occupation_pourcentage }}%</span>
             {% else %}
-              <span class="badge-status bs-disponible"><i class="bi bi-check2 me-1"></i>Disponible</span>
+              <span class="badge badge-status bs-disponible"><i class="bi bi-check2 me-1"></i>Disponible</span>
             {% endif %}
-          </span>
+          </div>
         </div>
         {% endif %}
       </div>
     </div>
   </div>
 
-  <!-- ══════════════════════════════════════════════════════════════════
-       SECTION 3 : GÉOLOCALISATION DÉTAILLÉE
-       ══════════════════════════════════════════════════════════════════ -->
-  <div id="tab-carte" class="sd-tab-content d-none">
-    <div class="sd-card">
-      <div class="sd-card-header">
-        <h2><i class="bi bi-geo-alt-fill text-danger"></i>Emplacement Géographique & Environnement</h2>
+  <!-- ═══════════════════════════════════════════════════════
+       ONGLET 3 : CARTE COMPLÈTE
+       ═══════════════════════════════════════════════════════ -->
+  <div id="sdp-map" class="sdp-section">
+    <div class="sdp-card">
+      <div class="sdp-card-head">
+        <h2><i class="bi bi-geo-alt-fill" style="color:#ef4444;"></i>Localisation Géographique</h2>
         <div class="d-flex gap-2">
-          <a href="https://www.google.com/maps?q={{ support.latitude }},{{ support.longitude }}" target="_blank" rel="noopener" class="btn btn-sm btn-outline-secondary">
+          <a href="https://www.google.com/maps?q={{ support.latitude }},{{ support.longitude }}" target="_blank" rel="noopener"
+             class="btn btn-sm" style="font-size:0.78rem; border:1px solid #e2e8f0; border-radius:9px; color:#64748b;">
             <i class="bi bi-google me-1"></i>Google Maps
           </a>
-          <a href="{% url 'carte' %}?support={{ support.pk }}" class="btn btn-sm btn-primary">
-            <i class="bi bi-map-fill me-1"></i>Carte Complète
+          <a href="{% url 'carte' %}?support={{ support.pk %}" class="btn btn-sm" style="font-size:0.78rem; border-radius:9px; background:#932e2b; color:#fff; border:none; font-weight:600;">
+            <i class="bi bi-map-fill me-1"></i>Carte Intégrale
           </a>
         </div>
       </div>
-      <div class="p-3">
-        <div id="full-tab-map" style="height:420px; width:100%; border-radius:10px; overflow:hidden;"></div>
+      <div style="padding:16px;">
+        <div id="full-tab-map" style="height:440px; border-radius:12px; overflow:hidden;"></div>
       </div>
     </div>
   </div>
 
-  <!-- ══════════════════════════════════════════════════════════════════
-       SECTION 4 : CAMPAGNES & PLANNING
-       ══════════════════════════════════════════════════════════════════ -->
-  <div id="tab-campagnes" class="sd-tab-content d-none">
-    
-    <!-- Campagnes Actives -->
-    <div class="sd-card mb-4">
-      <div class="sd-card-header">
-        <h2 class="text-success"><i class="bi bi-broadcast text-success me-2"></i>Campagnes en Cours de Diffusion</h2>
-        <span class="badge bg-success-subtle text-success border border-success-subtle">{{ lignes_actives|length }}</span>
+  <!-- ═══════════════════════════════════════════════════════
+       ONGLET 4 : CAMPAGNES & PLANNING
+       ═══════════════════════════════════════════════════════ -->
+  <div id="sdp-campaigns" class="sdp-section">
+
+    <!-- Campagnes actives -->
+    <div class="sdp-card">
+      <div class="sdp-card-head">
+        <h2 style="color:#059669;"><i class="bi bi-broadcast" style="color:#10b981;"></i>Campagnes en Cours de Diffusion</h2>
+        <span class="badge" style="background:#d1fae5; color:#065f46; border:1px solid #a7f3d0;">{{ lignes_actives|length }} actif{{ lignes_actives|length|pluralize }}</span>
       </div>
-      <div>
-        {% for l in lignes_actives %}
-        <div class="p-3.5 border-bottom d-flex align-items-center gap-3 flex-wrap">
-          <div class="d-inline-flex p-2.5 rounded-circle bg-success bg-opacity-10 text-success">
-            <i class="bi bi-broadcast fs-5"></i>
-          </div>
-          <div class="flex-grow-1 min-width-0">
-            <div class="fw-bold fs-6">
-              <a href="{% url 'campagne_detail' l.campagne.pk %}" class="text-dark text-decoration-none">
-                {{ l.campagne.nom }}
-              </a>
-            </div>
-            <div class="text-muted small">
-              <strong>{{ l.campagne.client.nom }}</strong> · <i class="bi bi-calendar3 me-1"></i>{{ l.campagne.date_debut|date:"d/m/Y" }} → {{ l.campagne.date_fin|date:"d/m/Y" }}
-            </div>
-          </div>
-          <span class="badge-status bs-en_cours">En cours</span>
-          <a href="{% url 'campagne_detail' l.campagne.pk %}" class="btn btn-sm btn-outline-secondary py-1 px-2.5">
-            Voir la campagne <i class="bi bi-arrow-right ms-1"></i>
-          </a>
+      {% for l in lignes_actives %}
+      <div class="sdp-camp-item">
+        <div class="sdp-camp-dot" style="background:rgba(16,185,129,0.1); color:#10b981;">
+          <i class="bi bi-broadcast"></i>
         </div>
-        {% empty %}
-        <div class="text-center py-4 text-muted small">
-          <i class="bi bi-inbox fs-2 d-block mb-1 opacity-50"></i>
-          Aucune campagne active actuellement sur ce support.
+        <div class="flex-grow-1 min-width-0">
+          <div style="font-weight:700; font-size:0.95rem; color:#0f172a;">
+            <a href="{% url 'campagne_detail' l.campagne.pk %}" style="color:inherit; text-decoration:none;">{{ l.campagne.nom }}</a>
+          </div>
+          <div style="font-size:0.8rem; color:#64748b; margin-top:2px;">
+            <strong>{{ l.campagne.client.nom }}</strong> ·
+            <i class="bi bi-calendar3 me-1"></i>{{ l.campagne.date_debut|date:"d/m/Y" }} → {{ l.campagne.date_fin|date:"d/m/Y" }}
+          </div>
         </div>
-        {% endfor %}
+        <span class="badge badge-status bs-en_cours">En cours</span>
+        <a href="{% url 'campagne_detail' l.campagne.pk %}" class="btn btn-sm" style="font-size:0.78rem; border:1px solid #e2e8f0; border-radius:9px; color:#64748b; white-space:nowrap;">
+          Détails <i class="bi bi-arrow-right ms-1"></i>
+        </a>
       </div>
+      {% empty %}
+      <div class="sdp-empty">
+        <i class="sdp-empty-icon bi bi-inbox"></i>
+        Aucune campagne active sur ce support.
+      </div>
+      {% endfor %}
     </div>
 
     <!-- Réservations à venir -->
-    <div class="sd-card mb-4">
-      <div class="sd-card-header">
-        <h2 class="text-warning-emphasis"><i class="bi bi-calendar-check-fill text-warning me-2"></i>Réservations à Venir</h2>
-        <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">{{ reservations|length }}</span>
+    {% if reservations %}
+    <div class="sdp-card">
+      <div class="sdp-card-head">
+        <h2 style="color:#b45309;"><i class="bi bi-calendar-check-fill" style="color:#f59e0b;"></i>Réservations à Venir</h2>
+        <span class="badge" style="background:#fef3c7; color:#92400e; border:1px solid #fcd34d;">{{ reservations|length }}</span>
       </div>
-      <div>
-        {% for resa in reservations %}
-        <div class="p-3.5 border-bottom d-flex align-items-center gap-3">
-          <div class="d-inline-flex p-2.5 rounded-circle bg-warning bg-opacity-10 text-warning">
-            <i class="bi bi-calendar-event fs-5"></i>
-          </div>
-          <div class="flex-grow-1">
-            <div class="fw-bold small text-dark">{{ resa.client.nom }}</div>
-            <div class="text-muted font-monospace" style="font-size:0.78rem;">
-              {{ resa.date_debut|date:"d/m/Y H:i" }} → {{ resa.date_fin|date:"d/m/Y H:i" }}
-            </div>
-          </div>
-          <span class="badge-status bs-reserve">Réservé</span>
+      {% for resa in reservations %}
+      <div class="sdp-camp-item">
+        <div class="sdp-camp-dot" style="background:rgba(245,158,11,0.1); color:#f59e0b;">
+          <i class="bi bi-calendar-event"></i>
         </div>
-        {% empty %}
-        <div class="text-center py-4 text-muted small">Aucune réservation programmée.</div>
-        {% endfor %}
+        <div class="flex-grow-1">
+          <div style="font-weight:700; font-size:0.9rem; color:#0f172a;">{{ resa.client.nom }}</div>
+          <div style="font-size:0.78rem; font-family:var(--font-mono,monospace); color:#94a3b8; margin-top:2px;">
+            {{ resa.date_debut|date:"d/m/Y H:i" }} → {{ resa.date_fin|date:"d/m/Y H:i" }}
+          </div>
+        </div>
+        <span class="badge badge-status bs-reserve">Réservé</span>
       </div>
+      {% endfor %}
     </div>
+    {% endif %}
 
-    <!-- Historique des Campagnes -->
-    <div class="sd-card">
-      <div class="sd-card-header">
-        <h2><i class="bi bi-clock-history text-secondary me-2"></i>Historique des Campagnes Passées</h2>
-        <span class="badge bg-light text-dark border">{{ historique|length }}</span>
+    <!-- Historique -->
+    <div class="sdp-card">
+      <div class="sdp-card-head">
+        <h2><i class="bi bi-clock-history" style="color:#94a3b8;"></i>Historique des Campagnes</h2>
+        <span class="badge" style="background:#f1f5f9; color:#475569; border:1px solid #e2e8f0;">{{ historique|length }}</span>
       </div>
-      <div>
-        {% for l in historique %}
-        <div class="p-3 border-bottom d-flex align-items-center gap-3" style="font-size:0.85rem;">
-          {% with visuel=l.campagne.visuels.first %}
-          {% if visuel %}
-            <img src="{{ visuel.fichier.url }}" alt="Visuel" style="width:46px; height:46px; object-fit:cover; border-radius:8px; border:1px solid var(--border);">
-          {% else %}
-            <img src="{% static 'img/logo.png' %}" alt="Logo" loading="lazy" style="width:46px; height:46px; object-fit:cover; border-radius:8px; border:1px solid var(--border);">
-          {% endif %}
-          {% endwith %}
-
-          <div class="flex-grow-1 min-width-0">
-            <div class="fw-bold text-dark">{{ l.campagne.client.nom }}</div>
-            <div class="text-muted small">{{ l.campagne.nom }}</div>
-          </div>
-          <span class="text-muted font-monospace small"><i class="bi bi-calendar3 me-1"></i>{{ l.campagne.date_debut|date:"d/m/Y" }} → {{ l.campagne.date_fin|date:"d/m/Y" }}</span>
+      {% for l in historique %}
+      <div class="sdp-camp-item">
+        {% with visuel=l.campagne.visuels.first %}
+        {% if visuel %}
+          <img src="{{ visuel.fichier.url }}" alt="" loading="lazy"
+               style="width:44px; height:44px; object-fit:cover; border-radius:10px; border:1px solid #e2e8f0; flex-shrink:0;">
+        {% else %}
+          <img src="{% static 'img/logo.png' %}" alt="" loading="lazy"
+               style="width:44px; height:44px; object-fit:cover; border-radius:10px; border:1px solid #e2e8f0; flex-shrink:0; opacity:0.5;">
+        {% endif %}
+        {% endwith %}
+        <div class="flex-grow-1 min-width-0">
+          <div style="font-weight:700; font-size:0.88rem; color:#0f172a;">{{ l.campagne.client.nom }}</div>
+          <div style="font-size:0.78rem; color:#94a3b8;" class="text-truncate">{{ l.campagne.nom }}</div>
         </div>
-        {% empty %}
-        <div class="text-center py-4 text-muted small">Aucun historique disponible.</div>
-        {% endfor %}
+        <span style="font-size:0.75rem; color:#94a3b8; font-family:var(--font-mono,monospace); white-space:nowrap;">
+          <i class="bi bi-calendar3 me-1"></i>{{ l.campagne.date_debut|date:"d/m/Y" }}
+        </span>
       </div>
+      {% empty %}
+      <div class="sdp-empty">
+        <i class="sdp-empty-icon bi bi-clock-history"></i>
+        Aucun historique disponible.
+      </div>
+      {% endfor %}
     </div>
 
   </div>
 
-  <!-- ══════════════════════════════════════════════════════════════════
-       SECTION 5 : MAINTENANCE & PHOTOS
-       ══════════════════════════════════════════════════════════════════ -->
-  <div id="tab-maintenance" class="sd-tab-content d-none">
+  <!-- ═══════════════════════════════════════════════════════
+       ONGLET 5 : MAINTENANCE & PHOTOS
+       ═══════════════════════════════════════════════════════ -->
+  <div id="sdp-maintenance" class="sdp-section">
     <div class="row g-4">
-      
-      <!-- Liste des Maintenances -->
+
+      <!-- Journal des interventions -->
       <div class="col-12 col-lg-7">
-        <div class="sd-card">
-          <div class="sd-card-header">
-            <h2><i class="bi bi-tools text-warning me-2"></i>Journal des Interventions Techniques</h2>
+        <div class="sdp-card">
+          <div class="sdp-card-head">
+            <h2><i class="bi bi-tools" style="color:#f59e0b;"></i>Journal des Interventions</h2>
             {% if user.is_technicien_role or user.is_staff_regie_role %}
-            <a href="{% url 'maintenance_create' support.pk %}" class="btn btn-sm btn-warning text-dark fw-semibold py-0.5 px-2">
-              <i class="bi bi-plus-lg me-1"></i>Nouvelle Intervention
+            <a href="{% url 'maintenance_create' support.pk %}" class="btn btn-sm fw-semibold"
+               style="background:#fef3c7; border:1px solid #fcd34d; color:#92400e; border-radius:9px; font-size:0.78rem;">
+              <i class="bi bi-plus-lg me-1"></i>Nouvelle intervention
             </a>
             {% endif %}
           </div>
-          <div>
+          <div class="sdp-timeline">
             {% for m in maintenances %}
-            <div class="p-3 border-bottom">
-              <div class="d-flex justify-content-between align-items-center mb-1">
-                <span class="badge-status {% if m.etat_apres == 'bon' %}bs-disponible{% elif m.etat_apres == 'maintenance' %}bs-occupe{% else %}bs-panne{% endif %}">
-                  {{ m.get_etat_apres_display }}
-                </span>
-                <span class="text-muted font-monospace" style="font-size:0.75rem;">{{ m.date_intervention|date:"d/m/Y H:i" }}</span>
+            <div class="sdp-tl-item">
+              <div class="sdp-tl-dot {% if m.etat_apres == 'bon' %}bs-disponible{% elif m.etat_apres == 'maintenance' %}bs-occupe{% else %}bs-panne{% endif %}"
+                   style="background:{% if m.etat_apres == 'bon' %}rgba(16,185,129,0.12){% elif m.etat_apres == 'maintenance' %}rgba(245,158,11,0.12){% else %}rgba(239,68,68,0.12){% endif %};
+                          color:{% if m.etat_apres == 'bon' %}#10b981{% elif m.etat_apres == 'maintenance' %}#f59e0b{% else %}#ef4444{% endif %};">
+                <i class="bi {% if m.etat_apres == 'bon' %}bi-check-circle-fill{% elif m.etat_apres == 'maintenance' %}bi-exclamation-circle-fill{% else %}bi-x-circle-fill{% endif %}"></i>
               </div>
-              <div class="text-dark small fw-semibold mt-1.5">{{ m.description|default:"Intervention technique de routine" }}</div>
-              <div class="text-muted small mt-1" style="font-size:0.75rem;">
-                <i class="bi bi-person me-1"></i>Effectué par : <strong>{{ m.effectue_par.get_full_name|default:m.effectue_par.username }}</strong>
+              <div class="sdp-tl-body">
+                <div class="d-flex justify-content-between align-items-start mb-1">
+                  <span class="badge badge-status {% if m.etat_apres == 'bon' %}bs-disponible{% elif m.etat_apres == 'maintenance' %}bs-occupe{% else %}bs-panne{% endif %}">
+                    {{ m.get_etat_apres_display }}
+                  </span>
+                  <span class="sdp-tl-date">{{ m.date_intervention|date:"d/m/Y H:i" }}</span>
+                </div>
+                <div style="font-size:0.86rem; font-weight:600; color:#1e293b; margin:6px 0 4px;">
+                  {{ m.description|default:"Intervention technique de routine" }}
+                </div>
+                <div style="font-size:0.75rem; color:#94a3b8;">
+                  <i class="bi bi-person me-1"></i>{{ m.effectue_par.get_full_name|default:m.effectue_par.username }}
+                </div>
               </div>
             </div>
             {% empty %}
-            <div class="text-center py-4 text-muted small">
-              <i class="bi bi-shield-check fs-2 d-block mb-1 text-success opacity-50"></i>
-              Aucune intervention ou anomalie signalée.
+            <div class="sdp-empty">
+              <i class="sdp-empty-icon bi bi-shield-check" style="color:#10b981;"></i>
+              Aucune intervention ni anomalie signalée.
             </div>
             {% endfor %}
           </div>
         </div>
       </div>
 
-      <!-- Galerie Photos -->
+      <!-- Galerie photos -->
       <div class="col-12 col-lg-5">
-        <div class="sd-card">
-          <div class="sd-card-header">
-            <h2><i class="bi bi-camera-fill text-warning me-2"></i>Galerie d'Interventions</h2>
-            <span class="badge bg-light text-dark border">{{ photos|length }}</span>
+        <div class="sdp-card">
+          <div class="sdp-card-head">
+            <h2><i class="bi bi-camera-fill" style="color:#6366f1;"></i>Galerie d'Interventions</h2>
+            <span class="badge" style="background:#f1f5f9; color:#475569; border:1px solid #e2e8f0;">{{ photos|length }}</span>
           </div>
-          <div class="p-3">
-            <div class="row g-2">
+          <div class="sdp-card-body">
+            {% if photos %}
+            <div class="sdp-gallery">
               {% for p in photos %}
-              <div class="col-6">
-                <div class="position-relative rounded-3 overflow-hidden border shadow-sm" style="height:120px; cursor:zoom-in;" onclick="openLightbox('{{ p.photo.url }}')">
-                  <img src="{{ p.photo.url }}" alt="Photo de maintenance" loading="lazy" style="width:100%; height:100%; object-fit:cover; display:block;">
-                  <div class="position-absolute bottom-0 start-0 end-0 p-1.5 bg-dark bg-opacity-75 text-white" style="font-size:0.68rem;">
-                    <div class="font-monospace text-truncate">{{ p.date_intervention|date:"d/m H:i" }} · {{ p.effectue_par.username }}</div>
-                  </div>
+              <div class="sdp-gallery-item" onclick="sdpLightbox('{{ p.photo.url }}')">
+                <img src="{{ p.photo.url }}" alt="Photo intervention" loading="lazy">
+                <div class="sdp-gallery-caption">
+                  {{ p.date_intervention|date:"d/m H:i" }} · {{ p.effectue_par.username }}
                 </div>
-              </div>
-              {% empty %}
-              <div class="col-12 text-center py-4 text-muted small">
-                <i class="bi bi-camera fs-3 d-block mb-1 opacity-50"></i>
-                Aucune photo d'intervention disponible.
               </div>
               {% endfor %}
             </div>
+            {% else %}
+            <div class="sdp-empty">
+              <i class="sdp-empty-icon bi bi-camera"></i>
+              Aucune photo d'intervention disponible.
+            </div>
+            {% endif %}
           </div>
         </div>
       </div>
@@ -936,251 +1390,289 @@
 
 </div>
 
-<!-- ══════════════════════════════════════════════════════════════════
-     LIGHTBOX POPUP
-     ══════════════════════════════════════════════════════════════════ -->
-<div id="sd-lightbox" class="sd-lightbox" onclick="closeLightbox(event)">
-  <div class="sd-lightbox-content" onclick="event.stopPropagation()">
-    <button class="sd-lightbox-close" onclick="closeLightbox()">&times;</button>
-    <img id="sd-lightbox-img" src="" alt="Aperçu HD">
+<!-- Lightbox -->
+<div id="sdp-lb" class="sdp-lb" onclick="sdpLbClose(event)">
+  <div class="sdp-lb-inner" onclick="event.stopPropagation()">
+    <button class="sdp-lb-close" onclick="sdpLbClose()">&times;</button>
+    <img id="sdp-lb-img" src="" alt="Aperçu HD" style="display:none;">
+    <video id="sdp-lb-vid" controls style="display:none; max-width:92vw; max-height:88vh;"></video>
   </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-/* ── GESTION DES ONGLETS SAAS ── */
-function switchTab(tabId, btn) {
-  document.querySelectorAll('.sd-tab-content').forEach(el => el.classList.add('d-none'));
-  document.querySelectorAll('.sd-nav-tab').forEach(el => el.classList.remove('active'));
-  
-  const target = document.getElementById(tabId);
-  if (target) {
-    target.classList.remove('d-none');
-    btn.classList.add('active');
-  }
-
-  if (tabId === 'tab-carte') {
-    setTimeout(initFullTabMap, 150);
-  }
+/* ── Tab System ── */
+function sdpTab(id, btn) {
+  document.querySelectorAll('.sdp-section').forEach(el => el.classList.remove('active'));
+  document.querySelectorAll('.sdp-tab').forEach(el => el.classList.remove('active'));
+  const sec = document.getElementById('sdp-' + id);
+  if (sec) sec.classList.add('active');
+  if (btn) btn.classList.add('active');
+  if (id === 'map') setTimeout(initFullMap, 180);
 }
 
-/* ── LIGHTBOX OVERLAY ── */
-function openLightbox(url) {
+/* ── Lightbox ── */
+function sdpLightbox(url) {
   if (!url) return;
-  const lb = document.getElementById('sd-lightbox');
-  const img = document.getElementById('sd-lightbox-img');
-  if (lb && img) {
-    img.src = url;
-    lb.classList.add('active');
+  const lb = document.getElementById('sdp-lb');
+  const img = document.getElementById('sdp-lb-img');
+  const vid = document.getElementById('sdp-lb-vid');
+  const isVideo = /\.(mp4|webm|ogg)(\?|$)/i.test(url);
+  if (isVideo) {
+    vid.src = url; vid.style.display = 'block';
+    img.src = ''; img.style.display = 'none';
+  } else {
+    img.src = url; img.style.display = 'block';
+    vid.src = ''; vid.style.display = 'none';
+  }
+  lb.classList.add('open');
+}
+function sdpLbClose(e) {
+  if (!e || e.target === document.getElementById('sdp-lb') || e.type === 'click') {
+    const lb = document.getElementById('sdp-lb');
+    lb.classList.remove('open');
+    document.getElementById('sdp-lb-vid').src = '';
   }
 }
-function closeLightbox() {
-  const lb = document.getElementById('sd-lightbox');
-  if (lb) lb.classList.remove('active');
-}
-document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') closeLightbox();
-});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') sdpLbClose(); });
 
-/* ── COPIER LES COORDONNÉES GPS ── */
-function copyGps(text) {
-  navigator.clipboard.writeText(text).then(() => {
-    alert("Coordonnées GPS copiées dans le presse-papier : " + text);
+/* ── Copy GPS ── */
+function sdpCopyGps(txt) {
+  navigator.clipboard.writeText(txt).then(() => {
+    const n = document.createElement('div');
+    n.textContent = '✓ Coordonnées copiées';
+    Object.assign(n.style, {
+      position:'fixed', bottom:'24px', left:'50%', transform:'translateX(-50%)',
+      background:'#0f172a', color:'#fff', padding:'10px 22px', borderRadius:'10px',
+      fontSize:'0.85rem', fontWeight:'600', zIndex:'9999', boxShadow:'0 8px 24px rgba(0,0,0,0.25)'
+    });
+    document.body.appendChild(n);
+    setTimeout(() => n.remove(), 2500);
   });
 }
 
-/* ── INITIALISATION CARTE LEAFLET SÉCURISÉE ── */
-let fullMapInstance = null;
-function initFullTabMap() {
-  const mapEl = document.getElementById('full-tab-map');
-  if (!mapEl || fullMapInstance) return;
-
+/* ── Cartes Leaflet ── */
+let fullMapInst = null;
+function initFullMap() {
+  if (fullMapInst) return;
   const lat = parseFloat('{{ support.latitude }}'.replace(',', '.'));
   const lng = parseFloat('{{ support.longitude }}'.replace(',', '.'));
-  const color = '{{ support.get_etat_color }}' || 'var(--color-primary)';
-
-  fullMapInstance = window.initIntegralMap('full-tab-map', {
-    center: Number.isFinite(lat) && Number.isFinite(lng) ? [lat, lng] : [12.3714, -1.5197],
-    zoom: Number.isFinite(lat) && Number.isFinite(lng) ? 16 : 13
+  const color = '{{ support.get_etat_color }}' || '#932e2b';
+  fullMapInst = window.initIntegralMap('full-tab-map', {
+    center: isFinite(lat) && isFinite(lng) ? [lat, lng] : [12.3714, -1.5197],
+    zoom: isFinite(lat) && isFinite(lng) ? 16 : 13
   });
-
-  if (fullMapInstance && Number.isFinite(lat) && Number.isFinite(lng)) {
+  if (fullMapInst && isFinite(lat) && isFinite(lng)) {
     const icon = L.divIcon({
-      html: `<div style="width:22px;height:22px;background:${color};border-radius:50%;border:3px solid white;box-shadow:0 0 0 5px ${color}44"></div>`,
-      iconSize: [22, 22],
-      iconAnchor: [11, 11],
-      className: ''
+      html: `<div style="width:22px;height:22px;background:${color};border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 5px ${color}44;"></div>`,
+      iconSize: [22,22], iconAnchor: [11,11], className: ''
     });
-    L.marker([lat, lng], { icon }).addTo(fullMapInstance)
-      .bindPopup(`<strong>{{ support.nom }}</strong><br><span class="badge bg-dark">{{ support.code }}</span>`)
+    const popup = `
+      <div class="lp-card">
+        <div class="lp-header">
+          <div class="lp-icon"><i class="bi {% if support.type_support == 'panneau' %}bi-sign-merge-right-fill{% else %}bi-display-fill{% endif %}"></i></div>
+          <div>
+            <div class="lp-name">{{ support.nom }}</div>
+            <div class="lp-code">{{ support.code }}</div>
+          </div>
+        </div>
+        <div class="lp-body">
+          {% if support.adresse %}<div class="lp-row"><i class="bi bi-geo-alt-fill"></i><span>{{ support.adresse }}{% if support.ville %}, <strong>{{ support.ville }}</strong>{% endif %}</span></div>{% endif %}
+          {% if support.get_format_display %}<div class="lp-row"><i class="bi bi-aspect-ratio"></i><span>{{ support.get_format_display }}{% if support.surface_m2 %} · {{ support.surface_m2 }} m²{% endif %}</span></div>{% endif %}
+        </div>
+        <div class="lp-footer">
+          <span class="lp-badge {% if support.etat == 'bon' %}lp-badge-green{% elif support.etat == 'maintenance' %}lp-badge-amber{% else %}lp-badge-red{% endif %}">
+            {{ support.get_etat_display }}
+          </span>
+          <a href="/gestion/inventory/{{ support.uuid }}/" class="lp-btn">Voir →</a>
+        </div>
+      </div>`;
+    L.marker([lat,lng], { icon }).addTo(fullMapInst)
+      .bindPopup(popup, { maxWidth: 290 })
       .openPopup();
   }
 }
 
 document.addEventListener('DOMContentLoaded', () => {
-  const mapEl = document.getElementById('mini-map');
-  if (!mapEl) return;
-  mapEl.style.width = '100%';
-  mapEl.style.height = '210px';
-
   const lat = parseFloat('{{ support.latitude }}'.replace(',', '.'));
   const lng = parseFloat('{{ support.longitude }}'.replace(',', '.'));
-  const color = '{{ support.get_etat_color }}' || 'var(--color-primary)';
+  const color = '{{ support.get_etat_color }}' || '#932e2b';
 
-  const miniMap = window.initIntegralMap('mini-map', {
-    center: Number.isFinite(lat) && Number.isFinite(lng) ? [lat, lng] : [12.3714, -1.5197],
-    zoom: Number.isFinite(lat) && Number.isFinite(lng) ? 15 : 12,
-    zoomControl: false,
-    dragging: false,
-    scrollWheelZoom: false
+  const mini = window.initIntegralMap('mini-map', {
+    center: isFinite(lat) && isFinite(lng) ? [lat, lng] : [12.3714, -1.5197],
+    zoom: isFinite(lat) && isFinite(lng) ? 15 : 12,
+    zoomControl: false, dragging: false, scrollWheelZoom: false
   });
-
-  if (miniMap && Number.isFinite(lat) && Number.isFinite(lng)) {
+  if (mini && isFinite(lat) && isFinite(lng)) {
     const icon = L.divIcon({
-      html: `<div style="width:18px;height:18px;background:${color};border-radius:50%;border:3px solid white;box-shadow:0 0 0 4px ${color}44"></div>`,
-      iconSize: [18, 18],
-      iconAnchor: [9, 9],
-      className: ''
+      html: `<div style="width:18px;height:18px;background:${color};border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 4px ${color}44;"></div>`,
+      iconSize: [18,18], iconAnchor: [9,9], className: ''
     });
-    L.marker([lat, lng], { icon }).addTo(miniMap);
-  }
-
-  if (miniMap) {
-    miniMap.on('click', () => {
-      window.location.href = `{% url 'carte' %}?support={{ support.pk }}`;
-    });
+    L.marker([lat,lng], { icon }).addTo(mini);
+    mini.on('click', () => window.location.href = `{% url 'carte' %}?support={{ support.pk }}`);
   }
 });
 
-/* ── FRISE DE DIFFUSION ÉCRAN NUMÉRIQUE ── */
-const COLORS = ['#378ADD', '#D85A30', '#1D9E75', '#7F77DD', '#BA7517', '#D4537E'];
-const spots = {{ spots_data|default:"[]"|safe }};
+/* ── Visualisation Frise — HTML/CSS lisible ── */
+const SPOT_COLORS = [
+  { bg:'#ede9fe', border:'#c4b5fd', text:'#5b21b6', bar:'#8b5cf6' },
+  { bg:'#fce7f3', border:'#f9a8d4', text:'#9d174d', bar:'#ec4899' },
+  { bg:'#dbeafe', border:'#93c5fd', text:'#1e40af', bar:'#3b82f6' },
+  { bg:'#d1fae5', border:'#6ee7b7', text:'#065f46', bar:'#10b981' },
+  { bg:'#fef3c7', border:'#fcd34d', text:'#92400e', bar:'#f59e0b' },
+  { bg:'#fee2e2', border:'#fca5a5', text:'#991b1b', bar:'#ef4444' },
+];
 
-function vd() { const el = document.getElementById('viewdur'); return el ? parseInt(el.value) : 86400; }
-
-function fmtRuler(t, viewDur) {
-  if (viewDur <= 3600) { const m = Math.floor(t / 60); return m === 0 ? '0' : m + 'min'; }
-  if (viewDur <= 86400) { return Math.floor(t / 3600) + 'h'; }
-  if (viewDur <= 604800) { const d = Math.floor(t / 86400); return d === 0 ? 'J1' : ('J' + (d + 1)); }
-  const w = Math.floor(t / 604800); return w === 0 ? 'S1' : ('S' + (w + 1));
+function fmtDur(sec) {
+  if (sec < 60) return sec + 's';
+  return Math.round(sec/60) + ' min';
+}
+function fmtInterval(sec) {
+  if (sec < 60) return 'toutes les ' + sec + 's';
+  if (sec < 3600) return 'toutes les ' + Math.round(sec/60) + ' min';
+  return 'toutes les ' + (sec/3600).toFixed(1) + 'h';
 }
 
-function viewLabel(v) { return v <= 3600 ? 'heure' : v <= 86400 ? 'jour' : v <= 604800 ? 'semaine' : 'mois'; }
-
-function getCC() {
-  const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-  return {
-    text:     dark ? 'rgba(255,255,255,0.45)' : 'rgba(0,0,0,0.42)',
-    textPri:  dark ? 'rgba(255,255,255,0.82)' : 'rgba(0,0,0,0.82)',
-    rowBg:    dark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)',
-    grid:     dark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.07)',
-    gridMaj:  dark ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.12)',
-  };
+function getCurrentScale() {
+  const sel = document.getElementById('viewdur');
+  return sel ? parseInt(sel.value) : 86400;
 }
 
-function renderMetrics() {
-  const el = document.getElementById('metrics');
-  if (!el) return;
-  const view = vd(); const vl = viewLabel(view);
-  const pubH = spots.reduce((a, sp) => a + (sp.dur / sp.interval) * 3600, 0);
-  const pubView = pubH / 3600 * view;
-  const pct = Math.round(pubView / view * 100);
-  el.innerHTML = `
-    <div class="telemetry-kpi"><div class="text-muted small text-uppercase font-monospace" style="font-size:0.68rem; font-weight:700;">Spots actifs</div><div class="fw-bold fs-5 text-primary">${spots.length}</div></div>
-    <div class="telemetry-kpi"><div class="text-muted small text-uppercase font-monospace" style="font-size:0.68rem; font-weight:700;">Pub totale / h</div><div class="fw-bold fs-5">${Math.round(pubH / 60)}<span class="small text-muted ms-1">min</span></div></div>
-    <div class="telemetry-kpi"><div class="text-muted small text-uppercase font-monospace" style="font-size:0.68rem; font-weight:700;">Pub totale / ${vl}</div><div class="fw-bold fs-5">${Math.round(pubView / 60)}<span class="small text-muted ms-1">min</span></div></div>
-    <div class="telemetry-kpi"><div class="text-muted small text-uppercase font-monospace" style="font-size:0.68rem; font-weight:700;">% antenne / ${vl}</div><div class="fw-bold fs-5 text-success">${pct}<span class="small text-muted ms-1">%</span></div></div>
-  `;
+function scaleLabel(v) {
+  if (v <= 3600)   return 'heure';
+  if (v <= 86400)  return 'jour';
+  if (v <= 604800) return 'semaine';
+  return 'mois';
 }
 
-function renderFrise() {
-  const canvas = document.getElementById('frise-canvas');
-  if (!canvas) return;
+function buildFrise() {
+  const container = document.getElementById('frise-container');
+  const metricsEl = document.getElementById('metrics');
+  const noteEl    = document.getElementById('frise-note');
+  if (!container) return;
+
   if (!spots.length) {
-    const note = document.getElementById('frise-note');
-    if (note) note.textContent = 'Aucun spot actif sur ce support.';
-    canvas.width = 0; canvas.height = 0;
+    container.innerHTML = `
+      <div style="text-align:center; padding:32px 16px; color:#94a3b8;">
+        <i class="bi bi-broadcast" style="font-size:2rem; display:block; margin-bottom:10px; opacity:0.4;"></i>
+        <div style="font-size:0.85rem; font-weight:600;">Aucun spot actif sur cet écran</div>
+      </div>`;
+    if (metricsEl) metricsEl.innerHTML = '';
+    if (noteEl) { const s = noteEl.querySelector('span')||noteEl; s.textContent=''; }
     return;
   }
-  const container = document.getElementById('frise-container');
-  const viewDur = vd();
-  const dpr = Math.min(window.devicePixelRatio || 1, 2);
-  const W = Math.max(container.clientWidth || 700, 300);
-  const LPAD = 74; const chartW = W - LPAD;
-  const ROW_H = 26; const RULER_H = 22; const GAP = 5;
-  const H = RULER_H + GAP + spots.length * (ROW_H + GAP);
 
-  canvas.width = W * dpr; canvas.height = H * dpr;
-  canvas.style.width = W + 'px'; canvas.style.height = H + 'px';
-  const ctx = canvas.getContext('2d');
-  ctx.scale(dpr, dpr); ctx.clearRect(0, 0, W, H);
+  const scale  = getCurrentScale();
+  const sLabel = scaleLabel(scale);
 
-  const cc = getCC();
-  const pxPerSec = chartW / viewDur;
-
-  let tickStep, subTick;
-  if (viewDur <= 3600)       { tickStep = 600;    subTick = 120; }
-  else if (viewDur <= 86400) { tickStep = 3600;   subTick = 1800; }
-  else if (viewDur <= 604800){ tickStep = 86400;  subTick = 43200; }
-  else                       { tickStep = 604800; subTick = 86400; }
-
-  ctx.lineWidth = 0.5;
-  for (let t = subTick; t < viewDur; t += subTick) {
-    const x = LPAD + t * pxPerSec;
-    ctx.strokeStyle = cc.grid;
-    ctx.beginPath(); ctx.moveTo(x, RULER_H); ctx.lineTo(x, H); ctx.stroke();
-  }
-  for (let t = 0; t <= viewDur; t += tickStep) {
-    const x = LPAD + t * pxPerSec;
-    ctx.strokeStyle = cc.gridMaj;
-    ctx.beginPath(); ctx.moveTo(x, 16); ctx.lineTo(x, H); ctx.stroke();
-    ctx.fillStyle = cc.text;
-    ctx.font = '10px sans-serif'; ctx.textAlign = 'center';
-    ctx.fillText(fmtRuler(t, viewDur), x, 12);
-  }
-
-  let hasDense = false;
-  spots.forEach((sp, i) => {
-    const col = COLORS[i % COLORS.length];
-    const y = RULER_H + GAP + i * (ROW_H + GAP);
-    ctx.fillStyle = cc.rowBg;
-    ctx.fillRect(LPAD, y, chartW, ROW_H);
-    ctx.fillStyle = cc.textPri;
-    ctx.font = '11px sans-serif'; ctx.textAlign = 'right';
-    const lbl = sp.name.length > 9 ? sp.name.slice(0, 8) + '…' : sp.name;
-    ctx.fillText(lbl, LPAD - 6, y + ROW_H / 2 + 4);
-    ctx.fillStyle = col;
-    const segW = Math.max(1.5, sp.dur * pxPerSec);
-    const spacing = sp.interval * pxPerSec;
-    if (spacing < 2) {
-      hasDense = true;
-      ctx.globalAlpha = 0.7;
-      ctx.fillRect(LPAD, y + 3, chartW, ROW_H - 6);
-      ctx.globalAlpha = 1;
-    } else {
-      for (let t = 0; t < viewDur; t += sp.interval) {
-        const x = LPAD + t * pxPerSec;
-        const w = Math.min(segW, LPAD + chartW - x);
-        if (w > 0) ctx.fillRect(x, y + 3, w, ROW_H - 6);
-      }
-    }
+  // ── Calculs globaux ──
+  let totalAirSec = 0;
+  const spotsCalc = spots.map((sp, i) => {
+    const perScale = Math.floor(scale / sp.interval) * sp.dur; // secondes de pub sur la période
+    totalAirSec += perScale;
+    const pct = Math.min(100, Math.round(perScale / scale * 100));
+    const perHour = Math.round(3600 / sp.interval);
+    return { ...sp, perScale, pct, perHour, color: SPOT_COLORS[i % SPOT_COLORS.length] };
   });
+  const totalPct = Math.min(100, Math.round(totalAirSec / scale * 100));
 
-  ctx.strokeStyle = cc.gridMaj; ctx.lineWidth = 0.5;
-  ctx.strokeRect(LPAD, RULER_H, chartW, H - RULER_H);
+  // ── Bande métriques ──
+  if (metricsEl) {
+    metricsEl.innerHTML = `
+      <div class="tlm-kpi"><div class="tlm-kpi-label">Spots actifs</div><div class="tlm-kpi-value" style="color:#6366f1;">${spots.length}</div></div>
+      <div class="tlm-kpi"><div class="tlm-kpi-label">Pub totale / ${sLabel}</div><div class="tlm-kpi-value">${fmtDur(totalAirSec)}</div></div>
+      <div class="tlm-kpi"><div class="tlm-kpi-label">% antenne / ${sLabel}</div><div class="tlm-kpi-value" style="color:#10b981;">${totalPct}<span style="font-size:0.75rem;color:#94a3b8;"> %</span></div></div>
+    `;
+  }
 
-  const note = document.getElementById('frise-note');
-  if (note) {
-    note.textContent = hasDense ? "Barre pleine = diffusions très denses à cette échelle." : '';
+  // ── Carte par spot ──
+  const cardsHtml = spotsCalc.map(sp => `
+    <div style="background:${sp.color.bg}; border:1px solid ${sp.color.border}; border-radius:12px; padding:14px 16px; margin-bottom:10px;">
+      <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
+        <div style="display:flex; align-items:center; gap:10px; min-width:0; flex:1;">
+          <div style="width:10px; height:10px; border-radius:50%; background:${sp.color.bar}; flex-shrink:0; margin-top:3px;"></div>
+          <div style="min-width:0;">
+            <div style="font-size:0.86rem; font-weight:700; color:${sp.color.text}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:320px;">${sp.name}</div>
+            <div style="font-size:0.72rem; color:${sp.color.text}; opacity:0.7; margin-top:2px; font-family:var(--font-mono,monospace);">
+              <i class="bi bi-stopwatch me-1"></i>Durée : <strong>${fmtDur(sp.dur)}</strong>
+              &nbsp;·&nbsp;
+              <i class="bi bi-arrow-repeat me-1"></i>${fmtInterval(sp.interval)}
+            </div>
+          </div>
+        </div>
+        <div style="display:flex; gap:6px; flex-shrink:0;">
+          <span style="background:${sp.color.bar}22; border:1px solid ${sp.color.border}; color:${sp.color.text}; font-size:0.72rem; font-weight:700; padding:3px 9px; border-radius:8px; font-family:var(--font-mono,monospace);">
+            ${perHourLabel(sp)} passages/h
+          </span>
+          <span style="background:${sp.color.bar}; color:#fff; font-size:0.72rem; font-weight:700; padding:3px 9px; border-radius:8px;">
+            ${sp.pct}% du ${sLabel}
+          </span>
+        </div>
+      </div>
+      <!-- Barre de progression -->
+      <div style="background:rgba(255,255,255,0.5); border-radius:8px; height:10px; overflow:hidden; border:1px solid ${sp.color.border};">
+        <div style="height:100%; width:${sp.pct}%; background:${sp.color.bar}; border-radius:8px; transition:width 0.6s ease;"></div>
+      </div>
+      <div style="display:flex; justify-content:space-between; margin-top:5px;">
+        <span style="font-size:0.68rem; color:${sp.color.text}; opacity:0.6; font-family:var(--font-mono,monospace);">${fmtDur(sp.perScale)} de diffusion / ${sLabel}</span>
+        <span style="font-size:0.68rem; color:${sp.color.text}; opacity:0.6; font-family:var(--font-mono,monospace);">${sp.pct}%</span>
+      </div>
+    </div>
+  `).join('');
+
+  // ── Barre globale ──
+  const globalHtml = `
+    <div style="margin-bottom:14px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:12px; padding:14px 16px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+        <span style="font-size:0.78rem; font-weight:700; color:#334155;">
+          <i class="bi bi-broadcast me-1" style="color:#6366f1;"></i>
+          Occupation totale de l'antenne / ${sLabel}
+        </span>
+        <span style="font-size:0.85rem; font-weight:800; color:${totalPct > 80 ? '#ef4444' : totalPct > 50 ? '#f59e0b' : '#10b981'};">${totalPct}%</span>
+      </div>
+      <div style="background:#e2e8f0; border-radius:8px; height:12px; overflow:hidden;">
+        <div style="height:100%; width:${totalPct}%; background:linear-gradient(90deg,#6366f1,#8b5cf6); border-radius:8px; transition:width 0.6s ease;"></div>
+      </div>
+      <div style="display:flex; justify-content:space-between; margin-top:6px;">
+        <span style="font-size:0.68rem; color:#94a3b8; font-family:var(--font-mono,monospace);">0%</span>
+        <span style="font-size:0.68rem; color:#94a3b8; font-family:var(--font-mono,monospace);">100% (saturation)</span>
+      </div>
+    </div>
+  `;
+
+  container.innerHTML = globalHtml + cardsHtml;
+
+  if (noteEl) {
+    const s = noteEl.querySelector('span') || noteEl;
+    s.textContent = `Échelle : 1 ${sLabel} · ${spots.length} spot${spots.length>1?'s':''} en diffusion simultanée`;
   }
 }
 
-function render() { renderMetrics(); renderFrise(); }
+const spots = {{ spots_data|default:"[]"|safe }};
 
-const viewDurEl = document.getElementById('viewdur');
-if (viewDurEl) viewDurEl.addEventListener('change', render);
-window.addEventListener('load', render);
-window.addEventListener('resize', renderFrise);
+function perHourLabel(sp) {
+  return Math.round(3600 / sp.interval);
+}
+
+// Compatibilité : garder render() qui appelle maintenant buildFrise
+function renderMetrics() {} // vide — géré dans buildFrise
+function renderFrise()   {} // vide — géré dans buildFrise
+
+/* ── Sélecteur d'échelle (pills) ── */
+function setScale(val, btn) {
+  const sel = document.getElementById('viewdur');
+  if (sel) { sel.value = val; }
+  document.querySelectorAll('.frise-pill').forEach(b => b.classList.remove('frise-pill-on'));
+  if (btn) btn.classList.add('frise-pill-on');
+  buildFrise();
+}
+
+function render(){ buildFrise(); }
+
+const vdEl=document.getElementById('viewdur');
+if(vdEl) vdEl.addEventListener('change',render);
+window.addEventListener('load',render);
+window.addEventListener('resize',renderFrise);
 </script>
 {% endblock %}

@@ -352,6 +352,10 @@ class ApiGeojsonView(View):
         
         if type_filtre:
             qs = qs.filter(type_support=type_filtre)  # ✅ corrigé : 'type' au lieu de 'type_support'
+            # Les sucettes 1x2 disposent d'un filtre dédié et ne doivent pas
+            # apparaître dans la vue générale des panneaux.
+            if type_filtre == Support.TYPE_PANNEAU and type_panneau_filtre != '1x2':
+                qs = qs.exclude(format='1x2')
         if etat_filtre:
             qs = qs.filter(etat=etat_filtre)
         if type_panneau_filtre:
@@ -737,6 +741,8 @@ class SupportListView(TechnicienStaffRequiredMixin,SortableListMixin, ListView):
 
         if type_f:
             queryset = queryset.filter(type_support=type_f)
+            if type_f == Support.TYPE_PANNEAU and type_panneau_f != '1x2':
+                queryset = queryset.exclude(format='1x2')
 
         if etat_f:
             queryset = queryset.filter(etat=etat_f)
@@ -777,6 +783,7 @@ class SupportListView(TechnicienStaffRequiredMixin,SortableListMixin, ListView):
             type_panneau_choices = [
                 (f.code, f"{f.dimensions} ({f.superficie}m²)" if f.superficie else f.dimensions)
                 for f in FormatSupport.hors_ecran()
+                if f.code != '1x2'
             ]
         else:
             # Type vide → on affiche TOUT (panneaux + écrans confondus)

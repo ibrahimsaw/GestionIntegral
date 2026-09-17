@@ -19,32 +19,6 @@
   </div>
 {% endblock %}
 
-{% block topbar_actions %}
-  <div class="d-flex flex-wrap gap-2">
-    <a href="{% url 'support_periodes_panne' support.pk %}" class="btn btn-outline-danger btn-sm shadow-sm">
-      <i class="bi bi-clock-history me-1"></i>
-      <span class="d-none d-xxl-inline">Périodes de panne</span>
-    </a>
-    {% if user.is_staff_regie_role %}
-    <a href="{% url 'support_edit' support.uuid %}" class="btn btn-outline-secondary btn-sm shadow-sm">
-      <i class="bi bi-pencil me-1"></i>
-      <span class="d-none d-xxl-inline">Modifier</span>
-    </a>
-    {% endif %}
-    {% if user.is_technicien_role or user.is_staff_regie_role %}
-    <a href="{% url 'maintenance_create' support.pk %}" class="btn btn-warning btn-sm shadow-sm text-dark fw-semibold">
-      <i class="bi bi-tools me-1"></i>
-      <span class="d-none d-xxl-inline">Maintenance</span>
-    </a>
-    {% endif %}
-    {% if user.is_admin %}
-    <a href="{% url 'support_delete' support.uuid %}" class="btn btn-outline-danger btn-sm shadow-sm px-2" title="Supprimer">
-      <i class="bi bi-trash"></i>
-    </a>
-    {% endif %}
-  </div>
-{% endblock %}
-
 {% block extra_head %}
 <style>
   /* ═══════════════════════════════════════════════════════════
@@ -85,7 +59,7 @@
     .sdp-card-body { padding: 14px; }
 
     /* Face cards */
-    .sdp-face { border-radius: 11px; }
+    .sdp-face { border-radius: var(--radius-md); }
     .sdp-face-thumb { height: 170px; }
 
     /* Timeline */
@@ -328,7 +302,7 @@
     align-items: center;
     gap: 7px;
     padding: 9px 18px;
-    border-radius: 11px;
+    border-radius: var(--radius-md);
     font-size: 0.84rem;
     font-weight: 600;
     color: #64748b;
@@ -347,6 +321,11 @@
     color: #fff;
     background: linear-gradient(135deg, #932e2b 0%, #7a1e1b 100%);
     box-shadow: 0 4px 14px rgba(147,46,43,0.32);
+    animation: sdp-tab-in 0.2s ease-out both;
+  }
+  @keyframes sdp-tab-in {
+    from { transform: translateY(2px); }
+    to { transform: translateY(0); }
   }
   .sdp-tab-badge {
     font-size: 0.68rem;
@@ -363,7 +342,17 @@
 
   /* ── Section Containers ── */
   .sdp-section { display: none; }
-  .sdp-section.active { display: block; }
+  .sdp-section.active {
+    display: block;
+    animation: sdp-section-in 0.28s ease-out both;
+  }
+  @keyframes sdp-section-in {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .sdp-section.active, .sdp-tab.active { animation: none; }
+  }
 
   /* ── Content Cards ── */
   .sdp-card {
@@ -617,7 +606,9 @@
   .sdp-lb {
     position: fixed;
     inset: 0;
+    /*
     background: rgba(2,6,23,0.92);
+    */
     backdrop-filter: blur(10px);
     z-index: 9999;
     display: none;
@@ -661,7 +652,7 @@
   .tlm-kpi {
     background: #f8fafc;
     border: 1px solid #e2e8f0;
-    border-radius: 11px;
+    border-radius: var(--radius-md);
     padding: 12px 16px;
   }
   .tlm-kpi-label {
@@ -682,10 +673,23 @@
 {% endblock %}
 
 {% block content %}
-<div class="d-flex align-items-center gap-3 mb-4">
+<div class="d-flex align-items-center gap-3 mb-4 " style="justify-content: space-between;">
   <a href="javascript:void(0)" onclick="history.back()" class="btn btn-outline-secondary btn-sm shadow-sm">
     <i class="bi bi-arrow-left me-1"></i>Retour
   </a>
+  <div class="d-flex flex-wrap gap-2">
+    <a href="{% url 'support_periodes_panne' support.pk %}" class="btn btn-outline-danger btn-sm shadow-sm">
+      <i class="bi bi-clock-history me-1"></i>
+      <span class="d-none d-xxl-inline">Périodes de panne</span>
+    </a>
+    {% if user.is_technicien_role or user.is_staff_regie_role %}
+    <a href="{% url 'maintenance_create' support.pk %}" class="btn btn-warning btn-sm shadow-sm text-dark fw-semibold">
+      <i class="bi bi-tools me-1"></i>
+      <span class="d-none d-xxl-inline">Maintenance</span>
+    </a>
+  </div>
+
+  {% endif %}
 </div>
 <div>
 
@@ -721,13 +725,15 @@
               {{ support.get_etat_display }}
             </span>
           </div>
-          <h1 style="font-size: clamp(1.4rem, 3vw, 1.9rem); font-weight: 800; color: #fff; margin: 0 0 10px; line-height: 1.15;">
+          <h1 style="font-size: clamp(0.7rem, 1.5vw, 0.9rem); font-weight: 800; color: #fff; margin: 0 0 10px; line-height: 1.15;">
             {{ support.nom }}
           </h1>
           <div class="d-flex flex-wrap gap-2" style="font-size:0.82rem; color:rgba(255,255,255,0.55);">
             <span style="word-break:break-word; min-width:0;">
               <i class="bi bi-geo-alt-fill me-1" style="color:#f87171;"></i>
-              {{ support.adresse|default:"" }}{% if support.quartier %}, {{ support.quartier }}{% endif %}{% if support.ville %} <strong style="color:rgba(255,255,255,0.8);">— {{ support.ville }}</strong>{% endif %}
+              {% if support.adresse %}{{ support.adresse|default:"" }},{% endif %}
+              {% if support.quartier %}{{ support.quartier }}{% endif %}
+              {% if support.ville %} <strong style="color:rgba(255,255,255,0.8);">— {{ support.ville }}</strong>{% endif %}
             </span>
             {% if support.latitude and support.longitude %}
             <span class="font-monospace" style="cursor:pointer; color:rgba(255,255,255,0.45); word-break:break-all;" onclick="sdpCopyGps('{{ support.latitude }}, {{ support.longitude }}')" title="Copier les coordonnées">
@@ -745,9 +751,14 @@
           <i class="bi bi-map-fill text-primary"></i> <span>Voir sur la carte</span>
         </a>
         {% if user.is_staff_regie_role %}
-        <a href="{% url 'support_edit' support.uuid %}" class="btn btn-sm d-inline-flex align-items-center gap-1 fw-semibold" style="background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.2); color:#fff; border-radius:10px; font-size:0.84rem; backdrop-filter:blur(4px);">
-          <i class="bi bi-pencil-square"></i> <span>Modifier</span>
-        </a>
+          <a href="{% url 'support_edit' support.uuid %}" class="btn btn-sm d-inline-flex align-items-center gap-1 fw-semibold" style="background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.2); color:#fff; border-radius:10px; font-size:0.84rem; backdrop-filter:blur(4px);">
+            <i class="bi bi-pencil-square"></i> <span>Modifier</span>
+          </a>
+        {% endif %}
+        {% if user.is_admin %}
+          <a href="{% url 'support_delete' support.uuid %}" class="btn btn-outline-danger btn-sm shadow-sm px-2" title="Supprimer">
+            <i class="bi bi-trash"></i> <span>Supprimer</span>
+          </a>
         {% endif %}
       </div>
     </div>
@@ -1009,12 +1020,12 @@
             </div>
 
             <!-- Frise Premium -->
-            <div style="border-radius:16px; overflow:hidden; border:1px solid #e2e8f0; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+            <div style="border-radius:8px; overflow:hidden; border:1px solid #e2e8f0; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
 
               <!-- En-tête sombre -->
               <div style="background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%); padding:14px 18px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
                 <div style="display:flex; align-items:center; gap:10px;">
-                  <div style="width:34px; height:34px; border-radius:10px; background:rgba(99,102,241,0.2); border:1px solid rgba(99,102,241,0.35); display:flex; align-items:center; justify-content:center;">
+                  <div style="width:34px; height:34px; border-radius:8px; background:rgba(99,102,241,0.2); border:1px solid rgba(99,102,241,0.35); display:flex; align-items:center; justify-content:center;">
                     <i class="bi bi-activity" style="color:#a5b4fc; font-size:1rem;"></i>
                   </div>
                   <div>
@@ -1407,7 +1418,11 @@ function sdpTab(id, btn) {
   document.querySelectorAll('.sdp-section').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.sdp-tab').forEach(el => el.classList.remove('active'));
   const sec = document.getElementById('sdp-' + id);
-  if (sec) sec.classList.add('active');
+  if (sec) {
+    sec.classList.remove('sdp-section-enter');
+    void sec.offsetWidth;
+    sec.classList.add('active', 'sdp-section-enter');
+  }
   if (btn) btn.classList.add('active');
   if (id === 'map') setTimeout(initFullMap, 180);
 }
@@ -1588,7 +1603,7 @@ function buildFrise() {
 
   // ── Carte par spot ──
   const cardsHtml = spotsCalc.map(sp => `
-    <div style="background:${sp.color.bg}; border:1px solid ${sp.color.border}; border-radius:12px; padding:14px 16px; margin-bottom:10px;">
+    <div style="background:${sp.color.bg}; border:1px solid ${sp.color.border}; border-radius:8px; padding:14px 16px; margin-bottom:10px;">
       <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
         <div style="display:flex; align-items:center; gap:10px; min-width:0; flex:1;">
           <div style="width:10px; height:10px; border-radius:50%; background:${sp.color.bar}; flex-shrink:0; margin-top:3px;"></div>
@@ -1623,7 +1638,7 @@ function buildFrise() {
 
   // ── Barre globale ──
   const globalHtml = `
-    <div style="margin-bottom:14px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:12px; padding:14px 16px;">
+    <div style="margin-bottom:14px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:8px; padding:14px 16px;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
         <span style="font-size:0.78rem; font-weight:700; color:#334155;">
           <i class="bi bi-broadcast me-1" style="color:#6366f1;"></i>

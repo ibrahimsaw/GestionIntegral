@@ -3,126 +3,353 @@
 {% block title %}{{ page_title }} — Integral{% endblock %}
 
 {% block topbar_title %}
+  <i class="bi bi-calendar-check me-2" style="color:var(--color-primary)"></i>
   {{ reservation.nom }}
 {% endblock %}
 
 {% block topbar_actions %}
-  <div class="d-flex gap-2">
+  <div class="d-flex align-items-center gap-2">
     {% if can_edit %}
-      <a href="{% url 'reservation_update' reservation.client.pk reservation.pk %}" class="btn btn-outline-secondary btn-sm shadow-sm">
-        <i class="bi bi-pencil me-1"></i>
-        <span class="d-none d-md-inline ms-1">Modifier</span>
+      {% if reservation.statut == 'en_attente' or reservation.statut == 'confirmee' %}
+      <a href="{% url 'reservation_update' reservation.client.pk reservation.pk %}" class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1 shadow-sm" style="border-radius: 8px;">
+        <i class="bi bi-pencil"></i>
+        <span>Modifier</span>
       </a>
-      <a href="{% url 'reservation_delete' reservation.client.pk reservation.pk %}" class="btn btn-outline-danger btn-sm shadow-sm">
-        <i class="bi bi-trash me-1"></i>
-        <span class="d-none d-md-inline ms-1">Supprimer</span>
+      {% endif %}
+      <a href="{% url 'reservation_delete' reservation.client.pk reservation.pk %}" class="btn btn-outline-danger btn-sm d-flex align-items-center gap-1 shadow-sm" style="border-radius: 8px;">
+        <i class="bi bi-trash3"></i>
+        <span>Supprimer</span>
       </a>
     {% endif %}
   </div>
 {% endblock %}
 
 {% block content %}
-  <div class="d-flex align-items-center gap-3 mb-4">
-    <a href="javascript:void(0)" onclick="history.back()" class="btn btn-outline-secondary btn-sm">
-      <i class="bi bi-arrow-left"></i>
-    </a>
-    <h1 class="h4 fw-bold mb-0">Détails de la réservation</h1>
-  </div>
-  <div class="container-fluid py-4">
-    <div class="row g-4">
-      <div class="col-lg-8">
-        <div class="card shadow-sm border-0 rounded-4">
-          <div class="card-body p-4">
-            <div class="mb-4">
-              <p class="text-muted mb-0">{{ reservation.client.nom }} • {{ reservation.reference }}</p>
-            </div>
+<div class="mb-4">
 
-            <div class="row g-3 mb-4">
-              <div class="col-sm-6">
-                <div class="border rounded-3 p-3 bg-light-subtle">
-                  <div class="text-uppercase text-muted small mb-2">Période</div>
-                  <div class="fw-semibold">{{ reservation.date_debut|date:"d/m/Y H:i" }}</div>
-                  <div class="fw-semibold">→ {{ reservation.date_fin|date:"d/m/Y H:i" }}</div>
-                </div>
-              </div>
-              <div class="col-sm-6">
-                <div class="border rounded-3 p-3 bg-light-subtle">
-                  <div class="text-uppercase text-muted small mb-2">Statut</div>
-                  <span class="badge bg-{{ reservation.get_statut_badge }} text-white">{{ reservation.get_statut_display }}</span>
-                </div>
-              </div>
-            </div>
-
-            <div class="mb-4">
-              <h5 class="fw-bold mb-3">Lignes de réservation</h5>
-              <div class="table-responsive">
-                <table class="table table-borderless align-middle mb-0">
-                  <thead>
-                    <tr>
-                      <th>Support</th>
-                      <th>Face</th>
-                      <th>Notes</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {% for ligne in reservation.lignes.all %}
-                    <tr>
-                      <td>{{ ligne.support.code }}</td>
-                      <td>{% if ligne.face %}Face {{ ligne.face.label }}{% else %}—{% endif %}</td>
-                      <td class="text-muted small">{{ ligne.notes|default:'—' }}</td>
-                    </tr>
-                    {% empty %}
-                    <tr>
-                      <td colspan="3" class="text-center text-muted py-4">Aucune ligne de réservation.</td>
-                    </tr>
-                    {% endfor %}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {% if reservation.notes %}
-            <div class="card border-0 bg-light-subtle rounded-4 p-4">
-              <h6 class="fw-semibold mb-2">Notes internes</h6>
-              <p class="mb-0 text-muted">{{ reservation.notes }}</p>
-            </div>
-            {% else %}
-            <div>
-              <p class="text-muted mb-0">Aucune note interne.</p>
-            </div>
-            {% endif %}
-          </div>
+  <!-- Header & Navigation -->
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
+    <div class="d-flex align-items-center gap-3">
+      <a href="{% url 'reservation_list' %}" class="btn btn-light border btn-sm d-flex align-items-center justify-content-center shadow-sm" style="width: 38px; height: 38px; border-radius: 20px;" title="Retour à la liste">
+        <i class="bi bi-arrow-left fs-6"></i>
+      </a>
+      <div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+          <h1 class="h4 fw-bold mb-0" style="color: #0f172a;">{{ reservation.nom }}</h1>
+          <span class="badge font-monospace text-muted px-2 py-1" style="background: #f1f5f9; border: 1px solid #e2e8f0; font-size: 0.78rem;">
+            {{ reservation.reference }}
+          </span>
+          {% if reservation.statut == 'en_attente' %}
+            <span class="badge px-3 py-1" style="background: #fef3c7; color: #92400e; border: 1px solid #fde68a; font-weight: 700; font-size: 0.75rem; border-radius: 8px;">
+              <i class="bi bi-clock-history me-1"></i>En attente de validation
+            </span>
+          {% elif reservation.statut == 'confirmee' %}
+            <span class="badge px-3 py-1" style="background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; font-weight: 700; font-size: 0.75rem; border-radius: 8px;">
+              <i class="bi bi-check-circle-fill me-1"></i>Confirmée
+            </span>
+          {% elif reservation.statut == 'annulee' %}
+            <span class="badge px-3 py-1" style="background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; font-weight: 700; font-size: 0.75rem; border-radius: 8px;">
+              <i class="bi bi-x-circle-fill me-1"></i>Annulée
+            </span>
+          {% elif reservation.statut == 'expiree' %}
+            <span class="badge px-3 py-1" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; font-weight: 700; font-size: 0.75rem; border-radius: 8px;">
+              <i class="bi bi-hourglass-bottom me-1"></i>Expirée
+            </span>
+          {% endif %}
         </div>
-      </div>
-
-      <div class="col-lg-4">
-        <div class="card shadow-sm border-0 rounded-4 p-4 bg-white">
-          <div class="mb-4">
-            <h6 class="fw-bold mb-2">Informations client</h6>
-            <p class="mb-1"><strong>{{ reservation.client.nom }}</strong></p>
-            {% if reservation.client.email %}<p class="mb-1 text-muted">{{ reservation.client.email }}</p>{% endif %}
-            {% if reservation.client.telephone %}<p class="mb-0 text-muted">{{ reservation.client.telephone }}</p>{% endif %}
-          </div>
-
-          <div class="mb-4">
-            <h6 class="fw-bold mb-2">Créé par</h6>
-            <p class="mb-0 text-muted">{{ reservation.created_by|default:'Système' }}</p>
-            <small class="text-muted">Le {{ reservation.created_at|date:"d/m/Y H:i" }}</small>
-          </div>
-
-          <div>
-            <a href="{% url 'client_detail' reservation.client.pk %}" class="btn btn-outline-secondary w-100 mb-2">Retour au client
-              
-            </a>
-            {% if can_edit %}
-            <a href="{% url 'reservation_update' reservation.client.pk reservation.pk %}" class="btn btn-primary w-100">
-              <i class="bi bi-pencil-square me-1"></i>
-              <span class="d-none d-md-inline ms-1">Modifier la réservation</span>
-            </a>
-            {% endif %}
-          </div>
+        <div class="small text-muted mt-1">
+          Client associé : <strong class="text-dark">{{ reservation.client.nom }}</strong>
         </div>
       </div>
     </div>
+
+    <!-- Actions rapides en haut -->
+    <div class="d-flex align-items-center gap-2">
+      {% if reservation.statut == 'en_attente' and user.is_staff_regie_role %}
+        {% if reservation.created_by_id != user.id %}
+        <a href="{% url 'reservation_traiter' reservation.client.pk reservation.pk %}" class="btn btn-success btn-sm d-flex align-items-center gap-2 shadow-sm px-3 py-2 fw-semibold" style="border-radius: 8px;">
+          <i class="bi bi-clipboard-check-fill"></i>
+          <span>Traiter la réservation</span>
+        </a>
+        {% else %}
+        <span class="badge bg-light text-muted border p-2" title="Double contrôle requis">
+          <i class="bi bi-info-circle me-1"></i>En attente de validation par un collègue
+        </span>
+        {% endif %}
+      {% endif %}
+    </div>
   </div>
+
+  <div class="row g-4">
+    <!-- COLONNE GAUCHE (Détails, Période, Faces) -->
+    <div class="col-lg-8">
+
+      <!-- Période & Synthèse -->
+      <div class="card border-0 shadow-sm mb-4" style="border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden;">
+        <div class="card-header bg-white py-3 px-4 border-bottom" style="border-color: #e2e8f0;">
+          <h6 class="mb-0 fw-bold d-flex align-items-center gap-2" style="color: #1e293b;">
+            <i class="bi bi-calendar-range text-primary"></i>Période de réservation
+          </h6>
+        </div>
+        <div class="card-body p-4">
+          <div class="row g-3">
+            <div class="col-sm-6">
+              <div class="p-3 rounded-3" style="background: #f8fafc; border: 1px solid #e2e8f0;">
+                <div class="text-uppercase text-muted fw-bold mb-1" style="font-size: 0.72rem; letter-spacing: 0.05em;">Date de début</div>
+                <div class="d-flex align-items-center gap-2">
+                  <i class="bi bi-calendar-check text-success fs-5"></i>
+                  <div>
+                    <div class="fw-bold font-monospace" style="color: #0f172a; font-size: 1rem;">{{ reservation.date_debut|date:"d/m/Y" }}</div>
+                    <small class="text-muted">{{ reservation.date_debut|date:"H:i" }}</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="col-sm-6">
+              <div class="p-3 rounded-3" style="background: #f8fafc; border: 1px solid #e2e8f0;">
+                <div class="text-uppercase text-muted fw-bold mb-1" style="font-size: 0.72rem; letter-spacing: 0.05em;">Date de fin</div>
+                <div class="d-flex align-items-center gap-2">
+                  <i class="bi bi-calendar-x text-danger fs-5"></i>
+                  <div>
+                    <div class="fw-bold font-monospace" style="color: #0f172a; font-size: 1rem;">{{ reservation.date_fin|date:"d/m/Y" }}</div>
+                    <small class="text-muted">{{ reservation.date_fin|date:"H:i" }}</small>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mt-3 p-3 rounded-3 d-flex align-items-center justify-content-between flex-wrap gap-2" style="background: #f1f5f9;">
+            <div class="d-flex align-items-center gap-2">
+              <i class="bi bi-hourglass-split text-primary fs-5"></i>
+              <span class="text-muted small">Durée totale réservée :</span>
+              <strong class="text-dark">{{ reservation.duree_jours }} jour{{ reservation.duree_jours|pluralize }}</strong>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+              <i class="bi bi-layers-fill text-secondary fs-5"></i>
+              <span class="text-muted small">Total faces bloquées :</span>
+              <strong class="text-dark">{{ reservation.lignes.count }} face{{ reservation.lignes.count|pluralize }}</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Faces réservées -->
+      <div class="card border-0 shadow-sm mb-4" style="border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden;">
+        <div class="card-header bg-white py-3 px-4 d-flex align-items-center justify-content-between border-bottom" style="border-color: #e2e8f0;">
+          <h6 class="mb-0 fw-bold d-flex align-items-center gap-2" style="color: #1e293b;">
+            <i class="bi bi-grid-3x3-gap-fill text-primary"></i>Faces et panneaux réservés
+          </h6>
+          <span class="badge px-3 py-2" style="background: #f8fafc; color: #475569; border: 1px solid #cbd5e1; font-weight: 700; border-radius: 8px;">
+            {{ reservation.lignes.count }} face{{ reservation.lignes.count|pluralize }}
+          </span>
+        </div>
+        <div class="card-body p-0 table-responsive">
+          <table class="table table-hover align-middle mb-0" style="border-collapse: separate; border-spacing: 0;">
+            <thead>
+              <tr style="background-color: #1e293b; color: #ffffff;">
+                <th class="py-3 px-3" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: #f8fafc; border: none;">Support & Code</th>
+                <th class="py-3 px-3" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: #f8fafc; border: none;">Face</th>
+                <th class="py-3 px-3" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: #f8fafc; border: none;">Localisation</th>
+                <th class="py-3 px-3" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: #f8fafc; border: none;">Format</th>
+                <th class="py-3 px-3 text-end" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: #f8fafc; border: none;">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for ligne in reservation.lignes.all %}
+              <tr style="border-bottom: 1px solid #f1f5f9;">
+                <td class="py-3 px-3">
+                  <div class="d-flex align-items-center gap-2">
+                    <div class="d-flex align-items-center justify-content-center rounded-2 bg-light border text-primary fw-bold" style="width: 32px; height: 32px; font-size: 0.75rem;">
+                      🪧
+                    </div>
+                    <div>
+                      <a href="{% url 'support_detail' ligne.support.uuid %}" class="fw-bold font-monospace text-decoration-none" style="color: var(--color-primary);">
+                        {{ ligne.support.code }}
+                      </a>
+                      <div class="small text-muted text-truncate" style="max-width: 200px;">
+                        {{ ligne.support.nom|default:ligne.support.code }}
+                      </div>
+                    </div>
+                  </div>
+                </td>
+                <td class="py-3 px-3">
+                  <span class="badge px-3 py-2 fw-bold" style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; border-radius: 8px;">
+                    <i class="bi bi-aspect-ratio me-1"></i>
+                    {% if ligne.face %}Face {{ ligne.face.label }}{% else %}Support complet{% endif %}
+                  </span>
+                </td>
+                <td class="py-3 px-3">
+                  <div class="text-dark fw-semibold" style="font-size: 0.85rem;">{{ ligne.support.ville|default:"—" }}</div>
+                  <small class="text-muted"><i class="bi bi-geo-alt me-1"></i>{{ ligne.support.quartier|default:ligne.support.adresse|default:"—" }}</small>
+                </td>
+                <td class="py-3 px-3">
+                  <span class="badge bg-light text-dark border" style="font-size: 0.75rem;">
+                    {{ ligne.support.get_format_display|default:ligne.support.format|default:"Standard" }}
+                  </span>
+                </td>
+                <td class="py-3 px-3 text-end">
+                  <a href="{% url 'support_detail' ligne.support.uuid %}" class="btn btn-sm btn-outline-secondary" style="border-radius: 8px;" title="Voir le panneau">
+                    <i class="bi bi-box-arrow-up-right"></i>
+                  </a>
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="5" class="text-center py-4 text-muted">
+                  <i class="bi bi-inbox d-block mb-1 fs-3 opacity-50"></i>
+                  Aucune face n'est associée à cette réservation.
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Notes internes -->
+      <div class="card border-0 shadow-sm" style="border-radius: 8px; border: 1px solid #e2e8f0;">
+        <div class="card-header bg-white py-3 px-4 border-bottom" style="border-color: #e2e8f0;">
+          <h6 class="mb-0 fw-bold d-flex align-items-center gap-2" style="color: #1e293b;">
+            <i class="bi bi-journal-text text-primary"></i>Notes et observations
+          </h6>
+        </div>
+        <div class="card-body p-4">
+          {% if reservation.notes %}
+          <div class="p-3 rounded-3" style="background: #f8fafc; border-left: 4px solid var(--color-primary); border-top: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;">
+            <p class="mb-0 text-dark" style="font-size: 0.9rem; white-space: pre-line;">{{ reservation.notes }}</p>
+          </div>
+          {% else %}
+          <p class="text-muted small mb-0 fst-italic">
+            <i class="bi bi-info-circle me-1"></i>Aucune note interne renseignée pour cette réservation.
+          </p>
+          {% endif %}
+        </div>
+      </div>
+
+    </div>
+
+    <!-- COLONNE DROITE (Client, Création, Actions) -->
+    <div class="col-lg-4">
+      
+      <!-- Fiche Client -->
+      <div class="card border-0 shadow-sm mb-4" style="border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden;">
+        <div class="card-header bg-white py-3 px-4 border-bottom" style="border-color: #e2e8f0;">
+          <h6 class="mb-0 fw-bold d-flex align-items-center gap-2" style="color: #1e293b;">
+            <i class="bi bi-building text-primary"></i>Client associé
+          </h6>
+        </div>
+        <div class="card-body p-4">
+          <div class="d-flex align-items-center gap-3 mb-3">
+            <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold shadow-sm flex-shrink-0" style="width: 48px; height: 48px; background: linear-gradient(135deg, var(--color-primary) 0%, #b91c1c 100%); font-size: 1.1rem;">
+              {{ reservation.client.nom|slice:":2"|upper }}
+            </div>
+            <div class="min-width-0">
+              <h6 class="fw-bold mb-0 text-dark text-truncate">{{ reservation.client.nom }}</h6>
+              <small class="text-muted">Client référencé</small>
+            </div>
+          </div>
+
+          <div class="d-flex flex-column gap-2 mb-3 pt-2 border-top">
+            {% if reservation.client.telephone %}
+            <div class="d-flex align-items-center gap-2 small text-muted">
+              <i class="bi bi-telephone text-primary"></i>
+              <span class="text-dark">{{ reservation.client.telephone }}</span>
+            </div>
+            {% endif %}
+
+            {% if reservation.client.email %}
+            <div class="d-flex align-items-center gap-2 small text-muted">
+              <i class="bi bi-envelope text-primary"></i>
+              <a href="mailto:{{ reservation.client.email }}" class="text-decoration-none text-dark">{{ reservation.client.email }}</a>
+            </div>
+            {% endif %}
+          </div>
+
+          <a href="{% url 'client_detail' reservation.client.pk %}" class="btn btn-outline-secondary w-100 btn-sm d-flex align-items-center justify-content-center gap-1" style="border-radius: 8px;">
+            <i class="bi bi-person-lines-fill"></i>
+            <span>Voir la fiche client</span>
+          </a>
+        </div>
+      </div>
+
+      <!-- Informations d'audit -->
+      <div class="card border-0 shadow-sm mb-4" style="border-radius: 8px; border: 1px solid #e2e8f0;">
+        <div class="card-header bg-white py-3 px-4 border-bottom" style="border-color: #e2e8f0;">
+          <h6 class="mb-0 fw-bold d-flex align-items-center gap-2" style="color: #1e293b;">
+            <i class="bi bi-shield-check text-primary"></i>Traçabilité
+          </h6>
+        </div>
+        <div class="card-body p-4">
+          <div class="d-flex flex-column gap-3">
+            <div>
+              <div class="text-uppercase text-muted fw-bold" style="font-size: 0.72rem; letter-spacing: 0.05em;">Créé par</div>
+              <div class="d-flex align-items-center gap-2 mt-1">
+                <i class="bi bi-person-badge text-secondary"></i>
+                <span class="fw-semibold text-dark" style="font-size: 0.88rem;">{{ reservation.created_by|default:"Système" }}</span>
+              </div>
+              <small class="text-muted d-block mt-1" style="font-size: 0.75rem;">
+                Le {{ reservation.created_at|date:"d/m/Y à H:i" }}
+              </small>
+            </div>
+
+            {% if reservation.updated_at %}
+            <div class="pt-2 border-top">
+              <div class="text-uppercase text-muted fw-bold" style="font-size: 0.72rem; letter-spacing: 0.05em;">Dernière modification</div>
+              <small class="text-muted d-block mt-1" style="font-size: 0.75rem;">
+                Le {{ reservation.updated_at|date:"d/m/Y à H:i" }}
+              </small>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Actions de gestion -->
+      <div class="card border-0 shadow-sm" style="border-radius: 8px; border: 1px solid #e2e8f0;">
+        <div class="card-header bg-white py-3 px-4 border-bottom" style="border-color: #e2e8f0;">
+          <h6 class="mb-0 fw-bold d-flex align-items-center gap-2" style="color: #1e293b;">
+            <i class="bi bi-gear-wide-connected text-primary"></i>Actions
+          </h6>
+        </div>
+        <div class="card-body p-4 d-flex flex-column gap-2">
+          {% if reservation.statut == 'en_attente' and user.is_staff_regie_role %}
+            {% if reservation.created_by_id != user.id %}
+            <a href="{% url 'reservation_traiter' reservation.client.pk reservation.pk %}" class="btn btn-success w-100 d-flex align-items-center justify-content-center gap-2 shadow-sm fw-semibold" style="border-radius: 8px;">
+              <i class="bi bi-clipboard-check-fill"></i>
+              <span>Valider / Annuler la réservation</span>
+            </a>
+            {% else %}
+            <div class="alert alert-warning py-2 small mb-0" style="border-radius: 8px;">
+              <i class="bi bi-lock-fill me-1"></i>Vous êtes le créateur. Double contrôle obligatoire.
+            </div>
+            {% endif %}
+          {% endif %}
+
+          {% if can_edit and reservation.statut == 'en_attente' or reservation.statut == 'confirmee' %}
+          <a href="{% url 'reservation_update' reservation.client.pk reservation.pk %}" class="btn btn-outline-secondary w-100 d-flex align-items-center justify-content-center gap-2" style="border-radius: 8px;">
+            <i class="bi bi-pencil-square"></i>
+            <span>Modifier la réservation</span>
+          </a>
+          {% endif %}
+
+          {% if can_delete %}
+          <a href="{% url 'reservation_delete' reservation.client.pk reservation.pk %}" class="btn btn-outline-danger w-100 d-flex align-items-center justify-content-center gap-2" style="border-radius: 8px;">
+            <i class="bi bi-trash3"></i>
+            <span>Supprimer la réservation</span>
+          </a>
+          {% endif %}
+
+          <a href="{% url 'reservation_list' %}" class="btn btn-light border w-100 mt-2 d-flex align-items-center justify-content-center gap-2" style="border-radius: 8px;">
+            <i class="bi bi-arrow-left"></i>
+            <span>Retour aux réservations</span>
+          </a>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
 {% endblock %}

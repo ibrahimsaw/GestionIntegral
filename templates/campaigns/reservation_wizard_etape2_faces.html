@@ -11,14 +11,11 @@
 {% block content %}
 <style>
   :root {
-    --step-active:   var(--color-primary);
+    --step-active:   var(--color-primary, #932e2b);
     --step-done:     #10b981;
     --step-inactive: #cbd5e1;
-    --radius-sm:  6px;
-    --radius-md:  10px;
-    --radius-lg:  14px;
     --shadow-sm:  0 1px 3px rgba(0,0,0,.06);
-    --shadow-md:  0 4px 16px rgba(0,0,0,.08);
+    --shadow-md:  0 6px 20px rgba(0,0,0,.08);
     --c-libre:    #10b981;
     --c-partiel:  #f59e0b;
     --c-occupe:   #ef4444;
@@ -27,39 +24,39 @@
   }
 
   .dates-bar {
-    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-    background: var(--bg-card, #fff); border: 1px solid var(--border, #e2e8f0);
-    border-radius: var(--radius-lg); padding: 10px 16px;
-    margin-bottom: 12px; box-shadow: var(--shadow-sm);
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    background: #ffffff; border: 1px solid #e2e8f0;
+    border-radius: var(--radius-md); padding: 12px 18px;
+    margin-bottom: 16px; box-shadow: var(--shadow-sm);
   }
   .dates-bar-label {
-    font-size: .75rem; font-weight: 800; color: var(--text-muted, #64748b);
-    text-transform: uppercase; letter-spacing: .08em; white-space: nowrap;
+    font-size: 0.78rem; font-weight: 800; color: #475569;
+    text-transform: uppercase; letter-spacing: 0.06em; white-space: nowrap;
     display: flex; align-items: center; gap: 6px;
   }
-  .dates-bar-sep { color: var(--text-muted, #64748b); font-size: .8rem; }
+  .dates-bar-sep { color: #94a3b8; font-size: 0.85rem; font-weight: bold; }
   .date-input-wrap {
-    display: flex; align-items: center; gap: 6px;
-    background: var(--bg-card2, #f8fafc); border: 1.5px solid var(--border, #e2e8f0);
-    border-radius: var(--radius-sm); padding: 5px 10px; transition: border-color .15s;
+    display: flex; align-items: center; gap: 8px;
+    background: #f8fafc; border: 1.5px solid #e2e8f0;
+    border-radius: var(--radius-sm); padding: 6px 12px; transition: border-color .15s;
   }
   .date-input-wrap:focus-within {
-    border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px rgba(37,99,235,.08);
+    border-color: var(--color-primary, #932e2b);
+    box-shadow: 0 0 0 3px rgba(147, 46, 43, 0.1);
   }
-  .date-input-wrap i { color: var(--text-muted, #64748b); font-size: .8rem; flex-shrink: 0; }
+  .date-input-wrap i { color: #64748b; font-size: 0.85rem; flex-shrink: 0; }
   .date-input-wrap input {
-    border: none; background: transparent; color: var(--text, #0f172a);
-    font-size: .8rem; font-weight: 600; outline: none; width: 150px;
+    border: none; background: transparent; color: #0f172a;
+    font-size: 0.82rem; font-weight: 600; outline: none; width: 140px;
   }
   #dates-status {
     display: flex; align-items: center; gap: 6px;
-    font-size: .74rem; font-weight: 700; padding: 5px 12px;
-    border-radius: 20px; transition: all .2s; margin-left: auto;
+    font-size: 0.76rem; font-weight: 700; padding: 6px 14px;
+    border-radius: 8px; transition: all .2s; margin-left: auto;
   }
-  #dates-status.waiting { background: var(--bg-card2, #f8fafc); color: var(--text-muted, #64748b); border: 1px solid var(--border, #e2e8f0); }
-  #dates-status.loading { background: #eff6ff; color: var(--color-primary); border: 1px solid #bfdbfe; }
-  #dates-status.ok      { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+  #dates-status.waiting { background: #f8fafc; color: #64748b; border: 1px solid #e2e8f0; }
+  #dates-status.loading { background: #eff6ff; color: #2563eb; border: 1px solid #bfdbfe; }
+  #dates-status.ok      { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
   #dates-status.error   { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
   #dates-status .spin {
     width: 12px; height: 12px; border: 2px solid currentColor;
@@ -69,178 +66,183 @@
   @keyframes spin { to { transform: rotate(360deg); } }
 
   .view-toggle {
-    display: inline-flex; gap: 3px;
-    background: var(--bg-card2, #f8fafc); border: 1px solid var(--border, #e2e8f0);
-    border-radius: var(--radius-md); padding: 3px;
+    display: inline-flex; gap: 4px;
+    background: #f1f5f9; border: 1px solid #e2e8f0;
+    border-radius: 8px; padding: 3px;
   }
   .vt-btn {
     display: flex; align-items: center; gap: 6px;
-    padding: 6px 14px; border-radius: var(--radius-sm);
+    padding: 6px 12px; border-radius: 7px;
     border: none; background: transparent;
-    font-size: .78rem; font-weight: 700; color: var(--text-muted, #64748b);
+    font-size: 0.78rem; font-weight: 700; color: #64748b;
     cursor: pointer; transition: all .18s;
   }
   .vt-btn.active {
-    background: var(--bg-card, #fff); color: var(--color-primary);
-    box-shadow: var(--shadow-sm); border: 1px solid var(--border, #e2e8f0);
+    background: #ffffff; color: var(--color-primary, #932e2b);
+    box-shadow: var(--shadow-sm); border: 1px solid #cbd5e1;
   }
-  .vt-btn:not(.active):hover { color: var(--text, #0f172a); }
+  .vt-btn:not(.active):hover { color: #0f172a; }
 
   .resa-grid {
-    display: grid; grid-template-columns: 1fr 320px;
-    gap: 14px; height: calc(100vh - 340px); min-height: 480px;
+    display: grid; grid-template-columns: 1fr 340px;
+    gap: 16px; height: calc(100vh - 310px); min-height: 520px;
   }
   @media (max-width: 992px) { .resa-grid { grid-template-columns: 1fr; height: auto; } }
 
   .main-section {
-    background: var(--bg-card, #fff); border: 1px solid var(--border, #e2e8f0);
+    background: #ffffff; border: 1px solid #e2e8f0;
     border-radius: var(--radius-lg); overflow: hidden;
     display: flex; flex-direction: column; box-shadow: var(--shadow-sm);
   }
   .section-header {
-    padding: 8px 12px; border-bottom: 1px solid var(--border, #e2e8f0);
-    background: var(--bg-card2, #f8fafc);
+    padding: 10px 14px; border-bottom: 1px solid #e2e8f0;
+    background: #f8fafc;
     display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex-shrink: 0;
   }
 
   .mf-select, .list-search {
-    padding: 5px 10px; border-radius: 20px;
-    border: 1.5px solid var(--border, #e2e8f0);
-    background: var(--bg-card, #fff); color: var(--text, #0f172a);
-    font-size: .74rem; font-weight: 600; cursor: pointer; transition: all .15s;
+    padding: 6px 12px; border-radius: 8px;
+    border: 1.5px solid #cbd5e1;
+    background: #ffffff; color: #0f172a;
+    font-size: 0.75rem; font-weight: 600; cursor: pointer; transition: all .15s;
   }
   .list-search {
-    padding-left: 28px; min-width: 170px;
+    padding-left: 30px; min-width: 180px;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' fill='%2394a3b8' viewBox='0 0 16 16'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398l3.85 3.85a1 1 0 0 0 1.415-1.415l-3.868-3.833zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z'/%3E%3C/svg%3E");
-    background-repeat: no-repeat; background-position: 9px center;
+    background-repeat: no-repeat; background-position: 10px center;
   }
   .mf-select:focus, .list-search:focus {
-    outline: none; border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px rgba(37,99,235,.08);
+    outline: none; border-color: var(--color-primary, #932e2b);
+    box-shadow: 0 0 0 3px rgba(147, 46, 43, 0.1);
   }
 
-  #map-resa { flex: 1; min-height: 360px; }
+  #map-resa { flex: 1; min-height: 380px; }
   .map-legend {
-    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
-    padding: 6px 12px; border-top: 1px solid var(--border, #e2e8f0);
-    background: var(--bg-card2, #f8fafc); font-size: .68rem; flex-shrink: 0;
+    display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+    padding: 8px 14px; border-top: 1px solid #e2e8f0;
+    background: #f8fafc; font-size: 0.72rem; flex-shrink: 0;
   }
-  .leg-item { display: flex; align-items: center; gap: 4px; color: var(--text-muted, #64748b); font-weight: 600; }
-  .leg-dot  { width: 8px; height: 8px; border-radius: 50%; }
+  .leg-item { display: flex; align-items: center; gap: 5px; color: #475569; font-weight: 600; }
+  .leg-dot  { width: 9px; height: 9px; border-radius: 50%; }
 
   #view-liste { display: none; flex: 1; overflow-y: auto; }
   .liste-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-    gap: 10px; padding: 10px;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 12px; padding: 14px;
   }
-  .liste-empty { grid-column: 1/-1; padding: 50px 20px; text-align: center; color: var(--text-muted, #64748b); }
-  .liste-empty i { font-size: 2.2rem; opacity: .25; display: block; margin-bottom: 8px; }
-  .liste-empty p { font-size: .8rem; }
+  .liste-empty { grid-column: 1/-1; padding: 60px 20px; text-align: center; color: #64748b; }
+  .liste-empty i { font-size: 2.4rem; opacity: .25; display: block; margin-bottom: 8px; }
+  .liste-empty p { font-size: 0.85rem; }
 
   .support-card {
-    background: var(--bg-card2, #f8fafc); border: 1px solid var(--border, #e2e8f0);
+    background: #ffffff; border: 1px solid #e2e8f0;
     border-radius: var(--radius-md); overflow: hidden; transition: all .15s;
   }
-  .support-card:hover { box-shadow: var(--shadow-md); }
-  .support-card.has-selected { border-color: var(--color-primary); box-shadow: 0 0 0 2px rgba(37,99,235,.1); }
-  .sc-header { padding: 9px 11px; background: var(--bg-card, #fff); border-bottom: 1px solid var(--border, #e2e8f0); display: flex; align-items: center; gap: 8px; }
-  .sc-icon { width: 30px; height: 30px; border-radius: var(--radius-sm); background: var(--color-primary); color: #fff; display: flex; align-items: center; justify-content: center; font-size: .7rem; font-weight: 800; flex-shrink: 0; }
+  .support-card:hover { box-shadow: var(--shadow-md); border-color: #cbd5e1; }
+  .support-card.has-selected { border-color: var(--color-primary, #932e2b); box-shadow: 0 0 0 2px rgba(147, 46, 43, 0.15); }
+  .sc-header { padding: 10px 12px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; gap: 8px; }
+  .sc-icon { width: 32px; height: 32px; border-radius: var(--radius-sm); background: var(--color-primary, #932e2b); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 800; flex-shrink: 0; }
   .sc-info { flex: 1; overflow: hidden; }
-  .sc-code { font-size: .68rem; font-weight: 800; color: var(--color-primary); letter-spacing: .05em; text-align: center; }
-  .sc-nom  { font-size: .78rem; font-weight: 700; color: var(--text, #0f172a); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .sc-format { font-size: .62rem; font-weight: 700; padding: 2px 7px; border-radius: 20px; background: var(--bg-card2, #f8fafc); border: 1px solid var(--border, #e2e8f0); color: var(--text-muted, #64748b); white-space: nowrap; flex-shrink: 0; }
-  .sc-faces { padding: 7px 9px; display: flex; flex-direction: column; gap: 5px; }
+  .sc-code { font-size: 0.72rem; font-weight: 800; color: var(--color-primary, #932e2b); letter-spacing: 0.05em; }
+  .sc-nom  { font-size: 0.82rem; font-weight: 700; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sc-format { font-size: 0.65rem; font-weight: 700; padding: 2px 8px; border-radius: 8px; background: #ffffff; border: 1px solid #e2e8f0; color: #64748b; white-space: nowrap; flex-shrink: 0; }
+  .sc-faces { padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
 
   .face-btn {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 6px 10px; border-radius: var(--radius-sm); border: 1.5px solid;
-    font-size: .74rem; font-weight: 700; cursor: pointer; transition: all .15s; background: transparent; width: 100%;
+    padding: 7px 12px; border-radius: var(--radius-sm); border: 1.5px solid;
+    font-size: 0.76rem; font-weight: 700; cursor: pointer; transition: all .15s; background: transparent; width: 100%;
   }
   .face-btn .fb-left { display: flex; align-items: center; gap: 6px; }
-  .face-btn .fb-badge { font-size: .6rem; font-weight: 800; padding: 2px 7px; border-radius: 20px; }
+  .face-btn .fb-badge { font-size: 0.65rem; font-weight: 800; padding: 2px 8px; border-radius: 8px; }
   .face-btn.libre    { border-color: var(--c-libre);   color: var(--c-libre); }
   .face-btn.libre:hover { background: #d1fae5; }
   .face-btn.occupe   { border-color: var(--c-occupe);  color: var(--c-occupe);  cursor: not-allowed; opacity: .5; }
   .face-btn.reserve  { border-color: var(--c-reserve); color: var(--c-reserve); cursor: not-allowed; opacity: .5; }
   .face-btn.panne    { border-color: var(--c-panne);   color: var(--c-panne);   cursor: not-allowed; opacity: .5; }
-  .face-btn.selected { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+  .face-btn.selected { background: var(--color-primary, #932e2b); border-color: var(--color-primary, #932e2b); color: #fff; }
   .face-btn.libre    .fb-badge { background: #d1fae5; color: #065f46; }
   .face-btn.occupe   .fb-badge { background: #fee2e2; color: #991b1b; }
   .face-btn.reserve  .fb-badge { background: #ede9fe; color: #5b21b6; }
   .face-btn.panne    .fb-badge { background: #f1f5f9; color: #475569; }
   .face-btn.selected .fb-badge { background: rgba(255,255,255,.2); color: #fff; }
 
-  .panier-section { background: var(--bg-card, #fff); border: 1px solid var(--border, #e2e8f0); border-radius: var(--radius-lg); display: flex; flex-direction: column; box-shadow: var(--shadow-sm); overflow: hidden; }
-  .panier-header { padding: 11px 14px; border-bottom: 1px solid var(--border, #e2e8f0); background: var(--bg-card2, #f8fafc); display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
-  .panier-title { font-size: .82rem; font-weight: 800; color: var(--text, #0f172a); display: flex; align-items: center; gap: 6px; }
-  .panier-count { background: var(--color-primary); color: #fff; font-size: .63rem; font-weight: 800; padding: 2px 8px; border-radius: 20px; min-width: 22px; text-align: center; }
-  .panier-body { flex: 1; overflow-y: auto; padding: 9px; }
-  .panier-item { display: flex; align-items: center; gap: 7px; padding: 7px 9px; border-radius: var(--radius-sm); border: 1px solid var(--border, #e2e8f0); background: var(--bg-card2, #f8fafc); margin-bottom: 5px; transition: all .15s; }
-  .panier-item:hover { border-color: var(--color-primary); background: #eff6ff; }
-  .pi-icon { width: 26px; height: 26px; border-radius: 6px; background: var(--color-primary); color: #fff; display: flex; align-items: center; justify-content: center; font-size: .65rem; font-weight: 800; flex-shrink: 0; }
+  .panier-section { background: #ffffff; border: 1px solid #e2e8f0; border-radius: var(--radius-lg); display: flex; flex-direction: column; box-shadow: var(--shadow-sm); overflow: hidden; }
+  .panier-header { padding: 12px 16px; border-bottom: 1px solid #e2e8f0; background: #1e293b; color: #fff; display: flex; align-items: center; justify-content: space-between; flex-shrink: 0; }
+  .panier-title { font-size: 0.88rem; font-weight: 800; color: #ffffff; display: flex; align-items: center; gap: 8px; }
+  .panier-count { background: var(--color-primary, #932e2b); color: #fff; font-size: 0.68rem; font-weight: 800; padding: 2px 9px; border-radius: 8px; min-width: 22px; text-align: center; }
+  .panier-body { flex: 1; overflow-y: auto; padding: 10px; }
+  .panier-item { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: var(--radius-sm); border: 1px solid #e2e8f0; background: #f8fafc; margin-bottom: 6px; transition: all .15s; }
+  .panier-item:hover { border-color: var(--color-primary, #932e2b); background: #fff5f5; }
+  .pi-icon { width: 28px; height: 28px; border-radius: 6px; background: var(--color-primary, #932e2b); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 0.7rem; font-weight: 800; flex-shrink: 0; }
   .pi-info { flex: 1; overflow: hidden; }
-  .pi-code { font-size: .74rem; font-weight: 800; color: var(--text, #0f172a); }
-  .pi-addr { font-size: .66rem; color: var(--text-muted, #64748b); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .pi-remove { width: 20px; height: 20px; border-radius: 4px; background: transparent; border: 1px solid var(--border, #e2e8f0); color: var(--text-muted, #64748b); cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: .68rem; transition: all .15s; flex-shrink: 0; }
+  .pi-code { font-size: 0.76rem; font-weight: 800; color: #0f172a; }
+  .pi-addr { font-size: 0.68rem; color: #64748b; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pi-remove { width: 22px; height: 22px; border-radius: 4px; background: transparent; border: 1px solid #e2e8f0; color: #64748b; cursor: pointer; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; transition: all .15s; flex-shrink: 0; }
   .pi-remove:hover { background: #fee2e2; border-color: #ef4444; color: #ef4444; }
-  .panier-empty { padding: 28px 14px; text-align: center; color: var(--text-muted, #64748b); }
-  .panier-empty i { font-size: 1.8rem; opacity: .3; display: block; margin-bottom: 7px; }
-  .panier-empty p { font-size: .75rem; line-height: 1.5; }
+  .panier-empty { padding: 32px 14px; text-align: center; color: #64748b; }
+  .panier-empty i { font-size: 2rem; opacity: .3; display: block; margin-bottom: 8px; }
+  .panier-empty p { font-size: 0.78rem; line-height: 1.5; }
 
-  .panier-footer { padding: 11px 12px; border-top: 1px solid var(--border, #e2e8f0); background: var(--bg-card2, #f8fafc); flex-shrink: 0; }
+  .panier-footer { padding: 12px 14px; border-top: 1px solid #e2e8f0; background: #f8fafc; flex-shrink: 0; }
   .nom-resa-wrap { margin-bottom: 10px; }
-  .nom-resa-wrap label { font-size: .68rem; font-weight: 800; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted, #64748b); display: block; margin-bottom: 4px; }
-  .nom-resa-wrap input { width: 100%; padding: 7px 10px; border-radius: var(--radius-sm); border: 1.5px solid var(--border, #e2e8f0); font-size: .8rem; }
-  .dates-hint { display: none; margin-bottom: 8px; padding: 6px 10px; border-radius: var(--radius-sm); background: #fef9c3; border: 1px solid #fde68a; font-size: .72rem; color: #854d0e; align-items: center; gap: 6px; }
+  .nom-resa-wrap label { font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.05em; color: #475569; display: block; margin-bottom: 4px; }
+  .nom-resa-wrap input { width: 100%; padding: 8px 12px; border-radius: var(--radius-sm); border: 1.5px solid #cbd5e1; font-size: 0.82rem; }
+  .nom-resa-wrap input:focus { outline: none; border-color: var(--color-primary, #932e2b); }
+  .dates-hint { display: none; margin-bottom: 8px; padding: 8px 12px; border-radius: var(--radius-sm); background: #fef9c3; border: 1px solid #fde68a; font-size: 0.74rem; color: #854d0e; align-items: center; gap: 6px; }
   .dates-hint.show { display: flex; }
-  .btn-continuer { width: 100%; padding: 10px; background: var(--color-primary); color: #fff; border: none; border-radius: var(--radius-sm); font-weight: 800; font-size: .83rem; cursor: pointer; transition: all .2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
-  .btn-continuer:hover:not(:disabled) { background: #1d4ed8; box-shadow: var(--shadow-md); }
-  .btn-continuer:disabled { opacity: .45; cursor: not-allowed; background: var(--text-muted, #64748b); }
+  .btn-continuer { width: 100%; padding: 12px; background: var(--color-primary, #932e2b); color: #fff; border: none; border-radius: var(--radius-sm); font-weight: 800; font-size: 0.88rem; cursor: pointer; transition: all .2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+  .btn-continuer:hover:not(:disabled) { background: #7f1d1d; box-shadow: var(--shadow-md); }
+  .btn-continuer:disabled { opacity: .45; cursor: not-allowed; background: #94a3b8; }
 
-  .rl-popup { min-width: 210px; padding: 12px 14px; font-family: inherit; }
-  .rl-popup-code { font-size: .58rem; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; color: var(--color-primary, #2563eb); margin-bottom: 2px; }
-  .rl-popup-nom  { font-size: .82rem; font-weight: 700; margin-bottom: 3px; }
-  .rl-popup-addr { font-size: .7rem; color: #64748b; margin-bottom: 9px; display: flex; align-items: center; gap: 4px; }
-  .rl-popup-faces { display: flex; flex-direction: column; gap: 5px; }
-  .rl-face-btn { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; border-radius: 6px; border: 1.5px solid; font-size: .74rem; font-weight: 700; cursor: pointer; transition: all .15s; background: transparent; width: 100%; }
+  .rl-popup { min-width: 220px; padding: 12px 14px; font-family: inherit; }
+  .rl-popup-code { font-size: 0.65rem; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; color: var(--color-primary, #932e2b); margin-bottom: 2px; }
+  .rl-popup-nom  { font-size: 0.85rem; font-weight: 700; margin-bottom: 3px; }
+  .rl-popup-addr { font-size: 0.72rem; color: #64748b; margin-bottom: 10px; display: flex; align-items: center; gap: 4px; }
+  .rl-popup-faces { display: flex; flex-direction: column; gap: 6px; }
+  .rl-face-btn { display: flex; align-items: center; justify-content: space-between; padding: 6px 10px; border-radius: 6px; border: 1.5px solid; font-size: 0.75rem; font-weight: 700; cursor: pointer; transition: all .15s; background: transparent; width: 100%; }
   .rl-face-btn.libre    { border-color: #10b981; color: #10b981; }
   .rl-face-btn.libre:hover { background: #d1fae5; }
   .rl-face-btn.occupe   { border-color: #ef4444; color: #ef4444; cursor: not-allowed; opacity: .55; }
   .rl-face-btn.reserve  { border-color: #7c3aed; color: #7c3aed; cursor: not-allowed; opacity: .55; }
   .rl-face-btn.panne    { border-color: #94a3b8; color: #94a3b8; cursor: not-allowed; opacity: .55; }
-  .rl-face-btn.selected { background: #2563eb; border-color: #2563eb; color: #fff; }
+  .rl-face-btn.selected { background: var(--color-primary, #932e2b); border-color: var(--color-primary, #932e2b); color: #fff; }
 
-  .liste-group-ville { grid-column: 1/-1; display: flex; align-items: center; gap: 10px; padding: 14px 4px 6px; font-size: .85rem; font-weight: 800; color: var(--text, #0f172a); border-bottom: 2px solid var(--color-primary); margin-bottom: 4px; }
+  .liste-group-ville { grid-column: 1/-1; display: flex; align-items: center; gap: 10px; padding: 14px 4px 6px; font-size: 0.88rem; font-weight: 800; color: #0f172a; border-bottom: 2px solid var(--color-primary, #932e2b); margin-bottom: 4px; }
   .liste-group-ville:first-child { padding-top: 4px; }
-  .liste-group-ville i { color: var(--color-primary); }
-  .liste-group-ville .count-badge { margin-left: auto; font-size: .68rem; font-weight: 700; color: var(--text-muted, #64748b); background: var(--bg-card2, #f8fafc); padding: 2px 9px; border-radius: 20px; border: 1px solid var(--border, #e2e8f0); }
-  .liste-group-quartier { grid-column: 1/-1; display: flex; align-items: center; gap: 7px; padding: 4px 4px 2px 14px; font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: var(--text-muted, #64748b); }
-  .liste-group-quartier i { font-size: .7rem; color: var(--color-primary); opacity: .7; }
+  .liste-group-ville i { color: var(--color-primary, #932e2b); }
+  .liste-group-ville .count-badge { margin-left: auto; font-size: 0.72rem; font-weight: 700; color: #475569; background: #f8fafc; padding: 2px 10px; border-radius: 8px; border: 1px solid #e2e8f0; }
+  .liste-group-quartier { grid-column: 1/-1; display: flex; align-items: center; gap: 7px; padding: 4px 4px 2px 14px; font-size: 0.74rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; }
+  .liste-group-quartier i { font-size: 0.72rem; color: var(--color-primary, #932e2b); opacity: .8; }
 
-  .sc-map-btn { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; padding: 7px 0; border: none; border-top: 1px solid var(--border, #e2e8f0); background: var(--bg-card, #fff); color: var(--color-primary); font-size: .72rem; font-weight: 700; cursor: pointer; transition: background .15s ease; }
-  .sc-map-btn:hover { background: var(--bg-card2, #f8fafc); }
+  .sc-map-btn { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; padding: 8px 0; border: none; border-top: 1px solid #e2e8f0; background: #ffffff; color: var(--color-primary, #932e2b); font-size: 0.75rem; font-weight: 700; cursor: pointer; transition: background .15s ease; }
+  .sc-map-btn:hover { background: #f8fafc; }
 </style>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-<div class="container-fluid py-4">
+<div class="mb-4">
 
   <!-- Bouton Retour & Titre -->
-  <div class="d-flex align-items-center gap-3 mb-3">
-    <a href="javascript:void(0)" onclick="history.back()" class="btn btn-outline-secondary btn-sm">
-      <i class="bi bi-arrow-left"></i>
-    </a>
-    <h1 class="h4 fw-bold mb-0">Nouvelle réservation</h1>
-    <a href="{% url 'reservation_wizard_cancel' %}" class="btn btn-link btn-sm text-danger ms-auto">
-      <i class="bi bi-x-lg me-1"></i>
-      <span class="d-none d-md-inline ms-1">Annuler</span>
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-3">
+    <div class="d-flex align-items-center gap-3">
+      <a href="javascript:void(0)" onclick="history.back()" class="btn btn-light border btn-sm d-flex align-items-center justify-content-center shadow-sm" style="width: 38px; height: 38px; border-radius: 20px;" title="Étape précédente">
+        <i class="bi bi-arrow-left fs-6"></i>
+      </a>
+      <div>
+        <h1 class="h4 fw-bold mb-0" style="color: #0f172a;">Sélection des faces & période</h1>
+        <p class="text-muted small mb-0">Étape 2 sur 3 — Client : <strong class="text-dark">{{ client.nom }}</strong></p>
+      </div>
+    </div>
+    <a href="{% url 'reservation_wizard_cancel' %}" class="btn btn-link btn-sm text-danger text-decoration-none">
+      <i class="bi bi-x-circle me-1"></i>Annuler la création
     </a>
   </div>
 
   {% for message in messages %}
-  <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show py-2 shadow-sm" role="alert">
+  <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show py-2 shadow-sm mb-3" role="alert" style="border-radius: 8px;">
     {{ message }}
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
   </div>
@@ -277,8 +279,8 @@
 
     <div class="date-input-wrap" id="wrap-duree-jours" style="display:none">
       <i class="bi bi-hourglass-split" style="color:#f59e0b"></i>
-      <input type="number" id="duree-jours" min="1" step="1" placeholder="Nombre" style="width:80px">
-      <span style="font-size:.72rem;color:var(--text-muted);white-space:nowrap;">jour(s)</span>
+      <input type="number" id="duree-jours" min="1" step="1" placeholder="Nombre" style="width:75px">
+      <span style="font-size:.74rem;color:#64748b;white-space:nowrap;">jour(s)</span>
     </div>
 
     <div id="dates-status" class="waiting">
@@ -289,6 +291,7 @@
 
   <div class="resa-grid">
 
+    <!-- Section Principale (Carte / Liste) -->
     <div class="main-section">
       <div class="section-header">
 
@@ -327,14 +330,14 @@
       </div>
 
       <div id="view-carte" style="flex:1;display:flex;flex-direction:column;">
-        <div id="map-resa" style="flex:1;min-height:360px;"></div>
+        <div id="map-resa" style="flex:1;min-height:380px;"></div>
         <div class="map-legend">
           <span class="leg-item"><span class="leg-dot" style="background:#10b981"></span>Libre</span>
           <span class="leg-item"><span class="leg-dot" style="background:#f59e0b"></span>Partiel</span>
           <span class="leg-item"><span class="leg-dot" style="background:#7c3aed"></span>Réservé</span>
           <span class="leg-item"><span class="leg-dot" style="background:#ef4444"></span>Occupé</span>
           <span class="leg-item"><span class="leg-dot" style="background:#94a3b8"></span>Panne</span>
-          <span class="leg-item"><span class="leg-dot" style="background:var(--color-primary)"></span>Sélectionné</span>
+          <span class="leg-item"><span class="leg-dot" style="background:var(--color-primary, #932e2b)"></span>Sélectionné</span>
         </div>
       </div>
 
@@ -346,29 +349,30 @@
 
     </div>
 
+    <!-- Section Panier / Sélection -->
     <div class="panier-section">
       <div class="panier-header">
         <div class="panier-title">
-          <i class="bi bi-bag-check-fill" style="color:var(--color-primary)"></i>
+          <i class="bi bi-bag-check-fill text-warning"></i>
           Sélection
           <span class="panier-count" id="panier-count">0</span>
         </div>
-        <button class="pi-remove" id="btn-vider-panier" title="Vider" style="display:none">
-          <i class="bi bi-trash3"></i>
+        <button class="pi-remove" id="btn-vider-panier" title="Vider le panier" style="display:none">
+          <i class="bi bi-trash3 text-white"></i>
         </button>
       </div>
 
       <div class="panier-body" id="panier-body">
         <div class="panier-empty" id="panier-empty">
           <i class="bi bi-map"></i>
-          <p>Cliquez sur une face libre pour l'ajouter.</p>
+          <p>Cliquez sur une face libre depuis la carte ou la liste pour l'ajouter.</p>
         </div>
       </div>
 
       <div class="panier-footer">
         <div class="nom-resa-wrap">
           <label for="nom_reservation"><i class="bi bi-tag me-1"></i>Nom de la réservation</label>
-          <input type="text" id="nom_reservation" value="{{ nom_reservation }}" placeholder="Ex : Campagne janvier 2026">
+          <input type="text" id="nom_reservation" value="{{ nom_reservation }}" placeholder="Ex : Campagne Janvier 2026">
         </div>
 
         <div class="dates-hint" id="dates-hint">
@@ -384,8 +388,8 @@
           <input type="hidden" name="nom_reservation" id="hidden-nom-reservation" value="">
 
           <button type="submit" class="btn-continuer" id="btn-continuer" disabled>
-            <i class="bi bi-arrow-right-circle-fill"></i>
-            Continuer — <span id="btn-count">0</span> face(s)
+            <i class="bi bi-arrow-right-circle-fill fs-5"></i>
+            <span>Continuer — <span id="btn-count">0</span> face(s)</span>
           </button>
         </form>
       </div>
@@ -409,15 +413,23 @@
     const COLORS = { libre:'#10b981', partiel:'#f59e0b', occupe:'#ef4444', panne:'#94a3b8', reserve:'#7c3aed' };
 
     const map = L.map('map-resa', { zoomControl: true }).setView([12.3714, -1.5197], 12);
-    window.buildSafeLeafletTiles(map, {
-      attribution: '&copy; OpenStreetMap contributors',
-      maxZoom: 19
-    });
+    if (typeof window.buildSafeLeafletTiles === 'function') {
+      window.buildSafeLeafletTiles(map, {
+        attribution: '&copy; OpenStreetMap contributors',
+        maxZoom: 19
+      });
+    } else {
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+        maxZoom: 19
+      }).addTo(map);
+    }
 
     function makeIcon(color, selected) {
-      const fillColor = selected ? '#dbeafe' : '#ffffff';
-      const inner = `<rect x="8" y="5" width="14" height="10" rx="2" fill="${fillColor}" stroke="${color}" stroke-width="1.8"/>
-                    <line x1="15" y1="15" x2="15" y2="20" stroke="${color}" stroke-width="1.5"/>`;
+      const fillColor = selected ? '#fee2e2' : '#ffffff';
+      const strokeCol = selected ? '#932e2b' : color;
+      const inner = `<rect x="8" y="5" width="14" height="10" rx="2" fill="${fillColor}" stroke="${strokeCol}" stroke-width="1.8"/>
+                    <line x1="15" y1="15" x2="15" y2="20" stroke="${strokeCol}" stroke-width="1.5"/>`;
       const id = 'shpanneau' + (selected ? 's' : '');
       const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 30 38">
         <defs><filter id="${id}"><feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-opacity=".28"/></filter></defs>
@@ -453,7 +465,7 @@
       features.forEach(f => {
         const p = f.properties;
         const isSelected = isPanierContainsSupport(p.id);
-        const color = isSelected ? '#2563eb' : getColor(p);
+        const color = isSelected ? '#932e2b' : getColor(p);
         const marker = L.marker([f.geometry.coordinates[1], f.geometry.coordinates[0]], { icon: makeIcon(color, isSelected) });
         marker.on('click', () => openPopupById(p.id, marker));
         marker.addTo(map);
@@ -493,11 +505,11 @@
       });
 
       const noteDate = !datesOk
-        ? `<div style="margin-top:8px;padding:5px 8px;background:#fef9c3;border-radius:5px;font-size:.68rem;color:#854d0e;display:flex;align-items:center;gap:5px;">
+        ? `<div style="margin-top:8px;padding:6px 10px;background:#fef9c3;border-radius:6px;font-size:.7rem;color:#854d0e;display:flex;align-items:center;gap:6px;">
             <i class="bi bi-calendar-event"></i>Saisissez la période pour valider la disponibilité.
           </div>` : '';
 
-      currentPopup = L.popup({ maxWidth: 270, closeButton: true })
+      currentPopup = L.popup({ maxWidth: 280, closeButton: true })
         .setLatLng(marker.getLatLng())
         .setContent(`
           <div class="rl-popup">
@@ -741,8 +753,6 @@
       return d.toISOString().slice(0, 10);
     }
 
-    // En mode "Durée" : la date de fin est calculée = date_debut + (N-1) jours
-    // (durée inclusive : 1 jour = date_debut === date_fin)
     function recalcDateFinFromDuree() {
       const d1 = elDateDebut ? elDateDebut.value : '';
       const duree = elDureeJours ? parseInt(elDureeJours.value, 10) : NaN;
@@ -771,8 +781,6 @@
     }
 
     function syncHiddenDates() {
-      // Reservation.date_debut / date_fin sont des DateTimeField → on borne la
-      // journée (00:00 → 23:59) à partir des dates saisies (date-only).
       const hd = document.getElementById('hidden-date-debut');
       const hf = document.getElementById('hidden-date-fin');
       if (hd) hd.value = elDateDebut.value ? `${elDateDebut.value}T00:00` : '';
@@ -805,9 +813,9 @@
         setDatesStatus('waiting', 'Saisissez les dates pour voir les disponibilités');
         refreshAll(); return;
       }
-      if (d1 >= d2) {
+      if (d1 > d2) {
         datesOk = false; facesOccupees = new Set();
-        setDatesStatus('error', 'La date de fin doit être après la date de début');
+        setDatesStatus('error', 'La date de fin doit être égale ou postérieure à la date de début');
         refreshAll(); return;
       }
       clearTimeout(checkDispoTimer);
@@ -905,7 +913,7 @@
         const marker = markersMap[String(p.id)];
         if (!marker) return;
         const isSel = isPanierContainsSupport(p.id);
-        marker.setIcon(makeIcon(isSel ? '#2563eb' : getColor(p), isSel));
+        marker.setIcon(makeIcon(isSel ? '#932e2b' : getColor(p), isSel));
       });
     }
 

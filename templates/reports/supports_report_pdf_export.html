@@ -1,0 +1,431 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>État des supports — {{ today|date:"d/m/Y" }}</title>
+  <style>
+    /* ════════════════════════════════════════
+       TEMPLATE DÉDIÉ WEASYPRINT
+       Styles directs, pas de @media, pas de CDN
+    ════════════════════════════════════════ */
+
+    @page {
+      size: A4 landscape;
+      margin: 1.5cm 1.2cm 2cm 1.2cm;
+      background: #f1f5f9;
+      @bottom-center {
+        content: "Document confidentiel — État du réseau au {{ today|date:'d/m/Y' }} — Page " counter(page) " / " counter(pages);
+        font-size: 6pt; color: #94a3b8; font-family: Arial, sans-serif;
+      }
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: Arial, sans-serif;
+      font-size: 8.5pt;
+      color: #0F172A;
+      background: #f1f5f9;
+    }
+
+    .page-wrapper { padding: 0; }
+
+    /* ── En-tête document ── */
+    .doc-header {
+      width: 100%;
+      border-collapse: collapse;
+      background: #ffffff;
+      border-bottom: 3px solid #932e2b;
+      border-radius: 8px 8px 0 0;
+      margin-bottom: 12px;
+    }
+    .doc-header td { padding: 12px 16px; vertical-align: middle; }
+    .doc-logo   { height: 42px; width: auto; }
+    .doc-center { text-align: center; }
+    .doc-brand  { font-size: 6pt; font-weight: bold; color: #94a3b8; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 3px; }
+    .doc-title  { font-size: 14pt; font-weight: bold; color: #932e2b; text-transform: uppercase; letter-spacing: 1px; }
+    .doc-meta   { font-size: 7.5pt; color: #64748b; margin-top: 3px; }
+    .doc-meta strong { color: #932e2b; }
+    .doc-right  { font-size: 7pt; color: #64748b; text-align: right; line-height: 1.8; white-space: nowrap; }
+    .doc-right strong { color: #334155; }
+
+    /* ── KPI Strip — table layout pour WeasyPrint ── */
+    .kpi-row {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 8px 0;
+      margin-bottom: 14px;
+    }
+    .kpi-box {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 10px 12px;
+      vertical-align: middle;
+      width: 20%;
+    }
+    /*
+    .kpi-box.k-primary { border-top: 3px solid #932e2b; }
+    .kpi-box.k-green   { border-top: 3px solid #166534; }
+    .kpi-box.k-indigo  { border-top: 3px solid #5b21b6; }
+    .kpi-box.k-occupe  { border-top: 3px solid #92400e; }
+    */
+
+    .kpi-inner { border-collapse: collapse; width: 100%; }
+    .kpi-icon-cell {
+      width: 34px; height: 34px;
+      border-radius: 8px;
+      text-align: center; vertical-align: middle;
+      font-size: 13pt; font-weight: bold;
+      padding-right: 8px;
+    }
+    .k-primary .kpi-icon-cell { background: rgba(147,46,43,0.1); color: #932e2b; }
+    .k-green   .kpi-icon-cell { background: #dcfce7; color: #166534; }
+    .k-indigo  .kpi-icon-cell { background: #ede9fe; color: #5b21b6; }
+    .k-occupe  .kpi-icon-cell { background: #fef3c7; color: #92400e; }
+
+    .kpi-label { font-size: 6.5pt; font-weight: bold; text-transform: uppercase; letter-spacing: 0.6px; color: #94a3b8; margin-bottom: 2px; }
+    .kpi-val   { font-size: 16pt; font-weight: bold; line-height: 1; }
+    .k-primary .kpi-val { color: #932e2b; }
+    .k-green   .kpi-val { color: #166534; }
+    .k-indigo  .kpi-val { color: #5b21b6; }
+    .k-occupe  .kpi-val { color: #92400e; }
+
+    /* ── Bandeau section ── */
+    .section-header {
+      background: #932e2b;
+      border-radius: 6px 6px 0 0;
+      padding: 8px 14px;
+      margin-top: 14px;
+      color: #ffffff;
+      font-size: 8pt;
+      font-weight: bold;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      page-break-after: avoid;
+    }
+    .section-count {
+      font-size: 6.5pt;
+      font-weight: normal;
+      color: rgba(255,255,255,0.5);
+      letter-spacing: 0;
+      text-transform: none;
+    }
+
+    /* ── Tableau ── */
+    .category-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #ffffff;
+      margin-bottom: 0;
+    }
+    col.c-code     { width: 65px; }
+    col.c-mairie   { width: 52px; }
+    col.c-nom      { width: 145px; }
+    col.c-ville    { width: 85px; }
+    col.c-quartier { width: 85px; }
+    col.c-adresse  { width: 100px; }
+    col.c-statut   { width: 68px; }
+    col.c-faces    { width: auto; }
+
+    thead th {
+      background: #932e2b;
+      color: #ffffff;
+      font-size: 6.5pt;
+      font-weight: bold;
+      padding: 8px 5px;
+      text-align: center;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      border-right: 0.5px solid rgba(255,255,255,0.12);
+      border-bottom: none;
+    }
+    thead th.left { text-align: left; padding-left: 8px; }
+
+    tbody td {
+      padding: 6px 4px;
+      /*
+      border-bottom: 0.5px solid #f1f5f9;
+      */
+      vertical-align: middle;
+      font-size: 7.5pt;
+      text-align: center;
+    }
+    tbody td.left { text-align: left; padding-left: 8px; }
+
+    tbody tr.row-normal:nth-child(even) td { background: #fafcff; }
+    tbody tr.row-normal:nth-child(odd)  td { background: #ffffff; }
+    tbody tr.row-panne td {
+      background: #fff7ed !important;
+      color: #9a3412;
+      border-color: #fed7aa;
+    }
+    tbody tr { page-break-inside: avoid; }
+
+    /* ── Badges statut ── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      color: #000;
+      gap: 6px;
+      padding: 4px 12px;
+      border-radius: var(--radius-pill);
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      white-space: nowrap;
+      border: 1px solid transparent;
+    }
+
+    .badge-bon   { 
+      background: #dcfce7; 
+      color: #166534; 
+      display: inline-block;
+      font-size: 6.5pt;
+      font-weight: bold;
+      border-radius: 10px;
+      padding: 2px 7px;
+      text-transform: uppercase;
+    }
+    .badge-panne { 
+      background: #fee2e2; 
+      color: #991b1b; 
+      display: inline-block;
+      font-size: 6.5pt;
+      font-weight: bold;
+      border-radius: 10px;
+      padding: 2px 7px;
+      text-transform: uppercase;
+    }
+
+    /* ── Tags de faces ── */
+    .face-tag {
+      display: inline-block;
+      font-size: 6.5pt;
+      font-weight: bold;
+      border-radius: 10px;
+      padding: 2px 8px;
+      margin-bottom: 2px;
+    }
+    .face-tag.occupe  { background: #dcfce7; color: #166534; }
+    .face-tag.reserve { background: #ede9fe; color: #5b21b6; }
+    .face-tag.panne   { background: #fee2e2; color: #991b1b; }
+    .face-tag.libre   { background: #f1f5f9; color: #475569; }
+
+    /* ── Légende ── */
+    .legend-table {
+      width: 100%;
+      margin-top: 12px;
+      background: #ffffff;
+      border: 0.5px solid #e2e8f0;
+      border-radius: 8px;
+      border-collapse: collapse;
+    }
+    .legend-table td { padding: 8px 14px; vertical-align: middle; font-size: 7pt; color: #64748b; }
+    .legend-title { font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; font-size: 6.5pt; }
+
+    /* ── Pied de page ── */
+    .doc-footer {
+      margin-top: 14px;
+      text-align: center;
+      font-size: 6.5pt;
+      color: #94a3b8;
+    }
+
+    /* ── Filigrane ── */
+    body::before {
+      content: "";
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%) rotate(-15deg);
+      width: 500px; height: 500px;
+      background-image: url("{% static 'img/logo.png' %}");
+      background-size: contain;
+      background-repeat: no-repeat;
+      background-position: center;
+      opacity: 0.2;
+      z-index: 0;
+      pointer-events: none;
+    }
+  </style>
+</head>
+<body>
+<div class="page-wrapper">
+
+  <!-- ══ EN-TÊTE ══ -->
+  <table class="doc-header">
+    <tr>
+      <td style="width:100px;"><img src="{% static 'img/logo.png' %}" alt="Logo" class="doc-logo"></td>
+      <td class="doc-center">
+        <div class="doc-brand">Integral — Régie Publicitaire</div>
+        <div class="doc-title">État du Réseau Publicitaire</div>
+        <div class="doc-meta">Rapport au <strong>{{ today|date:"d/m/Y" }}</strong></div>
+      </td>
+      <td class="doc-right" style="width:130px;">
+        Généré le {{ today|date:"d/m/Y" }}<br>
+        {% if filters.ville %}<strong>Ville :</strong> {{ filters.ville }}<br>{% endif %}
+        {% if filters.quartier %}<strong>Quartier :</strong> {{ filters.quartier }}<br>{% endif %}
+        {% if filters.statut %}<strong>Statut :</strong> {{ filters.statut }}<br>{% endif %}
+      </td>
+    </tr>
+  </table>
+
+  <!-- ══ KPI ══ -->
+  <table class="kpi-row">
+    <tr>
+      <td class="kpi-box k-primary">
+        <table class="kpi-inner"><tr>
+          <!-- 
+          <td class="kpi-icon-cell">🪧</td>
+          -->
+          <td><div class="kpi-label">Supports</div><div class="kpi-val">{{ total_panneaux }}</div></td>
+        </tr></table>
+      </td>
+      <td class="kpi-box k-primary">
+        <table class="kpi-inner"><tr>
+          <!-- 
+          <td class="kpi-icon-cell">▣</td>
+          -->
+          <td><div class="kpi-label">Faces totales</div><div class="kpi-val">{{ total_faces }}</div></td>
+        </tr></table>
+      </td>
+      <td class="kpi-box k-green">
+        <table class="kpi-inner"><tr>
+          <!-- 
+          <td class="kpi-icon-cell">✓</td>
+          -->
+          <td><div class="kpi-label">Faces libres</div><div class="kpi-val">{{ total_libres }}</div></td>
+        </tr></table>
+      </td>
+      <td class="kpi-box k-indigo">
+        <table class="kpi-inner"><tr>
+          <!-- 
+          <td class="kpi-icon-cell">◷</td>
+          -->
+          <td><div class="kpi-label">Faces réservées</div><div class="kpi-val">{{ total_reservees }}</div></td>
+        </tr></table>
+      </td>
+      <td class="kpi-box k-occupe">
+        <table class="kpi-inner"><tr>
+          <!-- 
+          <td class="kpi-icon-cell">●</td>
+          -->
+          <td><div class="kpi-label">Faces occupées</div><div class="kpi-val">{{ total_occupees }}</div></td>
+        </tr></table>
+      </td>
+    </tr>
+  </table>
+
+  <!-- ══ TABLEAUX PAR CATÉGORIE ══ -->
+  {% for section in categories_sections %}
+  <div class="section-header">
+    ◆ &nbsp; {{ section.nom }} &nbsp;
+    <span class="section-count">({{ section.total }} support{{ section.total|pluralize }}, {{ section.unites }} unité{{ section.unites|pluralize }})</span>
+  </div>
+  <table class="category-table">
+    <colgroup>
+      <col class="c-code">
+      <col class="c-mairie">
+      <col class="c-nom">
+      <col class="c-ville">
+      <col class="c-quartier">
+      <col class="c-adresse">
+      {% if afficher_etat %}<col class="c-statut">{% endif %}
+      <col class="c-faces">
+    </colgroup>
+    <thead>
+      <tr>
+        <th>CODE</th>
+        <th>MAIRIE</th>
+        <th class="left">NOM</th>
+        <th>VILLE</th>
+        <th>QUARTIER</th>
+        <th class="left">ADRESSE</th>
+        {% if afficher_etat %}<th>ÉTAT</th>{% endif %}
+        <th class="left">{% if section.nom == "Écran" %}STATUT ÉCRAN{% elif section.nom == "Marché" %}EMPLACEMENTS{% else %}FACES{% endif %}</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for panneau in section.items %}
+      <tr class="{% if panneau.etat_raw == 'panne' %}row-panne{% else %}row-normal{% endif %}">
+        <td><strong>{{ panneau.code }}</strong></td>
+        <td style="font-family:monospace; font-size:7pt; color:#64748b;">{{ panneau.code_ext }}</td>
+        <td class="left">{{ panneau.nom }}</td>
+        <td>{{ panneau.ville|default:"—" }}</td>
+        <td>{{ panneau.quartier|default:"—" }}</td>
+        <td class="left" style="font-size:7pt;">{% if panneau.adresse %}{{ panneau.adresse }}{% elif panneau.localisation %}{{ panneau.localisation }}{% else %}—{% endif %}</td>
+        {% if afficher_etat %}<td>
+          {% if panneau.etat_raw == 'panne' %}<span class="badge badge-panne">En panne</span>
+          {% else %}<span class="badge badge-bon">Bon état</span>{% endif %}
+        </td>{% endif %}
+        <td class="left">
+          {% if section.nom == "Écran" %}
+            {% for face in panneau.faces %}
+              {% if afficher_etat %}
+                {% if face.statut == 'panne' %}<span class="face-tag panne">⚠ Écran en panne</span>
+                {% elif face.statut == 'occupe' %}<span class="face-tag occupe">● Écran occupé</span>
+                {% else %}<span class="face-tag libre">○ Écran libre</span>{% endif %}
+              {% else %}<span class="face-tag libre">Écran</span>{% endif %}
+            {% endfor %}
+          {% elif section.nom == "Marché" %}
+            {% for emplacement in panneau.faces %}
+              {% if emplacement.occupee %}<span class="face-tag occupe">● {{ emplacement.label }}{% if emplacement.support_code %} — {{ emplacement.support_code }}{% endif %}{% if afficher_etat %} — Occupé{% endif %}</span>
+              {% else %}<span class="face-tag libre">○ {{ emplacement.label }}{% if emplacement.support_code %} — {{ emplacement.support_code }}{% endif %}{% if afficher_etat %} — Libre{% endif %}</span>{% endif %}
+            {% empty %}<span class="face-tag libre">Aucun emplacement enregistré</span>
+            {% endfor %}
+          {% elif panneau.etat_raw == 'panne' %}
+            <span class="face-tag panne">⚠ Inactif</span>
+          {% else %}
+            {% for face in panneau.faces %}
+              {% if face.statut == 'occupe' %}
+                {% if afficher_client %}
+                  {% for camp in face.campagnes %}<span class="face-tag occupe">● Face {{ face.label }} — {{ camp.client.nom }}{% if afficher_etat %} — occupée{% endif %}</span>
+                  {% empty %}<span class="face-tag occupe">● Face {{ face.label }}{% if afficher_etat %} — occupée{% endif %}</span>{% endfor %}
+                {% else %}<span class="face-tag occupe">● Face {{ face.label }}{% if afficher_etat %} — occupée{% endif %}</span>{% endif %}
+              {% elif face.statut == 'reserve' %}<span class="face-tag reserve">◷ Face {{ face.label }}{% if afficher_client and face.face.lignes_client.first.client %} — {{ face.face.lignes_client.first.client.nom }}{% endif %}{% if afficher_etat %} — Réservée{% endif %}</span>
+              {% elif face.statut == 'panne' %}<span class="face-tag panne">⚠ Face {{ face.label }}{% if afficher_etat %} — En Panne{% endif %}</span>
+              {% else %}<span class="face-tag libre">○ Face {{ face.label }}{% if afficher_etat %} — Libre{% endif %}</span>{% endif %}
+            {% empty %}<span style="color:#94a3b8;">—</span>
+            {% endfor %}
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% empty %}
+  <div style="padding:18px;text-align:center;color:#94a3b8;background:#fff;border-radius:8px;margin-top:8px;font-size:8pt;">Aucun support trouvé.</div>
+  {% endfor %}
+
+  <!-- ══ LÉGENDE ══ -->
+  <table class="legend-table">
+    <tr>
+      <td><span class="legend-title">Légende :</span></td>
+      <td><span class="face-tag libre">○ Libre</span></td>
+      <td><span class="face-tag reserve">◷ Réservée</span></td>
+      <td><span class="face-tag occupe">● Occupée</span></td>
+      <td><span class="face-tag panne">⚠ En panne</span></td>
+    </tr>
+  </table>
+
+  <!-- ══ PIED DE PAGE ══ -->
+  <div class="doc-footer">
+    Document confidentiel — État du réseau publicitaire au {{ today|date:"d/m/Y" }}
+  </div>
+
+</div>
+</body>
+</html>
+ </div>
+
+  <!-- ══ PIED DE PAGE ══ -->
+  <div class="doc-footer">
+    Document confidentiel — État du réseau publicitaire au {{ today|date:"d/m/Y" }}
+  </div>
+
+</div>
+</body>
+</html>
+

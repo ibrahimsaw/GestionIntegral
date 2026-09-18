@@ -1,176 +1,227 @@
 {% extends 'base.html' %}
-{% block title %}Traiter — {{ reservation.reference }}{% endblock %}
-{% block topbar_title %}Traiter la réservation {{ reservation.reference }}{% endblock %}
+{% block title %}Traiter — {{ reservation.reference }} — Integral{% endblock %}
+{% block topbar_title %}
+  <i class="bi bi-clipboard-check me-2" style="color:var(--color-primary)"></i>
+  Traiter la réservation {{ reservation.reference }}
+{% endblock %}
 
 {% block content %}
+<div class="mb-4">
 
-<div class="row justify-content-center">
-  <div class="col-12">
-    <!-- Bouton Retour & Titre -->
-    <div class="d-flex align-items-center gap-3 mb-4">
-      <a href="javascript:void(0)" onclick="history.back()" class="btn btn-outline-secondary btn-sm">
-        <i class="bi bi-arrow-left"></i>
+  <!-- Bouton Retour & Titre -->
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
+    <div class="d-flex align-items-center gap-3">
+      <a href="{% url 'reservation_detail' reservation.client.pk reservation.pk %}" class="btn btn-light border btn-sm d-flex align-items-center justify-content-center shadow-sm" style="width: 38px; height: 38px; border-radius: 10px;" title="Retour au détail">
+        <i class="bi bi-arrow-left fs-6"></i>
       </a>
-      <h1 class="h4 fw-bold mb-0">Traiter la réservation</h1>
+      <div>
+        <h1 class="h4 fw-bold mb-0" style="color: #0f172a;">Traitement de la réservation</h1>
+        <p class="text-muted small mb-0">Double contrôle et décision : validation ou annulation définitive.</p>
+      </div>
+    </div>
+    <a href="{% url 'reservation_list' %}" class="btn btn-outline-secondary btn-sm" style="border-radius: 8px;">
+      <i class="bi bi-list-ul me-1"></i>Liste des réservations
+    </a>
+  </div>
+
+  <!-- Récapitulatif de la réservation -->
+  <div class="card border-0 shadow-sm mb-4" style="border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden;">
+    <div class="card-header bg-white py-3 px-4 d-flex align-items-center justify-content-between border-bottom" style="border-color: #e2e8f0;">
+      <div class="d-flex align-items-center gap-2">
+        <span class="fw-bold" style="color: #1e293b; font-size: 1rem;">{{ reservation.nom }}</span>
+        <span class="badge font-monospace text-muted px-2 py-1" style="background: #f1f5f9; border: 1px solid #e2e8f0; font-size: 0.78rem;">
+          {{ reservation.reference }}
+        </span>
+      </div>
+      {% if reservation.statut == 'en_attente' %}
+        <span class="badge px-3 py-2" style="background: #fef3c7; color: #92400e; border: 1px solid #fde68a; font-weight: 700; font-size: 0.75rem; border-radius: 20px;">
+          <i class="bi bi-clock-history me-1"></i>En attente
+        </span>
+      {% else %}
+        <span class="badge px-3 py-2" style="background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; font-weight: 700; font-size: 0.75rem; border-radius: 20px;">
+          <i class="bi bi-check-circle-fill me-1"></i>Confirmée
+        </span>
+      {% endif %}
     </div>
 
-    <!-- Récapitulatif -->
-    <div class="card mb-4">
-      <div class="card-header d-flex align-items-center justify-content-between">
-        <span style="font-weight:600">{{ reservation.nom }}</span>
-        {% if reservation.statut == 'en_attente' %}
-          <span class="badge badge-status bs-bientot"><i class="bx bx-time me-1"></i>En attente</span>
-        {% else %}
-          <span class="badge badge-status bs-disponible"><i class="bx bx-check me-1"></i>Confirmée</span>
+    <div class="card-body p-4">
+      <div class="row g-3 mb-4">
+        <div class="col-md-3 col-sm-6">
+          <div class="p-3 rounded-3" style="background: #f8fafc; border: 1px solid #e2e8f0;">
+            <div class="text-uppercase text-muted fw-bold mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Client</div>
+            <a href="{% url 'client_detail' reservation.client.pk %}" class="fw-bold text-decoration-none d-block text-truncate" style="color: var(--color-primary); font-size: 0.95rem;">
+              {{ reservation.client.nom }}
+            </a>
+          </div>
+        </div>
+
+        <div class="col-md-3 col-sm-6">
+          <div class="p-3 rounded-3" style="background: #f8fafc; border: 1px solid #e2e8f0;">
+            <div class="text-uppercase text-muted fw-bold mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Période</div>
+            <div class="fw-bold font-monospace text-dark" style="font-size: 0.88rem;">
+              {{ reservation.date_debut|date:"d/m/Y" }} → {{ reservation.date_fin|date:"d/m/Y" }}
+            </div>
+            <small class="text-muted">({{ reservation.duree_jours }} jour{{ reservation.duree_jours|pluralize }})</small>
+          </div>
+        </div>
+
+        <div class="col-md-3 col-sm-6">
+          <div class="p-3 rounded-3" style="background: #f8fafc; border: 1px solid #e2e8f0;">
+            <div class="text-uppercase text-muted fw-bold mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Créateur</div>
+            <div class="fw-semibold text-dark" style="font-size: 0.9rem;">
+              <i class="bi bi-person me-1 text-secondary"></i>{{ reservation.created_by|default:"—" }}
+            </div>
+            <small class="text-muted">{{ reservation.created_at|date:"d/m/Y H:i" }}</small>
+          </div>
+        </div>
+
+        <div class="col-md-3 col-sm-6">
+          <div class="p-3 rounded-3" style="background: #f8fafc; border: 1px solid #e2e8f0;">
+            <div class="text-uppercase text-muted fw-bold mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Volume faces</div>
+            <div class="fw-bold text-dark" style="font-size: 1rem;">
+              <i class="bi bi-grid-fill text-primary me-1"></i>{{ reservation.lignes.count }} face{{ reservation.lignes.count|pluralize }}
+            </div>
+          </div>
+        </div>
+
+        {% if reservation.notes %}
+        <div class="col-12">
+          <div class="p-3 rounded-3" style="background: #fffbeb; border: 1px solid #fef3c7;">
+            <div class="text-uppercase text-warning-emphasis fw-bold mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Notes internes</div>
+            <div class="text-dark small" style="white-space: pre-line;">{{ reservation.notes }}</div>
+          </div>
+        </div>
         {% endif %}
       </div>
-      <div class="card-body">
 
-        <div class="row g-3 mb-3">
-          <div class="col-sm-6">
-            <div class="small text-muted" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em">Référence</div>
-            <div style="font-weight:600">{{ reservation.reference }}</div>
-          </div>
-          <div class="col-sm-6">
-            <div class="small text-muted" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em">Client</div>
+      <!-- Faces réservées -->
+      <h6 class="fw-bold text-dark mb-3" style="font-size: 0.9rem;">
+        <i class="bi bi-list-check me-1 text-primary"></i>Détail des faces concernées
+      </h6>
+      <div class="table-responsive border rounded-3 overflow-hidden">
+        <table class="table table-hover align-middle mb-0" style="border-collapse: separate; border-spacing: 0;">
+          <thead>
+            <tr style="background-color: #1e293b; color: #ffffff;">
+              <th class="py-2 px-3" style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: #f8fafc; border: none;">Support</th>
+              <th class="py-2 px-3" style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: #f8fafc; border: none;">Face</th>
+              <th class="py-2 px-3" style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: #f8fafc; border: none;">Localisation</th>
+              <th class="py-2 px-3" style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: #f8fafc; border: none;">Format</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for ligne in reservation.lignes.all %}
+            <tr style="border-bottom: 1px solid #f1f5f9;">
+              <td class="py-2 px-3 font-monospace fw-bold" style="color: var(--color-primary); font-size: 0.85rem;">
+                {{ ligne.support.code }}
+              </td>
+              <td class="py-2 px-3">
+                <span class="badge px-2 py-1" style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd;">
+                  Face {{ ligne.face.label|default:"—" }}
+                </span>
+              </td>
+              <td class="py-2 px-3 text-muted small">
+                {{ ligne.support.quartier|default:ligne.support.ville|default:"—" }}
+              </td>
+              <td class="py-2 px-3 text-muted small">
+                {{ ligne.support.get_format_display|default:ligne.support.format|default:"Standard" }}
+              </td>
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="4" class="text-center text-muted py-3 small">Aucune face associée.</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Actions : Valider et Annuler côte à côte -->
+  <div class="row g-4">
+
+    <!-- Colonne Valider -->
+    <div class="col-md-6">
+      <div class="card h-100 border-0 shadow-sm" style="border-radius: 16px; border: 1px solid #e2e8f0; {% if not peut_valider %}opacity:.65; background:#fafafa;{% endif %}">
+        <div class="card-body p-4 d-flex flex-column">
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; background: #dcfce7; color: #166534;">
+              <i class="bi bi-check-circle-fill fs-5"></i>
+            </div>
             <div>
-              <a href="{% url 'client_detail' reservation.client.pk %}" style="color:var(--color-primary);text-decoration:none;font-weight:600">
-                {{ reservation.client.nom }}
-              </a>
+              <h5 class="fw-bold mb-0 text-success">Valider la réservation</h5>
+              <small class="text-muted">Statut passe à « Confirmée »</small>
             </div>
           </div>
-          <div class="col-sm-6">
-            <div class="small text-muted" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em">Période</div>
-            <div style="font-size:.9rem">
-              <i class="bx bx-calendar me-1" style="color:var(--text-muted)"></i>
-              {{ reservation.date_debut|date:"d/m/Y" }}
-              <span class="mx-1">→</span>
-              {{ reservation.date_fin|date:"d/m/Y" }}
-              <span class="text-muted" style="font-size:.8rem">({{ reservation.duree_jours }} jour{{ reservation.duree_jours|pluralize }})</span>
+
+          <p class="text-muted my-3" style="font-size: 0.85rem; line-height: 1.5;">
+            Confirme définitivement la réservation des faces sélectionnées pour le client <strong>{{ reservation.client.nom }}</strong>. 
+            Un contrôle par un second membre de l'équipe est requis pour la conformité.
+          </p>
+
+          {% if peut_valider %}
+            <form method="post" class="mt-auto">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="valider">
+              <button type="submit" class="btn btn-success w-100 py-2 d-flex align-items-center justify-content-center gap-2 shadow-sm fw-bold" style="border-radius: 10px;">
+                <i class="bi bi-check-lg fs-5"></i>
+                <span>Confirmer et valider la réservation</span>
+              </button>
+            </form>
+          {% else %}
+            <div class="alert alert-secondary mb-0 mt-auto py-2 d-flex align-items-center gap-2" style="font-size: 0.8rem; border-radius: 8px;">
+              <i class="bi bi-lock-fill text-muted flex-shrink-0"></i>
+              <span>{{ erreur_valider }}</span>
             </div>
-          </div>
-          <div class="col-sm-6">
-            <div class="small text-muted" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em">Créée par</div>
-            <div style="font-size:.9rem">{{ reservation.created_by|default:"—" }}</div>
-          </div>
-          <div class="col-sm-6">
-            <div class="small text-muted" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em">Faces concernées</div>
-            <div style="font-size:.9rem">{{ reservation.lignes.count }} face{{ reservation.lignes.count|pluralize }}</div>
-          </div>
-          {% if reservation.notes %}
-          <div class="col-12">
-            <div class="small text-muted" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em">Notes internes</div>
-            <div style="font-size:.85rem;white-space:pre-line">{{ reservation.notes }}</div>
-          </div>
           {% endif %}
         </div>
-
-        <hr>
-
-        <div class="small text-muted mb-2" style="font-size:.72rem;text-transform:uppercase;letter-spacing:.05em">
-          Faces réservées
-        </div>
-        <div class="table-responsive">
-          <table class="table table-sm mb-0">
-            <thead>
-              <tr>
-                <th>Support</th>
-                <th>Face</th>
-                <th>Ville / Quartier</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for ligne in reservation.lignes.all %}
-              <tr>
-                <td style="font-weight:600">{{ ligne.support.code }}</td>
-                <td>{{ ligne.face.label|default:"—" }}</td>
-                <td style="color:var(--text-muted);font-size:.85rem">
-                  {{ ligne.support.quartier|default:ligne.support.ville|default:"—" }}
-                </td>
-              </tr>
-              {% empty %}
-              <tr>
-                <td colspan="3" class="text-center text-muted py-3">Aucune face associée.</td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-
       </div>
     </div>
 
-    <!-- Actions : Valider et Annuler côte à côte -->
-    <div class="row g-3">
-
-      <!-- Colonne Valider -->
-      <div class="col-md-6">
-        <div class="card h-100" style="{% if not peut_valider %}opacity:.55{% endif %}">
-          <div class="card-body d-flex flex-column">
-            <div class="d-flex align-items-center gap-2 mb-2">
-              <i class="bi bi-check-circle-fill" style="color:#10b981;font-size:1.2rem"></i>
-              <span style="font-weight:700">Valider</span>
+    <!-- Colonne Annuler -->
+    <div class="col-md-6">
+      <div class="card h-100 border-0 shadow-sm" style="border-radius: 16px; border: 1px solid #e2e8f0; {% if not peut_annuler %}opacity:.65; background:#fafafa;{% endif %}">
+        <div class="card-body p-4 d-flex flex-column">
+          <div class="d-flex align-items-center gap-2 mb-2">
+            <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; background: #fee2e2; color: #991b1b;">
+              <i class="bi bi-x-circle-fill fs-5"></i>
             </div>
-            <p class="text-muted mb-3" style="font-size:.83rem">
-              Confirme la réservation. Un second membre de l'équipe doit
-              obligatoirement effectuer ce contrôle.
-            </p>
-
-            {% if peut_valider %}
-              <form method="post" class="mt-auto">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="valider">
-                <button type="submit" class="btn btn-success w-100">
-                  <i class="bi bi-check-circle-fill me-1"></i>Confirmer la validation
-                </button>
-              </form>
-            {% else %}
-              <div class="alert alert-secondary mb-0 mt-auto" style="font-size:.8rem">
-                <i class="bi bi-lock-fill me-1"></i>{{ erreur_valider }}
-              </div>
-            {% endif %}
+            <div>
+              <h5 class="fw-bold mb-0 text-danger">Annuler la réservation</h5>
+              <small class="text-muted">Libération immédiate des espaces</small>
+            </div>
           </div>
+
+          <p class="text-muted my-3" style="font-size: 0.85rem; line-height: 1.5;">
+            Libère immédiatement toutes les faces bloquées par cette réservation et la passe au statut « Annulée ».
+            Cette action est irréversible.
+          </p>
+
+          {% if peut_annuler %}
+            <form method="post" class="mt-auto">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="annuler">
+              <div class="mb-3">
+                <label class="form-label text-muted fw-bold" style="font-size: 0.72rem; letter-spacing: 0.05em;">Motif d'annulation (facultatif)</label>
+                <textarea name="motif" class="form-control" rows="2" placeholder="Raison de l'annulation…" style="border-radius: 8px; font-size: 0.85rem;"></textarea>
+              </div>
+              <button type="submit" class="btn btn-outline-danger w-100 py-2 d-flex align-items-center justify-content-center gap-2 fw-bold" style="border-radius: 10px;" onclick="return confirm('Êtes-vous sûr de vouloir annuler définitivement cette réservation ?');">
+                <i class="bi bi-x-lg"></i>
+                <span>Confirmer l'annulation</span>
+              </button>
+            </form>
+          {% else %}
+            <div class="alert alert-secondary mb-0 mt-auto py-2 d-flex align-items-center gap-2" style="font-size: 0.8rem; border-radius: 8px;">
+              <i class="bi bi-lock-fill text-muted flex-shrink-0"></i>
+              <span>{{ erreur_annuler }}</span>
+            </div>
+          {% endif %}
         </div>
       </div>
-
-      <!-- Colonne Annuler -->
-      <div class="col-md-6">
-        <div class="card h-100" style="{% if not peut_annuler %}opacity:.55{% endif %}">
-          <div class="card-body d-flex flex-column">
-            <div class="d-flex align-items-center gap-2 mb-2">
-              <i class="bi bi-x-circle-fill" style="color:#ef4444;font-size:1.2rem"></i>
-              <span style="font-weight:700">Annuler</span>
-            </div>
-            <p class="text-muted mb-3" style="font-size:.83rem">
-              Libère immédiatement toutes les faces de cette réservation.
-              Action définitive.
-            </p>
-
-            {% if peut_annuler %}
-              <form method="post" class="mt-auto">
-                {% csrf_token %}
-                <input type="hidden" name="action" value="annuler">
-                <div class="mb-2">
-                  <textarea name="motif" class="form-control form-control-sm" rows="2"
-                            placeholder="Motif (facultatif)"></textarea>
-                </div>
-                <button type="submit" class="btn btn-outline-danger w-100"
-                        onclick="return confirm('Confirmer l\'annulation de cette réservation ?');">
-                  <i class="bi bi-x-circle-fill me-1"></i>Confirmer l'annulation
-                </button>
-              </form>
-            {% else %}
-              <div class="alert alert-secondary mb-0 mt-auto" style="font-size:.8rem">
-                <i class="bi bi-lock-fill me-1"></i>{{ erreur_annuler }}
-              </div>
-            {% endif %}
-          </div>
-        </div>
-      </div>
-
     </div>
 
   </div>
-</div>
 
+</div>
 {% endblock %}

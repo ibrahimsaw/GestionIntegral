@@ -7,24 +7,27 @@
 
 {% block topbar_actions %}
   {% if user.is_staff_regie_role %}
-  <a href="{% url 'reservation_list' %}" class="btn btn-outline-secondary btn-sm">
-    <i class="bx bx-arrow-back me-1"></i>
-    <span class="d-none d-md-inline ms-1">Retour aux réservations</span>
+  <a href="{% url 'reservation_list' %}" class="btn btn-outline-secondary btn-sm" style="border-radius: 8px;">
+    <i class="bi bi-arrow-left me-1"></i>
+    <span>Retour aux réservations</span>
   </a>
   {% endif %}
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
+<div class="mb-4">
   <div class="row justify-content-center">
     <div class="col-12 col-md-8 col-lg-6 col-xl-5">
 
-      <div class="card shadow-sm border-0" style="border-radius: 14px;">
-        <div class="card-header bg-transparent border-bottom py-3 px-4">
-          <h6 class="mb-0 fw-bold">
-            <i class="bx bx-user-check me-2 text-primary"></i>Sélectionner un client
-          </h6>
-          <p class="text-muted small mb-0 mt-1">Choisissez le client pour lequel créer la réservation.</p>
+      <div class="card border-0 shadow-sm" style="border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden;">
+        <div class="card-header bg-white border-bottom py-3 px-4 d-flex align-items-center gap-3" style="border-color: #e2e8f0;">
+          <div class="d-flex align-items-center justify-content-center rounded-3 text-white" style="width: 36px; height: 36px; background: var(--color-primary);">
+            <i class="bi bi-person-check-fill fs-6"></i>
+          </div>
+          <div>
+            <h6 class="mb-0 fw-bold" style="color: #0f172a; font-size: 1rem;">Sélectionner un client</h6>
+            <p class="text-muted small mb-0">Choisissez le client pour lequel créer la réservation.</p>
+          </div>
         </div>
 
         <div class="card-body p-4">
@@ -35,55 +38,62 @@
             <!-- Recherche -->
             <div class="mb-3">
               <div class="input-group">
-                <span class="input-group-text bg-white border-end-0">
-                  <i class="bx bx-search text-muted"></i>
+                <span class="input-group-text bg-white border-end-0 text-muted" style="border-radius: 10px 0 0 10px;">
+                  <i class="bi bi-search"></i>
                 </span>
                 <input id="clientSearch" type="text"
                        class="form-control border-start-0 ps-0"
-                       placeholder="Rechercher un client…"
-                       autocomplete="off">
+                       placeholder="Rechercher par nom de client…"
+                       autocomplete="off"
+                       style="border-radius: 0 10px 10px 0;">
               </div>
             </div>
 
             <!-- Liste clients -->
-            <div class="mb-3 border rounded-3 overflow-hidden" style="max-height: 320px; overflow-y: auto;">
+            <div class="mb-4 border rounded-3 overflow-hidden" style="max-height: 320px; overflow-y: auto; border-color: #e2e8f0 !important;">
               <div id="clientList">
                 {% for c in clients %}
                   <button type="button"
-                          class="client-item w-100 text-start px-3 py-2 border-0 border-bottom bg-white d-flex align-items-center gap-2"
+                          class="client-item w-100 text-start px-3 py-3 border-0 border-bottom bg-white d-flex align-items-center gap-3"
                           data-pk="{{ c.pk }}"
-                          data-nom="{{ c.nom|lower }}">
-                    <span class="rounded-circle bg-light border d-flex align-items-center justify-content-center flex-shrink-0"
-                        style="width:32px;height:32px;">
+                          data-nom="{{ c.nom|lower }}"
+                          style="transition: background 0.15s ease;">
+                    <span class="rounded-circle text-white fw-bold d-flex align-items-center justify-content-center flex-shrink-0"
+                        style="width: 36px; height: 36px; background: linear-gradient(135deg, var(--color-primary) 0%, #b91c1c 100%); font-size: 0.8rem;">
                     {% if c.logo %}
                         <img src="{{ c.logo.url }}" class="w-100 h-100 object-fit-contain rounded-circle" alt="Logo">
                     {% else %}
-                        <i class="bx bx-building small text-muted"></i>
+                        {{ c.nom|slice:":2"|upper }}
                     {% endif %}
                     </span>
-                    <span class="fw-semibold" style="font-size:.9rem;">{{ c.nom }}</span>
+                    <div class="min-width-0 flex-grow-1">
+                      <span class="fw-bold d-block text-dark text-truncate" style="font-size: 0.9rem;">{{ c.nom }}</span>
+                      {% if c.email %}<small class="text-muted text-truncate d-block">{{ c.email }}</small>{% endif %}
+                    </div>
+                    <i class="bi bi-chevron-right text-muted small"></i>
                   </button>
                 {% empty %}
                   <div class="text-center py-4 text-muted small">
-                    <i class="bx bx-user-x d-block mb-1" style="font-size:1.5rem;"></i>
-                    Aucun client actif trouvé.
+                    <i class="bi bi-person-x d-block mb-1 fs-3 opacity-50"></i>
+                    Aucun client trouvé.
                   </div>
                 {% endfor %}
               </div>
             </div>
 
             <!-- Info sélection -->
-            <div id="selectionInfo" class="alert alert-primary py-2 small d-none mb-3">
-              <i class="bx bx-check-circle me-1"></i>
-              Client sélectionné : <strong id="selectionNom"></strong>
+            <div id="selectionInfo" class="alert alert-primary py-2 px-3 small d-none mb-3 d-flex align-items-center gap-2" style="border-radius: 10px; background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd;">
+              <i class="bi bi-check-circle-fill fs-5"></i>
+              <div>Client sélectionné : <strong id="selectionNom"></strong></div>
             </div>
 
             <!-- Actions -->
             <div class="d-flex gap-2">
-              <button type="submit" class="btn btn-primary flex-fill" id="reservationSelectSubmit" disabled>
-                <i class="bx bx-calendar-plus me-1"></i>Créer la réservation
+              <button type="submit" class="btn btn-primary flex-fill py-2 fw-bold d-flex align-items-center justify-content-center gap-2 shadow-sm" id="reservationSelectSubmit" disabled style="border-radius: 10px; background: var(--color-primary); border-color: var(--color-primary);">
+                <i class="bi bi-calendar-plus"></i>
+                <span>Créer la réservation</span>
               </button>
-              <a href="{% url 'reservation_list' %}" class="btn btn-light border">Annuler</a>
+              <a href="{% url 'reservation_list' %}" class="btn btn-light border py-2 px-3 fw-semibold" style="border-radius: 10px;">Annuler</a>
             </div>
 
           </form>
@@ -96,18 +106,14 @@
 
 <style>
   .client-item {
-    transition: background-color 0.12s ease;
     cursor: pointer;
   }
   .client-item:hover {
-    background-color: #f0f5ff !important;
+    background-color: #f8fafc !important;
   }
   .client-item.active {
-    background-color: #e7f0ff !important;
-    border-left: 3px solid var(--color-primary, #0d6efd) !important;
-  }
-  .client-item.active .bx-building {
-    color: var(--color-primary, #0d6efd) !important;
+    background-color: #fff5f5 !important;
+    border-left: 4px solid var(--color-primary, #932e2b) !important;
   }
   #clientList .client-item:last-child {
     border-bottom: none !important;
@@ -125,7 +131,6 @@
 
   if (!list) return;
 
-  // ── Filtre ────────────────────────────────────────────────────────────
   search.addEventListener('input', function () {
     const q = this.value.trim().toLowerCase();
     Array.from(list.querySelectorAll('.client-item')).forEach(function (item) {
@@ -133,7 +138,6 @@
     });
   });
 
-  // ── Sélection ─────────────────────────────────────────────────────────
   list.addEventListener('click', function (e) {
     const btn = e.target.closest('.client-item');
     if (!btn) return;
@@ -143,11 +147,10 @@
 
     input.value      = btn.dataset.pk;
     submit.disabled  = false;
-    infoNom.textContent = btn.querySelector('.fw-semibold').textContent.trim();
+    infoNom.textContent = btn.querySelector('.fw-bold').textContent.trim();
     info.classList.remove('d-none');
   });
 
-  // ── Enter → sélection auto si un seul résultat visible ───────────────
   search.addEventListener('keydown', function (e) {
     if (e.key !== 'Enter') return;
     e.preventDefault();
@@ -156,5 +159,4 @@
   });
 })();
 </script>
-
 {% endblock %}

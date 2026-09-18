@@ -1,123 +1,243 @@
 {% extends 'base.html' %}
-{% block title %}{{ title }} — Integral{% endblock %}
+{% load static %}
+
+{% block title %}{{ title }} — {{ support.code }}{% endblock %}
 
 {% block topbar_title %}
   <i class="bi bi-clock-history me-2" style="color:#ef4444"></i>{{ title }}
 {% endblock %}
 
+{% block topbar_actions %}
+  <div class="d-flex gap-2">
+    <a href="{% url 'support_detail' support.uuid %}"
+       style="background:var(--bg-card);color:var(--text-muted);border:1px solid var(--border);border-radius:20px;padding:6px 16px;font-weight:600;font-size:0.8rem;text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
+      <i class="bi bi-geo-alt-fill text-primary"></i>
+      <span>Fiche support</span>
+    </a>
+    <a href="{% url 'maintenance_create' support.pk %}"
+       style="background:var(--color-primary);color:#fff;border-radius:20px;padding:6px 16px;font-weight:600;font-size:0.8rem;text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
+      <i class="bi bi-plus-lg"></i>
+      <span>Nouvelle intervention</span>
+    </a>
+  </div>
+{% endblock %}
+
 {% block content %}
 <style>
-  .kpi-stat-card {
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--bg-card);
-    padding: 18px 20px;
-    box-shadow: 0 4px 18px rgba(0,0,0,0.02);
-    text-align: center;
-    transition: all 0.2s ease;
+  /* ── Hero ── */
+  .spp-hero {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border-radius: 16px;
+    padding: 24px 28px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
   }
-  .kpi-stat-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.05);
+  .spp-hero-icon {
+    width: 54px; height: 54px;
+    background: rgba(239,68,68,0.15);
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.5rem; color: #ef4444; flex-shrink: 0;
   }
-  .table-custom-card {
-    border: 1px solid var(--border);
-    border-radius: 8px;
+  .spp-hero-title { font-size: 1.2rem; font-weight: 800; color: #fff; margin: 0; }
+  .spp-hero-sub   { font-size: 0.78rem; color: #94a3b8; margin-top: 3px; }
+
+  /* ── KPI Grid ── */
+  .spp-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  @media (max-width: 991px) { .spp-kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 575px) { .spp-kpi-grid { grid-template-columns: 1fr; } }
+
+  .spp-kpi-card {
     background: var(--bg-card);
-    box-shadow: 0 4px 20px rgba(0,0,0,0.02);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.02);
+  }
+  .spp-kpi-icon {
+    width: 44px; height: 44px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.25rem; flex-shrink: 0;
+  }
+  .spp-kpi-val { font-size: 1.55rem; font-weight: 800; line-height: 1; color: var(--text); }
+  .spp-kpi-lbl {
+    font-size: 0.68rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.6px;
+    color: var(--text-muted); margin-top: 4px;
+  }
+
+  /* ── Table Card ── */
+  .spp-table-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
     overflow: hidden;
+    margin-bottom: 24px;
   }
-  .table th {
-    background-color: #f8fafc;
+  .spp-table-hd {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    font-size: 0.78rem; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 0.5px;
     color: var(--text-muted);
-    font-size: 0.72rem;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.6px;
-    padding: 14px 18px;
-    border-bottom: 2px solid var(--border);
+    background: #f8fafc;
   }
-  .table td {
-    padding: 14px 18px;
+  .spp-table thead th {
+    background: #1e293b;
+    color: #ffffff;
+    font-size: 0.68rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.6px;
+    padding: 11px 14px;
+    border: none; white-space: nowrap;
+    border-right: 0.5px solid rgba(255,255,255,0.08);
+  }
+  .spp-table thead th:last-child { border-right: none; }
+  .spp-table tbody td {
+    padding: 13px 14px;
     border-bottom: 1px solid var(--border);
     vertical-align: middle;
+    font-size: 0.84rem;
   }
+  .spp-table tbody tr:last-child td { border-bottom: none; }
+  .spp-table tbody tr:hover td { background: rgba(239,68,68,0.02); }
+
+  /* ── Badges ── */
+  .spp-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 0.72rem; font-weight: 700;
+    border-radius: 20px; padding: 3px 10px;
+  }
+  .spp-badge-resolue { background: #dcfce7; color: #166534; }
+  .spp-badge-encours { background: #fee2e2; color: #991b1b; }
+
+  .spp-face-badge {
+    background: rgba(99,102,241,0.1);
+    color: #4f46e5;
+    border: 1px solid rgba(99,102,241,0.2);
+    font-family: monospace; font-size: 0.75rem; font-weight: 700;
+    border-radius: 6px; padding: 2px 8px;
+  }
+
+  .spp-back {
+    width: 36px; height: 36px;
+    border: 1px solid var(--border); border-radius: 50%;
+    background: var(--bg-card); color: var(--text-muted);
+    display: inline-flex; align-items: center; justify-content: center;
+    text-decoration: none; flex-shrink: 0;
+  }
+  .spp-back:hover { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
 </style>
 
-<div class="d-flex align-items-center gap-3 mb-4">
-  <a href="{% url 'support_detail' support.uuid %}" class="btn btn-outline-secondary btn-sm rounded-circle d-flex align-items-center justify-content-center" style="width:36px;height:36px">
-    <i class="bi bi-arrow-left"></i>
-  </a>
+<!-- ══ BREADCRUMB ══ -->
+<div class="d-flex align-items-center gap-2 mb-3" style="font-size:0.78rem;color:var(--text-muted);">
+  <a href="{% url 'support_detail' support.uuid %}" class="spp-back"><i class="bi bi-arrow-left"></i></a>
+  <a href="{% url 'support_detail' support.uuid %}" style="color:var(--text-muted);text-decoration:none;">Support {{ support.code }}</a>
+  <i class="bi bi-chevron-right" style="font-size:0.65rem;"></i>
+  <span style="color:var(--text);font-weight:600;">Périodes d'indisponibilité</span>
+</div>
+
+<!-- ══ HERO ══ -->
+<div class="spp-hero">
+  <div class="d-flex align-items-center gap-3">
+    <div class="spp-hero-icon"><i class="bi bi-clock-history"></i></div>
+    <div>
+      <div class="spp-hero-title">{{ support.code }} — {{ support.nom }}</div>
+      <div class="spp-hero-sub">
+        <i class="bi bi-geo-alt me-1"></i>{{ support.adresse|default:support.ville }}
+        &nbsp;·&nbsp; Type : <strong>{{ support.get_type_support_display }}</strong>
+      </div>
+    </div>
+  </div>
   <div>
-    <div class="d-flex align-items-center gap-2">
-      <h1 style="font-size:1.4rem;font-weight:800;margin:0">{{ title }}</h1>
-      <span class="badge bg-danger-subtle text-danger border border-danger-subtle font-monospace px-2.5 py-1 rounded-pill">{{ support.code }}</span>
-    </div>
-    <p style="color:var(--text-muted);font-size:.82rem;margin:2px 0 0">
-      <i class="bi bi-geo-alt me-1 text-danger"></i>{{ support.nom }} — {{ support.adresse|default:"Adresse non renseignée" }}
-    </p>
+    <span class="badge"
+          style="background:{% if support.etat == 'bon' %}#dcfce7;color:#166534;{% elif support.etat == 'maintenance' %}#fef3c7;color:#92400e;{% else %}#fee2e2;color:#991b1b;{% endif %} font-size:0.82rem;font-weight:700;padding:6px 14px;border-radius:20px;">
+      État actuel : {{ support.get_etat_display }}
+    </span>
   </div>
 </div>
 
-{# ── KPIs ── #}
-<div class="row g-3 mb-4">
-  <div class="col-6 col-md-3">
-    <div class="kpi-stat-card">
-      <div style="font-size:1.8rem;font-weight:800;color:var(--text)">{{ nb_total }}</div>
-      <div style="font-size:.72rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px">Pannes Totales</div>
+<!-- ══ KPIS ══ -->
+<div class="spp-kpi-grid">
+  <div class="spp-kpi-card" style="border-top:3px solid #64748b;">
+    <div class="spp-kpi-icon" style="background:#f1f5f9;color:#475569;"><i class="bi bi-list-check"></i></div>
+    <div>
+      <div class="spp-kpi-val">{{ nb_total }}</div>
+      <div class="spp-kpi-lbl">Pannes Totales</div>
     </div>
   </div>
-  <div class="col-6 col-md-3">
-    <div class="kpi-stat-card" style="border-bottom:3px solid #10b981">
-      <div style="font-size:1.8rem;font-weight:800;color:#059669">{{ nb_resolues }}</div>
-      <div style="font-size:.72rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px">Résolues</div>
+
+  <div class="spp-kpi-card" style="border-top:3px solid #10b981;">
+    <div class="spp-kpi-icon" style="background:#dcfce7;color:#166534;"><i class="bi bi-check-circle-fill"></i></div>
+    <div>
+      <div class="spp-kpi-val" style="color:#059669;">{{ nb_resolues }}</div>
+      <div class="spp-kpi-lbl">Résolues</div>
     </div>
   </div>
-  <div class="col-6 col-md-3">
-    <div class="kpi-stat-card" style="border-bottom:3px solid #ef4444">
-      <div style="font-size:1.8rem;font-weight:800;color:#dc2626">{{ nb_en_cours }}</div>
-      <div style="font-size:.72rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px">En Cours</div>
+
+  <div class="spp-kpi-card" style="border-top:3px solid #ef4444;">
+    <div class="spp-kpi-icon" style="background:#fee2e2;color:#dc2626;"><i class="bi bi-exclamation-triangle-fill"></i></div>
+    <div>
+      <div class="spp-kpi-val" style="color:#dc2626;">{{ nb_en_cours }}</div>
+      <div class="spp-kpi-lbl">En Cours</div>
     </div>
   </div>
-  <div class="col-6 col-md-3">
-    <div class="kpi-stat-card" style="border-bottom:3px solid #f59e0b">
-      <div style="font-size:1.8rem;font-weight:800;color:#d97706">{{ duree_moyenne.days }}j</div>
-      <div style="font-size:.72rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px">Durée Moyenne</div>
+
+  <div class="spp-kpi-card" style="border-top:3px solid #f59e0b;">
+    <div class="spp-kpi-icon" style="background:#fef3c7;color:#d97706;"><i class="bi bi-hourglass-split"></i></div>
+    <div>
+      <div class="spp-kpi-val" style="color:#d97706;">{{ duree_moyenne.days }}j</div>
+      <div class="spp-kpi-lbl">Durée Moyenne</div>
     </div>
   </div>
 </div>
 
-{# ── Stats par face (panneaux) ── #}
+<!-- ══ STATS PAR FACE (Panneaux) ══ -->
 {% if stats_par_face %}
 <div class="row g-3 mb-4">
   {% for label, stat in stats_par_face.items %}
   <div class="col-md-6">
-    <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
-      <div class="card-header bg-light py-3 px-4 d-flex align-items-center justify-content-between">
-        <span class="fw-bold font-monospace text-primary"><i class="bi bi-signpost-split me-2"></i>Face {{ label }}</span>
+    <div class="spp-table-card mb-0">
+      <div class="spp-table-hd">
+        <span style="color:var(--color-primary);font-weight:800;font-family:monospace;">
+          <i class="bi bi-signpost-split me-2"></i>Face {{ label }}
+        </span>
         {% if stat.nb_en_cours %}
-          <span class="badge bg-danger-subtle text-danger border border-danger-subtle rounded-pill font-monospace">EN PANNE</span>
+          <span class="spp-badge spp-badge-encours"><i class="bi bi-exclamation-triangle-fill"></i>EN PANNE</span>
         {% else %}
-          <span class="badge bg-success-subtle text-success border border-success-subtle rounded-pill font-monospace">OPÉRATIONNELLE</span>
+          <span class="spp-badge spp-badge-resolue"><i class="bi bi-check-circle-fill"></i>OPÉRATIONNELLE</span>
         {% endif %}
       </div>
-      <div class="card-body p-3 font-monospace small">
+      <div class="p-3" style="font-family:monospace;background:var(--bg-card);">
         <div class="d-flex justify-content-around text-center">
           <div>
-            <div class="fw-bold text-dark fs-6">{{ stat.nb_pannes }}</div>
-            <div class="text-muted" style="font-size:0.68rem">Pannes</div>
+            <div style="font-weight:800;font-size:1.1rem;color:var(--text);">{{ stat.nb_pannes }}</div>
+            <div style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;">Pannes</div>
           </div>
           <div>
-            <div class="fw-bold text-success fs-6">{{ stat.nb_resolues }}</div>
-            <div class="text-muted" style="font-size:0.68rem">Résolues</div>
+            <div style="font-weight:800;font-size:1.1rem;color:#059669;">{{ stat.nb_resolues }}</div>
+            <div style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;">Résolues</div>
           </div>
           <div>
-            <div class="fw-bold text-danger fs-6">{{ stat.nb_en_cours }}</div>
-            <div class="text-muted" style="font-size:0.68rem">En cours</div>
+            <div style="font-weight:800;font-size:1.1rem;color:#dc2626;">{{ stat.nb_en_cours }}</div>
+            <div style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;">En cours</div>
           </div>
           <div>
-            <div class="fw-bold text-warning-emphasis fs-6">{{ stat.duree_totale.days }}j</div>
-            <div class="text-muted" style="font-size:0.68rem">Cumulé</div>
+            <div style="font-weight:800;font-size:1.1rem;color:#d97706;">{{ stat.duree_totale.days }}j</div>
+            <div style="font-size:0.68rem;color:var(--text-muted);text-transform:uppercase;">Cumulé</div>
           </div>
         </div>
       </div>
@@ -127,54 +247,59 @@
 </div>
 {% endif %}
 
-{# ── Timeline des périodes ── #}
-<div class="table-custom-card">
-  <div class="card-header bg-light py-3 px-4 fw-bold font-monospace" style="font-size:0.85rem">
-    <i class="bi bi-clock-history me-2 text-danger"></i>Historique Chronologique des Pannes
+<!-- ══ TIMELINE TABLEAU ══ -->
+<div class="spp-table-card">
+  <div class="spp-table-hd">
+    <span><i class="bi bi-clock-history me-2" style="color:#ef4444;"></i>Historique Chronologique des Pannes</span>
+    <span style="font-family:monospace;font-size:0.75rem;color:var(--text-muted);">
+      Total : {{ periodes|length }} enregistrement{{ periodes|length|pluralize }}
+    </span>
   </div>
   <div class="card-body p-0">
     {% if periodes %}
     <div class="table-responsive">
-      <table class="table table-hover mb-0 align-middle" style="font-size:.85rem">
+      <table class="table spp-table mb-0 align-middle">
         <thead>
           <tr>
             {% if support.type_support == 'panneau' %}
-            <th class="ps-4">Face</th>
+            <th style="padding-left:20px;">Face</th>
             {% endif %}
             <th class="{% if support.type_support != 'panneau' %}ps-4{% endif %}">Début de la panne</th>
             <th>Fin / Résolution</th>
             <th>Durée d'indisponibilité</th>
-            <th class="text-end pe-4">Statut</th>
+            <th style="text-align:right;padding-right:20px;">Statut</th>
           </tr>
         </thead>
         <tbody>
           {% for p in periodes %}
           <tr>
             {% if support.type_support == 'panneau' %}
-            <td class="ps-4">
-              <span class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace px-2.5 py-1">
-                Face {{ p.face.label }}
-              </span>
-            </td>
-            {% endif %}
-            <td class="{% if support.type_support != 'panneau' %}ps-4{% endif %} font-monospace">
-              {{ p.debut|date:"d/m/Y H:i" }}
-            </td>
-            <td class="font-monospace">
-              {% if p.fin %}
-                {{ p.fin|date:"d/m/Y H:i" }}
+            <td style="padding-left:20px;">
+              {% if p.face %}
+                <span class="spp-face-badge">Face {{ p.face.label }}</span>
               {% else %}
-                <span class="text-danger fw-bold"><i class="bi bi-broadcast me-1"></i>En cours</span>
+                <span style="color:var(--text-muted);">—</span>
               {% endif %}
             </td>
-            <td class="font-monospace text-secondary">
+            {% endif %}
+            <td class="{% if support.type_support != 'panneau' %}ps-4{% endif %}" style="font-family:monospace;font-weight:700;color:#dc2626;">
+              {{ p.debut|date:"d/m/Y H:i" }}
+            </td>
+            <td style="font-family:monospace;">
+              {% if p.fin %}
+                <span style="color:#059669;font-weight:700;">{{ p.fin|date:"d/m/Y H:i" }}</span>
+              {% else %}
+                <span class="spp-badge spp-badge-encours"><i class="bi bi-broadcast"></i>En cours</span>
+              {% endif %}
+            </td>
+            <td style="font-family:monospace;font-weight:800;color:var(--text);">
               {{ p.duree.days }}j {{ p.duree|time:"H\h i\m" }}
             </td>
-            <td class="text-end pe-4">
+            <td style="text-align:right;padding-right:20px;">
               {% if p.resolue %}
-                <span class="badge badge-status bs-disponible">Résolue</span>
+                <span class="spp-badge spp-badge-resolue"><i class="bi bi-check-circle-fill"></i>Résolue</span>
               {% else %}
-                <span class="badge badge-status bs-panne">En cours</span>
+                <span class="spp-badge spp-badge-encours"><i class="bi bi-exclamation-triangle-fill"></i>En cours</span>
               {% endif %}
             </td>
           </tr>
@@ -183,9 +308,10 @@
       </table>
     </div>
     {% else %}
-    <div class="text-center py-5 text-muted">
-      <i class="bi bi-check-circle-fill d-block fs-2 text-success opacity-50 mb-2"></i>
-      <p class="mb-0 small fw-semibold">Aucune période d'indisponibilité enregistrée pour ce support.</p>
+    <div style="padding:50px 20px;text-align:center;">
+      <i class="bi bi-shield-check" style="font-size:2.2rem;color:#10b981;margin-bottom:8px;display:block;"></i>
+      <div style="font-weight:700;font-size:0.95rem;color:var(--text);">Aucune période d'indisponibilité</div>
+      <div style="font-size:0.8rem;color:var(--text-muted);">Ce support est pleinement opérationnel sans incident enregistré.</div>
     </div>
     {% endif %}
   </div>

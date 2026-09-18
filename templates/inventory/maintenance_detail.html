@@ -3,12 +3,21 @@
 
 {% block title %}Maintenance — {{ maintenance.support.code }}{% endblock %}
 {% block topbar_title %}
-  <i class="bi bi-tools me-2" style="color:#fbbf24"></i>Détail Maintenance — {{ maintenance.support.code }}
+  <i class="bi bi-tools me-2" style="color:#fbbf24"></i>Détail Intervention — {{ maintenance.support.code }}
 {% endblock %}
 
 {% block topbar_actions %}
-  <div class="d-flex gap-2">
-    <a href="{% url 'maintenance_update' maintenance.pk %}" class="btn btn-outline-primary btn-sm rounded-pill px-3 shadow-sm d-flex align-items-center gap-1">
+  <div class="d-flex flex-wrap gap-2">
+    {% if maintenance.etat_apres == 'panne' %}
+    <button type="button" class="btn btn-sm d-inline-flex align-items-center gap-2 shadow-sm"
+            data-bs-toggle="modal" data-bs-target="#modalReparationRapide"
+            style="background:#10b981;color:#fff;border-radius:8px;padding:6px 18px;font-weight:700;font-size:0.8rem;border:none;">
+      <i class="bi bi-wrench-adjustable-circle-fill"></i>
+      <span>Enregistrer une réparation</span>
+    </button>
+    {% endif %}
+    <a href="{% url 'maintenance_update' maintenance.pk %}"
+       style="background:#ede9fe;color:#5b21b6;border:1px solid #ddd6fe;border-radius:8px;padding:6px 16px;font-weight:700;font-size:0.8rem;text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
       <i class="bi bi-pencil"></i>
       <span class="d-none d-md-inline">Modifier le rapport</span>
     </a>
@@ -16,143 +25,462 @@
 {% endblock %}
 
 {% block content %}
-<div class="d-flex align-items-center gap-3 mb-4">
-  <a href="javascript:void(0)" onclick="history.back()" class="btn btn-outline-secondary btn-sm rounded-circle d-flex align-items-center justify-content-center" style="width:36px;height:36px">
-    <i class="bi bi-arrow-left"></i>
-  </a>
-  <div>
-    <div class="d-flex align-items-center gap-2">
-      <h1 style="font-size:1.4rem;font-weight:800;margin:0">Intervention sur {{ maintenance.support.code }}</h1>
-      <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle font-monospace px-2.5 py-1 rounded-pill">
-        {{ maintenance.date_intervention|date:"d/m/Y à H:i" }}
-      </span>
+<style>
+  /* ── Hero ── */
+  .mxd-hero {
+    background: linear-gradient(135deg, #932e2b 0%, #1e40af 100%);
+    border-radius: 8px;
+    padding: 24px 28px;
+    margin-bottom: 24px;
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+    justify-content: space-between;
+  }
+  .mxd-hero-left { display: flex; align-items: center; gap: 16px; }
+  .mxd-hero-icon {
+    width: 56px; height: 56px;
+    background: rgba(251,191,36,0.15);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.6rem; color: #fbbf24; flex-shrink: 0;
+  }
+  .mxd-hero-code {
+    font-family: monospace; font-size: 0.7rem; color: #64748b;
+    text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px;
+  }
+  .mxd-hero-title { font-size: 1.2rem; font-weight: 800; color: #fff; margin: 0; }
+  .mxd-hero-sub   { font-size: 0.78rem; color: #94a3b8; margin-top: 3px; }
+  .mxd-hero-date  {
+    background: rgba(251,191,36,0.15);
+    border: 1px solid rgba(251,191,36,0.3);
+    border-radius: 8px;
+    padding: 8px 16px;
+    font-family: monospace; font-size: 0.82rem; font-weight: 700;
+    color: #fbbf24; white-space: nowrap;
+  }
+
+  /* ── Sections ── */
+  .mxd-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+  .mxd-card-hd {
+    padding: 13px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; gap: 8px;
+    font-size: 0.78rem; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    color: var(--text-muted);
+    background: #f8fafc;
+  }
+  .mxd-card-bd { padding: 20px; }
+
+  /* ── Info Grid ── */
+  .mxd-info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  @media (max-width: 575px) { .mxd-info-grid { grid-template-columns: 1fr; } }
+  .mxd-info-lbl {
+    font-size: 0.68rem; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 0.7px;
+    color: #94a3b8; margin-bottom: 6px;
+  }
+  .mxd-info-val { font-size: 0.95rem; font-weight: 700; color: var(--text); }
+  .mxd-info-sub { font-size: 0.78rem; color: var(--text-muted); margin-top: 2px; }
+
+  /* ── Support Link ── */
+  .mxd-support-link {
+    display: inline-flex; align-items: center; gap: 8px;
+    text-decoration: none;
+  }
+  .mxd-support-code {
+    font-family: monospace; font-size: 1.05rem; font-weight: 800;
+    color: var(--color-primary);
+  }
+  .mxd-support-name { font-size: 0.82rem; color: var(--text-muted); margin-top: 1px; }
+
+  /* ── Technicien ── */
+  .mxd-avatar {
+    width: 40px; height: 40px;
+    background: #6366f1;
+    border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-weight: 800; font-size: 0.9rem; color: #fff; flex-shrink: 0;
+  }
+
+  /* ── Badges état ── */
+  .mxd-badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    font-size: 0.8rem; font-weight: 700;
+    border-radius: 8px; padding: 5px 14px;
+  }
+  .mxd-badge-bon   { background: #dcfce7; color: #166534; }
+  .mxd-badge-panne { background: #fee2e2; color: #991b1b; }
+  .mxd-badge-maint { background: #fef3c7; color: #92400e; }
+
+  /* ── Face badge ── */
+  .mxd-face {
+    background: rgba(99,102,241,0.1);
+    color: #4f46e5;
+    border: 1px solid rgba(99,102,241,0.2);
+    font-family: monospace; font-size: 0.82rem; font-weight: 700;
+    border-radius: 8px; padding: 4px 12px;
+    display: inline-block;
+  }
+
+  /* ── Description ── */
+  .mxd-desc {
+    background: #f8fafc;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    font-size: 0.88rem; line-height: 1.7;
+    color: var(--text-muted);
+  }
+
+  /* ── Photo ── */
+  .mxd-photo-img { width: 100%; height: 240px; object-fit: cover; display: block; }
+  .mxd-photo-empty {
+    height: 160px; display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    color: #cbd5e1; gap: 8px; font-size: 0.82rem;
+  }
+
+  /* ── Etat actuel ── */
+  .mxd-etat-pill {
+    display: flex; align-items: center; gap: 12px;
+    background: #f8fafc; border-radius: 12px; padding: 14px 16px;
+  }
+  .mxd-etat-dot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; }
+
+  /* ── Retour bouton ── */
+  .mxd-back {
+    width: 36px; height: 36px;
+    border: 1px solid var(--border); border-radius: 50%;
+    background: var(--bg-card); color: var(--text-muted);
+    display: inline-flex; align-items: center; justify-content: center;
+    text-decoration: none; flex-shrink: 0;
+  }
+  .mxd-back:hover { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
+</style>
+
+<!-- ══ BREADCRUMB ══ -->
+<div class="d-flex align-items-center gap-2 mb-3" style="font-size:0.78rem;color:var(--text-muted);">
+  <a href="{% url 'maintenance_list' %}" class="mxd-back"><i class="bi bi-arrow-left"></i></a>
+  <a href="{% url 'maintenance_list' %}" style="color:var(--text-muted);text-decoration:none;">Maintenances</a>
+  <i class="bi bi-chevron-right" style="font-size:0.65rem;"></i>
+  <span style="color:var(--text);font-weight:600;">Intervention #{{ maintenance.pk }}</span>
+</div>
+
+<!-- ══ HERO ══ -->
+<div class="mxd-hero">
+  <div class="mxd-hero-left">
+    <div class="mxd-hero-icon"><i class="bi bi-tools"></i></div>
+    <div>
+      <div class="mxd-hero-code">Rapport d'intervention · #{{ maintenance.pk }}</div>
+      <div class="mxd-hero-title">{{ maintenance.support.code }} — {{ maintenance.support.nom }}</div>
+      <div class="mxd-hero-sub">
+        <i class="bi bi-geo-alt me-1"></i>{{ maintenance.support.adresse|default:maintenance.support.ville }}
+        {% if maintenance.face %} &nbsp;·&nbsp; <span class="mxd-face" style="font-size:0.7rem;padding:2px 8px;border-radius:4px;background:rgba(99,102,241,0.2);color:#c7d2fe;border:none;">Face {{ maintenance.face.label }}</span>{% endif %}
+      </div>
     </div>
-    <p style="color:var(--text-muted);font-size:.82rem;margin:2px 0 0">
-      <i class="bi bi-geo-alt me-1 text-danger"></i>{{ maintenance.support.nom }} — {{ maintenance.support.adresse }}
-    </p>
+  </div>
+  <div class="d-flex align-items-center gap-2">
+    {% if maintenance.etat_apres == 'panne' %}
+    <button type="button" class="btn btn-sm d-inline-flex align-items-center gap-2 shadow"
+            data-bs-toggle="modal" data-bs-target="#modalReparationRapide"
+            style="background:#10b981;color:#fff;border-radius:10px;padding:8px 16px;font-weight:700;font-size:0.83rem;border:none;">
+      <i class="bi bi-check2-circle fs-6"></i>
+      <span>Enregistrer la réparation</span>
+    </button>
+    {% endif %}
+    <div class="mxd-hero-date">
+      <i class="bi bi-calendar3 me-2"></i>{{ maintenance.date_intervention|date:"d/m/Y à H:i" }}
+    </div>
   </div>
 </div>
 
+<!-- ══ CONTENU ══ -->
 <div class="row g-4">
-  <!-- Colonne gauche -->
+
+  <!-- ── Colonne principale ── -->
   <div class="col-lg-8">
 
     <!-- Informations principales -->
-    <div class="card mb-4 border-0 shadow-sm rounded-4 overflow-hidden">
-      <div class="card-header bg-light py-3 px-4 fw-bold font-monospace" style="font-size:0.85rem">
-        <i class="bi bi-info-circle me-2 text-warning"></i>Détails de l'Intervention
+    <div class="mxd-card">
+      <div class="mxd-card-hd">
+        <i class="bi bi-info-circle-fill" style="color:#fbbf24;"></i>
+        Détails de l'Intervention
       </div>
-      <div class="card-body p-4">
-        <div class="row g-4">
+      <div class="mxd-card-bd">
+        <div class="mxd-info-grid">
 
           <!-- Support -->
-          <div class="col-md-6">
-            <div class="text-muted text-uppercase fw-bold font-monospace mb-1" style="font-size:0.7rem;letter-spacing:0.6px">Support Concerné</div>
-            <a href="{% url 'support_detail' maintenance.support.uuid %}" class="fw-bold fs-5 text-primary text-decoration-none font-monospace">
-              {{ maintenance.support.code }}
+          <div class="mxd-info-item">
+            <div class="mxd-info-lbl"><i class="bi bi-geo-alt me-1"></i>Support concerné</div>
+            <a href="{% url 'support_detail' maintenance.support.uuid %}" class="mxd-support-link">
+              <span class="mxd-support-code">{{ maintenance.support.code }}</span>
             </a>
-            <div class="fw-semibold text-dark mt-1">{{ maintenance.support.nom }}{% if maintenance.face %} · Face {{ maintenance.face.label }}{% endif %}</div>
-            <div class="small text-muted">{{ maintenance.support.adresse }}</div>
+            <div class="mxd-support-name">{{ maintenance.support.nom }}</div>
+            <div class="mxd-info-sub">{{ maintenance.support.adresse|default:"—" }}</div>
+          </div>
+
+          <!-- Face -->
+          <div class="mxd-info-item">
+            <div class="mxd-info-lbl"><i class="bi bi-signpost-split me-1"></i>Face concernée</div>
+            {% if maintenance.face %}
+              <span class="mxd-face">Face {{ maintenance.face.label }}</span>
+              {% if maintenance.face.orientation %}<div class="mxd-info-sub">{{ maintenance.face.orientation }}</div>{% endif %}
+            {% else %}
+              <div style="color:var(--text-muted);font-size:0.88rem;">Intervention globale sur le support</div>
+            {% endif %}
           </div>
 
           <!-- Technicien -->
-          <div class="col-md-6">
-            <div class="text-muted text-uppercase fw-bold font-monospace mb-1" style="font-size:0.7rem;letter-spacing:0.6px">Technicien Référent</div>
+          <div class="mxd-info-item">
+            <div class="mxd-info-lbl"><i class="bi bi-person-badge me-1"></i>Technicien intervenant</div>
             {% if maintenance.effectue_par %}
-              <div class="fw-bold fs-6 text-dark">
-                <i class="bi bi-person-badge me-1 text-primary"></i>{{ maintenance.effectue_par.get_full_name|default:maintenance.effectue_par.username }}
+              <div class="d-flex align-items-center gap-10" style="gap:10px;">
+                <div class="mxd-avatar">{{ maintenance.effectue_par.get_full_name|default:maintenance.effectue_par.username|slice:":1"|upper }}</div>
+                <div>
+                  <div class="mxd-info-val">{{ maintenance.effectue_par.get_full_name|default:maintenance.effectue_par.username }}</div>
+                  <div class="mxd-info-sub">{{ maintenance.effectue_par.get_role_display }}</div>
+                </div>
               </div>
-              <div class="small text-muted">{{ maintenance.effectue_par.get_role_display }}</div>
             {% else %}
-              <span class="text-muted">—</span>
+              <span style="color:var(--text-muted);">Non renseigné</span>
             {% endif %}
           </div>
 
           <!-- Date -->
-          <div class="col-md-6">
-            <div class="text-muted text-uppercase fw-bold font-monospace mb-1" style="font-size:0.7rem;letter-spacing:0.6px">Date & Heure d'intervention</div>
-            <div class="fw-bold fs-6">{{ maintenance.date_intervention|date:"d/m/Y" }}</div>
-            <div class="small text-muted font-monospace">{{ maintenance.date_intervention|date:"H:i" }}</div>
+          <div class="mxd-info-item">
+            <div class="mxd-info-lbl"><i class="bi bi-calendar3 me-1"></i>Date & heure d'intervention</div>
+            <div class="mxd-info-val">{{ maintenance.date_intervention|date:"d/m/Y" }}</div>
+            <div class="mxd-info-sub" style="font-family:monospace;">{{ maintenance.date_intervention|date:"H:i" }}</div>
           </div>
 
-          <!-- État -->
-          <div class="col-md-6">
-            <div class="text-muted text-uppercase fw-bold font-monospace mb-1" style="font-size:0.7rem;letter-spacing:0.6px">État Enregistré</div>
+          <!-- État résultant -->
+          <div class="mxd-info-item" style="grid-column: span 2;">
+            <div class="mxd-info-lbl"><i class="bi bi-activity me-1"></i>État enregistré après intervention</div>
             {% if maintenance.etat_apres == 'bon' %}
-              <span class="badge badge-status bs-disponible">Opérationnel</span>
+              <span class="mxd-badge mxd-badge-bon"><i class="bi bi-check-circle-fill"></i>Opérationnel — Support remis en service</span>
             {% elif maintenance.etat_apres == 'maintenance' %}
-              <span class="badge badge-status bs-occupe">En Maintenance</span>
+              <span class="mxd-badge mxd-badge-maint"><i class="bi bi-wrench"></i>En maintenance — Travaux non finalisés</span>
             {% elif maintenance.etat_apres == 'panne' %}
-              <span class="badge badge-status bs-panne">En Panne</span>
+              <span class="mxd-badge mxd-badge-panne"><i class="bi bi-exclamation-triangle-fill"></i>En panne — Problème persistant</span>
             {% else %}
-              <span class="text-muted">—</span>
+              <span style="color:var(--text-muted);">—</span>
             {% endif %}
           </div>
 
         </div>
+
+        <!-- ── Encart Panne & Réparation Rapide ── -->
+        {% if maintenance.etat_apres == 'panne' %}
+        <div style="background:#fff7ed;border:1px solid #ffedd5;border-radius:12px;padding:16px;margin-top:20px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
+          <div class="d-flex align-items-center gap-3">
+            <div style="width:42px;height:42px;border-radius:10px;background:#fef3c7;color:#d97706;display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0;">
+              <i class="bi bi-exclamation-triangle-fill"></i>
+            </div>
+            <div>
+              <div style="font-weight:800;font-size:0.88rem;color:#9a3412;">Ce support a été enregistré comme étant EN PANNE</div>
+              <div style="font-size:0.78rem;color:#b45309;margin-top:2px;">
+                Cliquez sur le bouton pour enregistrer directement la réparation et rétablir l'état opérationnel.
+              </div>
+            </div>
+          </div>
+          <button type="button" class="btn btn-sm shadow-sm"
+                  data-bs-toggle="modal" data-bs-target="#modalReparationRapide"
+                  style="background:#10b981;color:#fff;border-radius:20px;padding:8px 20px;font-weight:700;font-size:0.82rem;border:none;white-space:nowrap;">
+            <i class="bi bi-wrench-adjustable-circle-fill me-1"></i>Enregistrer la réparation
+          </button>
+        </div>
+        {% endif %}
+
       </div>
     </div>
 
-    <!-- Description -->
-    <div class="card mb-4 border-0 shadow-sm rounded-4 overflow-hidden">
-      <div class="card-header bg-light py-3 px-4 fw-bold font-monospace" style="font-size:0.85rem">
-        <i class="bi bi-card-text me-2 text-primary"></i>Compte-Rendu & Travaux Effectués
+    <!-- Compte-rendu -->
+    <div class="mxd-card">
+      <div class="mxd-card-hd">
+        <i class="bi bi-card-text" style="color:#6366f1;"></i>
+        Compte-Rendu & Travaux Effectués
       </div>
-      <div class="card-body p-4">
+      <div class="mxd-card-bd">
         {% if maintenance.description %}
-          <p class="mb-0 text-secondary" style="line-height:1.7;font-size:0.9rem">{{ maintenance.description }}</p>
+          <div class="mxd-desc">{{ maintenance.description }}</div>
         {% else %}
-          <p class="mb-0 text-muted fst-italic small">Aucun compte-rendu détaillé n'a été rédigé.</p>
+          <div style="color:var(--text-muted);font-style:italic;font-size:0.85rem;padding:12px 0;">
+            <i class="bi bi-info-circle me-1"></i>Aucun compte-rendu détaillé n'a été rédigé pour cette intervention.
+          </div>
         {% endif %}
       </div>
     </div>
 
   </div>
 
-  <!-- Colonne droite -->
+  <!-- ── Colonne latérale ── -->
   <div class="col-lg-4">
 
     <!-- Photo de preuve -->
-    <div class="card mb-4 border-0 shadow-sm rounded-4 overflow-hidden">
-      <div class="card-header bg-light py-3 px-4 fw-bold font-monospace" style="font-size:0.85rem">
-        <i class="bi bi-camera me-2 text-warning"></i>Photo de Preuve
+    <div class="mxd-card">
+      <div class="mxd-card-hd">
+        <i class="bi bi-camera-fill" style="color:#fbbf24;"></i>
+        Photo de Preuve
       </div>
-      <div class="card-body p-0">
+      <div>
         {% if maintenance.photo %}
-          <img src="{{ maintenance.photo.url }}"
-               alt="Photo maintenance"
-               style="width:100%;height:220px;object-fit:cover;display:block">
-          <div class="p-3 text-center bg-light border-top">
-            <a href="{{ maintenance.photo.url }}" target="_blank" class="btn btn-outline-secondary btn-sm rounded-pill px-3 shadow-sm">
-              <i class="bi bi-box-arrow-up-right me-1"></i>Ouvrir en plein écran
+          <img src="{{ maintenance.photo.url }}" alt="Photo maintenance" class="mxd-photo-img">
+          <div style="padding:12px;text-align:center;border-top:1px solid var(--border);">
+            <a href="{{ maintenance.photo.url }}" target="_blank"
+               style="display:inline-flex;align-items:center;gap:6px;font-size:0.8rem;font-weight:600;color:var(--text-muted);text-decoration:none;padding:6px 14px;border:1px solid var(--border);border-radius:8px;background:var(--bg-card);">
+              <i class="bi bi-box-arrow-up-right"></i>Ouvrir en plein écran
             </a>
           </div>
         {% else %}
-          <div class="text-center py-5 text-muted">
-            <i class="bi bi-image d-block fs-2 opacity-25 mb-1"></i>
-            <p class="mb-0 small">Aucune photo jointe</p>
+          <div class="mxd-photo-empty">
+            <i class="bi bi-image" style="font-size:2rem;"></i>
+            <span>Aucune photo jointe</span>
           </div>
         {% endif %}
       </div>
     </div>
 
     <!-- État actuel du support -->
-    <div class="card border-0 shadow-sm rounded-4 overflow-hidden">
-      <div class="card-header bg-light py-3 px-4 fw-bold font-monospace" style="font-size:0.85rem">
-        <i class="bi bi-display me-2 text-primary"></i>État Actuel du Support
+    <div class="mxd-card">
+      <div class="mxd-card-hd">
+        <i class="bi bi-display" style="color:#6366f1;"></i>
+        État Actuel du Support
       </div>
-      <div class="card-body p-4 d-flex align-items-center gap-3">
-        <i class="bi bi-circle-fill fs-4"
-           style="color:{% if maintenance.support.etat == 'bon' %}#10b981{% elif maintenance.support.etat == 'maintenance' %}#f97316{% else %}#ef4444{% endif %}"></i>
-        <div class="flex-grow-1">
-          <div class="fw-bold">{{ maintenance.support.get_etat_display }}</div>
-          <a href="{% url 'support_detail' maintenance.support.uuid %}" class="small text-primary text-decoration-none fw-semibold">
-            Consulter la fiche support <i class="bi bi-arrow-right ms-1"></i>
-          </a>
+      <div class="mxd-card-bd">
+        <div class="mxd-etat-pill">
+          <div class="mxd-etat-dot"
+               style="background:{% if maintenance.support.etat == 'bon' %}#10b981{% elif maintenance.support.etat == 'maintenance' %}#f97316{% else %}#ef4444{% endif %};"></div>
+          <div style="flex:1;">
+            <div style="font-weight:700;font-size:0.9rem;">{{ maintenance.support.get_etat_display }}</div>
+            <a href="{% url 'support_detail' maintenance.support.uuid %}"
+               style="font-size:0.78rem;color:var(--color-primary);text-decoration:none;font-weight:600;">
+              Consulter la fiche <i class="bi bi-arrow-right ms-1"></i>
+            </a>
+          </div>
         </div>
       </div>
     </div>
 
+    <!-- Actions rapides -->
+    <div class="mxd-card">
+      <div class="mxd-card-hd">
+        <i class="bi bi-lightning-fill" style="color:#fbbf24;"></i>
+        Actions Rapides
+      </div>
+      <div class="mxd-card-bd d-flex flex-column gap-2">
+        {% if maintenance.etat_apres == 'panne' %}
+        <button type="button" class="w-100 text-start border-0 shadow-sm"
+                data-bs-toggle="modal" data-bs-target="#modalReparationRapide"
+                style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:#dcfce7;border-radius:10px;color:#166534;font-weight:700;font-size:0.84rem;cursor:pointer;">
+          <i class="bi bi-wrench-adjustable-circle-fill text-success fs-5"></i>
+          <div>
+            <div>Enregistrer la réparation</div>
+            <div style="font-size:0.7rem;font-weight:normal;color:#15803d;">Remettre en service opérationnel</div>
+          </div>
+        </button>
+        {% endif %}
+
+        <a href="{% url 'maintenance_update' maintenance.pk %}"
+           style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#ede9fe;border-radius:10px;text-decoration:none;color:#5b21b6;font-weight:600;font-size:0.83rem;">
+          <i class="bi bi-pencil-fill"></i>Modifier cette intervention
+        </a>
+        <a href="{% url 'maintenance_list' %}"
+           style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#f1f5f9;border-radius:10px;text-decoration:none;color:var(--text-muted);font-weight:600;font-size:0.83rem;">
+          <i class="bi bi-list-check"></i>Retour à la liste
+        </a>
+        <a href="{% url 'support_detail' maintenance.support.uuid %}"
+           style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#f0fdf4;border-radius:10px;text-decoration:none;color:#166534;font-weight:600;font-size:0.83rem;">
+          <i class="bi bi-geo-alt-fill"></i>Fiche du support
+        </a>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════
+     MODAL DE RÉPARATION RAPIDE
+     ══════════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="modalReparationRapide" tabindex="-1" aria-labelledby="modalReparationLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow-lg" style="border-radius:16px;overflow:hidden;">
+      <div class="modal-header border-0 text-white" style="background:linear-gradient(135deg, #059669 0%, #047857 100%);padding:18px 22px;">
+        <div class="d-flex align-items-center gap-3">
+          <div style="width:42px;height:42px;background:rgba(255,255,255,0.2);border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;">
+            <i class="bi bi-wrench-adjustable-circle-fill"></i>
+          </div>
+          <div>
+            <h5 class="modal-title fw-bold mb-0" id="modalReparationLabel" style="font-size:1.05rem;">Enregistrer la Réparation</h5>
+            <div style="font-size:0.75rem;opacity:0.85;">Remise en service immédiate de {{ maintenance.support.code }}</div>
+          </div>
+        </div>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fermer"></button>
+      </div>
+
+      <form method="post" action="{% url 'maintenance_quick_repair' maintenance.pk %}" enctype="multipart/form-data">
+        {% csrf_token %}
+        <div class="modal-body p-4">
+
+          <!-- Résumé du support -->
+          <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:14px;margin-bottom:18px;">
+            <div class="row g-2" style="font-size:0.82rem;">
+              <div class="col-6">
+                <span class="text-muted text-uppercase" style="font-size:0.68rem;font-weight:700;">Support :</span>
+                <div class="fw-bold font-monospace text-dark">{{ maintenance.support.code }}</div>
+              </div>
+              <div class="col-6">
+                <span class="text-muted text-uppercase" style="font-size:0.68rem;font-weight:700;">Élément :</span>
+                <div class="fw-bold text-dark">{% if maintenance.face %}Face {{ maintenance.face.label }}{% else %}Support complet{% endif %}</div>
+              </div>
+              <div class="col-6">
+                <span class="text-muted text-uppercase" style="font-size:0.68rem;font-weight:700;">Technicien :</span>
+                <div class="fw-semibold text-dark">{{ request.user.get_full_name|default:request.user.username }}</div>
+              </div>
+              <div class="col-6">
+                <span class="text-muted text-uppercase" style="font-size:0.68rem;font-weight:700;">Nouvel État :</span>
+                <div><span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 font-monospace">OPÉRATIONNEL (BON)</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Description des travaux -->
+          <div class="mb-3">
+            <label class="form-label text-uppercase fw-bold text-muted" style="font-size:0.72rem;letter-spacing:0.5px;">
+              <i class="bi bi-card-text me-1 text-success"></i>Compte-rendu des réparations
+            </label>
+            <textarea name="description" rows="3" class="form-control rounded-3" style="font-size:0.85rem;"
+                      placeholder="Ex: Remplacement du composant défectueux, tests effectués avec succès, remise en service.">Réparation effectuée — Remise en service opérationnel suite à l'intervention #{{ maintenance.pk }}{% if maintenance.face %} (Face {{ maintenance.face.label }}){% endif %}.</textarea>
+          </div>
+
+          <!-- Photo optionnelle -->
+          <div class="mb-2">
+            <label class="form-label text-uppercase fw-bold text-muted" style="font-size:0.72rem;letter-spacing:0.5px;">
+              <i class="bi bi-camera me-1 text-success"></i>Photo de preuve (optionnel)
+            </label>
+            <input type="file" name="photo" class="form-control form-control-sm rounded-3" accept="image/*">
+          </div>
+
+        </div>
+
+        <div class="modal-footer border-top bg-light p-3 d-flex justify-content-between">
+          <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3" data-bs-dismiss="modal">
+            Annuler
+          </button>
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-success btn-sm rounded-pill px-4 fw-bold shadow-sm d-flex align-items-center gap-2">
+              <i class="bi bi-check-lg"></i>
+              <span>Confirmer la réparation</span>
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
   </div>
 </div>
 {% endblock %}

@@ -9,134 +9,183 @@
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid py-4">
-  <div class="row justify-content-center">
-    <div class="col-12">
+<div class="mb-4">
 
-      <div class="d-flex align-items-center gap-3 mb-4">
-        <a href="javascript:void(0)" onclick="history.back()" class="btn btn-outline-secondary btn-sm">
-          <i class="bi bi-arrow-left"></i>
-        </a>
-        <h1 class="h4 fw-bold mb-0">Nouvelle réservation</h1>
-        <a href="{% url 'reservation_wizard_cancel' %}" class="btn btn-link btn-sm text-danger ms-auto">
-          <i class="bi bi-x-lg me-1"></i>
-          <span class="d-none d-md-inline ms-1">Annuler</span>
-        </a>
+  <!-- Bouton Retour & Titre -->
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
+    <div class="d-flex align-items-center gap-3">
+      <a href="{% url 'reservation_wizard_etape2' %}" class="btn btn-light border btn-sm d-flex align-items-center justify-content-center shadow-sm" style="width: 38px; height: 38px; border-radius: 10px;" title="Retour à l'étape 2">
+        <i class="bi bi-arrow-left fs-6"></i>
+      </a>
+      <div>
+        <h1 class="h4 fw-bold mb-0" style="color: #0f172a;">Vérification & Finalisation</h1>
+        <p class="text-muted small mb-0">Étape 3 sur 3 — Vérifiez l'ensemble des données avant d'enregistrer la réservation.</p>
       </div>
+    </div>
+    <a href="{% url 'reservation_wizard_cancel' %}" class="btn btn-link btn-sm text-danger text-decoration-none">
+      <i class="bi bi-x-circle me-1"></i>Annuler la création
+    </a>
+  </div>
 
-      {% for message in messages %}
-      <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show py-2 shadow-sm" role="alert">
-        {{ message }}
-        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
-      </div>
-      {% endfor %}
+  {% for message in messages %}
+  <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show py-2 shadow-sm mb-4" role="alert" style="border-radius: 8px;">
+    {{ message }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  {% endfor %}
 
-      {% include 'campaigns/_wizard_steps.html' with step=3 client=client %}
+  {% include 'campaigns/_wizard_steps.html' with step=3 client=client %}
 
-      {% if erreurs %}
-      <div class="alert alert-danger shadow-sm">
-        <h6 class="fw-bold mb-2"><i class="bi bi-exclamation-triangle me-2"></i>Conflits détectés</h6>
-        <ul class="mb-2 small">
-          {% for err in erreurs %}<li>{{ err }}</li>{% endfor %}
-        </ul>
-        <a href="{% url 'reservation_wizard_etape2' %}" class="btn btn-sm btn-outline-danger">
-          <i class="bi bi-arrow-left me-1"></i>Retour à la sélection des faces
-        </a>
-      </div>
-      {% endif %}
+  {% if erreurs %}
+  <div class="alert alert-danger shadow-sm mb-4" style="border-radius: 8px; border: 1px solid #fecaca; background: #fff5f5;">
+    <div class="d-flex align-items-center gap-2 mb-2">
+      <i class="bi bi-exclamation-octagon-fill text-danger fs-5"></i>
+      <h6 class="fw-bold mb-0 text-danger">Conflits de disponibilité détectés</h6>
+    </div>
+    <p class="small text-muted mb-2">Certaines faces ne sont plus libres sur cette période :</p>
+    <ul class="mb-3 small text-danger ps-3">
+      {% for err in erreurs %}<li>{{ err }}</li>{% endfor %}
+    </ul>
+    <a href="{% url 'reservation_wizard_etape2' %}" class="btn btn-sm btn-danger shadow-sm" style="border-radius: 8px;">
+      <i class="bi bi-arrow-left me-1"></i>Ajuster la sélection des faces
+    </a>
+  </div>
+  {% endif %}
+
+  <div class="row g-4 mb-4">
+    <!-- Colonne Client & Période -->
+    <div class="col-lg-6">
 
       <!-- Récap Client -->
-      <div class="card shadow-sm border-0 mb-4" style="border-radius:12px;">
-        <div class="card-header bg-transparent border-bottom py-3 d-flex justify-content-between align-items-center">
-          <h6 class="mb-0 fw-bold"><i class="bi bi-person-circle me-2 text-primary"></i>Client</h6>
-          <a href="{% url 'reservation_wizard_etape1' %}" class="btn btn-sm btn-outline-secondary">
-            <i class="bi bi-pencil me-1"></i>
-            <span class="d-none d-md-inline ms-1">Modifier</span>
+      <div class="card border-0 shadow-sm mb-4" style="border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden;">
+        <div class="card-header bg-white py-3 px-4 d-flex justify-content-between align-items-center border-bottom" style="border-color: #e2e8f0;">
+          <h6 class="mb-0 fw-bold d-flex align-items-center gap-2" style="color: #1e293b;">
+            <i class="bi bi-person-circle text-primary"></i>Client associé
+          </h6>
+          <a href="{% url 'reservation_wizard_etape1' %}" class="btn btn-sm btn-outline-secondary" style="border-radius: 8px;">
+            <i class="bi bi-pencil me-1"></i>Modifier
           </a>
         </div>
-        <div class="card-body p-3 d-flex align-items-center gap-3">
-          <div class="bg-light rounded-3 p-2 border d-flex align-items-center justify-content-center" style="width:56px;height:56px;flex-shrink:0;">
+        <div class="card-body p-4 d-flex align-items-center gap-3">
+          <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold shadow-sm flex-shrink-0" style="width: 52px; height: 52px; background: linear-gradient(135deg, var(--color-primary) 0%, #b91c1c 100%); font-size: 1.2rem;">
             {% if client.logo %}
-              <img src="{{ client.logo.url }}" class="w-100 h-100 object-fit-contain rounded" alt="Logo">
+              <img src="{{ client.logo.url }}" class="w-100 h-100 object-fit-contain rounded-circle" alt="Logo">
             {% else %}
-              <i class="bi bi-building fs-3 text-muted"></i>
+              {{ client.nom|slice:":2"|upper }}
             {% endif %}
           </div>
           <div class="flex-grow-1 min-width-0">
-            <h5 class="fw-bold mb-1 text-truncate">{{ client.nom }}</h5>
-            <div class="small text-muted">
-              {% if client.telephone %}<i class="bi bi-telephone me-1"></i>{{ client.telephone }}{% endif %}
-              {% if client.email %} · <i class="bi bi-envelope me-1"></i>{{ client.email }}{% endif %}
+            <h5 class="fw-bold mb-1 text-dark text-truncate">{{ client.nom }}</h5>
+            <div class="small text-muted d-flex align-items-center gap-3 flex-wrap">
+              {% if client.telephone %}<span><i class="bi bi-telephone text-secondary me-1"></i>{{ client.telephone }}</span>{% endif %}
+              {% if client.email %}<span><i class="bi bi-envelope text-secondary me-1"></i>{{ client.email }}</span>{% endif %}
             </div>
           </div>
         </div>
       </div>
 
       <!-- Récap Période -->
-      <div class="card shadow-sm border-0 mb-4" style="border-radius:12px;">
-        <div class="card-header bg-transparent border-bottom py-3 d-flex justify-content-between align-items-center">
-          <h6 class="mb-0 fw-bold"><i class="bi bi-calendar-week me-2 text-primary"></i>Période & nom</h6>
-          <a href="{% url 'reservation_wizard_etape2' %}" class="btn btn-sm btn-outline-secondary">
-            <i class="bi bi-pencil me-1"></i>
-            <span class="d-none d-md-inline ms-1">Modifier</span>
+      <div class="card border-0 shadow-sm" style="border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden;">
+        <div class="card-header bg-white py-3 px-4 d-flex justify-content-between align-items-center border-bottom" style="border-color: #e2e8f0;">
+          <h6 class="mb-0 fw-bold d-flex align-items-center gap-2" style="color: #1e293b;">
+            <i class="bi bi-calendar-range text-primary"></i>Période & Intitulé
+          </h6>
+          <a href="{% url 'reservation_wizard_etape2' %}" class="btn btn-sm btn-outline-secondary" style="border-radius: 8px;">
+            <i class="bi bi-pencil me-1"></i>Modifier
           </a>
         </div>
-        <div class="card-body p-3">
+        <div class="card-body p-4">
+          <div class="mb-3 p-3 rounded-3" style="background: #f8fafc; border: 1px solid #e2e8f0;">
+            <div class="text-uppercase text-muted fw-bold mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Nom de la réservation</div>
+            <div class="fw-bold text-dark" style="font-size: 1rem;">{{ nom_reservation }}</div>
+          </div>
+
           <div class="row g-3">
-            <div class="col-md-4">
-              <div class="small text-muted text-uppercase fw-bold">Nom</div>
-              <div class="fw-semibold">{{ nom_reservation }}</div>
+            <div class="col-6">
+              <div class="p-3 rounded-3" style="background: #f8fafc; border: 1px solid #e2e8f0;">
+                <div class="text-uppercase text-muted fw-bold mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Date début</div>
+                <div class="fw-bold font-monospace text-success">{{ date_debut|date:"d/m/Y" }}</div>
+                <small class="text-muted">{{ date_debut|date:"H:i" }}</small>
+              </div>
             </div>
-            <div class="col-md-4">
-              <div class="small text-muted text-uppercase fw-bold">Début</div>
-              <div class="fw-semibold">{{ date_debut|date:"d/m/Y H:i" }}</div>
-            </div>
-            <div class="col-md-4">
-              <div class="small text-muted text-uppercase fw-bold">Fin</div>
-              <div class="fw-semibold">{{ date_fin|date:"d/m/Y H:i" }}</div>
+            <div class="col-6">
+              <div class="p-3 rounded-3" style="background: #f8fafc; border: 1px solid #e2e8f0;">
+                <div class="text-uppercase text-muted fw-bold mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Date fin</div>
+                <div class="fw-bold font-monospace text-danger">{{ date_fin|date:"d/m/Y" }}</div>
+                <small class="text-muted">{{ date_fin|date:"H:i" }}</small>
+              </div>
             </div>
           </div>
-          <div class="mt-2 small text-muted">Durée : {{ duree_jours }} jour{{ duree_jours|pluralize }}</div>
-        </div>
-      </div>
 
-      <!-- Récap Faces -->
-      <div class="card shadow-sm border-0 mb-4" style="border-radius:12px;">
-        <div class="card-header bg-transparent border-bottom py-3 d-flex justify-content-between align-items-center">
-          <h6 class="mb-0 fw-bold"><i class="bi bi-grid-3x3-gap-fill me-2 text-primary"></i>Faces sélectionnées ({{ faces|length }})</h6>
-          <a href="{% url 'reservation_wizard_etape2' %}" class="btn btn-sm btn-outline-secondary">
-            <i class="bi bi-pencil me-1"></i>
-            <span class="d-none d-md-inline ms-1">Modifier</span>
-          </a>
-        </div>
-        <ul class="list-group list-group-flush">
-          {% for face in faces %}
-          <li class="list-group-item d-flex justify-content-between align-items-center py-2">
-            <span><i class="bi bi-geo-alt me-2 text-muted"></i>{{ face.support.code }} — Face {{ face.label }}</span>
-            <span class="small text-muted">{{ face.support.quartier|default:"—" }}</span>
-          </li>
-          {% empty %}
-          <li class="list-group-item text-muted small">Aucune face sélectionnée.</li>
-          {% endfor %}
-        </ul>
-      </div>
-
-      <!-- Validation -->
-      <form method="post">
-        {% csrf_token %}
-        <div class="card shadow-sm border-0" style="border-radius:12px;">
-          <div class="card-footer bg-light p-3 d-flex justify-content-between align-items-center">
-            <a href="{% url 'reservation_wizard_etape2' %}" class="btn btn-light border">
-              <i class="bi bi-arrow-left me-1"></i>Retour
-            </a>
-            <button type="submit" class="btn btn-primary px-4 shadow-sm" {% if erreurs %}disabled{% endif %}>
-              <i class="bi bi-check-lg me-1"></i>Confirmer et créer la réservation
-            </button>
+          <div class="mt-3 text-muted small d-flex align-items-center gap-2">
+            <i class="bi bi-hourglass-split text-primary"></i>
+            <span>Durée totale : <strong class="text-dark">{{ duree_jours }} jour{{ duree_jours|pluralize }}</strong></span>
           </div>
         </div>
-      </form>
+      </div>
 
     </div>
+
+    <!-- Colonne Faces sélectionnées -->
+    <div class="col-lg-6">
+      <div class="card border-0 shadow-sm h-100 d-flex flex-column" style="border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden;">
+        <div class="card-header bg-white py-3 px-4 d-flex justify-content-between align-items-center border-bottom" style="border-color: #e2e8f0;">
+          <h6 class="mb-0 fw-bold d-flex align-items-center gap-2" style="color: #1e293b;">
+            <i class="bi bi-grid-3x3-gap-fill text-primary"></i>Faces sélectionnées ({{ faces|length }})
+          </h6>
+          <a href="{% url 'reservation_wizard_etape2' %}" class="btn btn-sm btn-outline-secondary" style="border-radius: 8px;">
+            <i class="bi bi-pencil me-1"></i>Modifier
+          </a>
+        </div>
+        <div class="card-body p-0 flex-grow-1" style="max-height: 380px; overflow-y: auto;">
+          <ul class="list-group list-group-flush">
+            {% for face in faces %}
+            <li class="list-group-item d-flex justify-content-between align-items-center py-3 px-4" style="border-bottom: 1px solid #f1f5f9;">
+              <div class="d-flex align-items-center gap-3">
+                <div class="rounded-2 bg-light border text-primary fw-bold d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 0.8rem;">
+                  🪧
+                </div>
+                <div>
+                  <div class="fw-bold font-monospace" style="color: #0f172a; font-size: 0.9rem;">
+                    {{ face.support.code }} — Face {{ face.label }}
+                  </div>
+                  <div class="small text-muted">
+                    <i class="bi bi-geo-alt me-1"></i>{{ face.support.quartier|default:face.support.ville|default:"—" }}
+                  </div>
+                </div>
+              </div>
+              <span class="badge bg-light text-dark border px-2 py-1" style="font-size: 0.75rem;">
+                {{ face.support.get_format_display|default:face.support.format|default:"Standard" }}
+              </span>
+            </li>
+            {% empty %}
+            <li class="list-group-item text-center text-muted py-5">
+              <i class="bi bi-inbox fs-3 d-block mb-2 opacity-50"></i>
+              Aucune face sélectionnée.
+            </li>
+            {% endfor %}
+          </ul>
+        </div>
+      </div>
+    </div>
   </div>
+
+  <!-- Validation & Création finale -->
+  <form method="post">
+    {% csrf_token %}
+    <div class="card border-0 shadow-sm" style="border-radius: 8px; border: 1px solid #e2e8f0; background: #ffffff;">
+      <div class="card-body p-4 d-flex justify-content-between align-items-center flex-wrap gap-3">
+        <a href="{% url 'reservation_wizard_etape2' %}" class="btn btn-outline-secondary px-4 py-2 d-flex align-items-center gap-2 fw-semibold" style="border-radius: 10px;">
+          <i class="bi bi-arrow-left"></i>
+          <span>Retour à l'étape 2</span>
+        </a>
+        <button type="submit" class="btn btn-primary px-4 py-2 d-flex align-items-center gap-2 shadow fw-bold" style="border-radius: 10px; background-color: var(--color-primary); border-color: var(--color-primary);" {% if erreurs %}disabled{% endif %}>
+          <i class="bi bi-check-circle-fill fs-5"></i>
+          <span>Confirmer et créer la réservation</span>
+        </button>
+      </div>
+    </div>
+  </form>
+
 </div>
 {% endblock %}

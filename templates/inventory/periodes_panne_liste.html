@@ -6,100 +6,269 @@
   <i class="bi bi-exclamation-triangle-fill me-2" style="color:#ef4444"></i>{{ title }}
 {% endblock %}
 
+{% block topbar_actions %}
+  <div class="d-flex gap-2">
+    <a href="{% url 'maintenance_list' %}"
+       style="background:var(--bg-card);color:var(--text-muted);border:1px solid var(--border);border-radius:20px;padding:6px 16px;font-weight:600;font-size:0.8rem;text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
+      <i class="bi bi-tools"></i>
+      <span>Maintenances</span>
+    </a>
+    <a href="{% url 'maintenance_create' %}"
+       style="background:var(--color-primary);color:#fff;border-radius:20px;padding:6px 16px;font-weight:600;font-size:0.8rem;text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
+      <i class="bi bi-plus-lg"></i>
+      <span>Nouvelle intervention</span>
+    </a>
+  </div>
+{% endblock %}
+
 {% block content %}
 <style>
-  .kpi-stat-card {
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--bg-card);
-    padding: 18px 20px;
-    box-shadow: 0 4px 18px rgba(0,0,0,0.02);
-    text-align: center;
-    transition: all 0.2s ease;
+  /* ── Hero Banner ── */
+  .pp-hero {
+    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
+    border-radius: 16px;
+    padding: 24px 28px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    flex-wrap: wrap;
   }
-  .kpi-stat-card:hover {
+  .pp-hero-icon {
+    width: 54px; height: 54px;
+    background: rgba(239,68,68,0.15);
+    border-radius: 14px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.5rem; color: #ef4444; flex-shrink: 0;
+  }
+  .pp-hero-title { font-size: 1.2rem; font-weight: 800; color: #fff; margin: 0; }
+  .pp-hero-sub   { font-size: 0.78rem; color: #94a3b8; margin-top: 3px; }
+
+  /* ── KPI Grid ── */
+  .pp-kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  @media (max-width: 991px) { .pp-kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+  @media (max-width: 575px) { .pp-kpi-grid { grid-template-columns: 1fr; } }
+
+  .pp-kpi-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    box-shadow: 0 4px 16px rgba(0,0,0,0.02);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .pp-kpi-card:hover {
     transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.05);
+    box-shadow: 0 8px 24px rgba(0,0,0,0.06);
   }
-  .filter-card {
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--bg-card);
-    box-shadow: 0 4px 20px rgba(0,0,0,0.02);
+  .pp-kpi-icon {
+    width: 44px; height: 44px;
+    border-radius: 12px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.25rem; flex-shrink: 0;
   }
-  .table-custom-card {
-    border: 1px solid var(--border);
-    border-radius: 8px;
+  .pp-kpi-val { font-size: 1.55rem; font-weight: 800; line-height: 1; color: var(--text); }
+  .pp-kpi-lbl {
+    font-size: 0.68rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.6px;
+    color: var(--text-muted); margin-top: 4px;
+  }
+
+  /* ── Filter Card ── */
+  .pp-filter {
     background: var(--bg-card);
-    box-shadow: 0 4px 20px rgba(0,0,0,0.02);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    margin-bottom: 24px;
     overflow: hidden;
   }
-  .table th {
-    background-color: #f8fafc;
+  .pp-filter-hd {
+    padding: 12px 20px;
+    background: #f8fafc;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.75rem; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 0.6px;
     color: var(--text-muted);
-    font-size: 0.72rem;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.6px;
-    padding: 14px 16px;
-    border-bottom: 2px solid var(--border);
+    display: flex; align-items: center; gap: 8px;
   }
-  .table td {
-    padding: 14px 16px;
+  .pp-filter-bd { padding: 18px 20px; }
+  .pp-filter select, .pp-filter input {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 0.83rem;
+    padding: 7px 11px;
+    width: 100%;
+    background: var(--bg-card);
+    color: var(--text);
+  }
+  .pp-filter select:focus, .pp-filter input:focus {
+    outline: none;
+    border-color: #ef4444;
+    box-shadow: 0 0 0 3px rgba(239,68,68,0.15);
+  }
+  .pp-filter label {
+    font-size: 0.7rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    color: var(--text-muted); margin-bottom: 5px; display: block;
+  }
+
+  /* ── Table Card ── */
+  .pp-table-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .pp-table-hd {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    font-size: 0.78rem; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 0.5px;
+    color: var(--text-muted);
+    background: #f8fafc;
+    flex-wrap: wrap;
+  }
+  .pp-table thead th {
+    background: #1e293b;
+    color: #ffffff;
+    font-size: 0.68rem; font-weight: 700;
+    text-transform: uppercase; letter-spacing: 0.6px;
+    padding: 11px 14px;
+    border: none; white-space: nowrap;
+    border-right: 0.5px solid rgba(255,255,255,0.08);
+  }
+  .pp-table thead th:last-child { border-right: none; }
+  .pp-table tbody td {
+    padding: 13px 14px;
     border-bottom: 1px solid var(--border);
     vertical-align: middle;
+    font-size: 0.84rem;
+  }
+  .pp-table tbody tr:last-child td { border-bottom: none; }
+  .pp-table tbody tr:hover td { background: rgba(239,68,68,0.02); }
+
+  /* ── Badges ── */
+  .pp-badge {
+    display: inline-flex; align-items: center; gap: 4px;
+    font-size: 0.72rem; font-weight: 700;
+    border-radius: 20px; padding: 3px 10px;
+  }
+  .pp-badge-resolue { background: #dcfce7; color: #166534; }
+  .pp-badge-encours { background: #fee2e2; color: #991b1b; }
+
+  .pp-face-badge {
+    background: rgba(99,102,241,0.1);
+    color: #4f46e5;
+    border: 1px solid rgba(99,102,241,0.2);
+    font-family: monospace; font-size: 0.75rem; font-weight: 700;
+    border-radius: 6px; padding: 2px 8px;
+  }
+
+  .pp-support-code {
+    font-family: monospace; font-weight: 700; font-size: 0.85rem;
+    color: var(--color-primary); text-decoration: none;
+  }
+  .pp-support-code:hover { text-decoration: underline; }
+
+  /* ── Empty ── */
+  .pp-empty { padding: 60px 20px; text-align: center; }
+  .pp-empty-icon {
+    width: 64px; height: 64px;
+    background: #dcfce7; color: #166534;
+    border-radius: 50%;
+    display: inline-flex; align-items: center; justify-content: center;
+    font-size: 1.8rem; margin-bottom: 14px;
   }
 </style>
 
-{# ── En-tête ── #}
-<div class="d-flex align-items-center gap-3 mb-4">
-  <a href="{% url 'maintenance_list' %}" class="btn btn-outline-secondary btn-sm rounded-circle d-flex align-items-center justify-content-center" style="width:36px;height:36px">
-    <i class="bi bi-arrow-left"></i>
-  </a>
-  <div>
-    <h1 style="font-size:1.4rem;font-weight:800;margin:0">{{ title }}</h1>
-    <p style="color:var(--text-muted);font-size:.82rem;margin:2px 0 0">
-      Historique global des indisponibilités reconstitué à partir des rapports de maintenance
-    </p>
+<!-- ══ HERO ══ -->
+<div class="pp-hero">
+  <div class="d-flex align-items-center gap-3">
+    <div class="pp-hero-icon"><i class="bi bi-exclamation-octagon-fill"></i></div>
+    <div>
+      <div class="pp-hero-title">{{ title }}</div>
+      <div class="pp-hero-sub">Historique et analyse des indisponibilités reconstitué à partir des rapports de maintenance</div>
+    </div>
+  </div>
+  <div class="d-flex gap-2">
+    <a href="{% url 'maintenance_list' %}"
+       style="background:rgba(255,255,255,0.1);color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:10px;padding:8px 16px;font-size:0.8rem;font-weight:600;text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
+      <i class="bi bi-arrow-left"></i> Retour aux maintenances
+    </a>
   </div>
 </div>
 
-{# ── KPIs ── #}
-<div class="row g-3 mb-4">
-  <div class="col-6 col-md-3">
-    <div class="kpi-stat-card">
-      <div style="font-size:1.8rem;font-weight:800;color:var(--text)">{{ nb_total }}</div>
-      <div style="font-size:.72rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px">Pannes Totales</div>
+<!-- ══ KPIS ══ -->
+<div class="pp-kpi-grid">
+
+  <!-- Total pannes -->
+  <div class="pp-kpi-card" style="border-top:3px solid #64748b;">
+    <div class="pp-kpi-icon" style="background:#f1f5f9;color:#475569;">
+      <i class="bi bi-list-check"></i>
+    </div>
+    <div>
+      <div class="pp-kpi-val">{{ nb_total }}</div>
+      <div class="pp-kpi-lbl">Pannes Totales</div>
     </div>
   </div>
-  <div class="col-6 col-md-3">
-    <div class="kpi-stat-card" style="border-bottom:3px solid #10b981">
-      <div style="font-size:1.8rem;font-weight:800;color:#059669">{{ nb_resolues }}</div>
-      <div style="font-size:.72rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px">Résolues</div>
+
+  <!-- Résolues -->
+  <div class="pp-kpi-card" style="border-top:3px solid #10b981;">
+    <div class="pp-kpi-icon" style="background:#dcfce7;color:#166534;">
+      <i class="bi bi-check-circle-fill"></i>
+    </div>
+    <div>
+      <div class="pp-kpi-val" style="color:#059669;">{{ nb_resolues }}</div>
+      <div class="pp-kpi-lbl">Résolues</div>
     </div>
   </div>
-  <div class="col-6 col-md-3">
-    <div class="kpi-stat-card" style="border-bottom:3px solid #ef4444">
-      <div style="font-size:1.8rem;font-weight:800;color:#dc2626">{{ nb_en_cours }}</div>
-      <div style="font-size:.72rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px">En Cours</div>
+
+  <!-- En cours -->
+  <div class="pp-kpi-card" style="border-top:3px solid #ef4444;">
+    <div class="pp-kpi-icon" style="background:#fee2e2;color:#dc2626;">
+      <i class="bi bi-exclamation-triangle-fill"></i>
+    </div>
+    <div>
+      <div class="pp-kpi-val" style="color:#dc2626;">{{ nb_en_cours }}</div>
+      <div class="pp-kpi-lbl">En Cours</div>
     </div>
   </div>
-  <div class="col-6 col-md-3">
-    <div class="kpi-stat-card" style="border-bottom:3px solid #f59e0b">
-      <div style="font-size:1.8rem;font-weight:800;color:#d97706">{{ duree_moyenne.days }}j</div>
-      <div style="font-size:.72rem;color:var(--text-muted);font-weight:700;text-transform:uppercase;letter-spacing:.5px">Durée Moyenne</div>
+
+  <!-- Durée moyenne -->
+  <div class="pp-kpi-card" style="border-top:3px solid #f59e0b;">
+    <div class="pp-kpi-icon" style="background:#fef3c7;color:#d97706;">
+      <i class="bi bi-hourglass-split"></i>
+    </div>
+    <div>
+      <div class="pp-kpi-val" style="color:#d97706;">{{ duree_moyenne.days }}j</div>
+      <div class="pp-kpi-lbl">Durée Moyenne</div>
     </div>
   </div>
+
 </div>
 
-{# ── Filtres ── #}
-<div class="card filter-card mb-4">
-  <div class="card-body p-3 p-lg-4">
+<!-- ══ FILTRES ══ -->
+<div class="pp-filter">
+  <div class="pp-filter-hd">
+    <i class="bi bi-funnel-fill" style="color:#ef4444;"></i>
+    Filtrer les périodes de panne
+  </div>
+  <div class="pp-filter-bd">
     <form method="get" class="row g-3 align-items-end">
 
       <div class="col-md-3 col-sm-6">
-        <label class="form-label mb-1" style="font-size:.72rem;font-weight:700;text-transform:uppercase;color:var(--text-muted)">Support</label>
-        <select name="support" class="form-select form-select-sm rounded-3">
+        <label>Support</label>
+        <select name="support">
           <option value="">— Tous les supports —</option>
           {% for s in supports_liste %}
             <option value="{{ s.pk }}" {% if filters.support == s.pk|stringformat:"s" %}selected{% endif %}>
@@ -110,8 +279,8 @@
       </div>
 
       <div class="col-md-2 col-sm-6">
-        <label class="form-label mb-1" style="font-size:.72rem;font-weight:700;text-transform:uppercase;color:var(--text-muted)">Face</label>
-        <select name="face" class="form-select form-select-sm rounded-3">
+        <label>Face</label>
+        <select name="face">
           <option value="">— Toutes —</option>
           <option value="A" {% if filters.face == 'A' %}selected{% endif %}>Face A</option>
           <option value="B" {% if filters.face == 'B' %}selected{% endif %}>Face B</option>
@@ -119,8 +288,8 @@
       </div>
 
       <div class="col-md-2 col-sm-6">
-        <label class="form-label mb-1" style="font-size:.72rem;font-weight:700;text-transform:uppercase;color:var(--text-muted)">Statut</label>
-        <select name="statut" class="form-select form-select-sm rounded-3">
+        <label>Statut</label>
+        <select name="statut">
           <option value="">— Tous —</option>
           <option value="resolue"  {% if filters.statut == 'resolue'  %}selected{% endif %}>Résolues</option>
           <option value="en_cours" {% if filters.statut == 'en_cours' %}selected{% endif %}>En cours</option>
@@ -128,25 +297,25 @@
       </div>
 
       <div class="col-md-2 col-sm-6">
-        <label class="form-label mb-1" style="font-size:.72rem;font-weight:700;text-transform:uppercase;color:var(--text-muted)">Depuis</label>
-        <input type="date" name="date_debut" class="form-control form-control-sm rounded-3"
-               value="{{ filters.date_debut }}">
+        <label>Depuis le</label>
+        <input type="date" name="date_debut" value="{{ filters.date_debut }}">
       </div>
 
       <div class="col-md-2 col-sm-6">
-        <label class="form-label mb-1" style="font-size:.72rem;font-weight:700;text-transform:uppercase;color:var(--text-muted)">Jusqu'au</label>
-        <input type="date" name="date_fin" class="form-control form-control-sm rounded-3"
-               value="{{ filters.date_fin }}">
+        <label>Jusqu'au</label>
+        <input type="date" name="date_fin" value="{{ filters.date_fin }}">
       </div>
 
       <div class="col-md-1 col-sm-6 d-flex gap-1">
-        <button type="submit" class="btn btn-primary btn-sm flex-fill rounded-3 shadow-sm" title="Appliquer les filtres">
+        <button type="submit"
+                style="flex:1;background:var(--color-primary);color:#fff;border:none;border-radius:8px;padding:8px 12px;font-weight:700;font-size:0.8rem;cursor:pointer;display:flex;align-items:center;justify-content:center;"
+                title="Appliquer les filtres">
           <i class="bi bi-funnel-fill"></i>
         </button>
         {% if filters.support or filters.face or filters.statut or filters.date_debut or filters.date_fin %}
-        <a href="{% url 'periodes_panne_liste' %}" class="btn btn-outline-secondary btn-sm rounded-3" title="Effacer">
-          <i class="bi bi-arrow-counterclockwise"></i>
-        </a>
+        <a href="{% url 'periodes_panne_liste' %}"
+           style="width:38px;height:38px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;display:inline-flex;align-items:center;justify-content:center;color:var(--text-muted);text-decoration:none;"
+           title="Réinitialiser"><i class="bi bi-arrow-counterclockwise"></i></a>
         {% endif %}
       </div>
 
@@ -154,32 +323,32 @@
   </div>
 </div>
 
-{# ── Tableau ── #}
-<div class="table-custom-card">
-  <div class="card-header bg-light py-3 px-4 d-flex justify-content-between align-items-center">
-    <span class="fw-bold font-monospace" style="font-size:0.85rem">
-      <i class="bi bi-clock-history me-2 text-danger"></i>
+<!-- ══ TABLEAU ══ -->
+<div class="pp-table-card">
+  <div class="pp-table-hd">
+    <span>
+      <i class="bi bi-clock-history me-2" style="color:#ef4444;"></i>
       {{ nb_total }} période{{ nb_total|pluralize }} identifiée{{ nb_total|pluralize }}
     </span>
-    <span class="badge bg-light text-secondary border font-monospace">
-      Cumul d'indisponibilité : <strong>{{ duree_totale.days }} jours</strong>
+    <span style="background:#fff;border:1px solid var(--border);border-radius:20px;padding:4px 14px;font-family:monospace;font-size:0.75rem;color:var(--text);">
+      Cumul d'indisponibilité : <strong style="color:#dc2626;">{{ duree_totale.days }} jour{{ duree_totale.days|pluralize }}</strong>
     </span>
   </div>
 
   <div class="card-body p-0">
     {% if periodes %}
     <div class="table-responsive">
-      <table class="table table-hover mb-0 align-middle" style="font-size:.84rem">
+      <table class="table pp-table mb-0 align-middle">
         <thead>
           <tr>
-            <th class="ps-4">Support</th>
+            <th style="padding-left:20px;">Support</th>
             <th>Face</th>
             <th>Début de panne</th>
             <th>Fin / Résolution</th>
             <th>Durée</th>
             <th>Constat initial</th>
             <th>Rapport de résolution</th>
-            <th class="text-end pe-4">Statut</th>
+            <th style="text-align:right;padding-right:20px;">Statut</th>
           </tr>
         </thead>
         <tbody>
@@ -187,73 +356,86 @@
           <tr>
 
             {# Support #}
-            <td class="ps-4">
-              <a href="{% url 'support_detail' p.support.uuid %}" class="font-monospace fw-bold text-primary text-decoration-none">
+            <td style="padding-left:20px;">
+              <a href="{% url 'support_detail' p.support.uuid %}" class="pp-support-code">
                 {{ p.support.code }}
               </a>
-              <div class="text-muted small">{{ p.support.nom }}</div>
+              <div style="font-size:0.75rem;color:var(--text-muted);margin-top:2px;">{{ p.support.nom }}</div>
             </td>
 
             {# Face #}
             <td>
               {% if p.face %}
-                <span class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace px-2.5 py-1">Face {{ p.face.label }}</span>
+                <span class="pp-face-badge">Face {{ p.face.label }}</span>
               {% else %}
-                <span class="text-muted small">—</span>
+                <span style="color:var(--text-muted);font-size:0.8rem;">—</span>
               {% endif %}
             </td>
 
             {# Début panne #}
-            <td class="font-monospace">
-              <span class="text-danger fw-bold">
+            <td>
+              <div style="font-weight:700;color:#dc2626;font-family:monospace;font-size:0.84rem;">
                 {{ p.debut|date:"d/m/Y" }}
-              </span>
-              <div class="text-muted small" style="font-size:.72rem">{{ p.debut|date:"H:i" }}</div>
+              </div>
+              <div style="font-size:0.72rem;color:var(--text-muted);font-family:monospace;">{{ p.debut|date:"H:i" }}</div>
             </td>
 
             {# Fin panne #}
-            <td class="font-monospace">
+            <td>
               {% if p.fin %}
-                <span class="text-success fw-bold">{{ p.fin|date:"d/m/Y" }}</span>
-                <div class="text-muted small" style="font-size:.72rem">{{ p.fin|date:"H:i" }}</div>
+                <div style="font-weight:700;color:#059669;font-family:monospace;font-size:0.84rem;">
+                  {{ p.fin|date:"d/m/Y" }}
+                </div>
+                <div style="font-size:0.72rem;color:var(--text-muted);font-family:monospace;">{{ p.fin|date:"H:i" }}</div>
               {% else %}
-                <span class="badge bg-danger-subtle text-danger border border-danger-subtle font-monospace">En cours</span>
+                <span class="pp-badge pp-badge-encours"><i class="bi bi-broadcast"></i>En cours</span>
               {% endif %}
             </td>
 
             {# Durée #}
-            <td class="font-monospace fw-bold" style="color:{% if p.duree.days > 30 %}#dc2626{% elif p.duree.days > 7 %}#d97706{% else %}#475569{% endif %}">
-              {{ p.duree.days }}j
+            <td>
+              <span style="font-family:monospace;font-weight:800;color:{% if p.duree.days > 30 %}#dc2626{% elif p.duree.days > 7 %}#d97706{% else %}#475569{% endif %};font-size:0.88rem;">
+                {{ p.duree.days }}j
+              </span>
             </td>
 
             {# Description panne #}
-            <td style="max-width:180px">
+            <td>
               {% if p.maint_panne.description %}
-                <div class="text-secondary small text-truncate" title="{{ p.maint_panne.description }}">
+                <div style="max-width:200px;font-size:0.8rem;color:var(--text-muted);" class="text-truncate" title="{{ p.maint_panne.description }}">
                   {{ p.maint_panne.description }}
                 </div>
               {% else %}
-                <span class="text-muted">—</span>
+                <span style="color:var(--text-muted);">—</span>
               {% endif %}
             </td>
 
             {# Description résolution #}
-            <td style="max-width:180px">
+            <td>
               {% if p.maint_bon.description %}
-                <div class="text-secondary small text-truncate" title="{{ p.maint_bon.description }}">
+                <div style="max-width:200px;font-size:0.8rem;color:var(--text-muted);" class="text-truncate" title="{{ p.maint_bon.description }}">
                   {{ p.maint_bon.description }}
                 </div>
               {% else %}
-                <span class="text-muted">—</span>
+                <span style="color:var(--text-muted);">—</span>
               {% endif %}
             </td>
 
             {# Statut #}
-            <td class="text-end pe-4">
+            <td style="text-align:right;padding-right:20px;">
               {% if p.resolue %}
-                <span class="badge badge-status bs-disponible">Résolue</span>
+                <span class="pp-badge pp-badge-resolue"><i class="bi bi-check-circle-fill"></i>Résolue</span>
               {% else %}
-                <span class="badge badge-status bs-panne">En cours</span>
+                <div class="d-inline-flex align-items-center gap-2">
+                  <span class="pp-badge pp-badge-encours"><i class="bi bi-exclamation-triangle-fill"></i>En cours</span>
+                  {% if p.maint_panne %}
+                  <a href="{% url 'maintenance_detail' p.maint_panne.pk %}"
+                     style="padding:3px 8px;border-radius:6px;background:#10b981;color:#fff;font-size:0.7rem;font-weight:700;text-decoration:none;"
+                     title="Réparer">
+                    <i class="bi bi-wrench"></i>
+                  </a>
+                  {% endif %}
+                </div>
               {% endif %}
             </td>
 
@@ -264,14 +446,13 @@
     </div>
 
     {% else %}
-    <div class="text-center py-5 text-muted">
-      <i class="bi bi-check-circle-fill fs-1 text-success opacity-40 d-block mb-2"></i>
-      <p class="mb-0 fw-bold text-dark">Aucune période de panne correspondante</p>
-      <p class="small text-muted mb-0">Tous les supports sont opérationnels selon les critères sélectionnés.</p>
+    <div class="pp-empty">
+      <div class="pp-empty-icon"><i class="bi bi-shield-check"></i></div>
+      <div style="font-weight:800;font-size:1.05rem;color:var(--text);margin-bottom:6px;">Aucune période d'indisponibilité</div>
+      <div style="font-size:0.84rem;color:var(--text-muted);">Tous les supports correspondants aux filtres sélectionnés sont 100% opérationnels.</div>
     </div>
     {% endif %}
 
   </div>
 </div>
-
 {% endblock %}

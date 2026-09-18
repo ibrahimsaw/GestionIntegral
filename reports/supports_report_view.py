@@ -218,6 +218,7 @@ def _build_context_panneaux(filters: dict) -> dict:
         panneaux.append({
             "support"     : support,
             "code"        : support.code,
+            "code_ext"    : support.code_ext or "—",
             "nom"         : support.nom,
             "type"        : "Écran" if support.type_support == Support.TYPE_ECRAN else "Sucette" if support.format == "1x2" else "Marché" if support.is_dans_marche else "Panneau",
             "ville"       : support.ville,
@@ -375,7 +376,7 @@ class ExportSupportsPdfView(ClientStaffRequiredMixin, View):
         context = _build_context_panneaux(filters)
 
         html_string = render_to_string(
-            "reports/supports_report_pdf.html",
+            "reports/supports_report_pdf_export.html",
             context,
             request=request,
         )

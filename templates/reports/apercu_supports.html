@@ -2,109 +2,264 @@
 {% block title %}État des Supports — Integral{% endblock %}
 
 {% block topbar_title %}
-    <i class="bi bi-layout-three-columns me-2" style="color:var(--color-primary)"></i>Rapport du réseau
+  <div class="d-flex align-items-center gap-2">
+    <div style="width:32px;height:32px;border-radius:9px;background:rgba(147,46,43,0.1);color:#932e2b;display:flex;align-items:center;justify-content:center;">
+      <i class="bi bi-layout-three-columns"></i>
+    </div>
+    <span class="fw-bold">Rapport du réseau</span>
+  </div>
 {% endblock %}
 
-{% block topbar_actions %}
-<div class="btn-group" role="group">
-    <a href="{% url 'supports_export_pdf' %}?{{ request.GET.urlencode }}"
-       class="btn btn-primary btn-sm">
-        <i class="bi bi-file-earmark-pdf me-2"></i>
-        <span class="d-none d-md-inline ms-1">Pdf</span>
-    </a>
-    <a href="{% url 'supports_export_excel' %}?{{ request.GET.urlencode }}"
-       class="btn btn-success btn-sm">
-        <i class="bi bi-file-earmark-spreadsheet me-2"></i>
-        <span class="d-none d-md-inline ms-1">Excel</span>
-    </a>
-</div>
+{% block extra_head %}
+<style>
+  /* ── Panneau de filtres premium ── */
+  .rpt-filter {
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+    margin-bottom: 22px;
+  }
+  .rpt-filter-head {
+    background: linear-gradient(135deg, #932e2b 0%, #1e40af 100%);
+    padding: 14px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .rpt-filter-head-left {
+    display: flex; align-items: center; gap: 10px;
+  }
+  .rpt-filter-icon {
+    width: 34px; height: 34px;
+    border-radius: 8px;
+    background: rgba(147,46,43,0.25);
+    border: 1px solid rgba(147,46,43,0.4);
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-size: 1rem;
+  }
+  .rpt-filter-title {
+    font-size: 0.9rem; font-weight: 800; color: #fff;
+  }
+  .rpt-filter-hint {
+    font-size: 0.72rem; color: rgba(255,255,255,0.45);
+    font-family: var(--font-mono, monospace);
+  }
+  .rpt-filter-body {
+    padding: 20px 22px;
+  }
+  .rpt-filter-label {
+    display: block;
+    margin-bottom: 5px;
+    font-size: 0.68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.07em;
+    color: #94a3b8;
+  }
+  .rpt-select {
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 7px 10px;
+    font-size: 0.83rem;
+    width: 100%;
+    background: #f8fafc;
+    color: #0f172a;
+    transition: border-color 0.18s, box-shadow 0.18s;
+    -webkit-appearance: none;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2394a3b8' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 10px center;
+    padding-right: 30px;
+  }
+  .rpt-select:focus {
+    outline: none;
+    border-color: #932e2b;
+    box-shadow: 0 0 0 3px rgba(147,46,43,0.1);
+    background-color: #fff;
+  }
+  /* Chips catégories */
+  .rpt-chip-group { display: flex; flex-wrap: wrap; gap: 7px; }
+  .rpt-chip {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: #f8fafc;
+    color: #932e2b;
+    font-size: 0.76rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.18s ease;
+    user-select: none;
+  }
+  .rpt-chip input { position: absolute; opacity: 0; pointer-events: none; }
+  .rpt-chip:has(input:checked) {
+    border-color: #932e2b;
+    background: rgba(147,46,43,0.07);
+    color: #932e2b;
+    box-shadow: 0 2px 8px rgba(147,46,43,0.14);
+  }
+  .rpt-chip:hover { border-color: #932e2b; transform: translateY(-1px); }
+  /* Options d'affichage */
+  .rpt-display-row {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 14px;
+    margin-top: 16px; padding-top: 14px;
+    border-top: 1px solid #f1f5f9;
+  }
+  .rpt-display-label {
+    font-size: 0.68rem; font-weight: 800;
+    text-transform: uppercase; letter-spacing: 0.07em;
+    color: #94a3b8;
+  }
+  .rpt-check-label {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 0.81rem; color: #334155; font-weight: 600;
+    cursor: pointer;
+  }
+  .rpt-check-label input[type=checkbox] {
+    width: 15px; height: 15px;
+    border-radius: 4px;
+    accent-color: #932e2b;
+  }
+  /* Boutons filtrer */
+  .rpt-btn-apply {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 18px; border-radius: 8px;
+    background: #932e2b; color: #fff; border: none;
+    font-size: 0.82rem; font-weight: 700; cursor: pointer;
+    transition: background 0.18s; flex: 1;
+  }
+  .rpt-btn-apply:hover { background: #7a1e1b; }
+  .rpt-btn-reset {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 36px; height: 36px; border-radius: 8px;
+    border: 1px solid #e2e8f0; background: #f8fafc;
+    color: #64748b; text-decoration: none;
+    transition: all 0.18s; font-size: 0.9rem;
+  }
+  .rpt-btn-reset:hover { border-color: #932e2b; color: #932e2b; background: rgba(147,46,43,0.05); }
+
+  /* ── Responsive ── */
+  @media (max-width: 575.98px) {
+    .rpt-filter-body { padding: 14px; }
+    .rpt-filter-head { flex-direction: column; align-items: flex-start; }
+  }
+</style>
 {% endblock %}
 
 {% block content %}
-<style>
-    .report-filter-panel { border: 0; border-radius: 12px; box-shadow: 0 10px 28px rgba(31,46,40,.09); overflow: hidden; }
-    .report-filter-head { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 20px; color: #fff; background: var(--color-primary); }
-    .report-filter-title { display: flex; align-items: center; gap: 9px; font-weight: 800; }
-    .report-filter-hint { color: rgba(255,255,255,.72); font-size: .75rem; }
-    .report-filter-body { padding: 18px 20px; background: #fff; }
-    .report-filter-label { display: block; margin-bottom: 6px; color: #52605b; font-size: .72rem; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; }
-    .report-filter-select { border-color: #d9e1dd; border-radius: 7px; min-height: 36px; font-size: .82rem; }
-    .report-filter-select:focus { border-color: var(--color-primary); box-shadow: 0 0 0 3px rgba(147,46,43,.1); }
-    .report-category-list { display: flex; flex-wrap: wrap; gap: 7px; }
-    .report-category-chip { position: relative; display: inline-flex; align-items: center; gap: 6px; padding: 7px 10px; border: 1px solid #d9e1dd; border-radius: 20px; color: #52605b; background: #f8faf9; cursor: pointer; font-size: .77rem; font-weight: 700; transition: .18s ease; }
-    .report-category-chip input { position: absolute; opacity: 0; pointer-events: none; }
-    .report-category-chip:has(input:checked) { border-color: var(--color-primary); color: var(--color-primary); background: rgba(147,46,43,.08); box-shadow: 0 3px 8px rgba(147,46,43,.12); }
-    .report-category-chip:hover { border-color: var(--color-primary); transform: translateY(-1px); }
-    .report-display-options { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; margin-top: 16px; padding-top: 13px; border-top: 1px solid #edf1ef; }
-    .report-display-title { color: #52605b; font-size: .72rem; font-weight: 800; text-transform: uppercase; }
-    .report-display-option { color: #3f4b47; font-size: .8rem; }
-    .report-filter-actions { display: flex; gap: 8px; }
-    @media (max-width: 767px) { .report-filter-head { align-items: flex-start; flex-direction: column; gap: 4px; } .report-filter-body { padding: 15px; } .report-filter-actions { width: 100%; } }
-</style>
-<div class="card report-filter-panel mb-4">
-    <div class="report-filter-head">
-        <div class="report-filter-title"><i class="bi bi-sliders2"></i>Filtrer le rapport</div>
-        <div class="report-filter-hint">Combinez plusieurs critères</div>
+
+<!-- Panneau de filtres -->
+<div class="rpt-filter">
+  <div class="rpt-filter-head">
+    <div class="rpt-filter-head-left">
+      <div class="rpt-filter-icon"><i class="bi bi-sliders2"></i></div>
+      <div>
+        <div class="rpt-filter-title">Filtrer le rapport</div>
+        <div class="rpt-filter-hint">Combinez plusieurs critères pour affiner les résultats</div>
+      </div>
     </div>
-    <div class="report-filter-body">
-        <form method="get" class="row g-3 align-items-end">
-            <div class="col-md-3">
-                <label class="report-filter-label">Ville</label>
-                <select name="ville" class="form-select form-select-sm report-filter-select">
-                    <option value="">Toutes les villes</option>
-                    {% for v in villes %}<option value="{{ v }}" {% if filters.ville == v %}selected{% endif %}>{{ v }}</option>{% endfor %}
-                </select>
-            </div>
-            <div class="col-md-3">
-                <label class="report-filter-label">Quartier</label>
-                <select name="quartier" class="form-select form-select-sm report-filter-select">
-                    <option value="">Tous les quartiers</option>
-                    {% for q in quartiers %}<option value="{{ q }}" {% if filters.quartier == q %}selected{% endif %}>{{ q }}</option>{% endfor %}
-                </select>
-            </div>
-            <div class="col-md-6">
-                <label class="report-filter-label">Catégories</label>
-                <div class="report-category-list">
-                    {% for categorie in categories_rapport %}
-                    <label class="report-category-chip">
-                        <input class="form-check-input" type="checkbox" name="categorie" value="{{ categorie }}" {% if categorie in categories_selectionnees %}checked{% endif %}>
-                        {% if categorie == "Écran" %}<i class="bi bi-display"></i>{% elif categorie == "Marché" %}<i class="bi bi-shop-window"></i>{% elif categorie == "Sucette" %}<i class="bi bi-lamp"></i>{% else %}<i class="bi bi-signpost-split"></i>{% endif %}
-                        <span>{{ categorie }}</span>
-                    </label>
-                    {% endfor %}
-                </div>
-            </div>
-            <div class="col-md-3">
-                <label class="report-filter-label">État</label>
-                <select name="statut" class="form-select form-select-sm report-filter-select">
-                    <option value="">Tous les états</option>
-                    {% for s in statuts %}<option value="{{ s }}" {% if filters.statut == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
-                </select>
-            </div>
-            <div class="col-md-3">
-                <label class="report-filter-label">Occupation</label>
-                <select name="occupation" class="form-select form-select-sm report-filter-select">
-                    <option value="">Toutes</option>
-                    {% for key, label in occupation_choices.items %}<option value="{{ key }}" {% if filters.occupation == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
-                </select>
-            </div>
-            <div class="col-md-3 report-filter-actions">
-                <button type="submit" class="btn btn-primary btn-sm flex-fill"><i class="bi bi-funnel me-1"></i>Appliquer</button>
-                <a href="{% url 'supports_report' %}" class="btn btn-outline-secondary btn-sm" title="Réinitialiser"><i class="bi bi-arrow-counterclockwise"></i></a>
-            </div>
-            <div class="col-12 report-display-options">
-                <span class="report-display-title"><i class="bi bi-eye me-1"></i>Afficher</span>
-                <input type="hidden" name="afficher_etat" value="0">
-                <label class="form-check report-display-option mb-0"><input class="form-check-input" type="checkbox" name="afficher_etat" value="1" {% if afficher_etat %}checked{% endif %}> État</label>
-                <input type="hidden" name="afficher_client" value="0">
-                <label class="form-check report-display-option mb-0"><input class="form-check-input" type="checkbox" name="afficher_client" value="1" {% if afficher_client %}checked{% endif %}> Nom du client</label>
-            </div>
-        </form>
+    <div class="d-flex gap-2">
+      <a href="{% url 'supports_export_pdf' %}?{{ request.GET.urlencode }}"
+         style="display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:9px;background:rgba(239,68,68,0.2);border:1px solid rgba(239,68,68,0.35);color:#fca5a5;font-size:0.76rem;font-weight:700;text-decoration:none;">
+        <i class="bi bi-file-earmark-pdf"></i><span class="d-none d-sm-inline">PDF</span>
+      </a>
+      <a href="{% url 'supports_export_excel' %}?{{ request.GET.urlencode }}"
+         style="display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:9px;background:rgba(16,185,129,0.2);border:1px solid rgba(16,185,129,0.35);color:#6ee7b7;font-size:0.76rem;font-weight:700;text-decoration:none;">
+        <i class="bi bi-file-earmark-spreadsheet"></i><span class="d-none d-sm-inline">Excel</span>
+      </a>
     </div>
+  </div>
+
+  <div class="rpt-filter-body">
+    <form method="get" class="row g-3 align-items-end">
+
+      <div class="col-6 col-md-3">
+        <label class="rpt-filter-label"><i class="bi bi-geo-alt me-1"></i>Ville</label>
+        <select name="ville" class="rpt-select">
+          <option value="">Toutes les villes</option>
+          {% for v in villes %}<option value="{{ v }}" {% if filters.ville == v %}selected{% endif %}>{{ v }}</option>{% endfor %}
+        </select>
+      </div>
+
+      <div class="col-6 col-md-3">
+        <label class="rpt-filter-label"><i class="bi bi-map me-1"></i>Quartier</label>
+        <select name="quartier" class="rpt-select">
+          <option value="">Tous les quartiers</option>
+          {% for q in quartiers %}<option value="{{ q }}" {% if filters.quartier == q %}selected{% endif %}>{{ q }}</option>{% endfor %}
+        </select>
+      </div>
+
+      <div class="col-6 col-md-3">
+        <label class="rpt-filter-label"><i class="bi bi-activity me-1"></i>État</label>
+        <select name="statut" class="rpt-select">
+          <option value="">Tous les états</option>
+          {% for s in statuts %}<option value="{{ s }}" {% if filters.statut == s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+        </select>
+      </div>
+
+      <div class="col-6 col-md-3">
+        <label class="rpt-filter-label"><i class="bi bi-pie-chart me-1"></i>Occupation</label>
+        <select name="occupation" class="rpt-select">
+          <option value="">Toutes</option>
+          {% for key, label in occupation_choices.items %}<option value="{{ key }}" {% if filters.occupation == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
+        </select>
+      </div>
+
+      <div class="col-12">
+        <label class="rpt-filter-label"><i class="bi bi-tag me-1"></i>Catégories</label>
+        <div class="rpt-chip-group">
+          {% for categorie in categories_rapport %}
+          <label class="rpt-chip">
+            <input class="form-check-input" type="checkbox" name="categorie" value="{{ categorie }}" {% if categorie in categories_selectionnees %}checked{% endif %}>
+            {% if categorie == "Écran" %}<i class="bi bi-display"></i>
+            {% elif categorie == "Marché" %}<i class="bi bi-shop-window"></i>
+            {% elif categorie == "Sucette" %}<i class="bi bi-lamp"></i>
+            {% else %}<i class="bi bi-signpost-split"></i>{% endif %}
+            <span>{{ categorie }}</span>
+          </label>
+          {% endfor %}
+        </div>
+      </div>
+
+      <!-- Actions + options d'affichage -->
+      <div class="col-12">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+          <div class="rpt-display-row" style="margin-top:0; padding-top:0; border-top:none;">
+            <span class="rpt-display-label"><i class="bi bi-eye me-1"></i>Afficher</span>
+            <input type="hidden" name="afficher_etat" value="0">
+            <label class="rpt-check-label">
+              <input type="checkbox" name="afficher_etat" value="1" {% if afficher_etat %}checked{% endif %}> État
+            </label>
+            <input type="hidden" name="afficher_client" value="0">
+            <label class="rpt-check-label">
+              <input type="checkbox" name="afficher_client" value="1" {% if afficher_client %}checked{% endif %}> Nom du client
+            </label>
+          </div>
+          <div class="d-flex gap-2" style="min-width:160px;">
+            <button type="submit" class="rpt-btn-apply">
+              <i class="bi bi-funnel-fill"></i> Appliquer
+            </button>
+            <a href="{% url 'supports_report' %}" class="rpt-btn-reset" title="Réinitialiser les filtres">
+              <i class="bi bi-arrow-counterclockwise"></i>
+            </a>
+          </div>
+        </div>
+      </div>
+
+    </form>
+  </div>
 </div>
-{% comment %} {# ══════════════════════════════════════════
-   CONTENU — même rendu que le PDF
-════════════════════════════════════════════ #} {% endcomment %}
-{% include 'reports/supports_report_pdf.html' %}
+
+<!-- Contenu du rapport -->
+{% include 'reports/supports_report_pdf_export.html' %}
 
 {% endblock %}

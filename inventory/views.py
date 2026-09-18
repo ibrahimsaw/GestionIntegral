@@ -1384,6 +1384,48 @@ class MaintenanceUpdateView(LoginRequiredMixin, UpdateView):
         return context
 
 
+class MaintenanceQuickRepairView(LoginRequiredMixin, View):
+    """Enregistre automatiquement une réparation pour un support ou une face en panne."""
+
+    def post(self, request, pk):
+        maintenance = get_object_or_404(Maintenance.objects.select_related('support', 'face'), pk=pk)
+        support = maintenance.support
+        face = maintenance.face
+
+        description = request.POST.get('description', '').strip()
+        if not description:
+            face_info = f" (Face {face.label})" if face else ""
+            description = f"Réparation effectuée — Remise en service opérationnel suite à l'intervention #{maintenance.pk}{face_info}"
+
+        photo = request.FILES.get('photo')
+        date_str = request.POST.get('date_intervention')
+        if date_str:
+            try:
+                date_intervention = datetime.fromisoformat(date_str)
+                if timezone.is_naive(date_intervention):
+                    date_intervention = timezone.make_aware(date_intervention)
+            except Exception:
+                date_intervention = timezone.now()
+        else:
+            date_intervention = timezone.now()
+
+        nouvelle = Maintenance.objects.create(
+            support=support,
+            face=face,
+            effectue_par=request.user,
+            date_intervention=date_intervention,
+            etat_apres=Maintenance.ETAT_BON,
+            description=description,
+            photo=photo,
+        )
+
+        messages.success(
+            request,
+            f"Réparation enregistrée avec succès pour {support.code}{f' (Face {face.label})' if face else ''} ! Le statut est maintenant opérationnel."
+        )
+        return redirect('maintenance_detail', pk=nouvelle.pk)
+
+
 class SupportPeriodesVanneView(LoginRequiredMixin, View):
     template_name = 'inventory/support_periodes_panne.html'
 

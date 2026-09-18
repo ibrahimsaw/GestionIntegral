@@ -1,29 +1,84 @@
 {% extends 'base.html' %}
-{% block title %}Rapports — Integral{% endblock %}
-{% block topbar_title %}<i class="bi bi-file-earmark-bar-graph me-2" style="color:var(--color-primary)"></i>Exportations{% endblock %}
+{% block title %}Aperçu Client — {{ client.nom }} — Integral{% endblock %}
+
+{% block topbar_title %}
+  <div class="d-flex align-items-center gap-2">
+    <div style="width:36px;height:36px;border-radius:10px;background:#932e2b;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.95rem;flex-shrink:0;">
+      {{ client.nom|slice:":2"|upper }}
+    </div>
+    <div style="min-width:0;">
+      <div class="fw-bold text-truncate">{{ client.nom }}</div>
+      <div style="font-size:0.72rem;color:var(--text-muted);">Rapport client</div>
+    </div>
+  </div>
+{% endblock %}
+
 {% block topbar_actions %}
-  <div class="btn-group" role="group">
-    <a href="{% url 'export_client_pdf' client.pk %}" class="btn btn-primary btn-sm">
-      <i class="bi bi-file-earmark-pdf me-2"></i>
-      <span class="d-none d-md-inline ms-1">Pdf</span>
+  <div class="d-flex gap-2">
+    <a href="{% url 'export_client_pdf' client.pk %}"
+       style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:10px;background:#932e2b;color:#fff;font-size:0.82rem;font-weight:700;text-decoration:none;">
+      <i class="bi bi-file-earmark-pdf"></i>
+      <span class="d-none d-md-inline">Exporter PDF</span>
     </a>
-    <a href="{% url 'export_client_excel' client.pk %}" class="btn btn-success btn-sm">
-      <i class="bi bi-file-earmark-spreadsheet me-2"></i>
-      <span class="d-none d-md-inline ms-1">Excel</span>
+    <a href="{% url 'export_client_excel' client.pk %}"
+       style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:10px;background:#16a34a;color:#fff;font-size:0.82rem;font-weight:700;text-decoration:none;">
+      <i class="bi bi-file-earmark-spreadsheet"></i>
+      <span class="d-none d-md-inline">Excel</span>
     </a>
   </div>
 {% endblock %}
 
 {% block content %}
-  {%  include  'reports/client_pdf.html' %} 
-<!-- Main courante section -->
-<div class="card mt-4">
-  <div class="card-header"><i class="bi bi-clock-history me-2"></i>Export Main Courante</div>
-  <div class="card-body">
-    <p style="color:var(--text-muted);font-size:.84rem">Exportez la timeline complète d'un écran pour une date donnée.</p>
-    <a href="{% url 'main_courante' %}" class="btn btn-outline-secondary">
-      <i class="bi bi-arrow-right me-1"></i>Aller à la Main Courante
-    </a>
+  <!-- Bannière client -->
+  <div style="background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%); border-radius:16px; padding:22px 26px; margin-bottom:22px; display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:16px; box-shadow:0 10px 30px rgba(15,23,42,0.2);">
+    <div class="d-flex align-items-center gap-4">
+      <div style="width:56px;height:56px;border-radius:16px;background:rgba(147,46,43,0.3);border:2px solid rgba(147,46,43,0.5);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.2rem;color:#fff;flex-shrink:0;">
+        {{ client.nom|slice:":2"|upper }}
+      </div>
+      <div>
+        <div style="font-size:0.72rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:rgba(255,255,255,0.4);margin-bottom:4px;font-family:var(--font-mono,monospace);">Rapport client</div>
+        <div style="font-size:1.4rem;font-weight:800;color:#fff;line-height:1.2;">{{ client.nom }}</div>
+        {% if client.email %}<div style="font-size:0.82rem;color:rgba(255,255,255,0.5);margin-top:4px;"><i class="bi bi-envelope me-1"></i>{{ client.email }}</div>{% endif %}
+      </div>
+    </div>
+    <div class="d-flex gap-2">
+      <a href="{% url 'export_client_pdf' client.pk %}"
+         style="display:inline-flex;align-items:center;gap:5px;padding:7px 13px;border-radius:10px;background:rgba(239,68,68,0.2);border:1px solid rgba(239,68,68,0.35);color:#fca5a5;font-size:0.78rem;font-weight:700;text-decoration:none;">
+        <i class="bi bi-file-earmark-pdf"></i> PDF
+      </a>
+      <a href="{% url 'export_client_excel' client.pk %}"
+         style="display:inline-flex;align-items:center;gap:5px;padding:7px 13px;border-radius:10px;background:rgba(16,185,129,0.2);border:1px solid rgba(16,185,129,0.35);color:#6ee7b7;font-size:0.78rem;font-weight:700;text-decoration:none;">
+        <i class="bi bi-file-earmark-spreadsheet"></i> Excel
+      </a>
+    </div>
   </div>
-</div>
+
+  <!-- Contenu PDF preview -->
+  <div style="background:#fff;border-radius:16px;border:1px solid #e2e8f0;box-shadow:0 2px 8px rgba(0,0,0,0.05);overflow:hidden;margin-bottom:22px;">
+    <div style="padding:14px 20px;background:#f8fafc;border-bottom:1px solid #e2e8f0;display:flex;align-items:center;justify-content:space-between;">
+      <div style="font-size:0.88rem;font-weight:700;color:#0f172a;display:flex;align-items:center;gap:8px;">
+        <i class="bi bi-file-text" style="color:#932e2b;"></i> Aperçu du rapport
+      </div>
+      <span style="font-size:0.72rem;color:#94a3b8;font-family:var(--font-mono,monospace);">Rendu identique au PDF exporté</span>
+    </div>
+    <div style="padding:24px;">
+      {% include 'reports/client_pdf.html' %}
+    </div>
+  </div>
+
+  <!-- Main courante -->
+  <div style="background:#fff;border-radius:16px;border:1px solid #e2e8f0;box-shadow:0 2px 8px rgba(0,0,0,0.05);overflow:hidden;">
+    <div style="padding:14px 20px;background:#f8fafc;border-bottom:1px solid #e2e8f0;">
+      <div style="font-size:0.88rem;font-weight:700;color:#0f172a;display:flex;align-items:center;gap:8px;">
+        <i class="bi bi-clock-history" style="color:#f59e0b;"></i> Export Main Courante
+      </div>
+    </div>
+    <div style="padding:18px 20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;">
+      <p style="color:#64748b;font-size:0.84rem;margin:0;">Exportez la timeline complète d'un écran pour une date donnée.</p>
+      <a href="{% url 'main_courante' %}"
+         style="display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:10px;border:1px solid #e2e8f0;color:#334155;font-size:0.82rem;font-weight:600;text-decoration:none;background:#f8fafc;">
+        <i class="bi bi-arrow-right"></i> Aller à la Main Courante
+      </a>
+    </div>
+  </div>
 {% endblock %}

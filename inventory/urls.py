@@ -17,6 +17,7 @@ urlpatterns = [
     path('<uuid:uuid>/supprimer/', SupportDeleteView.as_view(), name='support_delete'),
     path('maintenances/',                    MaintenanceListView.as_view(),   name='maintenance_list'),
     path('maintenances/<int:pk>/',           MaintenanceDetailView.as_view(), name='maintenance_detail'),
+    path('maintenances/<int:pk>/reparation-rapide/', MaintenanceQuickRepairView.as_view(), name='maintenance_quick_repair'),
     path('maintenances/creer/',              MaintenanceCreateView.as_view(), name='maintenance_create'),
     path('maintenances/creer/<int:pk>/',     MaintenanceCreateView.as_view(), name='maintenance_create'),
     path('maintenances/<int:pk>/modifier/',  MaintenanceUpdateView.as_view(), name='maintenance_update'),

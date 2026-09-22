@@ -23,6 +23,7 @@ urlpatterns = [
     path('maintenances/<int:pk>/modifier/',  MaintenanceUpdateView.as_view(), name='maintenance_update'),
     path('<int:pk>/periodes-panne/', SupportPeriodesVanneView.as_view(), name='support_periodes_panne'),
     path('maintenances/periodes-panne/', PeriodesParVueView.as_view(), name='periodes_panne_liste'),
+    path('maintenances/periodes-panne/<int:pk>/', PeriodePanneDetailView.as_view(), name='periode_panne_detail'),
 
     path('formats/', FormatSupportListView.as_view(), name='format_list'),
     path('formats/ajouter/', FormatSupportCreateView.as_view(), name='format_create'),

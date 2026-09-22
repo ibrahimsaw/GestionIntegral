@@ -156,7 +156,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 DESIGN_CONFIG = {
     # Couleurs des marqueurs carte (utilisées par Leaflet JS)
     'COLOR_DISPONIBLE':  "#16a34a",   # gris — support libre
-    'COLOR_OCCUPE':      '#dc2626',   # Vert — support sous contrat
+    'COLOR_OCCUPE':      "#22c55e",   # Vert — support sous contrat
     'COLOR_RESERVE':     "#7c3aed",   # Orange — support réservé (en négociation) #6a8068
     'COLOR_PANNE': '#6c757d',   # Rouge — support en panne
     

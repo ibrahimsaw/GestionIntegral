@@ -9,12 +9,12 @@
 {% block topbar_actions %}
   <div class="d-flex gap-2">
     <a href="{% url 'maintenance_list' %}"
-       style="background:var(--bg-card);color:var(--text-muted);border:1px solid var(--border);border-radius:20px;padding:6px 16px;font-weight:600;font-size:0.8rem;text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
+       style="background:var(--bg-card);color:var(--text-muted);border:1px solid var(--border);border-radius:8px;padding:6px 16px;font-weight:600;font-size:0.8rem;text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
       <i class="bi bi-tools"></i>
       <span>Maintenances</span>
     </a>
     <a href="{% url 'maintenance_create' %}"
-       style="background:var(--color-primary);color:#fff;border-radius:20px;padding:6px 16px;font-weight:600;font-size:0.8rem;text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
+       style="background:var(--color-primary);color:#fff;border-radius:8px;padding:6px 16px;font-weight:600;font-size:0.8rem;text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
       <i class="bi bi-plus-lg"></i>
       <span>Nouvelle intervention</span>
     </a>
@@ -25,8 +25,8 @@
 <style>
   /* ── Hero Banner ── */
   .pp-hero {
-    background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-    border-radius: 16px;
+    background: linear-gradient(90deg, var(--color-primary) 0%, #1e40af 100%);
+    border-radius: 8px;
     padding: 24px 28px;
     margin-bottom: 24px;
     display: flex;
@@ -38,7 +38,7 @@
   .pp-hero-icon {
     width: 54px; height: 54px;
     background: rgba(239,68,68,0.15);
-    border-radius: 14px;
+    border-radius: 8px;
     display: flex; align-items: center; justify-content: center;
     font-size: 1.5rem; color: #ef4444; flex-shrink: 0;
   }
@@ -58,7 +58,7 @@
   .pp-kpi-card {
     background: var(--bg-card);
     border: 1px solid var(--border);
-    border-radius: 14px;
+    border-radius: 8px;
     padding: 16px 20px;
     display: flex;
     align-items: center;
@@ -72,7 +72,7 @@
   }
   .pp-kpi-icon {
     width: 44px; height: 44px;
-    border-radius: 12px;
+    border-radius: 8px;
     display: flex; align-items: center; justify-content: center;
     font-size: 1.25rem; flex-shrink: 0;
   }
@@ -87,7 +87,7 @@
   .pp-filter {
     background: var(--bg-card);
     border: 1px solid var(--border);
-    border-radius: 14px;
+    border-radius: 8px;
     margin-bottom: 24px;
     overflow: hidden;
   }
@@ -125,7 +125,7 @@
   .pp-table-card {
     background: var(--bg-card);
     border: 1px solid var(--border);
-    border-radius: 14px;
+    border-radius: 8px;
     overflow: hidden;
   }
   .pp-table-hd {
@@ -139,7 +139,7 @@
     flex-wrap: wrap;
   }
   .pp-table thead th {
-    background: #1e293b;
+    background: var(--color-primary);
     color: #ffffff;
     font-size: 0.68rem; font-weight: 700;
     text-transform: uppercase; letter-spacing: 0.6px;
@@ -161,7 +161,7 @@
   .pp-badge {
     display: inline-flex; align-items: center; gap: 4px;
     font-size: 0.72rem; font-weight: 700;
-    border-radius: 20px; padding: 3px 10px;
+    border-radius: 8px; padding: 3px 10px;
   }
   .pp-badge-resolue { background: #dcfce7; color: #166534; }
   .pp-badge-encours { background: #fee2e2; color: #991b1b; }
@@ -330,7 +330,7 @@
       <i class="bi bi-clock-history me-2" style="color:#ef4444;"></i>
       {{ nb_total }} période{{ nb_total|pluralize }} identifiée{{ nb_total|pluralize }}
     </span>
-    <span style="background:#fff;border:1px solid var(--border);border-radius:20px;padding:4px 14px;font-family:monospace;font-size:0.75rem;color:var(--text);">
+    <span style="background:#fff;border:1px solid var(--border);border-radius:08px;padding:4px 14px;font-family:monospace;font-size:0.75rem;color:var(--text);">
       Cumul d'indisponibilité : <strong style="color:#dc2626;">{{ duree_totale.days }} jour{{ duree_totale.days|pluralize }}</strong>
     </span>
   </div>
@@ -349,6 +349,7 @@
             <th>Constat initial</th>
             <th>Rapport de résolution</th>
             <th style="text-align:right;padding-right:20px;">Statut</th>
+            <th style="text-align:right;padding-right:20px;">Action</th>
           </tr>
         </thead>
         <tbody>
@@ -374,9 +375,11 @@
 
             {# Début panne #}
             <td>
-              <div style="font-weight:700;color:#dc2626;font-family:monospace;font-size:0.84rem;">
-                {{ p.debut|date:"d/m/Y" }}
-              </div>
+              <a href="{% url 'periode_panne_detail' p.maint_panne.pk %}" style="text-decoration:none;">
+                <div style="font-weight:700;color:#dc2626;font-family:monospace;font-size:0.84rem;">
+                  {{ p.debut|date:"d/m/Y" }}
+                </div>
+              </a>
               <div style="font-size:0.72rem;color:var(--text-muted);font-family:monospace;">{{ p.debut|date:"H:i" }}</div>
             </td>
 
@@ -437,6 +440,15 @@
                   {% endif %}
                 </div>
               {% endif %}
+            </td>
+
+            {# Détail de la période #}
+            <td>
+              <a href="{% url 'periode_panne_detail' p.maint_panne.pk %}"
+                 class="btn btn-sm btn-outline-primary btn-action-icon"
+                 title="Voir le détail de la période">
+                <i class="bi bi-eye me-1"></i>
+              </a>
             </td>
 
           </tr>

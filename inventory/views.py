@@ -38,11 +38,23 @@ from django.contrib.auth.mixins import LoginRequiredMixin # Optionnel: pour séc
 from .models import FormatSupport
 
 # 1. LISTER LES FORMATS
-class FormatSupportListView(LoginRequiredMixin, ListView):
+class FormatSupportListView(LoginRequiredMixin, SortableListMixin, ListView):
     model = FormatSupport
     template_name = 'inventory/format_list.html'
     context_object_name = 'formats'
-    # Les formats seront triés selon le Meta du modèle (catégorie, puis code)
+    paginate_by = 20
+    SORT_FIELDS = {
+        'code': 'code',
+        'categorie': 'categorie',
+        'dimensions': 'dimensions',
+        'superficie': 'superficie',
+    }
+    DEFAULT_SORT = 'categorie'
+    DEFAULT_DIR = 'asc'
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        return self.apply_sort(qs)
 
 # 2. AJOUTER UN FORMAT
 class FormatSupportCreateView(LoginRequiredMixin, CreateView):
@@ -1606,3 +1618,41 @@ class PeriodesParVueView(LoginRequiredMixin, View):
             },
         }
         return render(request, self.template_name, context)
+
+
+class PeriodePanneDetailView(LoginRequiredMixin, View):
+    template_name = 'inventory/periode_panne_detail.html'
+
+    def get(self, request, pk):
+        panne = get_object_or_404(
+            Maintenance.objects.select_related('support', 'face', 'effectue_par'),
+            pk=pk,
+            etat_apres=ETAT_PANNE,
+        )
+        maintenances = Maintenance.objects.filter(
+            support=panne.support,
+            face=panne.face,
+            date_intervention__gte=panne.date_intervention,
+        ).select_related('effectue_par').order_by('date_intervention')
+
+        resolution = None
+        for maintenance in maintenances:
+            if maintenance.etat_apres == ETAT_BON:
+                resolution = maintenance
+                break
+
+        fin = resolution.date_intervention if resolution else None
+        duree = (fin - panne.date_intervention) if fin else timezone.now() - panne.date_intervention
+
+        return render(request, self.template_name, {
+            'periode': {
+                'support': panne.support,
+                'face': panne.face,
+                'panne': panne,
+                'resolution': resolution,
+                'fin': fin,
+                'duree': duree,
+                'resolue': resolution is not None,
+            },
+            'title': f'Période de panne — {panne.support.code}',
+        })

@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
-{% load static %}
+{% load static sort_tags %}
 
-{% block title %}Formats de Support — Integral{% endblock %}
+{% block title %}Formats — Integral{% endblock %}
 
 {% block topbar_title %}
     <i class="bi bi-aspect-ratio me-2" style="color:var(--color-primary)"></i>Formats de Support
@@ -14,114 +14,151 @@
     </a>
 {% endblock %}
 
-{% block extra_head %}
-<style>
-    .format-table-card {
-        background: var(--bg-card);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        overflow: hidden;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.02);
-    }
-    .table th {
-        font-size: .72rem;
-        text-transform: uppercase;
-        letter-spacing: 0.6px;
-        font-weight: 800;
-        color: var(--text-muted);
-        background: #f8fafc;
-        border-bottom: 2px solid var(--border);
-        padding: 14px 18px;
-    }
-    .table td {
-        font-size: .85rem;
-        vertical-align: middle;
-        border-bottom: 1px solid var(--border);
-        padding: 14px 18px;
-    }
-    .table tr:hover td {
-        background-color: rgba(13, 110, 253, 0.02);
-    }
-</style>
-{% endblock %}
-
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-xl-12">
-        <div class="d-flex justify-content-between align-items-center mb-4">
-            <div>
-                <h1 style="font-size:1.4rem;font-weight:800;margin:0">Gestion des Formats Publicitaires</h1>
-                <p style="color:var(--text-muted);font-size:0.82rem;margin:2px 0 0">Gérez les gabarits, dimensions et catégories de vos panneaux</p>
-            </div>
-            <span class="badge bg-light text-dark border font-monospace px-3 py-2 rounded-pill">{{ formats|length }} format{{ formats|length|pluralize }}</span>
-        </div>
+<style>
+  .filter-card {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-card);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+    transition: box-shadow 0.2s ease, border-color 0.2s ease;
+  }
+  .filter-card:hover {
+    box-shadow: 0 8px 28px rgba(0,0,0,0.06);
+    border-color: rgba(13, 110, 253, 0.2);
+  }
+  .table-custom-card {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--bg-card);
+    box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+    overflow: hidden;
+  }
+  .table-supports thead th {
+    background-color: #f8fafc;
+    color: var(--text-muted);
+    font-size: 0.72rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    border-bottom: 2px solid var(--border);
+    white-space: nowrap;
+  }
+  .table-supports tbody td {
+    border-bottom: 1px solid var(--border);
+    vertical-align: middle;
+  }
+  .table-supports tbody tr.support-row {
+    transition: background-color 0.15s ease;
+  }
+  .table-supports tbody tr.support-row:hover {
+    background-color: rgba(13, 110, 253, 0.02);
+  }
+  .code-badge {
+    font-family: var(--mono, monospace);
+    font-weight: 700;
+    font-size: 0.82rem;
+    color: var(--color-primary);
+    background: rgba(13, 110, 253, 0.08);
+    padding: 4px 9px;
+    border-radius: 8px;
+    display: inline-block;
+    border: 1px solid rgba(13, 110, 253, 0.18);
+  }
+  .code {
+    font-family: var(--mono, monospace);
+    font-size: 0.82rem;
+    color: var(--color-primary);
+    font-weight: 700;
+  }
+  .active-filter-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    background: rgba(13, 110, 253, 0.08);
+    color: var(--color-primary);
+    border: 1px solid rgba(13, 110, 253, 0.2);
+    border-radius: var(--radius-md);
+    font-size: 0.74rem;
+    font-weight: 600;
+  }
+</style>
 
-        <div class="format-table-card">
-            <div class="table-responsive">
-                <table class="table table-hover mb-0 align-middle">
-                    <thead>
-                        <tr>
-                            <th class="ps-4" style="width: 180px;">Code Format</th>
-                            <th style="width: 200px;">Catégorie</th>
-                            <th style="width: 180px;">Dimensions</th>
-                            <th style="width: 180px;">Superficie</th>
-                            <th class="text-end pe-4" style="width: 140px;">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for format in formats %}
-                        <tr>
-                            <td class="ps-4">
-                                <span class="badge" style="background:rgba(13,110,253,0.08);border:1px solid rgba(13,110,253,0.18)">
-                                    {{ format.code }}
-                                </span>
-                            </td>
-                            <td>
-                                <span class="badge badge-status {% if format.categorie == 'Marché' %}bs-maintenance{% elif format.categorie == 'Géant' %}bs-occupe{% elif format.categorie == 'Sucette' %}bs-reserve{% else %}bs-disponible{% endif %}">
-                                    {{ format.categorie }}
-                                </span>
-                            </td>
-                            <td class="text-secondary fw-semibold font-monospace small">
-                                <i class="bi bi-arrows-angle-expand me-1 text-muted"></i>{{ format.dimensions|default:"—" }}
-                            </td>
-                            <td>
-                                {% if format.superficie %}
-                                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace px-2.5 py-1">
-                                        {{ format.superficie }} m²
-                                    </span>
-                                {% else %}
-                                    <span class="text-muted">—</span>
-                                {% endif %}
-                            </td>
-                            <td class="text-end pe-4">
-                                <div class="d-inline-flex gap-1 justify-content-end">
-                                    <a href="{% url 'format_update' format.pk %}" class="btn btn-outline-secondary btn-sm btn-action-icon rounded-3" title="Modifier">
-                                        <i class="bi bi-pencil"></i>
-                                    </a>
-                                    <a href="{% url 'format_delete' format.pk %}" class="btn btn-outline-danger btn-sm btn-action-icon rounded-3" title="Supprimer">
-                                        <i class="bi bi-trash"></i>
-                                    </a>
-                                </div>
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="5" class="text-center py-5 text-muted">
-                                <i class="bi bi-folder-x d-block fs-2 mb-2 opacity-30"></i>
-                                Aucun format enregistré en base de données.
-                                <div class="mt-2">
-                                    <a href="{% url 'format_create' %}" class="btn btn-primary btn-sm rounded-pill px-3">
-                                        <i class="bi bi-plus-lg me-1"></i>Créer le premier format
-                                    </a>
-                                </div>
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
+<div class="row justify-content-center">
+  <div class="col-xl-12">
+    <div class="d-flex justify-content-between align-items-center mb-4 gap-3 flex-wrap">
+      <div>
+        <h1 style="font-size:1.4rem;font-weight:800;margin:0">Gestion des Formats Publicitaires</h1>
+        <p style="color:var(--text-muted);font-size:0.82rem;margin:2px 0 0">Gérez les gabarits, dimensions et catégories de vos panneaux</p>
+      </div>
+      <span class="badge bg-light text-dark border font-monospace px-3 py-2 rounded-pill">{{ formats|length }} format{{ formats|length|pluralize }}</span>
     </div>
+
+    <div class="table-custom-card">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle table-supports">
+          <thead>
+            <tr>
+              <th class="ps-4" style="width: 180px;">{% sortable_th sort_links sort_key sort_dir 'code' 'Code Format' %}</th>
+              <th style="width: 200px;">{% sortable_th sort_links sort_key sort_dir 'categorie' 'Catégorie' %}</th>
+              <th style="width: 180px;">{% sortable_th sort_links sort_key sort_dir 'dimensions' 'Dimensions' %}</th>
+              <th style="width: 180px;">{% sortable_th sort_links sort_key sort_dir 'superficie' 'Superficie' %}</th>
+              <th class="text-end pe-4" style="width: 140px;">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for format in formats %}
+              <tr class="support-row">
+                <td>
+                  <span class="code">{{ format.code }}</span>
+                </td>
+                <td>
+                  <span class="badge badge-status {% if format.categorie == 'Marché' %}bs-maintenance{% elif format.categorie == 'Géant' %}bs-occupe{% elif format.categorie == 'Sucette' %}bs-reserve{% else %}bs-disponible{% endif %}">
+                    {{ format.categorie }}
+                  </span>
+                </td>
+                <td class="text-secondary fw-semibold font-monospace small">
+                  <i class="bi bi-arrows-angle-expand me-1 text-muted"></i>{{ format.dimensions|default:"—" }}
+                </td>
+                <td>
+                  {% if format.superficie %}
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace px-2.5 py-1">
+                      {{ format.superficie }} m²
+                    </span>
+                  {% else %}
+                    <span class="text-muted">—</span>
+                  {% endif %}
+                </td>
+                <td class="text-end pe-4">
+                  <div class="d-inline-flex gap-1 justify-content-end">
+                    <a href="{% url 'format_update' format.pk %}" class="btn btn-sm btn-outline-secondary btn-action-icon" title="Modifier">
+                      <i class="bi bi-pencil"></i>
+                    </a>
+                    <a href="{% url 'format_delete' format.pk %}" class="btn btn-sm btn-outline-danger btn-action-icon" title="Supprimer">
+                      <i class="bi bi-trash"></i>
+                    </a>
+                  </div>
+                </td>
+              </tr>
+            {% empty %}
+              <tr>
+                <td colspan="5" class="text-center py-5 text-muted">
+                  <i class="bi bi-folder-x d-block fs-2 mb-2 opacity-30"></i>
+                  Aucun format enregistré en base de données.
+                  <div class="mt-2">
+                    <a href="{% url 'format_create' %}" class="btn btn-primary btn-sm rounded-pill px-3">
+                      <i class="bi bi-plus-lg me-1"></i>Créer le premier format
+                    </a>
+                  </div>
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 </div>
 {% endblock %}
 

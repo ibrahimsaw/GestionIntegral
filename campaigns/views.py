@@ -1086,6 +1086,8 @@ def build_support_rows(campagne, lignes):
             'impression_unitaire': imp_u,
             'impression_total': imp_total,
             'total_support': total_support,
+            'lignes': group_lignes,
+            'faces': [l.face for l in group_lignes if l.face],
         })
 
         totaux['quantite'] += quantite
@@ -1095,6 +1097,87 @@ def build_support_rows(campagne, lignes):
         totaux['total'] += total_support
 
     return rows, totaux
+
+
+def serialize_supports_for_map(lignes):
+    """Génère la liste structurée des supports/marchés pour la carte interactive Leaflet."""
+    data = []
+    seen = set()
+    for ligne in lignes:
+        if ligne.emplacement_id and ligne.emplacement and ligne.emplacement.marche:
+            marche = ligne.emplacement.marche
+            key = f"marche_{marche.pk}"
+            if key not in seen:
+                seen.add(key)
+                if marche.latitude and marche.longitude:
+                    empls = [l.emplacement for l in lignes if l.emplacement_id and l.emplacement and l.emplacement.marche_id == marche.pk]
+                    data.append({
+                        'id': marche.pk,
+                        'type': 'marche',
+                        'code': marche.nom,
+                        'nom': marche.nom,
+                        'lat': float(marche.latitude),
+                        'lng': float(marche.longitude),
+                        'ville': marche.ville or '',
+                        'quartier': marche.quartier or '',
+                        'adresse': marche.adresse or '',
+                        'nb_emplacements': len(empls),
+                        'emplacements': [{'code': e.code, 'is_libre': e.is_libre()} for e in empls if e],
+                        'url': f"/gestion/inventory/marches/{marche.pk}/",
+                    })
+        else:
+            support = ligne.face.support if ligne.face else ligne.support
+            if not support:
+                continue
+            key = f"support_{support.pk}"
+            if key not in seen:
+                seen.add(key)
+                if support.latitude and support.longitude:
+                    supp_lignes = [l for l in lignes if (l.face and l.face.support_id == support.pk) or l.support_id == support.pk]
+                    faces_data = []
+                    for l in supp_lignes:
+                        if l.face:
+                            faces_data.append({
+                                'label': l.face.get_label_display(),
+                                'eclairage': l.face.get_eclairage_display(),
+                                'etat': l.face.get_etat_display(),
+                                'photo': l.face.photo.url if l.face.photo else '',
+                            })
+                    
+                    ecran_info = None
+                    if support.type_support == 'ecran' and hasattr(support, 'ecran_info'):
+                        e_info = support.ecran_info
+                        ecran_info = {
+                            'type_ecran': e_info.get_type_ecran_display(),
+                            'resolution': e_info.get_resolution_display(),
+                            'cellule': e_info.get_cellule_display() if hasattr(e_info, 'get_cellule_display') else e_info.cellule,
+                            'heure_allumage': str(e_info.heure_allumage)[:5],
+                            'heure_extinction': str(e_info.heure_extinction)[:5],
+                            'spots': supp_lignes[0].calculer_spots() if supp_lignes else 0,
+                            'frequence': supp_lignes[0].get_frequence_effective() if supp_lignes else '',
+                            'duree': supp_lignes[0].get_duree_passage_effective() if supp_lignes else '',
+                        }
+
+                    data.append({
+                        'id': support.pk,
+                        'uuid': str(support.uuid) if support.uuid else '',
+                        'code': support.code,
+                        'nom': support.nom,
+                        'type': support.type_support,
+                        'lat': float(support.latitude),
+                        'lng': float(support.longitude),
+                        'ville': support.ville or '',
+                        'quartier': support.quartier or '',
+                        'adresse': support.adresse or '',
+                        'format': support.get_format_display() if support.format else '',
+                        'dimensions': support.dimensions,
+                        'surface': support.surface_m2,
+                        'photo': support.photo_principale.url if support.photo_principale else '',
+                        'faces': faces_data,
+                        'ecran_info': ecran_info,
+                        'url': f"/gestion/inventory/{support.uuid}/" if support.uuid else f"/gestion/inventory/{support.pk}/",
+                    })
+    return data
 
 
 class CampagneDetailView(ClientStaffRequiredMixin, DetailView):
@@ -1136,9 +1219,10 @@ class CampagneDetailView(ClientStaffRequiredMixin, DetailView):
                 'total': Decimal('0.00'),
             }
 
+            all_child_lignes = []
             for enfant in enfants:
                 enfant_lignes = enfant.lignes.select_related(
-                    'support__ecran_info', 'face__support'
+                    'support__ecran_info', 'face__support', 'emplacement__marche'
                 ).all()
                 for ligne in enfant_lignes:
                     if enfant.type_support == 'ecran' and hasattr(ligne.support, 'ecran_info'):
@@ -1147,6 +1231,7 @@ class CampagneDetailView(ClientStaffRequiredMixin, DetailView):
                         ligne.spots_calcules = ligne.face.calculer_nombre_spots_campagne(enfant)
                     else:
                         ligne.spots_calcules = 0
+                    all_child_lignes.append(ligne)
 
                 rows, totaux = build_support_rows(enfant, enfant_lignes)
                 enfants_data.append({
@@ -1162,12 +1247,14 @@ class CampagneDetailView(ClientStaffRequiredMixin, DetailView):
             context['nombre_sous_campagnes'] = enfants.count()
             context['total_supports'] = sum(child.lignes.count() for child in enfants)
             context['total_spots'] = sum(child.calculer_nombre_spots() for child in enfants)
+            context['supports_map_json'] = json.dumps(serialize_supports_for_map(all_child_lignes))
         else:
             support_rows, totaux_campagne = build_support_rows(campagne, lignes)
             context['support_rows'] = support_rows
             context['totaux_campagne'] = totaux_campagne
-            context['total_supports'] = lignes.count()
+            context['total_supports'] = len(support_rows)
             context['total_spots'] = campagne.calculer_nombre_spots()
+            context['supports_map_json'] = json.dumps(serialize_supports_for_map(lignes))
 
         return context
 
@@ -2473,11 +2560,20 @@ class ReservationRedirectView(LoginRequiredMixin, View):
         reservation = get_object_or_404(Reservation, pk=pk)
         return redirect('reservation_detail', client_pk=reservation.client_id, resa_pk=reservation.pk)
     
-class ReservationListView(StaffRequiredMixin, ListView):
+class ReservationListView(StaffRequiredMixin, SortableListMixin, ListView):
     model = Reservation
     template_name = 'campaigns/reservation_list.html'
     context_object_name = 'reservations'
     paginate_by = 20
+    SORT_FIELDS = {
+        'nom': 'nom',
+        'client': 'client__nom',
+        'date_debut': 'date_debut',
+        'statut': 'statut',
+        'created_by': 'created_by__username',
+    }
+    DEFAULT_SORT = 'date_debut'
+    DEFAULT_DIR = 'desc'
 
     def get_queryset(self):
         qs = Reservation.objects.select_related('client', 'created_by').prefetch_related('lignes__face__support')
@@ -2499,7 +2595,7 @@ class ReservationListView(StaffRequiredMixin, ListView):
         if date_f:
             qs = qs.filter(date_debut__date=date_f)
 
-        return qs.order_by('-date_debut')
+        return self.apply_sort(qs)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -3032,16 +3128,25 @@ from datetime import datetime, time
 
 
 
-class DemandesListView(LoginRequiredMixin, View):
+class DemandesListView(LoginRequiredMixin, SortableListMixin, View):
     """Liste des demandes de réservation à traiter par le gestionnaire."""
     template_name = 'campaigns/demandes_liste.html'
+    SORT_FIELDS = {
+        'reference': 'reference',
+        'contact': 'nom_contact',
+        'emplacements': 'nb_emplacements',
+        'date_debut': 'date_debut_souhaitee',
+        'statut': 'statut',
+        'created_at': 'created_at',
+    }
+    DEFAULT_SORT = 'created_at'
+    DEFAULT_DIR = 'desc'
 
     def get(self, request):
         statut = request.GET.get('statut', '')
         qs = (
             DemandeReservation.objects
             .select_related('client', 'reservation', 'traite_par')
-            .order_by('-created_at')
         )
 
         if statut:
@@ -3053,6 +3158,8 @@ class DemandesListView(LoginRequiredMixin, View):
                 DemandeReservation.STATUT_EN_COURS,
             ])
 
+        qs = self.apply_sort(qs)
+
         compteurs = {
             'nouvelle': DemandeReservation.objects.filter(statut=DemandeReservation.STATUT_NOUVELLE).count(),
             'en_cours': DemandeReservation.objects.filter(statut=DemandeReservation.STATUT_EN_COURS).count(),
@@ -3060,11 +3167,13 @@ class DemandesListView(LoginRequiredMixin, View):
             'refusee':  DemandeReservation.objects.filter(statut=DemandeReservation.STATUT_REFUSEE).count(),
         }
 
-        return render(request, self.template_name, {
+        context = {
             'demandes': qs,
             'statut_actif': statut,
             'compteurs': compteurs,
-        })
+        }
+        context.update(self.get_sort_context())
+        return render(request, self.template_name, context)
 
 
 class DemandeDetailView(LoginRequiredMixin, View):

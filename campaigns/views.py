@@ -312,7 +312,12 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
         top_faces = top_faces_qs.order_by('-revenue', '-usage_count')[:6]
         top_faces_json = json.dumps([
-            {'label': f'{f.support.code}-{f.label}', 'revenue': float(f.revenue or 0), 'usage': f.usage_count}
+            {
+                'label': f'{f.support.code}-{f.label}',
+                'revenue': float(f.revenue or 0),
+                'usage': f.usage_count,
+                'url': reverse('support_detail', args=[f.support.uuid]),
+            }
             for f in top_faces
         ])
 

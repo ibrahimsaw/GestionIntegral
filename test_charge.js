@@ -56,7 +56,6 @@ const PRESENT_ROUTES = [
 
   // Planning
   { name: 'gestion_planning_calendrier', path: '/gestion/planning/calendrier/', expectedStatus: [200, 302], method: 'GET', weight: 2 },
-  { name: 'gestion_planning_main_courante', path: '/gestion/planning/main-courante/', expectedStatus: [200, 302], method: 'GET', weight: 2 },
   { name: 'gestion_planning_api_taux', path: '/gestion/planning/api/taux/', expectedStatus: [200, 302], method: 'GET', weight: 1 },
 
   // Reports

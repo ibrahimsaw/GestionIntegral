@@ -34,7 +34,7 @@ python manage.py runserver 0.0.0.0:8000
 - **accounts** — Modèle User personnalisé avec RBAC (admin/staff/technicien/client), AuditLog
 - **inventory** — Support (panneau/écran), FacePanneau (faces A/B), EcranNumerique (métadonnées écran)
 - **campaigns** — Client, Contrat, Campagne, LigneCampagne (affectation supports), SpotEcran
-- **planning** — LogDiffusion (logs de diffusion / main courante)
+- **planning** — LogDiffusion (logs de diffusion)
 - **reports** — Exports PDF (ReportLab) et Excel (openpyxl)
 
 ### Logique Métier Clé
@@ -81,7 +81,6 @@ DESIGN_CONFIG = {
 | `/inventory/` | Liste/CRUD supports | Staff+ |
 | `/campaigns/` | Dashboard + stats | Tous |
 | `/planning/calendrier/` | Calendrier mensuel | Staff+ |
-| `/planning/main-courante/` | Timeline horaire | Staff+ |
 | `/reports/` | Exports PDF/Excel | Tous |
 | `/admin/` | Admin Django | Admin |
 
@@ -106,7 +105,7 @@ DESIGN_CONFIG = {
 - **LigneCampagne** — Affectation de support dans campagne (sélection face pour panneaux, config spot pour écrans)
 
 ### planning/models.py
-- **LogDiffusion** — Log de passage automatique (main courante)
+- **LogDiffusion** — Log de passage automatique
 
 ## Notes de Développement
 

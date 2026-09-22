@@ -540,10 +540,20 @@ def get_cached_alertes():
 
 # ── Clients ──────────────────────────────────────────────────────────────────
 
-class ClientListView(StaffRequiredMixin, ListView):
+class ClientListView(StaffRequiredMixin, SortableListMixin, ListView):
     model = Client
     template_name = 'campaigns/client_list.html'
     context_object_name = 'clients'
+    paginate_by = 10
+    SORT_FIELDS = {
+        'reference': 'reference',
+        'nom': 'nom',
+        'contact': 'contact_nom',
+        'statut': 'actif',
+        'campagnes': 'cp_total',
+    }
+    DEFAULT_SORT = 'nom'
+    DEFAULT_DIR = 'asc'
 
     def get_queryset(self):
         qs = Client.objects.annotate(
@@ -551,29 +561,74 @@ class ClientListView(StaffRequiredMixin, ListView):
             cp_ecran=Count('campagnes', filter=Q(campagnes__statut='en_cours', campagnes__type_support='ecran', campagnes__actif=True)),
             cp_total=Count('campagnes', filter=Q(campagnes__statut='en_cours', campagnes__actif=True)),
         )
-        q = self.request.GET.get('q', '')
+        
+        # Restriction rôle non-admin
+        if not self.request.user.is_admin:
+            qs = qs.filter(actif=True)
+
+        # Recherche textuelle
+        q = self.request.GET.get('q', '').strip()
         if q:
-            qs = qs.filter(Q(nom__icontains=q) | Q(contact_nom__icontains=q))
-        return qs.prefetch_related('campagnes').order_by('nom')
+            qs = qs.filter(
+                Q(nom__icontains=q) |
+                Q(contact_nom__icontains=q) |
+                Q(reference__icontains=q) |
+                Q(telephone__icontains=q) |
+                Q(email__icontains=q)
+            )
+
+        # Filtre statut
+        status = self.request.GET.get('status', '').strip()
+        if status == 'actif':
+            qs = qs.filter(actif=True)
+        elif status == 'inactif':
+            qs = qs.filter(actif=False)
+
+        qs = self.apply_sort(qs)
+        return qs.prefetch_related('campagnes')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        for client in context['clients']:
+        
+        # Calcul des stats par client
+        clients_list = list(context['clients'])
+        total_spots_led_actifs = 0
+        total_faces_statiques_actives = 0
+        total_campagnes_actives = 0
+
+        for client in clients_list:
             campagnes_actives = [c for c in client.campagnes.all() if c.statut == 'en_cours' and c.actif]
             client.campagnes_stats = {
                 'panneau': client.cp_panneau,
                 'ecran': client.cp_ecran,
                 'total': client.cp_total,
             }
+            # Spots LED pour écrans, et faces pour panneaux (unités distinctes non additionnables)
             client.spots_stats = {
                 'panneau': sum(c.calculer_nombre_spots() for c in campagnes_actives if c.type_support and c.type_support != 'ecran'),
                 'ecran': sum(c.calculer_nombre_spots() for c in campagnes_actives if c.type_support == 'ecran'),
-                'total': sum(c.calculer_nombre_spots() for c in campagnes_actives),
             }
+            total_spots_led_actifs += client.spots_stats['ecran']
+            total_faces_statiques_actives += client.spots_stats['panneau']
+            total_campagnes_actives += client.campagnes_stats['total']
+
+        context['clients'] = clients_list
+
+        # Métriques globales portefeuille
+        base_clients = Client.objects.all()
         if not self.request.user.is_admin:
-            context['clients'] = context['clients'].filter(actif=True)
-        context['q'] = self.request.GET.get('q', '')
-        context['title'] = 'Liste des Clients'
+            base_clients = base_clients.filter(actif=True)
+
+        context['kpi_total_clients'] = base_clients.count()
+        context['kpi_actifs_count'] = base_clients.filter(actif=True).count()
+        context['kpi_inactifs_count'] = base_clients.filter(actif=False).count()
+        context['kpi_campagnes_actives'] = total_campagnes_actives
+        context['kpi_spots_led_actifs'] = total_spots_led_actifs
+        context['kpi_faces_statiques_actives'] = total_faces_statiques_actives
+
+        context['q'] = self.request.GET.get('q', '').strip()
+        context['status_filter'] = self.request.GET.get('status', '').strip()
+        context['title'] = 'Portefeuille Clients'
         return context
 
 
@@ -635,8 +690,20 @@ class ClientDetailView(ClientStaffRequiredMixin, DetailView):
             .order_by('date_debut')
         )
 
+        from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+        page_num = self.request.GET.get('page', 1)
+        paginator = Paginator(campagnes, 10)
+        try:
+            campagnes_page = paginator.page(page_num)
+        except (EmptyPage, PageNotAnInteger):
+            campagnes_page = paginator.page(1)
+
         context.update({
-            'campagnes': campagnes,
+            'campagnes': campagnes_page,
+            'page_obj': campagnes_page,
+            'paginator': paginator,
+            'is_paginated': campagnes_page.has_other_pages(),
+            'total_campagnes_count': len(campagnes),
             'contrats': contrats,
             'reservations': reservations,
         })

@@ -4,7 +4,7 @@
 {% block topbar_title %}<i class="bi bi-calendar-check me-2" style="color:var(--color-primary)"></i>Réservations{% endblock %}
 {% block topbar_actions %}
   {% if user.is_staff_regie_role %}
-  <a href="{% url 'reservation_wizard_etape1' %}" class="btn btn-primary btn-sm rounded-pill px-3 shadow-sm d-flex align-items-center gap-1">
+  <a href="{% url 'reservation_wizard_etape1' %}" class="btn btn-primary btn-sm px-3 shadow-sm d-flex align-items-center gap-1" style="border-radius: 8px;">
     <i class="bi bi-plus-lg"></i>
     <span class="d-none d-md-inline">Nouvelle réservation</span>
   </a>
@@ -35,38 +35,11 @@
     align-items: center;
     gap: 5px;
   }
-  .table-custom-card {
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--bg-card);
-    box-shadow: 0 4px 20px rgba(0,0,0,0.03);
-    overflow: hidden;
-  }
-  .table-supports thead th {
-    background-color: var(--color-primary);
-    color: #ffffff;
-    font-size: 0.72rem;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.6px;
-    border-bottom: 2px solid var(--border);
-    white-space: nowrap;
-  }
-  .table-supports tbody td {
-    border-bottom: 1px solid var(--border);
-    vertical-align: middle;
-  }
-  .table-supports tbody tr.support-row {
-    transition: background-color 0.15s ease;
-  }
-  .table-supports tbody tr.support-row:hover {
-    background-color: rgba(13, 110, 253, 0.02);
-  }
   .resa-ref-badge {
     font-size: 0.75rem;
     background: #f8fafc;
     padding: 2px 6px;
-    border-radius: 4px;
+    border-radius: 8px;
     border: 1px solid #e2e8f0;
   }
   .resa-notes-preview {
@@ -98,45 +71,63 @@
     color: #92400e;
     border: 1px solid #fde68a;
     font-weight: 700;
-    font-size: 0.75rem;
     border-radius: 8px;
+    font-size: 0.72rem;
   }
   .badge-statut-confirmee {
     background: #dcfce7;
     color: #166534;
     border: 1px solid #bbf7d0;
     font-weight: 700;
-    font-size: 0.75rem;
     border-radius: 8px;
+    font-size: 0.72rem;
   }
-  .badge-statut-annulee {
+  .badge-statut-rejetee {
     background: #fee2e2;
     color: #991b1b;
     border: 1px solid #fecaca;
     font-weight: 700;
-    font-size: 0.75rem;
     border-radius: 8px;
+    font-size: 0.72rem;
   }
-  .badge-statut-expiree {
+  .badge-statut-annulee {
     background: #f1f5f9;
     color: #475569;
+    border: 1px solid #e2e8f0;
+    font-weight: 700;
+    border-radius: 8px;
+    font-size: 0.72rem;
+  }
+  .badge-statut-expiree {
+    background: #f8fafc;
+    color: #64748b;
     border: 1px solid #cbd5e1;
     font-weight: 700;
-    font-size: 0.75rem;
     border-radius: 8px;
-  }
-  .btn-action-traiter {
-    background: #10b981;
-    border: 1px solid #059669;
-    color: #ffffff;
-    border-radius: 8px;
-  }
-  .btn-action-traiter:hover {
-    background: #059669;
-    color: #ffffff;
+    font-size: 0.72rem;
   }
   .btn-action-icon {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     border-radius: 8px;
+    font-size: 0.85rem;
+  }
+  .btn-action-traiter {
+    background: #0d6efd;
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    padding: 0.25rem 0.65rem;
+    font-weight: 700;
+    font-size: 0.75rem;
+  }
+  .btn-action-traiter:hover {
+    background: #0b5ed7;
+    color: #ffffff;
   }
 </style>
 
@@ -146,13 +137,13 @@
       <div class="col-xl-3 col-lg-4 col-md-6">
         <label class="filter-label"><i class="bi bi-search"></i>Recherche</label>
         <div class="input-group input-group-sm">
-          <input type="text" name="q" value="{{ q }}" class="form-control rounded-3" placeholder="Nom, référence, client…">
+          <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Nom, référence, client…" style="border-radius: 8px;">
         </div>
       </div>
 
       <div class="col-xl-2 col-lg-3 col-md-6">
         <label class="filter-label"><i class="bi bi-flag"></i>Statut</label>
-        <select name="statut" class="form-select form-select-sm rounded-3">
+        <select name="statut" class="form-select form-select-sm" style="border-radius: 8px;">
           <option value="">Tous les statuts</option>
           {% for value, label in statut_choices %}
             <option value="{{ value }}" {% if statut_f == value %}selected{% endif %}>{{ label }}</option>
@@ -162,7 +153,7 @@
 
       <div class="col-xl-3 col-lg-4 col-md-6">
         <label class="filter-label"><i class="bi bi-person"></i>Client</label>
-        <select name="client" class="form-select form-select-sm rounded-3">
+        <select name="client" class="form-select form-select-sm" style="border-radius: 8px;">
           <option value="">Tous les clients</option>
           {% for c in clients %}
             <option value="{{ c.pk }}" {% if client_f == c.pk|stringformat:"s" %}selected{% endif %}>{{ c.nom }}</option>
@@ -172,16 +163,16 @@
 
       <div class="col-xl-2 col-lg-3 col-md-6">
         <label class="filter-label"><i class="bi bi-calendar-event"></i>Date</label>
-        <input type="date" name="date" value="{{ date_f }}" class="form-control form-control-sm rounded-3">
+        <input type="date" name="date" value="{{ date_f }}" class="form-control form-control-sm" style="border-radius: 8px;">
       </div>
 
       <div class="col-xl-2 col-lg-2 col-md-12 d-flex gap-2">
-        <button type="submit" class="btn btn-primary btn-sm flex-fill rounded-3 shadow-sm d-flex align-items-center justify-content-center gap-1">
+        <button type="submit" class="btn btn-primary btn-sm flex-fill shadow-sm d-flex align-items-center justify-content-center gap-1" style="border-radius: 8px;">
           <i class="bi bi-funnel-fill"></i>
           <span>Filtrer</span>
         </button>
         {% if q or statut_f or client_f or date_f %}
-        <a href="{% url 'reservation_list' %}" class="btn btn-outline-secondary btn-sm rounded-3" title="Réinitialiser les filtres">
+        <a href="{% url 'reservation_list' %}" class="btn btn-outline-secondary btn-sm" style="border-radius: 8px;" title="Réinitialiser les filtres">
           <i class="bi bi-arrow-counterclockwise"></i>
         </a>
         {% endif %}
@@ -194,7 +185,7 @@
   <div class="card-header bg-white py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-2 border-bottom">
     <div class="d-flex align-items-center gap-2">
       <h6 class="mb-0 fw-bold text-dark">Résultats</h6>
-      <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill px-2.5 py-1 font-monospace" style="font-size: 0.75rem;">
+      <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2.5 py-1 font-monospace" style="font-size: 0.75rem; border-radius: 8px;">
         {{ reservations|length }} réservation{{ reservations|length|pluralize }}
       </span>
     </div>
@@ -286,7 +277,7 @@
                 <i class="bi bi-hourglass-bottom me-1"></i>Expirée
               </span>
             {% else %}
-              <span class="badge px-3 py-2 bg-light text-muted border rounded-3">
+              <span class="badge px-3 py-2 bg-light text-muted border" style="border-radius: 8px;">
                 {{ r.get_statut_display }}
               </span>
             {% endif %}
@@ -344,11 +335,11 @@
             Aucune réservation trouvée.
             <div class="mt-2">
               {% if q or statut_f or client_f or date_f %}
-                <a href="{% url 'reservation_list' %}" class="btn btn-outline-primary btn-sm rounded-pill px-3">
+                <a href="{% url 'reservation_list' %}" class="btn btn-outline-primary btn-sm px-3" style="border-radius: 8px;">
                   <i class="bi bi-arrow-counterclockwise me-1"></i>Réinitialiser les filtres
                 </a>
               {% elif user.is_staff_regie_role %}
-                <a href="{% url 'reservation_wizard_etape1' %}" class="btn btn-primary btn-sm rounded-pill px-3">
+                <a href="{% url 'reservation_wizard_etape1' %}" class="btn btn-primary btn-sm px-3" style="border-radius: 8px;">
                   <i class="bi bi-plus-lg me-1"></i>Créer la première réservation
                 </a>
               {% endif %}

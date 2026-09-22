@@ -1,51 +1,260 @@
 {% extends 'base.html' %}
 {% load static %}
+
 {% block title %}{{ title }} — Integral{% endblock %}
-{% block topbar_title %}<i class="bi bi-person me-2" style="color:var(--color-primary)"></i>{{ title }}{% endblock %}
+
+{% block topbar_title %}
+  <i class="bi bi-person me-2" style="color:var(--color-primary)"></i>{{ title }}
+{% endblock %}
+
 {% block content %}
-<div class="row justify-content-center">
-  <div class="col-lg-12">
-    <div class="d-flex align-items-center gap-3 mb-4">
-      <a href="javascript:void(0)" onclick="history.back()" class="btn btn-outline-secondary btn-sm">
-        <i class="bi bi-arrow-left"></i>
-      </a>
-      <h1 style="font-size:1.4rem;font-weight:800;margin:0">{{ title }}</h1>
-    </div>
-    <form method="post" enctype="multipart/form-data">
-      {% csrf_token %}
-      <div class="card">
-        <div class="card-header"><i class="bi bi-person me-2"></i>Informations Client</div>
-        <div class="card-body">
-          <div class="row g-3">
-            <div class="col-12"><label class="form-label">Raison sociale / Nom *</label>{{ form.nom }}</div>
-            <div class="col-md-6"><label class="form-label">Contact principal</label>{{ form.contact_nom }}</div>
-            <div class="col-md-6"><label class="form-label">Téléphone *</label>{{ form.telephone }}</div>
-            <div class="col-md-6"><label class="form-label">Email *</label>{{ form.email }}</div>
-            <div class="col-12"><label class="form-label">Adresse</label>{{ form.adresse }}</div>
-            <div class="col-md-12">
-                <label class="form-label">Logo</label>
-                <div class="mb-2">
-                    <img id="image-preview" 
-                        src="{% if form.instance.logo %}{{ form.instance.logo.url }}{% else %}{% static 'img/logo.png' %}{% endif %}" 
-                        alt="Aperçu" 
-                        class="img-thumbnail {% if not form.instance.logo %}d-none{% endif %}" 
-                        style="height: 120px; width: 180px; object-fit: cover; border-radius: 8px; border: 2px solid var(--color-primary);">
+<style>
+  /* ── Form Card & Layout ── */
+  .clf-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.03);
+    margin-bottom: 2rem;
+  }
+  .clf-card-header {
+    background: #ffffff;
+    padding: 1.2rem 1.5rem;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    font-weight: 700;
+    font-size: 0.95rem;
+    color: #0f172a;
+  }
+  .clf-card-header i { color: #932e2b; font-size: 1.1rem; }
+  .clf-card-body { padding: 1.5rem; }
+
+  /* ── Section Title inside Form ── */
+  .clf-sec-title {
+    font-size: 0.85rem;
+    font-weight: 700;
+    color: #334155;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .clf-sec-title i { color: #932e2b; }
+
+  /* ── Form Controls & Labels ── */
+  .form-label {
+    font-size: 0.8rem;
+    font-weight: 600;
+    color: #475569;
+    margin-bottom: 0.35rem;
+  }
+  .form-control, .form-select {
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    padding: 0.6rem 0.9rem;
+    font-size: 0.85rem;
+    transition: all 0.15s ease;
+  }
+  .form-control:focus, .form-select:focus {
+    border-color: #932e2b;
+    box-shadow: 0 0 0 3px rgba(147, 46, 43, 0.12);
+  }
+
+  /* ── Logo Upload Preview Box ── */
+  .clf-logo-box {
+    background: #f8fafc;
+    border: 2px dashed #cbd5e1;
+    border-radius: 8px;
+    padding: 1.25rem;
+    text-align: center;
+    transition: all 0.2s ease;
+  }
+  .clf-logo-box:hover {
+    border-color: #932e2b;
+    background: #fff;
+  }
+  .clf-logo-preview {
+    width: 100px;
+    height: 100px;
+    object-fit: contain;
+    border-radius: 8px;
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    padding: 6px;
+    margin-bottom: 0.75rem;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+  }
+
+  .clf-footer {
+    padding: 1rem 1.5rem;
+    background: #f8fafc;
+    border-top: 1px solid #e2e8f0;
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.75rem;
+  }
+
+  .clf-link { color: #932e2b; text-decoration: none; font-weight: 600; }
+  .clf-link:hover { text-decoration: underline; }
+</style>
+
+<div class="container-fluid py-3">
+
+  {# ── RETOUR ── #}
+  <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+    <a href="javascript:void(0)" onclick="history.back()" class="clf-link" style="font-size: 0.82rem;">
+      <i class="bi bi-arrow-left me-1"></i>Retour
+    </a>
+    <h5 class="fw-bold mb-0 text-dark">{{ title }}</h5>
+  </div>
+
+  <div class="row justify-content-center">
+    <div class="col-lg-10 col-xl-9">
+      
+      <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        <div class="clf-card">
+          <div class="clf-card-header">
+            <i class="bi bi-building"></i>
+            <span>{{ title }}</span>
+          </div>
+
+          <div class="clf-card-body">
+            
+            {# ── SECTION 1: IDENTITÉ & LOGO ── #}
+            <div class="clf-sec-title">
+              <i class="bi bi-info-circle-fill"></i> 1. Identité de l'entreprise
+            </div>
+            
+            <div class="row g-3 mb-4">
+              <div class="col-md-7">
+                <div class="mb-3">
+                  <label class="form-label">Raison sociale / Nom du Client <span class="text-danger">*</span></label>
+                  {{ form.nom }}
+                  {% if form.nom.errors %}<div class="text-danger small mt-1">{{ form.nom.errors }}</div>{% endif %}
                 </div>
                 <div>
-                    {{ form.logo }}
+                  <label class="form-label">Contact principal (Nom & Prénom)</label>
+                  {{ form.contact_nom }}
+                  {% if form.contact_nom.errors %}<div class="text-danger small mt-1">{{ form.contact_nom.errors }}</div>{% endif %}
                 </div>
+              </div>
+
+              {# Zone Logo #}
+              <div class="col-md-5">
+                <label class="form-label">Logo de l'entreprise</label>
+                <div class="clf-logo-box">
+                  <div>
+                    <img id="image-preview" 
+                         src="{% if form.instance.logo %}{{ form.instance.logo.url }}{% else %}{% static 'img/logo.png' %}{% endif %}" 
+                         alt="Aperçu logo" 
+                         class="clf-logo-preview {% if not form.instance.logo %}d-none{% endif %}">
+                  </div>
+                  <div class="small text-muted mb-2">Format JPEG, PNG ou SVG (max 5 Mo)</div>
+                  <div>
+                    {{ form.logo }}
+                  </div>
+                </div>
+                {% if form.logo.errors %}<div class="text-danger small mt-1">{{ form.logo.errors }}</div>{% endif %}
+              </div>
             </div>
-            <div class="col-12"><label class="form-label">Notes</label>{{ form.notes }}</div>
+
+            <hr class="my-4" style="border-color:#f1f5f9;">
+
+            {# ── SECTION 2: COORDONNÉES ── #}
+            <div class="clf-sec-title">
+              <i class="bi bi-telephone-fill"></i> 2. Coordonnées & Localisation
+            </div>
+
+            <div class="row g-3 mb-4">
+              <div class="col-md-6">
+                <label class="form-label">Numéro de Téléphone <span class="text-danger">*</span></label>
+                <div class="input-group">
+                  <span class="input-group-text bg-light text-muted border-end-0" style="border-radius:8px 0 0 8px; border-color:#cbd5e1;">
+                    <i class="bi bi-telephone"></i>
+                  </span>
+                  <input type="text" name="telephone" value="{{ form.telephone.value|default:'' }}" class="form-control border-start-0" placeholder="+226 XX XX XX XX" style="border-radius:0 8px 8px 0;" required>
+                </div>
+                {% if form.telephone.errors %}<div class="text-danger small mt-1">{{ form.telephone.errors }}</div>{% endif %}
+              </div>
+
+              <div class="col-md-6">
+                <label class="form-label">Adresse Email <span class="text-danger">*</span></label>
+                <div class="input-group">
+                  <span class="input-group-text bg-light text-muted border-end-0" style="border-radius:8px 0 0 8px; border-color:#cbd5e1;">
+                    <i class="bi bi-envelope"></i>
+                  </span>
+                  <input type="email" name="email" value="{{ form.email.value|default:'' }}" class="form-control border-start-0" placeholder="contact@entreprise.com" style="border-radius:0 8px 8px 0;" required>
+                </div>
+                {% if form.email.errors %}<div class="text-danger small mt-1">{{ form.email.errors }}</div>{% endif %}
+              </div>
+
+              <div class="col-12">
+                <label class="form-label">Adresse géographique / Siège</label>
+                <div class="input-group">
+                  <span class="input-group-text bg-light text-muted border-end-0" style="border-radius:8px 0 0 8px; border-color:#cbd5e1;">
+                    <i class="bi bi-geo-alt"></i>
+                  </span>
+                  <input type="text" name="adresse" value="{{ form.adresse.value|default:'' }}" class="form-control border-start-0" placeholder="Quartier, Rue, Porte, Ville..." style="border-radius:0 8px 8px 0;">
+                </div>
+                {% if form.adresse.errors %}<div class="text-danger small mt-1">{{ form.adresse.errors }}</div>{% endif %}
+              </div>
+            </div>
+
+            <hr class="my-4" style="border-color:#f1f5f9;">
+
+            {# ── SECTION 3: NOTES INTERNES ── #}
+            <div class="clf-sec-title">
+              <i class="bi bi-sticky-fill"></i> 3. Informations complémentaires
+            </div>
+
+            <div class="row g-3">
+              <div class="col-12">
+                <label class="form-label">Notes internes & Remarques de gestion</label>
+                {{ form.notes }}
+                {% if form.notes.errors %}<div class="text-danger small mt-1">{{ form.notes.errors }}</div>{% endif %}
+              </div>
+
+              <div class="col-12">
+                <div class="form-check form-switch p-3 bg-light border" style="border-radius:8px;">
+                  {{ form.actif }}
+                  <label class="form-check-label fw-bold text-dark ms-2" for="{{ form.actif.id_for_label }}">
+                    Client actif
+                  </label>
+                  <div class="form-text mt-1 text-muted" style="font-size:0.75rem;">
+                    Si cette option est décochée, le client sera considéré comme inactif / archivé.
+                  </div>
+                </div>
+                {% if form.actif.errors %}<div class="text-danger small mt-1">{{ form.actif.errors }}</div>{% endif %}
+              </div>
+            </div>
+
           </div>
+
+          {# Pied de formulaire #}
+          <div class="clf-footer">
+            <a href="{% url 'client_list' %}" class="btn btn-outline-secondary" style="border-radius:8px; font-weight:600;">
+              Annuler
+            </a>
+            <button type="submit" class="btn btn-primary px-4" style="border-radius:8px; font-weight:700;">
+              <i class="bi bi-check-lg me-1"></i>{% if obj %}Mettre à jour{% else %}Créer le client{% endif %}
+            </button>
+          </div>
+
         </div>
-        <div class="card-body pt-0 d-flex justify-content-end gap-2">
-          <a href="{% url 'client_list' %}" class="btn btn-outline-secondary">Annuler</a>
-          <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>{% if obj %}Enregistrer{% else %}Créer{% endif %}</button>
-        </div>
-      </div>
-    </form>
+      </form>
+
+    </div>
   </div>
+
 </div>
+
 <script>
 document.addEventListener("DOMContentLoaded", function () {
     const photoInput = document.querySelector('input[type="file"][name="logo"]');

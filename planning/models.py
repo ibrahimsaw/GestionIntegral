@@ -3,7 +3,7 @@ from django.utils import timezone
 
 
 class LogDiffusion(models.Model):
-    """Enregistrement de chaque passage d'un spot (main courante)."""
+    """Enregistrement de chaque passage d'un spot."""
     ecran       = models.ForeignKey('inventory.EcranNumerique', on_delete=models.CASCADE, related_name='logs')
     ligne       = models.ForeignKey('campaigns.LigneCampagne', on_delete=models.SET_NULL, null=True, related_name='logs')
     client      = models.ForeignKey('campaigns.Client', on_delete=models.SET_NULL, null=True)
@@ -15,7 +15,7 @@ class LogDiffusion(models.Model):
     class Meta:
         ordering = ['timestamp']
         verbose_name = "Log de Diffusion"
-        verbose_name_plural = "Main Courante"
+        verbose_name_plural = "Journaux de diffusion"
 
     def __str__(self):
         return f"{self.timestamp:%H:%M:%S} — {self.client} ({self.duree_sec}s)"

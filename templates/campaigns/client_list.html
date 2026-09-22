@@ -1,9 +1,15 @@
 {% extends 'base.html' %}
-{% block title %}Clients — Integral{% endblock %}
-{% block topbar_title %}<i class="bi bi-people me-2" style="color:var(--color-primary)"></i>Clients{% endblock %}
+{% load sort_tags %}
+
+{% block title %}Portefeuille Clients — Integral{% endblock %}
+
+{% block topbar_title %}
+  <i class="bi bi-people me-2" style="color:var(--color-primary)"></i>Clients & Annonceurs
+{% endblock %}
+
 {% block topbar_actions %}
   {% if user.is_staff_regie_role %}
-  <a href="{% url 'client_create' %}" class="btn btn-primary btn-sm">
+  <a href="{% url 'client_create' %}" class="btn btn-primary btn-sm shadow-sm" style="border-radius: 8px; font-weight: 600;">
     <i class="bi bi-plus-lg me-1"></i>
     <span class="d-none d-md-inline ms-1">Nouveau Client</span>
   </a>
@@ -11,61 +17,765 @@
 {% endblock %}
 
 {% block content %}
-<div class="card mb-4">
-  <div class="card-body">
-    <form method="get" class="row g-2 align-items-end">
-      <div class="col-md-6">
-        <label class="form-label">Recherche</label>
-        <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Nom, contact...">
-      </div>
-      <div class="col-md-2 d-flex gap-2">
-        <button type="submit" class="btn btn-primary flex-fill"><i class="bi bi-search"></i></button>
-        <a href="{% url 'client_list' %}" class="btn btn-outline-secondary"><i class="bi bi-x-lg"></i></a>
-      </div>
-    </form>
-  </div>
-</div>
+<style>
+  /* ═══════════════════════════════════════════════════════════════════════════
+     PORTFOLIO CLIENTS — DESIGN SAAS CRM (STRICT BORDER-RADIUS: 8PX)
+     ═══════════════════════════════════════════════════════════════════════════ */
 
-<div class="row g-3">
-  {% for c in clients %}
-  <div class="col-md-6 col-lg-4" >
-    <div class="card h-100" style="{% if c.actif %}background-color: #eb161629;{% endif %}">
-      <div class="card-body">
-        <div class="d-flex align-items-start gap-3 mb-3">
-          {% if c.logo %}
-          <img src="{{ c.logo.url }}" style="width:44px;height:44px;object-fit:contain;border-radius:8px;background:var(--bg-card2);padding:4px;flex-shrink:0">
-          {% else %}
-          <div style="width:44px;height:44px;background:var(--bg-card2);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
-            <i class="bi bi-building" style="font-size:1.2rem;color:var(--text-muted)"></i>
-          </div>
-          {% endif %}
-          <div class="flex-grow-1 overflow-hidden">
-            <div style="font-weight:700;font-size:.9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">{{ c.nom }}</div>
-            <div style="font-size:.75rem;color:var(--text-muted)">{{ c.contact_nom }}</div>
-          </div>
-          <div>
-            <p class="btn btn-sm btn-outline-secondary"><i class="bi bi-graph-up"></i> {{ c.spots_stats.total }}</p>
-          </div>
+  /* ── Hero Banner ── */
+  .cl-hero {
+    background: linear-gradient(135deg, #932e2b 0%, #1e40af 100%);
+    border-radius: 8px;
+    padding: 1.75rem 2rem;
+    color: #ffffff;
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 10px 25px rgba(147, 46, 43, 0.15);
+  }
+  .cl-hero::before {
+    content: '';
+    position: absolute;
+    top: -40%;
+    right: -10%;
+    width: 320px;
+    height: 320px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    transform: rotate(45deg);
+    pointer-events: none;
+  }
+  .cl-hero-title {
+    font-size: 1.5rem;
+    font-weight: 800;
+    margin-bottom: 0.25rem;
+    letter-spacing: -0.3px;
+    color: #ffffff;
+  }
+  .cl-hero-sub {
+    opacity: 0.9;
+    font-size: 0.85rem;
+    max-width: 650px;
+    color: #f1f5f9;
+  }
+
+  /* ── KPI Stat Cards Ribbon ── */
+  .cl-kpi-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 1rem 1.15rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.03);
+    display: flex;
+    align-items: center;
+    gap: 0.85rem;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    height: 100%;
+  }
+  .cl-kpi-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px rgba(0, 0, 0, 0.06);
+  }
+  .cl-kpi-icon {
+    width: 44px;
+    height: 44px;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.25rem;
+    flex-shrink: 0;
+  }
+  .cl-kpi-val {
+    font-size: 1.35rem;
+    font-weight: 800;
+    color: #0f172a;
+    line-height: 1.1;
+    font-family: 'SFMono-Regular', monospace;
+  }
+  .cl-kpi-lbl {
+    font-size: 0.68rem;
+    text-transform: uppercase;
+    font-weight: 700;
+    color: #64748b;
+    letter-spacing: 0.3px;
+    margin-top: 3px;
+  }
+
+  /* ── Filter & Search Bar ── */
+  .cl-filter-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.5rem;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+  }
+  .cl-search-input {
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    padding: 0.55rem 1rem;
+    font-size: 0.85rem;
+  }
+  .cl-search-input:focus {
+    border-color: #932e2b;
+    box-shadow: 0 0 0 3px rgba(147, 46, 43, 0.12);
+  }
+  .cl-filter-pill {
+    padding: 0.45rem 0.95rem;
+    font-size: 0.8rem;
+    font-weight: 600;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    color: #475569;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    transition: all 0.15s ease;
+  }
+  .cl-filter-pill:hover {
+    background: #f1f5f9;
+    color: #0f172a;
+  }
+  .cl-filter-pill.active {
+    background: #932e2b;
+    color: #ffffff;
+    border-color: #932e2b;
+  }
+  .cl-view-btn {
+    padding: 0.45rem 0.75rem;
+    font-size: 0.85rem;
+    border-radius: 8px;
+    border: 1px solid #cbd5e1;
+    background: #ffffff;
+    color: #64748b;
+    cursor: pointer;
+    transition: all 0.15s ease;
+  }
+  .cl-view-btn.active {
+    background: #1e293b;
+    color: #ffffff;
+    border-color: #1e293b;
+  }
+
+  /* ── Client Cards (Grid View) ── */
+  .cl-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    overflow: hidden;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    transition: all 0.2s ease;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+  }
+  .cl-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.08);
+    border: 2px solid #932e2b;
+  }
+  /*
+  .cl-card-active {
+    border-left: 4px solid #22c55e;
+  }
+    */
+  .cl-card-inactive {
+    border-left: 4px solid #94a3b8;
+    opacity: 0.88;
+  }
+  .cl-card-head {
+    padding: 1.15rem 1.25rem;
+    border-bottom: 1px solid #f1f5f9;
+    display: flex;
+    align-items: flex-start;
+    gap: 0.85rem;
+  }
+  .cl-avatar {
+    width: 52px;
+    height: 52px;
+    border-radius: 8px;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+  .cl-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    padding: 4px;
+  }
+  .cl-card-body {
+    padding: 1rem 1.25rem;
+    flex-grow: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+  }
+  .cl-card-foot {
+    padding: 0.75rem 1.25rem;
+    background: #f8fafc;
+    border-top: 1px solid #f1f5f9;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  /* ── Stats Box inside Card ── */
+  .cl-stats-box {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 0.65rem 0.85rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+  .cl-stat-item {
+    text-align: center;
+    flex: 1;
+  }
+  .cl-stat-num {
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: #0f172a;
+    font-family: 'SFMono-Regular', monospace;
+    line-height: 1.1;
+  }
+  .cl-stat-lbl {
+    font-size: 0.6rem;
+    text-transform: uppercase;
+    color: #64748b;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    margin-top: 2px;
+  }
+
+  /* ── Contact Lines ── */
+  .cl-contact-pill {
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    padding: 0.4rem 0.7rem;
+    font-size: 0.76rem;
+    color: #334155;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .cl-contact-pill i {
+    color: #932e2b;
+    font-size: 0.85rem;
+    flex-shrink: 0;
+  }
+  .cl-contact-pill a {
+    color: #1e293b;
+    text-decoration: none;
+    font-weight: 600;
+  }
+  .cl-contact-pill a:hover {
+    color: #932e2b;
+    text-decoration: underline;
+  }
+
+  /* ── Badges ── */
+  .cl-badge-ref {
+    font-family: 'SFMono-Regular', monospace;
+    font-size: 0.68rem;
+    font-weight: 700;
+    /*
+    background: #f1f5f9;
+    */
+    color: var(--color-primary);
+    /*
+    padding: 2px 7px;
+    border-radius: 8px;
+    border: 1px solid #e2e8f0;
+    */
+  }
+  .cl-badge-status {
+    font-size: 0.64rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 8px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .cl-badge-actif {
+    background: #dcfce7;
+    color: #166534;
+    border: 1px solid #bbf7d0;
+  }
+  .cl-badge-inactif {
+    background: #fee2e2;
+    color: #991b1b;
+    border: 1px solid #fecaca;
+  }
+
+  .cl-mono {
+    font-family: 'SFMono-Regular', monospace;
+  }
+</style>
+
+<div class="container-fluid py-3">
+
+  {# ═══════════════════════════════════════════ #}
+  {# ── BANNIÈRE HÉRO ── #}
+  {# ═══════════════════════════════════════════ #}
+  <div class="cl-hero">
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+      <div>
+        <div class="cl-hero-title">
+          <i class="bi bi-people-fill me-2"></i>Portefeuille Annonceurs & Clients
         </div>
-        <div style="font-size:.75rem;color:var(--text-muted);margin-bottom:6px">
-          <div><i class="bi bi-telephone me-1"></i>{% if c.telephone %}{{ c.telephone }}{% else %}Téléphone non renseigné{% endif %}</div>
-          <div><i class="bi bi-envelope me-1"></i>{% if c.email %}{{ c.email }}{% else %}Email non renseigné{% endif %}</div>
+        <div class="cl-hero-sub">
+          Supervisez l'ensemble des comptes clients, contrats de régie, historiques de diffusion et actions commerciales.
         </div>
-        <div class="d-flex justify-content-between align-items-center mt-2">
-          <span style="font-size:.68rem;font-family:var(--mono);color:var(--text-muted);text-transform:uppercase">{{ c.get_type_contrat_display }}</span>
-          <div class="d-flex gap-1">
-            <a href="{% url 'client_detail' c.pk %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-eye"></i></a>
-            {% if user.is_staff_regie_role %}
-            <a href="{% url 'client_edit' c.pk %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-pencil"></i></a>
-            <a href="{% url 'client_delete' c.pk %}" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></a>
-            {% endif %}
-          </div>
+      </div>
+      {% if user.is_staff_regie_role %}
+      <div>
+        <a href="{% url 'client_create' %}" class="btn btn-light shadow-sm" style="font-weight:700; color:#932e2b; border-radius:8px; padding:0.55rem 1.3rem;">
+          <i class="bi bi-plus-lg me-1"></i>Nouveau Client
+        </a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {# ═══════════════════════════════════════════ #}
+  {# ── RUBAN DE 5 CARTES KPI STATISTIQUES (SPOTS ET FACES SÉPARÉS) ── #}
+  {# ═══════════════════════════════════════════ #}
+  <div class="row g-3 mb-4">
+    {# 1. Total Clients #}
+    <div class="col-6 col-md-4 col-xl">
+      <div class="cl-kpi-card">
+        <div class="cl-kpi-icon" style="background:#eff6ff; color:#2563eb; border:1px solid #dbeafe;">
+          <i class="bi bi-building"></i>
+        </div>
+        <div>
+          <div class="cl-kpi-val">{{ kpi_total_clients|default:0 }}</div>
+          <div class="cl-kpi-lbl">Total Clients</div>
+        </div>
+      </div>
+    </div>
+
+    {# 2. Clients Actifs #}
+    <div class="col-6 col-md-4 col-xl">
+      <div class="cl-kpi-card">
+        <div class="cl-kpi-icon" style="background:#ecfdf5; color:#059669; border:1px solid #d1fae5;">
+          <i class="bi bi-check-circle-fill"></i>
+        </div>
+        <div>
+          <div class="cl-kpi-val" style="color:#059669;">{{ kpi_actifs_count|default:0 }}</div>
+          <div class="cl-kpi-lbl">Clients Actifs</div>
+        </div>
+      </div>
+    </div>
+
+    {# 3. Campagnes Actives #}
+    <div class="col-6 col-md-4 col-xl">
+      <div class="cl-kpi-card">
+        <div class="cl-kpi-icon" style="background:#fef2f2; color:#932e2b; border:1px solid #fee2e2;">
+          <i class="bi bi-megaphone-fill"></i>
+        </div>
+        <div>
+          <div class="cl-kpi-val" style="color:#932e2b;">{{ kpi_campagnes_actives|default:0 }}</div>
+          <div class="cl-kpi-lbl">Campagnes en Cours</div>
+        </div>
+      </div>
+    </div>
+
+    {# 4. Spots LED (Numérique) #}
+    <div class="col-6 col-md-6 col-xl">
+      <div class="cl-kpi-card">
+        <div class="cl-kpi-icon" style="background:#eef2ff; color:#4f46e5; border:1px solid #e0e7ff;">
+          <i class="bi bi-tv-fill"></i>
+        </div>
+        <div>
+          <div class="cl-kpi-val" style="color:#4f46e5;">{{ kpi_spots_led_actifs|default:0 }}</div>
+          <div class="cl-kpi-lbl">Spots LED (Écrans)</div>
+        </div>
+      </div>
+    </div>
+
+    {# 5. Faces Statiques (Panneaux) #}
+    <div class="col-6 col-md-6 col-xl">
+      <div class="cl-kpi-card">
+        <div class="cl-kpi-icon" style="background:#fffbeb; color:#d97706; border:1px solid #fef3c7;">
+          <i class="bi bi-layout-sidebar-inset"></i>
+        </div>
+        <div>
+          <div class="cl-kpi-val" style="color:#d97706;">{{ kpi_faces_statiques_actives|default:0 }}</div>
+          <div class="cl-kpi-lbl">Faces (Panneaux)</div>
         </div>
       </div>
     </div>
   </div>
-  {% empty %}
-  <div class="col-12"><div class="card"><div class="card-body text-center py-4" style="color:var(--text-muted)">Aucun client.</div></div></div>
-  {% endfor %}
+
+  {# ═══════════════════════════════════════════ #}
+  {# ── BARRE DE RECHERCHE, FILTRES & VUES ── #}
+  {# ═══════════════════════════════════════════ #}
+  <div class="cl-filter-card">
+    <form method="get" id="clientFilterForm" class="row g-2 align-items-center">
+      {# Champ Recherche #}
+      <div class="col-lg-5 col-md-12">
+        <div class="input-group">
+          <span class="input-group-text bg-light border-end-0" style="border-radius:8px 0 0 8px; border-color:#cbd5e1;">
+            <i class="bi bi-search text-muted"></i>
+          </span>
+          <input type="text" name="q" value="{{ q }}" class="form-control cl-search-input border-start-0" placeholder="Rechercher par nom, contact, référence, téléphone, email..." style="border-radius:0 8px 8px 0;">
+        </div>
+      </div>
+
+      {# Filtres Statut #}
+      <div class="col-lg-5 col-md-8 d-flex gap-2 flex-wrap align-items-center">
+        <input type="hidden" name="status" id="statusInput" value="{{ status_filter }}">
+        <a href="?{% if q %}q={{ q }}&{% endif %}status=" class="cl-filter-pill {% if not status_filter %}active{% endif %}">
+          <i class="bi bi-grid-fill"></i>Tous ({{ kpi_total_clients|default:0 }})
+        </a>
+        <a href="?{% if q %}q={{ q }}&{% endif %}status=actif" class="cl-filter-pill {% if status_filter == 'actif' %}active{% endif %}">
+          <i class="bi bi-check-circle"></i>Actifs ({{ kpi_actifs_count|default:0 }})
+        </a>
+        {% if user.is_admin %}
+        <a href="?{% if q %}q={{ q }}&{% endif %}status=inactif" class="cl-filter-pill {% if status_filter == 'inactif' %}active{% endif %}">
+          <i class="bi bi-x-circle"></i>Inactifs ({{ kpi_inactifs_count|default:0 }})
+        </a>
+        {% endif %}
+      </div>
+
+      {# Sélecteur de vue (Grille / Tableau) & Bouton validation #}
+      <div class="col-lg-2 col-md-4 d-flex justify-content-end gap-2">
+        <button type="submit" class="btn btn-primary btn-sm flex-fill" style="border-radius:8px; font-weight:600; font-size:0.83rem;">
+          <i class="bi bi-funnel me-1"></i>Filtrer
+        </button>
+        {% if q or status_filter %}
+        <a href="{% url 'client_list' %}" class="btn btn-outline-secondary btn-sm" style="border-radius:8px;" title="Réinitialiser">
+          <i class="bi bi-x-lg"></i>
+        </a>
+        {% endif %}
+        <div class="btn-group" role="group" style="border-radius:8px;">
+          <button type="button" class="cl-view-btn active" id="btnViewGrid" title="Vue Grille" onclick="setViewMode('grid')">
+            <i class="bi bi-grid-3x3-gap-fill"></i>
+          </button>
+          <button type="button" class="cl-view-btn" id="btnViewTable" title="Vue Tableau" onclick="setViewMode('table')">
+            <i class="bi bi-table"></i>
+          </button>
+        </div>
+      </div>
+    </form>
+
+    {% if q or status_filter %}
+    <div class="mt-2 text-muted d-flex align-items-center gap-2" style="font-size:0.78rem;">
+      <i class="bi bi-info-circle text-primary"></i>
+      <span>
+        Filtre actif : 
+        {% if q %}<strong>Recherche: "{{ q }}"</strong>{% endif %}
+        {% if status_filter %} <span class="badge bg-light text-dark border ms-1" style="border-radius:8px;">Statut : {{ status_filter|capfirst }}</span>{% endif %}
+        ({{ clients|length }} résultat{{ clients|length|pluralize }})
+      </span>
+      <a href="{% url 'client_list' %}" class="text-danger ms-auto text-decoration-none fw-bold" style="font-size:0.75rem;">
+        <i class="bi bi-x-circle me-1"></i>Effacer les filtres
+      </a>
+    </div>
+    {% endif %}
+  </div>
+
+  {# ═══════════════════════════════════════════ #}
+  {# ── VUE 1 : GRILLE DES CARTES CLIENTS ── #}
+  {# ═══════════════════════════════════════════ #}
+  <div id="clientsGridView" class="row g-3">
+    {% for c in clients %}
+    <div class="col-md-6 col-xl-4 client-item-card">
+      <div class="cl-card {% if c.actif %}cl-card-active{% else %}cl-card-inactive{% endif %}">
+        
+        {# En-tête de carte #}
+        <div class="cl-card-head">
+          <div class="cl-avatar">
+            {% if c.logo %}
+              <img src="{{ c.logo.url }}" alt="{{ c.nom }}">
+            {% else %}
+              <i class="bi bi-building fs-4" style="color:#932e2b"></i>
+            {% endif %}
+          </div>
+          <div style="min-width:0;" class="flex-grow-1">
+            <div class="d-flex align-items-center justify-content-between gap-1 mb-1">
+              <span class="cl-badge-ref">{{ c.reference }}</span>
+              {% if c.actif %}
+                <span class="cl-badge-status cl-badge-actif"><i class="bi bi-dot"></i>Actif</span>
+              {% else %}
+                <span class="cl-badge-status cl-badge-inactif"><i class="bi bi-dot"></i>Inactif</span>
+              {% endif %}
+            </div>
+            <h6 style="font-weight:700; font-size:0.95rem; margin:0;" class="text-truncate">
+              <a href="{% url 'client_detail' c.pk %}" class="text-dark text-decoration-none">
+                {{ c.nom }}
+              </a>
+            </h6>
+            {% if c.contact_nom %}
+              <span class="text-muted text-truncate d-block" style="font-size:0.75rem; margin-top:2px;">
+                <i class="bi bi-person me-1"></i>{{ c.contact_nom }}
+              </span>
+            {% endif %}
+          </div>
+        </div>
+
+        {# Corps de carte #}
+        <div class="cl-card-body">
+          
+          {# Coordonnées de contact #}
+          <div class="d-flex flex-column gap-1">
+            <div class="cl-contact-pill">
+              <i class="bi bi-telephone-fill"></i>
+              {% if c.telephone %}
+                <a href="tel:{{ c.telephone }}">{{ c.telephone }}</a>
+              {% else %}
+                <span class="text-muted fst-italic">Téléphone non renseigné</span>
+              {% endif %}
+            </div>
+            <div class="cl-contact-pill">
+              <i class="bi bi-envelope-fill"></i>
+              {% if c.email %}
+                <a href="mailto:{{ c.email }}" title="{{ c.email }}">{{ c.email|truncatechars:32 }}</a>
+              {% else %}
+                <span class="text-muted fst-italic">Email non renseigné</span>
+              {% endif %}
+            </div>
+          </div>
+
+          {# Statistiques d'activité : Spots LED et Faces Statiques bien séparés #}
+          <div class="cl-stats-box">
+            <div class="cl-stat-item">
+              <div class="cl-stat-num" style="color:#932e2b;">{{ c.campagnes_stats.total|default:0 }}</div>
+              <div class="cl-stat-lbl">Camp. actives</div>
+            </div>
+            <div class="cl-stat-item border-start border-end">
+              <div class="cl-stat-num" style="color:#4f46e5;">{{ c.spots_stats.ecran|default:0 }}</div>
+              <div class="cl-stat-lbl">Spots LED</div>
+            </div>
+            <div class="cl-stat-item">
+              <div class="cl-stat-num" style="color:#d97706;">{{ c.spots_stats.panneau|default:0 }}</div>
+              <div class="cl-stat-lbl">Faces Statiques</div>
+            </div>
+          </div>
+
+        </div>
+
+        {# Pied de carte #}
+        <div class="cl-card-foot">
+          <a href="{% url 'client_detail' c.pk %}" class="btn btn-sm" style="background:rgba(147,46,43,0.08); color:#932e2b; font-weight:700; font-size:0.75rem; border-radius:8px; border:1px solid rgba(147,46,43,0.15);">
+            <i class="bi bi-eye"></i>Fiche Client
+          </a>
+          
+          <div class="d-flex gap-1 align-items-center">
+            {% if user.is_staff_regie_role %}
+              <a href="{% url 'campagne_create' %}?client={{ c.pk }}" class="btn btn-sm btn-outline-primary py-1 px-2" style="font-size:0.74rem; border-radius:8px;" title="Créer une campagne">
+                <i class="bi bi-megaphone"></i>
+              </a>
+              <a href="{% url 'reservation_wizard_etape1' c.pk %}" class="btn btn-sm btn-outline-secondary py-1 px-2" style="font-size:0.74rem; border-radius:8px;" title="Nouvelle Réservation">
+                <i class="bi bi-calendar-plus"></i>
+              </a>
+              <a href="{% url 'client_edit' c.pk %}" class="btn btn-sm btn-outline-secondary py-1 px-2" style="font-size:0.74rem; border-radius:8px;" title="Modifier le client">
+                <i class="bi bi-pencil"></i>
+              </a>
+              <a href="{% url 'client_delete' c.pk %}" class="btn btn-sm btn-outline-danger py-1 px-2" style="font-size:0.74rem; border-radius:8px;" title="Supprimer le client">
+                <i class="bi bi-trash"></i>
+              </a>
+            {% endif %}
+          </div>
+        </div>
+
+      </div>
+    </div>
+    {% empty %}
+    <div class="col-12">
+      <div class="card text-center p-5 border-0 shadow-sm" style="border-radius:8px;">
+        <i class="bi bi-people text-muted" style="font-size:3rem;"></i>
+        <h5 class="fw-bold mt-3 text-dark">Aucun client trouvé</h5>
+        <p class="text-muted" style="max-width:420px; margin:0 auto 1.5rem; font-size:0.85rem;">
+          {% if q or status_filter %}
+            Aucun résultat ne correspond à vos critères de recherche.
+          {% else %}
+            Vous n'avez pas encore enregistré de client dans votre portefeuille.
+          {% endif %}
+        </p>
+        {% if user.is_staff_regie_role %}
+        <div>
+          <a href="{% url 'client_create' %}" class="btn btn-primary px-4 py-2" style="border-radius:8px; font-weight:600;">
+            <i class="bi bi-plus-lg me-1"></i>Créer le premier client
+          </a>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  {# ═══════════════════════════════════════════ #}
+  {# ── VUE 2 : TABLEAU COMPACT (TABLE VIEW) ── #}
+  {# ═══════════════════════════════════════════ #}
+  <div id="clientsTableView" class="card table-custom-card d-none">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle">
+        <thead>
+          <tr>
+            <th style="width: 130px;">{% sortable_th sort_links sort_key sort_dir 'reference' 'Référence' %}</th>
+            <th>{% sortable_th sort_links sort_key sort_dir 'nom' 'Annonceur / Raison Sociale' %}</th>
+            <th>{% sortable_th sort_links sort_key sort_dir 'contact' 'Contact Principal' %}</th>
+            <th>Téléphone & Email</th>
+            <th class="text-center">{% sortable_th sort_links sort_key sort_dir 'campagnes' 'Campagnes Actives' %}</th>
+            <th class="text-center">Supports en Diffusion</th>
+            <th class="text-center" style="width: 110px;">{% sortable_th sort_links sort_key sort_dir 'statut' 'Statut' %}</th>
+            <th class="text-end pe-3" style="width: 180px;">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for c in clients %}
+          <tr>
+            <td>
+              <span class="cl-badge-ref">{{ c.reference }}</span>
+            </td>
+            <td>
+              <div class="d-flex align-items-center gap-2">
+                <div class="cl-avatar" style="width:36px; height:36px;">
+                  {% if c.logo %}
+                    <img src="{{ c.logo.url }}" alt="{{ c.nom }}">
+                  {% else %}
+                    <i class="bi bi-building" style="color:#932e2b; font-size:1rem;"></i>
+                  {% endif %}
+                </div>
+                <div>
+                  <a href="{% url 'client_detail' c.pk %}" class="text-dark fw-bold text-decoration-none" style="font-size:0.88rem;">
+                    {{ c.nom }}
+                  </a>
+                  {% if c.adresse %}
+                    <div class="text-muted text-truncate" style="font-size:0.72rem; max-width:220px;">
+                      <i class="bi bi-geo-alt me-1"></i>{{ c.adresse }}
+                    </div>
+                  {% endif %}
+                </div>
+              </div>
+            </td>
+            <td>
+              {% if c.contact_nom %}
+                <span class="fw-semibold text-dark">{{ c.contact_nom }}</span>
+              {% else %}
+                <span class="text-muted fst-italic" style="font-size:0.75rem;">Non renseigné</span>
+              {% endif %}
+            </td>
+            <td>
+              <div class="d-flex flex-column gap-1" style="font-size:0.76rem;">
+                {% if c.telephone %}
+                  <div><i class="bi bi-telephone text-danger me-1"></i><a href="tel:{{ c.telephone }}" class="text-dark text-decoration-none">{{ c.telephone }}</a></div>
+                {% endif %}
+                {% if c.email %}
+                  <div><i class="bi bi-envelope text-primary me-1"></i><a href="mailto:{{ c.email }}" class="text-primary text-decoration-none">{{ c.email|truncatechars:28 }}</a></div>
+                {% endif %}
+              </div>
+            </td>
+            <td class="text-center">
+              <span class="badge bg-light text-dark border px-2 py-1 cl-mono" style="border-radius:8px; font-weight:700; font-size:0.8rem;">
+                {{ c.campagnes_stats.total|default:0 }}
+              </span>
+            </td>
+            <td class="text-center">
+              <div class="d-flex justify-content-center gap-1">
+                <span class="badge bg-primary-subtle text-primary border border-primary-subtle cl-mono" style="border-radius:8px; font-size:0.72rem;" title="Spots LED">
+                  {{ c.spots_stats.ecran|default:0 }} LED
+                </span>
+                <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle cl-mono" style="border-radius:8px; font-size:0.72rem;" title="Faces Statiques">
+                  {{ c.spots_stats.panneau|default:0 }} Faces
+                </span>
+              </div>
+            </td>
+            <td class="text-center">
+              {% if c.actif %}
+                <span class="cl-badge-status cl-badge-actif"><i class="bi bi-dot"></i>Actif</span>
+              {% else %}
+                <span class="cl-badge-status cl-badge-inactif"><i class="bi bi-dot"></i>Inactif</span>
+              {% endif %}
+            </td>
+            <td class="text-end">
+              <div class="d-flex gap-1 justify-content-end align-items-center">
+                <a href="{% url 'client_detail' c.pk %}" class="btn btn-sm btn-outline-primary py-1 px-2" style="border-radius:8px; font-size:0.75rem;" title="Voir la fiche client">
+                  <i class="bi bi-eye"></i>
+                </a>
+                {% if user.is_staff_regie_role %}
+                  <a href="{% url 'campagne_create' %}?client={{ c.pk }}" class="btn btn-sm btn-outline-secondary py-1 px-2" style="border-radius:8px; font-size:0.75rem;" title="Créer une campagne">
+                    <i class="bi bi-megaphone"></i>
+                  </a>
+                  <a href="{% url 'reservation_wizard_etape1' c.pk %}" class="btn btn-sm btn-outline-secondary py-1 px-2" style="border-radius:8px; font-size:0.75rem;" title="Réserver">
+                    <i class="bi bi-calendar-plus"></i>
+                  </a>
+                  <a href="{% url 'client_edit' c.pk %}" class="btn btn-sm btn-outline-secondary py-1 px-2" style="border-radius:8px; font-size:0.75rem;" title="Modifier">
+                    <i class="bi bi-pencil"></i>
+                  </a>
+                  <a href="{% url 'client_delete' c.pk %}" class="btn btn-sm btn-outline-danger py-1 px-2" style="border-radius:8px; font-size:0.75rem;" title="Supprimer">
+                    <i class="bi bi-trash"></i>
+                  </a>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="8" class="text-center py-5 text-muted">
+              <i class="bi bi-people fs-2 d-block mb-2"></i>
+              Aucun client trouvé dans le portefeuille.
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
 </div>
+
+<div class="mt-4">
+  {% pagination_nav %}
+</div>
+
+<script>
+  function setViewMode(mode) {
+    const gridView = document.getElementById('clientsGridView');
+    const tableView = document.getElementById('clientsTableView');
+    const btnGrid = document.getElementById('btnViewGrid');
+    const btnTable = document.getElementById('btnViewTable');
+
+    if (mode === 'table') {
+      gridView.classList.add('d-none');
+      tableView.classList.remove('d-none');
+      btnGrid.classList.remove('active');
+      btnTable.classList.add('active');
+      localStorage.setItem('client_view_mode', 'table');
+    } else {
+      tableView.classList.add('d-none');
+      gridView.classList.remove('d-none');
+      btnTable.classList.remove('active');
+      btnGrid.classList.add('active');
+      localStorage.setItem('client_view_mode', 'grid');
+    }
+  }
+
+  // Restaurer le mode de vue sauvegardé
+  document.addEventListener('DOMContentLoaded', function() {
+    const savedMode = localStorage.getItem('client_view_mode');
+    if (savedMode === 'table') {
+      setViewMode('table');
+    }
+  });
+</script>
 {% endblock %}

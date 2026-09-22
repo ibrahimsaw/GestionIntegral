@@ -37,12 +37,11 @@ Plateforme Web Full-Stack Django pour la gestion complète d'un parc publicitair
 ### 📅 Planning
 - **Calendrier mensuel** avec toutes les campagnes actives en couleur
 - **Taux d'occupation par support** sur le mois sélectionné
-- **Main Courante** : timeline heure par heure (00:00 → 22:00) de chaque passage
 - Alertes automatiques (campagnes finissant dans 7 jours, supports en panne)
 
 ### 📊 Rapports & Exports
 - **Export PDF** : rapport de campagne avec ReportLab (design sombre/professionnel)
-- **Export Excel** : rapport campagne + onglet Main Courante avec openpyxl
+- **Export Excel** : rapports de campagnes avec openpyxl
 - Accessible aux clients (lecture seule sur leurs propres campagnes)
 
 ### 🎨 Design System Centralisé
@@ -108,7 +107,6 @@ python manage.py runserver
 | `/campaigns/clients/` | Liste des clients | Staff+ |
 | `/campaigns/campaigns/` | Liste des campagnes | Tous |
 | `/planning/calendrier/` | Calendrier mensuel | Staff+ |
-| `/planning/main-courante/` | Timeline de diffusion | Staff+ |
 | `/reports/` | Exports PDF/Excel | Tous |
 | `/accounts/users/` | Gestion utilisateurs | Admin |
 | `/admin/` | Back-office Django | Admin |
@@ -143,7 +141,7 @@ geoad/
 ├── campaigns/                 ← Client, Campagne, LigneCampagne, SpotEcran
 │   ├── models.py              ← Logique métier + calcul secondes boucle
 │   └── views.py               ← CRUD + API disponibilité
-├── planning/                  ← Calendrier + Main Courante
+├── planning/                  ← Calendrier
 │   └── views.py               ← Génération timeline automatique
 ├── reports/                   ← Export PDF (ReportLab) + Excel (openpyxl)
 ├── templates/

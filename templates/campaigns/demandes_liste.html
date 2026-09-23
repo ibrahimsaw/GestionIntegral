@@ -1,92 +1,158 @@
 {% extends 'base.html' %}
-{% load sort_tags %}
+{% load static sort_tags %}
+
 {% block title %}Demandes de réservation — Integral{% endblock %}
-{% block topbar_title %}<i class="bi bi-file-earmark-text-fill me-2" style="color:var(--color-primary)"></i>Demandes de réservation{% endblock %}
+
+{% block topbar_title %}
+  <i class="bi bi-file-earmark-text-fill me-2" style="color:var(--color-primary)"></i>Demandes de réservation
+{% endblock %}
 
 {% block content %}
-<style>
-  .filter-card,
-  .table-custom-card {
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--bg-card);
-    box-shadow: 0 4px 20px rgba(0,0,0,0.03);
-  }
-  .filter-card { transition: box-shadow 0.2s ease, border-color 0.2s ease; }
-  .filter-card:hover { box-shadow: 0 8px 28px rgba(0,0,0,0.06); border-color: rgba(13, 110, 253, 0.2); }
-  .filter-label { font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--text-muted); margin-bottom: 5px; display: flex; align-items: center; gap: 5px; }
-  .table-custom-card { overflow: hidden; }
-  .table-supports thead th { background-color: #f8fafc; color: var(--text-muted); font-size: 0.72rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.6px; border-bottom: 2px solid var(--border); white-space: nowrap; }
-  .table-supports tbody td { border-bottom: 1px solid var(--border); vertical-align: middle; }
-  .table-supports tbody tr.request-row { transition: background-color 0.15s ease; }
-  .table-supports tbody tr.request-row:hover { background-color: rgba(13, 110, 253, 0.02); }
-  .request-reference { color: var(--color-primary); font-family: var(--mono, monospace); font-size: 0.82rem; font-weight: 700; }
-  .request-name { color: var(--text); font-weight: 700; }
-  .request-status { display: inline-flex; align-items: center; gap: 5px; border-radius: 8px; padding: 4px 10px; font-size: 0.72rem; font-weight: 700; }
-  .bs-dem-nouvelle { background:#fef9c3; color:#854d0e; }
-  .bs-dem-en_cours { background:#dbeafe; color:#1d4ed8; }
-  .bs-dem-validee { background:var(--color-disponible_bg); color:var(--color-disponible); }
-  .bs-dem-refusee { background:#fee2e2; color:#b91c1c; }
-</style>
 
-<div class="card filter-card mb-4">
-  <div class="card-body p-3 p-lg-4">
-    <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-3">
-      <div>
-        <h1 class="h5 mb-1 fw-bold">Demandes de réservation</h1>
-        <p class="small text-muted mb-0">Suivez et traitez les demandes reçues.</p>
+{# ═══════════════════════════════════════════ #}
+{# ── BANNIÈRE HÉRO DU MODULE DEMANDES ── #}
+{# ═══════════════════════════════════════════ #}
+<div class="cl-hero mb-4">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+    <div>
+      <div class="cl-hero-title">
+        <i class="bi bi-inbox-fill me-2"></i>Demandes de Réservation
       </div>
-      <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2" style="border-radius: 8px;">{{ demandes|length }} demande{{ demandes|length|pluralize }}</span>
+      <div class="cl-hero-sub">
+        Suivez, qualifiez et traitez les demandes de réservation soumises par les annonceurs et prospects.
+      </div>
     </div>
-    <div class="d-flex flex-wrap gap-2 pt-3 border-top">
-      <span class="filter-label mb-0 align-self-center me-2"><i class="bi bi-funnel-fill"></i>Statut</span>
-      <a href="?" class="btn btn-sm {% if not statut_actif %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="border-radius: 8px;">À traiter <span class="badge bg-light text-dark ms-1" style="border-radius: 8px;">{{ compteurs.nouvelle|add:compteurs.en_cours }}</span></a>
-      <a href="?statut=nouvelle" class="btn btn-sm {% if statut_actif == 'nouvelle' %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="border-radius: 8px;">Nouvelles <span class="badge bg-light text-dark ms-1" style="border-radius: 8px;">{{ compteurs.nouvelle }}</span></a>
-      <a href="?statut=en_cours" class="btn btn-sm {% if statut_actif == 'en_cours' %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="border-radius: 8px;">En cours <span class="badge bg-light text-dark ms-1" style="border-radius: 8px;">{{ compteurs.en_cours }}</span></a>
-      <a href="?statut=validee" class="btn btn-sm {% if statut_actif == 'validee' %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="border-radius: 8px;">Validées <span class="badge bg-light text-dark ms-1" style="border-radius: 8px;">{{ compteurs.validee }}</span></a>
-      <a href="?statut=refusee" class="btn btn-sm {% if statut_actif == 'refusee' %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="border-radius: 8px;">Refusées <span class="badge bg-light text-dark ms-1" style="border-radius: 8px;">{{ compteurs.refusee }}</span></a>
+    <div class="d-flex gap-2 flex-wrap align-items-center">
+      <span class="badge bg-white text-dark shadow-sm px-3 py-2 font-monospace" style="font-size:0.85rem; font-weight:700; border-radius:8px;">
+        {{ demandes|length }} demande{{ demandes|length|pluralize }}
+      </span>
     </div>
   </div>
 </div>
 
+{# ═══════════════════════════════════════════ #}
+{# ── ONGLETS DE FILTRAGE PAR STATUT ── #}
+{# ═══════════════════════════════════════════ #}
+<div class="card filter-card mb-4">
+  <div class="card-body p-3 p-lg-4">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+      <div class="d-flex flex-wrap gap-2 align-items-center">
+        <span class="filter-label mb-0 me-2"><i class="bi bi-funnel-fill"></i>Statut :</span>
+        <a href="?" class="btn btn-sm {% if not statut_actif %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="border-radius: 8px;">
+          À traiter <span class="badge bg-light text-dark ms-1" style="border-radius: 8px;">{{ compteurs.nouvelle|add:compteurs.en_cours }}</span>
+        </a>
+        <a href="?statut=nouvelle" class="btn btn-sm {% if statut_actif == 'nouvelle' %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="border-radius: 8px;">
+          Nouvelles <span class="badge bg-light text-dark ms-1" style="border-radius: 8px;">{{ compteurs.nouvelle }}</span>
+        </a>
+        <a href="?statut=en_cours" class="btn btn-sm {% if statut_actif == 'en_cours' %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="border-radius: 8px;">
+          En cours <span class="badge bg-light text-dark ms-1" style="border-radius: 8px;">{{ compteurs.en_cours }}</span>
+        </a>
+        <a href="?statut=validee" class="btn btn-sm {% if statut_actif == 'validee' %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="border-radius: 8px;">
+          Validées <span class="badge bg-light text-dark ms-1" style="border-radius: 8px;">{{ compteurs.validee }}</span>
+        </a>
+        <a href="?statut=refusee" class="btn btn-sm {% if statut_actif == 'refusee' %}btn-primary{% else %}btn-outline-secondary{% endif %}" style="border-radius: 8px;">
+          Refusées <span class="badge bg-light text-dark ms-1" style="border-radius: 8px;">{{ compteurs.refusee }}</span>
+        </a>
+      </div>
+      <div>
+        <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-3 py-2 font-monospace" style="border-radius: 8px;">
+          {{ demandes|length }} affichée{{ demandes|length|pluralize }}
+        </span>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ═══════════════════════════════════════════ #}
+{# ── TABLEAU DES DEMANDES ── #}
+{# ═══════════════════════════════════════════ #}
 <div class="card table-custom-card">
   <div class="card-header bg-white py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-2 border-bottom">
     <div class="d-flex align-items-center gap-2">
-      <h6 class="mb-0 fw-bold text-dark">Résultats</h6>
-      <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1 font-monospace" style="border-radius: 8px; font-size:0.75rem;">{{ demandes|length }} demande{{ demandes|length|pluralize }}</span>
+      <h6 class="mb-0 fw-bold text-dark">
+        <i class="bi bi-table me-2 text-primary"></i>Demandes reçues
+      </h6>
+      <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2.5 py-1 font-monospace" style="border-radius: 8px; font-size:0.75rem;">
+        {{ demandes|length }} résultat{{ demandes|length|pluralize }}
+      </span>
     </div>
   </div>
-  <div class="table-responsive">
-    <table id="tableDemandes" class="table table-hover mb-0 align-middle table-supports">
-      <thead>
-        <tr>
-          <th class="ps-4">{% sortable_th sort_links sort_key sort_dir 'reference' 'Référence' %}</th>
-          <th>{% sortable_th sort_links sort_key sort_dir 'contact' 'Contact' %}</th>
-          <th>{% sortable_th sort_links sort_key sort_dir 'emplacements' 'Emplacements' %}</th>
-          <th>{% sortable_th sort_links sort_key sort_dir 'date_debut' 'Période souhaitée' %}</th>
-          <th>{% sortable_th sort_links sort_key sort_dir 'statut' 'Statut' %}</th>
-          <th>{% sortable_th sort_links sort_key sort_dir 'created_at' 'Reçue le' %}</th>
-          <th class="text-end pe-4">Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        {% for demande in demandes %}
-        <tr class="request-row">
-          <td class="ps-4"><span class="request-reference">{{ demande.reference }}</span></td>
-          <td><div class="request-name">{{ demande.nom_contact }}</div>{% if demande.societe %}<small class="text-muted">{{ demande.societe }}</small>{% endif %}</td>
-          <td><span class="badge bg-primary-subtle text-primary border border-primary-subtle" style="border-radius: 8px;"><i class="bi bi-grid me-1"></i>{{ demande.nb_emplacements }} emplacement{{ demande.nb_emplacements|pluralize }}</span></td>
-          <td><div class="font-monospace small fw-semibold">{{ demande.date_debut_souhaitee|date:"d/m/Y" }} → {{ demande.date_fin_souhaitee|date:"d/m/Y" }}</div><small class="text-muted">{{ demande.duree_jours }} jour{{ demande.duree_jours|pluralize }}</small></td>
-          <td><span class="request-status bs-dem-{{ demande.statut }}"><i class="bi {{ demande.get_statut_icon }}"></i>{{ demande.get_statut_display }}</span>{% if demande.traite_par %}<small class="text-muted d-block mt-1">par {{ demande.traite_par.get_short_name|default:demande.traite_par.username }}</small>{% endif %}</td>
-          <td class="text-muted small">{{ demande.created_at|date:"d/m/Y H:i" }}</td>
-          <td class="text-end pe-4"><a href="{% url 'demande_detail' demande.uuid %}" class="btn btn-sm btn-outline-primary btn-action-icon" title="Voir le détail">{% if demande.statut == 'validee' or demande.statut == 'refusee' %}<i class="bi bi-eye"></i>{% else %}<i class="bi bi-arrow-right"></i>{% endif %}</a></td>
-        </tr>
-        {% empty %}
-        <tr><td colspan="7" class="text-center py-5" style="color:var(--text-muted)"><i class="bi bi-inbox d-block mb-3" style="font-size:2.5rem;opacity:0.4"></i><h6 class="fw-bold text-dark mb-1">Aucune demande trouvée</h6><p class="text-muted small mb-0">Aucune demande dans cette catégorie.</p></td></tr>
-        {% endfor %}
-      </tbody>
-    </table>
+
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table id="tableDemandes" class="table table-hover mb-0 align-middle table-supports">
+        <thead>
+          <tr>
+            <th class="ps-4">{% sortable_th sort_links sort_key sort_dir 'reference' 'Référence' %}</th>
+            <th>{% sortable_th sort_links sort_key sort_dir 'contact' 'Contact' %}</th>
+            <th>{% sortable_th sort_links sort_key sort_dir 'emplacements' 'Emplacements' %}</th>
+            <th>{% sortable_th sort_links sort_key sort_dir 'date_debut' 'Période souhaitée' %}</th>
+            <th>{% sortable_th sort_links sort_key sort_dir 'statut' 'Statut' %}</th>
+            <th>{% sortable_th sort_links sort_key sort_dir 'created_at' 'Reçue le' %}</th>
+            <th class="text-end pe-4">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for demande in demandes %}
+          <tr class="support-row">
+            <td class="ps-4">
+              <span class="request-reference font-monospace fw-bold">{{ demande.reference }}</span>
+            </td>
+            <td>
+              <div class="request-name text-dark fw-bold">{{ demande.nom_contact }}</div>
+              {% if demande.societe %}
+                <small class="text-muted d-block">{{ demande.societe }}</small>
+              {% endif %}
+            </td>
+            <td>
+              <span class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace" style="border-radius: 8px;">
+                <i class="bi bi-grid me-1"></i>{{ demande.nb_emplacements }} emplacement{{ demande.nb_emplacements|pluralize }}
+              </span>
+            </td>
+            <td>
+              <div class="font-monospace small fw-semibold text-dark">
+                {{ demande.date_debut_souhaitee|date:"d/m/Y" }} → {{ demande.date_fin_souhaitee|date:"d/m/Y" }}
+              </div>
+              <small class="text-muted font-monospace">{{ demande.duree_jours }} jour{{ demande.duree_jours|pluralize }}</small>
+            </td>
+            <td>
+              <span class="request-status bs-dem-{{ demande.statut }}">
+                <i class="bi {{ demande.get_statut_icon }}"></i>{{ demande.get_statut_display }}
+              </span>
+              {% if demande.traite_par %}
+                <small class="text-muted d-block mt-1" style="font-size:0.72rem;">
+                  par {{ demande.traite_par.get_short_name|default:demande.traite_par.username }}
+                </small>
+              {% endif %}
+            </td>
+            <td class="text-muted small font-monospace">
+              {{ demande.created_at|date:"d/m/Y H:i" }}
+            </td>
+            <td class="text-end pe-4">
+              <a href="{% url 'demande_detail' demande.uuid %}" class="btn btn-sm btn-outline-primary btn-action-icon" title="Voir le détail">
+                {% if demande.statut == 'validee' or demande.statut == 'refusee' %}
+                  <i class="bi bi-eye"></i>
+                {% else %}
+                  <i class="bi bi-arrow-right"></i>
+                {% endif %}
+              </a>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="7" class="text-center py-5 text-muted">
+              <i class="bi bi-inbox d-block mb-3" style="font-size:2.5rem;opacity:0.3;"></i>
+              <h6 class="fw-bold text-dark mb-1">Aucune demande trouvée</h6>
+              <p class="text-muted small mb-0">Aucune demande dans cette catégorie pour le moment.</p>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
   </div>
 </div>
+
 {% endblock %}
 
 {% block extra_js %}
@@ -98,9 +164,12 @@
 $(document).ready(function() {
   $('#tableDemandes').DataTable({
     pageLength: 15,
-    lengthMenu: [10, 15, 25, 50, 100],
-    order: [[5, 'desc']],
-    language: { url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/fr-FR.json' }
+    language: {
+      url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/fr-FR.json'
+    },
+    ordering: false,
+    searching: true,
+    dom: '<"p-3 d-flex justify-content-between align-items-center flex-wrap gap-2"<"d-flex align-items-center gap-2"l><"d-flex align-items-center gap-2"f>>rt<"p-3 d-flex justify-content-between align-items-center flex-wrap gap-2"<"small text-muted"i><"pagination-sm"p>>'
   });
 });
 </script>

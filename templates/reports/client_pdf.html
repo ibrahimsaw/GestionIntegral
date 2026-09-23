@@ -3,18 +3,20 @@
 <html lang="fr">
 <head>
     <meta charset="UTF-8">
+    <title>Rapport Consolidé de Diffusion — {{ client.nom }}</title>
     <style>
         :root {
-            --color-disponible:  {{ DESIGN.COLOR_DISPONIBLE }};
-            --color-occupe:      {{ DESIGN.COLOR_OCCUPE }};
-            --color-maintenance: {{ DESIGN.COLOR_MAINTENANCE }};
-            --color-primary:     {{ DESIGN.COLOR_PRIMARY }};
-            --color-secondary:   {{ DESIGN.COLOR_SECONDARY }};
-            --color-noir:        {{ DESIGN.COLOR_NOIR }};
-            --bg:       #f1f5f9;
+            --color-disponible:  {{ DESIGN.COLOR_DISPONIBLE|default:"#16a34a" }};
+            --color-occupe:      {{ DESIGN.COLOR_OCCUPE|default:"#dc2626" }};
+            --color-maintenance: {{ DESIGN.COLOR_MAINTENANCE|default:"#d97706" }};
+            --color-primary:     {{ DESIGN.COLOR_PRIMARY|default:"#932e2b" }};
+            --color-secondary:   {{ DESIGN.COLOR_SECONDARY|default:"#1e40af" }};
+            --color-noir:        {{ DESIGN.COLOR_NOIR|default:"#0f172a" }};
+            --bg:       #f8fafc;
             --bg-card:  #ffffff;
-            --bg-card2: #f8fafc;
-            --border:   #e2e8f0;
+            --bg-card2: #f1f5f9;
+            --border:   #cbd5e1;
+            --border-light: #e2e8f0;
             --text:     #1e293b;
             --text-muted: #64748b;
             --radius:    8px;
@@ -22,11 +24,11 @@
 
         @page {
             size: A4 landscape;
-            margin: 1.5cm 1cm;
+            margin: 1.2cm 1cm;
             @bottom-center {
-                content: "Document généré le {{ today }} — Page " counter(page) " / " counter(pages);
-                font-family: Arial, sans-serif;
-                font-size: 7pt;
+                content: "Planning de diffusion certifié par Integral GeoAD ERP — {{ client.nom }} — Page " counter(page) " / " counter(pages);
+                font-family: Arial, Helvetica, sans-serif;
+                font-size: 7.5pt;
                 color: #64748b;
             }
         }
@@ -34,10 +36,11 @@
         * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
-            font-family: Arial, sans-serif;
+            font-family: 'Segoe UI', Arial, Helvetica, sans-serif;
             font-size: 8pt;
-            color: var(--text);
-            background: #fff;
+            color: #1e293b;
+            background: #ffffff;
+            line-height: 1.35;
         }
 
         /* ── Filigrane ── */
@@ -47,13 +50,13 @@
             top: 50%;
             left: 50%;
             transform: translate(-50%, -50%) rotate(-15deg);
-            width: 500px;
-            height: 500px;
+            width: 520px;
+            height: 520px;
             background-image: url("{% static 'img/logo.png' %}");
             background-size: contain;
             background-repeat: no-repeat;
             background-position: center;
-            opacity: 0.4;
+            opacity: 0.07;
             z-index: 1000;
             pointer-events: none;
         }
@@ -63,69 +66,111 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            margin-bottom: 14px;
+            margin-bottom: 12px;
             padding-bottom: 10px;
-            border-bottom: 3px solid var(--color-primary);
+            border-bottom: 2.5px solid var(--color-primary);
             position: relative;
             z-index: 10;
         }
-        .doc-header-center { flex: 1; text-align: center;}
+        .doc-header-logo-left {
+            margin-right: 14px;
+            display: flex;
+            align-items: center;
+        }
+        .doc-logo {
+            height: 50px;
+            width: auto;
+            object-fit: contain;
+        }
+        .doc-header-center {
+            flex: 1;
+            text-align: center;
+        }
+        .doc-brand {
+            font-size: 7.5pt;
+            font-weight: 800;
+            color: var(--color-primary);
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            margin-bottom: 2px;
+        }
+        .doc-title {
+            font-size: 14pt;
+            font-weight: 800;
+            color: #0f172a;
+            text-transform: uppercase;
+            line-height: 1.2;
+            letter-spacing: -0.2px;
+        }
+        .doc-meta {
+            font-size: 8pt;
+            color: var(--text-muted);
+            margin-top: 3px;
+        }
+        .doc-meta strong {
+            color: var(--color-primary);
+        }
         .doc-header-right {
             text-align: right;
             font-size: 7.5pt;
             color: var(--text-muted);
             line-height: 1.6;
         }
-        .doc-brand {
-            font-size: 7pt;
-            font-weight: bold;
-            color: var(--text-muted);
-            letter-spacing: 1px;
-            text-transform: uppercase;
-            margin-bottom: 3px;
+
+        /* ── Cartouche Contrats Multiples ── */
+        .contracts-summary-box {
+            background: #f8fafc;
+            border: 1px solid var(--border-light);
+            border-radius: 6px;
+            padding: 6px 12px;
+            margin-top: 6px;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            flex-wrap: wrap;
+            text-align: left;
+            font-size: 7.3pt;
         }
-        .doc-title {
-            font-size: 15pt;
-            font-weight: bold;
-            color: var(--color-primary);
-            text-transform: uppercase;
-            line-height: 1.2;
+        .contract-pill {
+            background: #ffffff;
+            border: 1px solid #cbd5e1;
+            border-radius: 4px;
+            padding: 2px 8px;
+            font-size: 7.2pt;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
         }
-        .doc-meta {
-            font-size: 7.5pt;
-            color: var(--text-muted);
-            margin-top: 4px;
-        }
-        .doc-meta strong {
-            color: var(--color-primary);
+        .contract-pill.active {
+            border-color: #22c55e;
+            background: #f0fdf4;
+            color: #166534;
         }
 
         /* ── Bandeau section (Écran / Panneaux) ── */
         .section-header {
             display: flex;
             align-items: center;
-            justify-content: center;
-            margin: 16px 0 8px 0;
-            background: var(--color-primary);
+            justify-content: space-between;
+            margin: 14px 0 6px 0;
+            background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary) 100%);
             border-radius: 4px;
-            padding: 7px 14px;
+            padding: 6px 14px;
             position: relative;
             z-index: 10;
             page-break-inside: avoid;
         }
-        .section-header::before,
-        .section-header::after {
-            content: "◆";
-            color: var(--color-secondary);
-            font-size: 9pt;
-            margin: 0 10px;
-        }
         .section-title {
-            font-size: 11pt;
-            font-weight: bold;
-            color: #fff;
+            font-size: 9pt;
+            font-weight: 800;
+            color: #ffffff;
             text-transform: uppercase;
-            letter-spacing: 2px;
+            letter-spacing: 1px;
+        }
+        .section-meta {
+            font-size: 7.5pt;
+            color: rgba(255,255,255,0.85);
+            font-family: monospace;
         }
 
         /* ── Tableaux ── */
@@ -135,6 +180,7 @@
             table-layout: fixed;
             position: relative;
             z-index: 10;
+            margin-top: 4px;
         }
 
         /* Colonnes écrans */
@@ -143,11 +189,11 @@
         col.c-diff    { width: 2.1cm;  }
         col.c-debut   { width: 1.7cm;  }
         col.c-fin     { width: 1.7cm;  }
-        col.c-plage   { width: 2cm;    }
-        col.c-led     { width: 0.9cm;  }
-        col.c-spots   { width: 1.8cm;  }
-        col.c-reste   { width: 1.8cm;  }
-        col.c-ecrans  { width: 9.9cm;  }
+        col.c-plage   { width: 2.2cm;  }
+        col.c-led     { width: 1.0cm;  }
+        col.c-spots   { width: 1.9cm;  }
+        col.c-reste   { width: 1.9cm;  }
+        col.c-ecrans  { width: auto;   }
 
         /* Colonnes panneaux */
         col.p-num     { width: 0.9cm;  }
@@ -155,85 +201,88 @@
         col.p-debut   { width: 2.2cm;  }
         col.p-fin     { width: 2.2cm;  }
         col.p-duree   { width: 1.6cm;  }
-        col.p-nb      { width: 1.6cm;  }
+        col.p-nb      { width: 1.8cm;  }
         col.p-faces   { width: auto;   }
 
         thead tr th {
-            background-color: var(--color-primary);
-            color: #fff;
-            font-size: 7.5pt;
-            font-weight: bold;
+            background-color: #1e293b;
+            color: #ffffff;
+            font-size: 7.2pt;
+            font-weight: 800;
             text-align: center;
-            padding: 6px 4px;
-            border: 0.5px solid rgba(255,255,255,0.15);
+            padding: 5px 4px;
+            border: 0.5px solid #334155;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
         }
         thead tr th.left { text-align: left; padding-left: 6px; }
         thead { display: table-header-group; }
 
         tbody tr td {
-            padding: 4px 3px;
-            border: 0.5px solid var(--border);
+            padding: 4px 4px;
+            border: 0.5px solid var(--border-light);
             vertical-align: middle;
             text-align: center;
+            font-size: 7.8pt;
         }
         tbody tr td.left   { text-align: left; padding-left: 6px; }
         tbody tr td.ecrans {
             text-align: left;
             padding-left: 6px;
-            font-size: 7pt;
-            line-height: 1.5;
+            font-size: 7.2pt;
+            line-height: 1.4;
             word-wrap: break-word;
         }
 
         /* Alternance lignes */
-        tbody tr.row-data:nth-child(even) { background-color: var(--bg-card2); }
+        tbody tr.row-data:nth-child(even) { background-color: #f8fafc; }
         tbody tr.row-data:nth-child(odd)  { background-color: #ffffff; }
 
         /* Reste négatif */
-        td.reste-negatif { color: #c0392b; font-weight: bold; }
+        td.reste-negatif { color: #dc2626; font-weight: 800; }
 
         /* Bandeau CONTRAT */
         tr.row-contrat td {
-            background-color: var(--color-primary);
-            color: #fff;
-            font-weight: bold;
+            background: linear-gradient(90deg, var(--color-primary) 0%, var(--color-primary) 100%);
+            color: #ffffff;
+            font-weight: 800;
             font-size: 8pt;
-            text-align: center;
-            padding: 6px 5px;
+            text-align: left;
+            padding: 6px 10px;
             border: none;
             page-break-after: avoid;
         }
 
         /* Bandeau SANS CONTRAT */
         tr.row-no-contrat td {
-            background-color: rgba(241,245,249,0.9);
-            color: var(--color-noir);
-            font-weight: bold;
+            background-color: #e2e8f0;
+            color: #0f172a;
+            font-weight: 800;
             font-size: 8pt;
-            text-align: center;
-            padding: 6px 5px;
+            text-align: left;
+            padding: 6px 10px;
             border: 0.5px solid var(--border);
             page-break-after: avoid;
         }
 
         /* Bandeau MOIS */
         tr.row-mois td {
-            background-color: var(--bg-card2);
+            background-color: #f1f5f9;
             color: var(--color-primary);
-            font-weight: bold;
+            font-weight: 800;
             font-size: 7.5pt;
             text-align: left;
-            padding: 5px 8px;
-            border: 0.5px solid var(--border);
+            padding: 4px 8px;
+            border: 0.5px solid var(--border-light);
             page-break-after: avoid;
             letter-spacing: 0.5px;
         }
 
         /* Sous-total MOIS */
         tr.row-total-mois td {
-            background-color: var(--bg);
-            color: var(--text);
-            font-weight: bold;
+            background-color: #f8fafc;
+            color: #0f172a;
+            font-weight: 800;
             font-size: 7.5pt;
             border-top: 1px solid var(--border);
             border-bottom: 1px solid var(--border);
@@ -242,10 +291,10 @@
 
         /* Sous-total CONTRAT */
         tr.row-total-contrat td {
-            background-color: var(--bg-card2);
+            background-color: #f1f5f9;
             color: var(--color-primary);
-            font-weight: bold;
-            font-size: 8pt;
+            font-weight: 800;
+            font-size: 8.5pt;
             border-top: 2px solid var(--color-primary);
             border-bottom: 2px solid var(--color-primary);
             page-break-before: avoid;
@@ -253,135 +302,136 @@
 
         /* Total panneaux */
         tr.row-total-panneau td {
-            background-color: var(--bg-card2);
+            background-color: #f1f5f9;
             color: var(--color-primary);
-            font-weight: bold;
-            font-size: 8pt;
+            font-weight: 800;
+            font-size: 8.5pt;
             border-top: 2px solid var(--color-primary);
             border-bottom: 2px solid var(--color-primary);
             page-break-before: avoid;
         }
 
-        /* Tags faces/écrans */
-        .face-tag {
-            display: inline-block;
-            font-size: 7.5pt;
-            color: var(--color-primary);
-            background-color: #eef2ff;
-            border: 0.5px solid var(--color-primary);
-            border-radius: 3px;
-            padding: 1px 5px;
-            margin: 1px 0;
-        }
-
-        /* Badge statut panneau */
-        .badge-statut {
-            display: inline-block;
-            font-size: 6.5pt;
-            font-weight: bold;
-            border-radius: 3px;
-            padding: 1px 5px;
-            text-transform: uppercase;
-            letter-spacing: 0.3px;
-        }
-        .badge-en_cours  { background: #dcfce7; color: #166534; }
-        .badge-a_venir   { background: #dbeafe; color: #1e40af; }
-        .badge-terminee  { background: #f1f5f9; color: #475569; }
-        .badge-annulee   { background: #fee2e2; color: #991b1b; }
-        .badge-brouillon { background: #fef9c3; color: #854d0e; }
-
-        /* Séparateur de section */
-        .section-spacer {
-            height: 8px;
-            display: block;
-        }
-
-        /* Vide */
-        .empty-row td {
-            text-align: center;
-            padding: 20px;
-            color: var(--text-muted);
-            font-style: italic;
-        }
-        .doc-header-logo-left {
-            margin-right: 14px;
-            display: flex;
-            align-items: center;
-        }
-        .doc-logo {
-            height: 55px;
-            width: auto;
-            object-fit: contain;
-        }
+        /* Face tags */
         .face-row {
-            display: flex;
+            display: inline-flex;
             align-items: center;
-            gap: 6px;
-            padding: 2px 0;
-            border-bottom: 0.5px solid var(--border);
-        }
-        .face-row:last-child {
-            border-bottom: none;
+            gap: 4px;
+            margin: 1px 3px 1px 0;
         }
         .face-nom {
             font-size: 7pt;
-            color: var(--text);
-            flex: 1;
+            color: #1e293b;
         }
         .face-label {
-            font-size: 7pt;
-            font-weight: bold;
-            color: #fff;
-            background-color: var(--color-primary);
+            font-size: 6.8pt;
+            font-weight: 800;
+            color: var(--color-primary);
+            background-color: rgba(147, 46, 43, 0.08);
+            border: 0.5px solid rgba(147, 46, 43, 0.25);
             border-radius: 3px;
-            padding: 1px 5px;
+            padding: 1px 4px;
             white-space: nowrap;
+            font-family: monospace;
+        }
+
+        .section-spacer {
+            height: 10px;
+            display: block;
+        }
+
+        .empty-row td {
+            text-align: center;
+            padding: 16px;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        /* ── KPI Box conclusion ── */
+        .kpi-stat-box {
+            flex: 1;
+            min-width: 3.2cm;
+            background: #ffffff;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            padding: 8px 10px;
+            text-align: center;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+        }
+        .kpi-stat-label {
+            font-size: 6.5pt;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-weight: 800;
+            margin-bottom: 3px;
+        }
+        .kpi-stat-val {
+            font-size: 15pt;
+            font-weight: 800;
+            line-height: 1.1;
+            font-family: 'SFMono-Regular', monospace, Arial;
         }
     </style>
 </head>
 <body class="watermarked-card">
 
 <!-- ══════════════════════════════════════════
-     EN-TÊTE
+     EN-TÊTE DU DOCUMENT
 ════════════════════════════════════════════ -->
 <div class="doc-header">
-
-    <!-- Logo -->
     <div class="doc-header-logo-left">
         <img src="{% static 'img/logo.png' %}" alt="Logo" class="doc-logo">
     </div>
 
     <div class="doc-header-center">
-        <div class="doc-title">Rapport de diffusion : {{ client.nom }}</div>
+        <div class="doc-brand">Rapport Consolidé de Diffusion Multi-Contrats</div>
+        <div class="doc-title">{{ client.nom }}</div>
+        
         <div class="doc-meta">
-            {% with contrat=client.get_contrat_actif %}
-            {% if contrat %}
+            {% if contrats|length > 1 %}
+                <div style="font-weight: 700; color: #0f172a; margin-bottom: 4px;">
+                    <span style="color:var(--color-primary);">{{ contrats|length }} CONTRATS ENREGISTRÉS</span>
+                    &nbsp;·&nbsp; Volume Total Engagé : <strong>{{ total_spots_engages|floatformat:0 }} spots</strong>
+                </div>
+                <div class="contracts-summary-box">
+                    {% for c in contrats %}
+                    <span class="contract-pill {% if c in contrats_actifs %}active{% endif %}">
+                        <strong>{{ c.nom|default:c.get_type_contrat_display }}</strong> : 
+                        {{ c.nb_spots|floatformat:0 }} spots 
+                        ({{ c.date_debut|date:"d/m/Y" }} → {{ c.date_fin|date:"d/m/Y" }})
+                        {% if c in contrats_actifs %}<span style="font-weight:800; font-size:6.5pt;">[ACTIF]</span>{% endif %}
+                    </span>
+                    {% endfor %}
+                </div>
+            {% elif contrats|length == 1 %}
+                {% with c=contrats.0 %}
                 Contrat actif :&nbsp;
-                <strong>{{ contrat.get_type_contrat_display }}</strong> —
-                <strong>{{ contrat.nb_spots|floatformat:0 }} spots</strong> —
-                du {{ contrat.date_debut|date:"d/m/Y" }} au {{ contrat.date_fin|date:"d/m/Y" }}
+                <strong>{{ c.nom|default:c.get_type_contrat_display }}</strong> —
+                <strong>{{ c.nb_spots|floatformat:0 }} spots</strong> —
+                du {{ c.date_debut|date:"d/m/Y" }} au {{ c.date_fin|date:"d/m/Y" }}
+                {% endwith %}
             {% else %}
-                Aucun contrat actif
+                <span style="color:var(--text-muted);">Aucun contrat enregistré (Diffusion libre)</span>
             {% endif %}
-            {% endwith %}
         </div>
     </div>
 
     <div class="doc-header-right">
-        Généré le {{ today|date:"d/m/Y" }}<br>
-        Réf. : <strong>{{ client.code }}</strong><br>
+        Édité le : <strong>{{ today|date:"d/m/Y" }}</strong><br>
+        Réf. Client : <strong>{{ client.reference }}</strong><br>
         {% if client.telephone %}Tél. : {{ client.telephone }}<br>{% endif %}
         {% if client.email %}{{ client.email }}{% endif %}
     </div>
 </div>
 
 <!-- ══════════════════════════════════════════
-     SECTION ÉCRANS
+     SECTION 1 — CAMPAGNES ÉCRANS
 ════════════════════════════════════════════ -->
 {% if blocs_ecran %}
 <div class="section-ecran">
     <div class="section-header">
-        <span class="section-title">Campagnes Écrans</span>
+        <span class="section-title">1. Campagnes sur Écrans Numériques</span>
+        <span class="section-meta">{{ total_campagnes_ecran }} campagne{{ total_campagnes_ecran|pluralize }} · {{ blocs_ecran|length }} contrat{{ blocs_ecran|length|pluralize }}</span>
     </div>
     <table>
         <colgroup>
@@ -407,7 +457,7 @@
                 <th>LED</th>
                 <th>SPOTS/MOIS</th>
                 <th>RESTE</th>
-                <th class="left">ÉCRANS</th>
+                <th class="left">ÉCRANS ASSOCIÉS</th>
             </tr>
         </thead>
         <tbody>
@@ -417,15 +467,16 @@
             {% if bloc.contrat %}
             <tr class="row-contrat">
                 <td colspan="10">
-                    ◆&nbsp; {{ bloc.contrat.get_type_contrat_display|upper }}
-                    {% if bloc.contrat.nom %}&nbsp;— {{ bloc.contrat.nom }}{% endif %}
-                    &nbsp;|&nbsp; {{ bloc.contrat.nb_spots|floatformat:0 }} spots
-                    &nbsp;|&nbsp; {{ bloc.contrat.date_debut|date:"d/m/Y" }} → {{ bloc.contrat.date_fin|date:"d/m/Y" }}
+                    ◆&nbsp; CONTRAT : {{ bloc.contrat.get_type_contrat_display|upper }}
+                    {% if bloc.contrat.nom %}&nbsp;— {{ bloc.contrat.nom|upper }}{% endif %}
+                    &nbsp;|&nbsp; Volume total : {{ bloc.contrat.nb_spots|floatformat:0 }} spots
+                    &nbsp;|&nbsp; Période : {{ bloc.contrat.date_debut|date:"d/m/Y" }} → {{ bloc.contrat.date_fin|date:"d/m/Y" }}
+                    &nbsp;|&nbsp; Statut : {% if bloc.contrat.actif %}ACTIF{% else %}ÉCHU / CLÔTURÉ{% endif %}
                 </td>
             </tr>
             {% else %}
             <tr class="row-no-contrat">
-                <td colspan="10">◆&nbsp; CAMPAGNES SANS CONTRAT</td>
+                <td colspan="10">◆&nbsp; CAMPAGNES HORS CONTRAT RATTACHÉ</td>
             </tr>
             {% endif %}
 
@@ -438,20 +489,23 @@
                 {% for ligne in mois.lignes %}
                 <tr class="row-data">
                     <td>{{ ligne.num }}</td>
-                    <td class="left">{{ ligne.campagne.nom }}</td>
+                    <td class="left">
+                        <strong>{{ ligne.campagne.nom }}</strong><br>
+                        <span style="font-size:6.8pt; color:var(--text-muted); font-family:monospace;">{{ ligne.campagne.reference }}</span>
+                    </td>
                     <td>{{ ligne.freq_display }}</td>
                     <td>{{ ligne.campagne.date_debut|date:"d/m/y" }}</td>
                     <td>{{ ligne.campagne.date_fin|date:"d/m/y" }}</td>
                     <td>{{ ligne.campagne.tranches_horaires|default:"06:00-22:00" }}</td>
-                    <td>{{ ligne.nb_ecrans }}</td>
-                    <td>{{ ligne.spots|floatformat:0 }}</td>
+                    <td><strong>{{ ligne.nb_ecrans }}</strong></td>
+                    <td><strong>{{ ligne.spots|floatformat:0 }}</strong></td>
                     <td {% if ligne.reste < 0 %}class="reste-negatif"{% endif %}>
                         {% if ligne.reste_display %}{{ ligne.reste_display }}{% else %}—{% endif %}
                     </td>
                     <td class="ecrans">
                         {% for ecran in ligne.ecrans_str %}
                             <div class="face-row">
-                                <span class="face-nom"> {{ forloop.counter }} <i class="bi bi-display"></i> {{ ecran.support.nom }}  </span>
+                                <span class="face-nom">• {{ ecran.support.nom }}</span>
                             </div>
                         {% empty %}
                             <span style="color:var(--text-muted);">—</span>
@@ -460,11 +514,11 @@
                 </tr>
                 {% endfor %}
                 <tr class="row-total-mois">
-                    <td colspan="2" class="left">&nbsp;&nbsp;Total {{ mois.label }}</td>
+                    <td colspan="2" class="left">&nbsp;&nbsp;Total mensuel : {{ mois.label }}</td>
                     <td></td><td></td><td></td><td></td><td></td>
-                    <td>{{ mois.total_spots|floatformat:0 }}</td>
+                    <td><strong>{{ mois.total_spots|floatformat:0 }}</strong></td>
                     <td>
-                        {% if mois.reste_fin is not None %}{{ mois.reste_fin|floatformat:0 }}
+                        {% if mois.reste_fin is not None %}<strong>{{ mois.reste_fin|floatformat:0 }}</strong>
                         {% else %}—{% endif %}
                     </td>
                     <td></td>
@@ -472,17 +526,20 @@
             {% endfor %}
 
             <tr class="row-total-contrat">
-                <td colspan="2" class="left" style="font-size: 10pt; !important;">&nbsp;&nbsp;TOTAL — {{ bloc.label_total }}</td>
+                <td colspan="2" class="left">&nbsp;&nbsp;BILAN DU CONTRAT — {{ bloc.label_total }}</td>
                 <td></td>
                 <td></td>
                 <td></td>
                 <td></td>
                 <td></td>
-                <td style="font-size: 10pt; !important; color: green;">
-                    {{ bloc.total_spots|floatformat:0 }}
+                <td style="color: #16a34a;">
+                    <strong>{{ bloc.total_spots|floatformat:0 }}</strong>
                 </td>
-                <td style="font-size: 10pt; !important;">
-                    {% if bloc.reste_final is not None %}{{ bloc.reste_final|floatformat:0 }}
+                <td>
+                    {% if bloc.reste_final is not None %}
+                        <strong {% if bloc.reste_final < 0 %}style="color:#dc2626;"{% endif %}>
+                            {{ bloc.reste_final|floatformat:0 }}
+                        </strong>
                     {% else %}—{% endif %}
                 </td>
                 <td></td>
@@ -499,14 +556,15 @@
 {% endif %}
 
 <!-- ══════════════════════════════════════════
-     SECTION PANNEAUX
+     SECTION 2 — CAMPAGNES PANNEAUX
 ════════════════════════════════════════════ -->
 {% if blocs_panneaux %}
 <span class="section-spacer"></span>
 <div class="section-panneaux">
 
     <div class="section-header">
-        <span class="section-title">Campagnes Panneaux</span>
+        <span class="section-title">2. Affichage sur Panneaux Statiques</span>
+        <span class="section-meta">{{ total_campagnes_panneaux }} campagne{{ total_campagnes_panneaux|pluralize }} · {{ total_faces_global }} face{{ total_faces_global|pluralize }} allouée{{ total_faces_global|pluralize }}</span>
     </div>
 
     <table>
@@ -527,29 +585,44 @@
                 <th>FIN</th>
                 <th>DURÉE</th>
                 <th>NB FACES</th>
-                <th class="left">PANNEAUX / FACES</th>
+                <th class="left">PANNEAUX & FACES ALLOUÉES</th>
             </tr>
         </thead>
         <tbody>
         {% for bloc in blocs_panneaux %}
 
+            {# ── Bandeau contrat panneau si spécifié ── #}
+            {% if bloc.contrat %}
+            <tr class="row-contrat">
+                <td colspan="7">
+                    ◆&nbsp; CONTRAT : {{ bloc.contrat.get_type_contrat_display|upper }}
+                    {% if bloc.contrat.nom %}&nbsp;— {{ bloc.contrat.nom|upper }}{% endif %}
+                    &nbsp;|&nbsp; Période : {{ bloc.contrat.date_debut|date:"d/m/Y" }} → {{ bloc.contrat.date_fin|date:"d/m/Y" }}
+                </td>
+            </tr>
+            {% elif blocs_panneaux|length > 1 %}
+            <tr class="row-no-contrat">
+                <td colspan="7">◆&nbsp; {{ bloc.label }}</td>
+            </tr>
+            {% endif %}
+
             {% for ligne in bloc.lignes %}
             <tr class="row-data">
                 <td>{{ ligne.num }}</td>
                 <td class="left">
-                    {{ ligne.campagne.nom }}<br>
-                    <span style="font-size:6.5pt; color:var(--text-muted);">{{ ligne.reference }}</span>
+                    <strong>{{ ligne.campagne.nom }}</strong><br>
+                    <span style="font-size:6.8pt; color:var(--text-muted); font-family:monospace;">{{ ligne.reference }}</span>
                 </td>
                 <td>{{ ligne.date_debut|date:"d/m/Y" }}</td>
                 <td>{{ ligne.date_fin|date:"d/m/Y" }}</td>
-                <td>{{ ligne.duree_jours }}&nbsp;j</td>
-                <td>{{ ligne.nb_faces }}</td>
+                <td><strong>{{ ligne.duree_jours }}&nbsp;j</strong></td>
+                <td><strong>{{ ligne.nb_faces }}</strong></td>
                 <td class="ecrans">
                     {% for face in ligne.faces %}
                         <div class="face-row">
-                            <span class="face-nom">{{ face.support_nom }}</span>
+                            <span class="face-nom">• {{ face.support_nom }}</span>
                             {% if face.face_label != "-" %}
-                                <span class="face-label">{{ face.face_label }}</span>
+                                <span class="face-label">Face {{ face.face_label }}</span>
                             {% endif %}
                         </div>
                     {% empty %}
@@ -559,10 +632,10 @@
             </tr>
             {% endfor %}
 
-            {# ── Total panneaux ── #}
+            {# ── Sous-total contrat panneaux ── #}
             <tr class="row-total-panneau">
-                <td colspan="5" class="left">&nbsp;&nbsp;TOTAL PANNEAUX</td>
-                <td>{{ bloc.total_faces }}</td>
+                <td colspan="5" class="left">&nbsp;&nbsp;TOTAL FACES — {{ bloc.label }}</td>
+                <td><strong>{{ bloc.total_faces }}</strong></td>
                 <td></td>
             </tr>
 
@@ -575,63 +648,91 @@
     </table>
 </div>
 {% endif %}
+
 <!-- ══════════════════════════════════════════
-     CONCLUSION
-════════════════════════════════════════════ -->
-<!-- ══════════════════════════════════════════
-     CONCLUSION — KPI
+     SECTION 3 — SYNTHÈSE ET BILANS PAR CONTRAT (RÉSUMÉS SÉPARÉS)
 ════════════════════════════════════════════ -->
 <span class="section-spacer"></span>
 
 <div class="section-header">
-    <span class="section-title">Récapitulatif Global</span>
+    <span class="section-title">3. Synthèse et Bilans par Contrat</span>
+    <span class="section-meta">{{ contrats_resume|length }} contrat{{ contrats_resume|length|pluralize }} répertorié{{ contrats_resume|length|pluralize }}</span>
 </div>
 
-<div style="display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; position: relative; z-index: 10;">
+<table style="margin-top: 6px; width: 100%; border-collapse: collapse;">
+    <thead>
+        <tr>
+            <th style="width: 26%; text-align: left;">Contrat & Type</th>
+            <th style="width: 17%; text-align: center;">Période</th>
+            <th style="width: 11%; text-align: center;">Statut</th>
+            <th style="width: 12%; text-align: right;">Spots Engagés</th>
+            <th style="width: 12%; text-align: right;">Spots Diffusés</th>
+            <th style="width: 12%; text-align: right;">Solde Restant</th>
+            <th style="width: 10%; text-align: center;">% Consommé</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for cr in contrats_resume %}
+        <tr class="row-data">
+            <td class="left" style="vertical-align: middle;">
+                <strong style="color: #0f172a; font-size: 7.8pt;">{{ cr.nom }}</strong>
+                {% if cr.type_display and cr.nom != cr.type_display %}
+                    <br><span style="font-size: 6.8pt; color: var(--text-muted);">{{ cr.type_display }}</span>
+                {% endif %}
+            </td>
+            <td style="text-align: center; font-size: 7.2pt; vertical-align: middle;">
+                {% if cr.date_debut and cr.date_fin %}
+                    {{ cr.date_debut|date:"d/m/Y" }} → {{ cr.date_fin|date:"d/m/Y" }}
+                {% else %}
+                    <span style="color: var(--text-muted);">—</span>
+                {% endif %}
+            </td>
+            <td style="text-align: center; vertical-align: middle;">
+                {% if cr.est_actif %}
+                    <span style="background:#f0fdf4; color:#166534; border:1px solid #bbf7d0; padding:2px 6px; border-radius:3px; font-weight:700; font-size:6.8pt;">En cours</span>
+                {% elif cr.contrat %}
+                    <span style="background:#f8fafc; color:#64748b; border:1px solid #cbd5e1; padding:2px 6px; border-radius:3px; font-size:6.8pt;">{{ cr.statut_display }}</span>
+                {% else %}
+                    <span style="background:#fef3c7; color:#92400e; border:1px solid #fde68a; padding:2px 6px; border-radius:3px; font-size:6.8pt;">Hors Contrat</span>
+                {% endif %}
+            </td>
+            <td style="text-align: right; font-weight: 700; vertical-align: middle;">
+                {% if cr.spots_engages is not None %}
+                    {{ cr.spots_engages|floatformat:0 }}
+                {% else %}
+                    <span style="color: var(--text-muted);">—</span>
+                {% endif %}
+            </td>
+            <td style="text-align: right; font-weight: 700; color: #16a34a; vertical-align: middle;">
+                {{ cr.spots_diffuses|floatformat:0 }}
+            </td>
+            <td style="text-align: right; font-weight: 800; vertical-align: middle; {% if cr.solde_restant is not None and cr.solde_restant < 0 %}color:#dc2626;{% else %}color:#d97706;{% endif %}">
+                {% if cr.solde_restant is not None %}
+                    {{ cr.solde_restant|floatformat:0 }}
+                {% else %}
+                    <span style="color: var(--text-muted);">—</span>
+                {% endif %}
+            </td>
+            <td style="text-align: center; font-weight: 700; font-size: 7.2pt; vertical-align: middle;">
+                {% if cr.taux_consommation is not None %}
+                    {{ cr.taux_consommation }}%
+                {% else %}
+                    <span style="color: var(--text-muted);">—</span>
+                {% endif %}
+            </td>
+        </tr>
+        {% empty %}
+        <tr class="empty-row">
+            <td colspan="7">Aucun contrat disponible pour ce client.</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
 
-    <!-- Nb Contrats -->
-    <div style="flex: 1; min-width: 3cm; background: var(--bg-card2); border: 1px solid var(--border); border: 3px solid var(--color-primary); border-radius: var(--radius); padding: 10px 12px; text-align: center;">
-        <div style="font-size: 7pt; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Contrats</div>
-        <div style="font-size: 18pt; font-weight: bold; color: var(--color-primary);">{{ blocs_ecran|length }}</div>
-    </div>
-
-    <!-- Nb Campagnes Écrans -->
-    <div style="flex: 1; min-width: 3cm; background: var(--bg-card2); border: 1px solid var(--border); border: 3px solid var(--color-primary); border-radius: var(--radius); padding: 10px 12px; text-align: center;">
-        <div style="font-size: 7pt; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Campagnes Écrans</div>
-        <div style="font-size: 18pt; font-weight: bold; color: var(--color-primary);">{{ total_campagnes_ecran }}</div>
-    </div>
-
-    <!-- Total Spots -->
-    <div style="flex: 1; min-width: 3cm; background: var(--bg-card2); border: 1px solid var(--border); border: 3px solid #16a34a; border-radius: var(--radius); padding: 10px 12px; text-align: center;">
-        <div style="font-size: 7pt; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Total Spots</div>
-        <div style="font-size: 18pt; font-weight: bold; color: #16a34a;">{{ total_spots_global|floatformat:0 }}</div>
-    </div>
-
-    <!-- Reste Spots -->
-    <div style="flex: 1; min-width: 3cm; background: var(--bg-card2); border: 1px solid var(--border); border: 3px solid #f59e0b; border-radius: var(--radius); padding: 10px 12px; text-align: center;">
-        <div style="font-size: 7pt; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Reste Spots</div>
-        <div style="font-size: 18pt; font-weight: bold; color: #f59e0b;">{{ reste_spots_global|floatformat:0 }}</div>
-    </div>
-
-    <!-- Campagnes Panneaux -->
-    {% if blocs_panneaux %}
-    <div style="flex: 1; min-width: 3cm; background: var(--bg-card2); border: 1px solid var(--border); border: 3px solid var(--color-secondary); border-radius: var(--radius); padding: 10px 12px; text-align: center;">
-        <div style="font-size: 7pt; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Campagnes Panneaux</div>
-        <div style="font-size: 18pt; font-weight: bold; color: var(--color-secondary);">{{ total_campagnes_panneaux }}</div>
-    </div>
-
-    <!-- Total Faces -->
-    <div style="flex: 1; min-width: 3cm; background: var(--bg-card2); border: 1px solid var(--border); border: 3px solid var(--color-secondary); border-radius: var(--radius); padding: 10px 12px; text-align: center;">
-        <div style="font-size: 7pt; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px;">Total Faces</div>
-        <div style="font-size: 18pt; font-weight: bold; color: var(--color-secondary);">{{ total_faces_global }}</div>
-    </div>
-    {% endif %}
-
+<!-- Note bas de page -->
+<div style="margin-top: 14px; text-align: center; font-size: 7.2pt; color: var(--text-muted); position: relative; z-index: 10;">
+    Document confidentiel — <strong>{{ client.nom }}</strong> (Réf. client : {{ client.reference }}) — Certifié conforme par Integral GeoAD ERP
 </div>
 
-<!-- Note bas -->
-<div style="margin-top: 12px; text-align: center; font-size: 7pt; color: var(--text-muted); position: relative; z-index: 10;">
-    Document confidentiel — {{ client.nom }} (Réf. {{ client.code }}) — Généré le {{ today|date:"d/m/Y" }}
-</div>
 </body>
 </html>

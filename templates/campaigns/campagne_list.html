@@ -1,69 +1,229 @@
 {% extends 'base.html' %}
-{% load sort_tags %}
+{% load static sort_tags %}
+
 {% block title %}Campagnes — Integral{% endblock %}
-{% block topbar_title %}<i class="bi bi-megaphone me-2" style="color:var(--color-primary)"></i>Campagnes{% endblock %}
+
+{% block topbar_title %}
+  <i class="bi bi-megaphone me-2" style="color:var(--color-primary)"></i>Campagnes Publicitaires
+{% endblock %}
+
 {% block topbar_actions %}
   {% if user.is_staff_regie_role %}
-  <a href="{% url 'simulation_ecran' %}" class="btn btn-outline-warning btn-sm me-2">
-    <i class="bi bi-calculator-fill me-1"></i>
-    <span class="d-none d-md-inline ms-1">Simulateur</span>
-  </a>
-  <a href="{% url 'campagne_create' %}" class="btn btn-primary btn-sm">
-    <i class="bi bi-plus-lg me-1"></i>
-    <span class="d-none d-md-inline ms-1">Nouvelle</span>
-  </a>
+  <div class="d-flex flex-wrap gap-2">
+    <a href="{% url 'simulation_ecran' %}" class="btn btn-outline-warning btn-sm shadow-sm px-3 d-flex align-items-center gap-1">
+      <i class="bi bi-calculator-fill me-1"></i>
+      <span class="d-none d-md-inline">Simulateur</span>
+    </a>
+    <a href="{% url 'campagne_create' %}" class="btn btn-primary btn-sm shadow-sm px-3 d-flex align-items-center gap-1">
+      <i class="bi bi-plus-lg me-1"></i>
+      <span class="d-none d-md-inline">Nouvelle Campagne</span>
+    </a>
+  </div>
   {% endif %}
 {% endblock %}
 
 {% block content %}
-<div class="card mb-4">
-  <div class="card-body">
-    <form method="get" class="row g-2 align-items-end">
-      <div class="col-md-4">
-        <label class="form-label">Recherche</label>
-        <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Client, nom, référence...">
+
+{# ═══════════════════════════════════════════ #}
+{# ── BANNIÈRE HÉRO DU MODULE CAMPAGNES ── #}
+{# ═══════════════════════════════════════════ #}
+<div class="cl-hero mb-4">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+    <div>
+      <div class="cl-hero-title">
+        <i class="bi bi-megaphone-fill me-2"></i>Gestion des Campagnes
       </div>
-      <div class="col-md-3">
-        <label class="form-label">Statut</label>
-        <select name="statut" class="form-select">
-          <option value="">Tous les statuts</option>
-          {% for k, v in statut_choices %}
-          <option value="{{ k }}" {% if statut == k %}selected{% endif %}>{{ v }}</option>
-          {% endfor %}
-        </select>
+      <div class="cl-hero-sub">
+        Pilotez les réservations, plannings de diffusion, spots vidéo et performances de vos campagnes.
       </div>
-      <div class="col-md-3">
-        <label class="form-label">Type de Campagne</label>
-        <select name="type_support" class="form-select">
+    </div>
+    {% if user.is_staff_regie_role %}
+    <div class="d-flex gap-2 flex-wrap align-items-center d-inline d-md-none me-1">
+      <a href="{% url 'simulation_ecran' %}" class="btn btn-outline-light shadow-sm d-inline d-md-none me-1" style="font-weight: 600;">
+        <i class="bi bi-calculator me-1"></i>Simulateur
+      </a>
+      <a href="{% url 'campagne_create' %}" class="btn btn-light shadow-sm d-inline d-md-none me-1" style="font-weight: 700; color: #932e2b;">
+        <i class="bi bi-plus-lg me-1"></i>Nouvelle Campagne
+      </a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+{# ═══════════════════════════════════════════ #}
+{# ── RUBAN DE 4 CARTES KPI STATISTIQUES ── #}
+{# ═══════════════════════════════════════════ #}
+<div class="row g-3 mb-4">
+  {# 1. Total Campagnes #}
+  <div class="col-6 col-md-3">
+    <div class="cl-kpi-card">
+      <div class="cl-kpi-icon" style="background:#eff6ff; color:#2563eb; border:1px solid #dbeafe;">
+        <i class="bi bi-megaphone"></i>
+      </div>
+      <div>
+        <div class="cl-kpi-val">{{ kpi_total|default:0 }}</div>
+        <div class="cl-kpi-lbl">Total Campagnes</div>
+      </div>
+    </div>
+  </div>
+
+  {# 2. En Cours #}
+  <div class="col-6 col-md-3">
+    <div class="cl-kpi-card">
+      <div class="cl-kpi-icon" style="background:#ecfdf5; color:#059669; border:1px solid #d1fae5;">
+        <i class="bi bi-broadcast"></i>
+      </div>
+      <div>
+        <div class="cl-kpi-val" style="color:#059669;">{{ kpi_en_cours|default:0 }}</div>
+        <div class="cl-kpi-lbl">En Cours</div>
+      </div>
+    </div>
+  </div>
+
+  {# 3. À Venir #}
+  <div class="col-6 col-md-3">
+    <div class="cl-kpi-card">
+      <div class="cl-kpi-icon" style="background:#f0fdf4; color:#0284c7; border:1px solid #e0f2fe;">
+        <i class="bi bi-calendar-check"></i>
+      </div>
+      <div>
+        <div class="cl-kpi-val" style="color:#0284c7;">{{ kpi_a_venir|default:0 }}</div>
+        <div class="cl-kpi-lbl">À Venir</div>
+      </div>
+    </div>
+  </div>
+
+  {# 4. Terminées #}
+  <div class="col-6 col-md-3">
+    <div class="cl-kpi-card">
+      <div class="cl-kpi-icon" style="background:#f8fafc; color:#475569; border:1px solid #e2e8f0;">
+        <i class="bi bi-check2-all"></i>
+      </div>
+      <div>
+        <div class="cl-kpi-val" style="color:#475569;">{{ kpi_terminee|default:0 }}</div>
+        <div class="cl-kpi-lbl">Terminées</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ═══════════════════════════════════════════ #}
+{# ── SECTION FILTRES RAPIDES & AVANCÉS ── #}
+{# ═══════════════════════════════════════════ #}
+<div class="card filter-card mb-4">
+  <div class="card-body p-3 p-lg-4">
+
+    {# Onglets de statut rapides #}
+    <div class="d-flex flex-wrap gap-2 mb-3 pb-3 border-bottom align-items-center">
+      <span class="small text-muted fw-bold me-2" style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px;">Statut :</span>
+      <a href="?{% if q %}q={{ q }}&{% endif %}{% if type_support %}type_support={{ type_support }}&{% endif %}{% if actif %}actif={{ actif }}{% endif %}"
+         class="cpl-tab-btn {% if not statut %}active{% endif %}">
+        <i class="bi bi-grid-fill"></i>Toutes
+        <span class="cpl-tab-badge">{{ kpi_total|default:0 }}</span>
+      </a>
+      <a href="?statut=en_cours{% if q %}&q={{ q }}{% endif %}{% if type_support %}&type_support={{ type_support }}{% endif %}{% if actif %}&actif={{ actif }}{% endif %}"
+         class="cpl-tab-btn {% if statut == 'en_cours' %}active{% endif %}">
+        <i class="bi bi-broadcast text-success"></i>En cours
+        <span class="cpl-tab-badge">{{ kpi_en_cours|default:0 }}</span>
+      </a>
+      <a href="?statut=a_venir{% if q %}&q={{ q }}{% endif %}{% if type_support %}&type_support={{ type_support }}{% endif %}{% if actif %}&actif={{ actif }}{% endif %}"
+         class="cpl-tab-btn {% if statut == 'a_venir' %}active{% endif %}">
+        <i class="bi bi-calendar-check text-info"></i>À venir
+        <span class="cpl-tab-badge">{{ kpi_a_venir|default:0 }}</span>
+      </a>
+      <a href="?statut=terminee{% if q %}&q={{ q }}{% endif %}{% if type_support %}&type_support={{ type_support }}{% endif %}{% if actif %}&actif={{ actif }}{% endif %}"
+         class="cpl-tab-btn {% if statut == 'terminee' %}active{% endif %}">
+        <i class="bi bi-check2-all text-secondary"></i>Terminées
+        <span class="cpl-tab-badge">{{ kpi_terminee|default:0 }}</span>
+      </a>
+      {% if kpi_brouillon > 0 %}
+      <a href="?statut=brouillon{% if q %}&q={{ q }}{% endif %}{% if type_support %}&type_support={{ type_support }}{% endif %}{% if actif %}&actif={{ actif }}{% endif %}"
+         class="cpl-tab-btn {% if statut == 'brouillon' %}active{% endif %}">
+        <i class="bi bi-pencil-square text-warning"></i>Brouillons
+        <span class="cpl-tab-badge">{{ kpi_brouillon|default:0 }}</span>
+      </a>
+      {% endif %}
+    </div>
+
+    {# Formulaire de filtres détaillés #}
+    <form method="get" class="row g-3 align-items-end">
+      <div class="col-xl-4 col-md-6">
+        <label class="filter-label"><i class="bi bi-search"></i>Recherche</label>
+        <div class="input-group input-group-sm">
+          <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Client, nom de campagne, référence...">
+        </div>
+      </div>
+      <div class="col-xl-3 col-md-6">
+        <label class="filter-label"><i class="bi bi-grid"></i>Type de Support</label>
+        <select name="type_support" class="form-select form-select-sm">
           <option value="">Tous les types</option>
           {% for k, v in type_support_choices %}
           <option value="{{ k }}" {% if type_support == k %}selected{% endif %}>{{ v }}</option>
           {% endfor %}
         </select>
       </div>
-      <div class="col-md-2 d-flex gap-2">
-        <button type="submit" class="btn btn-primary flex-fill"><i class="bi bi-search"></i></button>
-        <a href="{% url 'campagne_list' %}" class="btn btn-outline-secondary"><i class="bi bi-x-lg"></i></a>
+      <div class="col-xl-3 col-md-6">
+        <label class="filter-label"><i class="bi bi-activity"></i>Statut de diffusion</label>
+        <select name="statut" class="form-select form-select-sm">
+          <option value="">Tous les statuts</option>
+          {% for k, v in statut_choices %}
+          <option value="{{ k }}" {% if statut == k %}selected{% endif %}>{{ v }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-xl-2 col-md-6 d-flex gap-2">
+        <button type="submit" class="btn btn-primary btn-sm flex-fill shadow-sm d-flex align-items-center justify-content-center gap-1">
+          <i class="bi bi-funnel-fill"></i>
+          <span>Filtrer</span>
+        </button>
+        {% if q or statut or type_support or actif %}
+        <a href="{% url 'campagne_list' %}" class="btn btn-outline-secondary btn-sm" title="Réinitialiser tous les filtres">
+          <i class="bi bi-arrow-counterclockwise"></i>
+        </a>
+        {% endif %}
       </div>
     </form>
+
+    {# ── Badges des filtres actifs ── #}
+    {% if q or statut or type_support or actif %}
+    <div class="d-flex flex-wrap gap-2 align-items-center mt-3 pt-3 border-top">
+      <span class="small text-muted fw-bold me-1" style="font-size: 0.72rem;">Filtres actifs :</span>
+      {% if q %}
+        <span class="active-filter-pill"><i class="bi bi-search"></i>"{{ q }}"</span>
+      {% endif %}
+      {% if statut %}
+        <span class="active-filter-pill"><i class="bi bi-activity"></i>Statut: {{ statut|title }}</span>
+      {% endif %}
+      {% if type_support %}
+        <span class="active-filter-pill"><i class="bi bi-grid"></i>Type: {{ type_support|title }}</span>
+      {% endif %}
+      <a href="{% url 'campagne_list' %}" class="small text-danger text-decoration-none ms-2 fw-semibold" style="font-size: 0.75rem;">
+        <i class="bi bi-x-circle me-1"></i>Effacer tout
+      </a>
+    </div>
+    {% endif %}
+
   </div>
 </div>
 
+{# ═══════════════════════════════════════════ #}
+{# ── TABLEAU DES CAMPAGNES ── #}
+{# ═══════════════════════════════════════════ #}
 <form method="post" id="form-actions">
   {% csrf_token %}
   <input type="hidden" name="action" id="action-input">
 
-  <div class="card">
-    <div class="card-header d-flex align-items-center justify-content-between gap-2">
-
-      <div class="d-flex align-items-center gap-2">
+  <div class="card table-custom-card">
+    <div class="card-header bg-white py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-2 border-bottom">
+      <div class="d-flex align-items-center gap-3">
         <input type="checkbox" id="select-all" class="form-check-input mt-0" title="Tout sélectionner">
-        <span id="selection-count" style="font-size:.85rem; color:var(--text-muted)">
-          {{ campagnes|length }} campagne(s)
+        <h6 class="mb-0 fw-bold text-dark">Campagnes publicitaires</h6>
+        <span id="selection-count" class="badge bg-primary-subtle text-primary border border-primary-subtle px-2.5 py-1 font-monospace" style="font-size: 0.75rem;">
+          {{ campagnes|length }} campagne{{ campagnes|length|pluralize }}
         </span>
       </div>
 
-      <!-- Actions (visibles seulement si sélection) -->
+      <!-- Actions groupées -->
       <div id="actions-bar" class="d-flex align-items-center gap-2" style="display:none !important;">
         {% if user.is_staff_regie_role %}
         <select id="action-select" class="form-select form-select-sm" style="width:auto;">
@@ -71,108 +231,171 @@
           <option value="archiver">Archiver</option>
           <option value="supprimer">Supprimer</option>
         </select>
-        <button type="button" class="btn btn-sm btn-primary" onclick="confirmerAction()">
-          <i class="bi bi-check-lg"></i> Appliquer
+        <button type="button" class="btn btn-sm btn-primary shadow-sm" onclick="confirmerAction()">
+          <i class="bi bi-check-lg me-1"></i>Appliquer
         </button>
         {% endif %}
       </div>
-
     </div>
 
-    <div class="card-body p-0 table-responsive">
-      <table class="table mb-0">
-        <thead>
-          <tr>
-            <th style="width:2rem"></th>
-            <th>#</th>
-            <th>{% sortable_th sort_links sort_key sort_dir 'reference' 'Réf.' %}</th>
-            <th>{% sortable_th sort_links sort_key sort_dir 'client' 'Client' %}</th>
-            <th>{% sortable_th sort_links sort_key sort_dir 'nom' 'Campagne' %}</th>
-            <th>{% sortable_th sort_links sort_key sort_dir 'statut' 'Statut' %}</th>
-            <th>{% sortable_th sort_links sort_key sort_dir 'date_debut' 'Période' %}</th>
-            <th>{% sortable_th sort_links sort_key sort_dir 'nb_supports' 'Supports' %}</th>
-            <th>{% sortable_th sort_links sort_key sort_dir 'type_support' 'Type' %}</th>
-            <th>Spots</th>
-            {% if user.is_admin %}
-              <th>{% sortable_th sort_links sort_key sort_dir 'actif' 'Archivée' %}</th>
-            {% endif %}
-            <th></th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for c in campagnes %}
-          <tr style="font-size:.9rem ;{% if user.is_admin %} {% if c.actif %}background-color: transparent{% else %}background-color:#00000029{% endif %}{% endif %};" class="row-selectable">
-            <td>
-              <input type="checkbox" name="selected_ids" value="{{ c.pk }}"
-              class="form-check-input mt-0 row-checkbox">
-            </td>
-            <td>{{ forloop.counter }}</td>
-            <td class="mono" style="font-size:.72rem;color:var(--color-primary)">{{ c.reference }}</td>
-            <td style="font-weight:600">{{ c.client.nom }}</td>
-            <td>
-                {{ c.nom }}
-              {% if c.campagne_parente %}
-              <div class="small text-muted mt-1">
-                Sous-campagne de
-                <a href="{% url 'campagne_detail' c.campagne_parente.pk %}" class="text-decoration-none">{{ c.campagne_parente.nom }}</a>
-              </div>
-              {% elif c.est_mere %}
-              <div class="small text-muted mt-1">
-                Campagne mère • {{ c.sous_campagnes.count }} sous-campagne{% if c.sous_campagnes.count > 1 %}s{% endif %}
-              </div>
+    <div class="card-body p-0">
+      <div class="table-responsive">
+        <table class="table table-hover mb-0 align-middle table-supports">
+          <thead>
+            <tr>
+              <th style="width:2.5rem" class="ps-3"></th>
+              <th>{% sortable_th sort_links sort_key sort_dir 'reference' 'Réf.' %}</th>
+              <th>{% sortable_th sort_links sort_key sort_dir 'client' 'Client' %}</th>
+              <th>{% sortable_th sort_links sort_key sort_dir 'nom' 'Campagne' %}</th>
+              <th>{% sortable_th sort_links sort_key sort_dir 'statut' 'Statut' %}</th>
+              <th>{% sortable_th sort_links sort_key sort_dir 'date_debut' 'Période' %}</th>
+              <th>{% sortable_th sort_links sort_key sort_dir 'nb_supports' 'Supports' %}</th>
+              <th>{% sortable_th sort_links sort_key sort_dir 'type_support' 'Type' %}</th>
+              <th>Spots</th>
+              {% if user.is_admin %}
+                <th>{% sortable_th sort_links sort_key sort_dir 'actif' 'Archivée' %}</th>
               {% endif %}
-            </td>
-            <td><span class="badge badge-status bs-{{ c.statut }}">{{ c.get_statut_display }}</span></td>
+              <th class="text-end pe-4">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for c in campagnes %}
+            <tr class="support-row {% if user.is_admin and not c.actif %}opacity-75 bg-light{% endif %}">
+              <td class="ps-3">
+                <input type="checkbox" name="selected_ids" value="{{ c.pk }}" class="form-check-input mt-0 row-checkbox">
+              </td>
+              
+              {# Référence #}
+              <td>
+                <span class="code-primary fw-bold font-monospace">{{ c.reference }}</span>
+              </td>
 
-            <td class="mono" style="font-size:.75rem">
-              {{ c.date_debut|date:"d/m/Y" }}<br>{{ c.date_fin|date:"d/m/Y" }}
-            </td>
-            <td class="mono">{{ c.nb_supports }}</td>
-            <td style="text-align:center;vertical-align:middle;">
-              <a href="{% url 'campagne_detail' c.pk %}">
-                {% if c.est_mere %}
-                  <i class="bi bi-diagram-3 support-mere"></i>
-                {% elif c.type_support == 'ecran' %}
-                  <i class="bi bi-display support-ecran"></i>
-                {% elif c.type_support == 'marche' %}
-                  <i class="bi bi-cart support-marche"></i>
+              {# Client #}
+              <td>
+                <div class="d-flex align-items-center gap-2">
+                  <div class="mx-avatar">
+                    {{ c.client.nom|slice:":1"|upper }}
+                  </div>
+                  <div>
+                    <div class="fw-bold text-dark" style="font-size:0.84rem;">{{ c.client.nom }}</div>
+                  </div>
+                </div>
+              </td>
+
+              {# Nom & Liens #}
+              <td>
+                <a href="{% url 'campagne_detail' c.pk %}" class="text-dark fw-bold text-decoration-none" style="font-size:0.86rem;">
+                  {{ c.nom }}
+                </a>
+                {% if c.campagne_parente %}
+                <div class="small text-muted mt-1" style="font-size:0.72rem;">
+                  <i class="bi bi-arrow-return-right me-1 text-primary"></i>Sous-campagne de
+                  <a href="{% url 'campagne_detail' c.campagne_parente.pk %}" class="text-primary text-decoration-none fw-semibold">{{ c.campagne_parente.nom }}</a>
+                </div>
+                {% elif c.est_mere %}
+                <div class="small text-primary mt-1 fw-semibold" style="font-size:0.72rem;">
+                  <i class="bi bi-diagram-3 me-1"></i>Campagne mère • {{ c.sous_campagnes.count }} sous-campagne{{ c.sous_campagnes.count|pluralize }}
+                </div>
+                {% endif %}
+              </td>
+
+              {# Statut #}
+              <td>
+                <span class="badge badge-status bs-{{ c.statut }}">{{ c.get_statut_display }}</span>
+              </td>
+
+              {# Période #}
+              <td>
+                <div class="font-monospace small fw-bold text-dark" style="font-size:0.82rem;">
+                  <i class="bi bi-calendar3 me-1 text-muted"></i>{{ c.date_debut|date:"d/m/Y" }}
+                </div>
+                <div class="font-monospace text-muted mt-0.5" style="font-size:0.72rem;">
+                  <i class="bi bi-arrow-right me-1"></i>{{ c.date_fin|date:"d/m/Y" }}
+                </div>
+              </td>
+
+              {# Supports #}
+              <td>
+                <span class="badge bg-light text-secondary border font-monospace" style="font-size:0.75rem;">
+                  {{ c.nb_supports }} support{{ c.nb_supports|pluralize }}
+                </span>
+              </td>
+
+              {# Type #}
+              <td class="text-center">
+                <a href="{% url 'campagne_detail' c.pk %}" class="text-decoration-none" title="{{ c.get_type_support_display }}">
+                  {% if c.est_mere %}
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle" style="font-size:0.72rem;">
+                      <i class="bi bi-diagram-3 me-1"></i>Mère
+                    </span>
+                  {% elif c.type_support == 'ecran' %}
+                    <span class="badge bg-info-subtle text-info border border-info-subtle" style="font-size:0.72rem;">
+                      <i class="bi bi-display me-1"></i>Écran
+                    </span>
+                  {% elif c.type_support == 'marche' %}
+                    <span class="badge bg-warning-subtle text-warning border border-warning-subtle" style="font-size:0.72rem;">
+                      <i class="bi bi-shop me-1"></i>Marché
+                    </span>
+                  {% else %}
+                    <span class="badge bg-danger-subtle text-danger border border-danger-subtle" style="font-size:0.72rem;">
+                      <i class="bi bi-sign-merge-right me-1"></i>Panneau
+                    </span>
+                  {% endif %}
+                </a>
+              </td>
+
+              {# Spots #}
+              <td>
+                <span class="font-monospace fw-bold text-dark" style="font-size:0.84rem;">
+                  {{ c.calculer_nombre_spots|default:"—" }}
+                </span>
+              </td>
+
+              {# Actif / Archivé #}
+              {% if user.is_admin %}
+              <td>
+                {% if c.actif %}
+                <span class="badge bg-success-subtle text-success border border-success-subtle" style="border-radius:8px;">Active</span>
                 {% else %}
-                  <i class="bi bi-sign-merge-right support-panneau" title="Panneau"></i>
+                <span class="badge bg-danger-subtle text-danger border border-danger-subtle" style="border-radius:8px;">Archivée</span>
                 {% endif %}
-              </a>
-            </td>
-            <td class="font-monospace fw-bold">{{ c.calculer_nombre_spots }}</td>
-            {% if user.is_admin %}
-            <td>
-              {% if c.actif %}
-              <span class="badge badge-status bs-success">Active</span>
-              {% else %}
-              <span class="badge badge-status bs-danger">Archivée</span>
+              </td>
               {% endif %}
-            </td>
-            {% endif %}
-            <td>
-              <div class="d-flex gap-1">
-                <a href="{% url 'campagne_detail' c.pk %}" class="btn btn-sm btn-outline-secondary">
-                  <i class="bi bi-eye"></i>
-                </a>
-                {% if user.is_staff_regie_role %}
-                <a href="{% url 'campagne_edit' c.pk %}" class="btn btn-sm btn-outline-secondary">
-                  <i class="bi bi-pencil"></i>
-                </a>
-                {% endif %}
-              </div>
-            </td>
-          </tr>
-          {% empty %}
-          <tr>
-            <td colspan="11" class="text-center py-4" style="color:var(--text-muted)">
-              Aucune campagne
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+
+              {# Actions #}
+              <td class="text-end pe-4">
+                <div class="d-inline-flex gap-1 justify-content-end">
+                  <a href="{% url 'campagne_detail' c.pk %}" class="btn btn-sm btn-outline-primary btn-action-icon" title="Voir le détail de la campagne">
+                    <i class="bi bi-eye"></i>
+                  </a>
+                  {% if user.is_staff_regie_role %}
+                  <a href="{% url 'campagne_edit' c.pk %}" class="btn btn-sm btn-outline-secondary btn-action-icon" title="Modifier la campagne">
+                    <i class="bi bi-pencil"></i>
+                  </a>
+                  {% endif %}
+                </div>
+              </td>
+
+            </tr>
+            {% empty %}
+            <tr>
+              <td colspan="12" class="text-center py-5 text-muted">
+                <div class="py-3">
+                  <i class="bi bi-megaphone text-muted d-block mb-3" style="font-size:2.8rem;opacity:0.3;"></i>
+                  <h6 class="fw-bold text-dark mb-1">Aucune campagne trouvée</h6>
+                  <p class="text-muted small mb-3">Aucune campagne ne correspond aux critères de recherche actuels.</p>
+                  {% if user.is_staff_regie_role %}
+                  <a href="{% url 'campagne_create' %}" class="btn btn-primary btn-sm px-3 shadow-sm">
+                    <i class="bi bi-plus-lg me-1"></i>Créer une nouvelle campagne
+                  </a>
+                  {% endif %}
+                </div>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
 </form>
@@ -180,6 +403,7 @@
 <div class="mt-4">
   {% pagination_nav %}
 </div>
+
 <script>
 const selectAll  = document.getElementById('select-all');
 const actionsBar = document.getElementById('actions-bar');
@@ -196,14 +420,18 @@ function majSelection() {
     actionsBar.style.display = 'none';
     countLabel.textContent = total + ' campagne(s)';
   }
-  selectAll.indeterminate = checked > 0 && checked < total;
-  selectAll.checked = checked === total;
+  if (selectAll) {
+    selectAll.indeterminate = checked > 0 && checked < total;
+    selectAll.checked = checked === total && total > 0;
+  }
 }
 
-selectAll.addEventListener('change', () => {
-  checkboxes.forEach(cb => cb.checked = selectAll.checked);
-  majSelection();
-});
+if (selectAll) {
+  selectAll.addEventListener('change', () => {
+    checkboxes.forEach(cb => cb.checked = selectAll.checked);
+    majSelection();
+  });
+}
 
 checkboxes.forEach(cb => cb.addEventListener('change', majSelection));
 

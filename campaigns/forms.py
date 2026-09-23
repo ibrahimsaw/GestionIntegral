@@ -135,6 +135,8 @@ class CampagneForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields['client'].required = False
+        self.fields['client'].help_text = "Laissez vide pour une campagne propre à INTEGRAL."
 
         # 1. Déterminer le client à utiliser pour filtrer contrat / campagne_parente
         #    Ordre de priorité :

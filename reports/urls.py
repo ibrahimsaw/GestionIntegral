@@ -12,6 +12,7 @@ urlpatterns = [
     path('client/<int:pk>/pdf/', views.ExportClientPdfView.as_view(), name='export_client_pdf'),
     path('client/<int:pk>/excel/', views.ExportClientExcelView.as_view(), name='export_client_excel'),
     path('client/<int:pk>/preview/', views.PreviewClientPdfView.as_view(), name='preview_client_pdf'),
+    path('client/<int:pk>/preview-alias/', views.PreviewClientPdfView.as_view(), name='client_preview'),
     path("supports/", SupportsReportView.as_view(), name="supports_report"),
     path("supports/export/pdf/", ExportSupportsPdfView.as_view(), name="supports_export_pdf"),
     path("supports/export/excel/", ExportSupportsExcelView.as_view(), name="supports_export_excel"),

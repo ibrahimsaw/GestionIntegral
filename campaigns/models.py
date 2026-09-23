@@ -162,6 +162,24 @@ class Client(models.Model):
         today = timezone.now().date()
         return self.campagnes.filter(date_debut__lte=today, date_fin__gte=today, statut__in=['en_cours', 'a_venir'])
 
+    @classmethod
+    def get_client_interne(cls):
+        """Retourne le client utilisé pour les campagnes propres à INTEGRAL."""
+        client, created = cls.objects.get_or_create(
+            reference='CLI-INTEGRAL',
+            defaults={
+                'nom': 'INTEGRAL (Société)',
+                'contact_nom': 'Service interne',
+                'telephone': 'N/A',
+                'email': 'interne@integral.local',
+                'actif': True,
+            },
+        )
+        if not created and client.nom != 'INTEGRAL (Société)':
+            client.nom = 'INTEGRAL (Société)'
+            client.save(update_fields=['nom'])
+        return client
+
 class Contrat(models.Model):
     """Contrat signé par un client."""
     client       = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='contrats')
@@ -854,6 +872,8 @@ class Campagne(models.Model):
         return f"{self.nom} — {self.client.nom}"
 
     def save(self, *args, **kwargs):
+        if self.client_id is None:
+            self.client = Client.get_client_interne()
         if not self.reference:
             self.reference = f"CAM-{timezone.now().year}-{str(uuid.uuid4())[:6].upper()}"
         super().save(*args, **kwargs)

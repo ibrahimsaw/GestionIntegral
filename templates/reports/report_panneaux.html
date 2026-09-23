@@ -1,60 +1,158 @@
 {% extends 'base.html' %}
+{% load static sort_tags %}
+
 {% block title %}Rapport Panneaux — Integral{% endblock %}
-{% block topbar_title %}<i class="bi bi-file-earmark-bar-graph me-2" style="color:var(--color-primary)"></i>Rapport Panneaux{% endblock %}
+
+{% block topbar_title %}
+  <i class="bi bi-file-earmark-bar-graph me-2" style="color:var(--color-primary)"></i>Rapport & État des Panneaux
+{% endblock %}
+
+{% block topbar_actions %}
+  <div class="d-flex flex-wrap gap-2">
+    <a href="{% url 'supports_report' %}" class="btn btn-outline-secondary btn-sm shadow-sm px-3 d-flex align-items-center gap-1">
+      <i class="bi bi-arrow-left me-1"></i>
+      <span class="d-none d-md-inline">Rapport Global</span>
+    </a>
+    <a href="javascript:void(0)" onclick="window.print()" class="btn btn-primary btn-sm shadow-sm px-3 d-flex align-items-center gap-1">
+      <i class="bi bi-printer me-1"></i>
+      <span class="d-none d-md-inline">Imprimer</span>
+    </a>
+  </div>
+{% endblock %}
 
 {% block content %}
-    <div class="container-fluid">
-        <div class="row">
-            <div class="col-12">
-                <h2>Rapport Panneaux</h2>
-                <form method="get" class="mb-3">
-                    <div class="row">
-                        <div class="col-md-3">
-                            <label for="ville" class="form-label">Ville</label>
-                            <input type="text" class="form-control" id="ville" name="ville" value="{{ filters.ville }}">
-                        </div>
-                        <div class="col-md-3">
-                            <label for="quartier" class="form-label">Quartier</label>
-                            <input type="text" class="form-control" id="quartier" name="quartier" value="{{ filters.quartier }}">
-                        </div>
-                        <div class="col-md-3">
-                            <label for="statut" class="form-label">Statut</label>
-                            <select class="form-control" id="statut" name="statut">
-                                <option value="">Tous les statuts</option>
-                                <option value="en_cours" {% if filters.statut == "en_cours" %}selected{% endif %}>En cours</option>
-                                <option value="termine" {% if filters.statut == "termine" %}selected{% endif %}>Terminé</option>
-                            </select>
-                        </div>
-                        <div class="col-md-3">
-                            <label class="form-label">&nbsp;</label>
-                            <button type "submit" class("btn btn-primary")>Filtrer</button>
-                        </div>
-                    </div>
-                </form>
 
-                <table class("table table-striped"):
-                    <thead>
-                        <tr>
-                            <th>Code</th>
-                            <th>Nom</th>
-                            <th>Ville</th>
-                            <th>Quartier</th>
-                            <th>Adresse</th>
-                            <th>Statut</th>
-                            <th>Faces occupées</th>
-                            <th>Faces libres</th>
-                            <th>Campagnes associées</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-
-                    </tbody>
-                </table>
-
-            </div>
-
-        </div>
-
+{# ═══════════════════════════════════════════ #}
+{# ── BANNIÈRE HÉRO DU RAPPORT PANNEAUX ── #}
+{# ═══════════════════════════════════════════ #}
+<div class="cl-hero mb-4">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+    <div>
+      <div class="cl-hero-title">
+        <i class="bi bi-sign-merge-right-fill me-2"></i>Rapport d'Occupation des Panneaux
+      </div>
+      <div class="cl-hero-sub">
+        Analyse détaillée de l'occupation commerciale, faces libres et campagnes associées au parc de panneaux.
+      </div>
     </div>
+    <div class="d-flex gap-2 flex-wrap align-items-center d-inline d-md-none me-1">
+      <a href="javascript:void(0)" onclick="window.print()" class="btn btn-light shadow-sm d-inline d-md-none me-1" style="font-weight: 700; color: #932e2b;">
+        <i class="bi bi-printer me-1"></i>Imprimer le rapport
+      </a>
+    </div>
+  </div>
+</div>
+
+{# ═══════════════════════════════════════════ #}
+{# ── FORMULAIRE DE RECHERCHE & FILTRES ── #}
+{# ═══════════════════════════════════════════ #}
+<div class="card filter-card mb-4">
+  <div class="card-body p-3 p-lg-4">
+    <form method="get" class="row g-3 align-items-end">
+      <div class="col-xl-3 col-md-6">
+        <label class="filter-label"><i class="bi bi-geo-alt"></i>Ville</label>
+        <input type="text" class="form-control form-control-sm" id="ville" name="ville" value="{{ filters.ville }}" placeholder="Ex: Abidjan, Bouaké...">
+      </div>
+      <div class="col-xl-3 col-md-6">
+        <label class="filter-label"><i class="bi bi-pin-map"></i>Quartier</label>
+        <input type="text" class="form-control form-control-sm" id="quartier" name="quartier" value="{{ filters.quartier }}" placeholder="Ex: Cocody, Plateau...">
+      </div>
+      <div class="col-xl-3 col-md-6">
+        <label class="filter-label"><i class="bi bi-activity"></i>Statut de diffusion</label>
+        <select class="form-select form-select-sm" id="statut" name="statut">
+          <option value="">Tous les statuts</option>
+          <option value="en_cours" {% if filters.statut == "en_cours" %}selected{% endif %}>En cours</option>
+          <option value="termine" {% if filters.statut == "termine" %}selected{% endif %}>Terminé</option>
+        </select>
+      </div>
+      <div class="col-xl-3 col-md-6 d-flex gap-2">
+        <button type="submit" class="btn btn-primary btn-sm flex-fill shadow-sm d-flex align-items-center justify-content-center gap-1">
+          <i class="bi bi-funnel-fill"></i>
+          <span>Filtrer</span>
+        </button>
+        {% if filters.ville or filters.quartier or filters.statut %}
+        <a href="{% url 'reports_index' %}" class="btn btn-outline-secondary btn-sm" title="Réinitialiser">
+          <i class="bi bi-arrow-counterclockwise"></i>
+        </a>
+        {% endif %}
+      </div>
+    </form>
+  </div>
+</div>
+
+{# ═══════════════════════════════════════════ #}
+{# ── TABLEAU DES RÉSULTATS DU RAPPORT ── #}
+{# ═══════════════════════════════════════════ #}
+<div class="card table-custom-card">
+  <div class="card-header bg-white py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-2 border-bottom">
+    <div class="d-flex align-items-center gap-2">
+      <h6 class="mb-0 fw-bold text-dark">
+        <i class="bi bi-table me-2 text-primary"></i>Données des Panneaux Publicitaires
+      </h6>
+    </div>
+  </div>
+
+  <div class="card-body p-0">
+    <div class="table-responsive">
+      <table class="table table-hover mb-0 align-middle table-supports">
+        <thead>
+          <tr>
+            <th class="ps-4">Code</th>
+            <th>Nom du support</th>
+            <th>Localisation</th>
+            <th>Adresse</th>
+            <th>Statut</th>
+            <th>Faces occupées</th>
+            <th>Faces libres</th>
+            <th class="text-end pe-4">Campagnes associées</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in panneaux %}
+          <tr class="support-row">
+            <td class="ps-4">
+              <span class="code-primary fw-bold font-monospace">{{ p.code }}</span>
+            </td>
+            <td>
+              <div class="fw-bold text-dark">{{ p.nom }}</div>
+            </td>
+            <td>
+              <div>{{ p.ville }}</div>
+              <small class="text-muted">{{ p.quartier|default:"—" }}</small>
+            </td>
+            <td>
+              <span class="small text-muted">{{ p.adresse|default:"—" }}</span>
+            </td>
+            <td>
+              <span class="badge badge-status bs-{{ p.etat }}">{{ p.get_etat_display }}
+            </td>
+            <td>
+              <span class="badge bg-danger-subtle text-danger border border-danger-subtle font-monospace" style="border-radius:8px;">
+                {{ p.faces_occupees_count|default:0 }}
+              </span>
+            </td>
+            <td>
+              <span class="badge bg-success-subtle text-success border border-success-subtle font-monospace" style="border-radius:8px;">
+                {{ p.faces_libres_count|default:0 }}
+              </span>
+            </td>
+            <td class="text-end pe-4">
+              <span class="small text-dark fw-semibold">{{ p.campagnes_count|default:0 }} campagne{{ p.campagnes_count|pluralize }}</span>
+            </td>
+          </tr>
+          {% empty %}
+          <tr>
+            <td colspan="8" class="text-center py-5 text-muted">
+              <i class="bi bi-sign-merge-right d-block mb-3" style="font-size:2.5rem;opacity:0.3;"></i>
+              <h6 class="fw-bold text-dark mb-1">Aucune donnée disponible</h6>
+              <p class="text-muted small mb-0">Ajustez vos filtres pour visualiser les panneaux correspondants.</p>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
 
 {% endblock %}

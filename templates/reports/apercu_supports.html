@@ -1,179 +1,145 @@
 {% extends 'base.html' %}
+{% load static %}
+
 {% block title %}État des Supports — Integral{% endblock %}
 
 {% block topbar_title %}
-  <div class="d-flex align-items-center gap-2">
-    <div style="width:32px;height:32px;border-radius:9px;background:rgba(147,46,43,0.1);color:#932e2b;display:flex;align-items:center;justify-content:center;">
-      <i class="bi bi-layout-three-columns"></i>
-    </div>
-    <span class="fw-bold">Rapport du réseau</span>
-  </div>
+  <i class="bi bi-layout-three-columns me-2" style="color:var(--color-primary)"></i>Rapport Global du Réseau
 {% endblock %}
 
-{% block extra_head %}
-<style>
-  /* ── Panneau de filtres premium ── */
-  .rpt-filter {
-    background: #fff;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    overflow: hidden;
-    box-shadow: 0 2px 10px rgba(0,0,0,0.06);
-    margin-bottom: 22px;
-  }
-  .rpt-filter-head {
-    background: linear-gradient(135deg, #932e2b 0%, #1e40af 100%);
-    padding: 14px 20px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 10px;
-  }
-  .rpt-filter-head-left {
-    display: flex; align-items: center; gap: 10px;
-  }
-  .rpt-filter-icon {
-    width: 34px; height: 34px;
-    border-radius: 8px;
-    background: rgba(147,46,43,0.25);
-    border: 1px solid rgba(147,46,43,0.4);
-    display: flex; align-items: center; justify-content: center;
-    color: #fff; font-size: 1rem;
-  }
-  .rpt-filter-title {
-    font-size: 0.9rem; font-weight: 800; color: #fff;
-  }
-  .rpt-filter-hint {
-    font-size: 0.72rem; color: rgba(255,255,255,0.45);
-    font-family: var(--font-mono, monospace);
-  }
-  .rpt-filter-body {
-    padding: 20px 22px;
-  }
-  .rpt-filter-label {
-    display: block;
-    margin-bottom: 5px;
-    font-size: 0.68rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.07em;
-    color: #94a3b8;
-  }
-  .rpt-select {
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    padding: 7px 10px;
-    font-size: 0.83rem;
-    width: 100%;
-    background: #f8fafc;
-    color: #0f172a;
-    transition: border-color 0.18s, box-shadow 0.18s;
-    -webkit-appearance: none;
-    appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='%2394a3b8' viewBox='0 0 16 16'%3E%3Cpath d='M7.247 11.14 2.451 5.658C1.885 5.013 2.345 4 3.204 4h9.592a1 1 0 0 1 .753 1.659l-4.796 5.48a1 1 0 0 1-1.506 0z'/%3E%3C/svg%3E");
-    background-repeat: no-repeat;
-    background-position: right 10px center;
-    padding-right: 30px;
-  }
-  .rpt-select:focus {
-    outline: none;
-    border-color: #932e2b;
-    box-shadow: 0 0 0 3px rgba(147,46,43,0.1);
-    background-color: #fff;
-  }
-  /* Chips catégories */
-  .rpt-chip-group { display: flex; flex-wrap: wrap; gap: 7px; }
-  .rpt-chip {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    background: #f8fafc;
-    color: #932e2b;
-    font-size: 0.76rem;
-    font-weight: 700;
-    cursor: pointer;
-    transition: all 0.18s ease;
-    user-select: none;
-  }
-  .rpt-chip input { position: absolute; opacity: 0; pointer-events: none; }
-  .rpt-chip:has(input:checked) {
-    border-color: #932e2b;
-    background: rgba(147,46,43,0.07);
-    color: #932e2b;
-    box-shadow: 0 2px 8px rgba(147,46,43,0.14);
-  }
-  .rpt-chip:hover { border-color: #932e2b; transform: translateY(-1px); }
-  /* Options d'affichage */
-  .rpt-display-row {
-    display: flex; flex-wrap: wrap; align-items: center; gap: 14px;
-    margin-top: 16px; padding-top: 14px;
-    border-top: 1px solid #f1f5f9;
-  }
-  .rpt-display-label {
-    font-size: 0.68rem; font-weight: 800;
-    text-transform: uppercase; letter-spacing: 0.07em;
-    color: #94a3b8;
-  }
-  .rpt-check-label {
-    display: inline-flex; align-items: center; gap: 7px;
-    font-size: 0.81rem; color: #334155; font-weight: 600;
-    cursor: pointer;
-  }
-  .rpt-check-label input[type=checkbox] {
-    width: 15px; height: 15px;
-    border-radius: 4px;
-    accent-color: #932e2b;
-  }
-  /* Boutons filtrer */
-  .rpt-btn-apply {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 8px 18px; border-radius: 8px;
-    background: #932e2b; color: #fff; border: none;
-    font-size: 0.82rem; font-weight: 700; cursor: pointer;
-    transition: background 0.18s; flex: 1;
-  }
-  .rpt-btn-apply:hover { background: #7a1e1b; }
-  .rpt-btn-reset {
-    display: inline-flex; align-items: center; justify-content: center;
-    width: 36px; height: 36px; border-radius: 8px;
-    border: 1px solid #e2e8f0; background: #f8fafc;
-    color: #64748b; text-decoration: none;
-    transition: all 0.18s; font-size: 0.9rem;
-  }
-  .rpt-btn-reset:hover { border-color: #932e2b; color: #932e2b; background: rgba(147,46,43,0.05); }
-
-  /* ── Responsive ── */
-  @media (max-width: 575.98px) {
-    .rpt-filter-body { padding: 14px; }
-    .rpt-filter-head { flex-direction: column; align-items: flex-start; }
-  }
-</style>
+{% block topbar_actions %}
+  <div class="d-flex flex-wrap gap-2">
+    <a href="{% url 'supports_export_pdf' %}?{{ request.GET.urlencode }}" class="btn btn-outline-danger btn-sm shadow-sm px-3 d-flex align-items-center gap-1" style="border-radius:8px; font-weight:600;">
+      <i class="bi bi-file-earmark-pdf"></i>
+      <span class="d-none d-md-inline">Export PDF</span>
+    </a>
+    <a href="{% url 'supports_export_excel' %}?{{ request.GET.urlencode }}" class="btn btn-outline-success btn-sm shadow-sm px-3 d-flex align-items-center gap-1" style="border-radius:8px; font-weight:600;">
+      <i class="bi bi-file-earmark-spreadsheet"></i>
+      <span class="d-none d-md-inline">Export Excel</span>
+    </a>
+    <button onclick="window.print()" class="btn btn-primary btn-sm shadow-sm px-3 d-flex align-items-center gap-1" style="border-radius:8px; font-weight:600;">
+      <i class="bi bi-printer"></i>
+      <span class="d-none d-md-inline">Imprimer</span>
+    </button>
+  </div>
 {% endblock %}
 
 {% block content %}
 
-<!-- Panneau de filtres -->
-<div class="rpt-filter">
+{# ═══════════════════════════════════════════ #}
+{# ── BANNIÈRE HÉRO DU RAPPORT RÉSEAU ── #}
+{# ═══════════════════════════════════════════ #}
+<div class="cl-hero mb-4">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+    <div>
+      <div class="cl-hero-title">
+        <i class="bi bi-signpost-2-fill me-2"></i>État du Réseau & Inventaire des Supports
+      </div>
+      <div class="cl-hero-sub">
+        Consultez l'état d'occupation en temps réel par catégorie, filtrez par localisation et exportez le rapport certifié.
+      </div>
+    </div>
+
+    <div class="d-flex gap-2 flex-wrap align-items-center d-inline d-md-none me-1">
+      <a href="{% url 'supports_export_pdf' %}?{{ request.GET.urlencode }}" class="btn btn-light shadow-sm d-inline d-md-none me-1" style="font-weight: 700; color: #932e2b; border-radius:8px;">
+        <i class="bi bi-file-earmark-pdf me-1"></i>PDF
+      </a>
+      <a href="{% url 'supports_export_excel' %}?{{ request.GET.urlencode }}" class="btn btn-outline-light shadow-sm d-inline d-md-none me-1" style="font-weight: 700; border-radius:8px;">
+        <i class="bi bi-file-earmark-spreadsheet me-1"></i>Excel
+      </a>
+    </div>
+  </div>
+</div>
+
+{# ═══════════════════════════════════════════ #}
+{# ── RUBAN DE 5 CARTES KPI STATISTIQUES ── #}
+{# ═══════════════════════════════════════════ #}
+<div class="row g-3 mb-4">
+  {# 1. Total Supports #}
+  <div class="col-6 col-md-4 col-xl">
+    <div class="cl-kpi-card">
+      <div class="cl-kpi-icon" style="background:#eff6ff; color:#2563eb; border:1px solid #dbeafe;">
+        <i class="bi bi-signpost-2-fill"></i>
+      </div>
+      <div>
+        <div class="cl-kpi-val">{{ total_panneaux|default:0 }}</div>
+        <div class="cl-kpi-lbl">Total Supports</div>
+      </div>
+    </div>
+  </div>
+
+  {# 2. Faces Totales #}
+  <div class="col-6 col-md-4 col-xl">
+    <div class="cl-kpi-card">
+      <div class="cl-kpi-icon" style="background:#f1f5f9; color:#475569; border:1px solid #e2e8f0;">
+        <i class="bi bi-layout-split"></i>
+      </div>
+      <div>
+        <div class="cl-kpi-val" style="color:#475569;">{{ total_faces|default:0 }}</div>
+        <div class="cl-kpi-lbl">Faces Totales</div>
+      </div>
+    </div>
+  </div>
+
+  {# 3. Faces Libres #}
+  <div class="col-6 col-md-4 col-xl">
+    <div class="cl-kpi-card">
+      <div class="cl-kpi-icon" style="background:#ecfdf5; color:#059669; border:1px solid #d1fae5;">
+        <i class="bi bi-check-circle-fill"></i>
+      </div>
+      <div>
+        <div class="cl-kpi-val" style="color:#059669;">{{ total_libres|default:0 }}</div>
+        <div class="cl-kpi-lbl">Faces Libres</div>
+      </div>
+    </div>
+  </div>
+
+  {# 4. Faces Réservées #}
+  <div class="col-6 col-md-6 col-xl">
+    <div class="cl-kpi-card">
+      <div class="cl-kpi-icon" style="background:#ede9fe; color:#5b21b6; border:1px solid #ddd6fe;">
+        <i class="bi bi-bookmark-fill"></i>
+      </div>
+      <div>
+        <div class="cl-kpi-val" style="color:#5b21b6;">{{ total_reservees|default:0 }}</div>
+        <div class="cl-kpi-lbl">Faces Réservées</div>
+      </div>
+    </div>
+  </div>
+
+  {# 5. Faces Occupées #}
+  <div class="col-6 col-md-6 col-xl">
+    <div class="cl-kpi-card">
+      <div class="cl-kpi-icon" style="background:#fffbeb; color:#d97706; border:1px solid #fef3c7;">
+        <i class="bi bi-broadcast-pin"></i>
+      </div>
+      <div>
+        <div class="cl-kpi-val" style="color:#d97706;">{{ total_occupees|default:0 }}</div>
+        <div class="cl-kpi-lbl">Faces Occupées</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ═══════════════════════════════════════════ #}
+{# ── PANNEAU DE FILTRES MULTICRITÈRES ── #}
+{# ═══════════════════════════════════════════ #}
+<div class="rpt-filter mb-4">
   <div class="rpt-filter-head">
     <div class="rpt-filter-head-left">
       <div class="rpt-filter-icon"><i class="bi bi-sliders2"></i></div>
       <div>
-        <div class="rpt-filter-title">Filtrer le rapport</div>
-        <div class="rpt-filter-hint">Combinez plusieurs critères pour affiner les résultats</div>
+        <div class="rpt-filter-title">Filtrer l'état du réseau</div>
+        <div class="rpt-filter-hint">Combinez plusieurs critères pour affiner les données du rapport</div>
       </div>
     </div>
     <div class="d-flex gap-2">
       <a href="{% url 'supports_export_pdf' %}?{{ request.GET.urlencode }}"
-         style="display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:9px;background:rgba(239,68,68,0.2);border:1px solid rgba(239,68,68,0.35);color:#fca5a5;font-size:0.76rem;font-weight:700;text-decoration:none;">
+         style="display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:8px;background:rgba(239,68,68,0.2);border:1px solid rgba(239,68,68,0.35);color:#fca5a5;font-size:0.76rem;font-weight:700;text-decoration:none;">
         <i class="bi bi-file-earmark-pdf"></i><span class="d-none d-sm-inline">PDF</span>
       </a>
       <a href="{% url 'supports_export_excel' %}?{{ request.GET.urlencode }}"
-         style="display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:9px;background:rgba(16,185,129,0.2);border:1px solid rgba(16,185,129,0.35);color:#6ee7b7;font-size:0.76rem;font-weight:700;text-decoration:none;">
+         style="display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:8px;background:rgba(16,185,129,0.2);border:1px solid rgba(16,185,129,0.35);color:#6ee7b7;font-size:0.76rem;font-weight:700;text-decoration:none;">
         <i class="bi bi-file-earmark-spreadsheet"></i><span class="d-none d-sm-inline">Excel</span>
       </a>
     </div>
@@ -215,11 +181,11 @@
       </div>
 
       <div class="col-12">
-        <label class="rpt-filter-label"><i class="bi bi-tag me-1"></i>Catégories</label>
+        <label class="rpt-filter-label"><i class="bi bi-tag me-1"></i>Catégories de supports</label>
         <div class="rpt-chip-group">
           {% for categorie in categories_rapport %}
           <label class="rpt-chip">
-            <input class="form-check-input" type="checkbox" name="categorie" value="{{ categorie }}" {% if categorie in categories_selectionnees %}checked{% endif %}>
+            <input type="checkbox" name="categorie" value="{{ categorie }}" {% if categorie in categories_selectionnees %}checked{% endif %}>
             {% if categorie == "Écran" %}<i class="bi bi-display"></i>
             {% elif categorie == "Marché" %}<i class="bi bi-shop-window"></i>
             {% elif categorie == "Sucette" %}<i class="bi bi-lamp"></i>
@@ -237,16 +203,16 @@
             <span class="rpt-display-label"><i class="bi bi-eye me-1"></i>Afficher</span>
             <input type="hidden" name="afficher_etat" value="0">
             <label class="rpt-check-label">
-              <input type="checkbox" name="afficher_etat" value="1" {% if afficher_etat %}checked{% endif %}> État
+              <input type="checkbox" name="afficher_etat" value="1" {% if afficher_etat %}checked{% endif %}> État technique
             </label>
             <input type="hidden" name="afficher_client" value="0">
             <label class="rpt-check-label">
-              <input type="checkbox" name="afficher_client" value="1" {% if afficher_client %}checked{% endif %}> Nom du client
+              <input type="checkbox" name="afficher_client" value="1" {% if afficher_client %}checked{% endif %}> Nom des annonceurs
             </label>
           </div>
           <div class="d-flex gap-2" style="min-width:160px;">
             <button type="submit" class="rpt-btn-apply">
-              <i class="bi bi-funnel-fill"></i> Appliquer
+              <i class="bi bi-funnel-fill"></i> Appliquer les filtres
             </button>
             <a href="{% url 'supports_report' %}" class="rpt-btn-reset" title="Réinitialiser les filtres">
               <i class="bi bi-arrow-counterclockwise"></i>
@@ -259,7 +225,35 @@
   </div>
 </div>
 
-<!-- Contenu du rapport -->
-{% include 'reports/supports_report_pdf_export.html' %}
+{# ═══════════════════════════════════════════ #}
+{# ── FEUILLE DE RAPPORT (PREVIEW EMBEDDED) ── #}
+{# ═══════════════════════════════════════════ #}
+<div class="card table-custom-card mb-4 shadow-sm" style="border: 1px solid #cbd5e1;">
+  <div class="card-header bg-white py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-2 border-bottom">
+    <div class="d-flex align-items-center gap-2">
+      <i class="bi bi-file-earmark-spreadsheet text-danger" style="font-size:1.2rem;"></i>
+      <h6 class="mb-0 fw-bold text-dark">Rendu du rapport officiel du réseau</h6>
+      <span class="badge bg-light text-secondary border font-monospace ms-2" style="font-size:0.72rem; border-radius:8px;">
+        Format A4 Paysage
+      </span>
+    </div>
+    <div class="d-flex gap-2 align-items-center">
+      <a href="{% url 'supports_export_pdf' %}?{{ request.GET.urlencode }}" class="btn btn-sm btn-primary shadow-sm d-flex align-items-center gap-1" style="border-radius:8px; font-weight:700;">
+        <i class="bi bi-file-earmark-pdf"></i>
+        <span>Télécharger PDF</span>
+      </a>
+      <a href="{% url 'supports_export_excel' %}?{{ request.GET.urlencode }}" class="btn btn-sm btn-success shadow-sm d-flex align-items-center gap-1" style="border-radius:8px; font-weight:700;">
+        <i class="bi bi-file-earmark-spreadsheet"></i>
+        <span>Excel</span>
+      </a>
+    </div>
+  </div>
+
+  <div class="card-body p-3 p-lg-4" style="background:#f8fafc; overflow-x:auto;">
+    <div class="mx-auto bg-white p-3 p-lg-4 shadow-sm" style="min-width: 900px; border: 1px solid #e2e8f0; border-radius: 8px;">
+      {% include 'reports/supports_report_pdf_export.html' %}
+    </div>
+  </div>
+</div>
 
 {% endblock %}

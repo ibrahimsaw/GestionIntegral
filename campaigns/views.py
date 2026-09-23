@@ -663,30 +663,109 @@ class ClientDetailView(ClientStaffRequiredMixin, DetailView):
     context_object_name = 'client'
 
     def get_object(self, queryset=None):
-        client = super().get_object(queryset=queryset)
-        return client
+        return super().get_object(queryset=queryset)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         client = self.object
-        if self.request.user.is_admin:
-            campagnes = client.campagnes.all().order_by('-date_debut')
-            contrats = client.contrats.all().order_by('-date_debut')
-        else:
-            campagnes = client.campagnes.filter(actif=True).order_by('-date_debut')
-            contrats = client.contrats.filter(archive=True).order_by('-date_debut')
+        today = timezone.now().date()
 
-        campagnes_actives = [c for c in campagnes if c.statut == 'en_cours' and (self.request.user.is_admin or c.actif)]
+        # Tous les contrats et campagnes du client
+        if self.request.user.is_admin:
+            contrats_qs = client.contrats.all().order_by('-date_debut')
+            campagnes_all_qs = client.campagnes.all().select_related('contrat', 'campagne_parente').order_by('-date_debut')
+        else:
+            contrats_qs = client.contrats.filter(archive=False).order_by('-date_debut')
+            if not contrats_qs.exists():
+                contrats_qs = client.contrats.all().order_by('-date_debut')
+            campagnes_all_qs = client.campagnes.filter(actif=True).select_related('contrat', 'campagne_parente').order_by('-date_debut')
+
+        # Calculer les métriques globales actives
+        campagnes_actives = [c for c in campagnes_all_qs if c.statut == 'en_cours' and (self.request.user.is_admin or c.actif)]
         client.campagnes_stats = {
             'panneau': len([c for c in campagnes_actives if c.type_support and c.type_support != 'ecran']),
             'ecran': len([c for c in campagnes_actives if c.type_support == 'ecran']),
+            'marche': len([c for c in campagnes_actives if c.type_support == 'marche']),
             'total': len(campagnes_actives),
         }
         client.spots_stats = {
             'panneau': sum(c.calculer_nombre_spots() for c in campagnes_actives if c.type_support and c.type_support != 'ecran'),
             'ecran': sum(c.calculer_nombre_spots() for c in campagnes_actives if c.type_support == 'ecran'),
+            'marche': sum(c.calculer_nombre_spots() for c in campagnes_actives if c.type_support == 'marche'),
             'total': sum(c.calculer_nombre_spots() for c in campagnes_actives),
         }
+
+        # Enrichissement individuel des contrats pour affichage multi-contrats rigoureux
+        contrats_enrichis = []
+        for c in contrats_qs:
+            spots_diff = c.spots_utilises()
+            spots_rest = c.spots_restants()
+            pct_reel = round((spots_diff / c.nb_spots * 100), 1) if c.nb_spots > 0 else 0
+            pct_width = min(max(int(round(spots_diff / c.nb_spots * 100)), 0), 100) if c.nb_spots > 0 else 0
+            is_active_now = c.is_actif()
+            camps = c.campagnes.all()
+            contrats_enrichis.append({
+                'contrat': c,
+                'spots_diffuses': spots_diff,
+                'spots_restants': spots_rest,
+                'pct_width': pct_width,
+                'pct_consommation': min(pct_reel, 100),
+                'pct_consommation_reel': pct_reel,
+                'nb_campagnes': camps.count(),
+                'is_active': is_active_now,
+            })
+
+        campagnes_sans_contrat_count = campagnes_all_qs.filter(contrat__isnull=True).count()
+
+        # ── FILTRAGE DYNAMIQUE DES CAMPAGNES ──
+        req = self.request.GET
+        contrat_filter = req.get('contrat', '').strip()
+        statut_filter = req.get('statut', '').strip()
+        type_filter = req.get('type_support', '').strip()
+        search_query = req.get('q', '').strip()
+        d1_str = req.get('date_debut', '').strip()
+        d2_str = req.get('date_fin', '').strip()
+
+        campagnes_filtered = campagnes_all_qs
+
+        selected_contrat_obj = None
+        if contrat_filter:
+            if contrat_filter in ['hors_contrat', 'sans_contrat', 'none']:
+                campagnes_filtered = campagnes_filtered.filter(contrat__isnull=True)
+            else:
+                try:
+                    c_id = int(contrat_filter)
+                    campagnes_filtered = campagnes_filtered.filter(contrat_id=c_id)
+                    selected_contrat_obj = contrats_qs.filter(pk=c_id).first()
+                except ValueError:
+                    pass
+
+        if statut_filter:
+            campagnes_filtered = campagnes_filtered.filter(statut=statut_filter)
+
+        if type_filter:
+            if type_filter == 'mere':
+                campagnes_filtered = campagnes_filtered.filter(est_mere=True)
+            else:
+                campagnes_filtered = campagnes_filtered.filter(type_support=type_filter, est_mere=False)
+
+        if search_query:
+            campagnes_filtered = campagnes_filtered.filter(
+                Q(nom__icontains=search_query) | Q(reference__icontains=search_query)
+            )
+
+        if d1_str:
+            try:
+                d1 = datetime.strptime(d1_str, '%Y-%m-%d').date()
+                campagnes_filtered = campagnes_filtered.filter(date_fin__gte=d1)
+            except ValueError:
+                pass
+        if d2_str:
+            try:
+                d2 = datetime.strptime(d2_str, '%Y-%m-%d').date()
+                campagnes_filtered = campagnes_filtered.filter(date_debut__lte=d2)
+            except ValueError:
+                pass
 
         reservations = (
             client.reservations_globales
@@ -697,20 +776,35 @@ class ClientDetailView(ClientStaffRequiredMixin, DetailView):
 
         from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
         page_num = self.request.GET.get('page', 1)
-        paginator = Paginator(campagnes, 10)
+        paginator = Paginator(campagnes_filtered, 10)
         try:
             campagnes_page = paginator.page(page_num)
         except (EmptyPage, PageNotAnInteger):
             campagnes_page = paginator.page(1)
+
+        has_active_filters = bool(contrat_filter or statut_filter or type_filter or search_query or d1_str or d2_str)
 
         context.update({
             'campagnes': campagnes_page,
             'page_obj': campagnes_page,
             'paginator': paginator,
             'is_paginated': campagnes_page.has_other_pages(),
-            'total_campagnes_count': len(campagnes),
-            'contrats': contrats,
+            'total_campagnes_count': campagnes_filtered.count(),
+            'total_campagnes_all': campagnes_all_qs.count(),
+            'contrats': contrats_qs,
+            'contrats_enrichis': contrats_enrichis,
+            'campagnes_sans_contrat_count': campagnes_sans_contrat_count,
             'reservations': reservations,
+            'filters': {
+                'contrat': contrat_filter,
+                'statut': statut_filter,
+                'type_support': type_filter,
+                'q': search_query,
+                'date_debut': d1_str,
+                'date_fin': d2_str,
+            },
+            'has_active_filters': has_active_filters,
+            'selected_contrat_obj': selected_contrat_obj,
         })
         return context
 
@@ -972,6 +1066,18 @@ class CampagneListView(ClientStaffRequiredMixin, SortableListMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)  # ne touche plus à context['campagnes']
+
+        base_qs = Campagne.objects.all()
+        if self.request.user.is_client_role and self.request.user.client_profile:
+            base_qs = base_qs.filter(client=self.request.user.client_profile)
+        if not self.request.user.is_admin:
+            base_qs = base_qs.filter(actif=True)
+
+        context['kpi_total'] = base_qs.count()
+        context['kpi_en_cours'] = base_qs.filter(statut='en_cours').count()
+        context['kpi_a_venir'] = base_qs.filter(statut='a_venir').count()
+        context['kpi_terminee'] = base_qs.filter(statut='terminee').count()
+        context['kpi_brouillon'] = base_qs.filter(statut='brouillon').count()
 
         context['q']                    = self.request.GET.get('q', '')
         context['statut']               = self.request.GET.get('statut', '')

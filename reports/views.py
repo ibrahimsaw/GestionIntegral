@@ -1,7 +1,7 @@
 import datetime
 from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
-from django.core.exceptions import PermissionDenied  # CORRECTION : import manquant
+from django.core.exceptions import PermissionDenied
 from accounts.decorators import *
 from campaigns.models import Campagne, Client
 from django.http import HttpResponse
@@ -13,12 +13,6 @@ import io
 from django.views import View
 
 import pandas as pd
-
-from django.contrib.auth.decorators import login_required
-from django.http import HttpResponse
-from django.shortcuts import get_object_or_404
-from django.template.loader import render_to_string
-
 
 
 class ReportsIndexView(LoginRequiredMixin, View):
@@ -36,13 +30,6 @@ def _check_campagne_permission(request, campagne):
             raise PermissionDenied
     elif not request.user.is_staff:
         raise PermissionDenied
-
-
-"""
-Export PDF du détail d'une campagne — version WeasyPrint.
-Gère les campagnes écran ET panneau.
-"""
-
 
 
 DEFAULT_PLAGE = "06:00-22:00"
@@ -104,26 +91,14 @@ def _mois_couverts(date_debut, date_fin):
     return mois
 
 
-
 # ══════════════════════════════════════════════════════════════════
 # CONSTRUCTION DU CONTEXTE CAMPAGNE
 # ══════════════════════════════════════════════════════════════════
 
 def _build_context_campagne(campagne):
     """
-    Construit le contexte complet pour le PDF d'une campagne.
-
-    Retourne :
-    {
-        'campagne'      : <Campagne>,
-        'client'        : <Client>,
-        'today'         : date,
-        'infos'         : { ... },   # infos générales
-        'supports'      : [ ... ],   # détail supports/écrans/faces
-        'spots_par_mois': [ ... ],   # spots proratisés par mois (écran seulement)
-    }
+    Construit le contexte complet pour le PDF / aperçu d'une campagne.
     """
-
     enfants = []
     campagnes = [campagne]
 
@@ -189,13 +164,13 @@ def _build_context_campagne(campagne):
                 continue
             support = ligne.support
             support_dict.setdefault(support.pk, {
-                "code"   : support.code,
-                "nom"    : support.nom,
-                "ville"  : support.ville,
+                "code"    : support.code,
+                "nom"     : support.nom,
+                "ville"   : support.ville,
                 "quartier": support.quartier,
-                "adresse": support.adresse,
-                "type"   : "Écran",
-                "face"   : None,
+                "adresse" : support.adresse,
+                "type"    : "Écran",
+                "face"    : None,
             })
         supports = list(support_dict.values())
 
@@ -220,13 +195,13 @@ def _build_context_campagne(campagne):
 
         for v in faces_dict.values():
             supports.append({
-                "code" : v["code"],
-                "nom"  : v["nom"],
-                "ville" : v["ville"],
-                "quartier" : v["quartier"],
+                "code"    : v["code"],
+                "nom"     : v["nom"],
+                "ville"   : v["ville"],
+                "quartier": v["quartier"],
                 "adresse" : v["adresse"],
-                "type" : v["type"],
-                "face" : " & ".join(v["face_labels"]) if v["face_labels"] else "—",
+                "type"    : v["type"],
+                "face"    : " & ".join(v["face_labels"]) if v["face_labels"] else "—",
             })
 
     supports_by_child = []
@@ -240,13 +215,13 @@ def _build_context_campagne(campagne):
                         continue
                     support = ligne.support
                     support_dict.setdefault(support.pk, {
-                        "code"   : support.code,
-                        "nom"    : support.nom,
-                        "ville"  : support.ville,
+                        "code"    : support.code,
+                        "nom"     : support.nom,
+                        "ville"   : support.ville,
                         "quartier": support.quartier,
-                        "adresse": support.adresse,
-                        "type"   : "Écran",
-                        "face"   : None,
+                        "adresse" : support.adresse,
+                        "type"    : "Écran",
+                        "face"    : None,
                     })
                 child_supports = list(support_dict.values())
             elif infos["effective_type_support"] == "panneau":
@@ -270,20 +245,20 @@ def _build_context_campagne(campagne):
 
                 child_supports = [
                     {
-                        "code" : v["code"],
-                        "nom"  : v["nom"],
-                        "ville" : v["ville"],
-                        "quartier" : v["quartier"],
+                        "code"    : v["code"],
+                        "nom"     : v["nom"],
+                        "ville"   : v["ville"],
+                        "quartier": v["quartier"],
                         "adresse" : v["adresse"],
-                        "type" : v["type"],
-                        "face" : " & ".join(v["face_labels"]) if v["face_labels"] else "—",
+                        "type"    : v["type"],
+                        "face"    : " & ".join(v["face_labels"]) if v["face_labels"] else "—",
                     }
                     for v in faces_dict.values()
                 ]
 
             supports_by_child.append({
-                "campagne" : enfant,
-                "supports" : child_supports,
+                "campagne": enfant,
+                "supports": child_supports,
             })
 
     # ── Spots par mois (écran uniquement) ────────────────────────
@@ -329,18 +304,18 @@ def _build_context_campagne(campagne):
     infos["total_spots"] = sum(c.calculer_nombre_spots() for c in campagnes)
 
     return {
-        "campagne"      : campagne,
-        "client"        : campagne.client,
-        "today"         : datetime.date.today(),
-        "infos"         : infos,
-        "supports"      : supports,
+        "campagne"         : campagne,
+        "client"           : campagne.client,
+        "today"            : datetime.date.today(),
+        "infos"            : infos,
+        "supports"         : supports,
         "supports_by_child": supports_by_child,
-        "spots_par_mois": spots_par_mois,
+        "spots_par_mois"   : spots_par_mois,
     }
 
 
 # ══════════════════════════════════════════════════════════════════
-# VUES
+# VUES CAMPAGNE
 # ══════════════════════════════════════════════════════════════════
 
 class ExportCampagnePdfView(ClientStaffRequiredMixin, View):
@@ -375,6 +350,7 @@ class ExportCampagnePdfView(ClientStaffRequiredMixin, View):
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
         return response
 
+
 class PreviewCampagnePdfView(ClientStaffRequiredMixin, View):
     def get(self, request, pk):
         """Prévisualise le détail d'une campagne dans le navigateur."""
@@ -394,23 +370,56 @@ class PreviewCampagnePdfView(ClientStaffRequiredMixin, View):
             _build_context_campagne(campagne),
         )
 
-"""
-Export PDF du planning de diffusion — version WeasyPrint.
-
-La logique de calcul reste identique, mais tout le rendu
-est délégué au template planning_pdf.html.
-"""
-
-
 
 # ══════════════════════════════════════════════════════════════════
-# CONSTRUCTION DES BLOCS ÉCRANS
+# UTILITAIRES FILTRES & CONTEXTE CLIENT
 # ══════════════════════════════════════════════════════════════════
 
-def _build_blocs_ecran(client):
+def _extract_client_filters(request):
+    return {
+        "contrat"     : request.GET.get("contrat", ""),
+        "type_support": request.GET.get("type_support", ""),
+        "statut"      : request.GET.get("statut", ""),
+        "date_debut"  : request.GET.get("date_debut", ""),
+        "date_fin"    : request.GET.get("date_fin", ""),
+        "annee"       : request.GET.get("annee", ""),
+    }
+
+
+def _apply_campagne_filters(qs, filters):
+    if not filters:
+        return qs
+    statut_f   = filters.get("statut")
+    date_deb_f = filters.get("date_debut")
+    date_fin_f = filters.get("date_fin")
+    annee_f    = filters.get("annee")
+
+    if statut_f:
+        qs = qs.filter(statut=statut_f)
+    if date_deb_f:
+        try:
+            d_deb = datetime.datetime.strptime(date_deb_f, "%Y-%m-%d").date()
+            qs = qs.filter(date_fin__gte=d_deb)
+        except (ValueError, TypeError):
+            pass
+    if date_fin_f:
+        try:
+            d_fin = datetime.datetime.strptime(date_fin_f, "%Y-%m-%d").date()
+            qs = qs.filter(date_debut__lte=d_fin)
+        except (ValueError, TypeError):
+            pass
+    if annee_f:
+        try:
+            annee_int = int(annee_f)
+            qs = qs.filter(date_debut__year__lte=annee_int, date_fin__year__gte=annee_int)
+        except (ValueError, TypeError):
+            pass
+    return qs
+
+
+def _build_blocs_ecran(client, filters=None):
     """
     Structure retournée :
-
     blocs = [
         {
             'contrat'     : <Contrat> ou None,
@@ -432,7 +441,7 @@ def _build_blocs_ecran(client):
                             'spots_total'  : int,
                             'reste'        : int,
                             'reste_display': str,
-                            'ecrans_str'   : str,
+                            'ecrans_str'   : list of Support,
                         },
                     ],
                 },
@@ -440,259 +449,381 @@ def _build_blocs_ecran(client):
         },
     ]
     """
+    filters = filters or {}
+    contrat_f = filters.get("contrat", "")
+    type_f    = filters.get("type_support", "")
+
+    if type_f == "panneau":
+        return []
+
     blocs   = []
     counter = 1
 
-    # ── Contrats ──────────────────────────────────────────────────
-    contrats = (
-        client.contrats
-        .order_by("date_debut")
-        .prefetch_related("campagnes__lignes__support")
-    )
+    # 1. Contrats
+    if contrat_f != "sans_contrat":
+        contrats = (
+            client.contrats
+            .order_by("date_debut")
+            .prefetch_related("campagnes__lignes__support")
+        )
+        if contrat_f:
+            contrats = contrats.filter(pk=contrat_f)
 
-    for contrat in contrats:
-        campagnes = list(
-            contrat.campagnes
-            .filter(lignes__support__type_support="ecran")
+        for contrat in contrats:
+            campagnes_qs = (
+                contrat.campagnes
+                .filter(lignes__support__type_support="ecran")
+                .distinct()
+                .order_by("date_debut")
+            )
+            campagnes_qs = _apply_campagne_filters(campagnes_qs, filters)
+            campagnes = list(campagnes_qs)
+            if not campagnes:
+                continue
+
+            spots_par_campagne = {
+                c.pk: c.calculer_nombre_spots() for c in campagnes
+            }
+
+            tous_les_mois = sorted({
+                ym
+                for c in campagnes
+                for ym in _mois_couverts(c.date_debut, c.date_fin)
+            })
+
+            reste               = contrat.nb_spots
+            total_spots_contrat = 0
+            mois_blocs          = []
+
+            for (annee, mois) in tous_les_mois:
+                if filters.get("annee"):
+                    try:
+                        if int(filters["annee"]) != annee:
+                            continue
+                    except (ValueError, TypeError):
+                        pass
+
+                label_mois       = f"{MOIS_FR[mois]} {annee}"
+                lignes_mois      = []
+                total_spots_mois = 0
+
+                for campagne in campagnes:
+                    spots_mois = _spots_du_mois(
+                        campagne, spots_par_campagne[campagne.pk], annee, mois
+                    )
+                    if spots_mois == 0:
+                        continue
+
+                    lignes_ecrans = [
+                        l for l in campagne.lignes.all()
+                        if l.support and l.support.type_support == "ecran"
+                    ]
+                    nb_ecrans = len(lignes_ecrans)
+
+                    total_spots_mois    += spots_mois
+                    total_spots_contrat += spots_mois
+                    reste               -= spots_mois
+
+                    lignes_mois.append({
+                        "num"          : counter,
+                        "campagne"     : campagne,
+                        "freq_display" : _format_freq(campagne),
+                        "nb_ecrans"    : nb_ecrans,
+                        "spots"        : spots_mois,
+                        "spots_total"  : spots_par_campagne[campagne.pk],
+                        "reste"        : reste,
+                        "reste_display": f"{reste:,}",
+                        "ecrans_str"   : lignes_ecrans,
+                    })
+                    counter += 1
+
+                if lignes_mois:
+                    mois_blocs.append({
+                        "label"       : label_mois,
+                        "total_spots" : total_spots_mois,
+                        "reste_fin"   : reste,
+                        "lignes"      : lignes_mois,
+                    })
+
+            if mois_blocs:
+                blocs.append({
+                    "contrat"    : contrat,
+                    "label_total": (contrat.nom or contrat.get_type_contrat_display()).upper(),
+                    "total_spots": total_spots_contrat,
+                    "reste_final": reste,
+                    "mois"       : mois_blocs,
+                })
+
+    # 2. Campagnes orphelines (sans contrat)
+    if not contrat_f or contrat_f == "sans_contrat":
+        campagnes_orphelines_qs = (
+            Campagne.objects
+            .filter(
+                client=client,
+                contrat__isnull=True,
+                lignes__support__type_support="ecran",
+            )
             .distinct()
             .order_by("date_debut")
+            .prefetch_related("lignes__support")
         )
-        if not campagnes:
-            continue
+        campagnes_orphelines_qs = _apply_campagne_filters(campagnes_orphelines_qs, filters)
+        campagnes_orphelines = list(campagnes_orphelines_qs)
 
-        spots_par_campagne = {
-            c.pk: c.calculer_nombre_spots() for c in campagnes
-        }
+        if campagnes_orphelines:
+            spots_par_campagne = {
+                c.pk: c.calculer_nombre_spots() for c in campagnes_orphelines
+            }
 
-        tous_les_mois = sorted({
-            ym
-            for c in campagnes
-            for ym in _mois_couverts(c.date_debut, c.date_fin)
-        })
+            tous_les_mois = sorted({
+                ym
+                for c in campagnes_orphelines
+                for ym in _mois_couverts(c.date_debut, c.date_fin)
+            })
 
-        reste               = contrat.nb_spots
-        total_spots_contrat = 0
-        mois_blocs          = []
+            total_spots_section = 0
+            mois_blocs          = []
 
-        for (annee, mois) in tous_les_mois:
-            label_mois       = f"{MOIS_FR[mois]} {annee}"
-            lignes_mois      = []
-            total_spots_mois = 0
+            for (annee, mois) in tous_les_mois:
+                if filters.get("annee"):
+                    try:
+                        if int(filters["annee"]) != annee:
+                            continue
+                    except (ValueError, TypeError):
+                        pass
 
-            for campagne in campagnes:
-                spots_mois = _spots_du_mois(
-                    campagne, spots_par_campagne[campagne.pk], annee, mois
-                )
-                if spots_mois == 0:
-                    continue
+                label_mois       = f"{MOIS_FR[mois]} {annee}"
+                lignes_mois      = []
+                total_spots_mois = 0
 
-                # Utilise les données préchargées — évite le N+1
-                lignes_ecrans = [
-                    l for l in campagne.lignes.all()
-                    if l.support.type_support == "ecran"
-                ]
-                ecrans_str = " • ".join(l.support.nom for l in lignes_ecrans)
-                nb_ecrans  = len(lignes_ecrans)
+                for campagne in campagnes_orphelines:
+                    spots_mois = _spots_du_mois(
+                        campagne, spots_par_campagne[campagne.pk], annee, mois
+                    )
+                    if spots_mois == 0:
+                        continue
 
-                total_spots_mois    += spots_mois
-                total_spots_contrat += spots_mois
-                reste               -= spots_mois
+                    lignes_ecrans = [
+                        l for l in campagne.lignes.all()
+                        if l.support and l.support.type_support == "ecran"
+                    ]
+                    nb_ecrans = len(lignes_ecrans)
 
-                lignes_mois.append({
-                    "num"          : counter,
-                    "campagne"     : campagne,
-                    "freq_display" : _format_freq(campagne),
-                    "nb_ecrans"    : nb_ecrans,
-                    "spots"        : spots_mois,
-                    "spots_total"  : spots_par_campagne[campagne.pk],
-                    "reste"        : reste,
-                    "reste_display": f"{reste:,}",
-                    "ecrans_str"   : lignes_ecrans,
+                    total_spots_mois    += spots_mois
+                    total_spots_section += spots_mois
+
+                    lignes_mois.append({
+                        "num"          : counter,
+                        "campagne"     : campagne,
+                        "freq_display" : _format_freq(campagne),
+                        "nb_ecrans"    : nb_ecrans,
+                        "spots"        : spots_mois,
+                        "spots_total"  : spots_par_campagne[campagne.pk],
+                        "reste"        : None,
+                        "reste_display": "",
+                        "ecrans_str"   : lignes_ecrans,
+                    })
+                    counter += 1
+
+                if lignes_mois:
+                    mois_blocs.append({
+                        "label"       : label_mois,
+                        "total_spots" : total_spots_mois,
+                        "reste_fin"   : None,
+                        "lignes"      : lignes_mois,
+                    })
+
+            if mois_blocs:
+                blocs.append({
+                    "contrat"    : None,
+                    "label_total": "SANS CONTRAT",
+                    "total_spots": total_spots_section,
+                    "reste_final": None,
+                    "mois"       : mois_blocs,
                 })
-                counter += 1
-
-            if lignes_mois:
-                mois_blocs.append({
-                    "label"       : label_mois,
-                    "total_spots" : total_spots_mois,
-                    "reste_fin"   : reste,
-                    "lignes"      : lignes_mois,
-                })
-
-        blocs.append({
-            "contrat"    : contrat,
-            "label_total": (contrat.nom or contrat.get_type_contrat_display()).upper(),
-            "total_spots": total_spots_contrat,
-            "reste_final": reste,
-            "mois"       : mois_blocs,
-        })
-
-    # ── Campagnes sans contrat ────────────────────────────────────
-    campagnes_orphelines = list(
-        Campagne.objects
-        .filter(
-            client=client,
-            contrat__isnull=True,
-            lignes__support__type_support="ecran",
-        )
-        .distinct()
-        .order_by("date_debut")
-        .prefetch_related("lignes__support")
-    )
-
-    if campagnes_orphelines:
-        spots_par_campagne = {
-            c.pk: c.calculer_nombre_spots() for c in campagnes_orphelines
-        }
-
-        tous_les_mois = sorted({
-            ym
-            for c in campagnes_orphelines
-            for ym in _mois_couverts(c.date_debut, c.date_fin)
-        })
-
-        total_spots_section = 0
-        mois_blocs          = []
-
-        for (annee, mois) in tous_les_mois:
-            label_mois       = f"{MOIS_FR[mois]} {annee}"
-            lignes_mois      = []
-            total_spots_mois = 0
-
-            for campagne in campagnes_orphelines:
-                spots_mois = _spots_du_mois(
-                    campagne, spots_par_campagne[campagne.pk], annee, mois
-                )
-                if spots_mois == 0:
-                    continue
-
-                # Utilise les données préchargées — évite le N+1
-                lignes_ecrans = [
-                    l for l in campagne.lignes.all()
-                    if l.support.type_support == "ecran"
-                ]
-                ecrans_str = " • ".join(l.support.nom for l in lignes_ecrans)
-                nb_ecrans  = len(lignes_ecrans)
-
-                total_spots_mois    += spots_mois
-                total_spots_section += spots_mois
-
-                lignes_mois.append({
-                    "num"          : counter,
-                    "campagne"     : campagne,
-                    "freq_display" : _format_freq(campagne),
-                    "nb_ecrans"    : nb_ecrans,
-                    "spots"        : spots_mois,
-                    "spots_total"  : spots_par_campagne[campagne.pk],
-                    "reste"        : None,
-                    "reste_display": "",
-                    "ecrans_str"   : lignes_ecrans
-                })
-                counter += 1
-
-            if lignes_mois:
-                mois_blocs.append({
-                    "label"       : label_mois,
-                    "total_spots" : total_spots_mois,
-                    "reste_fin"   : None,
-                    "lignes"      : lignes_mois,
-                })
-
-        blocs.append({
-            "contrat"    : None,
-            "label_total": "SANS CONTRAT",
-            "total_spots": total_spots_section,
-            "reste_final": None,
-            "mois"       : mois_blocs,
-        })
 
     return blocs
 
 
-# ══════════════════════════════════════════════════════════════════
-# CONSTRUCTION DES BLOCS PANNEAUX
-# ══════════════════════════════════════════════════════════════════
-
-def _build_blocs_panneaux(client):
+def _build_blocs_panneaux(client, filters=None):
     """
-    Structure des campagnes panneau d'un client.
+    Structure des campagnes panneau d'un client, regroupées par contrat.
     Les faces sont regroupées par support (panneau).
     """
-    campagnes = list(
-        Campagne.objects
-        .filter(client=client, type_support="panneau")
-        .distinct()
-        .order_by("date_debut")
-        .prefetch_related("lignes__support", "lignes__face")
-    )
+    filters   = filters or {}
+    contrat_f = filters.get("contrat", "")
+    type_f    = filters.get("type_support", "")
 
-    if not campagnes:
+    if type_f == "ecran":
         return []
 
-    lignes  = []
+    blocs   = []
     counter = 1
 
-    for campagne in campagnes:
-        lignes_panneau = [
-            l for l in campagne.lignes.all()
-            if l.support.type_support == "panneau"
-        ]
+    # 1. Campagnes avec contrat
+    if contrat_f != "sans_contrat":
+        contrats = (
+            client.contrats
+            .order_by("date_debut")
+            .prefetch_related("campagnes__lignes__support", "campagnes__lignes__face")
+        )
+        if contrat_f:
+            contrats = contrats.filter(pk=contrat_f)
 
-        # Regrouper les faces par support (évite les doublons de nom)
-        faces_dict = {}
-        for l in lignes_panneau:
-            key = l.support.pk
-            if key not in faces_dict:
-                faces_dict[key] = {
-                    "support_code": l.support.code,
-                    "support_nom" : l.support.nom,
-                    "face_labels" : [],
-                }
-            if l.face:
-                faces_dict[key]["face_labels"].append(l.face.label)
+        for contrat in contrats:
+            campagnes_qs = (
+                contrat.campagnes
+                .filter(type_support="panneau")
+                .distinct()
+                .order_by("date_debut")
+                .prefetch_related("lignes__support", "lignes__face")
+            )
+            campagnes_qs = _apply_campagne_filters(campagnes_qs, filters)
+            campagnes = list(campagnes_qs)
+            if not campagnes:
+                continue
 
-        faces = [
-            {
-                "support_code": v["support_code"],
-                "support_nom" : v["support_nom"],
-                "face_label"  : " & ".join(v["face_labels"]) if v["face_labels"] else "-",
-            }
-            for v in faces_dict.values()
-        ]
+            lignes = []
+            for campagne in campagnes:
+                lignes_panneau = [
+                    l for l in campagne.lignes.all()
+                    if l.support and l.support.type_support == "panneau"
+                ]
+                faces_dict = {}
+                for l in lignes_panneau:
+                    key = l.support.pk
+                    if key not in faces_dict:
+                        faces_dict[key] = {
+                            "support_code": l.support.code,
+                            "support_nom" : l.support.nom,
+                            "face_labels" : [],
+                        }
+                    if l.face and l.face.label not in faces_dict[key]["face_labels"]:
+                        faces_dict[key]["face_labels"].append(l.face.label)
 
-        nb_faces = sum(len(v["face_labels"]) for v in faces_dict.values())
+                faces = [
+                    {
+                        "support_code": v["support_code"],
+                        "support_nom" : v["support_nom"],
+                        "face_label"  : " & ".join(v["face_labels"]) if v["face_labels"] else "-",
+                    }
+                    for v in faces_dict.values()
+                ]
+                nb_faces = sum(len(v["face_labels"]) for v in faces_dict.values())
 
-        lignes.append({
-            "num"        : counter,
-            "campagne"   : campagne,
-            "reference"  : campagne.reference,
-            "date_debut" : campagne.date_debut,
-            "date_fin"   : campagne.date_fin,
-            "duree_jours": campagne.duree_jours(),
-            "statut"     : campagne.get_statut_display(),
-            "notes"      : campagne.notes,
-            "faces"      : faces,
-            "nb_faces"   : nb_faces,
-        })
-        counter += 1
+                lignes.append({
+                    "num"        : counter,
+                    "campagne"   : campagne,
+                    "reference"  : campagne.reference,
+                    "date_debut" : campagne.date_debut,
+                    "date_fin"   : campagne.date_fin,
+                    "duree_jours": campagne.duree_jours(),
+                    "statut"     : campagne.get_statut_display(),
+                    "notes"      : campagne.notes,
+                    "faces"      : faces,
+                    "nb_faces"   : nb_faces,
+                })
+                counter += 1
 
-    return [{
-        "label"      : "PANNEAUX",
-        "total_faces": sum(l["nb_faces"] for l in lignes),
-        "lignes"     : lignes,
-    }]
+            if lignes:
+                blocs.append({
+                    "contrat"    : contrat,
+                    "label"      : (contrat.nom or contrat.get_type_contrat_display()).upper(),
+                    "total_faces": sum(l["nb_faces"] for l in lignes),
+                    "lignes"     : lignes,
+                })
+
+    # 2. Campagnes sans contrat
+    if not contrat_f or contrat_f == "sans_contrat":
+        campagnes_sans_contrat_qs = (
+            Campagne.objects
+            .filter(client=client, contrat__isnull=True, type_support="panneau")
+            .distinct()
+            .order_by("date_debut")
+            .prefetch_related("lignes__support", "lignes__face")
+        )
+        campagnes_sans_contrat_qs = _apply_campagne_filters(campagnes_sans_contrat_qs, filters)
+        campagnes_sans_contrat = list(campagnes_sans_contrat_qs)
+
+        if campagnes_sans_contrat:
+            lignes = []
+            for campagne in campagnes_sans_contrat:
+                lignes_panneau = [
+                    l for l in campagne.lignes.all()
+                    if l.support and l.support.type_support == "panneau"
+                ]
+                faces_dict = {}
+                for l in lignes_panneau:
+                    key = l.support.pk
+                    if key not in faces_dict:
+                        faces_dict[key] = {
+                            "support_code": l.support.code,
+                            "support_nom" : l.support.nom,
+                            "face_labels" : [],
+                        }
+                    if l.face and l.face.label not in faces_dict[key]["face_labels"]:
+                        faces_dict[key]["face_labels"].append(l.face.label)
+
+                faces = [
+                    {
+                        "support_code": v["support_code"],
+                        "support_nom" : v["support_nom"],
+                        "face_label"  : " & ".join(v["face_labels"]) if v["face_labels"] else "-",
+                    }
+                    for v in faces_dict.values()
+                ]
+                nb_faces = sum(len(v["face_labels"]) for v in faces_dict.values())
+
+                lignes.append({
+                    "num"        : counter,
+                    "campagne"   : campagne,
+                    "reference"  : campagne.reference,
+                    "date_debut" : campagne.date_debut,
+                    "date_fin"   : campagne.date_fin,
+                    "duree_jours": campagne.duree_jours(),
+                    "statut"     : campagne.get_statut_display(),
+                    "notes"      : campagne.notes,
+                    "faces"      : faces,
+                    "nb_faces"   : nb_faces,
+                })
+                counter += 1
+
+            if lignes:
+                blocs.append({
+                    "contrat"    : None,
+                    "label"      : "SANS CONTRAT RATTACHÉ",
+                    "total_faces": sum(l["nb_faces"] for l in lignes),
+                    "lignes"     : lignes,
+                })
+
+    return blocs
 
 
-# ══════════════════════════════════════════════════════════════════
-# VUES
-# ══════════════════════════════════════════════════════════════════
+def _build_context(client, filters=None):
+    """Contexte partagé entre export PDF, Excel et preview."""
+    filters        = filters or {}
+    blocs_ecran    = _build_blocs_ecran(client, filters)
+    blocs_panneaux = _build_blocs_panneaux(client, filters)
+    contrats       = list(client.contrats.all().order_by("date_debut"))
+    today          = datetime.date.today()
+    contrats_actifs = [c for c in contrats if c.actif and c.date_debut <= today <= c.date_fin]
 
-def _build_context(client):
-    """Contexte partagé entre export PDF et preview."""
-    blocs_ecran    = _build_blocs_ecran(client)
-    blocs_panneaux = _build_blocs_panneaux(client)
+    # Années disponibles pour filtre
+    all_campaigns_dates = client.campagnes.values_list('date_debut__year', 'date_fin__year')
+    annees = set()
+    for deb, fin in all_campaigns_dates:
+        if deb:
+            annees.add(deb)
+        if fin:
+            annees.add(fin)
+    for c in contrats:
+        if c.date_debut:
+            annees.add(c.date_debut.year)
+        if c.date_fin:
+            annees.add(c.date_fin.year)
+    annees_choices = sorted(list(annees), reverse=True)
 
-    # ── KPI Écrans ──
+    # ── KPI Globaux ──
     total_campagnes_ecran = sum(
         len(mois["lignes"])
         for bloc in blocs_ecran
@@ -701,13 +832,12 @@ def _build_context(client):
     total_spots_global = sum(
         bloc["total_spots"] for bloc in blocs_ecran
     )
-    reste_spots_global = sum(
-        bloc["reste_final"]
+    total_spots_engages = sum(
+        bloc["contrat"].nb_spots
         for bloc in blocs_ecran
-        if bloc.get("reste_final") is not None
-    )
+        if bloc.get("contrat") is not None
+    ) or sum(c.nb_spots for c in contrats)
 
-    # ── KPI Panneaux ──
     total_campagnes_panneaux = sum(
         len(bloc["lignes"]) for bloc in blocs_panneaux
     )
@@ -715,29 +845,124 @@ def _build_context(client):
         bloc["total_faces"] for bloc in blocs_panneaux
     )
 
+    # ── Résumés Séparés par Contrat (Pas d'addition globale arbitraire) ──
+    contrats_resume = []
+    blocs_ecran_par_contrat = {}
+    bloc_ecran_orphelin = None
+    for b in blocs_ecran:
+        if b.get("contrat"):
+            blocs_ecran_par_contrat[b["contrat"].pk] = b
+        else:
+            bloc_ecran_orphelin = b
+
+    blocs_panneaux_par_contrat = {}
+    bloc_panneau_orphelin = None
+    for b in blocs_panneaux:
+        if b.get("contrat"):
+            blocs_panneaux_par_contrat[b["contrat"].pk] = b
+        else:
+            bloc_panneau_orphelin = b
+
+    contrat_f = filters.get("contrat", "")
+    contrats_a_inclure = contrats
+    if contrat_f and contrat_f != "sans_contrat":
+        try:
+            contrats_a_inclure = [c for c in contrats if str(c.pk) == str(contrat_f)]
+        except Exception:
+            pass
+    elif contrat_f == "sans_contrat":
+        contrats_a_inclure = []
+
+    for c in contrats_a_inclure:
+        b_ecran = blocs_ecran_par_contrat.get(c.pk)
+        b_panneau = blocs_panneaux_par_contrat.get(c.pk)
+
+        spots_engages = c.nb_spots
+        spots_diffuses = b_ecran["total_spots"] if b_ecran else 0
+        solde_restant = b_ecran["reste_final"] if (b_ecran and b_ecran.get("reste_final") is not None) else spots_engages
+        taux_conso = round((spots_diffuses / spots_engages * 100), 1) if spots_engages > 0 else 0
+
+        nb_camp_ecran = sum(len(m["lignes"]) for m in b_ecran["mois"]) if b_ecran else 0
+        nb_camp_panneau = len(b_panneau["lignes"]) if b_panneau else 0
+        nb_faces = b_panneau["total_faces"] if b_panneau else 0
+
+        est_actif = c.actif and c.date_debut <= today <= c.date_fin
+
+        contrats_resume.append({
+            "contrat"             : c,
+            "nom"                 : c.nom or c.get_type_contrat_display(),
+            "type_display"        : c.get_type_contrat_display(),
+            "date_debut"          : c.date_debut,
+            "date_fin"            : c.date_fin,
+            "est_actif"           : est_actif,
+            "statut_display"      : "En cours" if est_actif else ("Échu" if c.date_fin < today else "À venir"),
+            "spots_engages"       : spots_engages,
+            "spots_diffuses"      : spots_diffuses,
+            "solde_restant"       : solde_restant,
+            "taux_consommation"   : taux_conso,
+            "nb_campagnes_ecran"  : nb_camp_ecran,
+            "nb_campagnes_panneau": nb_camp_panneau,
+            "nb_faces"            : nb_faces,
+            "total_campagnes"     : nb_camp_ecran + nb_camp_panneau,
+        })
+
+    # Hors contrat si présent
+    if (bloc_ecran_orphelin or bloc_panneau_orphelin) and (not contrat_f or contrat_f == "sans_contrat"):
+        spots_diffuses_hc = bloc_ecran_orphelin["total_spots"] if bloc_ecran_orphelin else 0
+        nb_camp_ecran_hc = sum(len(m["lignes"]) for m in bloc_ecran_orphelin["mois"]) if bloc_ecran_orphelin else 0
+        nb_camp_panneau_hc = len(bloc_panneau_orphelin["lignes"]) if bloc_panneau_orphelin else 0
+        nb_faces_hc = bloc_panneau_orphelin["total_faces"] if bloc_panneau_orphelin else 0
+
+        contrats_resume.append({
+            "contrat"             : None,
+            "nom"                 : "Campagnes Hors Contrat",
+            "type_display"        : "Diffusions ponctuelles sans contrat cadre",
+            "date_debut"          : None,
+            "date_fin"            : None,
+            "est_actif"           : False,
+            "statut_display"      : "Ponctuel",
+            "spots_engages"       : None,
+            "spots_diffuses"      : spots_diffuses_hc,
+            "solde_restant"       : None,
+            "taux_consommation"   : None,
+            "nb_campagnes_ecran"  : nb_camp_ecran_hc,
+            "nb_campagnes_panneau": nb_camp_panneau_hc,
+            "nb_faces"            : nb_faces_hc,
+            "total_campagnes"     : nb_camp_ecran_hc + nb_camp_panneau_hc,
+        })
+
     return {
         "client"                  : client,
+        "contrats"                : contrats,
+        "contrats_actifs"         : contrats_actifs,
+        "contrats_resume"         : contrats_resume,
+        "total_spots_engages"     : total_spots_engages,
         "blocs_ecran"             : blocs_ecran,
         "blocs_panneaux"          : blocs_panneaux,
-        "today"                   : datetime.date.today(),
-        # KPI conclus
+        "today"                   : today,
+        "filters"                 : filters,
+        "annees_choices"          : annees_choices,
+        # KPI globaux
         "total_campagnes_ecran"   : total_campagnes_ecran,
         "total_spots_global"      : total_spots_global,
-        "reste_spots_global"      : reste_spots_global,
         "total_campagnes_panneaux": total_campagnes_panneaux,
         "total_faces_global"      : total_faces_global,
-        # "DESIGN"                : DESIGN,
     }
 
+
+# ══════════════════════════════════════════════════════════════════
+# VUES CLIENT
+# ══════════════════════════════════════════════════════════════════
 
 class ExportClientPdfView(ClientStaffRequiredMixin, View):
     def get(self, request, pk):
         """Télécharge le planning de diffusion d'un client en PDF."""
-        client = get_object_or_404(Client, pk=pk)
+        client  = get_object_or_404(Client, pk=pk)
+        filters = _extract_client_filters(request)
 
         html_string = render_to_string(
             "reports/client_pdf.html",
-            _build_context(client),
+            _build_context(client, filters),
             request=request,
         )
         pdf = HTML(
@@ -756,57 +981,131 @@ class ExportClientPdfView(ClientStaffRequiredMixin, View):
 
 class PreviewClientPdfView(ClientStaffRequiredMixin, View):
     def get(self, request, pk):
-        """Prévisualise le planning de diffusion dans le navigateur."""
-        client = get_object_or_404(Client, pk=pk)
-        return render(request, "reports/apercu_client.html", _build_context(client))
+        """Prévisualise le planning de diffusion dans le navigateur avec filtres."""
+        client  = get_object_or_404(Client, pk=pk)
+        filters = _extract_client_filters(request)
+        return render(request, "reports/apercu_client.html", _build_context(client, filters))
 
 
 class ExportClientExcelView(ClientStaffRequiredMixin, View):
     def get(self, request, pk):
-        client = get_object_or_404(Client, pk=pk)
-
-        html_string = render_to_string(
-            "reports/client_pdf.html",
-            _build_context(client),
-            request=request,
-        )
+        client  = get_object_or_404(Client, pk=pk)
+        filters = _extract_client_filters(request)
+        ctx     = _build_context(client, filters)
 
         buffer = io.BytesIO()
 
         with pd.ExcelWriter(buffer, engine="openpyxl") as writer:
-            tables = pd.read_html(io.StringIO(html_string))
+            from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+            from openpyxl.utils import get_column_letter
 
-            sheet_names = ["Écrans", "Panneaux"]
+            titre_font  = Font(bold=True, size=13, name="Arial", color="1E293B")
+            header_fill = PatternFill("solid", start_color="1E293B", end_color="1E293B")
+            header_font = Font(bold=True, color="FFFFFF", name="Arial", size=10)
+            thin_border = Border(
+                left=Side(style="thin", color="E2E8F0"),
+                right=Side(style="thin", color="E2E8F0"),
+                top=Side(style="thin", color="E2E8F0"),
+                bottom=Side(style="thin", color="E2E8F0"),
+            )
 
-            for i, df in enumerate(tables):
-                sheet = sheet_names[i] if i < len(sheet_names) else f"Tableau_{i+1}"
+            has_sheet = False
 
-                df = df[df.apply(lambda row: row.nunique() > 1, axis=1)]
+            # ── 1. Feuille Écrans ──
+            if ctx["blocs_ecran"]:
+                rows_ecran = []
+                for bloc in ctx["blocs_ecran"]:
+                    for mois in bloc["mois"]:
+                        for l in mois["lignes"]:
+                            ecrans_val = " • ".join(s.nom for s in l["ecrans_str"]) if isinstance(l["ecrans_str"], list) else str(l["ecrans_str"])
+                            c = l["campagne"]
+                            rows_ecran.append({
+                                "N°": l["num"],
+                                "Campagne": c.nom,
+                                "Contrat": bloc["label_total"],
+                                "Mois": mois["label"],
+                                "Période": f"{c.date_debut:%d/%m/%Y} → {c.date_fin:%d/%m/%Y}",
+                                "Écrans": ecrans_val,
+                                "Fréquence": l["freq_display"],
+                                "Spots Mois": l["spots"],
+                                "Total Campagne": l["spots_total"],
+                                "Solde Restant": l["reste_display"] if l["reste_display"] else "—",
+                            })
 
-                df.to_excel(writer, index=False, sheet_name=sheet, startrow=2)
+                if rows_ecran:
+                    df_ecran = pd.DataFrame(rows_ecran)
+                    df_ecran.to_excel(writer, index=False, sheet_name="Écrans Numériques", startrow=2)
+                    ws = writer.sheets["Écrans Numériques"]
+                    ws["A1"] = f"Rapport de Diffusion Écrans — {client.nom}"
+                    ws["A1"].font = titre_font
 
-                ws = writer.sheets[sheet]
+                    for cell in ws[3]:
+                        cell.fill = header_fill
+                        cell.font = header_font
+                        cell.alignment = Alignment(horizontal="center", vertical="center")
 
-                ws["A1"] = f"Rapport de diffusion – {client.nom}"
-                from openpyxl.styles import Font, PatternFill, Alignment
-                ws["A1"].font = Font(bold=True, size=13, name="Arial")
+                    for row in ws.iter_rows(min_row=4, max_row=ws.max_row):
+                        for cell in row:
+                            cell.border = thin_border
+                            cell.alignment = Alignment(vertical="center")
 
-                header_fill = PatternFill("solid", start_color="4472C4", end_color="4472C4")
-                header_font = Font(bold=True, color="FFFFFF", name="Arial", size=10)
-                for cell in ws[3]:
-                    cell.fill = header_fill
-                    cell.font = header_font
-                    cell.alignment = Alignment(horizontal="center")
+                    for col in ws.columns:
+                        max_len = max((len(str(c.value or '')) for c in col), default=10)
+                        ws.column_dimensions[get_column_letter(col[0].column)].width = min(max(max_len + 4, 12), 50)
 
-                from openpyxl.utils import get_column_letter
-                for col in ws.columns:
-                    max_len = max(
-                        (len(str(c.value)) for c in col if c.value is not None),
-                        default=10,
-                    )
-                    ws.column_dimensions[get_column_letter(col[0].column)].width = min(max_len + 4, 60)
+                    ws.freeze_panes = "A4"
+                    has_sheet = True
 
-                ws.freeze_panes = "A4"
+            # ── 2. Feuille Panneaux ──
+            if ctx["blocs_panneaux"]:
+                rows_panneaux = []
+                for bloc in ctx["blocs_panneaux"]:
+                    for l in bloc["lignes"]:
+                        faces_str = " ; ".join(f"{f['support_nom']} ({f['face_label']})" for f in l["faces"])
+                        c = l["campagne"]
+                        rows_panneaux.append({
+                            "N°": l["num"],
+                            "Campagne": c.nom,
+                            "Référence": l["reference"],
+                            "Contrat": bloc["label"],
+                            "Période": f"{l['date_debut']:%d/%m/%Y} → {l['date_fin']:%d/%m/%Y}",
+                            "Durée (j)": l["duree_jours"],
+                            "Statut": l["statut"],
+                            "Supports & Faces": faces_str,
+                            "Nb Faces": l["nb_faces"],
+                        })
+
+                if rows_panneaux:
+                    df_panneaux = pd.DataFrame(rows_panneaux)
+                    df_panneaux.to_excel(writer, index=False, sheet_name="Panneaux Statiques", startrow=2)
+                    ws = writer.sheets["Panneaux Statiques"]
+                    ws["A1"] = f"Rapport d'Affichage Panneaux — {client.nom}"
+                    ws["A1"].font = titre_font
+
+                    for cell in ws[3]:
+                        cell.fill = header_fill
+                        cell.font = header_font
+                        cell.alignment = Alignment(horizontal="center", vertical="center")
+
+                    for row in ws.iter_rows(min_row=4, max_row=ws.max_row):
+                        for cell in row:
+                            cell.border = thin_border
+                            cell.alignment = Alignment(vertical="center")
+
+                    for col in ws.columns:
+                        max_len = max((len(str(c.value or '')) for c in col), default=10)
+                        ws.column_dimensions[get_column_letter(col[0].column)].width = min(max(max_len + 4, 12), 50)
+
+                    ws.freeze_panes = "A4"
+                    has_sheet = True
+
+            # Si aucune donnée filtrée
+            if not has_sheet:
+                df_empty = pd.DataFrame([{"Information": "Aucune donnée correspondant aux critères de filtre."}])
+                df_empty.to_excel(writer, index=False, sheet_name="Synthèse", startrow=2)
+                ws = writer.sheets["Synthèse"]
+                ws["A1"] = f"Rapport de Diffusion — {client.nom}"
+                ws["A1"].font = titre_font
 
         buffer.seek(0)
 
@@ -820,12 +1119,3 @@ class ExportClientExcelView(ClientStaffRequiredMixin, View):
         )
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
         return response
-    
-    
-# je veux construire un rapport pour tous les panneaux de leur etat actuel en fonction de leur statut et de leur ville, quartier, adresse, etc. et leur nombre de faces ocupées et libres, et les campagnes associées à chaque panneau. Je veux aussi pouvoir filtrer par ville, quartier, statut, etc.
-
-
-
-
-
-

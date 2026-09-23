@@ -4,160 +4,114 @@
 {% block title %}Formats — Integral{% endblock %}
 
 {% block topbar_title %}
-    <i class="bi bi-aspect-ratio me-2" style="color:var(--color-primary)"></i>Formats de Support
+  <i class="bi bi-aspect-ratio me-2" style="color:var(--color-primary)"></i>Formats de Support
 {% endblock %}
 
 {% block topbar_actions %}
-    <a href="{% url 'format_create' %}" class="btn btn-primary btn-sm px-3 shadow-sm d-flex align-items-center gap-1" style="border-radius: 8px; font-weight: 600;">
-        <i class="bi bi-plus-lg"></i>
-        <span class="d-none d-md-inline">Ajouter un format</span>
-    </a>
+  {% if user.is_staff_regie_role or user.is_admin %}
+  <a href="{% url 'format_create' %}" class="btn btn-primary btn-sm px-3 shadow-sm d-flex align-items-center gap-1">
+    <i class="bi bi-plus-lg"></i>
+    <span class="d-none d-md-inline">Ajouter un format</span>
+  </a>
+  {% endif %}
 {% endblock %}
 
 {% block content %}
-<style>
-  .filter-card {
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--bg-card);
-    box-shadow: 0 4px 20px rgba(0,0,0,0.03);
-    transition: box-shadow 0.2s ease, border-color 0.2s ease;
-  }
-  .filter-card:hover {
-    box-shadow: 0 8px 28px rgba(0,0,0,0.06);
-    border-color: rgba(13, 110, 253, 0.2);
-  }
-  .table-custom-card {
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--bg-card);
-    box-shadow: 0 4px 20px rgba(0,0,0,0.03);
-    overflow: hidden;
-  }
-  .table-supports thead th {
-    background-color: #f8fafc;
-    color: var(--text-muted);
-    font-size: 0.72rem;
-    font-weight: 800;
-    text-transform: uppercase;
-    letter-spacing: 0.6px;
-    border-bottom: 2px solid var(--border);
-    white-space: nowrap;
-  }
-  .table-supports tbody td {
-    border-bottom: 1px solid var(--border);
-    vertical-align: middle;
-  }
-  .table-supports tbody tr.support-row {
-    transition: background-color 0.15s ease;
-  }
-  .table-supports tbody tr.support-row:hover {
-    background-color: rgba(13, 110, 253, 0.02);
-  }
-  .code-badge {
-    font-family: var(--mono, monospace);
-    font-weight: 700;
-    font-size: 0.82rem;
-    color: var(--color-primary);
-    background: rgba(13, 110, 253, 0.08);
-    padding: 4px 9px;
-    border-radius: 8px;
-    display: inline-block;
-    border: 1px solid rgba(13, 110, 253, 0.18);
-  }
-  .code {
-    font-family: var(--mono, monospace);
-    font-size: 0.82rem;
-    color: var(--color-primary);
-    font-weight: 700;
-  }
-  .active-filter-pill {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 4px 10px;
-    background: rgba(13, 110, 253, 0.08);
-    color: var(--color-primary);
-    border: 1px solid rgba(13, 110, 253, 0.2);
-    border-radius: 8px;
-    font-size: 0.74rem;
-    font-weight: 600;
-  }
-</style>
 
-<div class="row justify-content-center">
-  <div class="col-xl-12">
-    <div class="d-flex justify-content-between align-items-center mb-4 gap-3 flex-wrap">
-      <div>
-        <h1 style="font-size:1.4rem;font-weight:800;margin:0">Gestion des Formats Publicitaires</h1>
-        <p style="color:var(--text-muted);font-size:0.82rem;margin:2px 0 0">Gérez les gabarits, dimensions et catégories de vos panneaux</p>
+{# ── BANNIÈRE HÉRO (CL-HERO) ── #}
+<div class="cl-hero mb-4">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+    <div>
+      <div class="cl-hero-title">
+        <i class="bi bi-aspect-ratio me-2"></i>Gestion des Formats & Gabarits
       </div>
-      <span class="badge bg-light text-dark border font-monospace px-3 py-2" style="border-radius: 8px;">{{ formats|length }} format{{ formats|length|pluralize }}</span>
-    </div>
-
-    <div class="table-custom-card">
-      <div class="table-responsive">
-        <table class="table table-hover mb-0 align-middle table-supports">
-          <thead>
-            <tr>
-              <th class="ps-4" style="width: 180px;">{% sortable_th sort_links sort_key sort_dir 'code' 'Code Format' %}</th>
-              <th style="width: 200px;">{% sortable_th sort_links sort_key sort_dir 'categorie' 'Catégorie' %}</th>
-              <th style="width: 180px;">{% sortable_th sort_links sort_key sort_dir 'dimensions' 'Dimensions' %}</th>
-              <th style="width: 180px;">{% sortable_th sort_links sort_key sort_dir 'superficie' 'Superficie' %}</th>
-              <th class="text-end pe-4" style="width: 140px;">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {% for format in formats %}
-              <tr class="support-row">
-                <td>
-                  <span class="code">{{ format.code }}</span>
-                </td>
-                <td>
-                  <span class="badge badge-status {% if format.categorie == 'Marché' %}bs-maintenance{% elif format.categorie == 'Géant' %}bs-occupe{% elif format.categorie == 'Sucette' %}bs-reserve{% else %}bs-disponible{% endif %}">
-                    {{ format.categorie }}
-                  </span>
-                </td>
-                <td class="text-secondary fw-semibold font-monospace small">
-                  <i class="bi bi-arrows-angle-expand me-1 text-muted"></i>{{ format.dimensions|default:"—" }}
-                </td>
-                <td>
-                  {% if format.superficie %}
-                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace px-2.5 py-1" style="border-radius: 8px;">
-                      {{ format.superficie }} m²
-                    </span>
-                  {% else %}
-                    <span class="text-muted">—</span>
-                  {% endif %}
-                </td>
-                <td class="text-end pe-4">
-                  <div class="d-inline-flex gap-1 justify-content-end">
-                    <a href="{% url 'format_update' format.pk %}" class="btn btn-sm btn-outline-secondary btn-action-icon" title="Modifier" style="border-radius: 8px;">
-                      <i class="bi bi-pencil"></i>
-                    </a>
-                    <a href="{% url 'format_delete' format.pk %}" class="btn btn-sm btn-outline-danger btn-action-icon" title="Supprimer" style="border-radius: 8px;">
-                      <i class="bi bi-trash"></i>
-                    </a>
-                  </div>
-                </td>
-              </tr>
-            {% empty %}
-              <tr>
-                <td colspan="5" class="text-center py-5 text-muted">
-                  <i class="bi bi-folder-x d-block fs-2 mb-2 opacity-30"></i>
-                  Aucun format enregistré en base de données.
-                  <div class="mt-2">
-                    <a href="{% url 'format_create' %}" class="btn btn-primary btn-sm px-3" style="border-radius: 8px;">
-                      <i class="bi bi-plus-lg me-1"></i>Créer le premier format
-                    </a>
-                  </div>
-                </td>
-              </tr>
-            {% endfor %}
-          </tbody>
-        </table>
+      <div class="cl-hero-sub">
+        Configurez et supervisez les dimensions, superficies et catégories de vos supports publicitaires.
       </div>
     </div>
+    {% if user.is_staff_regie_role or user.is_admin %}
+    <div>
+      <a href="{% url 'format_create' %}" class="btn btn-light shadow-sm d-inline d-md-none me-1" style="font-weight: 700; color: #932e2b;">
+        <i class="bi bi-plus-lg me-1"></i>Nouveau Format
+      </a>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card table-custom-card">
+  <div class="card-header bg-white py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-2 border-bottom">
+    <div class="d-flex align-items-center gap-2">
+      <h6 class="mb-0 fw-bold text-dark">Gabarits configurés</h6>
+      <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2.5 py-1 font-monospace" style="font-size: 0.75rem;">
+        {{ formats|length }} format{{ formats|length|pluralize }}
+      </span>
+    </div>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle table-supports">
+      <thead>
+        <tr>
+          <th class="ps-4" style="width: 180px;">{% sortable_th sort_links sort_key sort_dir 'code' 'Code Format' %}</th>
+          <th style="width: 200px;">{% sortable_th sort_links sort_key sort_dir 'categorie' 'Catégorie' %}</th>
+          <th style="width: 180px;">{% sortable_th sort_links sort_key sort_dir 'dimensions' 'Dimensions' %}</th>
+          <th style="width: 180px;">{% sortable_th sort_links sort_key sort_dir 'superficie' 'Superficie' %}</th>
+          <th class="text-end pe-4" style="width: 140px;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for format in formats %}
+          <tr class="support-row">
+            <td class="ps-4">
+              <span class="code-primary">{{ format.code }}</span>
+            </td>
+            <td>
+              <span class="badge badge-status {% if format.categorie == 'Marché' %}bs-maintenance{% elif format.categorie == 'Géant' %}bs-occupe{% elif format.categorie == 'Sucette' %}bs-reserve{% else %}bs-disponible{% endif %}">
+                {{ format.categorie }}
+              </span>
+            </td>
+            <td class="text-secondary fw-semibold font-monospace small">
+              <i class="bi bi-arrows-angle-expand me-1 text-muted"></i>{{ format.dimensions|default:"—" }}
+            </td>
+            <td>
+              {% if format.superficie %}
+                <span class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace px-2.5 py-1">
+                  {{ format.superficie }} m²
+                </span>
+              {% else %}
+                <span class="text-muted">—</span>
+              {% endif %}
+            </td>
+            <td class="text-end pe-4">
+              <div class="d-inline-flex gap-1 justify-content-end">
+                <a href="{% url 'format_update' format.pk %}" class="btn btn-sm btn-outline-secondary btn-action-icon" title="Modifier">
+                  <i class="bi bi-pencil"></i>
+                </a>
+                <a href="{% url 'format_delete' format.pk %}" class="btn btn-sm btn-outline-danger btn-action-icon" title="Supprimer">
+                  <i class="bi bi-trash"></i>
+                </a>
+              </div>
+            </td>
+          </tr>
+        {% empty %}
+          <tr>
+            <td colspan="5" class="text-center py-5 text-muted">
+              <div class="py-3">
+                <i class="bi bi-aspect-ratio text-muted d-block mb-3" style="font-size: 2.5rem; opacity: 0.4;"></i>
+                <h6 class="fw-bold text-dark mb-1">Aucun format trouvé</h6>
+                <p class="text-muted small mb-3">Aucun format publicitaire n'est actuellement enregistré en base de données.</p>
+                {% if user.is_staff_regie_role or user.is_admin %}
+                <a href="{% url 'format_create' %}" class="btn btn-primary btn-sm px-3">
+                  <i class="bi bi-plus-lg me-1"></i>Créer le premier format
+                </a>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
+        {% endfor %}
+      </tbody>
+    </table>
   </div>
 </div>
 

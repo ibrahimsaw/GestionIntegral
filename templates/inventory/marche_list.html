@@ -14,32 +14,28 @@
 {% endblock %}
 
 {% block content %}
-<style>
-  .marche-card {
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    background: var(--bg-card);
-    box-shadow: 0 4px 20px rgba(0,0,0,0.02);
-    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-    overflow: hidden;
-  }
-  .marche-card:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 8px 24px rgba(0,0,0,0.06);
-    border-color: rgba(249, 115, 22, 0.3);
-  }
-  .marche-stat-pill {
-    background: #f8fafc;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 8px 12px;
-    text-align: center;
-    flex: 1;
-  }
-</style>
+<div class="cl-hero mb-4">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+    <div>
+      <div class="cl-hero-title">
+        <i class="bi bi-shop me-2"></i>Gestion des Marchés
+      </div>
+      <div class="cl-hero-sub">
+        Organisez les emplacements publicitaires et suivez l’occupation de chaque marché.
+      </div>
+    </div>
+    {% if user.is_staff_regie_role or user.is_admin %}
+    <div>
+      <a href="{% url 'marche_create' %}" class="btn btn-light shadow-sm d-inline d-md-none me-1" style="font-weight: 700; color: #932e2b;">
+        <i class="bi bi-plus-lg me-1 d-inline d-md-none"></i>Nouveau Marché
+      </a>
+    </div>
+    {% endif %}
+  </div>
+</div>
 
 <!-- Filtre / Recherche -->
-<div class="card mb-4 border-0 shadow-sm rounded-4">
+<div class="card marche-filter-card mb-4">
   <div class="card-body p-3">
     <form method="get" class="row g-2 align-items-center">
       <div class="col-md-5">
@@ -71,13 +67,13 @@
   <div class="col-md-6 col-xl-4">
     <div class="marche-card h-100 d-flex flex-column">
       <div class="card-body p-4 d-flex flex-column flex-grow-1">
-        <div class="d-flex justify-content-between align-items-start mb-3">
+        <div class="marche-card-head mb-3">
           <div>
             <div class="d-flex align-items-center gap-2">
-              <i class="bi bi-shop text-warning" style="font-size:1.1rem"></i>
-              <h5 class="fw-bold mb-0 text-dark" style="font-size:1.05rem">{{ m.nom }}</h5>
+              <span class="marche-card-icon"><i class="bi bi-shop"></i></span>
+              <h5 class="marche-card-name">{{ m.nom }}</h5>
             </div>
-            <div class="text-muted small mt-1">
+            <div class="marche-card-location">
               <i class="bi bi-geo-alt me-1 text-danger"></i>{{ m.quartier|default:"—" }}{% if m.quartier and m.ville %}, {% endif %}{{ m.ville }}
             </div>
           </div>
@@ -96,16 +92,16 @@
 
         <div class="d-flex gap-2 my-auto pt-2 pb-3">
           <div class="marche-stat-pill">
-            <div class="fw-bold fs-6 text-dark">{{ m.nb_emplacements }}</div>
-            <div class="text-muted text-uppercase" style="font-size:0.65rem;font-weight:700">Total</div>
+            <div class="marche-stat-value">{{ m.nb_emplacements }}</div>
+            <div class="marche-stat-label">Total</div>
           </div>
           <div class="marche-stat-pill">
-            <div class="fw-bold fs-6 text-success">{{ m.nb_emplacements_libres }}</div>
-            <div class="text-muted text-uppercase" style="font-size:0.65rem;font-weight:700">Libres</div>
+            <div class="marche-stat-value text-success">{{ m.nb_emplacements_libres }}</div>
+            <div class="marche-stat-label">Libres</div>
           </div>
           <div class="marche-stat-pill">
-            <div class="fw-bold fs-6 text-primary">{{ m.taux_occupation_pourcentage }}%</div>
-            <div class="text-muted text-uppercase" style="font-size:0.65rem;font-weight:700">Occupation</div>
+            <div class="marche-stat-value text-primary">{{ m.taux_occupation_pourcentage }}%</div>
+            <div class="marche-stat-label">Occupation</div>
           </div>
         </div>
 
@@ -114,8 +110,8 @@
             <span>Taux de remplissage</span>
             <span class="font-monospace fw-bold">{{ m.taux_occupation_pourcentage }}%</span>
           </div>
-          <div class="progress rounded-pill" style="height:6px;background:#e2e8f0">
-            <div class="progress-bar rounded-pill" role="progressbar" style="width:{{ m.taux_occupation_pourcentage|unlocalize }}%;background:linear-gradient(90deg, #f97316 0%, #ea580c 100%)"></div>
+          <div class="marche-progress">
+            <div class="progress-bar" role="progressbar" style="width:{{ m.taux_occupation_pourcentage|unlocalize }}%"></div>
           </div>
         </div>
 

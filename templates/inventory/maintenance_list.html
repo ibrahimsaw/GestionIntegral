@@ -2,18 +2,18 @@
 {% load static sort_tags %}
 
 {% block title %}Interventions de Maintenance — Integral{% endblock %}
+
 {% block topbar_title %}
-  <i class="bi bi-tools me-2" style="color:#fbbf24"></i>Interventions de Maintenance
+  <i class="bi bi-tools me-2" style="color:var(--color-primary)"></i>Interventions de Maintenance
 {% endblock %}
+
 {% block topbar_actions %}
   <div class="d-flex flex-wrap gap-2">
-    <a href="{% url 'periodes_panne_liste' %}" class="btn btn-sm d-flex align-items-center gap-1"
-       style="background:#fef2f2;color:#dc2626;border:1px solid #fecaca;border-radius:8px;padding:6px 14px;font-weight:600;font-size:0.8rem;">
-      <i class="bi bi-exclamation-triangle-fill"></i>
+    <a href="{% url 'periodes_panne_liste' %}" class="btn btn-outline-danger btn-sm shadow-sm px-3 d-flex align-items-center gap-1">
+      <i class="bi bi-clock-history"></i>
       <span class="d-none d-md-inline">Périodes de panne</span>
     </a>
-    <a href="{% url 'maintenance_create' %}" class="btn btn-sm d-flex align-items-center gap-1"
-       style="background:var(--color-primary);color:#fff;border-radius:8px;padding:6px 14px;font-weight:600;font-size:0.8rem;">
+    <a href="{% url 'maintenance_create' %}" class="btn btn-primary btn-sm shadow-sm px-3 d-flex align-items-center gap-1">
       <i class="bi bi-plus-lg"></i>
       <span class="d-none d-md-inline">Nouvelle maintenance</span>
     </a>
@@ -21,240 +21,145 @@
 {% endblock %}
 
 {% block content %}
-<style>
-  /* ── Hero Banner ── */
-  .mx-hero {
-    background: linear-gradient(135deg, #932e2b 0%, #1e40af 100%);
-    border-radius: 8px;
-    padding: 24px 28px;
-    margin-bottom: 24px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 16px;
-    flex-wrap: wrap;
-  }
-  .mx-hero-icon {
-    width: 52px; height: 52px;
-    background: rgba(251,191,36,0.15);
-    border-radius: 8px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 1.5rem; color: #fbbf24; flex-shrink: 0;
-  }
-  .mx-hero-title { font-size: 1.2rem; font-weight: 800; color: #fff; margin: 0; }
-  .mx-hero-sub   { font-size: 0.78rem; color: #94a3b8; margin: 2px 0 0; }
-  .mx-kpi {
-    display: flex; gap: 12px; flex-wrap: wrap;
-  }
-  .mx-kpi-box {
-    background: rgba(255,255,255,0.07);
-    border: 1px solid rgba(255,255,255,0.1);
-    border-radius: 8px;
-    padding: 10px 16px;
-    text-align: center; min-width: 80px;
-  }
-  .mx-kpi-val  { font-size: 1.4rem; font-weight: 800; color: #fff; line-height: 1; }
-  .mx-kpi-lbl  { font-size: 0.65rem; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.6px; margin-top: 3px; }
 
-  /* ── Filter Panel ── */
-  .mx-filter {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    margin-bottom: 20px;
-    overflow: hidden;
-  }
-  .mx-filter-hd {
-    padding: 12px 20px;
-    background: #f8fafc;
-    border-bottom: 1px solid var(--border);
-    font-size: 0.75rem; font-weight: 800;
-    text-transform: uppercase; letter-spacing: 0.6px;
-    color: var(--text-muted);
-    display: flex; align-items: center; gap: 8px;
-  }
-  .mx-filter-bd { padding: 16px 20px; }
-  .mx-filter select, .mx-filter input {
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    font-size: 0.83rem;
-    padding: 7px 10px;
-    width: 100%;
-    background: var(--bg-card);
-    color: var(--text);
-  }
-  .mx-filter select:focus, .mx-filter input:focus {
-    outline: none;
-    border-color: #fbbf24;
-    box-shadow: 0 0 0 3px rgba(251,191,36,0.15);
-  }
-  .mx-filter label {
-    font-size: 0.7rem; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 0.5px;
-    color: var(--text-muted); margin-bottom: 5px; display: block;
-  }
-
-  /* ── Table Card ── */
-  .mx-table-card {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    overflow: hidden;
-  }
-  .mx-table-hd {
-    padding: 14px 20px;
-    border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; justify-content: space-between; gap: 8px;
-    font-size: 0.78rem; font-weight: 800;
-    text-transform: uppercase; letter-spacing: 0.5px;
-    color: var(--text-muted);
-  }
-  .mx-table thead th {
-    background: #932e2b;
-    color: #ffffff;
-    font-size: 0.68rem; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 0.6px;
-    padding: 11px 14px;
-    border: none; white-space: nowrap;
-    border-right: 0.5px solid rgba(255,255,255,0.08);
-  }
-  .mx-table thead th:last-child { border-right: none; }
-  .mx-table tbody td {
-    padding: 13px 14px;
-    border-bottom: 1px solid var(--border);
-    vertical-align: middle;
-    font-size: 0.84rem;
-  }
-  .mx-table tbody tr:last-child td { border-bottom: none; }
-  .mx-table tbody tr:hover td { background: rgba(251,191,36,0.03); }
-
-  /* ── Support Cell ── */
-  .mx-support-code {
-    font-family: monospace; font-weight: 700; font-size: 0.85rem;
-    color: var(--color-primary); text-decoration: none;
-  }
-  .mx-support-code:hover { text-decoration: underline; }
-  .mx-support-name { font-size: 0.75rem; color: var(--text-muted); margin-top: 2px; }
-
-  /* ── Technicien Avatar ── */
-  .mx-avatar {
-    width: 32px; height: 32px;
-    background: #6366f1;
-    border-radius: 8px;
-    display: inline-flex; align-items: center; justify-content: center;
-    font-weight: 800; font-size: 0.72rem; color: #fff;
-    flex-shrink: 0;
-  }
-
-  /* ── Badges ── */
-  .mx-badge {
-    display: inline-flex; align-items: center; gap: 4px;
-    font-size: 0.72rem; font-weight: 700;
-    border-radius: 8px; padding: 3px 10px;
-  }
-  .mx-badge-bon   { background: #dcfce7; color: #166534; }
-  .mx-badge-panne { background: #fee2e2; color: #991b1b; }
-  .mx-badge-maint { background: #fef3c7; color: #92400e; }
-
-  .mx-face-badge {
-    background: rgba(99,102,241,0.1);
-    color: #4f46e5;
-    border: 1px solid rgba(99,102,241,0.2);
-    font-family: monospace; font-size: 0.75rem; font-weight: 700;
-    border-radius: 8px; padding: 2px 8px;
-  }
-
-  /* ── Description truncate ── */
-  .mx-desc { font-size: 0.8rem; color: var(--text-muted); max-width: 240px; }
-
-  /* ── Actions ── */
-  .mx-actions { display: inline-flex; gap: 6px; }
-  .mx-btn-icon {
-    width: 32px; height: 32px;
-    border-radius: 8px; border: 1px solid var(--border);
-    background: var(--bg-card); color: var(--text-muted);
-    display: inline-flex; align-items: center; justify-content: center;
-    font-size: 0.85rem; text-decoration: none;
-    transition: all 0.15s;
-  }
-  .mx-btn-icon:hover { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
-  .mx-btn-icon.edit:hover { background: #6366f1; border-color: #6366f1; }
-
-  /* ── Pagination ── */
-  .mx-page-link {
-    width: 34px; height: 34px;
-    border-radius: 8px;
-    border: 1px solid var(--border);
-    background: var(--bg-card);
-    color: var(--text-muted);
-    display: inline-flex; align-items: center; justify-content: center;
-    text-decoration: none; font-size: 0.83rem; font-weight: 600;
-    transition: all 0.15s;
-  }
-  .mx-page-link:hover, .mx-page-link.active { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
-
-  /* ── Empty State ── */
-  .mx-empty {
-    padding: 60px 20px;
-    text-align: center;
-  }
-  .mx-empty-icon {
-    width: 70px; height: 70px;
-    background: #f1f5f9;
-    border-radius: 50%;
-    display: inline-flex; align-items: center; justify-content: center;
-    font-size: 1.8rem; color: #cbd5e1;
-    margin-bottom: 16px;
-  }
-</style>
-
-<!-- ══ HERO ══ -->
-<div class="mx-hero">
-  <div class="d-flex align-items-center gap-14" style="gap:14px">
-    <div class="mx-hero-icon"><i class="bi bi-tools"></i></div>
+{# ═══════════════════════════════════════════ #}
+{# ── BANNIÈRE HÉRO DU MODULE MAINTENANCE ── #}
+{# ═══════════════════════════════════════════ #}
+<div class="cl-hero mb-4">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
     <div>
-      <div class="mx-hero-title">Historique des Maintenances</div>
-      <div class="mx-hero-sub">Toutes les interventions techniques enregistrées sur le réseau</div>
+      <div class="cl-hero-title">
+        <i class="bi bi-tools me-2"></i>Maintenance & Santé du Réseau
+      </div>
+      <div class="cl-hero-sub">
+        Supervision opérationnelle des interventions, réparations de faces et suivi technique du parc.
+      </div>
     </div>
-  </div>
-  <div class="mx-kpi">
-    <div class="mx-kpi-box">
-      <div class="mx-kpi-val">{{ page_obj.paginator.count }}</div>
-      <div class="mx-kpi-lbl">Interventions</div>
+    <div class="d-flex gap-2 flex-wrap d-inline d-md-none me-1">
+      <a href="{% url 'periodes_panne_liste' %}" class="btn btn-outline-light shadow-sm d-flex align-items-center gap-1" style="font-weight: 600;">
+        <i class="bi bi-clock-history"></i>
+        <span>Périodes de panne</span>
+      </a>
+      <a href="{% url 'maintenance_create' %}" class="btn btn-light shadow-sm d-flex align-items-center gap-1" style="font-weight: 700; color: #932e2b;">
+        <i class="bi bi-plus-lg"></i>
+        <span>Nouvelle intervention</span>
+      </a>
     </div>
   </div>
 </div>
 
-<!-- ══ FILTRES ══ -->
-<div class="mx-filter">
-  <div class="mx-filter-hd">
-    <i class="bi bi-funnel-fill" style="color:#fbbf24"></i>
-    Filtrer les interventions
+{# ═══════════════════════════════════════════ #}
+{# ── RUBAN DE 4 CARTES KPI STATISTIQUES ── #}
+{# ═══════════════════════════════════════════ #}
+<div class="row g-3 mb-4">
+  {# 1. Total Interventions #}
+  <div class="col-6 col-md-3">
+    <div class="cl-kpi-card">
+      <div class="cl-kpi-icon" style="background:#eff6ff; color:#2563eb; border:1px solid #dbeafe;">
+        <i class="bi bi-tools"></i>
+      </div>
+      <div>
+        <div class="cl-kpi-val">{{ kpi_total|default:0 }}</div>
+        <div class="cl-kpi-lbl">Total Interventions</div>
+      </div>
+    </div>
   </div>
-  <div class="mx-filter-bd">
+
+  {# 2. Opérationnels (Bon) #}
+  <div class="col-6 col-md-3">
+    <div class="cl-kpi-card">
+      <div class="cl-kpi-icon" style="background:#ecfdf5; color:#059669; border:1px solid #d1fae5;">
+        <i class="bi bi-check-circle-fill"></i>
+      </div>
+      <div>
+        <div class="cl-kpi-val" style="color:#059669;">{{ kpi_operationnels|default:0 }}</div>
+        <div class="cl-kpi-lbl">Remis en Service</div>
+      </div>
+    </div>
+  </div>
+
+  {# 3. En cours de maintenance #}
+  <div class="col-6 col-md-3">
+    <div class="cl-kpi-card">
+      <div class="cl-kpi-icon" style="background:#fffbeb; color:#d97706; border:1px solid #fef3c7;">
+        <i class="bi bi-wrench"></i>
+      </div>
+      <div>
+        <div class="cl-kpi-val" style="color:#d97706;">{{ kpi_en_maintenance|default:0 }}</div>
+        <div class="cl-kpi-lbl">En Maintenance</div>
+      </div>
+    </div>
+  </div>
+
+  {# 4. Pannes actives / Alertes #}
+  <div class="col-6 col-md-3">
+    <div class="cl-kpi-card">
+      <div class="cl-kpi-icon" style="background:#fef2f2; color:#dc2626; border:1px solid #fee2e2;">
+        <i class="bi bi-exclamation-triangle-fill"></i>
+      </div>
+      <div>
+        <div class="cl-kpi-val" style="color:#dc2626;">{{ kpi_pannes_actives|default:0 }}</div>
+        <div class="cl-kpi-lbl">Supports en Panne</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ═══════════════════════════════════════════ #}
+{# ── SECTION FILTRES RAPIDES & AVANCÉS ── #}
+{# ═══════════════════════════════════════════ #}
+<div class="card filter-card mb-4">
+  <div class="card-body p-3 p-lg-4">
+    
+    {# Filtres rapides par statut #}
+    <div class="d-flex flex-wrap gap-2 mb-3 pb-3 border-bottom align-items-center">
+      <span class="small text-muted fw-bold me-2" style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px;">Statut :</span>
+      <a href="?{% if request.GET.support %}support={{ request.GET.support }}&{% endif %}{% if request.GET.face %}face={{ request.GET.face }}&{% endif %}{% if request.GET.technicien %}technicien={{ request.GET.technicien }}&{% endif %}"
+         class="cpl-tab-btn {% if not request.GET.etat %}active{% endif %}">
+        <i class="bi bi-grid-fill"></i>Tous
+        <span class="cpl-tab-badge">{{ kpi_total|default:0 }}</span>
+      </a>
+      <a href="?etat=bon{% if request.GET.support %}&support={{ request.GET.support }}{% endif %}{% if request.GET.face %}&face={{ request.GET.face }}{% endif %}{% if request.GET.technicien %}&technicien={{ request.GET.technicien }}{% endif %}"
+         class="cpl-tab-btn {% if request.GET.etat == 'bon' %}active{% endif %}">
+        <i class="bi bi-check-circle-fill text-success"></i>Opérationnels
+        <span class="cpl-tab-badge">{{ kpi_operationnels|default:0 }}</span>
+      </a>
+      <a href="?etat=maintenance{% if request.GET.support %}&support={{ request.GET.support }}{% endif %}{% if request.GET.face %}&face={{ request.GET.face }}{% endif %}{% if request.GET.technicien %}&technicien={{ request.GET.technicien }}{% endif %}"
+         class="cpl-tab-btn {% if request.GET.etat == 'maintenance' %}active{% endif %}">
+        <i class="bi bi-wrench text-warning"></i>En Maintenance
+        <span class="cpl-tab-badge">{{ kpi_en_maintenance|default:0 }}</span>
+      </a>
+      <a href="?etat=panne{% if request.GET.support %}&support={{ request.GET.support }}{% endif %}{% if request.GET.face %}&face={{ request.GET.face }}{% endif %}{% if request.GET.technicien %}&technicien={{ request.GET.technicien }}{% endif %}"
+         class="cpl-tab-btn {% if request.GET.etat == 'panne' %}active{% endif %}">
+        <i class="bi bi-exclamation-triangle-fill text-danger"></i>En Panne
+        <span class="cpl-tab-badge">{{ kpi_en_panne|default:0 }}</span>
+      </a>
+    </div>
+
+    {# Formulaire de filtres détaillés #}
     <form method="get">
       <div class="row g-3 align-items-end">
-        <div class="col-md-3 col-sm-6">
-          <label>Support</label>
-          <select name="support">
+        <div class="col-xl-3 col-md-6">
+          <label class="filter-label"><i class="bi bi-geo-alt"></i>Support</label>
+          <select name="support" class="form-select form-select-sm">
             <option value="">Tous les supports</option>
             {% for s in supports %}
               <option value="{{ s.pk }}" {% if request.GET.support == s.pk|stringformat:"s" %}selected{% endif %}>{{ s.code }} — {{ s.nom }}</option>
             {% endfor %}
           </select>
         </div>
-        <div class="col-md-2 col-sm-6">
-          <label>Face</label>
-          <select name="face">
+        <div class="col-xl-2 col-md-6">
+          <label class="filter-label"><i class="bi bi-aspect-ratio"></i>Face</label>
+          <select name="face" class="form-select form-select-sm">
             <option value="">Toutes les faces</option>
             {% for f in faces %}
               <option value="{{ f.pk }}" {% if request.GET.face == f.pk|stringformat:"s" %}selected{% endif %}>Face {{ f.label }}</option>
             {% endfor %}
           </select>
         </div>
-        <div class="col-md-2 col-sm-6">
-          <label>État résultant</label>
-          <select name="etat">
+        <div class="col-xl-2 col-md-6">
+          <label class="filter-label"><i class="bi bi-activity"></i>État résultant</label>
+          <select name="etat" class="form-select form-select-sm">
             <option value="">Tous les états</option>
             {% for val, label in etat_choices %}
               <option value="{{ val }}" {% if request.GET.etat == val %}selected{% endif %}>{{ label }}</option>
@@ -262,9 +167,9 @@
           </select>
         </div>
         {% if not request.user.is_technicien %}
-        <div class="col-md-3 col-sm-6">
-          <label>Technicien</label>
-          <select name="technicien">
+        <div class="col-xl-3 col-md-6">
+          <label class="filter-label"><i class="bi bi-person"></i>Technicien</label>
+          <select name="technicien" class="form-select form-select-sm">
             <option value="">Tous les techniciens</option>
             {% for t in techniciens %}
               <option value="{{ t.pk }}" {% if request.GET.technicien == t.pk|stringformat:"s" %}selected{% endif %}>{{ t.get_full_name|default:t.username }}</option>
@@ -272,67 +177,112 @@
           </select>
         </div>
         {% endif %}
-        <div class="col-md-2 col-sm-6 d-flex gap-2">
-          <button type="submit"
-                  style="flex:1;background:var(--color-primary);color:#fff;border:none;border-radius:8px;padding:8px 12px;font-weight:700;font-size:0.8rem;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;">
-            <i class="bi bi-funnel-fill"></i> Filtrer
+        <div class="col-xl-2 col-md-6 d-flex gap-2">
+          <button type="submit" class="btn btn-primary btn-sm flex-fill shadow-sm d-flex align-items-center justify-content-center gap-1">
+            <i class="bi bi-funnel-fill"></i>
+            <span>Filtrer</span>
           </button>
           {% if request.GET.support or request.GET.face or request.GET.etat or request.GET.technicien %}
-          <a href="{% url 'maintenance_list' %}"
-             style="width:38px;height:38px;background:var(--bg-card);border:1px solid var(--border);border-radius:8px;display:inline-flex;align-items:center;justify-content:center;color:var(--text-muted);text-decoration:none;"
-             title="Réinitialiser"><i class="bi bi-arrow-counterclockwise"></i></a>
+          <a href="{% url 'maintenance_list' %}" class="btn btn-outline-secondary btn-sm" title="Réinitialiser tous les filtres">
+            <i class="bi bi-arrow-counterclockwise"></i>
+          </a>
           {% endif %}
         </div>
       </div>
     </form>
+
+    {# ── Badges des filtres actifs ── #}
+    {% if request.GET.support or request.GET.face or request.GET.etat or request.GET.technicien %}
+    <div class="d-flex flex-wrap gap-2 align-items-center mt-3 pt-3 border-top">
+      <span class="small text-muted fw-bold me-1" style="font-size: 0.72rem;">Filtres actifs :</span>
+      {% if request.GET.support %}
+        <span class="active-filter-pill"><i class="bi bi-geo-alt"></i>Support sélectionné</span>
+      {% endif %}
+      {% if request.GET.face %}
+        <span class="active-filter-pill"><i class="bi bi-aspect-ratio"></i>Face sélectionnée</span>
+      {% endif %}
+      {% if request.GET.etat %}
+        <span class="active-filter-pill"><i class="bi bi-activity"></i>État: {{ request.GET.etat|title }}</span>
+      {% endif %}
+      {% if request.GET.technicien %}
+        <span class="active-filter-pill"><i class="bi bi-person"></i>Technicien sélectionné</span>
+      {% endif %}
+      <a href="{% url 'maintenance_list' %}" class="small text-danger text-decoration-none ms-2 fw-semibold" style="font-size: 0.75rem;">
+        <i class="bi bi-x-circle me-1"></i>Effacer tout
+      </a>
+    </div>
+    {% endif %}
   </div>
 </div>
 
-<!-- ══ LISTE ══ -->
+{# ═══════════════════════════════════════════ #}
+{# ── LISTE DES INTERVENTIONS (TABLEAU) ── #}
+{# ═══════════════════════════════════════════ #}
 {% if maintenances %}
-<div class="mx-table-card">
-  <div class="mx-table-hd">
-    <span><i class="bi bi-list-check me-2" style="color:#fbbf24"></i>Interventions enregistrées</span>
-    <span style="background:#f1f5f9;border-radius:20px;padding:3px 12px;font-size:0.75rem;color:var(--text-muted);">
-      {{ page_obj.paginator.count }} résultat{{ page_obj.paginator.count|pluralize }}
+<div class="card table-custom-card">
+  <div class="card-header bg-white py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-2 border-bottom">
+    <div class="d-flex align-items-center gap-2">
+      <h6 class="mb-0 fw-bold text-dark">Rapports d'intervention</h6>
+      <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2.5 py-1 font-monospace" style="font-size: 0.75rem;">
+        {{ page_obj.paginator.count }} résultat{{ page_obj.paginator.count|pluralize }}
+      </span>
+    </div>
+    <span class="text-muted small">
+      <i class="bi bi-info-circle me-1"></i>Cliquez sur un code pour consulter la fiche du support
     </span>
   </div>
+
   <div class="table-responsive">
-    <table class="table mx-table mb-0 align-middle">
+    <table class="table table-hover mb-0 align-middle table-supports">
       <thead>
         <tr>
-          <th style="padding-left:20px;">Support</th>
-          <th>Face</th>
+          <th class="ps-4">Support & Emplacement</th>
+          <th>Face / Écran</th>
           <th>Date & Heure</th>
           <th>Technicien</th>
           <th>État résultant</th>
-          <th>Description</th>
-          <th style="text-align:right;padding-right:20px;">Actions</th>
+          <th>Constat & Rapport</th>
+          <th class="text-end pe-4">Actions</th>
         </tr>
       </thead>
       <tbody>
         {% for m in maintenances %}
-        <tr>
+        <tr class="support-row">
           <!-- Support -->
-          <td style="padding-left:20px;">
-            <a href="{% url 'support_detail' m.support.uuid %}" class="mx-support-code">{{ m.support.code }}</a>
-            <div class="mx-support-name">{{ m.support.nom }}</div>
+          <td class="ps-4">
+            <a href="{% url 'support_detail' m.support.uuid %}" class="code-primary text-decoration-none fw-bold">
+              {{ m.support.code }}
+            </a>
+            <div class="fw-semibold text-dark small mt-1">{{ m.support.nom }}</div>
+            {% if m.support.ville %}
+              <div class="text-muted" style="font-size: 0.72rem;">
+                <i class="bi bi-geo-alt me-1"></i>{{ m.support.quartier|default:"" }}{% if m.support.quartier and m.support.ville %}, {% endif %}{{ m.support.ville }}
+              </div>
+            {% endif %}
           </td>
 
           <!-- Face -->
           <td>
             {% if m.face %}
               <span class="mx-face-badge">Face {{ m.face.label }}</span>
-              {% if m.face.orientation %}<div class="text-muted" style="font-size:0.68rem;margin-top:2px;">{{ m.face.orientation }}</div>{% endif %}
+              {% if m.face.orientation %}
+                <div class="text-muted small mt-1" style="font-size:0.68rem;">{{ m.face.orientation }}</div>
+              {% endif %}
             {% else %}
-              <span style="color:var(--text-muted);">—</span>
+              <span class="badge bg-light text-secondary border font-monospace" style="font-size: 0.72rem;">
+                Support complet
+              </span>
             {% endif %}
           </td>
 
           <!-- Date -->
           <td>
-            <div style="font-weight:700;font-size:0.84rem;">{{ m.date_intervention|date:"d/m/Y" }}</div>
-            <div style="font-size:0.72rem;color:var(--text-muted);font-family:monospace;">{{ m.date_intervention|date:"H:i" }}</div>
+            <div class="fw-bold text-dark" style="font-size:0.84rem;">
+              <i class="bi bi-calendar3 me-1 text-muted"></i>{{ m.date_intervention|date:"d/m/Y" }}
+            </div>
+            <div class="font-monospace text-muted mt-1" style="font-size:0.72rem;">
+              <i class="bi bi-clock me-1"></i>{{ m.date_intervention|date:"H:i" }}
+            </div>
           </td>
 
           <!-- Technicien -->
@@ -345,40 +295,61 @@
                   {% endwith %}
                 </div>
                 <div>
-                  <div style="font-weight:600;font-size:0.83rem;">{{ m.effectue_par.get_full_name|default:m.effectue_par.username }}</div>
-                  <div style="font-size:0.7rem;color:var(--text-muted);">{{ m.effectue_par.get_role_display }}</div>
+                  <div class="fw-bold text-dark" style="font-size:0.83rem;">
+                    {{ m.effectue_par.get_full_name|default:m.effectue_par.username }}
+                  </div>
+                  <div class="text-muted" style="font-size:0.7rem;">
+                    {{ m.effectue_par.get_role_display|default:"Technicien" }}
+                  </div>
                 </div>
               </div>
             {% else %}
-              <span style="color:var(--text-muted);">—</span>
+              <span class="text-muted">—</span>
             {% endif %}
           </td>
 
-          <!-- État -->
+          <!-- État résultant -->
           <td>
             {% if m.etat_apres == 'bon' %}
-              <span class="mx-badge mx-badge-bon"><i class="bi bi-check-circle-fill"></i>Opérationnel</span>
+              <span class="badge badge-status bs-disponible">
+                <i class="bi bi-check-circle-fill me-1"></i>Opérationnel
+              </span>
             {% elif m.etat_apres == 'maintenance' %}
-              <span class="mx-badge mx-badge-maint"><i class="bi bi-wrench"></i>En maintenance</span>
+              <span class="badge badge-status bs-occupe">
+                <i class="bi bi-wrench me-1"></i>En maintenance
+              </span>
             {% elif m.etat_apres == 'panne' %}
-              <span class="mx-badge mx-badge-panne"><i class="bi bi-exclamation-triangle-fill"></i>En panne</span>
+              <span class="badge badge-status bs-panne">
+                <i class="bi bi-exclamation-triangle-fill me-1"></i>En panne
+              </span>
             {% else %}
-              <span style="color:var(--text-muted);">—</span>
+              <span class="text-muted">—</span>
             {% endif %}
           </td>
 
           <!-- Description -->
           <td>
-            <div class="mx-desc text-truncate" style="max-width:220px;" title="{{ m.description }}">
-              {{ m.description|default:"—" }}
+            <div class="text-dark text-truncate" style="max-width:260px; font-size:0.82rem;" title="{{ m.description }}">
+              {{ m.description|default:"Intervention technique de routine" }}
             </div>
+            {% if m.photo %}
+              <div class="mt-1">
+                <span class="badge bg-primary-subtle text-primary border border-primary-subtle" style="font-size:0.68rem;">
+                  <i class="bi bi-image me-1"></i>Photo jointe
+                </span>
+              </div>
+            {% endif %}
           </td>
 
           <!-- Actions -->
-          <td style="text-align:right;padding-right:20px;">
-            <div class="mx-actions">
-              <a href="{% url 'maintenance_detail' m.pk %}" class="mx-btn-icon" title="Voir le détail"><i class="bi bi-eye"></i></a>
-              <a href="{% url 'maintenance_update' m.pk %}" class="mx-btn-icon edit" title="Modifier"><i class="bi bi-pencil"></i></a>
+          <td class="text-end pe-4">
+            <div class="d-inline-flex gap-1 justify-content-end">
+              <a href="{% url 'maintenance_detail' m.pk %}" class="btn btn-sm btn-outline-primary btn-action-icon" title="Voir le détail de l'intervention">
+                <i class="bi bi-eye"></i>
+              </a>
+              <a href="{% url 'maintenance_update' m.pk %}" class="btn btn-sm btn-outline-secondary btn-action-icon" title="Modifier le rapport">
+                <i class="bi bi-pencil"></i>
+              </a>
             </div>
           </td>
         </tr>
@@ -388,21 +359,28 @@
   </div>
 </div>
 
-<!-- ══ PAGINATION ══ -->
+{# ── PAGINATION ── #}
 <div class="mt-4">
   {% pagination_nav %}
 </div>
 
 {% else %}
-<div class="mx-table-card">
-  <div class="mx-empty">
-    <div class="mx-empty-icon"><i class="bi bi-tools"></i></div>
-    <div style="font-weight:700;font-size:1rem;color:var(--text);margin-bottom:6px;">Aucune intervention enregistrée</div>
-    <div style="font-size:0.83rem;color:var(--text-muted);margin-bottom:20px;">Aucune maintenance ne correspond à vos critères de recherche.</div>
-    <a href="{% url 'maintenance_create' %}"
-       style="background:var(--color-primary);color:#fff;border-radius:8px;padding:8px 22px;font-weight:700;font-size:0.83rem;text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
-      <i class="bi bi-plus-lg"></i> Enregistrer une maintenance
-    </a>
+<div class="card table-custom-card">
+  <div class="card-body text-center py-5 text-muted">
+    <div class="py-4">
+      <i class="bi bi-tools text-muted d-block mb-3" style="font-size: 2.5rem; opacity: 0.4;"></i>
+      <h6 class="fw-bold text-dark mb-1">Aucune intervention enregistrée</h6>
+      <p class="text-muted small mb-3">Aucune maintenance ne correspond à vos critères de recherche actuels.</p>
+      {% if request.GET.support or request.GET.face or request.GET.etat or request.GET.technicien %}
+      <a href="{% url 'maintenance_list' %}" class="btn btn-outline-primary btn-sm px-3">
+        <i class="bi bi-arrow-counterclockwise me-1"></i>Réinitialiser les filtres
+      </a>
+      {% else %}
+      <a href="{% url 'maintenance_create' %}" class="btn btn-primary btn-sm px-3">
+        <i class="bi bi-plus-lg me-1"></i>Créer la première maintenance
+      </a>
+      {% endif %}
+    </div>
   </div>
 </div>
 {% endif %}

@@ -1274,6 +1274,16 @@ class MaintenanceListView(LoginRequiredMixin, SortableListMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        base_qs = Maintenance.objects.all()
+        if self.request.user.is_technicien:
+            base_qs = base_qs.filter(effectue_par=self.request.user)
+
+        context['kpi_total'] = base_qs.count()
+        context['kpi_operationnels'] = base_qs.filter(etat_apres='bon').count()
+        context['kpi_en_maintenance'] = base_qs.filter(etat_apres='maintenance').count()
+        context['kpi_en_panne'] = base_qs.filter(etat_apres='panne').count()
+        context['kpi_pannes_actives'] = Support.objects.filter(actif=True, etat='panne').count()
+
         context['etat_choices'] = Maintenance.ETAT_CHOICES
         context['supports']     = Support.objects.filter(actif=True).order_by('code')
         if self.request.user.is_technicien:

@@ -1,0 +1,297 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Rapport Global des Campagnes — {{ today|date:"d/m/Y" }}</title>
+  <style>
+    @page {
+      size: A4 landscape;
+      margin: 1.2cm 1cm 1.5cm 1cm;
+      background: #f8fafc;
+      @bottom-center {
+        content: "Document confidentiel — Rapport Global des Campagnes au {{ today|date:'d/m/Y' }} — Page " counter(page) " / " counter(pages);
+        font-size: 7pt;
+        color: #94a3b8;
+        font-family: 'Plus Jakarta Sans', Arial, sans-serif;
+      }
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Plus Jakarta Sans', Arial, sans-serif;
+      font-size: 8pt;
+      color: #0F172A;
+      background: #f8fafc;
+    }
+
+    /* ── En-tête document ── */
+    .doc-header {
+      width: 100%;
+      border-collapse: collapse;
+      background: #ffffff;
+      border-bottom: 3px solid #932e2b;
+      border-radius: 8px 8px 0 0;
+      margin-bottom: 12px;
+    }
+    .doc-header td { padding: 12px 18px; vertical-align: middle; }
+    .doc-logo   { height: 44px; width: auto; object-fit: contain; }
+    .doc-center { text-align: center; }
+    .doc-brand  { font-size: 6.5pt; font-weight: bold; color: #94a3b8; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 3px; }
+    .doc-title  { font-size: 13pt; font-weight: bold; color: #932e2b; text-transform: uppercase; letter-spacing: 0.8px; }
+    .doc-meta   { font-size: 7.5pt; color: #64748b; margin-top: 3px; }
+    .doc-meta strong { color: #932e2b; }
+    .doc-right  { font-size: 7pt; color: #64748b; text-align: right; line-height: 1.7; white-space: nowrap; }
+    .doc-right strong { color: #334155; }
+
+    /* ── KPI Strip ── */
+    .kpi-row {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 8px 0;
+      margin-bottom: 14px;
+    }
+    .kpi-box {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 8px 12px;
+      vertical-align: middle;
+      width: 25%;
+    }
+    .kpi-label { font-size: 6.5pt; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; margin-bottom: 2px; }
+    .kpi-val   { font-size: 15pt; font-weight: bold; line-height: 1; font-family: 'SFMono-Regular', monospace, Arial; }
+    .k-primary .kpi-val { color: #932e2b; }
+    .k-green   .kpi-val { color: #166534; }
+    .k-blue    .kpi-val { color: #2563eb; }
+    .k-orange  .kpi-val { color: #ea580c; }
+
+    /* ── Tableau consolidé ── */
+    .table-container {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .category-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #ffffff;
+    }
+    col.c-ref    { width: 85px; }
+    col.c-nom    { width: 170px; }
+    col.c-cl     { width: 140px; }
+    col.c-typ    { width: 90px; }
+    col.c-per    { width: 120px; }
+    col.c-sup    { width: 65px; }
+    col.c-bud    { width: 100px; }
+    col.c-stat   { width: auto; }
+    col.c-ref    { width: 75px; }
+    col.c-nom    { width: 140px; }
+    col.c-cl     { width: 130px; }
+    col.c-typ    { width: 85px; }
+    col.c-per    { width: 115px; }
+    col.c-stat   { width: 70px; }
+    col.c-sup    { width: auto; }
+    col.c-bud    { width: 95px; }
+
+    thead th {
+      background: #932e2b;
+      color: #ffffff;
+      font-size: 6.5pt;
+      font-weight: bold;
+      padding: 8px 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border: none;
+      vertical-align: middle;
+    }
+    thead th.text-center { text-align: center; }
+    thead th.text-end    { text-align: right; }
+
+    tbody tr {
+      border-bottom: 1px solid #f1f5f9;
+      page-break-inside: avoid;
+    }
+    tbody tr:nth-child(even) td { background-color: #fafafa; }
+    tbody td {
+      padding: 6px;
+      vertical-align: middle;
+      font-size: 7.5pt;
+      color: #334155;
+    }
+
+    .badge-code {
+      font-family: 'SFMono-Regular', monospace, Arial;
+      font-size: 7pt;
+      font-weight: bold;
+      color: #932e2b;
+      background: #fff1f2;
+      border: 1px solid #fecdd3;
+      border-radius: 4px;
+      padding: 2px 5px;
+      display: inline-block;
+    }
+
+    .badge-status {
+      display: inline-block;
+      font-size: 6.5pt;
+      font-weight: bold;
+      padding: 2px 5px;
+      border-radius: 4px;
+    }
+    .bs-en_cours { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+    .bs-a_venir  { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+    .bs-terminee { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
+    .bs-annulee  { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; }
+
+    .sup-chip {
+      display: inline-block;
+      font-size: 6.5pt;
+      font-weight: 600;
+      padding: 1px 4px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 3px;
+      margin: 1px 2px;
+      color: #334155;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- En-tête -->
+  <table class="doc-header">
+    <tr>
+      <td style="width:20%;">
+        <img src="{% static 'images/logo.png' %}" alt="Integral" class="doc-logo">
+      </td>
+      <td class="doc-center" style="width:60%;">
+        <div class="doc-brand">Régie Publicitaire — Gestion Intégrale</div>
+        <div class="doc-title">Rapport Global des Campagnes</div>
+        <div class="doc-title">Rapport Consolidé des Campagnes Publicitaires</div>
+        <div class="doc-meta">
+          Synthèse globale des réservations & diffusions · Arrêté au <strong>{{ today|date:"d/m/Y" }}</strong>
+        </div>
+      </td>
+      <td class="doc-right" style="width:20%;">
+        <strong>Régie Commerciale</strong><br>
+        {{ total_campagnes }} Campagne{{ total_campagnes|pluralize }} programmée{{ total_campagnes|pluralize }}<br>
+        {{ total_campagnes }} Campagne{{ total_campagnes|pluralize }} répertoriée{{ total_campagnes|pluralize }}<br>
+        {{ total_en_cours }} En cours de diffusion
+      </td>
+    </tr>
+  </table>
+
+  <!-- KPI Strip -->
+  <table class="kpi-row">
+    <tr>
+      <td class="kpi-box k-primary">
+        <div class="kpi-label">Total Campagnes</div>
+        <div class="kpi-val">{{ total_campagnes }}</div>
+      </td>
+      <td class="kpi-box k-green">
+        <div class="kpi-label">En Cours</div>
+        <div class="kpi-val">{{ total_en_cours }}</div>
+      </td>
+      <td class="kpi-box k-orange">
+        <div class="kpi-label">À Venir</div>
+        <div class="kpi-val">{{ total_a_venir }}</div>
+      </td>
+      <td class="kpi-box k-blue">
+        <div class="kpi-label">Montant Engagé</div>
+        <div class="kpi-val" style="font-size:12pt;">{{ total_budget_global|floatformat:0 }} FCFA</div>
+      </td>
+    </tr>
+  </table>
+
+  <!-- Tableau consolidé -->
+  <div class="table-container">
+    <table class="category-table">
+      <colgroup>
+        <col class="c-ref">
+        <col class="c-nom">
+        <col class="c-cl">
+        <col class="c-typ">
+        <col class="c-per">
+        <col class="c-stat">
+        <col class="c-sup">
+        <col class="c-bud">
+        <col class="c-stat">
+      </colgroup>
+      <thead>
+        <tr>
+          <th>Réf.</th>
+          <th>Campagne</th>
+          <th>Client / Annonceur</th>
+          <th>Type</th>
+          <th>Période</th>
+          <th class="text-center">Supports</th>
+          <th class="text-center">Statut</th>
+          <th>Supports & Localisations Mobilisés</th>
+          <th class="text-end">Budget (FCFA)</th>
+          <th class="text-center">Statut</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in campagnes %}
+        <tr>
+          <td><span class="badge-code">{{ c.reference }}</span></td>
+          <td><strong>{{ c.nom }}</strong></td>
+          <td>{{ c.client_nom }}</td>
+          <td>
+            <strong>{{ c.client_nom }}</strong><br>
+            <span style="font-size:6.8pt; color:#64748b;">{{ c.client_telephone }}</span>
+          </td>
+          <td>{{ c.type_support }}</td>
+          <td>{{ c.date_debut|date:"d/m/Y" }} → {{ c.date_fin|date:"d/m/Y" }}</td>
+          <td style="text-align:center;"><strong>{{ c.nb_supports }}</strong></td>
+          <td style="text-align:right;"><strong>{{ c.budget|floatformat:0 }}</strong></td>
+          <td>
+            {{ c.date_debut|date:"d/m/Y" }} → {{ c.date_fin|date:"d/m/Y" }}
+            {% if c.duree_jours %}<br><span style="font-size:6.5pt; color:#64748b;">({{ c.duree_jours }} jours)</span>{% endif %}
+          </td>
+          <td style="text-align:center;">
+            {% if c.statut == 'en_cours' %}
+              <span style="color:#059669; font-weight:bold;">En cours</span>
+              <span class="badge-status bs-en_cours">En cours</span>
+            {% elif c.statut == 'a_venir' %}
+              <span style="color:#2563eb; font-weight:bold;">À venir</span>
+              <span class="badge-status bs-a_venir">À venir</span>
+            {% elif c.statut == 'terminee' %}
+              <span style="color:#64748b;">Terminée</span>
+              <span class="badge-status bs-terminee">Terminée</span>
+            {% elif c.statut == 'annulee' %}
+              <span style="color:#dc2626;">Annulée</span>
+              <span class="badge-status bs-annulee">Annulée</span>
+            {% else %}
+              <span>{{ c.statut_display }}</span>
+              <span class="badge-status bs-terminee">{{ c.statut_display }}</span>
+            {% endif %}
+          </td>
+          <td>
+            {% for s in c.supports %}
+              <span class="sup-chip">{{ s.code }} ({{ s.ville }}{% if s.quartier %}, {{ s.quartier }}{% endif %})</span>
+            {% empty %}
+              <span style="font-size:6.5pt; color:#94a3b8; font-style:italic;">Aucun support alloué</span>
+            {% endfor %}
+          </td>
+          <td style="text-align:right; font-weight:bold; color:#0f172a;">
+            {{ c.budget|floatformat:0 }}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="8" style="text-align:center; padding:20px; color:#94a3b8;">
+            Aucune campagne trouvée.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+</body>
+</html>
+

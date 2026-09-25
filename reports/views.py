@@ -1119,3 +1119,532 @@ class ExportClientExcelView(ClientStaffRequiredMixin, View):
         )
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
         return response
+
+
+# ══════════════════════════════════════════════════════════════════
+# RAPPORT DÉTAILLÉ DE SUPPORT INDIVIDUEL (PDF & APERÇU)
+# ══════════════════════════════════════════════════════════════════
+
+def _build_context_support_detail(support, request=None):
+    """
+    Construit le contexte complet et exhaustif pour la fiche technique,
+    les diffusions, les campagnes & planning, et le journal de maintenance du support.
+    """
+    today = datetime.date.today()
+    from django.utils import timezone
+    now = timezone.now()
+    from campaigns.models import LigneCampagne, ReservationLigne
+
+    # ── 1. Fiche Technique complète ──
+    info_rows = [
+        ('Code Réseau', support.code),
+        ('Nom du Support', support.nom),
+        ('Typologie', support.get_type_support_display()),
+        ('Format Réseau', support.get_format_display() or support.format or 'Standard'),
+        ('Dimensions (L × H)', support.dimensions or 'Standard'),
+        ('Superficie Totale', f"{support.surface_m2} m²" if support.surface_m2 else '—'),
+        ('Ville', support.ville or '—'),
+        ('Quartier', support.quartier or '—'),
+        ('Adresse / Repère', support.adresse or '—'),
+        ('Coordonnées GPS', f"{support.latitude}, {support.longitude}" if support.latitude and support.longitude else '—'),
+        ('Date d\'Installation', support.date_installation.strftime('%d/%m/%Y') if support.date_installation else '—'),
+        ('État Opérationnel', support.get_etat_display()),
+    ]
+
+    if getattr(support, 'code_mairie', None):
+        info_rows.insert(1, ('Code Mairie', support.code_mairie))
+
+    if support.is_dans_marche:
+        info_rows.append(('Marché Commercial', support.marche.nom))
+        info_rows.append(('Emplacement Marché', support.emplacement.code if support.emplacement else '—'))
+
+    if support.type_support == 'panneau':
+        if support.type_panneau:
+            info_rows.append(('Type de Structure', support.type_panneau))
+        info_rows.append(('Capacité Faces', f"{support.faces.count()} Face{'s' if support.faces.count() > 1 else ''}"))
+
+    # ── 2. Campagnes Actives, Réservations & Historique ──
+    lignes_actives = list(
+        LigneCampagne.objects.filter(
+            support=support,
+            campagne__date_debut__lte=today,
+            campagne__date_fin__gte=today,
+            campagne__statut__in=['en_cours', 'a_venir'],
+        ).select_related('campagne__client', 'face').prefetch_related('campagne__visuels')
+    )
+
+    reservations = list(
+        ReservationLigne.objects.filter(
+            support=support,
+            reservation__date_fin__gte=now,
+            reservation__statut__in=['en_attente', 'confirmee'],
+        ).select_related('reservation__client', 'face').order_by('reservation__date_debut')
+    )
+
+    historique = list(
+        LigneCampagne.objects.filter(
+            support=support,
+            campagne__date_fin__lt=today,
+        ).select_related('campagne__client', 'face').prefetch_related('campagne__visuels').order_by('-campagne__date_fin')[:15]
+    )
+
+    # ── 3. Maintenance & Interventions ──
+    maintenances = list(
+        support.maintenances.select_related('effectue_par', 'face').order_by('-date_intervention')
+    )
+
+    # ── 4. Faces & Visuels (Panneau) ──
+    faces_data = []
+    if support.type_support == 'panneau':
+        for face in support.faces.all():
+            statut = face.get_statut()
+            camp_active = None
+            visuel_actif = None
+            for l in lignes_actives:
+                if l.face_id == face.id:
+                    camp_active = l.campagne
+                    visuel_actif = l.visuel or (camp_active.visuels.first() if camp_active.visuels.exists() else None)
+                    break
+            
+            # Réservation en attente sur cette face
+            resa_active = None
+            for r in reservations:
+                if r.face_id == face.id:
+                    resa_active = r.reservation
+                    break
+
+            faces_data.append({
+                'face': face,
+                'label': face.label,
+                'eclairage': face.get_eclairage_display(),
+                'notes': face.notes,
+                'photo': face.photo,
+                'statut': statut,
+                'campagne': camp_active,
+                'visuel_actif': visuel_actif,
+                'reservation': resa_active,
+            })
+
+    # ── 5. DOOH Écran Numérique ──
+    ecran_info = getattr(support, 'ecran_info', None)
+    spots_data = []
+    if support.type_support == 'ecran' and ecran_info:
+        info_rows.append(('Résolution Écran', ecran_info.get_resolution_display()))
+        if hasattr(ecran_info, 'format_detail') and ecran_info.format_detail:
+            info_rows.append(('Cellules / Dalle', f"{ecran_info.format_detail.get('dimensions','')} ({ecran_info.format_detail.get('superficie','')}m²)"))
+        h_on = ecran_info.heure_allumage.strftime('%H:%M') if ecran_info.heure_allumage else '06:00'
+        h_off = ecran_info.heure_extinction.strftime('%H:%M') if ecran_info.heure_extinction else '22:00'
+        info_rows.append(('Plage d\'Allumage', f"{h_on} — {h_off}"))
+        info_rows.append(('Taux d\'Occupation', f"{support.taux_occupation_pourcentage}%"))
+
+        for l in lignes_actives:
+            visuel = l.visuel or (l.campagne.visuels.first() if l.campagne.visuels.exists() else None)
+            freq = l.campagne.frequence or 120
+            duree = l.campagne.duree_passage or 10
+            spots_data.append({
+                'campagne': l.campagne,
+                'client': l.campagne.client,
+                'duree': duree,
+                'freq': freq,
+                'passages_heure': 3600 // freq if freq > 0 else 30,
+                'visuel': visuel,
+            })
+
+    return {
+        'support': support,
+        'today': today,
+        'info_rows': info_rows,
+        'faces_data': faces_data,
+        'ecran_info': ecran_info,
+        'spots_data': spots_data,
+        'lignes_actives': lignes_actives,
+        'reservations': reservations,
+        'historique': historique,
+        'maintenances': maintenances,
+    }
+
+
+class ExportSupportPdfView(ClientStaffRequiredMixin, View):
+    """Télécharge la fiche détaillée et le rapport d'un support en PDF."""
+    def get(self, request, pk=None, uuid=None):
+        from inventory.models import Support
+        if uuid:
+            support = get_object_or_404(Support, uuid=uuid)
+        else:
+            support = get_object_or_404(Support, pk=pk)
+
+        context = _build_context_support_detail(support, request=request)
+        html_string = render_to_string(
+            "reports/support_detail_pdf.html",
+            context,
+            request=request,
+        )
+        pdf = HTML(
+            string=html_string,
+            base_url=request.build_absolute_uri(),
+        ).write_pdf()
+
+        filename = f"rapport_support_{support.code}_{datetime.datetime.now():%Y%m%d_%H%M%S}.pdf"
+        response = HttpResponse(pdf, content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
+
+
+class PreviewSupportPdfView(ClientStaffRequiredMixin, View):
+    """Prévisualise le rapport détaillé du support dans le navigateur."""
+    def get(self, request, pk=None, uuid=None):
+        from inventory.models import Support
+        if uuid:
+            support = get_object_or_404(Support, uuid=uuid)
+        else:
+            support = get_object_or_404(Support, pk=pk)
+
+        context = _build_context_support_detail(support, request=request)
+        return render(
+            request,
+            "reports/apercu_support_detail.html",
+            context,
+        )
+
+
+# ══════════════════════════════════════════════════════════════════
+# RAPPORT DÉTAILLÉ DE MARCHÉ (PDF & APERÇU)
+# ══════════════════════════════════════════════════════════════════
+
+def _build_context_marche_detail(marche, request=None):
+    """
+    Construit le contexte complet pour la fiche et le rapport détaillé d'un Marché :
+    localisation, statistiques, liste des emplacements et panneaux, campagnes actives,
+    réservations, maintenances et photos.
+    """
+    from django.db.models import Q
+    from django.utils import timezone
+    from inventory.models import Support, Maintenance
+    from campaigns.models import LigneCampagne, ReservationLigne
+
+    today = timezone.now().date()
+    now = timezone.now()
+
+    info_rows = [
+        ('Nom du Marché', marche.nom),
+        ('Ville', marche.ville or '—'),
+        ('Quartier', marche.quartier or '—'),
+        ('Adresse / Localisation', marche.adresse or '—'),
+        ('Coordonnées GPS', f"{marche.latitude}, {marche.longitude}" if marche.latitude and marche.longitude else '—'),
+        ('Rayon du Périmètre', f"{marche.rayon_metres} mètres"),
+        ('Capacité Totale', f"{marche.nb_emplacements} emplacement{'s' if marche.nb_emplacements > 1 else ''}"),
+        ('Statut Opérationnel', 'Actif / En exploitation' if marche.actif else 'Inactif'),
+        ('Date d\'Enregistrement', marche.created_at.strftime('%d/%m/%Y') if marche.created_at else '—'),
+    ]
+
+    # Emplacements et Statuts
+    emplacements_qs = marche.emplacements.select_related('support_installe').prefetch_related('support_installe__faces').all()
+    emplacements_data = []
+    
+    for emp in emplacements_qs:
+        supp = getattr(emp, 'support_installe', None)
+        
+        # Campagne active sur cet emplacement ou son support
+        q_filter = Q(emplacement=emp)
+        if supp:
+            q_filter |= Q(support=supp)
+        
+        lignes_emp = list(
+            LigneCampagne.objects.filter(
+                q_filter,
+                campagne__date_debut__lte=today,
+                campagne__date_fin__gte=today,
+                campagne__statut__in=['en_cours', 'a_venir'],
+            ).select_related('campagne__client', 'face').prefetch_related('campagne__visuels')
+        )
+        campagne_active = lignes_emp[0].campagne if lignes_emp else None
+        visuel_url = None
+        if lignes_emp:
+            if lignes_emp[0].visuel:
+                visuel_url = lignes_emp[0].visuel.url
+            elif campagne_active and campagne_active.visuels.exists():
+                visuel_url = campagne_active.visuels.first().fichier.url
+        
+        # Réservation active
+        resa_active = None
+        if supp:
+            resa = ReservationLigne.objects.filter(
+                support=supp,
+                reservation__date_fin__gte=now,
+                reservation__statut__in=['en_attente', 'confirmee'],
+            ).select_related('reservation__client').first()
+            if resa:
+                resa_active = resa.reservation
+
+        emplacements_data.append({
+            'emplacement': emp,
+            'code': emp.code,
+            'notes': emp.notes,
+            'is_libre': emp.is_libre(),
+            'est_dans_campagne': emp.est_dans_campagne or bool(lignes_emp),
+            'support': supp,
+            'campagne_active': campagne_active,
+            'visuel_url': visuel_url,
+            'reservation_active': resa_active,
+        })
+
+    # Campagnes actives globales dans le marché
+    campagnes_actives = list(
+        LigneCampagne.objects.filter(
+            Q(emplacement__marche=marche) | Q(support__emplacement__marche=marche),
+            campagne__date_debut__lte=today,
+            campagne__date_fin__gte=today,
+            campagne__statut__in=['en_cours', 'a_venir'],
+        ).select_related('campagne__client', 'emplacement', 'support', 'face').prefetch_related('campagne__visuels').distinct()
+    )
+
+    # Réservations futures dans le marché
+    reservations = list(
+        ReservationLigne.objects.filter(
+            support__emplacement__marche=marche,
+            reservation__date_fin__gte=now,
+            reservation__statut__in=['en_attente', 'confirmee'],
+        ).select_related('reservation__client', 'support', 'face').order_by('reservation__date_debut')
+    )
+
+    # Historique récent
+    historique = list(
+        LigneCampagne.objects.filter(
+            Q(emplacement__marche=marche) | Q(support__emplacement__marche=marche),
+            campagne__date_fin__lt=today,
+        ).select_related('campagne__client', 'emplacement', 'support', 'face').order_by('-campagne__date_fin')[:20]
+    )
+
+    # Maintenances dans le marché
+    maintenances = list(
+        Maintenance.objects.filter(
+            support__emplacement__marche=marche
+        ).select_related('support', 'effectue_par', 'face').order_by('-date_intervention')[:20]
+    )
+
+    # Photos
+    photos = []
+    for emp_d in emplacements_data:
+        supp = emp_d['support']
+        if supp and supp.photo_principale:
+            photos.append({'url': supp.photo_principale.url, 'label': f"Support {supp.code} (Emplacement {emp_d['code']})"})
+        if emp_d.get('visuel_url'):
+            photos.append({'url': emp_d['visuel_url'], 'label': f"Visuel Actif — Emplacement {emp_d['code']}"})
+
+    for m in maintenances:
+        if m.photo:
+            photos.append({'url': m.photo.url, 'label': f"Maintenance Support {m.support.code} ({m.date_intervention.strftime('%d/%m/%Y')})"})
+
+    return {
+        'marche': marche,
+        'today': today,
+        'info_rows': info_rows,
+        'emplacements_data': emplacements_data,
+        'campagnes_actives': campagnes_actives,
+        'reservations': reservations,
+        'historique': historique,
+        'maintenances': maintenances,
+        'photos': photos,
+    }
+
+
+class ExportMarchePdfView(ClientStaffRequiredMixin, View):
+    """Télécharge la fiche et le rapport détaillé d'un Marché en PDF."""
+    def get(self, request, pk=None):
+        from inventory.models import Marche
+        marche = get_object_or_404(Marche, pk=pk)
+        context = _build_context_marche_detail(marche, request=request)
+        html_string = render_to_string(
+            "reports/marche_detail_pdf.html",
+            context,
+            request=request,
+        )
+        pdf = HTML(
+            string=html_string,
+            base_url=request.build_absolute_uri(),
+        ).write_pdf()
+
+        filename = f"rapport_marche_{marche.pk}_{datetime.datetime.now():%Y%m%d_%H%M%S}.pdf"
+        response = HttpResponse(pdf, content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
+
+
+class PreviewMarchePdfView(ClientStaffRequiredMixin, View):
+    """Prévisualise le rapport détaillé du Marché dans le navigateur."""
+    def get(self, request, pk=None):
+        from inventory.models import Marche
+        marche = get_object_or_404(Marche, pk=pk)
+        context = _build_context_marche_detail(marche, request=request)
+        return render(
+            request,
+            "reports/apercu_marche_detail.html",
+            context,
+        )
+
+
+# ══════════════════════════════════════════════════════════════════
+# RAPPORT DÉTAILLÉ D'EMPLACEMENT (PDF & APERÇU)
+# ══════════════════════════════════════════════════════════════════
+
+def _build_context_emplacement_detail(emplacement, request=None):
+    """
+    Construit le contexte complet pour la fiche et le rapport détaillé d'un Emplacement :
+    caractéristiques, marché parent, panneau installé, campagnes, réservations et maintenances.
+    """
+    from django.db.models import Q
+    from django.utils import timezone
+    from inventory.models import Support, Maintenance
+    from campaigns.models import LigneCampagne, ReservationLigne
+
+    today = timezone.now().date()
+    now = timezone.now()
+    marche = emplacement.marche
+    support = getattr(emplacement, 'support_installe', None)
+
+    info_rows = [
+        ('Code Emplacement', emplacement.code),
+        ('Marché Commercial', marche.nom),
+        ('Ville', marche.ville or '—'),
+        ('Quartier', marche.quartier or '—'),
+        ('Adresse du Marché', marche.adresse or '—'),
+        ('Coordonnées GPS Marché', f"{marche.latitude}, {marche.longitude}" if marche.latitude and marche.longitude else '—'),
+        ('Rayon / Périmètre', f"{marche.rayon_metres} mètres"),
+        ('Disponibilité Support', 'Libre (aucun panneau installé)' if emplacement.is_libre() else f"Installé : {support.code} ({support.nom})"),
+        ('Statut Publicitaire', 'En campagne active' if emplacement.est_dans_campagne else 'Disponible / Hors campagne'),
+        ('Date Création', emplacement.created_at.strftime('%d/%m/%Y') if emplacement.created_at else '—'),
+    ]
+
+    support_info_rows = []
+    faces_data = []
+    if support:
+        support_info_rows = [
+            ('Code Support', support.code),
+            ('Nom du Support', support.nom),
+            ('Typologie', support.get_type_support_display()),
+            ('Format Réseau', support.get_format_display() or support.format or 'Standard'),
+            ('Dimensions (L × H)', support.dimensions or 'Standard'),
+            ('Superficie', f"{support.surface_m2} m²" if support.surface_m2 else '—'),
+            ('État Opérationnel', support.get_etat_display()),
+            ('Date d\'Installation', support.date_installation.strftime('%d/%m/%Y') if support.date_installation else '—'),
+        ]
+        if getattr(support, 'code_mairie', None):
+            support_info_rows.insert(1, ('Code Mairie', support.code_mairie))
+
+        for face in support.faces.all():
+            faces_data.append({
+                'face': face,
+                'label': face.label,
+                'eclairage': face.get_eclairage_display(),
+                'statut': face.get_statut(),
+                'photo': face.photo,
+                'notes': face.notes,
+            })
+
+    # Campagnes actives
+    q_filter = Q(emplacement=emplacement)
+    if support:
+        q_filter |= Q(support=support)
+
+    lignes_actives = list(
+        LigneCampagne.objects.filter(
+            q_filter,
+            campagne__date_debut__lte=today,
+            campagne__date_fin__gte=today,
+            campagne__statut__in=['en_cours', 'a_venir'],
+        ).select_related('campagne__client', 'face').prefetch_related('campagne__visuels')
+    )
+
+    # Réservations futures
+    reservations = []
+    if support:
+        reservations = list(
+            ReservationLigne.objects.filter(
+                support=support,
+                reservation__date_fin__gte=now,
+                reservation__statut__in=['en_attente', 'confirmee'],
+            ).select_related('reservation__client', 'face').order_by('reservation__date_debut')
+        )
+
+    # Historique des campagnes
+    historique = list(
+        LigneCampagne.objects.filter(
+            q_filter,
+            campagne__date_fin__lt=today,
+        ).select_related('campagne__client', 'face').order_by('-campagne__date_fin')[:15]
+    )
+
+    # Maintenances
+    maintenances = []
+    if support:
+        maintenances = list(
+            support.maintenances.select_related('effectue_par', 'face').order_by('-date_intervention')[:15]
+        )
+
+    # Photos
+    photos = []
+    if support and support.photo_principale:
+        photos.append({'url': support.photo_principale.url, 'label': 'Photo Principale du Support'})
+    for f in faces_data:
+        if f['photo']:
+            photos.append({'url': f['photo'].url, 'label': f"Face {f['label']} — Structure"})
+    for l in lignes_actives:
+        if l.visuel:
+            photos.append({'url': l.visuel.url, 'label': f"Visuel — {l.campagne.nom}"})
+        elif l.campagne.visuels.exists():
+            photos.append({'url': l.campagne.visuels.first().fichier.url, 'label': f"Visuel — {l.campagne.nom}"})
+    for m in maintenances:
+        if m.photo:
+            photos.append({'url': m.photo.url, 'label': f"Maintenance du {m.date_intervention.strftime('%d/%m/%Y')}"})
+
+    return {
+        'emplacement': emplacement,
+        'marche': marche,
+        'support': support,
+        'today': today,
+        'info_rows': info_rows,
+        'support_info_rows': support_info_rows,
+        'faces_data': faces_data,
+        'lignes_actives': lignes_actives,
+        'reservations': reservations,
+        'historique': historique,
+        'maintenances': maintenances,
+        'photos': photos,
+    }
+
+
+class ExportEmplacementPdfView(ClientStaffRequiredMixin, View):
+    """Télécharge la fiche et le rapport détaillé d'un Emplacement en PDF."""
+    def get(self, request, pk=None):
+        from inventory.models import Emplacement
+        emplacement = get_object_or_404(Emplacement, pk=pk)
+        context = _build_context_emplacement_detail(emplacement, request=request)
+        html_string = render_to_string(
+            "reports/emplacement_detail_pdf.html",
+            context,
+            request=request,
+        )
+        pdf = HTML(
+            string=html_string,
+            base_url=request.build_absolute_uri(),
+        ).write_pdf()
+
+        filename = f"rapport_emplacement_{emplacement.code}_{datetime.datetime.now():%Y%m%d_%H%M%S}.pdf"
+        response = HttpResponse(pdf, content_type="application/pdf")
+        response["Content-Disposition"] = f'attachment; filename="{filename}"'
+        return response
+
+
+class PreviewEmplacementPdfView(ClientStaffRequiredMixin, View):
+    """Prévisualise le rapport détaillé de l'Emplacement dans le navigateur."""
+    def get(self, request, pk=None):
+        from inventory.models import Emplacement
+        emplacement = get_object_or_404(Emplacement, pk=pk)
+        context = _build_context_emplacement_detail(emplacement, request=request)
+        return render(
+            request,
+            "reports/apercu_emplacement_detail.html",
+            context,
+        )
+
+

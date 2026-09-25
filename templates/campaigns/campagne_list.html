@@ -251,7 +251,9 @@
               <th>{% sortable_th sort_links sort_key sort_dir 'date_debut' 'Période' %}</th>
               <th>{% sortable_th sort_links sort_key sort_dir 'nb_supports' 'Supports' %}</th>
               <th>{% sortable_th sort_links sort_key sort_dir 'type_support' 'Type' %}</th>
+              <!--
               <th>Spots</th>
+              -->
               {% if user.is_admin %}
                 <th>{% sortable_th sort_links sort_key sort_dir 'actif' 'Archivée' %}</th>
               {% endif %}
@@ -273,9 +275,6 @@
               {# Client #}
               <td>
                 <div class="d-flex align-items-center gap-2">
-                  <div class="mx-avatar">
-                    {{ c.client.nom|slice:":1"|upper }}
-                  </div>
                   <div>
                     <div class="fw-bold text-dark" style="font-size:0.84rem;">{{ c.client.nom }}</div>
                   </div>
@@ -317,7 +316,13 @@
               {# Supports #}
               <td>
                 <span class="badge bg-light text-secondary border font-monospace" style="font-size:0.75rem;">
-                  {{ c.nb_supports }} support{{ c.nb_supports|pluralize }}
+                  {% if c.type_support == 'ecran' %}
+                    {{ c.calculer_nombre_spots|default:"—" }} spots/{{ c.nb_supports }} écran{{ c.nb_supports|pluralize }}
+                  {% elif c.type_support == 'marche' %}
+                    {{ c.nb_supports }} marché{{ c.nb_supports|pluralize }}
+                  {% else %}
+                  {{ c.calculer_nombre_spots|default:"—" }} face{{c.calculer_nombre_spots|pluralize }}/{{ c.nb_supports }} support{{ c.nb_supports|pluralize }}
+                  {% endif %}
                 </span>
               </td>
 
@@ -326,30 +331,33 @@
                 <a href="{% url 'campagne_detail' c.pk %}" class="text-decoration-none" title="{{ c.get_type_support_display }}">
                   {% if c.est_mere %}
                     <span class="badge bg-primary-subtle text-primary border border-primary-subtle" style="font-size:0.72rem;">
-                      <i class="bi bi-diagram-3 me-1"></i>Mère
+                      <i class="bi bi-diagram-3 me-1"></i>
                     </span>
                   {% elif c.type_support == 'ecran' %}
                     <span class="badge bg-info-subtle text-info border border-info-subtle" style="font-size:0.72rem;">
-                      <i class="bi bi-display me-1"></i>Écran
+                      <i class="bi bi-display me-1"></i>
                     </span>
                   {% elif c.type_support == 'marche' %}
                     <span class="badge bg-warning-subtle text-warning border border-warning-subtle" style="font-size:0.72rem;">
-                      <i class="bi bi-shop me-1"></i>Marché
+                      <i class="bi bi-shop me-1"></i>
                     </span>
                   {% else %}
                     <span class="badge bg-danger-subtle text-danger border border-danger-subtle" style="font-size:0.72rem;">
-                      <i class="bi bi-sign-merge-right me-1"></i>Panneau
+                      <i class="bi bi-sign-merge-right me-1"></i>
                     </span>
                   {% endif %}
                 </a>
               </td>
 
               {# Spots #}
+              <!--
               <td>
                 <span class="font-monospace fw-bold text-dark" style="font-size:0.84rem;">
                   {{ c.calculer_nombre_spots|default:"—" }}
                 </span>
               </td>
+              -->
+              
 
               {# Actif / Archivé #}
               {% if user.is_admin %}
@@ -373,6 +381,9 @@
                     <i class="bi bi-pencil"></i>
                   </a>
                   {% endif %}
+                  <a href="{% url 'campagne_preview' c.pk %}" class="btn btn-sm btn-outline-view btn-action-icon" title="Aperçu de la campagne">
+                    <i class="bi bi-download"></i>
+                  </a>
                 </div>
               </td>
 

@@ -1,0 +1,676 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <title>Rapport Détaillé — {{ support.code }} — {{ support.nom }}</title>
+    <style>
+        :root {
+            --color-primary:   #932e2b;
+            --color-secondary: #1e40af;
+            --color-noir:      #0f172a;
+            --bg:              #f8fafc;
+            --bg-card:         #ffffff;
+            --bg-card2:        #f1f5f9;
+            --border:          #cbd5e1;
+            --border-light:    #e2e8f0;
+            --text:            #1e293b;
+            --text-muted:      #64748b;
+        }
+
+        @page {
+            size: A4 portrait;
+            margin: 1.2cm 1cm;
+            @bottom-center {
+                content: "Fiche Technique & Preuve d'Exploitation Réseau — Integral GeoAD ERP — Page " counter(page) " / " counter(pages);
+                font-family: 'Segoe UI', Arial, Helvetica, sans-serif;
+                font-size: 7.2pt;
+                color: #64748b;
+            }
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Segoe UI', Arial, Helvetica, sans-serif;
+            font-size: 8.5pt;
+            color: #1e293b;
+            background: #ffffff;
+            line-height: 1.35;
+        }
+
+        /* ── Filigrane de sécurité ── */
+        .watermarked::before {
+            content: "";
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-35deg);
+            width: 440px;
+            height: 440px;
+            background-image: url("{% static 'img/logo.png' %}");
+            background-size: contain;
+            background-repeat: no-repeat;
+            background-position: center;
+            opacity: 0.05;
+            z-index: 1000;
+            pointer-events: none;
+        }
+
+        /* ══════════════════════════════════
+           EN-TÊTE DU DOCUMENT
+        ══════════════════════════════════ */
+        .doc-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
+            padding-bottom: 10px;
+            border-bottom: 2.5px solid var(--color-primary);
+        }
+        .doc-header-logo {
+            margin-right: 14px;
+            display: flex;
+            align-items: center;
+        }
+        .doc-logo {
+            height: 48px;
+            width: auto;
+            object-fit: contain;
+        }
+        .doc-header-center {
+            flex: 1;
+            text-align: center;
+        }
+        .doc-brand {
+            font-size: 7.5pt;
+            font-weight: 800;
+            color: var(--color-primary);
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            margin-bottom: 2px;
+        }
+        .doc-title {
+            font-size: 12.5pt;
+            font-weight: 800;
+            color: #0f172a;
+            text-transform: uppercase;
+            line-height: 1.2;
+            letter-spacing: -0.2px;
+        }
+        .doc-subtitle {
+            font-size: 8pt;
+            font-weight: 700;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+        .doc-header-right {
+            text-align: right;
+            font-size: 7.2pt;
+            color: var(--text-muted);
+            line-height: 1.55;
+        }
+
+        /* ══════════════════════════════════
+           BANDEAU SECTION
+        ══════════════════════════════════ */
+        .section-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin: 11px 0 6px 0;
+            background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary) 100%);
+            border-radius: 4px;
+            padding: 4px 10px;
+            page-break-inside: avoid;
+        }
+        .section-title {
+            font-size: 8.2pt;
+            font-weight: 800;
+            color: #ffffff;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+        }
+        .section-meta {
+            font-size: 7pt;
+            color: rgba(255,255,255,0.95);
+            font-family: monospace;
+            font-weight: 700;
+        }
+
+        .subsection-title {
+            font-size: 7.8pt;
+            font-weight: 800;
+            color: #0f172a;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+            margin: 8px 0 4px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* ══════════════════════════════════
+           GRILLES D'INFORMATIONS
+        ══════════════════════════════════ */
+        .fiche {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            margin-bottom: 5px;
+        }
+        .fiche-bloc {
+            flex: 1;
+            min-width: 47%;
+            background: #f8fafc;
+            border: 1px solid var(--border-light);
+            border-radius: 4px;
+            padding: 5px 8px;
+        }
+        .fiche-bloc.full {
+            min-width: 100%;
+            flex: none;
+            width: 100%;
+        }
+        .fiche-label {
+            font-size: 6.2pt;
+            font-weight: 800;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 1px;
+        }
+        .fiche-value {
+            font-size: 8.2pt;
+            color: #0f172a;
+            font-weight: 700;
+        }
+        .fiche-value.muted {
+            font-weight: normal;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        /* ── Badges ── */
+        .badge {
+            display: inline-block;
+            font-size: 6.8pt;
+            font-weight: 800;
+            border-radius: 4px;
+            padding: 2px 6px;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            border: 1px solid transparent;
+        }
+        .badge-bon          { background: #dcfce7; color: #166534; border-color: #bbf7d0; }
+        .badge-maintenance  { background: #fef3c7; color: #92400e; border-color: #fcd34d; }
+        .badge-panne        { background: #fee2e2; color: #991b1b; border-color: #fecaca; }
+        .badge-libre        { background: #dcfce7; color: #166534; border-color: #bbf7d0; }
+        .badge-occupe       { background: #fee2e2; color: #991b1b; border-color: #fecaca; }
+        .badge-reserve      { background: #ede9fe; color: #5b21b6; border-color: #c4b5fd; }
+        .badge-en_cours     { background: #dcfce7; color: #166534; border-color: #bbf7d0; }
+        .badge-a_venir      { background: #ede9fe; color: #5b21b6; border-color: #c4b5fd; }
+        .badge-termine      { background: #f1f5f9; color: #475569; border-color: #cbd5e1; }
+
+        /* ══════════════════════════════════
+           TABLEAUX
+        ══════════════════════════════════ */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+            font-size: 7.8pt;
+            margin-top: 3px;
+            margin-bottom: 5px;
+        }
+
+        thead tr th {
+            background-color: #0f172a;
+            color: #ffffff;
+            font-size: 7pt;
+            font-weight: 800;
+            text-align: center;
+            padding: 4px 5px;
+            border: 0.5px solid #334155;
+            text-transform: uppercase;
+            letter-spacing: 0.4px;
+        }
+        thead tr th.left { text-align: left; padding-left: 7px; }
+        thead { display: table-header-group; }
+
+        tbody tr td {
+            padding: 4px 5px;
+            border: 0.5px solid var(--border-light);
+            vertical-align: middle;
+            text-align: center;
+            font-size: 7.5pt;
+        }
+        tbody tr td.left { text-align: left; padding-left: 7px; }
+
+        tbody tr:nth-child(even) { background-color: #f8fafc; }
+        tbody tr:nth-child(odd)  { background-color: #ffffff; }
+
+        .face-tag {
+            font-size: 6.8pt;
+            font-weight: 800;
+            color: var(--color-primary);
+            background-color: rgba(147, 46, 43, 0.08);
+            border: 0.5px solid rgba(147, 46, 43, 0.25);
+            border-radius: 4px;
+            padding: 2px 5px;
+            font-family: monospace;
+        }
+
+        /* ══════════════════════════════════
+           CARTES VISUELS DE DIFFUSION
+        ══════════════════════════════════ */
+        .diffusion-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 7px;
+            margin-top: 4px;
+            margin-bottom: 6px;
+            page-break-inside: avoid;
+        }
+        .diffusion-card {
+            flex: 1;
+            min-width: 47%;
+            background: #ffffff;
+            border: 1px solid var(--border-light);
+            border-radius: 4px;
+            padding: 7px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.03);
+        }
+        .diffusion-card-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 5px;
+            padding-bottom: 3px;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .diffusion-img-box {
+            height: 110px;
+            background: #f1f5f9;
+            border: 0.5px solid #cbd5e1;
+            border-radius: 3px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 5px;
+        }
+        .diffusion-img-box img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        .diffusion-img-placeholder {
+            color: #94a3b8;
+            font-size: 7.2pt;
+            text-align: center;
+            padding: 8px;
+            font-style: italic;
+        }
+
+        /* ══════════════════════════════════
+           GALERIE & PHOTOS
+        ══════════════════════════════════ */
+        .photo-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 7px;
+            margin-top: 4px;
+            page-break-inside: avoid;
+        }
+        .photo-card {
+            flex: 1;
+            min-width: 30%;
+            max-width: 32%;
+            background: #f8fafc;
+            border: 1px solid var(--border-light);
+            border-radius: 4px;
+            padding: 5px;
+            text-align: center;
+        }
+        .photo-card img {
+            width: 100%;
+            height: 100px;
+            object-fit: cover;
+            border-radius: 3px;
+            border: 0.5px solid #cbd5e1;
+        }
+        .photo-card-label {
+            font-size: 6.5pt;
+            font-weight: 700;
+            color: #334155;
+            margin-top: 3px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .section-note {
+            font-size: 6.8pt;
+            color: var(--text-muted);
+            font-style: italic;
+            margin-top: 4px;
+            text-align: right;
+        }
+    </style>
+</head>
+<body class="watermarked">
+
+<!-- ══════════════════════════════════════════
+     EN-TÊTE OFFICIEL
+════════════════════════════════════════════ -->
+<div class="doc-header">
+    <div class="doc-header-logo">
+        <img src="{% static 'img/logo.png' %}" alt="Logo" class="doc-logo">
+    </div>
+    <div class="doc-header-center">
+        <div class="doc-brand">Rapport Technique & Commercial d'Exploitation</div>
+        <div class="doc-title">{{ support.nom }}</div>
+        <div class="doc-subtitle">Code Réseau : {{ support.code }} · {{ support.get_type_support_display }}</div>
+    </div>
+    <div class="doc-header-right">
+        Réf. : <strong>{{ support.code }}</strong><br>
+        Date d'émission : <strong>{{ today|date:"d/m/Y" }}</strong><br>
+        Ville : <strong>{{ support.ville|default:"—" }}</strong><br>
+        Statut : <strong>{{ support.get_etat_display }}</strong>
+    </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SECTION 1 — FICHE TECHNIQUE COMPLÈTE
+════════════════════════════════════════════ -->
+<div class="section-header">
+    <span class="section-title">1. Fiche Technique Complète & Implantation</span>
+    <span class="section-meta">{{ support.code }}</span>
+</div>
+
+<div class="fiche">
+    {% for label, val in info_rows %}
+    <div class="fiche-bloc">
+        <div class="fiche-label">{{ label }}</div>
+        <div class="fiche-value">{{ val }}</div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- ══════════════════════════════════════════
+     SECTION 2 — DIFFUSIONS EN COURS & VISUELS
+════════════════════════════════════════════ -->
+{% if support.type_support == 'panneau' %}
+<div class="section-header">
+    <span class="section-title">2. Diffusions en Cours & Visuels Actifs (Faces)</span>
+    <span class="section-meta">{{ faces_data|length }} Face{{ faces_data|length|pluralize }}</span>
+</div>
+
+<div class="diffusion-grid">
+    {% for f in faces_data %}
+    <div class="diffusion-card">
+        <div class="diffusion-card-head">
+            <span class="face-tag">FACE {{ f.label }}</span>
+            <span class="badge badge-{{ f.statut }}">
+                {% if f.statut == 'libre' %}Disponible{% elif f.statut == 'reserve' %}Réservée{% elif f.statut == 'occupe' %}Occupée{% else %}En panne{% endif %}
+            </span>
+        </div>
+        
+        <div class="diffusion-img-box">
+            {% if f.visuel_actif %}
+                {% with vn=f.visuel_actif.fichier.name|lower %}
+                    {% if "mp4" in vn or "webm" in vn %}
+                        <div class="diffusion-img-placeholder">🎬 Fichier Vidéo : {{ f.visuel_actif.fichier.name }}</div>
+                    {% else %}
+                        <img src="{{ f.visuel_actif.fichier.url }}" alt="Visuel Face {{ f.label }}">
+                    {% endif %}
+                {% endwith %}
+            {% elif f.photo %}
+                <img src="{{ f.photo.url }}" alt="Photo Face {{ f.label }}">
+            {% else %}
+                <div class="diffusion-img-placeholder">Aucun visuel de campagne actif (Face disponible)</div>
+            {% endif %}
+        </div>
+
+        <div style="font-size:7.5pt; line-height:1.4;">
+            {% if f.campagne %}
+                <div><strong>Annonceur :</strong> {{ f.campagne.client.nom }}</div>
+                <div><strong>Campagne :</strong> {{ f.campagne.nom }} ({{ f.campagne.reference }})</div>
+                <div><strong>Période :</strong> <span style="font-family:monospace;">{{ f.campagne.date_debut|date:"d/m/Y" }} → {{ f.campagne.date_fin|date:"d/m/Y" }}</span></div>
+            {% elif f.reservation %}
+                <div><strong>Réservation :</strong> {{ f.reservation.client.nom }}</div>
+                <div><strong>Période :</strong> <span style="font-family:monospace;">{{ f.reservation.date_debut|date:"d/m/Y" }} → {{ f.reservation.date_fin|date:"d/m/Y" }}</span></div>
+            {% else %}
+                <div style="color:#059669; font-weight:700;">✓ Face libre — Disponible pour réservation</div>
+            {% endif %}
+            <div style="font-size:6.8pt; color:#64748b; margin-top:2px;">
+                Éclairage : {{ f.eclairage }}{% if f.notes %} · Notes : {{ f.notes }}{% endif %}
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% elif support.type_support == 'ecran' %}
+<div class="section-header">
+    <span class="section-title">2. Télémétrie DOOH & Diffusions Numériques en Cours</span>
+    <span class="section-meta">{{ spots_data|length }} spot{{ spots_data|length|pluralize }} actif{{ spots_data|length|pluralize }}</span>
+</div>
+
+<table>
+    <thead>
+        <tr>
+            <th class="left" style="width:4.5cm;">ANNONCEUR & CAMPAGNE</th>
+            <th>DURÉE DU SPOT</th>
+            <th>FRÉQUENCE</th>
+            <th>PASSAGES / HEURE</th>
+            <th>PÉRIODE DE DIFFUSION</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for sp in spots_data %}
+        <tr>
+            <td class="left">
+                <strong>{{ sp.client.nom }}</strong><br>
+                <span style="font-size:7pt; color:#64748b;">{{ sp.campagne.nom }}</span>
+            </td>
+            <td><strong>{{ sp.duree }}s</strong></td>
+            <td>Toutes les {{ sp.freq }}s</td>
+            <td><strong>{{ sp.passages_heure }} / h</strong></td>
+            <td style="font-family:monospace; font-size:7.2pt;">
+                {{ sp.campagne.date_debut|date:"d/m/Y" }} → {{ sp.campagne.date_fin|date:"d/m/Y" }}
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="5" style="text-align:center; color:#64748b; padding:8px; font-style:italic;">
+                Aucun spot actif actuellement sur cet écran LED.
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
+<!-- ══════════════════════════════════════════
+     SECTION 3 — CAMPAGNES & PLANNING COMPLET
+════════════════════════════════════════════ -->
+<div class="section-header">
+    <span class="section-title">3. Campagnes & Planning des Réservations</span>
+    <span class="section-meta">{{ lignes_actives|length }} Active{{ lignes_actives|length|pluralize }} · {{ reservations|length }} Réservation{{ reservations|length|pluralize }}</span>
+</div>
+
+<!-- 3.1 Campagnes Actives -->
+<div class="subsection-title">► Campagnes Actuellement en Cours de Diffusion</div>
+<table>
+    <thead>
+        <tr>
+            <th style="width:2cm;">RÉFÉRENCE</th>
+            <th class="left" style="width:3.8cm;">ANNONCEUR</th>
+            <th class="left" style="width:4.5cm;">CAMPAGNE</th>
+            <th style="width:3.5cm;">PÉRIODE</th>
+            <th style="width:1.5cm;">FACE</th>
+            <th style="width:2cm;">STATUT</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for l in lignes_actives %}
+        <tr>
+            <td style="font-family:monospace; font-weight:700;">{{ l.campagne.reference }}</td>
+            <td class="left"><strong>{{ l.campagne.client.nom }}</strong></td>
+            <td class="left">{{ l.campagne.nom }}</td>
+            <td style="font-family:monospace; font-size:7.2pt;">{{ l.campagne.date_debut|date:"d/m/Y" }} → {{ l.campagne.date_fin|date:"d/m/Y" }}</td>
+            <td>{% if l.face %}<span class="face-tag">Face {{ l.face.label }}</span>{% else %}—{% endif %}</td>
+            <td><span class="badge badge-en_cours">En cours</span></td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="6" style="text-align:center; color:#64748b; padding:6px; font-style:italic;">
+                Aucune campagne active actuellement sur ce support.
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<!-- 3.2 Réservations à venir -->
+{% if reservations %}
+<div class="subsection-title" style="margin-top:8px;">► Réservations Programmées & Confirmées</div>
+<table>
+    <thead>
+        <tr>
+            <th class="left" style="width:4.5cm;">CLIENT / ANNONCEUR</th>
+            <th style="width:4.5cm;">PÉRIODE DE RÉSERVATION</th>
+            <th style="width:2cm;">FACE CONCERNÉE</th>
+            <th>STATUT</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for r in reservations %}
+        <tr>
+            <td class="left"><strong>{{ r.reservation.client.nom }}</strong></td>
+            <td style="font-family:monospace; font-size:7.2pt;">{{ r.reservation.date_debut|date:"d/m/Y H:i" }} → {{ r.reservation.date_fin|date:"d/m/Y H:i" }}</td>
+            <td>{% if r.face %}<span class="face-tag">Face {{ r.face.label }}</span>{% else %}Toutes faces{% endif %}</td>
+            <td><span class="badge badge-reserve">{{ r.reservation.get_statut_display|default:"Réservé" }}</span></td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
+<!-- 3.3 Historique récent -->
+{% if historique %}
+<div class="subsection-title" style="margin-top:8px;">► Historique Récent des Diffusions Archivées</div>
+<table>
+    <thead>
+        <tr>
+            <th style="width:2cm;">RÉFÉRENCE</th>
+            <th class="left" style="width:4cm;">ANNONCEUR</th>
+            <th class="left">CAMPAGNE</th>
+            <th style="width:3.8cm;">PÉRIODE DE DIFFUSION</th>
+            <th style="width:1.5cm;">FACE</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for h in historique %}
+        <tr>
+            <td style="font-family:monospace;">{{ h.campagne.reference }}</td>
+            <td class="left"><strong>{{ h.campagne.client.nom }}</strong></td>
+            <td class="left">{{ h.campagne.nom }}</td>
+            <td style="font-family:monospace; font-size:7.2pt;">{{ h.campagne.date_debut|date:"d/m/Y" }} → {{ h.campagne.date_fin|date:"d/m/Y" }}</td>
+            <td>{% if h.face %}<span class="face-tag">Face {{ h.face.label }}</span>{% else %}—{% endif %}</td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+{% endif %}
+
+<!-- ══════════════════════════════════════════
+     SECTION 4 — SUIVI TECHNIQUE & MAINTENANCE
+════════════════════════════════════════════ -->
+<div class="section-header">
+    <span class="section-title">4. Suivi Technique & Journal de Maintenance</span>
+    <span class="section-meta">{{ maintenances|length }} opération{{ maintenances|length|pluralize }} répertoriée{{ maintenances|length|pluralize }}</span>
+</div>
+
+<table>
+    <thead>
+        <tr>
+            <th style="width:2.8cm;">DATE & HEURE</th>
+            <th style="width:3.2cm;">TECHNICIEN</th>
+            <th style="width:1.6cm;">FACE</th>
+            <th style="width:2.4cm;">ÉTAT RÉSULTANT</th>
+            <th class="left">NATURE DE L'INTERVENTION & COMPTE-RENDU</th>
+        </tr>
+    </thead>
+    <tbody>
+        {% for m in maintenances %}
+        <tr>
+            <td style="font-family:monospace; font-size:7.2pt;">{{ m.date_intervention|date:"d/m/Y H:i" }}</td>
+            <td>{{ m.effectue_par.get_full_name|default:m.effectue_par.username }}</td>
+            <td>{% if m.face %}<span class="face-tag">Face {{ m.face.label }}</span>{% else %}Structure{% endif %}</td>
+            <td>
+                <span class="badge badge-{{ m.etat_apres }}">
+                    {{ m.get_etat_apres_display }}
+                </span>
+            </td>
+            <td class="left" style="font-size:7.2pt;">
+                {{ m.description|default:"Intervention technique et maintenance préventive de routine." }}
+            </td>
+        </tr>
+        {% empty %}
+        <tr>
+            <td colspan="5" style="text-align:center; color:#64748b; padding:8px; font-style:italic;">
+                Aucun incident ni intervention de maintenance répertorié sur ce support.
+            </td>
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+
+<!-- ══════════════════════════════════════════
+     SECTION 5 — GALERIE PHOTOGRAPHIQUE CERTIFIÉE
+════════════════════════════════════════════ -->
+<div class="section-header">
+    <span class="section-title">5. Galerie Photographique du Support</span>
+</div>
+
+<div class="photo-grid">
+    {% if support.photo_principale %}
+    <div class="photo-card">
+        <img src="{{ support.photo_principale.url }}" alt="Photo Principale">
+        <div class="photo-card-label">Photo Principale du Support</div>
+    </div>
+    {% endif %}
+
+    {% for f in faces_data %}
+        {% if f.photo %}
+        <div class="photo-card">
+            <img src="{{ f.photo.url }}" alt="Face {{ f.label }}">
+            <div class="photo-card-label">Face {{ f.label }} — Structure</div>
+        </div>
+        {% elif f.visuel_actif %}
+            <div class="photo-card">
+                <img src="{{ f.visuel_actif.fichier.url }}" alt="Visuel Face {{ f.label }}">
+                <div class="photo-card-label">Face {{ f.label }} — Visuel Actif</div>
+            </div>
+        {% endif %}
+    {% endfor %}
+
+    {% for m in maintenances %}
+        {% if m.photo %}
+        <div class="photo-card">
+            <img src="{{ m.photo.url }}" alt="Maintenance">
+            <div class="photo-card-label">Maintenance {{ m.date_intervention|date:"d/m/Y" }}</div>
+        </div>
+        {% endif %}
+    {% endfor %}
+</div>
+
+<p class="section-note">
+    Document officiel généré automatiquement par la plateforme Integral GeoAD ERP. Certifié conforme aux données techniques et commerciales en vigueur.
+</p>
+
+</body>
+</html>

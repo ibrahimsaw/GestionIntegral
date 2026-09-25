@@ -1,0 +1,368 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>Portefeuille Clients — {{ today|date:"d/m/Y" }}</title>
+  <title>Portefeuille Clients & Campagnes Actives — {{ today|date:"d/m/Y" }}</title>
+  <style>
+    @page {
+      size: A4 landscape;
+      margin: 1.2cm 1cm 1.5cm 1cm;
+      background: #f8fafc;
+      @bottom-center {
+        content: "Document confidentiel — Rapport Global du Portefeuille Clients au {{ today|date:'d/m/Y' }} — Page " counter(page) " / " counter(pages);
+        content: "Document confidentiel — Portefeuille Clients & Campagnes au {{ today|date:'d/m/Y' }} — Page " counter(page) " / " counter(pages);
+        font-size: 7pt;
+        color: #94a3b8;
+        font-family: 'Plus Jakarta Sans', Arial, sans-serif;
+      }
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Plus Jakarta Sans', Arial, sans-serif;
+      font-size: 8pt;
+      color: #0F172A;
+      background: #f8fafc;
+    }
+
+    /* ── En-tête document ── */
+    .doc-header {
+      width: 100%;
+      border-collapse: collapse;
+      background: #ffffff;
+      border-bottom: 3px solid #932e2b;
+      border-radius: 8px 8px 0 0;
+      margin-bottom: 12px;
+    }
+    .doc-header td { padding: 12px 18px; vertical-align: middle; }
+    .doc-logo   { height: 44px; width: auto; object-fit: contain; }
+    .doc-center { text-align: center; }
+    .doc-brand  { font-size: 6.5pt; font-weight: bold; color: #94a3b8; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 3px; }
+    .doc-title  { font-size: 13pt; font-weight: bold; color: #932e2b; text-transform: uppercase; letter-spacing: 0.8px; }
+    .doc-meta   { font-size: 7.5pt; color: #64748b; margin-top: 3px; }
+    .doc-meta strong { color: #932e2b; }
+    .doc-right  { font-size: 7pt; color: #64748b; text-align: right; line-height: 1.7; white-space: nowrap; }
+    .doc-right strong { color: #334155; }
+
+    /* ── KPI Strip ── */
+    .kpi-row {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 8px 0;
+      margin-bottom: 14px;
+    }
+    .kpi-box {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 8px 12px;
+      vertical-align: middle;
+      width: 25%;
+    }
+    .kpi-label { font-size: 6.5pt; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; margin-bottom: 2px; }
+    .kpi-val   { font-size: 15pt; font-weight: bold; line-height: 1; font-family: 'SFMono-Regular', monospace, Arial; }
+    .k-primary .kpi-val { color: #932e2b; }
+    .k-green   .kpi-val { color: #166534; }
+    .k-blue    .kpi-val { color: #2563eb; }
+    .k-orange  .kpi-val { color: #ea580c; }
+
+    .table-container {
+    /* ── Client Block ── */
+    .client-card {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      page-break-inside: avoid;
+      overflow: hidden;
+    }
+    .category-table {
+    .client-header {
+      background: #f1f5f9;
+      border-bottom: 1px solid #cbd5e1;
+      padding: 8px 12px;
+      width: 100%;
+      border-collapse: collapse;
+      background: #ffffff;
+    }
+    col.c-ref    { width: 85px; }
+    col.c-nom    { width: 170px; }
+    col.c-cont   { width: 130px; }
+    col.c-tel    { width: 100px; }
+    col.c-mail   { width: 130px; }
+    col.c-stat   { width: 65px; }
+    col.c-camp   { width: 85px; }
+    col.c-budg   { width: auto; }
+    .client-header td { vertical-align: middle; }
+    .client-title { font-size: 10pt; font-weight: bold; color: #0f172a; }
+    .client-ref {
+      font-family: 'SFMono-Regular', monospace, Arial;
+      font-size: 7.5pt;
+      font-weight: bold;
+      color: #932e2b;
+      background: #fff1f2;
+      border: 1px solid #fecdd3;
+      border-radius: 4px;
+      padding: 2px 6px;
+      display: inline-block;
+      margin-right: 6px;
+    }
+    .client-contacts { font-size: 7pt; color: #475569; margin-top: 3px; }
+    .client-contacts strong { color: #0f172a; }
+
+    thead th {
+    /* ── Campaigns sub-table ── */
+    .camp-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 7.5pt;
+    }
+    .camp-table th {
+      background: #932e2b;
+      color: #ffffff;
+      font-size: 6.5pt;
+      font-weight: bold;
+      padding: 8px 6px;
+      padding: 6px 8px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border: none;
+      vertical-align: middle;
+    }
+    thead th.text-center { text-align: center; }
+    thead th.text-end    { text-align: right; }
+
+    tbody tr {
+    .camp-table td {
+      padding: 6px 8px;
+      border-bottom: 1px solid #f1f5f9;
+      page-break-inside: avoid;
+    }
+    tbody tr:nth-child(even) td { background-color: #fafafa; }
+    tbody td {
+      padding: 6px;
+      vertical-align: middle;
+      font-size: 7.5pt;
+      color: #334155;
+    }
+    .camp-table tr:nth-child(even) td { background-color: #fafafa; }
+
+    .badge-code {
+      font-family: 'SFMono-Regular', monospace, Arial;
+      font-size: 7pt;
+    .badge-status {
+      display: inline-block;
+      font-size: 6.5pt;
+      font-weight: bold;
+      color: #932e2b;
+      background: #fff1f2;
+      border: 1px solid #fecdd3;
+      padding: 2px 5px;
+      border-radius: 4px;
+      padding: 2px 5px;
+    }
+    .bs-en_cours { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
+    .bs-a_venir  { background: #eff6ff; color: #1e40af; border: 1px solid #bfdbfe; }
+    .bs-terminee { background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; }
+
+    .sup-chip {
+      display: inline-block;
+      font-size: 6.5pt;
+      font-weight: 600;
+      padding: 1px 4px;
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 3px;
+      margin: 1px 2px;
+      color: #334155;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- En-tête -->
+  <table class="doc-header">
+    <tr>
+      <td style="width:20%;">
+        <img src="{% static 'images/logo.png' %}" alt="Integral" class="doc-logo">
+      </td>
+      <td class="doc-center" style="width:60%;">
+        <div class="doc-brand">Régie Publicitaire — Gestion Intégrale</div>
+        <div class="doc-title">Rapport Global du Portefeuille Clients</div>
+        <div class="doc-title">Rapport Consolidé du Portefeuille Clients</div>
+        <div class="doc-meta">
+          Inventaire consolidé des comptes annonceurs · Arrêté au <strong>{{ today|date:"d/m/Y" }}</strong>
+          Synthèse détaillée des annonceurs & campagnes associées · Arrêté au <strong>{{ today|date:"d/m/Y" }}</strong>
+        </div>
+      </td>
+      <td class="doc-right" style="width:20%;">
+        <strong>Portefeuille CRM</strong><br>
+        {{ total_clients }} Annonceur{{ total_clients|pluralize }} répertorié{{ total_clients|pluralize }}<br>
+        {{ total_clients_actifs }} Comptes actifs
+        {{ total_clients }} Compte{{ total_clients|pluralize }} client{{ total_clients|pluralize }}<br>
+        {{ total_campagnes_actives }} Campagne{{ total_campagnes_actives|pluralize }} active{{ total_campagnes_actives|pluralize }}
+      </td>
+    </tr>
+  </table>
+
+  <!-- KPI Strip -->
+  <table class="kpi-row">
+    <tr>
+      <td class="kpi-box k-primary">
+        <div class="kpi-label">Total Annonceurs</div>
+        <div class="kpi-val">{{ total_clients }}</div>
+      </td>
+      <td class="kpi-box k-green">
+        <div class="kpi-label">Clients Actifs</div>
+        <div class="kpi-val">{{ total_clients_actifs }}</div>
+      </td>
+      <td class="kpi-box k-orange">
+        <div class="kpi-label">Campagnes en Cours</div>
+        <div class="kpi-val">{{ total_campagnes_actives }}</div>
+      </td>
+      <td class="kpi-box k-blue">
+        <div class="kpi-label">Volume d'Affaires Cumulé</div>
+        <div class="kpi-label">Volume d'Affaires Engagé</div>
+        <div class="kpi-val" style="font-size:12pt;">{{ total_budget_global|floatformat:0 }} FCFA</div>
+      </td>
+    </tr>
+  </table>
+
+  <!-- Tableau consolidé -->
+  <div class="table-container">
+    <table class="category-table">
+      <colgroup>
+        <col class="c-ref">
+        <col class="c-nom">
+        <col class="c-cont">
+        <col class="c-tel">
+        <col class="c-mail">
+        <col class="c-stat">
+        <col class="c-camp">
+        <col class="c-budg">
+      </colgroup>
+  <!-- Liste des clients et leurs campagnes -->
+  {% for c in clients %}
+  <div class="client-card">
+    <table class="client-header">
+      <tr>
+        <td style="width:65%;">
+          <span class="client-ref">{{ c.reference }}</span>
+          <span class="client-title">{{ c.nom }}</span>
+          {% if c.actif %}
+            <span style="color:#166534; font-weight:bold; font-size:6.8pt; margin-left:6px;">● Actif</span>
+          {% else %}
+            <span style="color:#94a3b8; font-size:6.8pt; margin-left:6px;">● Inactif</span>
+          {% endif %}
+          <div class="client-contacts">
+            <strong>Contact :</strong> {{ c.contact_nom }} · 
+            <strong>Tél :</strong> {{ c.telephone }} · 
+            <strong>Email :</strong> {{ c.email }}
+            {% if c.adresse and c.adresse != '—' %} · <strong>Adresse :</strong> {{ c.adresse }}{% endif %}
+          </div>
+        </td>
+        <td style="width:35%; text-align:right;">
+          <div style="font-size:7.5pt; color:#475569;">
+            <strong>{{ c.nb_campagnes_actives }}</strong> active{{ c.nb_campagnes_actives|pluralize }} · 
+            <strong>{{ c.nb_campagnes_total }}</strong> au total
+          </div>
+          <div style="font-size:8.5pt; font-weight:bold; color:#932e2b; margin-top:2px;">
+            Total : {{ c.budget_total|floatformat:0 }} FCFA
+          </div>
+        </td>
+      </tr>
+    </table>
+
+    {% if c.campagnes %}
+    <table class="camp-table">
+      <thead>
+        <tr>
+          <th>Réf. Client</th>
+          <th>Raison Sociale / Nom</th>
+          <th>Contact</th>
+          <th>Téléphone</th>
+          <th>Email</th>
+          <th class="text-center">Statut</th>
+          <th class="text-center">Campagnes</th>
+          <th class="text-end">Volume Total</th>
+          <th style="width:75px;">Réf.</th>
+          <th style="width:140px;">Nom Campagne</th>
+          <th style="width:85px;">Type</th>
+          <th style="width:125px;">Période</th>
+          <th style="width:75px; text-align:center;">Statut</th>
+          <th>Supports & Emplacements Assignés</th>
+          <th style="width:105px; text-align:right;">Budget (FCFA)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for c in clients %}
+        {% for cmp in c.campagnes %}
+        <tr>
+          <td><span class="badge-code">{{ c.reference }}</span></td>
+          <td><strong style="font-family:'SFMono-Regular', monospace; font-size:7pt; color:#932e2b;">{{ cmp.reference }}</strong></td>
+          <td><strong>{{ cmp.nom }}</strong></td>
+          <td>{{ cmp.type_support }}</td>
+          <td>
+            <strong>{{ c.nom }}</strong><br>
+            <span style="font-size:6.8pt; color:#64748b;">{{ c.adresse|default:"—" }}</span>
+            {{ cmp.date_debut|date:"d/m/Y" }} → {{ cmp.date_fin|date:"d/m/Y" }}
+            {% if cmp.duree_jours %}<span style="font-size:6.5pt; color:#64748b;">({{ cmp.duree_jours }}j)</span>{% endif %}
+          </td>
+          <td>{{ c.contact_nom }}</td>
+          <td>{{ c.telephone }}</td>
+          <td>{{ c.email }}</td>
+          <td style="text-align:center;">
+            {% if c.actif %}
+              <span style="color:#059669; font-weight:bold;">Actif</span>
+            {% if cmp.statut == 'en_cours' %}
+              <span class="badge-status bs-en_cours">En cours</span>
+            {% elif cmp.statut == 'a_venir' %}
+              <span class="badge-status bs-a_venir">À venir</span>
+            {% else %}
+              <span style="color:#94a3b8;">Inactif</span>
+              <span class="badge-status bs-terminee">{{ cmp.statut_display }}</span>
+            {% endif %}
+          </td>
+          <td style="text-align:center;">
+            <strong>{{ c.nb_campagnes_actives }}</strong> en cours<br>
+            <span style="font-size:6.5pt; color:#64748b;">({{ c.nb_campagnes_total }} tot.)</span>
+          <td>
+            {% for s in cmp.supports %}
+              <span class="sup-chip">{{ s.code }} ({{ s.ville }}{% if s.quartier %}, {{ s.quartier }}{% endif %})</span>
+            {% empty %}
+              <span style="font-size:6.5pt; color:#94a3b8; font-style:italic;">Aucun support alloué</span>
+            {% endfor %}
+          </td>
+          <td style="text-align:right;">
+            <strong style="color:#932e2b;">{{ c.budget_total|floatformat:0 }} FCFA</strong>
+          <td style="text-align:right; font-weight:bold; color:#0f172a;">
+            {{ cmp.montant|floatformat:0 }}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="8" style="text-align:center; padding:20px; color:#94a3b8;">
+            Aucun client trouvé.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div style="padding:10px 14px; color:#94a3b8; font-style:italic; font-size:7.5pt;">
+      Aucune campagne enregistrée pour ce client.
+    </div>
+    {% endif %}
+  </div>
+  {% empty %}
+  <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:8px; padding:30px; text-align:center; color:#94a3b8;">
+    Aucun client ne correspond aux critères.
+  </div>
+  {% endfor %}
+
+</body>
+</html>
+

@@ -8,20 +8,7 @@
 {% endblock %}
 
 {% block topbar_actions %}
-  <div class="d-flex flex-wrap gap-2">
-    <a href="{% url 'supports_export_pdf' %}?{{ request.GET.urlencode }}" class="btn btn-outline-danger btn-sm shadow-sm px-3 d-flex align-items-center gap-1" style="border-radius:8px; font-weight:600;">
-      <i class="bi bi-file-earmark-pdf"></i>
-      <span class="d-none d-md-inline">Export PDF</span>
-    </a>
-    <a href="{% url 'supports_export_excel' %}?{{ request.GET.urlencode }}" class="btn btn-outline-success btn-sm shadow-sm px-3 d-flex align-items-center gap-1" style="border-radius:8px; font-weight:600;">
-      <i class="bi bi-file-earmark-spreadsheet"></i>
-      <span class="d-none d-md-inline">Export Excel</span>
-    </a>
-    <button onclick="window.print()" class="btn btn-primary btn-sm shadow-sm px-3 d-flex align-items-center gap-1" style="border-radius:8px; font-weight:600;">
-      <i class="bi bi-printer"></i>
-      <span class="d-none d-md-inline">Imprimer</span>
-    </button>
-  </div>
+
 {% endblock %}
 
 {% block content %}
@@ -38,15 +25,6 @@
       <div class="cl-hero-sub">
         Consultez l'état d'occupation en temps réel par catégorie, filtrez par localisation et exportez le rapport certifié.
       </div>
-    </div>
-
-    <div class="d-flex gap-2 flex-wrap align-items-center d-inline d-md-none me-1">
-      <a href="{% url 'supports_export_pdf' %}?{{ request.GET.urlencode }}" class="btn btn-light shadow-sm d-inline d-md-none me-1" style="font-weight: 700; color: #932e2b; border-radius:8px;">
-        <i class="bi bi-file-earmark-pdf me-1"></i>PDF
-      </a>
-      <a href="{% url 'supports_export_excel' %}?{{ request.GET.urlencode }}" class="btn btn-outline-light shadow-sm d-inline d-md-none me-1" style="font-weight: 700; border-radius:8px;">
-        <i class="bi bi-file-earmark-spreadsheet me-1"></i>Excel
-      </a>
     </div>
   </div>
 </div>
@@ -133,22 +111,12 @@
         <div class="rpt-filter-hint">Combinez plusieurs critères pour affiner les données du rapport</div>
       </div>
     </div>
-    <div class="d-flex gap-2">
-      <a href="{% url 'supports_export_pdf' %}?{{ request.GET.urlencode }}"
-         style="display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:8px;background:rgba(239,68,68,0.2);border:1px solid rgba(239,68,68,0.35);color:#fca5a5;font-size:0.76rem;font-weight:700;text-decoration:none;">
-        <i class="bi bi-file-earmark-pdf"></i><span class="d-none d-sm-inline">PDF</span>
-      </a>
-      <a href="{% url 'supports_export_excel' %}?{{ request.GET.urlencode }}"
-         style="display:inline-flex;align-items:center;gap:5px;padding:6px 12px;border-radius:8px;background:rgba(16,185,129,0.2);border:1px solid rgba(16,185,129,0.35);color:#6ee7b7;font-size:0.76rem;font-weight:700;text-decoration:none;">
-        <i class="bi bi-file-earmark-spreadsheet"></i><span class="d-none d-sm-inline">Excel</span>
-      </a>
-    </div>
   </div>
 
   <div class="rpt-filter-body">
     <form method="get" class="row g-3 align-items-end">
 
-      <div class="col-6 col-md-3">
+      <div class="col-6 col-md-4 col-xl-2">
         <label class="rpt-filter-label"><i class="bi bi-geo-alt me-1"></i>Ville</label>
         <select name="ville" class="rpt-select">
           <option value="">Toutes les villes</option>
@@ -156,7 +124,7 @@
         </select>
       </div>
 
-      <div class="col-6 col-md-3">
+      <div class="col-6 col-md-4 col-xl-2">
         <label class="rpt-filter-label"><i class="bi bi-map me-1"></i>Quartier</label>
         <select name="quartier" class="rpt-select">
           <option value="">Tous les quartiers</option>
@@ -164,7 +132,19 @@
         </select>
       </div>
 
-      <div class="col-6 col-md-3">
+      <div class="col-6 col-md-4 col-xl-3">
+        <label class="rpt-filter-label"><i class="bi bi-shop me-1"></i>Marché</label>
+        <select name="marche_pk" class="rpt-select">
+          <option value="">Tous les marchés</option>
+          {% for m in marches_list %}
+            <option value="{{ m.pk }}" {% if filters.marche_pk == m.pk|stringformat:"s" %}selected{% endif %}>
+              {{ m.nom }}{% if m.ville %} ({{ m.ville }}){% endif %}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-6 col-md-4 col-xl-2">
         <label class="rpt-filter-label"><i class="bi bi-activity me-1"></i>État</label>
         <select name="statut" class="rpt-select">
           <option value="">Tous les états</option>
@@ -172,10 +152,10 @@
         </select>
       </div>
 
-      <div class="col-6 col-md-3">
+      <div class="col-6 col-md-4 col-xl-3">
         <label class="rpt-filter-label"><i class="bi bi-pie-chart me-1"></i>Occupation</label>
         <select name="occupation" class="rpt-select">
-          <option value="">Toutes</option>
+          <option value="">Toutes occupations</option>
           {% for key, label in occupation_choices.items %}<option value="{{ key }}" {% if filters.occupation == key %}selected{% endif %}>{{ label }}</option>{% endfor %}
         </select>
       </div>

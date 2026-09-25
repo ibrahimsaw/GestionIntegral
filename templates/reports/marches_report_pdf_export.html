@@ -1,0 +1,274 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <title>État Global des Marchés — {{ today|date:"d/m/Y" }}</title>
+  <style>
+    /* ════════════════════════════════════════
+       TEMPLATE DÉDIÉ WEASYPRINT (PAGED MEDIA)
+       Format A4 Paysage — Rapport Marchés
+    ════════════════════════════════════════ */
+
+    @page {
+      size: A4 landscape;
+      margin: 1.2cm 1cm 1.5cm 1cm;
+      background: #f8fafc;
+      @bottom-center {
+        content: "Document confidentiel — Rapport Global des Marchés & Emplacements au {{ today|date:'d/m/Y' }} — Page " counter(page) " / " counter(pages);
+        font-size: 7pt;
+        color: #94a3b8;
+        font-family: 'Plus Jakarta Sans', Arial, sans-serif;
+      }
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Plus Jakarta Sans', Arial, sans-serif;
+      font-size: 8pt;
+      color: #0F172A;
+      background: #f8fafc;
+    }
+
+    /* ── En-tête document ── */
+    .doc-header {
+      width: 100%;
+      border-collapse: collapse;
+      background: #ffffff;
+      border-bottom: 3px solid #932e2b;
+      border-radius: 8px 8px 0 0;
+      margin-bottom: 12px;
+    }
+    .doc-header td { padding: 12px 18px; vertical-align: middle; }
+    .doc-logo   { height: 44px; width: auto; object-fit: contain; }
+    .doc-center { text-align: center; }
+    .doc-brand  { font-size: 6.5pt; font-weight: bold; color: #94a3b8; letter-spacing: 1.5px; text-transform: uppercase; margin-bottom: 3px; }
+    .doc-title  { font-size: 13pt; font-weight: bold; color: #932e2b; text-transform: uppercase; letter-spacing: 0.8px; }
+    .doc-meta   { font-size: 7.5pt; color: #64748b; margin-top: 3px; }
+    .doc-meta strong { color: #932e2b; }
+    .doc-right  { font-size: 7pt; color: #64748b; text-align: right; line-height: 1.7; white-space: nowrap; }
+    .doc-right strong { color: #334155; }
+
+    /* ── KPI Strip — table layout ── */
+    .kpi-row {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 8px 0;
+      margin-bottom: 14px;
+    }
+    .kpi-box {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      padding: 8px 12px;
+      vertical-align: middle;
+      width: 20%;
+    }
+    .kpi-label { font-size: 6.5pt; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; margin-bottom: 2px; }
+    .kpi-val   { font-size: 15pt; font-weight: bold; line-height: 1; font-family: 'SFMono-Regular', monospace, Arial; }
+    .k-primary .kpi-val { color: #932e2b; }
+    .k-green   .kpi-val { color: #166534; }
+    .k-blue    .kpi-val { color: #2563eb; }
+    .k-orange  .kpi-val { color: #ea580c; }
+    .k-slate   .kpi-val { color: #475569; }
+
+    /* ── Tableau ── */
+    .table-container {
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .category-table {
+      width: 100%;
+      border-collapse: collapse;
+      background: #ffffff;
+    }
+    col.c-code     { width: 75px; }
+    col.c-nom      { width: 140px; }
+    col.c-ville    { width: 95px; }
+    col.c-quartier { width: 95px; }
+    col.c-adresse  { width: 120px; }
+    col.c-stats    { width: 90px; }
+    col.c-taux     { width: 75px; }
+    col.c-empl     { width: auto; }
+
+    thead th {
+      background: #932e2b;
+      color: #ffffff;
+      font-size: 6.5pt;
+      font-weight: bold;
+      padding: 8px 6px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      border: none;
+      vertical-align: middle;
+    }
+    thead th.text-center { text-align: center; }
+    thead th.text-end    { text-align: right; }
+
+    tbody tr {
+      border-bottom: 1px solid #f1f5f9;
+      page-break-inside: avoid;
+    }
+    tbody tr:nth-child(even) td { background-color: #fafafa; }
+    tbody td {
+      padding: 6px;
+      vertical-align: middle;
+      font-size: 7.5pt;
+      color: #334155;
+    }
+
+    .badge-code {
+      font-family: 'SFMono-Regular', monospace, Arial;
+      font-size: 7pt;
+      font-weight: bold;
+      color: #932e2b;
+      background: #fff1f2;
+      border: 1px solid #fecdd3;
+      border-radius: 4px;
+      padding: 2px 5px;
+      display: inline-block;
+    }
+
+    .emp-chip {
+      display: inline-block;
+      font-size: 6.5pt;
+      font-weight: 600;
+      padding: 2px 5px;
+      border-radius: 4px;
+      margin: 1px 2px;
+      border: 1px solid #e2e8f0;
+    }
+    .emp-libre {
+      background: #ecfdf5;
+      color: #065f46;
+      border-color: #a7f3d0;
+    }
+    .emp-occupe {
+      background: #fff7ed;
+      color: #9a3412;
+      border-color: #fed7aa;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- En-tête -->
+  <table class="doc-header">
+    <tr>
+      <td style="width:20%;">
+        <img src="{% static 'images/logo.png' %}" alt="Integral" class="doc-logo">
+      </td>
+      <td class="doc-center" style="width:60%;">
+        <div class="doc-brand">Régie Publicitaire — Gestion Intégrale</div>
+        <div class="doc-title">Rapport Global des Marchés & Emplacements</div>
+        <div class="doc-meta">
+          Inventaire consolidé du réseau · Arrêté au <strong>{{ today|date:"d/m/Y" }}</strong>
+        </div>
+      </td>
+      <td class="doc-right" style="width:20%;">
+        <strong>Réseau National</strong><br>
+        {{ total_marches }} Marché{{ total_marches|pluralize }} répertorié{{ total_marches|pluralize }}<br>
+        {{ total_emplacements }} Emplacements totaux
+      </td>
+    </tr>
+  </table>
+
+  <!-- KPI Strip -->
+  <table class="kpi-row">
+    <tr>
+      <td class="kpi-box k-primary">
+        <div class="kpi-label">Marchés Répertoriés</div>
+        <div class="kpi-val">{{ total_marches }}</div>
+      </td>
+      <td class="kpi-box k-slate">
+        <div class="kpi-label">Emplacements Totaux</div>
+        <div class="kpi-val">{{ total_emplacements }}</div>
+      </td>
+      <td class="kpi-box k-green">
+        <div class="kpi-label">Emplacements Libres</div>
+        <div class="kpi-val">{{ total_libres }}</div>
+      </td>
+      <td class="kpi-box k-orange">
+        <div class="kpi-label">Emplacements Occupés</div>
+        <div class="kpi-val">{{ total_occupes }}</div>
+      </td>
+      <td class="kpi-box k-blue">
+        <div class="kpi-label">Taux d'Occupation</div>
+        <div class="kpi-val">{{ taux_occupation_global }}%</div>
+      </td>
+    </tr>
+  </table>
+
+  <!-- Tableau consolidé -->
+  <div class="table-container">
+    <table class="category-table">
+      <colgroup>
+        <col class="c-code">
+        <col class="c-nom">
+        <col class="c-ville">
+        <col class="c-quartier">
+        <col class="c-adresse">
+        <col class="c-stats">
+        <col class="c-taux">
+        <col class="c-empl">
+      </colgroup>
+      <thead>
+        <tr>
+          <th>Réf.</th>
+          <th>Marché</th>
+          <th>Ville</th>
+          <th>Quartier</th>
+          <th>Adresse / Repère</th>
+          <th class="text-center">Slots</th>
+          <th class="text-center">Taux</th>
+          <th>Emplacements Publicitaires & Statut</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in marches %}
+        <tr>
+          <td><span class="badge-code">{{ m.code }}</span></td>
+          <td>
+            <strong>{{ m.nom }}</strong><br>
+            <span style="font-size:6.5pt; color:#64748b;">{% if m.actif %}Actif{% else %}Inactif{% endif %}</span>
+          </td>
+          <td>{{ m.ville|default:"—" }}</td>
+          <td>{{ m.quartier|default:"—" }}</td>
+          <td><span style="font-size:7pt; color:#64748b;">{{ m.adresse|default:"—" }}</span></td>
+          <td style="text-align:center;">
+            <strong>{{ m.nb_emplacements }}</strong><br>
+            <span style="font-size:6.5pt; color:#059669;">{{ m.nb_libres }} lib.</span> · 
+            <span style="font-size:6.5pt; color:#ea580c;">{{ m.nb_occupes }} occ.</span>
+          </td>
+          <td style="text-align:center;">
+            <strong style="color:{% if m.taux_occupation > 50 %}#932e2b{% elif m.taux_occupation > 0 %}#ea580c{% else %}#059669{% endif %};">
+              {{ m.taux_occupation }}%
+            </strong>
+          </td>
+          <td>
+            {% for emp in m.emplacements %}
+              <span class="emp-chip {% if emp.is_occupe %}emp-occupe{% else %}emp-libre{% endif %}">
+                {{ emp.code }} ({{ emp.format }}) : {% if emp.is_occupe %}Occupé{% else %}Libre{% endif %}
+              </span>
+            {% empty %}
+              <span style="font-size:6.8pt; color:#94a3b8; font-style:italic;">Aucun emplacement</span>
+            {% endfor %}
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="8" style="text-align:center; padding:20px; color:#94a3b8;">
+            Aucun marché trouvé.
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+</body>
+</html>
+

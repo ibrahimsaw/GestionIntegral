@@ -104,6 +104,7 @@ def _build_context_panneaux(filters: dict) -> dict:
     statut    = filters.get("statut",    "").strip()
     q         = filters.get("q",         "").strip()
     client_pk = filters.get("client_pk", "")
+    marche_pk = filters.get("marche_pk", "").strip()
     categories = filters.get("categories", [])
     if isinstance(categories, str):
         categories = [categories] if categories else []
@@ -116,11 +117,16 @@ def _build_context_panneaux(filters: dict) -> dict:
             non_market_filters |= Q(type_support=Support.TYPE_PANNEAU, format="1x2", emplacement__isnull=True)
         if "Écran" in categories:
             non_market_filters |= Q(type_support=Support.TYPE_ECRAN)
+        if "Marché" in categories:
+            non_market_filters |= Q(emplacement__isnull=False)
         qs = qs.filter(non_market_filters) if non_market_filters else qs.none()
+    elif marche_pk:
+        qs = qs.filter(emplacement__marche_id=marche_pk)
     else:
         qs = qs.exclude(emplacement__isnull=False)
-    include_markets = not categories or "Marché" in categories
-    if categories and categories == ["Marché"]:
+
+    include_markets = not categories or "Marché" in categories or bool(marche_pk)
+    if categories and categories == ["Marché"] and not marche_pk:
         qs = qs.none()
 
     if ville:
@@ -240,7 +246,9 @@ def _build_context_panneaux(filters: dict) -> dict:
     # On le garde visible dans le rapport pour suivre aussi les emplacements
     # encore disponibles à développer.
     marches = Marche.objects.filter(actif=True).prefetch_related("emplacements__support_installe__faces")
-    if not include_markets:
+    if marche_pk:
+        marches = marches.filter(pk=marche_pk)
+    elif not include_markets:
         marches = marches.none()
     for marche in marches:
         faces_marche = []
@@ -318,6 +326,7 @@ def _build_context_panneaux(filters: dict) -> dict:
     quartiers = sorted({q.strip() for q in all_supports.values_list("quartier", flat=True) if q and q.strip()})
     statuts   = sorted({s.strip() for s in all_supports.values_list("etat",     flat=True) if s and s.strip()})
     clients   = Client.objects.order_by("nom")
+    marches_list = Marche.objects.filter(actif=True).order_by("nom")
 
     return {
         "panneaux"          : panneaux,
@@ -332,6 +341,7 @@ def _build_context_panneaux(filters: dict) -> dict:
         "quartiers"         : quartiers,
         "statuts"           : statuts,
         "clients"           : clients,
+        "marches_list"      : marches_list,
         "occupation_choices": OCCUPATION_CHOICES,
         "total_panneaux"    : len(panneaux),
         "total_faces"       : total_faces,
@@ -349,6 +359,7 @@ def _filters_from_request(request) -> dict:
         "statut"    : request.GET.get("statut",    ""),
         "occupation": request.GET.get("occupation",""),
         "client_pk" : request.GET.get("client_pk", ""),
+        "marche_pk" : request.GET.get("marche_pk", ""),
         "q"         : request.GET.get("q",         ""),
         "categories": request.GET.getlist("categorie"),
         "afficher_etat": request.GET.get("afficher_etat", "1"),

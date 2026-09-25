@@ -1,0 +1,310 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}État des Marchés — Integral{% endblock %}
+
+{% block topbar_title %}
+  <i class="bi bi-shop me-2" style="color:var(--color-primary)"></i>Rapport Global des Marchés
+{% endblock %}
+
+{% block topbar_actions %}
+  <div class="d-flex flex-wrap gap-2">
+    <a href="{% url 'marches_export_pdf' %}?{{ request.GET.urlencode }}" class="btn btn-outline-danger btn-sm shadow-sm px-3 d-flex align-items-center gap-1" style="border-radius:8px; font-weight:600;">
+      <i class="bi bi-file-earmark-pdf"></i>
+      <span class="d-none d-md-inline">Export PDF</span>
+    </a>
+    <a href="{% url 'marches_export_excel' %}?{{ request.GET.urlencode }}" class="btn btn-outline-success btn-sm shadow-sm px-3 d-flex align-items-center gap-1" style="border-radius:8px; font-weight:600;">
+      <i class="bi bi-file-earmark-spreadsheet"></i>
+      <span class="d-none d-md-inline">Export Excel</span>
+    </a>
+    <button onclick="window.print()" class="btn btn-primary btn-sm shadow-sm px-3 d-flex align-items-center gap-1" style="border-radius:8px; font-weight:600;">
+      <i class="bi bi-printer"></i>
+      <span class="d-none d-md-inline">Imprimer</span>
+    </button>
+  </div>
+{% endblock %}
+
+{% block content %}
+
+{# ═══════════════════════════════════════════ #}
+{# ── BANNIÈRE HÉRO DU RAPPORT MARCHÉS ── #}
+{# ═══════════════════════════════════════════ #}
+<div class="cl-hero mb-4">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+    <div>
+      <div class="cl-hero-title">
+        <i class="bi bi-shop me-2"></i>État Global des Marchés & Emplacements
+      </div>
+      <div class="cl-hero-sub">
+        Supervisez l'ensemble des marchés, leurs emplacements publicitaires et leur taux d'occupation en temps réel.
+      </div>
+    </div>
+
+    <div class="d-flex gap-2 flex-wrap align-items-center d-inline d-md-none me-1">
+      <a href="{% url 'marches_export_pdf' %}?{{ request.GET.urlencode }}" class="btn btn-light shadow-sm d-inline d-md-none me-1" style="font-weight: 700; color: #932e2b; border-radius:8px;">
+        <i class="bi bi-file-earmark-pdf me-1"></i>PDF
+      </a>
+      <a href="{% url 'marches_export_excel' %}?{{ request.GET.urlencode }}" class="btn btn-outline-light shadow-sm d-inline d-md-none me-1" style="font-weight: 700; border-radius:8px;">
+        <i class="bi bi-file-earmark-spreadsheet me-1"></i>Excel
+      </a>
+    </div>
+  </div>
+</div>
+
+{# ═══════════════════════════════════════════ #}
+{# ── RUBAN KPI STATISTIQUES ── #}
+{# ═══════════════════════════════════════════ #}
+<div class="row g-3 mb-4">
+  {# 1. Total Marchés #}
+  <div class="col-6 col-md-4 col-xl">
+    <div class="cl-kpi-card">
+      <div class="cl-kpi-icon" style="background:#eff6ff; color:#2563eb; border:1px solid #dbeafe;">
+        <i class="bi bi-shop"></i>
+      </div>
+      <div>
+        <div class="cl-kpi-val">{{ total_marches|default:0 }}</div>
+        <div class="cl-kpi-lbl">Total Marchés</div>
+      </div>
+    </div>
+  </div>
+
+  {# 2. Emplacements Totaux #}
+  <div class="col-6 col-md-4 col-xl">
+    <div class="cl-kpi-card">
+      <div class="cl-kpi-icon" style="background:#f1f5f9; color:#475569; border:1px solid #e2e8f0;">
+        <i class="bi bi-grid-3x3-gap"></i>
+      </div>
+      <div>
+        <div class="cl-kpi-val" style="color:#475569;">{{ total_emplacements|default:0 }}</div>
+        <div class="cl-kpi-lbl">Emplacements Totaux</div>
+      </div>
+    </div>
+  </div>
+
+  {# 3. Emplacements Libres #}
+  <div class="col-6 col-md-4 col-xl">
+    <div class="cl-kpi-card">
+      <div class="cl-kpi-icon" style="background:#ecfdf5; color:#059669; border:1px solid #d1fae5;">
+        <i class="bi bi-check-circle-fill"></i>
+      </div>
+      <div>
+        <div class="cl-kpi-val" style="color:#059669;">{{ total_libres|default:0 }}</div>
+        <div class="cl-kpi-lbl">Emplacements Libres</div>
+      </div>
+    </div>
+  </div>
+
+  {# 4. Emplacements Occupés #}
+  <div class="col-6 col-md-6 col-xl">
+    <div class="cl-kpi-card">
+      <div class="cl-kpi-icon" style="background:#fff7ed; color:#ea580c; border:1px solid #ffedd5;">
+        <i class="bi bi-broadcast-pin"></i>
+      </div>
+      <div>
+        <div class="cl-kpi-val" style="color:#ea580c;">{{ total_occupes|default:0 }}</div>
+        <div class="cl-kpi-lbl">Emplacements Occupés</div>
+      </div>
+    </div>
+  </div>
+
+  {# 5. Taux d'Occupation Global #}
+  <div class="col-12 col-md-6 col-xl">
+    <div class="cl-kpi-card">
+      <div class="cl-kpi-icon" style="background:#fff1f2; color:#932e2b; border:1px solid #ffe4e6;">
+        <i class="bi bi-pie-chart-fill"></i>
+      </div>
+      <div>
+        <div class="cl-kpi-val" style="color:#932e2b;">{{ taux_occupation_global|default:"0.0" }}%</div>
+        <div class="cl-kpi-lbl">Occupation Moyenne</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+{# ═══════════════════════════════════════════ #}
+{# ── FORMULAIRE DE FILTRES ── #}
+{# ═══════════════════════════════════════════ #}
+<div class="card filter-card mb-4" style="border-radius:8px !important; border:1px solid #e2e8f0;">
+  <div class="card-body p-3 p-lg-4">
+    <form method="get" class="row g-3 align-items-end">
+
+      <div class="col-xl-3 col-md-4 col-sm-6">
+        <label class="filter-label"><i class="bi bi-search"></i>Recherche</label>
+        <input type="text" name="q" value="{{ filters.q }}" class="form-control form-control-sm" placeholder="Nom, ville, quartier, adresse..." style="border-radius:8px;">
+      </div>
+
+      <div class="col-xl-2 col-md-4 col-sm-6">
+        <label class="filter-label"><i class="bi bi-geo-alt"></i>Ville</label>
+        <select name="ville" class="form-select form-select-sm" style="border-radius:8px;">
+          <option value="">Toutes les villes</option>
+          {% for v in all_villes %}
+            <option value="{{ v }}" {% if filters.ville == v %}selected{% endif %}>{{ v }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-xl-2 col-md-4 col-sm-6">
+        <label class="filter-label"><i class="bi bi-signpost-split"></i>Quartier</label>
+        <select name="quartier" class="form-select form-select-sm" style="border-radius:8px;">
+          <option value="">Tous les quartiers</option>
+          {% for q_name in all_quartiers %}
+            <option value="{{ q_name }}" {% if filters.quartier == q_name %}selected{% endif %}>{{ q_name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-xl-2 col-md-4 col-sm-6">
+        <label class="filter-label"><i class="bi bi-activity"></i>Statut</label>
+        <select name="statut" class="form-select form-select-sm" style="border-radius:8px;">
+          <option value="">Tous les statuts</option>
+          <option value="actif" {% if filters.statut == 'actif' %}selected{% endif %}>Actifs</option>
+          <option value="inactif" {% if filters.statut == 'inactif' %}selected{% endif %}>Inactifs</option>
+        </select>
+      </div>
+
+      <div class="col-xl-2 col-md-4 col-sm-6">
+        <label class="filter-label"><i class="bi bi-pie-chart"></i>Occupation</label>
+        <select name="occupation" class="form-select form-select-sm" style="border-radius:8px;">
+          <option value="">Toutes occupations</option>
+          <option value="occupe" {% if filters.occupation == 'occupe' %}selected{% endif %}>Au moins un occupé</option>
+          <option value="libre" {% if filters.occupation == 'libre' %}selected{% endif %}>Au moins un libre</option>
+          <option value="total_occupe" {% if filters.occupation == 'total_occupe' %}selected{% endif %}>Totalement occupé</option>
+          <option value="total_libre" {% if filters.occupation == 'total_libre' %}selected{% endif %}>Totalement libre</option>
+        </select>
+      </div>
+
+      <div class="col-xl-1 col-md-4 col-sm-6 d-flex gap-2">
+        <button type="submit" class="btn btn-primary btn-sm flex-fill shadow-sm d-flex align-items-center justify-content-center gap-1" style="border-radius:8px; font-weight:600;">
+          <i class="bi bi-funnel-fill"></i>
+          <span class="d-none d-xl-inline">Filtrer</span>
+        </button>
+        {% if filters.q or filters.ville or filters.quartier or filters.statut or filters.occupation %}
+        <a href="{% url 'marches_report' %}" class="btn btn-outline-secondary btn-sm" title="Réinitialiser" style="border-radius:8px;">
+          <i class="bi bi-arrow-counterclockwise"></i>
+        </a>
+        {% endif %}
+      </div>
+
+    </form>
+  </div>
+</div>
+
+{# ═══════════════════════════════════════════ #}
+{# ── TABLEAU DES MARCHÉS & EMPLACEMENTS ── #}
+{# ═══════════════════════════════════════════ #}
+<div class="card table-custom-card" style="border-radius:8px !important; border:1px solid #e2e8f0; overflow:hidden;">
+  <div class="card-header bg-white py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-2 border-bottom">
+    <div class="d-flex align-items-center gap-2">
+      <h6 class="mb-0 fw-bold text-dark"><i class="bi bi-shop me-2 text-primary"></i>Marchés Répertoriés</h6>
+      <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2.5 py-1 font-monospace" style="font-size:0.75rem;">
+        {{ total_marches }} marché{{ total_marches|pluralize }}
+      </span>
+    </div>
+    <div class="text-muted small">
+      Généré le <strong>{{ today|date:"d/m/Y" }}</strong>
+    </div>
+  </div>
+
+  <div class="table-responsive">
+    <table class="table table-hover mb-0 align-middle">
+      <thead style="background:#932e2b; color:#ffffff;">
+        <tr>
+          <th style="color:#ffffff; font-size:0.78rem; font-weight:700; width:90px;">Réf.</th>
+          <th style="color:#ffffff; font-size:0.78rem; font-weight:700;">Nom du Marché</th>
+          <th style="color:#ffffff; font-size:0.78rem; font-weight:700;">Localisation</th>
+          <th style="color:#ffffff; font-size:0.78rem; font-weight:700; text-align:center; width:120px;">Emplacements</th>
+          <th style="color:#ffffff; font-size:0.78rem; font-weight:700; text-align:center; width:140px;">Occupation</th>
+          <th style="color:#ffffff; font-size:0.78rem; font-weight:700;">Détail Emplacements</th>
+          <th style="color:#ffffff; font-size:0.78rem; font-weight:700; text-align:end; width:100px;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for m in marches %}
+        <tr>
+          <td>
+            <span class="badge font-monospace" style="background:#f1f5f9; color:#932e2b; border:1px solid #cbd5e1; border-radius:6px; font-size:0.75rem; font-weight:700;">
+              {{ m.code }}
+            </span>
+          </td>
+          <td>
+            <div class="fw-bold text-dark" style="font-size:0.9rem;">
+              <a href="{% url 'marche_detail' m.pk %}" class="text-dark text-decoration-none hover-primary">
+                {{ m.nom }}
+              </a>
+            </div>
+            {% if m.actif %}
+              <span class="badge bg-success-subtle text-success border border-success-subtle" style="font-size:0.65rem; border-radius:6px;">Actif</span>
+            {% else %}
+              <span class="badge bg-secondary-subtle text-secondary border" style="font-size:0.65rem; border-radius:6px;">Inactif</span>
+            {% endif %}
+          </td>
+          <td>
+            <div class="text-dark fw-semibold" style="font-size:0.82rem;">{{ m.ville }}{% if m.quartier %}, {{ m.quartier }}{% endif %}</div>
+            {% if m.adresse %}
+              <div class="text-muted small text-truncate" style="font-size:0.74rem; max-width:200px;">
+                <i class="bi bi-pin-map me-1 text-danger"></i>{{ m.adresse }}
+              </div>
+            {% endif %}
+          </td>
+          <td class="text-center">
+            <div class="d-flex flex-column align-items-center">
+              <span class="badge bg-light text-dark border font-monospace px-2.5 py-1" style="font-size:0.8rem; border-radius:6px;">
+                {{ m.nb_emplacements }} slot{{ m.nb_emplacements|pluralize }}
+              </span>
+              <span class="text-muted small mt-1" style="font-size:0.68rem;">
+                <b class="text-success">{{ m.nb_libres }} lib.</b> / <b class="text-primary">{{ m.nb_occupes }} occ.</b>
+              </span>
+            </div>
+          </td>
+          <td class="text-center">
+            <div class="d-flex flex-column align-items-center">
+              <span class="fw-bold font-monospace" style="font-size:0.85rem; color:{% if m.taux_occupation > 50 %}#932e2b{% elif m.taux_occupation > 0 %}#ea580c{% else %}#059669{% endif %};">
+                {{ m.taux_occupation }}%
+              </span>
+              <div class="progress w-100 mt-1" style="height:5px; border-radius:6px; background:#f1f5f9;">
+                <div class="progress-bar" style="width:{{ m.taux_occupation }}%; background:{% if m.taux_occupation > 50 %}#932e2b{% elif m.taux_occupation > 0 %}#ea580c{% else %}#059669{% endif %};"></div>
+              </div>
+            </div>
+          </td>
+          <td>
+            <div class="d-flex flex-wrap gap-1.5 align-items-center" style="gap:6px;">
+              {% for emp in m.emplacements %}
+                <span class="badge {% if emp.is_occupe %}bg-warning-subtle text-warning-emphasis border border-warning-subtle{% else %}bg-success-subtle text-success border border-success-subtle{% endif %} px-2 py-1" style="border-radius:6px; font-size:0.72rem;" title="Emplacement {{ emp.code }} ({{ emp.format }}) : {% if emp.is_occupe %}Occupé ({{ emp.campagne.nom|default:'Campagne' }}){% else %}Libre{% endif %}">
+                  <i class="bi {% if emp.is_occupe %}bi-broadcast{% else %}bi-check-circle-fill{% endif %} me-1"></i>
+                  <b>{{ emp.code }}</b> <span class="opacity-75">({{ emp.format }})</span>
+                </span>
+              {% empty %}
+                <span class="text-muted small fst-italic" style="font-size:0.75rem;">Aucun emplacement configuré</span>
+              {% endfor %}
+            </div>
+          </td>
+          <td class="text-end">
+            <div class="d-inline-flex gap-1">
+              <a href="{% url 'preview_marche_pdf' m.pk %}" class="btn btn-sm btn-outline-secondary btn-action-icon" title="Aperçu Rapport Web Marché">
+                <i class="bi bi-eye-fill"></i>
+              </a>
+              <a href="{% url 'export_marche_pdf' m.pk %}" class="btn btn-sm btn-outline-danger btn-action-icon" title="Télécharger PDF Marché">
+                <i class="bi bi-file-earmark-pdf-fill"></i>
+              </a>
+              <a href="{% url 'marche_detail' m.pk %}" class="btn btn-sm btn-outline-primary btn-action-icon" title="Voir le marché">
+                <i class="bi bi-arrow-right"></i>
+              </a>
+            </div>
+          </td>
+        </tr>
+        {% empty %}
+        <tr>
+          <td colspan="7" class="text-center py-5 text-muted">
+            <i class="bi bi-shop d-block mb-2 text-muted" style="font-size:2.5rem; opacity:0.3;"></i>
+            <h6 class="fw-bold text-dark">Aucun marché ne correspond aux critères</h6>
+            <p class="small text-muted mb-0">Modifiez ou réinitialisez vos filtres.</p>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+{% endblock %}
+

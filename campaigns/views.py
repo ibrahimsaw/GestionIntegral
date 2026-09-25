@@ -1372,8 +1372,8 @@ class CampagneDetailView(ClientStaffRequiredMixin, DetailView):
         ).all()
 
         for ligne in lignes:
-            if campagne.type_support == 'ecran' and ligne.support and hasattr(ligne.support, 'ecran_info'):
-                ligne.spots_calcules = ligne.support.ecran_info.calculer_nombre_spots_campagne(campagne)
+            if campagne.type_support == 'ecran' and ligne.support:
+                ligne.spots_calcules = ligne.calculer_spots()
             elif campagne.type_support == 'marche' and ligne.emplacement:
                 total_jours = campagne.duree_jours()
                 jours_dispo = ligne.emplacement.jours_disponibles_sur_periode(campagne.date_debut, campagne.date_fin)
@@ -1403,8 +1403,16 @@ class CampagneDetailView(ClientStaffRequiredMixin, DetailView):
                     'support__ecran_info', 'face__support', 'emplacement__marche'
                 ).all()
                 for ligne in enfant_lignes:
-                    if enfant.type_support == 'ecran' and hasattr(ligne.support, 'ecran_info'):
-                        ligne.spots_calcules = ligne.support.ecran_info.calculer_nombre_spots_campagne(enfant)
+                    if enfant.type_support == 'ecran' and ligne.support:
+                        ligne.spots_calcules = ligne.calculer_spots()
+                    elif enfant.type_support == 'marche' and ligne.emplacement:
+                        total_jours = enfant.duree_jours()
+                        jours_dispo = ligne.emplacement.jours_disponibles_sur_periode(
+                            enfant.date_debut,
+                            enfant.date_fin,
+                            exclude_campagne_id=enfant.pk,
+                        )
+                        ligne.spots_calcules = round(jours_dispo / total_jours, 2) if total_jours else 0
                     elif enfant.type_support != 'ecran' and ligne.face:
                         ligne.spots_calcules = ligne.face.calculer_nombre_spots_campagne(enfant)
                     else:
@@ -1481,6 +1489,15 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
     @transaction.atomic
     def form_valid(self, form):
         is_create = self.object is None
+        previous_values = {}
+        if not is_create:
+            previous_values = {
+                field: getattr(self.object, field)
+                for field in (
+                    'date_debut', 'date_fin', 'duree_passage',
+                    'frequence', 'tranches_horaires',
+                )
+            }
         
         if is_create:
             form.instance.created_by = self.request.user
@@ -1489,6 +1506,21 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
             form.instance.actif = False
         
         self.object = form.save()
+
+        if not is_create:
+            changed_line_fields = {
+                field: getattr(self.object, field)
+                for field, old_value in previous_values.items()
+                if old_value != getattr(self.object, field)
+            }
+            for ligne in self.object.lignes.all():
+                update_fields = {
+                    field: new_value
+                    for field, new_value in changed_line_fields.items()
+                    if getattr(ligne, field) == previous_values[field]
+                }
+                if update_fields:
+                    LigneCampagne.objects.filter(pk=ligne.pk).update(**update_fields)
 
         # Lorsqu'une campagne vient du simulateur, reprendre les écrans choisis.
         if is_create and self.object.type_support == 'ecran':

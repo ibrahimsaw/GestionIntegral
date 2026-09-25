@@ -135,11 +135,19 @@ class MarcheCreateView(StaffRequiredMixin, CreateView):
 class MarcheUpdateView(StaffRequiredMixin, UpdateView):
     model = Marche
     fields = ['nom', 'ville', 'quartier', 'adresse', 'latitude', 'longitude', 'rayon_metres', 'description', 'actif']
-    template_name = 'inventory/marche_form.html'
+    template_name = 'inventory/support_form.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['title'] = f'Modifier — {self.object.nom}'
+        context['initial_type_choice'] = 'marche'
+        context['ecran_form'] = EcranNumeriqueForm(prefix='ecran')
+        context['face_form'] = FacePanneauForm()
+        context['marches'] = Marche.objects.filter(actif=True).order_by('nom')
+        context['marche_form'] = MarcheForm(instance=self.object, prefix='marche')
+        context['form'] = SupportForm(initial={'type_support': 'marche'})
+        context['form'].fields['type_support'].initial = 'marche'
+        context['form'].initial['type_support'] = 'marche'
         return context
 
     def get_success_url(self):
@@ -1002,24 +1010,59 @@ class SupportCreateView(StaffRequiredMixin, CreateView):
     form_class = SupportForm
     template_name = 'inventory/support_form.html'
 
+    def get_type_choice_from_request(self):
+        value = (
+            self.request.GET.get('type')
+            or self.request.GET.get('type_support')
+            or self.request.GET.get('type_choice')
+        )
+        if value in (Support.TYPE_PANNEAU, Support.TYPE_ECRAN, 'marche'):
+            return value
+        return None
+
     def get_initial(self):
         # Récupère les coordonnées depuis l'URL (clic sur la carte)
         initial = super().get_initial()
         initial['latitude'] = self.request.GET.get('lat', '')
         initial['longitude'] = self.request.GET.get('lng', '')
+        type_choice = self.get_type_choice_from_request()
+        if type_choice:
+            initial['type_support'] = type_choice
         return initial
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         if self.request.POST:
             context['ecran_form'] = EcranNumeriqueForm(self.request.POST, prefix='ecran')
+            if 'marche_form' not in context:
+                context['marche_form'] = MarcheForm(self.request.POST, prefix='marche')
         else:
             context['ecran_form'] = EcranNumeriqueForm(prefix='ecran')
-        
+            context['marche_form'] = MarcheForm(prefix='marche')
+            type_choice = self.get_type_choice_from_request()
+            if type_choice:
+                context['initial_type_choice'] = type_choice
+
         context['face_form'] = FacePanneauForm() # Pour le template dynamique
         context['title'] = "Nouveau Support"
         context['marches'] = Marche.objects.filter(actif=True).order_by('nom')
         return context
+
+    def post(self, request, *args, **kwargs):
+        type_choice = request.POST.get('type_choice', 'panneau')
+        if type_choice == 'marche':
+            marche_form = MarcheForm(request.POST, prefix='marche')
+            if marche_form.is_valid():
+                marche = marche_form.save(commit=False)
+                marche.created_by = request.user
+                marche.save()
+                log_action(request, AuditLog.ACTION_CREATE, 'inventory', obj=marche, detail=f"Création marché: {marche.nom}")
+                messages.success(request, f'Marché "{marche.nom}" créé avec succès.')
+                return redirect('marche_detail', pk=marche.pk)
+            else:
+                self.object = None
+                return self.render_to_response(self.get_context_data(form=self.get_form(), marche_form=marche_form, initial_type_choice='marche'))
+        return super().post(request, *args, **kwargs)
 
     def form_valid(self, form):
         context = self.get_context_data()

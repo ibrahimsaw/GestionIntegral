@@ -2,177 +2,369 @@
 {% load static %}
 
 {% block title %}{{ title }} — Integral{% endblock %}
-{% block topbar_title %}<i class="bi bi-geo me-2" style="color:var(--color-primary)"></i>{{ title }}{% endblock %}
 
-{% block extra_head %}
-<style>
-    .form-section {
-        background: var(--bg-card);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        margin-bottom: 24px;
-        overflow: hidden;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.02);
-        transition: box-shadow 0.2s ease;
-    }
-    .form-section:hover {
-        box-shadow: 0 8px 24px rgba(0,0,0,0.04);
-    }
-    .form-section-hd {
-        padding: 14px 20px;
-        border-bottom: 1px solid var(--border);
-        font-size: 0.85rem;
-        font-weight: 800;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        background: #f8fafc;
-        letter-spacing: 0.3px;
-    }
-    .form-section-bd {
-        padding: 20px;
-    }
-    .errorlist {
-        color: #ef4444;
-        font-size: 0.75rem;
-        list-style: none;
-        padding: 0;
-        margin-top: 4px;
-        font-weight: 600;
-    }
-    .form-control, .form-select {
-        border-radius: 8px;
-        border: 1px solid var(--border);
-        font-size: 0.85rem;
-        padding: 8px 12px;
-    }
-    .form-control:focus, .form-select:focus {
-        border-color: var(--color-primary);
-        box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.15);
-    }
-    .form-label {
-        font-size: 0.75rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        color: var(--text-muted);
-        margin-bottom: 5px;
-    }
-</style>
+{% block topbar_title %}
+  <div class="d-flex align-items-center gap-2">
+    <i class="bi bi-geo-alt-fill" style="color:var(--color-primary)"></i>
+    <span class="fw-bold">{{ title }}</span>
+    <span class="badge bg-light text-dark border ms-1" style="font-size:0.7rem; border-radius:8px; font-weight:600;">{{ marche.nom }}</span>
+  </div>
 {% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-xl-7 col-lg-9">
-        <div class="d-flex align-items-center gap-3 mb-4">
-            <a href="{% url 'marche_detail' marche.pk %}" class="btn btn-outline-secondary btn-sm rounded-circle d-flex align-items-center justify-content-center" style="width:36px;height:36px">
-                <i class="bi bi-arrow-left"></i>
-            </a>
-            <div>
-                <h1 style="font-size:1.4rem;font-weight:800;margin:0">{{ title }}</h1>
-                <p style="font-size:.82rem;color:var(--text-muted);margin:2px 0 0">
-                    Marché : <strong class="text-dark">{{ marche.nom }}</strong>
-                    {% if marche.rayon_metres %} — situé dans le périmètre (rayon {{ marche.rayon_metres }} m){% endif %}
-                </p>
-            </div>
-        </div>
+<div class="container-fluid py-3">
 
-        <div class="alert alert-light border rounded-4 d-flex align-items-start gap-3 p-3 mb-4 shadow-sm" style="font-size:.82rem">
-            <i class="bi bi-info-circle-fill fs-5 text-primary"></i>
-            <div class="text-secondary">
-                Un emplacement ne nécessite pas de coordonnées GPS directes : il est automatiquement situé au sein du marché <strong>{{ marche.nom }}</strong>.
-            </div>
-        </div>
+  {# ── BREADCRUMB ── #}
+  <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2" style="font-size:0.83rem;">
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <a href="{% url 'marche_detail' marche.pk %}" class="d-inline-flex align-items-center gap-1 text-muted text-decoration-none">
+        <i class="bi bi-arrow-left"></i> Retour au marché
+      </a>
+      <span class="text-muted">/</span>
+      <a href="{% url 'marche_detail' marche.pk %}" class="text-decoration-none fw-semibold" style="color:var(--color-primary);">
+        <i class="bi bi-shop me-1 text-warning"></i>{{ marche.nom }}
+      </a>
+      <span class="text-muted">/</span>
+      <span class="fw-bold text-dark">{% if object %}Modifier l'emplacement {{ object.code }}{% else %}Nouvel emplacement{% endif %}</span>
+    </div>
 
-        {% if campagnes_liees %}
-        <div class="form-section">
-            <div class="form-section-hd"><i class="bi bi-megaphone text-warning"></i>Campagnes associées à cet emplacement</div>
-            <div class="form-section-bd">
-                <div class="d-flex flex-column gap-2">
-                    {% for ligne in campagnes_liees %}
-                    <a href="{% url 'campagne_detail' ligne.campagne.pk %}"
-                       class="d-flex justify-content-between align-items-center p-3 rounded-3 text-decoration-none border bg-light shadow-sm"
-                       style="color:inherit">
-                        <div>
-                            <strong class="text-dark">{{ ligne.campagne.nom }}</strong>
-                            <span class="small text-muted"> — {{ ligne.campagne.client.nom }}</span>
-                        </div>
-                        <div class="d-flex align-items-center gap-2">
-                            <span class="font-monospace text-muted small">
-                                {{ ligne.campagne.date_debut|date:"d/m/Y" }} → {{ ligne.campagne.date_fin|date:"d/m/Y" }}
-                            </span>
-                            <span class="badge badge-status bs-{{ ligne.campagne.statut }}">{{ ligne.campagne.get_statut_display }}</span>
-                        </div>
-                    </a>
-                    {% endfor %}
-                </div>
-            </div>
+    {% if object %}
+    <a href="{% url 'emplacement_detail' object.pk %}" class="btn btn-outline-secondary btn-sm" style="border-radius:8px; font-size:0.78rem; font-weight:600;">
+      <i class="bi bi-eye me-1"></i>Voir la fiche
+    </a>
+    {% endif %}
+  </div>
+
+  {# ── HERO BANDEAU ── #}
+  <div class="mb-4 p-4 d-flex align-items-center justify-content-between flex-wrap gap-3"
+       style="background:linear-gradient(135deg,var(--color-primary) 0%,#1e40af 100%); border-radius:8px !important; color:#fff; box-shadow:0 8px 24px rgba(15,23,42,0.12); position:relative; overflow:hidden;">
+    <div style="position:absolute;right:-20px;top:-20px;width:150px;height:150px;border-radius:50%;background:rgba(147,46,43,0.12);pointer-events:none;"></div>
+    
+    <div class="d-flex align-items-center gap-3">
+      <div class="d-flex align-items-center justify-content-center flex-shrink-0"
+           style="width:58px;height:58px;border-radius:8px !important;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);font-size:1.6rem;color:#fbbf24;">
+        <i class="bi bi-geo-alt-fill"></i>
+      </div>
+      <div>
+        <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:rgba(255,255,255,0.55);">
+          Inventaire & Cartographie
         </div>
+        <h1 class="mb-0 fw-bold" style="font-size:1.5rem;letter-spacing:-0.03em;color:#fff;">
+          {% if object %}Modifier l'Emplacement <span style="color:#fbbf24;">{{ object.code }}</span>{% else %}Créer un Nouvel Emplacement{% endif %}
+        </h1>
+        <div class="d-flex align-items-center gap-2 mt-1" style="font-size:0.8rem;color:rgba(255,255,255,0.7);">
+          <i class="bi bi-shop text-warning"></i>
+          <span>Marché : <strong class="text-white">{{ marche.nom }}</strong></span>
+          {% if marche.ville %}
+          <span>·</span>
+          <span>{{ marche.quartier|default:"" }}{% if marche.quartier and marche.ville %}, {% endif %}{{ marche.ville }}</span>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="d-none d-md-block text-end">
+      <span class="badge" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:8px;font-size:0.75rem;padding:6px 12px;">
+        <i class="bi bi-shield-check me-1 text-success"></i>Géoréférencement automatique
+      </span>
+    </div>
+  </div>
+
+  {# ── GRILLE PRINCIPALE ── #}
+  <div class="row g-4">
+
+    {# ── COLONNE FORMULAIRE (GAUCHE) ── #}
+    <div class="col-lg-7 col-xl-8">
+      
+      <form method="post" id="emplacementForm" novalidate>
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+          <div class="alert alert-danger mb-4 d-flex align-items-center gap-2" style="border-radius:8px !important;font-size:0.85rem;">
+            <i class="bi bi-exclamation-triangle-fill fs-5 flex-shrink-0"></i>
+            <div>{{ form.non_field_errors }}</div>
+          </div>
         {% endif %}
 
-        <form method="post" id="emplacementForm">
-            {% csrf_token %}
-            {% if form.non_field_errors %}
-                <div class="alert alert-danger rounded-3">{{ form.non_field_errors }}</div>
-            {% endif %}
+        {# ── SECTION FORMULAIRE : INFORMATIONS DE L'EMPLACEMENT ── #}
+        <div class="card shadow-sm mb-4" style="border-radius:8px !important; border:1px solid #e2e8f0; overflow:hidden;">
+          <div class="card-header bg-white py-3 px-4 d-flex align-items-center justify-content-between border-bottom">
+            <div class="d-flex align-items-center gap-2">
+              <div class="d-flex align-items-center justify-content-center"
+                   style="width:32px;height:32px;border-radius:8px !important;background:rgba(147,46,43,0.08);color:#932e2b;font-size:0.95rem;">
+                <i class="bi bi-pin-map-fill"></i>
+              </div>
+              <span class="fw-bold text-dark" style="font-size:0.92rem;">Paramètres de l'Emplacement</span>
+            </div>
+            <span class="badge bg-light text-muted border" style="font-size:0.7rem; border-radius:8px;">Champs obligatoires *</span>
+          </div>
 
-            <div class="form-section">
-                <div class="form-section-hd"><i class="bi bi-tag text-primary"></i>Identification & Repères</div>
-                <div class="form-section-bd">
-                    <div class="row g-3">
-                        <div class="col-12">
-                            <label class="form-label">Code / Repère *</label>
-                            {{ form.code }}
-                            {{ form.code.errors }}
-                            <div class="small text-muted mt-1">Exemple : "A-01", "Allée Centrale - Stand 14"</div>
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label">Notes & Description de repérage</label>
-                            {{ form.notes }}
-                            {{ form.notes.errors }}
-                            <div class="small text-muted mt-1">Détails utiles pour situer physiquement l'emplacement (face à l'entrée principale, angle nord, etc.)</div>
-                        </div>
-                    </div>
+          <div class="card-body p-4">
+            <div class="row g-4">
+
+              {# Champ Code #}
+              <div class="col-12">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                  <label class="form-label mb-0" for="{{ form.code.id_for_label }}" style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#475569;">
+                    Code / Repère de l'emplacement <span class="text-danger">*</span>
+                  </label>
+                  {% if not object %}
+                  <button type="button" id="btn-refresh-code" class="btn btn-link p-0 text-decoration-none" style="font-size:0.74rem;color:var(--color-primary);font-weight:600;">
+                    <i class="bi bi-arrow-clockwise me-1"></i>Générer le prochain code
+                  </button>
+                  {% endif %}
                 </div>
-            </div>
 
-            <div class="d-flex gap-3 justify-content-end mt-4 mb-5">
-                <a href="{% url 'marche_detail' marche.pk %}" class="btn btn-outline-secondary rounded-pill px-4">Annuler</a>
-                <button type="submit" class="btn btn-primary rounded-pill px-5 shadow-sm d-flex align-items-center gap-2">
-                    <i class="bi bi-cloud-arrow-up"></i>
-                    <span>{% if object %}Mettre à jour l'emplacement{% else %}Créer l'emplacement{% endif %}</span>
-                </button>
+                <div class="input-group" style="gap: 10px;">
+                  <span class="input-group-text bg-light text-muted border-end-0" style="border-radius:8px 0 0 8px;font-size:0.85rem;">
+                    <i class="bi bi-tag-fill text-primary"></i>
+                  </span>
+                  {{ form.code }}
+                </div>
+
+                {% if form.code.errors %}
+                  <div class="mt-1">
+                    {% for error in form.code.errors %}
+                      <div class="text-danger fw-semibold d-flex align-items-center gap-1" style="font-size:0.75rem;">
+                        <i class="bi bi-exclamation-circle-fill"></i> {{ error }}
+                      </div>
+                    {% endfor %}
+                  </div>
+                {% endif %}
+                
+                <div class="form-text text-muted mt-1" style="font-size:0.75rem;">
+                  <i class="bi bi-info-circle me-1"></i>Format suggéré : <code>A-01</code>, <code>STAND-14</code>, ou <code>ALLÉE-NORD-03</code>.
+                </div>
+              </div>
+
+              {# Aperçu visuel en direct #}
+              <div class="col-12">
+                <div class="p-3 d-flex align-items-center justify-content-between flex-wrap gap-2"
+                     style="background:#f8fafc; border:1px dashed #cbd5e1; border-radius:8px !important;">
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="badge" style="background:#932e2b;color:#fff;border-radius:6px;font-size:0.72rem;padding:4px 8px;">Aperçu</span>
+                    <span class="text-muted" style="font-size:0.8rem;">Repère complet :</span>
+                    <strong id="live-code-preview" class="text-dark font-monospace" style="font-size:0.95rem;">
+                      {{ marche.nom }} — {{ form.code.value|default:"(Code)" }}
+                    </strong>
+                  </div>
+                  <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1" style="border-radius:6px;font-size:0.7rem;">
+                    <i class="bi bi-check-circle me-1"></i>Disponible par défaut
+                  </span>
+                </div>
+              </div>
+
+              {# Champ Notes & Repérage #}
+              <div class="col-12">
+                <label class="form-label" for="{{ form.notes.id_for_label }}" style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#475569;">
+                  Notes & Repères physiques sur le site
+                </label>
+                
+                {{ form.notes }}
+
+                {% if form.notes.errors %}
+                  <div class="mt-1">
+                    {% for error in form.notes.errors %}
+                      <div class="text-danger fw-semibold d-flex align-items-center gap-1" style="font-size:0.75rem;">
+                        <i class="bi bi-exclamation-circle-fill"></i> {{ error }}
+                      </div>
+                    {% endfor %}
+                  </div>
+                {% endif %}
+
+                <div class="form-text text-muted mt-1" style="font-size:0.75rem;">
+                  Indiquez les détails utiles pour situer l'emplacement sur place (ex: <em>Face à la porte centrale, à côté du stand Orange</em>).
+                </div>
+              </div>
+
             </div>
-        </form>
+          </div>
+
+          {# ── PIED DE FORMULAIRE (ACTIONS) ── #}
+          <div class="card-footer bg-light py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-2 border-top">
+            <a href="{% url 'marche_detail' marche.pk %}" class="btn btn-outline-secondary px-3" style="border-radius:8px;font-size:0.83rem;font-weight:600;">
+              <i class="bi bi-x me-1"></i>Annuler
+            </a>
+            
+            <button type="submit" class="btn btn-primary px-4 shadow-sm d-flex align-items-center gap-2" style="border-radius:8px;font-size:0.83rem;font-weight:700;">
+              <i class="bi bi-cloud-arrow-up-fill"></i>
+              <span>{% if object %}Enregistrer les modifications{% else %}Créer l'emplacement{% endif %}</span>
+            </button>
+          </div>
+        </div>
+
+      </form>
+
+      {# ── CAMPAGNES LIÉES SI EXISTANTES ── #}
+      {% if campagnes_liees %}
+      <div class="card shadow-sm mb-4" style="border-radius:8px !important; border:1px solid #e2e8f0; overflow:hidden;">
+        <div class="card-header bg-white py-3 px-4 d-flex align-items-center justify-content-between border-bottom">
+          <div class="d-flex align-items-center gap-2">
+            <div class="d-flex align-items-center justify-content-center"
+                 style="width:30px;height:30px;border-radius:8px !important;background:rgba(217,119,6,0.1);color:#d97706;font-size:0.9rem;">
+              <i class="bi bi-megaphone-fill"></i>
+            </div>
+            <span class="fw-bold text-dark" style="font-size:0.88rem;">Campagnes actives sur cet emplacement</span>
+          </div>
+          <span class="badge bg-light text-dark border" style="border-radius:8px;font-size:0.7rem;font-weight:700;">{{ campagnes_liees|length }}</span>
+        </div>
+        <div class="card-body p-3 d-flex flex-column gap-2">
+          {% for ligne in campagnes_liees %}
+          <a href="{% url 'campagne_detail' ligne.campagne.pk %}"
+             class="d-flex justify-content-between align-items-center p-3 text-decoration-none text-dark"
+             style="border-radius:8px !important;border:1px solid #e2e8f0;background:#f8fafc;transition:all 0.15s ease;">
+            <div class="min-width-0 flex-grow-1">
+              <div class="fw-bold text-dark text-truncate" style="font-size:0.86rem;">{{ ligne.campagne.nom }}</div>
+              <div class="text-muted" style="font-size:0.75rem;">{{ ligne.campagne.client.nom }}</div>
+            </div>
+            <div class="d-flex align-items-center gap-2 ms-3 flex-shrink-0">
+              <span class="font-monospace text-muted" style="font-size:0.73rem;white-space:nowrap;">
+                {{ ligne.campagne.date_debut|date:"d/m/Y" }} → {{ ligne.campagne.date_fin|date:"d/m/Y" }}
+              </span>
+              <span class="badge badge-status bs-{{ ligne.campagne.statut }}">{{ ligne.campagne.get_statut_display }}</span>
+              <i class="bi bi-chevron-right text-muted" style="font-size:0.75rem;"></i>
+            </div>
+          </a>
+          {% endfor %}
+        </div>
+      </div>
+      {% endif %}
+
     </div>
+
+    {# ── COLONNE INFOS MARCHÉ & CONSEILS (DROITE) ── #}
+    <div class="col-lg-5 col-xl-4">
+
+      {# ── CARTE MARCHÉ RATTACHÉ ── #}
+      <div class="card shadow-sm mb-4" style="border-radius:8px !important; border:1px solid #e2e8f0; overflow:hidden;">
+        <div class="card-header bg-white py-3 px-4 d-flex align-items-center gap-2 border-bottom">
+          <div class="d-flex align-items-center justify-content-center"
+               style="width:30px;height:30px;border-radius:8px !important;background:rgba(217,119,6,0.1);color:#d97706;font-size:0.9rem;">
+            <i class="bi bi-shop"></i>
+          </div>
+          <span class="fw-bold text-dark" style="font-size:0.88rem;">Marché de Rattachement</span>
+        </div>
+        <div class="card-body p-4">
+          <h5 class="fw-bold mb-1 text-dark" style="font-size:1.05rem;">{{ marche.nom }}</h5>
+          <div class="text-muted mb-3" style="font-size:0.8rem;">
+            <i class="bi bi-geo-alt me-1 text-danger"></i>
+            {{ marche.quartier|default:"Non spécifié" }}{% if marche.quartier and marche.ville %}, {% endif %}{{ marche.ville }}
+          </div>
+
+          <div class="p-3 mb-3" style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px !important;font-size:0.79rem;color:#0369a1;line-height:1.5;">
+            <div class="fw-bold mb-1 d-flex align-items-center gap-1">
+              <i class="bi bi-info-circle-fill text-primary"></i> Géoréférencement automatique
+            </div>
+            Cet emplacement hérite automatiquement des coordonnées GPS du marché
+            {% if marche.rayon_metres %}dans un rayon de <strong>{{ marche.rayon_metres }} mètres</strong>{% endif %}.
+          </div>
+
+          <a href="{% url 'marche_detail' marche.pk %}" class="btn btn-outline-primary w-100 btn-sm d-flex align-items-center justify-content-center gap-2" style="border-radius:8px;font-weight:600;">
+            <i class="bi bi-map-fill"></i>
+            <span>Consulter la fiche du marché</span>
+          </a>
+        </div>
+      </div>
+
+      {# ── CARTE CONSEILS & BONNES PRATIQUES ── #}
+      <div class="card shadow-sm" style="border-radius:8px !important; border:1px solid #e2e8f0; overflow:hidden;">
+        <div class="card-header bg-white py-3 px-4 d-flex align-items-center gap-2 border-bottom">
+          <div class="d-flex align-items-center justify-content-center"
+               style="width:30px;height:30px;border-radius:8px !important;background:rgba(30,64,175,0.08);color:#1e40af;font-size:0.9rem;">
+            <i class="bi bi-lightbulb-fill text-warning"></i>
+          </div>
+          <span class="fw-bold text-dark" style="font-size:0.88rem;">Guide & Bonnes Pratiques</span>
+        </div>
+        <div class="card-body p-4" style="font-size:0.8rem;color:#475569;line-height:1.6;">
+          <div class="d-flex align-items-start gap-2 mb-3">
+            <i class="bi bi-check2-circle text-success fs-6 mt-0.5 flex-shrink-0"></i>
+            <div><strong>Unicité du code :</strong> Le code doit être unique à l'intérieur de ce marché.</div>
+          </div>
+          <div class="d-flex align-items-start gap-2 mb-3">
+            <i class="bi bi-check2-circle text-success fs-6 mt-0.5 flex-shrink-0"></i>
+            <div><strong>Installation d'un support :</strong> Une fois créé, vous pourrez lui assigner un panneau publicitaire depuis l'inventaire.</div>
+          </div>
+          <div class="d-flex align-items-start gap-2">
+            <i class="bi bi-check2-circle text-success fs-6 mt-0.5 flex-shrink-0"></i>
+            <div><strong>Disponibilité :</strong> L'emplacement sera immédiatement éligible pour les réservations de campagnes.</div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        document.querySelectorAll('#emplacementForm input, #emplacementForm select, #emplacementForm textarea').forEach(el => {
-            if (el.tagName === 'SELECT') el.classList.add('form-select');
-            else el.classList.add('form-control');
-        });
+document.addEventListener('DOMContentLoaded', function () {
+  const codeInput = document.getElementById('id_code');
+  const notesInput = document.getElementById('id_notes');
+  const livePreview = document.getElementById('live-code-preview');
+  const btnRefresh = document.getElementById('btn-refresh-code');
+  const marcheNom = "{{ marche.nom|escapejs }}";
 
-        {% if not object %}
-        const codeInput = document.getElementById('id_code');
-        if (codeInput) {
-            let userEdited = false;
-            codeInput.addEventListener('input', () => { userEdited = true; });
+  // Configuration Bootstrap des champs
+  if (codeInput) {
+    codeInput.classList.add('form-control', 'font-monospace');
+    codeInput.style.borderRadius = '0 8px 8px 0';
+    codeInput.style.fontSize = '0.88rem';
+    codeInput.style.fontWeight = '600';
+    codeInput.placeholder = 'Ex: A-01';
+  }
 
-            fetch("{% url 'emplacement_next_code' marche.pk %}")
-                .then(r => r.json())
-                .then(data => {
-                    if (!userEdited && !codeInput.value) {
-                        codeInput.value = data.code;
-                    }
-                })
-                .catch(() => {});
+  if (notesInput) {
+    notesInput.classList.add('form-control');
+    notesInput.style.borderRadius = '8px';
+    notesInput.style.fontSize = '0.84rem';
+    notesInput.rows = 4;
+    notesInput.placeholder = 'Ex: Angle nord, face à l\'entrée principale des piétons, stand n° 12...';
+  }
+
+  // Live preview update
+  function updateLivePreview() {
+    if (codeInput && livePreview) {
+      const val = codeInput.value.trim();
+      livePreview.textContent = marcheNom + ' — ' + (val || '(Code non défini)');
+    }
+  }
+
+  if (codeInput) {
+    codeInput.addEventListener('input', updateLivePreview);
+    updateLivePreview();
+  }
+
+  // Générateur de prochain code
+  function fetchNextCode() {
+    fetch("{% url 'emplacement_next_code' marche.pk %}")
+      .then(r => r.json())
+      .then(data => {
+        if (data && data.code && codeInput) {
+          codeInput.value = data.code;
+          updateLivePreview();
+          // Feedback visuel doux
+          codeInput.style.borderColor = 'var(--color-primary)';
+          setTimeout(() => { codeInput.style.borderColor = ''; }, 1000);
         }
-        {% endif %}
+      })
+      .catch(() => {});
+  }
+
+  {% if not object %}
+  // Auto-fetch si vide au chargement
+  if (codeInput && !codeInput.value) {
+    fetchNextCode();
+  }
+  {% endif %}
+
+  if (btnRefresh) {
+    btnRefresh.addEventListener('click', function(e) {
+      e.preventDefault();
+      fetchNextCode();
     });
+  }
+});
 </script>
 {% endblock %}
-

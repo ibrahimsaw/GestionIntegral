@@ -28,9 +28,7 @@
 {% block content %}
 <div class="dash">
 
-  <!-- ══════════════════════════════════════════════════════════════════
-       MODALE DYNAMIQUE AJAX
-       ══════════════════════════════════════════════════════════════════ -->
+  <!-- MODALE DYNAMIQUE AJAX -->
   <div id="custom-modal-overlay" class="custom-modal-overlay" style="display:none;" onclick="if(event.target === this) closeCustomModal()">
     <div class="custom-modal-box">
       <div class="custom-modal-header">
@@ -41,9 +39,39 @@
     </div>
   </div>
 
-  <!-- ══════════════════════════════════════════════════════════════════
-       FILTRE PAR VILLE
-       ══════════════════════════════════════════════════════════════════ -->
+  <!-- ═══════════════ BANDEAU KPI (NOUVEAU) ═══════════════ -->
+  <div class="dash-kpi-strip mb-3" data-aos="fade-up">
+    <div class="dash-kpi-tile dash-kpi-primary">
+      <div class="dash-kpi-icon"><i class="bi bi-cash-stack"></i></div>
+      <div>
+        <div class="dash-kpi-val num" data-count="{{ revenu_actif|floatformat:0 }}">—</div>
+        <div class="dash-kpi-lbl">Revenu en cours (FCFA)</div>
+      </div>
+    </div>
+    <div class="dash-kpi-tile dash-kpi-blue">
+      <div class="dash-kpi-icon"><i class="bi bi-megaphone-fill"></i></div>
+      <div>
+        <div class="dash-kpi-val num" data-count="{{ campagnes_actives }}">—</div>
+        <div class="dash-kpi-lbl">Campagnes actives</div>
+      </div>
+    </div>
+    <div class="dash-kpi-tile dash-kpi-green">
+      <div class="dash-kpi-icon"><i class="bi bi-check2-circle"></i></div>
+      <div>
+        <div class="dash-kpi-val num" data-count="{{ total_faces_libre }}">—</div>
+        <div class="dash-kpi-lbl">Panneaux libres</div>
+      </div>
+    </div>
+    <div class="dash-kpi-tile dash-kpi-orange">
+      <div class="dash-kpi-icon"><i class="bi bi-display"></i></div>
+      <div>
+        <div class="dash-kpi-val num" data-count="{{ total_faces_occupe }}">—</div>
+        <div class="dash-kpi-lbl">Faces occupées</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FILTRE PAR VILLE -->
   <nav class="dash-villes-bar" aria-label="Filtrer par ville" data-aos="fade-up">
     <a class="dash-ville-btn {% if not ville_active %}is-active{% endif %}" href="?">
       <i class="bi bi-globe2"></i>Toutes les villes
@@ -55,14 +83,13 @@
     {% endfor %}
   </nav>
 
-  <!-- ══════════════════════════════════════════════════════════════════
-       HERO BANDEAU : REVENU & STATISTIQUES COMMERCIALES
-       ══════════════════════════════════════════════════════════════════ -->
+  <!-- HERO BANDEAU -->
   {% with rev_total=revenu_actif|add:revenu_a_venir %}
-  <section class="cl-hero" data-aos="fade-up" data-aos-delay="50">
+  <section class="cl-hero dash-hero" data-aos="fade-up" data-aos-delay="50">
     <div class="hero-grid">
-
       <div>
+        <div class="dash-greeting">Bonjour, {{ request.user.get_full_name|default:request.user.username }} 👋</div>
+        <div class="dash-today-date" id="dash-today-date"></div>
         <div class="d-flex align-items-center gap-2 text-uppercase fw-bold text-white-50 small mb-1">
           <i class="bi bi-cash-stack"></i>Revenu des Campagnes en Cours
         </div>
@@ -73,7 +100,6 @@
           {% if ville_active %}Périmètre : <strong>{{ ville_active }}</strong>{% else %}Ensemble du réseau national{% endif %} · 
           <strong>{{ revenu_a_venir|floatformat:0 }} FCFA</strong> engagés sur les campagnes futures.
         </p>
-
         {% if rev_total %}
         <div class="revenue-split-bar" role="img" aria-label="Répartition du revenu actif et futur">
           <span class="part-now"    style="width:{% widthratio revenu_actif rev_total 100 %}%" title="En cours : {{ revenu_actif|floatformat:0 }} FCFA"></span>
@@ -85,36 +111,30 @@
         </div>
         {% endif %}
       </div>
-
       <div class="hero-stat-boxes">
         <button type="button" class="hero-stat-btn"
                 onclick="loadModalContent('{% url 'api_dashboard_clients_actifs' %}?ville={{ ville_active }}', 'Clients actifs')">
           <div class="hero-stat-val num">{{ total_clients }}</div>
           <div class="hero-stat-lbl">Clients Actifs</div>
         </button>
-
         <button type="button" class="hero-stat-btn"
                 onclick="loadModalContent('{% url 'api_dashboard_campagnes' 'en_cours' %}?ville={{ ville_active }}', 'Campagnes en cours')">
           <div class="hero-stat-val num">{{ campagnes_actives }}</div>
           <div class="hero-stat-lbl">Campagnes en cours</div>
         </button>
-
         <button type="button" class="hero-stat-btn"
                 onclick="loadModalContent('{% url 'api_dashboard_campagnes' 'a_venir' %}?ville={{ ville_active }}', 'Campagnes à venir')">
           <div class="hero-stat-val num">{{ campagnes_a_venir }}</div>
           <div class="hero-stat-lbl">À venir (30j)</div>
         </button>
       </div>
-
     </div>
   </section>
   {% endwith %}
 
-  <!-- ══════════════════════════════════════════════════════════════════
-       RACCOURCIS RAPIDES
-       ══════════════════════════════════════════════════════════════════ -->
+  <!-- RACCOURCIS RAPIDES (6 items) -->
   <div class="row g-3 mb-4" data-aos="fade-up" data-aos-delay="100">
-    <div class="col-6 col-lg-3">
+    <div class="col-6 col-md-4 col-xl-2">
       <a href="{% url 'planning_calendrier' %}" class="shortcut-card">
         <div class="shortcut-icon-circle shortcut-icon-primary">
           <i class="bi bi-calendar3"></i>
@@ -126,19 +146,19 @@
         <i class="bi bi-chevron-right shortcut-arrow d-none d-sm-block"></i>
       </a>
     </div>
-    <div class="col-6 col-lg-3">
+    <div class="col-6 col-md-4 col-xl-2">
       <a href="{% url 'reports_index' %}" class="shortcut-card">
         <div class="shortcut-icon-circle shortcut-icon-success">
           <i class="bi bi-file-earmark-bar-graph-fill"></i>
         </div>
         <div>
           <div class="shortcut-title">Rapports</div>
-          <div class="shortcut-desc">Preuves & exports PDF</div>
+          <div class="shortcut-desc">Preuves &amp; exports PDF</div>
         </div>
         <i class="bi bi-chevron-right shortcut-arrow d-none d-sm-block"></i>
       </a>
     </div>
-    <div class="col-6 col-lg-3">
+    <div class="col-6 col-md-4 col-xl-2">
       <a href="{% url 'simulation_ecran' %}" class="shortcut-card">
         <div class="shortcut-icon-circle shortcut-icon-warning">
           <i class="bi bi-calculator-fill"></i>
@@ -150,7 +170,7 @@
         <i class="bi bi-chevron-right shortcut-arrow d-none d-sm-block"></i>
       </a>
     </div>
-    <div class="col-6 col-lg-3">
+    <div class="col-6 col-md-4 col-xl-2">
       <a href="{% url 'campagne_list' %}" class="shortcut-card">
         <div class="shortcut-icon-circle shortcut-icon-purple">
           <i class="bi bi-megaphone-fill"></i>
@@ -162,38 +182,55 @@
         <i class="bi bi-chevron-right shortcut-arrow d-none d-sm-block"></i>
       </a>
     </div>
+    <div class="col-6 col-md-4 col-xl-2">
+      <a href="{% url 'client_list' %}" class="shortcut-card">
+        <div class="shortcut-icon-circle shortcut-icon-teal">
+          <i class="bi bi-people-fill"></i>
+        </div>
+        <div>
+          <div class="shortcut-title">Clients</div>
+          <div class="shortcut-desc">Portefeuille CRM</div>
+        </div>
+        <i class="bi bi-chevron-right shortcut-arrow d-none d-sm-block"></i>
+      </a>
+    </div>
+    <div class="col-6 col-md-4 col-xl-2">
+      <a href="{% url 'support_list' %}" class="shortcut-card">
+        <div class="shortcut-icon-circle shortcut-icon-orange">
+          <i class="bi bi-collection-fill"></i>
+        </div>
+        <div>
+          <div class="shortcut-title">Inventaire</div>
+          <div class="shortcut-desc">Gestion des supports</div>
+        </div>
+        <i class="bi bi-chevron-right shortcut-arrow d-none d-sm-block"></i>
+      </a>
+    </div>
   </div>
 
-  <!-- ══════════════════════════════════════════════════════════════════
-       OCCUPATION & COMPOSITION DU PARC PUBLICITAIRE
-       ══════════════════════════════════════════════════════════════════ -->
+  <!-- OCCUPATION & COMPOSITION DU PARC -->
   <div class="row g-3 mb-4" data-aos="fade-up" data-aos-delay="150">
-    <!-- Occupation par format -->
     <div class="col-12 col-xl-8">
-      <div class="section-card">
+      <div class="section-card dash-section-card">
         <div class="section-card-header">
           <h2><i class="bi bi-bar-chart-fill text-primary"></i>Occupation du Parc</h2>
           <span class="badge bg-light text-dark border num fw-bold">{{ total_faces }} faces · {{ total_supports }} supports</span>
         </div>
         <div class="section-card-body">
-
           {% if total_faces %}
           <div class="parc-total-bar" role="img" aria-label="Répartition globale des faces par statut">
-            <span style="width:{% widthratio total_faces_occupe total_faces 100 %}%; background:var(--st-occupe);" title="{{ total_faces_occupe }} occupées"></span>
-            <span style="width:{% widthratio total_faces_reserve total_faces 100 %}%; background:var(--st-reserve);" title="{{ total_faces_reserve }} réservées"></span>
-            <span style="width:{% widthratio total_faces_libre total_faces 100 %}%; background:var(--st-libre);" title="{{ total_faces_libre }} libres"></span>
-            <span style="width:{% widthratio total_faces_panne total_faces 100 %}%; background:var(--st-panne);" title="{{ total_faces_panne }} en panne"></span>
+            <span style="width:{% widthratio total_faces_occupe total_faces 100 %}%; background:var(--st-occupe);" title="{{ total_faces_occupe }} occupées" data-bs-toggle="tooltip" data-bs-title="{{ total_faces_occupe }} faces occupées"></span>
+            <span style="width:{% widthratio total_faces_reserve total_faces 100 %}%; background:var(--st-reserve);" title="{{ total_faces_reserve }} réservées" data-bs-toggle="tooltip" data-bs-title="{{ total_faces_reserve }} faces réservées"></span>
+            <span style="width:{% widthratio total_faces_libre total_faces 100 %}%; background:var(--st-libre);" title="{{ total_faces_libre }} libres" data-bs-toggle="tooltip" data-bs-title="{{ total_faces_libre }} faces libres"></span>
+            <span style="width:{% widthratio total_faces_panne total_faces 100 %}%; background:var(--st-panne);" title="{{ total_faces_panne }} en panne" data-bs-toggle="tooltip" data-bs-title="{{ total_faces_panne }} faces en panne"></span>
           </div>
           {% endif %}
-
           <div class="parc-legend-chips">
             <span><i class="dot-indicator" style="background:var(--st-occupe)"></i><b class="num">{{ total_faces_occupe }}</b>occupées</span>
             <span><i class="dot-indicator" style="background:var(--st-reserve)"></i><b class="num">{{ total_faces_reserve }}</b>réservées</span>
             <span><i class="dot-indicator" style="background:var(--st-libre)"></i><b class="num">{{ total_faces_libre }}</b>libres</span>
             <span><i class="dot-indicator" style="background:var(--st-panne)"></i><b class="num">{{ total_faces_panne }}</b>en panne</span>
           </div>
-
-          <!-- Lignes par Format -->
           {% for cat in format_categories %}
           <div class="parc-format-row">
             <div class="parc-format-name">
@@ -203,7 +240,6 @@
                 <small>{{ cat.nb_supports }} support{{ cat.nb_supports|pluralize:",s" }}</small>
               </span>
             </div>
-
             {% if cat.nb_faces %}
             <div class="parc-bar-meter">
               {% if cat.nb_occupe %}<span style="width:{% widthratio cat.nb_occupe cat.nb_faces 100 %}%; background:var(--st-occupe);" title="{{ cat.nb_occupe }} occupée{{ cat.nb_occupe|pluralize:",s" }}">{{ cat.nb_occupe }}</span>{% endif %}
@@ -214,11 +250,9 @@
             {% else %}
             <div class="parc-bar-meter"></div>
             {% endif %}
-
             <div class="parc-format-count num"><b>{{ cat.nb_faces }}</b> faces</div>
           </div>
           {% endfor %}
-
           {% if nb_ecrans > 0 %}
           <div class="parc-format-row">
             <div class="parc-format-name">
@@ -235,22 +269,23 @@
             <div class="parc-format-count num"><b>{{ nb_ecrans }}</b> écrans</div>
           </div>
           {% endif %}
-
         </div>
       </div>
     </div>
-
-    <!-- Composition & Donut -->
     <div class="col-12 col-xl-4">
-      <div class="section-card">
+      <div class="section-card dash-section-card">
         <div class="section-card-header">
           <h2><i class="bi bi-pie-chart-fill text-primary"></i>Composition</h2>
           <span class="badge bg-light text-dark border num fw-bold">{{ total_supports }} supports</span>
         </div>
         <div class="section-card-body">
           <div class="composition">
-            <div class="dash-donut-wrap">
+            <div class="dash-donut-wrap" style="position:relative;">
               <canvas id="chartTypes" width="115" height="115" role="img" aria-label="Répartition du parc par type de support"></canvas>
+              <div id="donut-center-label" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none;flex-direction:column;">
+                <span style="font-size:1.3rem;font-weight:900;color:#0f172a;line-height:1;">{{ total_supports }}</span>
+                <span style="font-size:0.58rem;font-weight:700;color:#64748b;text-transform:uppercase;letter-spacing:0.4px;">supports</span>
+              </div>
             </div>
             <div class="composition-info" style="font-size:0.85rem; min-width:0;">
               <div class="d-flex align-items-center justify-content-between py-2 border-bottom gap-2">
@@ -267,7 +302,6 @@
               </div>
             </div>
           </div>
-
           {% if supports_panne %}
           <a href="{% url 'maintenance_list' %}" class="d-flex align-items-center justify-content-center gap-1 mt-3 pt-3 border-top text-decoration-none fw-semibold text-primary small">
             <i class="bi bi-tools"></i>Voir les interventions à planifier →
@@ -278,24 +312,21 @@
     </div>
   </div>
 
-  <!-- ══════════════════════════════════════════════════════════════════
-       CLASSEMENTS TOP CAMPAGNES & TOP FACES
-       ══════════════════════════════════════════════════════════════════ -->
+  <!-- CLASSEMENTS TOP CAMPAGNES & TOP FACES -->
   <div class="row g-3 mb-4" data-aos="fade-up" data-aos-delay="200">
     <div class="col-12 col-lg-6">
-      <div class="section-card">
+      <div class="section-card dash-section-card">
         <div class="section-card-header">
           <h2><i class="bi bi-trophy-fill text-warning"></i>Campagnes les Plus Rentables</h2>
-          <span class="badge bg-light text-muted border">En cours & À venir</span>
+          <span class="badge bg-light text-muted border">En cours &amp; À venir</span>
         </div>
         <div class="section-card-body">
           <div id="topCampaignsList"></div>
         </div>
       </div>
     </div>
-
     <div class="col-12 col-lg-6">
-      <div class="section-card">
+      <div class="section-card dash-section-card">
         <div class="section-card-header">
           <h2><i class="bi bi-star-fill text-primary"></i>Faces les Plus Rentables</h2>
           <span class="badge bg-light text-muted border">Historique cumulé</span>
@@ -307,24 +338,23 @@
     </div>
   </div>
 
-  <!-- ══════════════════════════════════════════════════════════════════
-       TABLEAU DES CAMPAGNES RÉCENTES
-       ══════════════════════════════════════════════════════════════════ -->
+  <!-- TABLEAU DES CAMPAGNES RÉCENTES (avec colonne Avancement) -->
   <div class="table-custom-card" data-aos="fade-up" data-aos-delay="250">
     <div class="section-card-header">
       <h2><i class="bi bi-megaphone-fill text-primary"></i>Campagnes Récentes</h2>
       <a href="{% url 'campagne_list' %}" class="btn btn-sm btn-outline-secondary">
-        Campagnes <i class="bi bi-arrow-right ms-1"></i>
+        Toutes <i class="bi bi-arrow-right ms-1"></i>
       </a>
     </div>
     <div class="table-responsive">
-      <table class="table">
+      <table class="table dash-table">
         <thead>
           <tr>
+            <th>Type</th>
             <th>Réf.</th>
             <th>Client</th>
             <th>Campagne</th>
-            <th>Période</th>
+            <th>Période &amp; Avancement</th>
             <th class="text-center">Supports</th>
             <th>Statut</th>
             <th class="text-end">Action</th>
@@ -332,7 +362,16 @@
         </thead>
         <tbody>
           {% for c in campagnes_recentes %}
-          <tr>
+          <tr data-debut="{{ c.date_debut|date:'Y-m-d' }}" data-fin="{{ c.date_fin|date:'Y-m-d' }}">
+            <td class="text-center">
+              {% if c.type_support == 'ecran' %}
+                <span class="badge" style="background:rgba(6,182,212,0.12);color:#0891b2;border:1px solid #bae6fd;border-radius:8px;font-size:0.65rem;"><i class="bi bi-display"></i></span>
+              {% elif c.est_mere %}
+                <span class="badge bg-light text-dark border" style="border-radius:8px;font-size:0.65rem;"><i class="bi bi-diagram-3"></i></span>
+              {% else %}
+                <span class="badge" style="background:rgba(147,46,43,0.1);color:#932e2b;border:1px solid rgba(147,46,43,0.2);border-radius:8px;font-size:0.65rem;"><i class="bi bi-sign-merge-right"></i></span>
+              {% endif %}
+            </td>
             <td class="code-primary">{{ c.reference|default:c.pk }}</td>
             <td>
               <div class="d-flex align-items-center gap-2">
@@ -341,8 +380,13 @@
               </div>
             </td>
             <td><span class="fw-semibold">{{ c.nom }}</span></td>
-            <td class="num text-muted small text-nowrap">
-              <i class="bi bi-calendar3 me-1"></i>{{ c.date_debut|date:"d/m/Y" }} → {{ c.date_fin|date:"d/m/Y" }}
+            <td>
+              <div class="num text-muted small text-nowrap">
+                <i class="bi bi-calendar3 me-1"></i>{{ c.date_debut|date:"d/m/Y" }} → {{ c.date_fin|date:"d/m/Y" }}
+              </div>
+              <div class="dash-progress-micro mt-1">
+                <div class="dash-progress-micro-bar" style="width:0%"></div>
+              </div>
             </td>
             <td class="text-center num">
               <span class="badge bg-light text-dark border px-2">{{ c.nb_supports }}</span>
@@ -366,7 +410,7 @@
           </tr>
           {% empty %}
           <tr>
-            <td colspan="7" class="text-center py-5 text-muted">
+            <td colspan="8" class="text-center py-5 text-muted">
               <i class="bi bi-megaphone fs-1 d-block mb-2 opacity-50"></i>
               <p class="mb-2">Aucune campagne enregistrée pour l'instant.</p>
               <a href="{% url 'campagne_create' %}" class="btn btn-sm btn-primary">
@@ -392,6 +436,42 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
 (function () {
+  // ── Date du jour (FR) ──
+  const dateEl = document.getElementById('dash-today-date');
+  if (dateEl) {
+    const now = new Date();
+    const opts = { weekday:'long', day:'numeric', month:'long', year:'numeric' };
+    const str = now.toLocaleDateString('fr-FR', opts);
+    dateEl.textContent = str.charAt(0).toUpperCase() + str.slice(1);
+  }
+
+  // ── Counter animation KPI ──
+  document.querySelectorAll('.dash-kpi-val[data-count]').forEach(el => {
+    const raw = el.getAttribute('data-count').replace(/\s/g, '').replace(',', '.');
+    const target = parseInt(raw, 10) || 0;
+    if (target === 0) { el.textContent = '0'; return; }
+    let start = 0;
+    const duration = 900;
+    const step = target / (duration / 16);
+    const timer = setInterval(() => {
+      start += step;
+      if (start >= target) { start = target; clearInterval(timer); }
+      el.textContent = Math.floor(start).toLocaleString('fr-FR');
+    }, 16);
+  });
+
+  // ── Barres de progression temporelle des campagnes ──
+  const today = new Date();
+  document.querySelectorAll('.dash-table tbody tr[data-debut]').forEach(row => {
+    const debut = new Date(row.dataset.debut);
+    const fin = new Date(row.dataset.fin);
+    const total = fin - debut;
+    const elapsed = today - debut;
+    let pct = total > 0 ? Math.min(Math.max(Math.round(elapsed / total * 100), 0), 100) : 0;
+    const bar = row.querySelector('.dash-progress-micro-bar');
+    if (bar) bar.style.width = pct + '%';
+  });
+
   const cs        = getComputedStyle(document.documentElement);
   const C_PRIMARY = cs.getPropertyValue('--color-primary').trim() || '#932e2b';
 
@@ -409,7 +489,7 @@
     return (Number(n) || 0).toLocaleString('fr-FR');
   }
 
-  // ── 1. Donut Composition du Parc ──
+  // ── Donut Composition ──
   const tStats = safeJSON('types-stats');
   const ctxTypes = document.getElementById('chartTypes');
   if (ctxTypes && tStats.length) {
@@ -442,7 +522,7 @@
     });
   }
 
-  // ── 2. Rendu des Classements Top Campagnes & Top Faces ──
+  // ── Classements ──
   function renderRank(items, container, buildRight, emptyMsg) {
     if (!container) return;
     if (!items.length) {
@@ -504,6 +584,11 @@
       '</div>',
     'Pas encore assez d\'historique.'
   );
+
+  // ── Bootstrap Tooltips ──
+  if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
+    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => new bootstrap.Tooltip(el));
+  }
 })();
 </script>
 

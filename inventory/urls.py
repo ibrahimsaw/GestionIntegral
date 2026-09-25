@@ -32,7 +32,7 @@ urlpatterns = [
 
     # Marchés
     path('marches/', MarcheListView.as_view(), name='marche_list'),
-    path('marches/ajouter/', MarcheCreateView.as_view(), name='marche_create'),
+    path('marches/ajouter/', SupportCreateView.as_view(), name='marche_create'),
     path('marches/<int:pk>/', MarcheDetailView.as_view(), name='marche_detail'),
     path('marches/<int:pk>/modifier/', MarcheUpdateView.as_view(), name='marche_update'),
     path('marches/<int:pk>/supprimer/', MarcheDeleteView.as_view(), name='marche_delete'),

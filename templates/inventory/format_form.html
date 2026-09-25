@@ -4,142 +4,433 @@
 {% block title %}{{ title }} — Integral{% endblock %}
 
 {% block topbar_title %}
-    <i class="bi bi-aspect-ratio me-2" style="color:var(--color-primary)"></i>{{ title }}
-{% endblock %}
-
-{% block extra_head %}
-<style>
-    .form-section {
-        background: var(--bg-card);
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        margin-bottom: 24px;
-        overflow: hidden;
-        box-shadow: 0 4px 20px rgba(0,0,0,0.02);
-        transition: box-shadow 0.2s ease;
-    }
-    .form-section:hover {
-        box-shadow: 0 8px 24px rgba(0,0,0,0.04);
-    }
-    .form-section-hd {
-        padding: 14px 20px;
-        border-bottom: 1px solid var(--border);
-        font-size: 0.85rem;
-        font-weight: 800;
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        background: #f8fafc;
-        letter-spacing: 0.3px;
-    }
-    .form-section-bd {
-        padding: 20px;
-    }
-    .errorlist {
-        color: #ef4444;
-        font-size: 0.75rem;
-        list-style: none;
-        padding: 0;
-        margin-top: 4px;
-        font-weight: 600;
-    }
-    .form-control, .form-select {
-        border-radius: 8px;
-        border: 1px solid var(--border);
-        font-size: 0.85rem;
-        padding: 8px 12px;
-    }
-    .form-control:focus, .form-select:focus {
-        border-color: var(--color-primary);
-        box-shadow: 0 0 0 3px rgba(13, 110, 253, 0.15);
-    }
-    .form-label {
-        font-size: 0.75rem;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: 0.5px;
-        color: var(--text-muted);
-        margin-bottom: 5px;
-    }
-</style>
+  <div class="d-flex align-items-center gap-2">
+    <i class="bi bi-aspect-ratio" style="color:var(--color-primary)"></i>
+    <span class="fw-bold">{{ title }}</span>
+  </div>
 {% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-    <div class="col-xl-7 col-lg-9">
-        <div class="d-flex align-items-center gap-3 mb-4">
-            <a href="javascript:void(0)" onclick="history.back()" class="btn btn-outline-secondary btn-sm rounded-circle d-flex align-items-center justify-content-center" style="width:36px;height:36px">
-                <i class="bi bi-arrow-left"></i>
-            </a>
-            <div>
-                <h1 style="font-size:1.4rem;font-weight:800;margin:0">{{ title }}</h1>
-                <p style="color:var(--text-muted);font-size:0.8rem;margin:2px 0 0">Définissez les dimensions et la catégorie du format</p>
+<div class="container-fluid py-3">
+
+  {# ── BREADCRUMB ── #}
+  <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2" style="font-size:0.83rem;">
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <a href="{% url 'format_list' %}" class="d-inline-flex align-items-center gap-1 text-muted text-decoration-none">
+        <i class="bi bi-arrow-left"></i> Formats
+      </a>
+      <span class="text-muted">/</span>
+      <span class="fw-bold text-dark">{% if object %}Modifier {{ object.code }}{% else %}Nouveau Format{% endif %}</span>
+    </div>
+
+    <a href="{% url 'format_list' %}" class="btn btn-outline-secondary btn-sm" style="border-radius:8px; font-size:0.78rem; font-weight:600;">
+      <i class="bi bi-grid-1x2 me-1"></i>Tous les Formats
+    </a>
+  </div>
+
+  {# ── HERO BANDEAU ── #}
+  <div class="mb-4 p-4 d-flex align-items-center justify-content-between flex-wrap gap-3"
+       style="background:linear-gradient(135deg,var(--color-primary) 0%,#1e40af 100%); border-radius:8px !important; color:#fff; box-shadow:0 8px 24px rgba(15,23,42,0.12); position:relative; overflow:hidden;">
+    <div style="position:absolute;right:-20px;top:-20px;width:150px;height:150px;border-radius:50%;background:rgba(147,46,43,0.12);pointer-events:none;"></div>
+    
+    <div class="d-flex align-items-center gap-3">
+      <div class="d-flex align-items-center justify-content-center flex-shrink-0"
+           style="width:58px;height:58px;border-radius:8px !important;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);font-size:1.6rem;color:#60a5fa;">
+        <i class="bi bi-aspect-ratio-fill"></i>
+      </div>
+      <div>
+        <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:rgba(255,255,255,0.55);">
+          Inventaire & Gabarits Publicitaires
+        </div>
+        <h1 class="mb-0 fw-bold" style="font-size:1.5rem;letter-spacing:-0.03em;color:#fff;">
+          {% if object %}Modifier le Format <span style="color:#60a5fa;">{{ object.code }}</span>{% else %}Créer un Format Publicitaire{% endif %}
+        </h1>
+        <div class="mt-1" style="font-size:0.8rem;color:rgba(255,255,255,0.7);">
+          Définissez le code, les dimensions, la surface en m² et la catégorie de ce gabarit.
+        </div>
+      </div>
+    </div>
+
+    <div class="d-none d-md-block text-end">
+      <span class="badge" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:8px;font-size:0.75rem;padding:6px 12px;">
+        <i class="bi bi-bounding-box-circles me-1 text-info"></i>Gabarit d'affichage
+      </span>
+    </div>
+  </div>
+
+  {# ── GRILLE PRINCIPALE ── #}
+  <div class="row g-4">
+
+    {# ── COLONNE FORMULAIRE (GAUCHE) ── #}
+    <div class="col-lg-7 col-xl-8">
+      
+      <form method="post" id="mainFormatForm" novalidate>
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+          <div class="alert alert-danger mb-4 d-flex align-items-center gap-2" style="border-radius:8px !important;font-size:0.85rem;">
+            <i class="bi bi-exclamation-triangle-fill fs-5 flex-shrink-0"></i>
+            <div>{{ form.non_field_errors }}</div>
+          </div>
+        {% endif %}
+
+        {# ── SECTION 1 : IDENTIFICATION & CATÉGORISATION ── #}
+        <div class="card shadow-sm mb-4" style="border-radius:8px !important; border:1px solid #e2e8f0; overflow:hidden;">
+          <div class="card-header bg-white py-3 px-4 d-flex align-items-center justify-content-between border-bottom">
+            <div class="d-flex align-items-center gap-2">
+              <div class="d-flex align-items-center justify-content-center"
+                   style="width:32px;height:32px;border-radius:8px !important;background:rgba(147,46,43,0.08);color:#932e2b;font-size:0.95rem;">
+                <i class="bi bi-tag-fill"></i>
+              </div>
+              <span class="fw-bold text-dark" style="font-size:0.92rem;">1. Identification & Catégorisation</span>
             </div>
+            <span class="badge bg-light text-muted border" style="font-size:0.7rem; border-radius:8px;">Obligatoire *</span>
+          </div>
+
+          <div class="card-body p-4">
+            <div class="row g-4">
+
+              {# Champ Code #}
+              <div class="col-md-6">
+                <label class="form-label" for="{{ form.code.id_for_label }}" style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#475569;">
+                  Code Format <span class="text-danger">*</span>
+                </label>
+                <div class="input-group">
+                  <span class="input-group-text bg-light text-muted border-end-0" style="border-radius:8px 0 0 8px;font-size:0.85rem;">
+                    <i class="bi bi-upc"></i>
+                  </span>
+                  {{ form.code }}
+                </div>
+                {% if form.code.errors %}
+                  <div class="mt-1">
+                    {% for error in form.code.errors %}
+                      <div class="text-danger fw-semibold d-flex align-items-center gap-1" style="font-size:0.75rem;">
+                        <i class="bi bi-exclamation-circle-fill"></i> {{ error }}
+                      </div>
+                    {% endfor %}
+                  </div>
+                {% endif %}
+                <div class="form-text text-muted mt-1" style="font-size:0.74rem;">
+                  Ex : <code>4x3</code>, <code>12x4</code>, <code>sucette-1x2</code>
+                </div>
+              </div>
+
+              {# Champ Catégorie #}
+              <div class="col-md-6">
+                <label class="form-label" for="{{ form.categorie.id_for_label }}" style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#475569;">
+                  Catégorie <span class="text-danger">*</span>
+                </label>
+                <div class="input-group">
+                  <span class="input-group-text bg-light text-muted border-end-0" style="border-radius:8px 0 0 8px;font-size:0.85rem;">
+                    <i class="bi bi-grid-fill text-primary"></i>
+                  </span>
+                  {{ form.categorie }}
+                </div>
+                {% if form.categorie.errors %}
+                  <div class="mt-1">
+                    {% for error in form.categorie.errors %}
+                      <div class="text-danger fw-semibold d-flex align-items-center gap-1" style="font-size:0.75rem;">
+                        <i class="bi bi-exclamation-circle-fill"></i> {{ error }}
+                      </div>
+                    {% endfor %}
+                  </div>
+                {% endif %}
+                <div class="form-text text-muted mt-1" style="font-size:0.74rem;">
+                  Ex : Standard, Géant, Sucette, Marché...
+                </div>
+              </div>
+
+            </div>
+          </div>
         </div>
 
-        <form method="post" id="mainFormatForm">
-            {% csrf_token %}
-            {% if form.non_field_errors %}
-                <div class="alert alert-danger rounded-3">{{ form.non_field_errors }}</div>
-            {% endif %}
-
-            <div class="form-section">
-                <div class="form-section-hd">
-                    <i class="bi bi-aspect-ratio text-primary"></i>Caractéristiques du Format
-                </div>
-                <div class="form-section-bd">
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label">Code Format * (ex: 4x3, gm-5x4)</label>
-                            {{ form.code }}
-                            {{ form.code.errors }}
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Catégorie * (Standard, Géant, Sucette, Marché)</label>
-                            {{ form.categorie }}
-                            {{ form.categorie.errors }}
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Dimensions (ex: 4m × 3m)</label>
-                            {{ form.dimensions }}
-                            {{ form.dimensions.errors }}
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label">Superficie (en m²)</label>
-                            {{ form.superficie }}
-                            {{ form.superficie.errors }}
-                        </div>
-                    </div>
-                </div>
+        {# ── SECTION 2 : DIMENSIONS & SUPERFICIE ── #}
+        <div class="card shadow-sm mb-4" style="border-radius:8px !important; border:1px solid #e2e8f0; overflow:hidden;">
+          <div class="card-header bg-white py-3 px-4 d-flex align-items-center justify-content-between border-bottom">
+            <div class="d-flex align-items-center gap-2">
+              <div class="d-flex align-items-center justify-content-center"
+                   style="width:32px;height:32px;border-radius:8px !important;background:rgba(37,99,235,0.08);color:#2563eb;font-size:0.95rem;">
+                <i class="bi bi-rulers"></i>
+              </div>
+              <span class="fw-bold text-dark" style="font-size:0.92rem;">2. Mesures & Superficie</span>
             </div>
+            <button type="button" id="btn-calc-surface" class="btn btn-link p-0 text-decoration-none" style="font-size:0.75rem;color:var(--color-primary);font-weight:600;">
+              <i class="bi bi-calculator me-1"></i>Calculer la surface
+            </button>
+          </div>
 
-            <div class="d-flex gap-3 justify-content-end mt-4 mb-5">
-                <a href="{% url 'format_list' %}" class="btn btn-outline-secondary rounded-pill px-4">
-                    Annuler
-                </a>
-                <button type="submit" class="btn btn-primary rounded-pill px-5 shadow-sm d-flex align-items-center gap-2">
-                    <i class="bi bi-cloud-arrow-up"></i>
-                    <span>{% if object %}Mettre à jour le format{% else %}Enregistrer le format{% endif %}</span>
-                </button>
+          <div class="card-body p-4">
+            <div class="row g-4">
+
+              {# Dimensions #}
+              <div class="col-md-6">
+                <label class="form-label" for="{{ form.dimensions.id_for_label }}" style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#475569;">
+                  Dimensions (L × H)
+                </label>
+                <div class="input-group">
+                  <span class="input-group-text bg-light text-muted border-end-0" style="border-radius:8px 0 0 8px;font-size:0.85rem;">
+                    <i class="bi bi-arrows-angle-expand"></i>
+                  </span>
+                  {{ form.dimensions }}
+                </div>
+                {% if form.dimensions.errors %}
+                  <div class="mt-1">
+                    {% for error in form.dimensions.errors %}
+                      <div class="text-danger fw-semibold d-flex align-items-center gap-1" style="font-size:0.75rem;">
+                        <i class="bi bi-exclamation-circle-fill"></i> {{ error }}
+                      </div>
+                    {% endfor %}
+                  </div>
+                {% endif %}
+                <div class="form-text text-muted mt-1" style="font-size:0.74rem;">
+                  Ex : <code>4m × 3m</code> ou <code>12 x 4</code>
+                </div>
+              </div>
+
+              {# Superficie #}
+              <div class="col-md-6">
+                <label class="form-label" for="{{ form.superficie.id_for_label }}" style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#475569;">
+                  Superficie (en m²)
+                </label>
+                <div class="input-group">
+                  <span class="input-group-text bg-light text-muted border-end-0" style="border-radius:8px 0 0 8px;font-size:0.85rem;">
+                    <i class="bi bi-bounding-box"></i>
+                  </span>
+                  {{ form.superficie }}
+                  <span class="input-group-text bg-light fw-bold text-muted border-start-0" style="border-radius:0 8px 8px 0;font-size:0.85rem;">
+                    m²
+                  </span>
+                </div>
+                {% if form.superficie.errors %}
+                  <div class="mt-1">
+                    {% for error in form.superficie.errors %}
+                      <div class="text-danger fw-semibold d-flex align-items-center gap-1" style="font-size:0.75rem;">
+                        <i class="bi bi-exclamation-circle-fill"></i> {{ error }}
+                      </div>
+                    {% endfor %}
+                  </div>
+                {% endif %}
+                <div class="form-text text-muted mt-1" style="font-size:0.74rem;">
+                  Surface calculée en mètres carrés (ex : <code>12.00</code>)
+                </div>
+              </div>
+
             </div>
-        </form>
+          </div>
+
+          {# ── PIED DE FORMULAIRE (ACTIONS) ── #}
+          <div class="card-footer bg-light py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-2 border-top">
+            <a href="{% url 'format_list' %}" class="btn btn-outline-secondary px-3" style="border-radius:8px;font-size:0.83rem;font-weight:600;">
+              <i class="bi bi-x me-1"></i>Annuler
+            </a>
+            
+            <button type="submit" class="btn btn-primary px-4 shadow-sm d-flex align-items-center gap-2" style="border-radius:8px;font-size:0.83rem;font-weight:700;">
+              <i class="bi bi-cloud-arrow-up-fill"></i>
+              <span>{% if object %}Mettre à jour le format{% else %}Enregistrer le format{% endif %}</span>
+            </button>
+          </div>
+        </div>
+
+      </form>
+
     </div>
+
+    {# ── COLONNE APERÇU EN DIRECT & GUIDE (DROITE) ── #}
+    <div class="col-lg-5 col-xl-4">
+
+      {# ── CARTE APERÇU DU GABARIT VISUEL ── #}
+      <div class="card shadow-sm mb-4" style="border-radius:8px !important; border:1px solid #e2e8f0; overflow:hidden;">
+        <div class="card-header bg-white py-3 px-4 d-flex align-items-center gap-2 border-bottom">
+          <div class="d-flex align-items-center justify-content-center"
+               style="width:30px;height:30px;border-radius:8px !important;background:rgba(147,46,43,0.08);color:#932e2b;font-size:0.9rem;">
+            <i class="bi bi-eye-fill"></i>
+          </div>
+          <span class="fw-bold text-dark" style="font-size:0.88rem;">Aperçu Visuel du Gabarit</span>
+        </div>
+        <div class="card-body p-4 text-center">
+
+          {# Boîte de simulation de proportion #}
+          <div class="d-flex align-items-center justify-content-center mx-auto mb-3"
+               style="height:140px; background:#f8fafc; border:2px dashed #cbd5e1; border-radius:8px; position:relative; overflow:hidden;">
+            <div id="ratio-box"
+                 style="width:120px; height:90px; background:linear-gradient(135deg, #932e2b 0%, #1e40af 100%); border-radius:6px; box-shadow:0 4px 12px rgba(0,0,0,0.15); display:flex; align-items:center; justify-content:center; color:#fff; font-weight:bold; font-size:0.85rem; transition:all 0.3s ease;">
+              <span id="preview-code-tag">4x3</span>
+            </div>
+          </div>
+
+          <div class="d-flex justify-content-around py-2 border-top border-bottom" style="font-size:0.8rem;">
+            <div>
+              <div class="text-muted small">Code</div>
+              <strong id="preview-code" class="text-dark font-monospace">—</strong>
+            </div>
+            <div>
+              <div class="text-muted small">Catégorie</div>
+              <strong id="preview-cat" class="text-primary">—</strong>
+            </div>
+            <div>
+              <div class="text-muted small">Surface</div>
+              <strong id="preview-surface" class="text-success">— m²</strong>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {# ── CARTE GABARITS DE RÉFÉRENCE ── #}
+      <div class="card shadow-sm" style="border-radius:8px !important; border:1px solid #e2e8f0; overflow:hidden;">
+        <div class="card-header bg-white py-3 px-4 d-flex align-items-center gap-2 border-bottom">
+          <div class="d-flex align-items-center justify-content-center"
+               style="width:30px;height:30px;border-radius:8px !important;background:rgba(30,64,175,0.08);color:#1e40af;font-size:0.9rem;">
+            <i class="bi bi-info-circle-fill"></i>
+          </div>
+          <span class="fw-bold text-dark" style="font-size:0.88rem;">Gabarits Standards du Secteur</span>
+        </div>
+        <div class="card-body p-3 d-flex flex-column gap-2" style="font-size:0.8rem;">
+          
+          <div class="p-2.5 d-flex align-items-center justify-content-between rounded" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px !important;padding: 0.4rem 0.5rem;">
+            <div>
+              <strong class="text-dark">Panneau 4×3</strong>
+              <div class="text-muted small">Standard urbain classique</div>
+            </div>
+            <span class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace">12 m²</span>
+          </div>
+
+          <div class="p-2.5 d-flex align-items-center justify-content-between rounded" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px !important; padding: 0.4rem 0.5rem;">
+            <div>
+              <strong class="text-dark">Panneau Géant 12×4</strong>
+              <div class="text-muted small">Autoroutes & Grands axes</div>
+            </div>
+            <span class="badge bg-danger-subtle text-danger border border-danger-subtle font-monospace">48 m²</span>
+          </div>
+
+          <div class="p-2.5 d-flex align-items-center justify-content-between rounded" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px !important;padding: 0.4rem 0.5rem;">
+            <div>
+              <strong class="text-dark">Sucette / Mobilier 1×2</strong>
+              <div class="text-muted small">Trottoirs & centres piétons</div>
+            </div>
+            <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle font-monospace">2 m²</span>
+          </div>
+
+          <div class="p-2.5 d-flex align-items-center justify-content-between rounded" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px !important;padding: 0.4rem 0.5rem;">
+            <div>
+              <strong class="text-dark">Structure Marché</strong>
+              <div class="text-muted small">Halles & stands commerciaux</div>
+            </div>
+            <span class="badge bg-success-subtle text-success border border-success-subtle font-monospace">Variable</span>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const inputs = document.querySelectorAll('input, select');
-        inputs.forEach(input => {
-            if(input.type !== 'submit' && input.type !== 'hidden') {
-                input.classList.add('form-control');
-                if (input.tagName === 'SELECT') {
-                    input.classList.remove('form-control');
-                    input.classList.add('form-select');
-                }
-            }
-        });
+document.addEventListener('DOMContentLoaded', function () {
+  const codeInput = document.getElementById('id_code');
+  const catInput = document.getElementById('id_categorie');
+  const dimInput = document.getElementById('id_dimensions');
+  const surfInput = document.getElementById('id_superficie');
+
+  const previewCodeTag = document.getElementById('preview-code-tag');
+  const previewCode = document.getElementById('preview-code');
+  const previewCat = document.getElementById('preview-cat');
+  const previewSurface = document.getElementById('preview-surface');
+  const ratioBox = document.getElementById('ratio-box');
+  const btnCalc = document.getElementById('btn-calc-surface');
+
+  // Application des classes Bootstrap aux inputs
+  document.querySelectorAll('#mainFormatForm input, #mainFormatForm select').forEach(el => {
+    if (el.tagName === 'SELECT') {
+      el.classList.add('form-select');
+    } else {
+      el.classList.add('form-control');
+    }
+    el.style.borderRadius = '0 8px 8px 0';
+    el.style.fontSize = '0.85rem';
+  });
+
+  if (surfInput) {
+    surfInput.style.borderRadius = '0';
+  }
+
+  // Mise à jour de l'aperçu dynamique
+  function updatePreview() {
+    const code = codeInput ? codeInput.value.trim() : '';
+    const cat = catInput ? (catInput.options ? (catInput.options[catInput.selectedIndex]?.text || catInput.value) : catInput.value) : '';
+    const dim = dimInput ? dimInput.value.trim() : '';
+    const surf = surfInput ? surfInput.value.trim() : '';
+
+    if (previewCode) previewCode.textContent = code || '—';
+    if (previewCodeTag) previewCodeTag.textContent = code || '4x3';
+    if (previewCat) previewCat.textContent = cat || 'Standard';
+    if (previewSurface) previewSurface.textContent = surf ? surf + ' m²' : '—';
+
+    // Ajustement visuel des proportions du ratioBox
+    if (dim) {
+      const match = dim.match(/(\d+(?:[.,]\d+)?)\s*(?:m)?\s*[x×*]\s*(\d+(?:[.,]\d+)?)/i);
+      if (match) {
+        const w = parseFloat(match[1].replace(',', '.'));
+        const h = parseFloat(match[2].replace(',', '.'));
+        if (w > 0 && h > 0) {
+          const ratio = w / h;
+          if (ratio >= 2.5) {
+            // Très large (ex: 12x4)
+            ratioBox.style.width = '180px';
+            ratioBox.style.height = '60px';
+          } else if (ratio > 1) {
+            // Paysage classique (ex: 4x3)
+            ratioBox.style.width = '130px';
+            ratioBox.style.height = '85px';
+          } else if (ratio === 1) {
+            // Carré
+            ratioBox.style.width = '90px';
+            ratioBox.style.height = '90px';
+          } else {
+            // Portrait / Sucette (ex: 1x2)
+            ratioBox.style.width = '65px';
+            ratioBox.style.height = '110px';
+          }
+        }
+      }
+    }
+  }
+
+  // Calcul automatique de la surface depuis les dimensions
+  function calculateSurface() {
+    if (dimInput && surfInput) {
+      const dim = dimInput.value.trim();
+      const match = dim.match(/(\d+(?:[.,]\d+)?)\s*(?:m)?\s*[x×*]\s*(\d+(?:[.,]\d+)?)/i);
+      if (match) {
+        const w = parseFloat(match[1].replace(',', '.'));
+        const h = parseFloat(match[2].replace(',', '.'));
+        if (!isNaN(w) && !isNaN(h)) {
+          const area = (w * h).toFixed(2);
+          surfInput.value = area;
+          updatePreview();
+          surfInput.style.borderColor = '#16a34a';
+          setTimeout(() => { surfInput.style.borderColor = ''; }, 1200);
+        }
+      }
+    }
+  }
+
+  if (codeInput) codeInput.addEventListener('input', updatePreview);
+  if (catInput) catInput.addEventListener('change', updatePreview);
+  if (dimInput) {
+    dimInput.addEventListener('input', () => {
+      updatePreview();
+      calculateSurface();
     });
+  }
+  if (surfInput) surfInput.addEventListener('input', updatePreview);
+  if (btnCalc) btnCalc.addEventListener('click', calculateSurface);
+
+  // Initialisation au chargement
+  updatePreview();
+});
 </script>
 {% endblock %}

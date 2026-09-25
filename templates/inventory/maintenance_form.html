@@ -2,8 +2,12 @@
 {% load static %}
 
 {% block title %}{{ title }} — Integral{% endblock %}
+
 {% block topbar_title %}
-  <i class="bi bi-tools me-2" style="color:#fbbf24"></i>{{ title }}
+  <div class="d-flex align-items-center gap-2">
+    <i class="bi bi-tools" style="color:#d97706;"></i>
+    <span class="fw-bold">{{ title }}</span>
+  </div>
 {% endblock %}
 
 {% block content %}
@@ -12,359 +16,384 @@
 <link href="https://cdnjs.cloudflare.com/ajax/libs/select2/4.1.0-rc.0/css/select2.min.css" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/select2/4.1.0-rc.0/js/select2.min.js"></script>
 
-<style>
-  /* ── Select2 ── */
-  .select2-container .select2-selection--single {
-    height: 40px !important; padding: 4px 8px !important;
-    border: 1px solid var(--border, #ced4da) !important;
-    border-radius: 10px !important;
-  }
-  .select2-container--default .select2-selection--single .select2-selection__rendered {
-    line-height: 30px !important; font-size: 0.85rem !important;
-  }
-  .select2-container--default .select2-selection--single .select2-selection__arrow { height: 38px !important; }
-  .select2-container--default .select2-selection--single:focus-within {
-    border-color: #fbbf24 !important;
-    box-shadow: 0 0 0 3px rgba(251,191,36,0.2) !important;
-  }
+<div class="container-fluid py-3">
 
-  /* ── Hero ── */
-  .mxf-hero {
-    background: linear-gradient(135deg, #932e2b 0%, #1e40af 100%);
-    border-radius: 8px;
-    padding: 24px 28px;
-    margin-bottom: 24px;
-    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
-  }
-  .mxf-hero-icon {
-    width: 56px; height: 56px;
-    background: rgba(251,191,36,0.15);
-    border-radius: 8px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 1.6rem; color: #fbbf24; flex-shrink: 0;
-  }
-  .mxf-hero-title { font-size: 1.1rem; font-weight: 800; color: #fff; margin: 0; }
-  .mxf-hero-sub   { font-size: 0.78rem; color: #94a3b8; margin-top: 3px; }
-
-  /* ── Cards ── */
-  .mxf-card {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    overflow: hidden;
-    margin-bottom: 20px;
-  }
-  .mxf-card-hd {
-    padding: 13px 20px;
-    border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; gap: 8px;
-    font-size: 0.78rem; font-weight: 800;
-    text-transform: uppercase; letter-spacing: 0.5px;
-    color: var(--text-muted);
-    background: #f8fafc;
-  }
-  .mxf-card-bd { padding: 22px; }
-
-  /* ── Form labels & controls ── */
-  .mxf-label {
-    display: block;
-    font-size: 0.72rem; font-weight: 700;
-    text-transform: uppercase; letter-spacing: 0.5px;
-    color: var(--text-muted); margin-bottom: 6px;
-  }
-  .mxf-control {
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    font-size: 0.85rem;
-    padding: 9px 13px;
-    width: 100%;
-    background: var(--bg-card);
-    color: var(--text);
-    transition: border-color 0.15s, box-shadow 0.15s;
-  }
-  .mxf-control:focus {
-    outline: none;
-    border-color: #fbbf24;
-    box-shadow: 0 0 0 3px rgba(251,191,36,0.18);
-  }
-
-  /* ── État Boutons Radio ── */
-  .mxf-etat-group { display: flex; gap: 10px; }
-  .mxf-etat-option { flex: 1; }
-  .mxf-etat-option input[type="radio"] { display: none; }
-  .mxf-etat-btn {
-    display: flex; align-items: center; justify-content: center; gap: 8px;
-    padding: 12px 14px;
-    border: 2px solid var(--border);
-    border-radius: 8px;
-    cursor: pointer;
-    font-weight: 700; font-size: 0.85rem;
-    margin: 0; width: 100%;
-    transition: all 0.18s;
-    background: var(--bg-card);
-    color: var(--text-muted);
-    user-select: none;
-  }
-  .mxf-etat-btn:hover { border-color: var(--color-primary); }
-  .mxf-etat-option input[type="radio"]:checked + .mxf-etat-btn-bon {
-    background: rgba(16,185,129,0.08);
-    color: #059669; border-color: #10b981;
-    box-shadow: 0 4px 14px rgba(16,185,129,0.15);
-  }
-  .mxf-etat-option input[type="radio"]:checked + .mxf-etat-btn-panne {
-    background: rgba(239,68,68,0.08);
-    color: #dc2626; border-color: #ef4444;
-    box-shadow: 0 4px 14px rgba(239,68,68,0.15);
-  }
-
-  /* ── Photo preview ── */
-  .mxf-photo-zone {
-    border: 2px dashed var(--border);
-    border-radius: 8px;
-    padding: 16px;
-    text-align: center;
-    background: #f8fafc;
-  }
-  .mxf-photo-preview {
-    width: 100%; max-height: 180px;
-    object-fit: cover; border-radius: 8px;
-    border: 2px solid var(--color-primary);
-    margin-bottom: 12px;
-  }
-
-  /* ── Error alert ── */
-  .mxf-error {
-    background: #fef2f2; border: 1px solid #fecaca;
-    border-radius: 8px; padding: 14px 16px; margin-bottom: 20px;
-    font-size: 0.84rem; color: #dc2626;
-  }
-  .mxf-error strong { display: block; margin-bottom: 6px; font-size: 0.88rem; }
-
-  /* ── Form actions ── */
-  .mxf-actions {
-    padding: 16px 22px;
-    border-top: 1px solid var(--border);
-    background: #f8fafc;
-    display: flex; justify-content: flex-end; gap: 12px;
-  }
-  .mxf-btn-cancel {
-    padding: 9px 22px; border-radius: 8px;
-    border: 1px solid var(--border); background: var(--bg-card);
-    color: var(--text-muted); font-weight: 600; font-size: 0.85rem;
-    text-decoration: none; display: inline-flex; align-items: center; gap: 6px;
-    cursor: pointer;
-  }
-  .mxf-btn-cancel:hover { background: #f1f5f9; color: var(--text); }
-  .mxf-btn-submit {
-    padding: 9px 28px; border-radius: 8px;
-    border: none; background: var(--color-primary);
-    color: #fff; font-weight: 700; font-size: 0.88rem;
-    display: inline-flex; align-items: center; gap: 8px;
-    cursor: pointer; box-shadow: 0 4px 14px rgba(147,46,43,0.3);
-    transition: opacity 0.15s;
-  }
-  .mxf-btn-submit:hover { opacity: 0.9; }
-
-  /* ── Info hint ── */
-  .mxf-hint {
-    font-size: 0.75rem; color: var(--text-muted);
-    display: flex; align-items: center; gap: 5px; margin-top: 5px;
-  }
-
-  /* ── Retour ── */
-  .mxf-back {
-    width: 36px; height: 36px;
-    border: 1px solid var(--border); border-radius: 50%;
-    background: var(--bg-card); color: var(--text-muted);
-    display: inline-flex; align-items: center; justify-content: center;
-    text-decoration: none; flex-shrink: 0;
-  }
-  .mxf-back:hover { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
-</style>
-
-<div class="row justify-content-center">
-  <div>
-
-    <!-- ── Breadcrumb ── -->
-    <div class="d-flex align-items-center gap-2 mb-3" style="font-size:0.78rem;color:var(--text-muted);">
-      <a href="{% url 'maintenance_list' %}" class="mxf-back"><i class="bi bi-arrow-left"></i></a>
-      <a href="{% url 'maintenance_list' %}" style="color:var(--text-muted);text-decoration:none;">Maintenances</a>
-      <i class="bi bi-chevron-right" style="font-size:0.65rem;"></i>
-      <span style="color:var(--text);font-weight:600;">{{ title }}</span>
+  {# ── BREADCRUMB ── #}
+  <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2" style="font-size:0.83rem;">
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+      <a href="{% url 'maintenance_list' %}" class="d-inline-flex align-items-center gap-1 text-muted text-decoration-none">
+        <i class="bi bi-arrow-left"></i> Maintenances
+      </a>
+      <span class="text-muted">/</span>
+      <span class="fw-bold text-dark">{{ title }}</span>
     </div>
 
-    <!-- ── Hero ── -->
-    <div class="mxf-hero">
-      <div class="mxf-hero-icon"><i class="bi bi-tools"></i></div>
+    <a href="{% url 'maintenance_list' %}" class="btn btn-outline-secondary btn-sm" style="border-radius:8px; font-size:0.78rem; font-weight:600;">
+      <i class="bi bi-list-check me-1"></i>Historique des maintenances
+    </a>
+  </div>
+
+  {# ── HERO BANDEAU ── #}
+  <div class="mb-4 p-4 d-flex align-items-center justify-content-between flex-wrap gap-3"
+       style="background:linear-gradient(135deg,#0f172a 0%,#1e293b 100%); border-radius:8px !important; color:#fff; box-shadow:0 8px 24px rgba(15,23,42,0.12); position:relative; overflow:hidden;">
+    <div style="position:absolute;right:-20px;top:-20px;width:150px;height:150px;border-radius:50%;background:rgba(217,119,6,0.12);pointer-events:none;"></div>
+    
+    <div class="d-flex align-items-center gap-3">
+      <div class="d-flex align-items-center justify-content-center flex-shrink-0"
+           style="width:58px;height:58px;border-radius:8px !important;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.15);font-size:1.6rem;color:#fbbf24;">
+        <i class="bi bi-tools"></i>
+      </div>
       <div>
-        <div class="mxf-hero-title">{{ title }}</div>
-        {% if form.instance.pk %}
-          <div class="mxf-hero-sub">
-            Support : <strong style="color:#e2e8f0;">{{ form.instance.support.code }}</strong> — {{ form.instance.support.nom }}
-          </div>
-        {% else %}
-          <div class="mxf-hero-sub">Renseignez les détails des réparations et l'état final du panneau</div>
-        {% endif %}
+        <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:rgba(255,255,255,0.55);">
+          Maintenance & Service Technique
+        </div>
+        <h1 class="mb-0 fw-bold" style="font-size:1.5rem;letter-spacing:-0.03em;color:#fff;">
+          {{ title }}
+        </h1>
+        <div class="mt-1" style="font-size:0.8rem;color:rgba(255,255,255,0.7);">
+          {% if form.instance.pk %}
+            Support : <strong class="text-white font-monospace">{{ form.instance.support.code }}</strong> — {{ form.instance.support.nom }}
+          {% else %}
+            Renseignez les détails de l'intervention, la date et l'état final du panneau publicitaire.
+          {% endif %}
+        </div>
       </div>
     </div>
 
-    <form method="post" enctype="multipart/form-data">
-      {% csrf_token %}
+    <div class="d-none d-md-block text-end">
+      <span class="badge" style="background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.2);color:#fff;border-radius:8px;font-size:0.75rem;padding:6px 12px;">
+        <i class="bi bi-check-circle me-1 text-warning"></i>Rapport d'intervention technique
+      </span>
+    </div>
+  </div>
 
-      {% if form.errors %}
-        <div class="mxf-error">
-          <strong><i class="bi bi-exclamation-triangle me-1"></i>Le formulaire contient des erreurs :</strong>
-          <ul class="mb-0 ps-3" style="font-size:0.82rem;">
-            {% for field in form %}
-              {% if field.errors %}<li>{{ field.label }} : {{ field.errors|striptags }}</li>{% endif %}
-            {% endfor %}
-            {% if form.non_field_errors %}<li>{{ form.non_field_errors|striptags }}</li>{% endif %}
-          </ul>
-        </div>
-      {% endif %}
+  {# ── GRILLE PRINCIPALE ── #}
+  <div class="row g-4">
 
-      <input type="hidden" name="effectue_par" value="{{ request.user.pk }}">
-      {% if support_pk %}<input type="hidden" name="support" value="{{ support_pk }}">{% endif %}
+    {# ── COLONNE FORMULAIRE (GAUCHE) ── #}
+    <div class="col-lg-7 col-xl-8">
 
-      <!-- ── Section 1 : Identification ── -->
-      <div class="mxf-card">
-        <div class="mxf-card-hd">
-          <i class="bi bi-geo-alt-fill" style="color:var(--color-primary);"></i>
-          Identification du Support
-        </div>
-        <div class="mxf-card-bd">
-          <div class="row g-4">
+      <form method="post" enctype="multipart/form-data" novalidate id="maintenanceForm">
+        {% csrf_token %}
 
-            <!-- Support -->
-            <div class="col-md-6">
-              <label class="mxf-label"><i class="bi bi-geo-alt me-1"></i>Support *</label>
-              {{ form.support }}
-              {% if form.support.errors %}<div class="text-danger small mt-1">{{ form.support.errors }}</div>{% endif %}
+        {% if form.errors %}
+          <div class="alert alert-danger mb-4 p-3 d-flex align-items-start gap-3" style="border-radius:8px !important;font-size:0.85rem;">
+            <i class="bi bi-exclamation-triangle-fill fs-5 flex-shrink-0 mt-0.5"></i>
+            <div class="flex-grow-1">
+              <strong>Des erreurs sont survenues lors de la validation :</strong>
+              <ul class="mb-0 mt-1 ps-3" style="font-size:0.8rem;">
+                {% for field in form %}
+                  {% if field.errors %}
+                    <li><strong>{{ field.label }}</strong> : {{ field.errors|striptags }}</li>
+                  {% endif %}
+                {% endfor %}
+                {% if form.non_field_errors %}
+                  <li>{{ form.non_field_errors|striptags }}</li>
+                {% endif %}
+              </ul>
             </div>
+          </div>
+        {% endif %}
 
-            <!-- Appliquer tout le support -->
-            {% if form.appliquer_tout_le_support %}
-            <div class="col-md-6 d-flex align-items-center" id="bloc-appliquer-tout">
-              <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:10px;padding:12px 16px;width:100%;">
-                <div class="d-flex align-items-center gap-3">
-                  {{ form.appliquer_tout_le_support }}
+        <input type="hidden" name="effectue_par" value="{{ request.user.pk }}">
+        {% if support_pk %}<input type="hidden" name="support" value="{{ support_pk }}">{% endif %}
+
+        {# ── SECTION 1 : CIBLE DE L'INTERVENTION ── #}
+        <div class="card shadow-sm mb-4" style="border-radius:8px !important; border:1px solid #e2e8f0; overflow:hidden;">
+          <div class="card-header bg-white py-3 px-4 d-flex align-items-center justify-content-between border-bottom">
+            <div class="d-flex align-items-center gap-2">
+              <div class="d-flex align-items-center justify-content-center"
+                   style="width:32px;height:32px;border-radius:8px !important;background:rgba(147,46,43,0.08);color:#932e2b;font-size:0.95rem;">
+                <i class="bi bi-geo-alt-fill"></i>
+              </div>
+              <span class="fw-bold text-dark" style="font-size:0.92rem;">1. Cible de l'Intervention</span>
+            </div>
+            <span class="badge bg-light text-muted border" style="font-size:0.7rem; border-radius:8px;">Équipement *</span>
+          </div>
+
+          <div class="card-body p-4">
+            <div class="row g-4">
+
+              {# Support #}
+              <div class="col-12">
+                <label class="form-label" for="{{ form.support.id_for_label }}" style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#475569;">
+                  Support concerné <span class="text-danger">*</span>
+                </label>
+                {{ form.support }}
+                {% if form.support.errors %}
+                  <div class="text-danger small mt-1 fw-semibold"><i class="bi bi-exclamation-circle-fill me-1"></i>{{ form.support.errors }}</div>
+                {% endif %}
+                <div class="form-text text-muted mt-1" style="font-size:0.75rem;">
+                  Recherchez par code (ex: <code>OUA-001</code>), quartier ou type de support.
+                </div>
+              </div>
+
+              {# Option Appliquer à tout le support #}
+              {% if form.appliquer_tout_le_support %}
+              <div class="col-12" id="bloc-appliquer-tout">
+                <div class="p-3 d-flex align-items-center gap-3"
+                     style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px !important;">
+                  <div class="form-check m-0">
+                    {{ form.appliquer_tout_le_support }}
+                  </div>
                   <div>
-                    <label class="form-check-label" for="id_appliquer_tout" style="font-size:0.85rem;font-weight:600;cursor:pointer;margin:0;">
+                    <label class="form-check-label fw-bold text-success mb-0" for="id_appliquer_tout" style="font-size:0.85rem; cursor:pointer;">
                       {{ form.appliquer_tout_le_support.label }}
                     </label>
                     {% if form.appliquer_tout_le_support.help_text %}
-                    <div style="font-size:0.73rem;color:var(--text-muted);margin-top:2px;">{{ form.appliquer_tout_le_support.help_text }}</div>
+                    <div class="text-muted" style="font-size:0.75rem; margin-top:2px;">
+                      {{ form.appliquer_tout_le_support.help_text }}
+                    </div>
                     {% endif %}
                   </div>
                 </div>
               </div>
-            </div>
-            {% endif %}
+              {% endif %}
 
-            <!-- Face -->
-            <div class="col-md-6" id="bloc-face" style="display:none;">
-              <label class="mxf-label"><i class="bi bi-signpost-split me-1"></i>Face concernée</label>
-              {{ form.face }}
-              <div class="mxf-hint"><i class="bi bi-info-circle"></i>Sélectionnez la face spécifique pour cette intervention.</div>
-              {% if form.face.errors %}<div class="text-danger small mt-1">{{ form.face.errors }}</div>{% endif %}
-            </div>
-
-          </div>
-        </div>
-      </div>
-
-      <!-- ── Section 2 : Intervention ── -->
-      <div class="mxf-card">
-        <div class="mxf-card-hd">
-          <i class="bi bi-clipboard2-check-fill" style="color:#fbbf24;"></i>
-          Rapport d'Intervention
-        </div>
-        <div class="mxf-card-bd">
-          <div class="row g-4">
-
-            <!-- Technicien -->
-            <div class="col-md-6">
-              <label class="mxf-label"><i class="bi bi-person-fill me-1"></i>Technicien Intervenant</label>
-              {{ form.effectue_par }}
-              {% if form.effectue_par.errors %}<div class="text-danger small mt-1">{{ form.effectue_par.errors }}</div>{% endif %}
-            </div>
-
-            <!-- Date intervention -->
-            <div class="col-md-6">
-              <label class="mxf-label"><i class="bi bi-calendar3 me-1"></i>Date & Heure d'intervention *</label>
-              {{ form.date_intervention }}
-              {% if form.date_intervention.errors %}<div class="text-danger small mt-1">{{ form.date_intervention.errors }}</div>{% endif %}
-            </div>
-
-            <!-- État résultant -->
-            <div class="col-12">
-              <label class="mxf-label"><i class="bi bi-activity me-1"></i>État résultant *</label>
-              <div class="mxf-etat-group">
-                {% for radio in form.etat_apres %}
-                <div class="mxf-etat-option">
-                  {{ radio.tag }}
-                  <label for="{{ radio.id_for_label }}"
-                         class="mxf-etat-btn {% if radio.data.value == 'panne' %}mxf-etat-btn-panne{% else %}mxf-etat-btn-bon{% endif %}">
-                    {% if radio.data.value == 'panne' %}
-                      <i class="bi bi-exclamation-triangle-fill"></i>
-                    {% else %}
-                      <i class="bi bi-check-circle-fill"></i>
-                    {% endif %}
-                    {{ radio.choice_label }}
-                  </label>
+              {# Face spécifique #}
+              <div class="col-12" id="bloc-face" style="display:none;">
+                <label class="form-label" for="{{ form.face.id_for_label }}" style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#475569;">
+                  Face concernée
+                </label>
+                <div class="input-group">
+                  <span class="input-group-text bg-light text-muted border-end-0" style="border-radius:8px 0 0 8px;">
+                    <i class="bi bi-signpost-split"></i>
+                  </span>
+                  {{ form.face }}
                 </div>
-                {% endfor %}
+                {% if form.face.errors %}
+                  <div class="text-danger small mt-1 fw-semibold"><i class="bi bi-exclamation-circle-fill me-1"></i>{{ form.face.errors }}</div>
+                {% endif %}
+                <div class="form-text text-muted mt-1" style="font-size:0.75rem;">
+                  <i class="bi bi-info-circle me-1"></i>Laissez vide si l'intervention concerne l'ensemble des faces.
+                </div>
               </div>
-              <div class="mxf-hint mt-2"><i class="bi bi-info-circle"></i>L'état du panneau sera automatiquement synchronisé après enregistrement.</div>
-              {% if form.etat_apres.errors %}<div class="text-danger small mt-1">{{ form.etat_apres.errors }}</div>{% endif %}
-            </div>
 
-            <!-- Description -->
-            <div class="col-12">
-              <label class="mxf-label"><i class="bi bi-card-text me-1"></i>Description des travaux / Observations</label>
-              {{ form.description }}
-              {% if form.description.errors %}<div class="text-danger small mt-1">{{ form.description.errors }}</div>{% endif %}
             </div>
+          </div>
+        </div>
 
+        {# ── SECTION 2 : RAPPORT TECHNIQUE & ÉTAT RÉSULTANT ── #}
+        <div class="card shadow-sm mb-4" style="border-radius:8px !important; border:1px solid #e2e8f0; overflow:hidden;">
+          <div class="card-header bg-white py-3 px-4 d-flex align-items-center justify-content-between border-bottom">
+            <div class="d-flex align-items-center gap-2">
+              <div class="d-flex align-items-center justify-content-center"
+                   style="width:32px;height:32px;border-radius:8px !important;background:rgba(217,119,6,0.1);color:#d97706;font-size:0.95rem;">
+                <i class="bi bi-clipboard2-check-fill"></i>
+              </div>
+              <span class="fw-bold text-dark" style="font-size:0.92rem;">2. Rapport d'Intervention & État</span>
+            </div>
+            <span class="badge bg-light text-muted border" style="font-size:0.7rem; border-radius:8px;">Résultat *</span>
+          </div>
+
+          <div class="card-body p-4">
+            <div class="row g-4">
+
+              {# Technicien #}
+              <div class="col-md-6">
+                <label class="form-label" style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#475569;">
+                  Technicien intervenant
+                </label>
+                <div class="input-group">
+                  <span class="input-group-text bg-light text-muted border-end-0" style="border-radius:8px 0 0 8px;">
+                    <i class="bi bi-person-fill"></i>
+                  </span>
+                  {{ form.effectue_par }}
+                </div>
+                {% if form.effectue_par.errors %}
+                  <div class="text-danger small mt-1 fw-semibold">{{ form.effectue_par.errors }}</div>
+                {% endif %}
+              </div>
+
+              {# Date & Heure #}
+              <div class="col-md-6">
+                <label class="form-label" for="{{ form.date_intervention.id_for_label }}" style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#475569;">
+                  Date & Heure d'intervention <span class="text-danger">*</span>
+                </label>
+                <div class="input-group">
+                  <span class="input-group-text bg-light text-muted border-end-0" style="border-radius:8px 0 0 8px;">
+                    <i class="bi bi-calendar-event"></i>
+                  </span>
+                  {{ form.date_intervention }}
+                </div>
+                {% if form.date_intervention.errors %}
+                  <div class="text-danger small mt-1 fw-semibold">{{ form.date_intervention.errors }}</div>
+                {% endif %}
+              </div>
+
+              {# État après travaux (Radio Cards) #}
+              <div class="col-12">
+                <label class="form-label mb-2" style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#475569;">
+                  État résultant du panneau <span class="text-danger">*</span>
+                </label>
+
+                <div class="row g-3">
+                  {% for radio in form.etat_apres %}
+                  <div class="col-sm-6">
+                    <label for="{{ radio.id_for_label }}"
+                           class="d-flex align-items-center gap-3 p-3 w-100 border cursor-pointer position-relative text-decoration-none"
+                           style="border-radius:8px !important; transition:all 0.2s ease; background:#fff; cursor:pointer;"
+                           id="label-{{ radio.id_for_label }}">
+                      <div class="form-check m-0 pe-none">
+                        {{ radio.tag }}
+                      </div>
+                      <div class="d-flex align-items-center gap-2">
+                        {% if radio.data.value == 'panne' %}
+                          <i class="bi bi-exclamation-triangle-fill fs-5 text-danger"></i>
+                          <div>
+                            <strong class="text-danger" style="font-size:0.88rem;">{{ radio.choice_label }}</strong>
+                            <div class="text-muted" style="font-size:0.72rem;">Panneau hors service / bloqué</div>
+                          </div>
+                        {% else %}
+                          <i class="bi bi-check-circle-fill fs-5 text-success"></i>
+                          <div>
+                            <strong class="text-success" style="font-size:0.88rem;">{{ radio.choice_label }}</strong>
+                            <div class="text-muted" style="font-size:0.72rem;">Panneau réparé & disponible</div>
+                          </div>
+                        {% endif %}
+                      </div>
+                    </label>
+                  </div>
+                  {% endfor %}
+                </div>
+
+                {% if form.etat_apres.errors %}
+                  <div class="text-danger small mt-2 fw-semibold">{{ form.etat_apres.errors }}</div>
+                {% endif %}
+                <div class="form-text text-muted mt-2" style="font-size:0.75rem;">
+                  <i class="bi bi-info-circle me-1"></i>L'état du panneau sera instantanément synchronisé sur la carte et dans l'inventaire.
+                </div>
+              </div>
+
+              {# Description des travaux #}
+              <div class="col-12">
+                <label class="form-label" for="{{ form.description.id_for_label }}" style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#475569;">
+                  Description des travaux / Diagnostics & Pièces remplacées
+                </label>
+                {{ form.description }}
+                {% if form.description.errors %}
+                  <div class="text-danger small mt-1 fw-semibold">{{ form.description.errors }}</div>
+                {% endif %}
+                <div class="form-text text-muted mt-1" style="font-size:0.75rem;">
+                  Précisez les interventions effectuées (ex: <em>Remplacement transformateur LED, redressement de la tôle, graissage serrure</em>).
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+        {# ── SECTION 3 : PREUVE PHOTOGRAPHIQUE ── #}
+        <div class="card shadow-sm mb-4" style="border-radius:8px !important; border:1px solid #e2e8f0; overflow:hidden;">
+          <div class="card-header bg-white py-3 px-4 d-flex align-items-center justify-content-between border-bottom">
+            <div class="d-flex align-items-center gap-2">
+              <div class="d-flex align-items-center justify-content-center"
+                   style="width:32px;height:32px;border-radius:8px !important;background:rgba(30,64,175,0.08);color:#1e40af;font-size:0.95rem;">
+                <i class="bi bi-camera-fill"></i>
+              </div>
+              <span class="fw-bold text-dark" style="font-size:0.92rem;">3. Photo de Preuve sur Site</span>
+            </div>
+            <span class="badge bg-light text-muted border" style="font-size:0.7rem; border-radius:8px;">Justificatif</span>
+          </div>
+
+          <div class="card-body p-4">
+            <div class="p-4 text-center border-dashed"
+                 style="background:#f8fafc; border:2px dashed #cbd5e1; border-radius:8px !important; position:relative;">
+              
+              {% if form.instance.photo %}
+                <img id="image-preview" src="{{ form.instance.photo.url }}" alt="Aperçu photo"
+                     class="img-fluid mb-3 shadow-sm"
+                     style="max-height:220px; border-radius:8px !important; border:2px solid var(--color-primary);">
+              {% else %}
+                <img id="image-preview" src="" alt="Aperçu photo"
+                     class="img-fluid mb-3 shadow-sm d-none"
+                     style="max-height:220px; border-radius:8px !important; border:2px solid var(--color-primary);">
+                <div id="upload-placeholder">
+                  <i class="bi bi-cloud-arrow-up text-muted" style="font-size:2.4rem; opacity:0.6;"></i>
+                  <div class="fw-bold text-dark mt-2" style="font-size:0.88rem;">Sélectionnez une photo attestant des travaux</div>
+                  <p class="text-muted small mb-3">Formats acceptés : JPG, PNG, WEBP</p>
+                </div>
+              {% endif %}
+
+              <div class="d-inline-block">
+                {{ form.photo }}
+              </div>
+
+              {% if form.photo.errors %}
+                <div class="text-danger small mt-2 fw-semibold">{{ form.photo.errors }}</div>
+              {% endif %}
+            </div>
+          </div>
+
+          {# ── PIED DE FORMULAIRE (ACTIONS) ── #}
+          <div class="card-footer bg-light py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-2 border-top">
+            <a href="{% url 'maintenance_list' %}" class="btn btn-outline-secondary px-3" style="border-radius:8px;font-size:0.83rem;font-weight:600;">
+              <i class="bi bi-x me-1"></i>Annuler
+            </a>
+            
+            <button type="submit" class="btn btn-primary px-4 shadow-sm d-flex align-items-center gap-2" style="border-radius:8px;font-size:0.83rem;font-weight:700;">
+              <i class="bi bi-cloud-arrow-up-fill"></i>
+              <span>{% if form.instance.pk %}Mettre à jour le rapport{% else %}Enregistrer l'intervention{% endif %}</span>
+            </button>
+          </div>
+        </div>
+
+      </form>
+
+    </div>
+
+    {# ── COLONNE CONSEILS & INSTRUCTIONS (DROITE) ── #}
+    <div class="col-lg-5 col-xl-4">
+
+      {# ── CARTE CONSIGNES RAPIDES ── #}
+      <div class="card shadow-sm mb-4" style="border-radius:8px !important; border:1px solid #e2e8f0; overflow:hidden;">
+        <div class="card-header bg-white py-3 px-4 d-flex align-items-center gap-2 border-bottom">
+          <div class="d-flex align-items-center justify-content-center"
+               style="width:30px;height:30px;border-radius:8px !important;background:rgba(217,119,6,0.1);color:#d97706;font-size:0.9rem;">
+            <i class="bi bi-lightbulb-fill"></i>
+          </div>
+          <span class="fw-bold text-dark" style="font-size:0.88rem;">Consignes d'Intervention</span>
+        </div>
+        <div class="card-body p-4" style="font-size:0.8rem;color:#475569;line-height:1.6;">
+          <div class="d-flex align-items-start gap-2 mb-3">
+            <span class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace mt-0.5">1</span>
+            <div><strong>Ciblage :</strong> Précisez si l'intervention concerne la structure globale ou une face particulière.</div>
+          </div>
+          <div class="d-flex align-items-start gap-2 mb-3">
+            <span class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace mt-0.5">2</span>
+            <div><strong>État après travaux :</strong> Si le support est opérationnel, choisissez <em>« Bon état »</em> pour le libérer sur la carte.</div>
+          </div>
+          <div class="d-flex align-items-start gap-2">
+            <span class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace mt-0.5">3</span>
+            <div><strong>Photo de preuve :</strong> Obligatoire pour valider le rapport auprès de la régie commerciale.</div>
           </div>
         </div>
       </div>
 
-      <!-- ── Section 3 : Photo ── -->
-      <div class="mxf-card">
-        <div class="mxf-card-hd">
-          <i class="bi bi-camera-fill" style="color:#fbbf24;"></i>
-          Photo de Preuve sur Site
-        </div>
-        <div class="mxf-card-bd">
-          <div class="mxf-photo-zone">
-            {% if form.instance.photo %}
-              <img id="image-preview" src="{{ form.instance.photo.url }}" alt="Aperçu" class="mxf-photo-preview">
-            {% else %}
-              <img id="image-preview" src="{% static 'img/logo.png' %}" alt="Aperçu" class="mxf-photo-preview d-none">
-              <i class="bi bi-cloud-upload" style="font-size:2rem;color:#cbd5e1;margin-bottom:8px;display:block;"></i>
-              <div style="font-size:0.82rem;color:var(--text-muted);margin-bottom:12px;">Cliquez pour sélectionner une photo ou glissez-la ici</div>
-            {% endif %}
-            {{ form.photo }}
-            <div class="mxf-hint justify-content-center mt-2"><i class="bi bi-info-circle"></i>Photo attestant de la réalisation des travaux ou de l'état du panneau</div>
+      {# ── CARTE SYNCHRONISATION SYSTÈME ── #}
+      <div class="card shadow-sm" style="border-radius:8px !important; border:1px solid #e2e8f0; overflow:hidden;">
+        <div class="card-header bg-white py-3 px-4 d-flex align-items-center gap-2 border-bottom">
+          <div class="d-flex align-items-center justify-content-center"
+               style="width:30px;height:30px;border-radius:8px !important;background:rgba(16,185,129,0.1);color:#10b981;font-size:0.9rem;">
+            <i class="bi bi-arrow-repeat"></i>
           </div>
-          {% if form.photo.errors %}<div class="text-danger small mt-2">{{ form.photo.errors }}</div>{% endif %}
+          <span class="fw-bold text-dark" style="font-size:0.88rem;">Effet sur l'Inventaire</span>
         </div>
-
-        <!-- Actions -->
-        <div class="mxf-actions">
-          <a href="{% url 'maintenance_list' %}" class="mxf-btn-cancel">
-            <i class="bi bi-x-lg"></i>Annuler
+        <div class="card-body p-4" style="font-size:0.8rem;color:#475569;line-height:1.6;">
+          <div class="p-3 mb-3" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px !important;color:#166534;">
+            <i class="bi bi-check-circle-fill me-1"></i>
+            La mise à jour de l'état clôturera ou créera automatiquement la période d'indisponibilité correspondante dans le planning.
+          </div>
+          <a href="{% url 'carte' %}" class="btn btn-outline-secondary w-100 btn-sm d-flex align-items-center justify-content-center gap-2" style="border-radius:8px;font-weight:600;">
+            <i class="bi bi-map"></i>
+            <span>Vérifier sur la carte</span>
           </a>
-          <button type="submit" class="mxf-btn-submit">
-            <i class="bi bi-check-lg"></i>
-            {% if form.instance.pk %}Mettre à jour le rapport{% else %}Enregistrer l'intervention{% endif %}
-          </button>
         </div>
       </div>
 
-    </form>
+    </div>
   </div>
+
 </div>
 {% endblock %}
 
@@ -373,23 +402,70 @@
   const supportTypes = {{ support_types_json|safe }};
 
   document.addEventListener("DOMContentLoaded", function () {
-    // ── Select2 ──
-    if (window.jQuery) {
+    // ── Select2 Init ──
+    if (window.jQuery && $.fn.select2) {
       $('#id_support').select2({
-        placeholder: "Rechercher un support (ville, quartier, code)...",
-        allowClear: true, width: '100%',
+        placeholder: "Rechercher un support (code, nom, quartier)...",
+        allowClear: true,
+        width: '100%',
       });
     }
 
-    // ── Style des form controls ──
-    document.querySelectorAll('.mxf-card select, .mxf-card input[type="text"], .mxf-card input[type="datetime-local"], .mxf-card textarea').forEach(el => {
-      el.classList.add('mxf-control');
+    // ── Style Bootstrap des contrôles ──
+    document.querySelectorAll('#maintenanceForm input[type="text"], #maintenanceForm input[type="datetime-local"], #maintenanceForm select, #maintenanceForm textarea').forEach(el => {
+      if (el.tagName === 'SELECT') {
+        el.classList.add('form-select');
+      } else {
+        el.classList.add('form-control');
+      }
+      el.style.borderRadius = '8px';
+      el.style.fontSize = '0.85rem';
     });
 
-    // ── Photo preview ──
+    const descInput = document.getElementById('id_description');
+    if (descInput) {
+      descInput.rows = 4;
+      descInput.placeholder = "Indiquez les actions entreprises, les anomalies observées et les pièces éventuellement changées...";
+    }
+
+    // ── Highlight interactif des boutons radio état ──
+    function updateRadioCards() {
+      document.querySelectorAll('input[type="radio"][name="etat_apres"]').forEach(radio => {
+        const label = document.getElementById('label-' + radio.id);
+        if (label) {
+          if (radio.checked) {
+            if (radio.value === 'panne') {
+              label.style.borderColor = '#ef4444';
+              label.style.background = '#fef2f2';
+              label.style.boxShadow = '0 0 0 2px rgba(239,68,68,0.2)';
+            } else {
+              label.style.borderColor = '#10b981';
+              label.style.background = '#f0fdf4';
+              label.style.boxShadow = '0 0 0 2px rgba(16,185,129,0.2)';
+            }
+          } else {
+            label.style.borderColor = '#e2e8f0';
+            label.style.background = '#ffffff';
+            label.style.boxShadow = 'none';
+          }
+        }
+      });
+    }
+
+    document.querySelectorAll('input[type="radio"][name="etat_apres"]').forEach(r => {
+      r.addEventListener('change', updateRadioCards);
+    });
+    updateRadioCards();
+
+    // ── Photo Preview ──
     const photoInput = document.querySelector('input[type="file"][name="photo"]');
     const previewImg = document.getElementById('image-preview');
+    const placeholder = document.getElementById('upload-placeholder');
     if (photoInput && previewImg) {
+      photoInput.classList.add('form-control');
+      photoInput.style.borderRadius = '8px';
+      photoInput.style.fontSize = '0.82rem';
+
       photoInput.addEventListener('change', function () {
         const file = this.files[0];
         if (file) {
@@ -397,24 +473,25 @@
           reader.onload = e => {
             previewImg.src = e.target.result;
             previewImg.classList.remove('d-none');
+            if (placeholder) placeholder.classList.add('d-none');
           };
           reader.readAsDataURL(file);
         }
       });
     }
 
-    // ── Logic support/face ──
-    const supportSelect   = document.getElementById('id_support');
-    const faceSelect      = document.getElementById('id_face');
-    const blocFace        = document.getElementById('bloc-face');
-    const blocAppliqueTout= document.getElementById('bloc-appliquer-tout');
-    const checkboxTout    = document.getElementById('id_appliquer_tout');
+    // ── Logic Support / Face AJAX ──
+    const supportSelect    = document.getElementById('id_support');
+    const faceSelect       = document.getElementById('id_face');
+    const blocFace         = document.getElementById('bloc-face');
+    const blocAppliqueTout = document.getElementById('bloc-appliquer-tout');
+    const checkboxTout     = document.getElementById('id_appliquer_tout');
 
     if (!supportSelect) return;
 
     function chargerFaces(supportId, faceSelectionnee = null) {
       if (!faceSelect) return Promise.resolve();
-      faceSelect.innerHTML = '<option value="">---------</option>';
+      faceSelect.innerHTML = '<option value="">Sélectionnez une face...</option>';
       if (!supportId) return Promise.resolve();
       return fetch(`/gestion/inventory/api/faces/${supportId}/`)
         .then(r => r.json())

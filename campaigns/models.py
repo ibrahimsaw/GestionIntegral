@@ -928,13 +928,12 @@ class Campagne(models.Model):
         return (prix * Decimal(faces)).quantize(Decimal('0.01'))
     
     def montant_total_affichage(self):
-        print(self.type_support)
         prix = self.prix_affichage or Decimal('0.00')
 
         if self.est_mere:
             total = Decimal('0.00')
             for enfant in self.sous_campagnes.all():
-                total += enfant.montant_total() or Decimal('0.00')
+                total += enfant.montant_total_affichage() or Decimal('0.00')
             return total
 
         if self.type_support == 'ecran':
@@ -958,7 +957,7 @@ class Campagne(models.Model):
         if self.est_mere:
             total = Decimal('0.00')
             for enfant in self.sous_campagnes.all():
-                total += enfant.montant_total() or Decimal('0.00')
+                total += enfant.montant_total_impression() or Decimal('0.00')
             return total
         
         if self.type_support == 'ecran':
@@ -985,44 +984,7 @@ class Campagne(models.Model):
         return self.lignes.count()
     
     def calculer_nombre_spots_ecran(self):
-        total_jours = self.duree_jours()
-        if total_jours == 0:
-            return 0
-
-        if self.type_support == 'marche':
-            total = 0
-            for ligne in self.lignes.filter(emplacement__isnull=False).select_related('emplacement'):
-                jours_dispo = ligne.emplacement.jours_disponibles_sur_periode(
-                    self.date_debut, self.date_fin, exclude_campagne_id=self.pk
-                )
-                total += jours_dispo / total_jours
-            return round(total, 2)
-
-        if self.type_support and self.type_support != 'ecran':
-            total = 0
-            for ligne in self.lignes.select_related('face__support').all():
-                if not ligne.face:
-                    continue
-                support     = ligne.face.support
-                jours_dispo = support.jours_disponibles_sur_periode(self.date_debut, self.date_fin)
-                total += jours_dispo / total_jours
-            return round(total, 2)
-
-        elif self.type_support == 'ecran':
-            if not self.frequence or not self.duree_passage:
-                return 0
-
-            spots_par_heure = (3600 / self.frequence) * self.get_nombre_visuels_effective()
-            heures_tranches = calculer_duree_tranches(self.tranches_horaires)
-            spots_par_jour  = spots_par_heure * heures_tranches
-
-            total = 0
-            for ligne in self.lignes.select_related('support').all():
-                support     = ligne.support
-                jours_dispo = support.jours_disponibles_sur_periode(self.date_debut, self.date_fin)
-                total += spots_par_jour * jours_dispo
-            return round(total)
-        return 0
+        return self.calculer_nombre_spots() if self.type_support == 'ecran' else 0
 
     def diffusions_par_heure(self):
         if self.type_support == 'ecran' and self.frequence:
@@ -1055,7 +1017,6 @@ class Campagne(models.Model):
                 jours_dispo = ligne.emplacement.jours_disponibles_sur_periode(
                     self.date_debut, self.date_fin, exclude_campagne_id=self.pk
                 )
-                print(f"Support {ligne.emplacement} : {jours_dispo} jours dispo sur {total_jours} jours")
                 total += jours_dispo / total_jours
             return round(total, 2)
 
@@ -1073,17 +1034,22 @@ class Campagne(models.Model):
             return round(total, 2)
 
         elif self.type_support == 'ecran':
-            return sum(getattr(ligne, 'calculer_spots', lambda: 0)() for ligne in self.lignes.all())
+            return sum(ligne.calculer_spots() for ligne in self.lignes.all())
         return 0
     
     def calculer_nombre_spots24(self):
         if self.type_support == 'ecran':
-            return self.calculer_nombre_spots() // max(self.duree_jours(), 1)
+            return round(self.calculer_nombre_spots() / max(self.duree_jours(), 1), 2)
         return 0
     
     def calculer_nombre_spotsjourecran(self):
         if self.type_support == 'ecran' and self.lignes.count() > 0:
-            return (self.calculer_nombre_spots() // max(self.duree_jours(), 1)) // self.lignes.count()
+            return round(
+                self.calculer_nombre_spots()
+                / max(self.duree_jours(), 1)
+                / self.lignes.count(),
+                2,
+            )
         return 0
 
     def auto_update_statut(self):

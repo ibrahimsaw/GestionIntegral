@@ -4,87 +4,112 @@
 
 {% block topbar_title %}
   <div class="d-flex align-items-center gap-2">
-    <div class="d-inline-flex align-items-center justify-content-center rounded-3 p-2" style="background: rgba(147, 46, 43, 0.08); color: var(--color-primary);">
+    <div class="d-inline-flex align-items-center justify-content-center p-2" style="border-radius:8px !important; background:rgba(147,46,43,0.08); color:var(--color-primary,#932e2b);">
       <i class="bi {% if support.type_support == 'panneau' %}bi-sign-merge-right{% else %}bi-display{% endif %} fs-5"></i>
     </div>
     <div class="min-width-0" style="max-width: 100%;">
-      <div class="d-flex align-items-center gap-2" style="min-width: 0; max-width: 100%;">
-        <span class="fw-bold text-truncate" style="display: inline-block; max-width: min(42vw, 460px); min-width: 0; vertical-align: middle;">{{ support.nom }}</span>
-        <span class="badge bg-light text-dark border font-monospace px-2" style="font-size:0.75rem; flex-shrink: 0;">{{ support.code }}</span>
+      <div class="d-flex align-items-center gap-2" style="min-width:0; max-width:100%;">
+        <span class="fw-bold text-truncate" style="display:inline-block; max-width:min(42vw, 460px); min-width:0; vertical-align:middle; font-size:1.05rem; color:#0f172a;">{{ support.nom }}</span>
+        <span class="badge bg-light text-dark border font-monospace px-2" style="font-size:0.75rem; border-radius:8px !important; flex-shrink:0;">{{ support.code }}</span>
       </div>
       <div class="text-muted d-none d-sm-block" style="font-size:0.75rem;">
-        <i class="bi bi-geo-alt me-1"></i>{{ support.quartier|default:"" }}{% if support.quartier and support.ville %}, {% endif %}{{ support.ville|default:"" }}
+        <i class="bi bi-geo-alt me-1 text-danger"></i>{{ support.quartier|default:"" }}{% if support.quartier and support.ville %}, {% endif %}{{ support.ville|default:"" }}
       </div>
     </div>
   </div>
 {% endblock %}
 
 {% block content %}
-<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-4">
-  <a href="javascript:void(0)" onclick="history.back()" class="btn btn-outline-secondary btn-sm shadow-sm">
-    <i class="bi bi-arrow-left me-1"></i>Retour
-  </a>
-  <div class="d-flex flex-wrap gap-2">
-    <a href="{% url 'support_periodes_panne' support.pk %}" class="btn btn-outline-danger btn-sm shadow-sm">
-      <i class="bi bi-clock-history me-1"></i>
-      <span class="d-none d-sm-inline">Périodes de panne</span>
-    </a>
-    {% if user.is_technicien_role or user.is_staff_regie_role %}
-    <a href="{% url 'maintenance_create' support.pk %}" class="btn btn-warning btn-sm shadow-sm text-dark fw-semibold">
-      <i class="bi bi-tools me-1"></i>
-      <span class="d-none d-sm-inline">Maintenance</span>
-    </a>
-    {% endif %}
-  </div>
-</div>
-<div>
+<div class="support-detail-page">
 
   <!-- ═══════════════════════════════════════════════════════
-       HERO CINÉMATIQUE
+       BARRE D'ACTIONS SUPÉRIEURE
        ═══════════════════════════════════════════════════════ -->
-  <div class="sdp-hero">
+  <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3">
+    <a href="javascript:void(0)" onclick="history.back()" class="btn btn-outline-secondary btn-sm shadow-sm d-inline-flex align-items-center gap-1" style="border-radius:8px !important; font-weight:600;">
+      <i class="bi bi-arrow-left"></i><span>Retour</span>
+    </a>
+    <div class="d-flex flex-wrap gap-2">
+      <a href="{% url 'support_periodes_panne' support.pk %}" class="btn btn-outline-danger btn-sm shadow-sm d-inline-flex align-items-center gap-1" style="border-radius:8px !important; font-weight:600;">
+        <i class="bi bi-clock-history"></i>
+        <span>Périodes de panne</span>
+      </a>
+      {% if user.is_technicien_role or user.is_staff_regie_role %}
+      <a href="{% url 'maintenance_create' support.pk %}" class="btn btn-warning btn-sm shadow-sm text-dark fw-semibold d-inline-flex align-items-center gap-1" style="border-radius:8px !important;">
+        <i class="bi bi-tools"></i>
+        <span>Maintenance</span>
+      </a>
+      {% endif %}
+      {% if user.is_staff_regie_role %}
+      <a href="{% url 'support_edit' support.uuid %}" class="btn btn-outline-primary btn-sm shadow-sm d-inline-flex align-items-center gap-1" style="border-radius:8px !important; font-weight:600;">
+        <i class="bi bi-pencil-square"></i>
+        <span>Modifier</span>
+      </a>
+      {% endif %}
+      {% if user.is_admin %}
+      <a href="{% url 'support_delete' support.uuid %}" class="btn btn-outline-danger btn-sm shadow-sm d-inline-flex align-items-center gap-1" style="border-radius:8px !important; font-weight:600;" title="Supprimer">
+        <i class="bi bi-trash"></i>
+        <span class="d-none d-sm-inline">Supprimer</span>
+      </a>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════
+       HERO CINÉMATIQUE OFFICIEL
+       ═══════════════════════════════════════════════════════ -->
+  <div class="sdp-hero" style="border-radius:8px !important; overflow:hidden; position:relative; margin-bottom:20px; box-shadow:0 8px 24px rgba(147,46,43,0.14);">
     {% if support.photo_principale %}
     <div class="sdp-hero-bg" style="background-image: url('{{ support.photo_principale.url }}');"></div>
     {% else %}
-    <div class="sdp-hero-bg" style="background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%);"></div>
+    <div class="sdp-hero-bg" style="background: linear-gradient(135deg, #932e2b 0%, #1e40af 100%) !important;"></div>
     {% endif %}
-    <div class="sdp-hero-overlay"></div>
+    <div class="sdp-hero-overlay" style="background: linear-gradient(135deg, rgba(147,46,43,0.92) 0%, rgba(30,64,175,0.85) 100%) !important;"></div>
     <div class="sdp-hero-glow"></div>
 
-    <div class="sdp-hero-content">
+    <div class="sdp-hero-content" style="position:relative; z-index:2; padding:22px 26px;">
       <!-- Info principale -->
-      <div class="d-flex align-items-start gap-4">
-        <div class="d-none d-lg-inline">
-          <div class="sdp-hero-icon">
-            <i class="bi {% if support.type_support == 'panneau' %}bi-sign-merge-right-fill{% else %}bi-display-fill{% endif %} text-warning"></i>
+      <div class="d-flex align-items-start gap-3 min-width-0 flex-grow-1">
+        <div class="d-none d-md-inline-flex">
+          <div class="sdp-hero-icon" style="width:54px; height:54px; border-radius:8px !important; background:rgba(255,255,255,0.14); border:1px solid rgba(255,255,255,0.25); display:flex; align-items:center; justify-content:center; font-size:1.5rem; color:#fff; backdrop-filter:blur(8px);">
+            <i class="bi {% if support.type_support == 'panneau' %}bi-sign-merge-right-fill text-warning{% else %}bi-display-fill text-info{% endif %}"></i>
           </div>
         </div>
 
-        <div>
+        <div class="min-width-0 flex-grow-1">
           <div class="d-flex align-items-center flex-wrap gap-2 mb-2">
-            <span class="sdp-code-badge">{{ support.code }}</span>
-            <span style="font-size:0.78rem; font-weight:600; color:rgba(255,255,255,0.6); text-transform:uppercase; letter-spacing:0.06em;">
+            <span class="sdp-code-badge" style="font-family:'SFMono-Regular',Consolas,monospace; font-weight:700; font-size:0.8rem; background:rgba(255,255,255,0.18); border:1px solid rgba(255,255,255,0.3); color:#fff; padding:3px 10px; border-radius:8px !important;">
+              {{ support.code }}
+            </span>
+            <span style="font-size:0.76rem; font-weight:700; color:rgba(255,255,255,0.85); text-transform:uppercase; letter-spacing:0.06em;">
               {{ support.get_type_support_display }}{% if support.format %} · {{ support.get_format_display }}{% endif %}
             </span>
-            <span class="sdp-pulse {% if support.etat == 'bon' %}pulse-green{% elif support.etat == 'maintenance' %}pulse-amber{% else %}pulse-red{% endif %}">
+            <span class="sdp-pulse {% if support.etat == 'bon' %}pulse-green{% elif support.etat == 'maintenance' %}pulse-amber{% else %}pulse-red{% endif %}" style="border-radius:8px !important;">
               <span class="sdp-pulse-dot"></span>
               {{ support.get_etat_display }}
             </span>
+            {% if support.is_dans_marche %}
+            <span class="badge" style="background:rgba(245,158,11,0.25); border:1px solid rgba(245,158,11,0.45); color:#fef3c7; font-size:0.72rem; border-radius:8px !important;">
+              <i class="bi bi-shop me-1"></i>{{ support.marche.nom }} ({{ support.emplacement.code }})
+            </span>
+            {% endif %}
           </div>
-          <h1 style="font-size: clamp(0.7rem, 1.5vw, 0.9rem); font-weight: 800; color: #fff; margin: 0 0 10px; line-height: 1.15;">
+
+          <h1 style="font-size: clamp(1.15rem, 2.2vw, 1.55rem); font-weight: 800; color: #ffffff; margin: 0 0 8px; line-height: 1.2; letter-spacing: -0.02em;">
             {{ support.nom }}
           </h1>
-          <div class="d-flex flex-wrap gap-2" style="font-size:0.82rem; color:rgba(255,255,255,0.55);">
-            <span style="word-break:break-word; min-width:0;">
-              <i class="bi bi-geo-alt-fill me-1" style="color:#f87171;"></i>
-              {% if support.adresse %}{{ support.adresse|default:"" }},{% endif %}
-              {% if support.quartier %}{{ support.quartier }}{% endif %}
-              {% if support.ville %} <strong style="color:rgba(255,255,255,0.8);">— {{ support.ville }}</strong>{% endif %}
+
+          <div class="d-flex flex-wrap align-items-center gap-3" style="font-size:0.82rem; color:rgba(255,255,255,0.8);">
+            <span>
+              <i class="bi bi-geo-alt-fill me-1" style="color:#fca5a5;"></i>
+              {% if support.adresse %}{{ support.adresse }}{% endif %}
+              {% if support.quartier %}{% if support.adresse %}, {% endif %}{{ support.quartier }}{% endif %}
+              {% if support.ville %}<strong class="text-white ms-1">— {{ support.ville }}</strong>{% endif %}
             </span>
             {% if support.latitude and support.longitude %}
-            <span class="font-monospace" style="cursor:pointer; color:rgba(255,255,255,0.45); word-break:break-all;" onclick="sdpCopyGps('{{ support.latitude }}, {{ support.longitude }}')" title="Copier les coordonnées">
-              <i class="bi bi-crosshair me-1" style="color:#fbbf24;"></i>{{ support.latitude }}, {{ support.longitude }}
-              <i class="bi bi-clipboard ms-1 opacity-50"></i>
+            <span class="font-monospace d-inline-flex align-items-center gap-1" style="cursor:pointer; background:rgba(0,0,0,0.25); padding:2px 8px; border-radius:8px !important; color:#fde68a; border:1px solid rgba(255,255,255,0.15);" onclick="sdpCopyGps('{{ support.latitude }}, {{ support.longitude }}')" title="Cliquer pour copier les coordonnées GPS">
+              <i class="bi bi-crosshair"></i>{{ support.latitude }}, {{ support.longitude }}
+              <i class="bi bi-clipboard ms-1 opacity-75"></i>
             </span>
             {% endif %}
           </div>
@@ -92,32 +117,22 @@
       </div>
 
       <!-- Actions Hero -->
-      <div class="d-flex flex-wrap gap-2 align-self-center">
-        <a href="{% url 'carte' %}?support={{ support.pk }}" class="btn btn-light btn-sm fw-semibold d-inline-flex align-items-center gap-1" style="border-radius:10px; font-size:0.84rem;">
-          <i class="bi bi-map-fill text-primary"></i> <span>Voir sur la carte</span>
+      <div class="d-flex flex-wrap gap-2 align-self-start align-self-md-center flex-shrink-0">
+        <a href="{% url 'carte' %}?support={{ support.pk }}" class="btn btn-light btn-sm fw-bold d-inline-flex align-items-center gap-1 shadow-sm" style="border-radius:8px !important; font-size:0.82rem; color:#0f172a;">
+          <i class="bi bi-map-fill text-primary"></i> <span>Carte globale</span>
         </a>
-        {% if user.is_staff_regie_role %}
-          <a href="{% url 'support_edit' support.uuid %}" class="btn btn-sm d-inline-flex align-items-center gap-1 fw-semibold" style="background:rgba(255,255,255,0.12); border:1px solid rgba(255,255,255,0.2); color:#fff; border-radius:10px; font-size:0.84rem; backdrop-filter:blur(4px);">
-            <i class="bi bi-pencil-square"></i> <span>Modifier</span>
-          </a>
-        {% endif %}
-        {% if user.is_admin %}
-          <a href="{% url 'support_delete' support.uuid %}" class="btn btn-outline-danger btn-sm shadow-sm px-2" title="Supprimer">
-            <i class="bi bi-trash"></i> <span>Supprimer</span>
-          </a>
-        {% endif %}
       </div>
     </div>
   </div>
 
   <!-- ═══════════════════════════════════════════════════════
-       BANDE KPI
+       BANDEAU KPI EN 4 TUILES HARMONISÉES (BORDER-RADIUS: 8PX)
        ═══════════════════════════════════════════════════════ -->
-  <div class="sdp-kpi-strip">
+  <div class="sdp-kpi-strip mb-4">
 
     <!-- Statut Commercial -->
     <div class="sdp-kpi">
-      <div class="sdp-kpi-icon" style="display:flex; align-items:center; justify-content:center; width:46px; height:46px; border-radius:13px; background: #b8e0d393; color:#059669; ">
+      <div class="sdp-kpi-icon" style="background:rgba(16,185,129,0.12); color:#10b981;">
         <i class="bi bi-check-circle-fill"></i>
       </div>
       <div>
@@ -126,30 +141,36 @@
           {% if support.type_support == 'panneau' %}
             {{ support.faces.count }} Face{{ support.faces.count|pluralize:",s" }}
           {% elif support.is_occupe %}
-            <span style="color:#ef4444;">Occupé</span>
+            <span class="text-danger">Occupé</span>
           {% else %}
-            <span style="color:#10b981;">Libre</span>
+            <span class="text-success">Disponible</span>
           {% endif %}
         </div>
-        {% if support.type_support == 'ecran' %}
-        <div class="sdp-kpi-sub">{{ support.taux_occupation_pourcentage }}% taux occup.</div>
-        {% endif %}
+        <div class="sdp-kpi-sub">
+          {% if support.type_support == 'ecran' %}
+            {{ support.taux_occupation_pourcentage }}% taux d'occupation
+          {% else %}
+            {% if support.is_occupe %}En cours de diffusion{% else %}Prêt pour réservation{% endif %}
+          {% endif %}
+        </div>
       </div>
     </div>
 
-    <!-- Gabarit -->
+    <!-- Gabarit & Dimensions -->
     <div class="sdp-kpi">
-      <div class="sdp-kpi-icon" style="background:rgba(59,130,246,0.1); color:#3b82f6;">
+      <div class="sdp-kpi-icon" style="background:rgba(30,64,175,0.1); color:#1e40af;">
         <i class="bi bi-aspect-ratio-fill"></i>
       </div>
       <div>
         <div class="sdp-kpi-label">Gabarit & Surface</div>
         <div class="sdp-kpi-value">{{ support.dimensions|default:support.get_format_display|default:"Standard" }}</div>
-        {% if support.surface_m2 %}<div class="sdp-kpi-sub">{{ support.surface_m2 }}</div>{% endif %}
+        <div class="sdp-kpi-sub">
+          {% if support.surface_m2 %}{{ support.surface_m2 }} m²{% else %}{{ support.get_type_support_display }}{% endif %}
+        </div>
       </div>
     </div>
 
-    <!-- Campagnes -->
+    <!-- Campagnes Actives -->
     <div class="sdp-kpi">
       <div class="sdp-kpi-icon" style="background:rgba(147,46,43,0.1); color:#932e2b;">
         <i class="bi bi-megaphone-fill"></i>
@@ -157,33 +178,33 @@
       <div>
         <div class="sdp-kpi-label">Campagnes Actives</div>
         <div class="sdp-kpi-value" style="color:#932e2b;">{{ lignes_actives|length }}</div>
-        <div class="sdp-kpi-sub">{{ historique|length }} passée{{ historique|length|pluralize }}</div>
+        <div class="sdp-kpi-sub">{{ historique|length }} campagne{{ historique|length|pluralize }} archivée{{ historique|length|pluralize }}</div>
       </div>
     </div>
 
     <!-- Maintenance -->
     <div class="sdp-kpi">
-      <div class="sdp-kpi-icon" style="background:rgba(245,158,11,0.1); color:#f59e0b;">
+      <div class="sdp-kpi-icon" style="background:rgba(245,158,11,0.12); color:#d97706;">
         <i class="bi bi-wrench-adjustable-circle-fill"></i>
       </div>
       <div>
         <div class="sdp-kpi-label">Dernier Entretien</div>
         <div class="sdp-kpi-value">
-          {% if maintenances %}{{ maintenances.0.date_intervention|date:"d/m/Y" }}{% else %}<span style="color:#10b981; font-size:0.95rem;">Aucun incident</span>{% endif %}
+          {% if maintenances %}{{ maintenances.0.date_intervention|date:"d/m/Y" }}{% else %}<span class="text-success" style="font-size:0.9rem;">Opérationnel</span>{% endif %}
         </div>
-        <div class="sdp-kpi-sub">{{ maintenances|length }} intervention{{ maintenances|length|pluralize }}</div>
+        <div class="sdp-kpi-sub">{{ maintenances|length }} intervention{{ maintenances|length|pluralize }} répertoriée{{ maintenances|length|pluralize }}</div>
       </div>
     </div>
 
   </div>
 
   <!-- ═══════════════════════════════════════════════════════
-       NAVIGATION PAR ONGLETS
+       NAVIGATION PAR ONGLETS (BORDER-RADIUS: 8PX)
        ═══════════════════════════════════════════════════════ -->
   <div class="sdp-tabs">
     <button class="sdp-tab active" onclick="sdpTab('overview', this)">
       <i class="bi bi-grid-fill"></i>
-      <span>{% if support.type_support == 'panneau' %}Faces & Visuels{% else %}Écran LED{% endif %}</span>
+      <span>{% if support.type_support == 'panneau' %}Faces & Visuels{% else %}Diffusion DOOH LED{% endif %}</span>
     </button>
     <button class="sdp-tab" onclick="sdpTab('specs', this)">
       <i class="bi bi-sliders"></i>
@@ -195,18 +216,18 @@
     </button>
     <button class="sdp-tab" onclick="sdpTab('campaigns', this)">
       <i class="bi bi-calendar-range-fill"></i>
-      <span>Campagnes</span>
+      <span>Campagnes & Planning</span>
       {% if lignes_actives %}<span class="sdp-tab-badge">{{ lignes_actives|length }}</span>{% endif %}
     </button>
     <button class="sdp-tab" onclick="sdpTab('maintenance', this)">
       <i class="bi bi-tools"></i>
-      <span>Maintenance</span>
+      <span>Maintenance & Photos</span>
       {% if maintenances %}<span class="sdp-tab-badge">{{ maintenances|length }}</span>{% endif %}
     </button>
   </div>
 
   <!-- ═══════════════════════════════════════════════════════
-       ONGLET 1 : VUE D'ENSEMBLE
+       ONGLET 1 : VUE D'ENSEMBLE (FACES / DOOH TELEMETRY)
        ═══════════════════════════════════════════════════════ -->
   <div id="sdp-overview" class="sdp-section active">
     <div class="row g-4">
@@ -215,12 +236,12 @@
       <div class="col-12 col-lg-8">
 
         {% if support.type_support == 'panneau' %}
-        <!-- Faces Panneau -->
+        <!-- Faces Panneau Statique -->
         <div class="sdp-card">
           <div class="sdp-card-head">
-            <h2><i class="bi bi-sign-merge-right-fill" style="color:#932e2b;"></i>Faces du Panneau</h2>
-            <span class="badge" style="background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; font-size:0.78rem;">
-              {{ support.faces.count }} face{{ support.faces.count|pluralize }}
+            <h2><i class="bi bi-sign-merge-right-fill" style="color:var(--color-primary,#932e2b);"></i>Faces du Panneau</h2>
+            <span class="badge" style="background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; font-size:0.75rem; border-radius:8px !important;">
+              {{ support.faces.count }} face{{ support.faces.count|pluralize }} au total
             </span>
           </div>
           <div class="sdp-card-body">
@@ -246,27 +267,27 @@
                             {% elif face.photo %}
                               <img src="{{ face.photo.url }}" alt="Face {{ face.label }}" loading="lazy">
                             {% else %}
-                              <img src="{% static 'img/logo.png' %}" alt="Logo">
+                              <img src="{% static 'img/logo.png' %}" alt="Logo" style="opacity:0.6; padding:20px; object-fit:contain;">
                             {% endif %}
                           {% endwith %}
                         {% elif face.photo %}
                           <img src="{{ face.photo.url }}" alt="Face {{ face.label }}" loading="lazy">
                         {% else %}
-                          <img src="{% static 'img/logo.png' %}" alt="Logo">
+                          <img src="{% static 'img/logo.png' %}" alt="Logo" style="opacity:0.6; padding:20px; object-fit:contain;">
                         {% endif %}
                       {% endwith %}
 
                       <span class="sdp-face-badge-top">
-                        <span class="badge" style="background:rgba(0,0,0,0.6); color:#fff; font-size:0.7rem; font-family:var(--font-mono,monospace); backdrop-filter:blur(4px);">
+                        <span class="badge" style="background:rgba(15,23,42,0.75); color:#fff; font-size:0.72rem; font-family:'SFMono-Regular',Consolas,monospace; border-radius:8px !important; backdrop-filter:blur(4px);">
                           Face {{ face.label }}
                         </span>
                       </span>
-                      <button class="sdp-face-badge-zoom" title="Agrandir">
+                      <button class="sdp-face-badge-zoom" title="Agrandir en HD">
                         <i class="bi bi-arrows-fullscreen"></i>
                       </button>
                       <div class="sdp-face-thumb-overlay">
-                        <span style="color:#fff; font-size:0.75rem; font-weight:600;">
-                          <i class="bi bi-zoom-in me-1"></i>Voir en HD
+                        <span style="color:#fff; font-size:0.75rem; font-weight:700;">
+                          <i class="bi bi-zoom-in me-1"></i>Aperçu Haute Définition
                         </span>
                       </div>
                     </div>
@@ -274,53 +295,58 @@
                     <!-- Infos face -->
                     <div class="sdp-face-info">
                       <div class="d-flex justify-content-between align-items-center">
-                        <span style="font-weight:800; font-size:0.98rem; color:#0f172a;">Face {{ face.label }}</span>
+                        <span style="font-weight:800; font-size:0.95rem; color:#0f172a;">Face {{ face.label }}</span>
                         {% if statut == 'libre' %}
-                          <span class="badge badge-status bs-disponible">LIBRE</span>
+                          <span class="badge badge-status bs-disponible" style="border-radius:8px !important;">LIBRE</span>
                         {% elif statut == 'reserve' %}
-                          <span class="badge badge-status bs-reserve">RÉSERVÉE</span>
+                          <span class="badge badge-status bs-reserve" style="border-radius:8px !important;">RÉSERVÉE</span>
                         {% else %}
-                          <span class="badge badge-status bs-occupe">OCCUPÉE</span>
+                          <span class="badge badge-status bs-occupe" style="border-radius:8px !important;">OCCUPÉE</span>
                         {% endif %}
                       </div>
 
                       <div class="d-flex flex-wrap gap-2">
-                        <span class="badge" style="background:#f1f5f9; color:#64748b; border:1px solid #e2e8f0; font-size:0.72rem;">
+                        <span class="badge" style="background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; font-size:0.72rem; border-radius:8px !important;">
                           {{ support.get_format_display|default:"Standard" }}
                         </span>
                         {% if face.eclairage %}
-                        <span class="badge" style="background:#fef3c7; color:#92400e; border:1px solid #fcd34d; font-size:0.72rem;">
+                        <span class="badge" style="background:#fef3c7; color:#92400e; border:1px solid #fcd34d; font-size:0.72rem; border-radius:8px !important;">
                           <i class="bi bi-lightbulb me-1"></i>{{ face.get_eclairage_display }}
+                        </span>
+                        {% endif %}
+                        {% if face.notes %}
+                        <span class="badge" style="background:#f8fafc; color:#64748b; border:1px solid #e2e8f0; font-size:0.72rem; border-radius:8px !important;" title="{{ face.notes }}">
+                          <i class="bi bi-info-circle me-1"></i>Notes
                         </span>
                         {% endif %}
                       </div>
 
                       {% with camp=face.get_campagne_active %}
                       {% if camp %}
-                        <div class="sdp-face-campaign active-camp">
+                        <div class="sdp-face-campaign active-camp" style="border-radius:8px !important;">
                           <div class="d-flex align-items-center justify-content-between mb-1">
-                            <span style="font-weight:700; color:#dc2626; font-size:0.78rem;">
-                              <i class="bi bi-broadcast me-1"></i>Diffusion Active
+                            <span style="font-weight:700; color:#dc2626; font-size:0.76rem;">
+                              <i class="bi bi-broadcast me-1"></i>Campagne Active
                             </span>
-                            <a href="{% url 'campagne_detail' camp.pk %}" style="font-size:0.72rem; color:#dc2626;">Voir →</a>
+                            <a href="{% url 'campagne_detail' camp.pk %}" style="font-size:0.72rem; font-weight:700; color:#dc2626;">Détail →</a>
                           </div>
                           <div style="font-weight:700; font-size:0.85rem; color:#0f172a;" class="text-truncate">
                             {{ camp.client.nom }} — {{ camp.nom }}
                           </div>
-                          <div style="font-size:0.72rem; color:#6b7280; font-family:var(--font-mono,monospace); margin-top:4px;">
+                          <div style="font-size:0.72rem; color:#64748b; font-family:'SFMono-Regular',Consolas,monospace; margin-top:3px;">
                             <i class="bi bi-calendar3 me-1"></i>{{ camp.date_debut|date:"d/m/Y" }} → {{ camp.date_fin|date:"d/m/Y" }}
                           </div>
                         </div>
                       {% elif statut == 'reserve' %}
-                        <div class="sdp-face-campaign reserved-camp">
+                        <div class="sdp-face-campaign reserved-camp" style="border-radius:8px !important;">
                           <span style="font-weight:600; font-size:0.8rem; color:#b45309;">
-                            <i class="bi bi-calendar-check me-1"></i>Réservée — diffusion à venir
+                            <i class="bi bi-calendar-check me-1"></i>Réservation confirmée à venir
                           </span>
                         </div>
                       {% else %}
-                        <div class="sdp-face-campaign free-camp">
+                        <div class="sdp-face-campaign free-camp" style="border-radius:8px !important;">
                           <span style="font-weight:600; font-size:0.8rem; color:#059669;">
-                            <i class="bi bi-check-circle me-1"></i>Face disponible à la vente
+                            <i class="bi bi-check-circle me-1"></i>Face libre pour nouvelle campagne
                           </span>
                         </div>
                       {% endif %}
@@ -333,7 +359,7 @@
               <div class="col-12">
                 <div class="sdp-empty">
                   <i class="sdp-empty-icon bi bi-sign-merge-right"></i>
-                  Aucune face enregistrée sur ce support.
+                  Aucune face enregistrée sur ce panneau.
                 </div>
               </div>
               {% endfor %}
@@ -343,50 +369,50 @@
         {% endif %}
 
         {% if ecran %}
-        <!-- Écran Numérique -->
+        <!-- Écran Numérique DOOH -->
         <div class="sdp-card">
           <div class="sdp-card-head">
-            <h2><i class="bi bi-cpu-fill" style="color:#6366f1;"></i>Statistiques Écran Numérique</h2>
-            <span class="badge" style="background:#ede9fe; color:#5b21b6; border:1px solid #c4b5fd; font-size:0.78rem;">
-              <i class="bi bi-broadcast me-1"></i>DOOH LED
+            <h2><i class="bi bi-cpu-fill" style="color:var(--color-primary,#932e2b);"></i>Diffusion DOOH & Télémétrie</h2>
+            <span class="badge" style="background:#ede9fe; color:#5b21b6; border:1px solid #c4b5fd; font-size:0.75rem; border-radius:8px !important;">
+              <i class="bi bi-broadcast me-1"></i>Écran LED Numérique
             </span>
           </div>
           <div class="sdp-card-body">
             <div class="row g-3 mb-4">
               {% for label, icon, value, color in ecran_stats %}
               <div class="col-6 col-md-3">
-                <div class="tlm-kpi">
+                <div class="tlm-kpi" style="border-radius:8px !important;">
                   <div class="tlm-kpi-label">
                     <i class="bi {{ icon }} me-1" style="color:{{ color|default:'#932e2b' }};"></i>{{ label }}
                   </div>
-                  <div class="tlm-kpi-value" style="color:{{ color|default:'#0f172a' }};">{{ value }}</div>
+                  <div class="tlm-kpi-value" style="color:{{ color|default:'#0f172a' }}; font-size:0.95rem;">{{ value }}</div>
                 </div>
               </div>
               {% endfor %}
             </div>
 
-            <!-- Frise Premium -->
-            <div style="border-radius:8px; overflow:hidden; border:1px solid #e2e8f0; box-shadow:0 2px 8px rgba(0,0,0,0.05);">
+            <!-- Frise de Continuité -->
+            <div style="border-radius:8px !important; overflow:hidden; border:1px solid #e2e8f0; box-shadow:0 2px 8px rgba(0,0,0,0.04);">
 
-              <!-- En-tête sombre -->
-              <div style="background:linear-gradient(135deg,#1e293b 0%,#0f172a 100%); padding:14px 18px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
+              <!-- En-tête Gradient -->
+              <div style="background:linear-gradient(135deg, #932e2b 0%, #1e40af 100%) !important; padding:14px 18px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px;">
                 <div style="display:flex; align-items:center; gap:10px;">
-                  <div style="width:34px; height:34px; border-radius:8px; background:rgba(99,102,241,0.2); border:1px solid rgba(99,102,241,0.35); display:flex; align-items:center; justify-content:center;">
-                    <i class="bi bi-activity" style="color:#a5b4fc; font-size:1rem;"></i>
+                  <div style="width:34px; height:34px; border-radius:8px !important; background:rgba(255,255,255,0.18); border:1px solid rgba(255,255,255,0.3); display:flex; align-items:center; justify-content:center;">
+                    <i class="bi bi-activity" style="color:#fff; font-size:1rem;"></i>
                   </div>
                   <div>
-                    <div style="font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.1em; color:rgba(255,255,255,0.4); font-family:var(--font-mono,monospace); margin-bottom:1px;">Télémétrie de diffusion</div>
-                    <div style="font-size:0.88rem; font-weight:700; color:#fff;">Frise de continuité</div>
+                    <div style="font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:rgba(255,255,255,0.7); font-family:'SFMono-Regular',Consolas,monospace; margin-bottom:1px;">Télémétrie en direct</div>
+                    <div style="font-size:0.88rem; font-weight:800; color:#fff;">Frise d'occupation temporelle</div>
                   </div>
                 </div>
                 <!-- Pills d'échelle -->
                 <div style="display:flex; align-items:center; gap:6px;">
-                  <span style="font-size:0.68rem; color:rgba(255,255,255,0.38); font-weight:600; text-transform:uppercase; letter-spacing:0.06em; margin-right:2px;">Échelle</span>
-                  <div style="display:flex; gap:3px; background:rgba(255,255,255,0.07); border:1px solid rgba(255,255,255,0.1); border-radius:10px; padding:3px;">
-                    <button onclick="setScale(3600,this)"    class="frise-pill" data-val="3600">1h</button>
-                    <button onclick="setScale(86400,this)"   class="frise-pill frise-pill-on" data-val="86400">1j</button>
-                    <button onclick="setScale(604800,this)"  class="frise-pill" data-val="604800">1sem</button>
-                    <button onclick="setScale(2592000,this)" class="frise-pill" data-val="2592000">1mois</button>
+                  <span style="font-size:0.68rem; color:rgba(255,255,255,0.7); font-weight:700; text-transform:uppercase; letter-spacing:0.06em; margin-right:2px;">Échelle :</span>
+                  <div style="display:flex; gap:3px; background:rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.2); border-radius:8px !important; padding:3px;">
+                    <button onclick="setScale(3600,this)"    class="frise-pill" data-val="3600" style="border-radius:8px !important;">1h</button>
+                    <button onclick="setScale(86400,this)"   class="frise-pill frise-pill-on" data-val="86400" style="border-radius:8px !important;">1j</button>
+                    <button onclick="setScale(604800,this)"  class="frise-pill" data-val="604800" style="border-radius:8px !important;">1sem</button>
+                    <button onclick="setScale(2592000,this)" class="frise-pill" data-val="2592000" style="border-radius:8px !important;">1mois</button>
                   </div>
                 </div>
                 <!-- Select caché pour le JS -->
@@ -399,16 +425,16 @@
               </div>
 
               <!-- Métriques -->
-              <div style="background:#fff; border-bottom:1px solid #f1f5f9; padding:12px 18px;">
+              <div style="background:#ffffff; border-bottom:1px solid #f1f5f9; padding:12px 18px;">
                 <div id="metrics" style="display:flex; flex-wrap:wrap; gap:10px;"></div>
               </div>
 
-              <!-- Canvas -->
-              <div style="background:#fff;">
-                <div id="frise-container" style="padding:12px 14px; overflow-x:auto; overflow-y:hidden; min-height:60px;"></div>
-                <div style="padding:7px 18px 10px; background:#f8fafc; border-top:1px solid #f1f5f9;">
-                  <p id="frise-note" style="font-size:0.7rem; color:#94a3b8; font-family:var(--font-mono,monospace); margin:0; display:flex; align-items:center; gap:5px;">
-                    <i class="bi bi-info-circle" style="flex-shrink:0; opacity:0.6;"></i><span></span>
+              <!-- Canvas / Items -->
+              <div style="background:#ffffff;">
+                <div id="frise-container" style="padding:14px 16px; overflow-x:auto; overflow-y:hidden; min-height:60px;"></div>
+                <div style="padding:8px 18px 10px; background:#f8fafc; border-top:1px solid #f1f5f9;">
+                  <p id="frise-note" style="font-size:0.72rem; color:#64748b; font-family:'SFMono-Regular',Consolas,monospace; margin:0; display:flex; align-items:center; gap:6px;">
+                    <i class="bi bi-info-circle text-primary" style="flex-shrink:0;"></i><span></span>
                   </p>
                 </div>
               </div>
@@ -424,16 +450,16 @@
 
         {% if support.photo_principale %}
         <!-- Photo principale -->
-        <div class="sdp-card" style="cursor:zoom-in;" onclick="sdpLightbox('{{ support.photo_principale.url }}')">
-          <div style="position:relative; height:220px; overflow:hidden; background:#0f172a;">
+        <div class="sdp-card" style="cursor:zoom-in; border-radius:8px !important;" onclick="sdpLightbox('{{ support.photo_principale.url }}')">
+          <div style="position:relative; height:220px; overflow:hidden; background:#0f172a; border-radius:8px 8px 0 0;">
             <img src="{{ support.photo_principale.url }}" alt="{{ support.code }}" loading="lazy"
                  style="width:100%; height:100%; object-fit:cover; display:block; transition:transform 0.4s ease;"
-                 onmouseenter="this.style.transform='scale(1.05)'" onmouseleave="this.style.transform='scale(1)'">
-            <div style="position:absolute; inset:0; background:linear-gradient(180deg,transparent 55%,rgba(15,23,42,0.82) 100%); display:flex; align-items:flex-end; padding:14px; justify-content:space-between;">
-              <span class="badge" style="background:rgba(0,0,0,0.6); color:rgba(255,255,255,0.9); font-size:0.7rem; backdrop-filter:blur(4px);">
+                 onmouseenter="this.style.transform='scale(1.04)'" onmouseleave="this.style.transform='scale(1)'">
+            <div style="position:absolute; inset:0; background:linear-gradient(180deg,transparent 55%,rgba(15,23,42,0.85) 100%); display:flex; align-items:flex-end; padding:12px 14px; justify-content:space-between;">
+              <span class="badge" style="background:rgba(0,0,0,0.65); color:rgba(255,255,255,0.95); font-size:0.7rem; border-radius:8px !important; backdrop-filter:blur(4px);">
                 <i class="bi bi-camera me-1"></i>Photo principale
               </span>
-              <span class="badge" style="background:rgba(255,255,255,0.15); color:#fff; font-size:0.7rem; backdrop-filter:blur(4px);">
+              <span class="badge" style="background:rgba(255,255,255,0.2); color:#fff; font-size:0.7rem; border-radius:8px !important; backdrop-filter:blur(4px);">
                 <i class="bi bi-arrows-fullscreen me-1"></i>Zoom HD
               </span>
             </div>
@@ -442,24 +468,24 @@
         {% endif %}
 
         <!-- Mini-carte -->
-        <div class="sdp-card">
+        <div class="sdp-card" style="border-radius:8px !important;">
           <div class="sdp-card-head">
             <h2><i class="bi bi-pin-map-fill" style="color:#ef4444;"></i>Localisation</h2>
-            <a href="{% url 'carte' %}?support={{ support.pk %}" class="btn btn-sm" style="font-size:0.75rem; padding:3px 10px; border:1px solid #e2e8f0; border-radius:8px; color:#64748b;">
+            <a href="{% url 'carte' %}?support={{ support.pk }}" class="btn btn-sm" style="font-size:0.75rem; padding:3px 10px; border:1px solid #e2e8f0; border-radius:8px !important; color:#475569; font-weight:600;">
               Plein écran <i class="bi bi-arrow-up-right ms-1"></i>
             </a>
           </div>
           <div id="mini-map" style="height:200px; cursor:pointer;"></div>
-          <div style="padding:14px 18px; background:#f8fafc; border-top:1px solid #e2e8f0;">
+          <div style="padding:12px 16px; background:#f8fafc; border-top:1px solid #e2e8f0;">
             <div class="d-flex justify-content-between align-items-center">
               <div>
-                <div style="font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:#94a3b8; margin-bottom:3px;">Coordonnées GPS</div>
-                <div class="font-monospace" style="font-size:0.85rem; font-weight:700; color:#932e2b;">
+                <div style="font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:#94a3b8; margin-bottom:2px;">Coordonnées GPS</div>
+                <div class="font-monospace" style="font-size:0.84rem; font-weight:700; color:#932e2b;">
                   {{ support.latitude|default:"—" }}, {{ support.longitude|default:"—" }}
                 </div>
               </div>
               {% if support.marche %}
-              <a href="{% url 'marche_detail' support.marche.pk %}" class="btn btn-sm" style="font-size:0.78rem; border:1px solid #fcd34d; background:#fef3c7; color:#92400e; border-radius:10px; font-weight:600;">
+              <a href="{% url 'marche_detail' support.marche.pk %}" class="btn btn-sm" style="font-size:0.78rem; border:1px solid #fcd34d; background:#fef3c7; color:#92400e; border-radius:8px !important; font-weight:700;">
                 <i class="bi bi-shop me-1"></i>{{ support.marche.nom }}
               </a>
               {% endif %}
@@ -469,16 +495,20 @@
 
         <!-- Marché / Zone -->
         {% if support.is_dans_marche %}
-        <div class="sdp-card">
-          <div class="sdp-card-body" style="padding:16px 18px;">
+        <div class="sdp-card" style="border-radius:8px !important;">
+          <div class="sdp-card-body" style="padding:14px 16px;">
             <div class="d-flex align-items-center gap-3">
-              <div style="width:42px; height:42px; border-radius:12px; background:rgba(245,158,11,0.1); color:#f59e0b; display:flex; align-items:center; justify-content:center; font-size:1.2rem; flex-shrink:0;">
+              <div style="width:40px; height:40px; border-radius:8px !important; background:rgba(245,158,11,0.12); color:#d97706; display:flex; align-items:center; justify-content:center; font-size:1.2rem; flex-shrink:0;">
                 <i class="bi bi-shop-window"></i>
               </div>
-              <div>
-                <div style="font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.07em; color:#94a3b8; margin-bottom:2px;">Zone de marché</div>
-                <div style="font-weight:700; font-size:0.92rem; color:#0f172a;">{{ support.marche.nom }}</div>
+              <div class="min-width-0 flex-grow-1">
+                <div style="font-size:0.68rem; font-weight:700; text-transform:uppercase; letter-spacing:0.06em; color:#94a3b8; margin-bottom:2px;">Périmètre de marché</div>
+                <div style="font-weight:700; font-size:0.90rem; color:#0f172a;" class="text-truncate">{{ support.marche.nom }}</div>
+                <div style="font-size:0.72rem; color:#64748b;">Emplacement : <strong class="text-dark">{{ support.emplacement.code }}</strong></div>
               </div>
+              <a href="{% url 'marche_detail' support.marche.pk %}" class="btn btn-sm btn-outline-secondary" style="border-radius:8px !important; font-size:0.74rem;">
+                Voir <i class="bi bi-arrow-right ms-1"></i>
+              </a>
             </div>
           </div>
         </div>
@@ -492,12 +522,12 @@
        ONGLET 2 : FICHE TECHNIQUE
        ═══════════════════════════════════════════════════════ -->
   <div id="sdp-specs" class="sdp-section">
-    <div class="sdp-card">
+    <div class="sdp-card" style="border-radius:8px !important;">
       <div class="sdp-card-head">
-        <h2><i class="bi bi-sliders" style="color:#6366f1;"></i>Fiche Technique Complète</h2>
-        <span class="badge" style="background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; font-size:0.78rem; font-family:var(--font-mono,monospace);">{{ support.code }}</span>
+        <h2><i class="bi bi-sliders" style="color:var(--color-primary,#932e2b);"></i>Fiche Technique Complète</h2>
+        <span class="badge" style="background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; font-size:0.75rem; font-family:'SFMono-Regular',Consolas,monospace; border-radius:8px !important;">{{ support.code }}</span>
       </div>
-      <div class="sdp-specs-grid">
+      <div class="sdp-specs-grid" style="border-radius:0 0 8px 8px;">
         {% for label, value in info_rows %}
         <div class="sdp-spec">
           <div class="sdp-spec-label">{{ label }}</div>
@@ -507,19 +537,19 @@
         <div class="sdp-spec">
           <div class="sdp-spec-label">État Opérationnel</div>
           <div class="sdp-spec-value">
-            <span class="badge badge-status {% if support.etat == 'bon' %}bs-disponible{% elif support.etat == 'maintenance' %}bs-occupe{% else %}bs-panne{% endif %}">
+            <span class="badge badge-status {% if support.etat == 'bon' %}bs-disponible{% elif support.etat == 'maintenance' %}bs-occupe{% else %}bs-panne{% endif %}" style="border-radius:8px !important;">
               {{ support.get_etat_display }}
             </span>
           </div>
         </div>
         {% if support.type_support == 'ecran' %}
         <div class="sdp-spec">
-          <div class="sdp-spec-label">Taux d'Occupation</div>
+          <div class="sdp-spec-label">Taux d'Occupation Réel</div>
           <div class="sdp-spec-value">
             {% if support.is_occupe %}
-              <span class="badge badge-status bs-occupe"><i class="bi bi-broadcast me-1"></i>{{ support.taux_occupation_pourcentage }}%</span>
+              <span class="badge badge-status bs-occupe" style="border-radius:8px !important;"><i class="bi bi-broadcast me-1"></i>{{ support.taux_occupation_pourcentage }}%</span>
             {% else %}
-              <span class="badge badge-status bs-disponible"><i class="bi bi-check2 me-1"></i>Disponible</span>
+              <span class="badge badge-status bs-disponible" style="border-radius:8px !important;"><i class="bi bi-check2 me-1"></i>Disponible</span>
             {% endif %}
           </div>
         </div>
@@ -529,24 +559,24 @@
   </div>
 
   <!-- ═══════════════════════════════════════════════════════
-       ONGLET 3 : CARTE COMPLÈTE
+       ONGLET 3 : LOCALISATION GPS & CARTE
        ═══════════════════════════════════════════════════════ -->
   <div id="sdp-map" class="sdp-section">
-    <div class="sdp-card">
+    <div class="sdp-card" style="border-radius:8px !important;">
       <div class="sdp-card-head">
-        <h2><i class="bi bi-geo-alt-fill" style="color:#ef4444;"></i>Localisation Géographique</h2>
+        <h2><i class="bi bi-geo-alt-fill" style="color:#ef4444;"></i>Localisation Géographique Précise</h2>
         <div class="d-flex gap-2">
           <a href="https://www.google.com/maps?q={{ support.latitude }},{{ support.longitude }}" target="_blank" rel="noopener"
-             class="btn btn-sm" style="font-size:0.78rem; border:1px solid #e2e8f0; border-radius:9px; color:#64748b;">
-            <i class="bi bi-google me-1"></i>Google Maps
+             class="btn btn-sm" style="font-size:0.78rem; border:1px solid #e2e8f0; border-radius:8px !important; color:#475569; font-weight:600;">
+            <i class="bi bi-google me-1 text-primary"></i>Google Maps
           </a>
-          <a href="{% url 'carte' %}?support={{ support.pk %}" class="btn btn-sm" style="font-size:0.78rem; border-radius:9px; background:#932e2b; color:#fff; border:none; font-weight:600;">
-            <i class="bi bi-map-fill me-1"></i>Carte Intégrale
+          <a href="{% url 'carte' %}?support={{ support.pk }}" class="btn btn-sm" style="font-size:0.78rem; border-radius:8px !important; background:var(--color-primary,#932e2b); color:#fff; border:none; font-weight:600;">
+            <i class="bi bi-map-fill me-1"></i>Carte Globale
           </a>
         </div>
       </div>
       <div style="padding:16px;">
-        <div id="full-tab-map" style="height:440px; border-radius:12px; overflow:hidden;"></div>
+        <div id="full-tab-map" style="height:440px; border-radius:8px !important; overflow:hidden; border:1px solid #e2e8f0;"></div>
       </div>
     </div>
   </div>
@@ -557,96 +587,97 @@
   <div id="sdp-campaigns" class="sdp-section">
 
     <!-- Campagnes actives -->
-    <div class="sdp-card">
+    <div class="sdp-card" style="border-radius:8px !important;">
       <div class="sdp-card-head">
         <h2 style="color:#059669;"><i class="bi bi-broadcast" style="color:#10b981;"></i>Campagnes en Cours de Diffusion</h2>
-        <span class="badge" style="background:#d1fae5; color:#065f46; border:1px solid #a7f3d0;">{{ lignes_actives|length }} actif{{ lignes_actives|length|pluralize }}</span>
+        <span class="badge" style="background:#d1fae5; color:#065f46; border:1px solid #a7f3d0; border-radius:8px !important;">{{ lignes_actives|length }} active{{ lignes_actives|length|pluralize }}</span>
       </div>
       {% for l in lignes_actives %}
       <div class="sdp-camp-item">
-        <div class="sdp-camp-dot" style="background:rgba(16,185,129,0.1); color:#10b981;">
+        <div class="sdp-camp-dot" style="background:rgba(16,185,129,0.12); color:#10b981; border-radius:8px !important;">
           <i class="bi bi-broadcast"></i>
         </div>
         <div class="flex-grow-1 min-width-0">
-          <div style="font-weight:700; font-size:0.95rem; color:#0f172a;">
+          <div style="font-weight:700; font-size:0.92rem; color:#0f172a;">
             <a href="{% url 'campagne_detail' l.campagne.pk %}" style="color:inherit; text-decoration:none;">{{ l.campagne.nom }}</a>
           </div>
-          <div style="font-size:0.8rem; color:#64748b; margin-top:2px;">
-            <strong>{{ l.campagne.client.nom }}</strong> ·
-            <i class="bi bi-calendar3 me-1"></i>{{ l.campagne.date_debut|date:"d/m/Y" }} → {{ l.campagne.date_fin|date:"d/m/Y" }}
+          <div style="font-size:0.78rem; color:#64748b; margin-top:2px;">
+            <strong class="text-dark">{{ l.campagne.client.nom }}</strong> ·
+            <i class="bi bi-calendar3 me-1 text-primary"></i>{{ l.campagne.date_debut|date:"d/m/Y" }} → {{ l.campagne.date_fin|date:"d/m/Y" }}
+            {% if l.face %} · <span class="badge bg-light text-dark border" style="border-radius:8px !important;">Face {{ l.face.label }}</span>{% endif %}
           </div>
         </div>
-        <span class="badge badge-status bs-en_cours">En cours</span>
-        <a href="{% url 'campagne_detail' l.campagne.pk %}" class="btn btn-sm" style="font-size:0.78rem; border:1px solid #e2e8f0; border-radius:9px; color:#64748b; white-space:nowrap;">
+        <span class="badge badge-status bs-en_cours" style="border-radius:8px !important;">En cours</span>
+        <a href="{% url 'campagne_detail' l.campagne.pk %}" class="btn btn-sm btn-outline-secondary" style="font-size:0.78rem; border-radius:8px !important; white-space:nowrap; font-weight:600;">
           Détails <i class="bi bi-arrow-right ms-1"></i>
         </a>
       </div>
       {% empty %}
       <div class="sdp-empty">
         <i class="sdp-empty-icon bi bi-inbox"></i>
-        Aucune campagne active sur ce support.
+        Aucune campagne en cours de diffusion sur ce support.
       </div>
       {% endfor %}
     </div>
 
     <!-- Réservations à venir -->
     {% if reservations %}
-    <div class="sdp-card">
+    <div class="sdp-card" style="border-radius:8px !important;">
       <div class="sdp-card-head">
-        <h2 style="color:#b45309;"><i class="bi bi-calendar-check-fill" style="color:#f59e0b;"></i>Réservations à Venir</h2>
-        <span class="badge" style="background:#fef3c7; color:#92400e; border:1px solid #fcd34d;">{{ reservations|length }}</span>
+        <h2 style="color:#b45309;"><i class="bi bi-calendar-check-fill" style="color:#f59e0b;"></i>Réservations Confirmées & à Venir</h2>
+        <span class="badge" style="background:#fef3c7; color:#92400e; border:1px solid #fcd34d; border-radius:8px !important;">{{ reservations|length }}</span>
       </div>
       {% for resa in reservations %}
       <div class="sdp-camp-item">
-        <div class="sdp-camp-dot" style="background:rgba(245,158,11,0.1); color:#f59e0b;">
+        <div class="sdp-camp-dot" style="background:rgba(245,158,11,0.12); color:#f59e0b; border-radius:8px !important;">
           <i class="bi bi-calendar-event"></i>
         </div>
-        <div class="flex-grow-1">
-          <div style="font-weight:700; font-size:0.9rem; color:#0f172a;">{{ resa.client.nom }}</div>
-          <div style="font-size:0.78rem; font-family:var(--font-mono,monospace); color:#94a3b8; margin-top:2px;">
+        <div class="flex-grow-1 min-width-0">
+          <div style="font-weight:700; font-size:0.88rem; color:#0f172a;">{{ resa.client.nom }}</div>
+          <div style="font-size:0.76rem; font-family:'SFMono-Regular',Consolas,monospace; color:#64748b; margin-top:2px;">
             {{ resa.date_debut|date:"d/m/Y H:i" }} → {{ resa.date_fin|date:"d/m/Y H:i" }}
           </div>
         </div>
-        <span class="badge badge-status bs-reserve">Réservé</span>
+        <span class="badge badge-status bs-reserve" style="border-radius:8px !important;">Réservé</span>
       </div>
       {% endfor %}
     </div>
     {% endif %}
 
     <!-- Historique -->
-    <div class="sdp-card">
+    <div class="sdp-card" style="border-radius:8px !important;">
       <div class="sdp-card-head">
-        <h2><i class="bi bi-clock-history" style="color:#94a3b8;"></i>Historique des Campagnes</h2>
-        <span class="badge" style="background:#f1f5f9; color:#475569; border:1px solid #e2e8f0;">{{ historique|length }}</span>
+        <h2><i class="bi bi-clock-history" style="color:#64748b;"></i>Historique des Diffusions</h2>
+        <span class="badge" style="background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; border-radius:8px !important;">{{ historique|length }}</span>
       </div>
       {% for l in historique %}
       <div class="sdp-camp-item">
         {% with visuel=l.campagne.visuels.first %}
         {% if visuel %}
           <img src="{{ visuel.fichier.url }}" alt="" loading="lazy"
-               style="width:44px; height:44px; object-fit:cover; border-radius:10px; border:1px solid #e2e8f0; flex-shrink:0;">
+               style="width:42px; height:42px; object-fit:cover; border-radius:8px !important; border:1px solid #e2e8f0; flex-shrink:0;">
         {% else %}
           <img src="{% static 'img/logo.png' %}" alt="" loading="lazy"
-               style="width:44px; height:44px; object-fit:cover; border-radius:10px; border:1px solid #e2e8f0; flex-shrink:0; opacity:0.5;">
+               style="width:42px; height:42px; object-fit:contain; border-radius:8px !important; border:1px solid #e2e8f0; flex-shrink:0; opacity:0.6; padding:4px;">
         {% endif %}
         {% endwith %}
         <div class="flex-grow-1 min-width-0">
           <div style="font-weight:700; font-size:0.88rem; color:#0f172a;">{{ l.campagne.client.nom }}</div>
-          <div style="font-size:0.78rem; color:#94a3b8;" class="text-truncate">{{ l.campagne.nom }}</div>
+          <div style="font-size:0.76rem; color:#64748b;" class="text-truncate">{{ l.campagne.nom }}</div>
         </div>
         <div class="d-flex flex-column align-items-end gap-1">
-          <span style="font-size:0.75rem; color:#94a3b8; font-family:var(--font-mono,monospace); white-space:nowrap;">
+          <span style="font-size:0.74rem; color:#64748b; font-family:'SFMono-Regular',Consolas,monospace; white-space:nowrap;">
             <i class="bi bi-calendar3 me-1"></i>{{ l.campagne.date_debut|date:"d/m/Y" }}
           </span>
-          <a href="{% url 'campagne_detail' l.campagne.pk %}" style="color:var(--color-primary); white-space:nowrap;">
-            Détails <i class="bi bi-arrow-right ms-1"></i>
+          <a href="{% url 'campagne_detail' l.campagne.pk %}" style="color:var(--color-primary,#932e2b); font-weight:700; font-size:0.76rem; white-space:nowrap;">
+            Détails →
           </a>
         </div>
       </div>
       {% empty %}
       <div class="sdp-empty">
         <i class="sdp-empty-icon bi bi-clock-history"></i>
-        Aucun historique disponible.
+        Aucun historique archivé pour ce support.
       </div>
       {% endfor %}
     </div>
@@ -661,12 +692,12 @@
 
       <!-- Journal des interventions -->
       <div class="col-12 col-lg-7">
-        <div class="sdp-card">
+        <div class="sdp-card" style="border-radius:8px !important;">
           <div class="sdp-card-head">
             <h2><i class="bi bi-tools" style="color:#f59e0b;"></i>Journal des Interventions</h2>
             {% if user.is_technicien_role or user.is_staff_regie_role %}
             <a href="{% url 'maintenance_create' support.pk %}" class="btn btn-sm fw-semibold"
-               style="background:#fef3c7; border:1px solid #fcd34d; color:#92400e; border-radius:9px; font-size:0.78rem;">
+               style="background:#fef3c7; border:1px solid #fcd34d; color:#92400e; border-radius:8px !important; font-size:0.78rem;">
               <i class="bi bi-plus-lg me-1"></i>Nouvelle intervention
             </a>
             {% endif %}
@@ -675,13 +706,13 @@
             {% for m in maintenances %}
             <div class="sdp-tl-item">
               <div class="sdp-tl-dot {% if m.etat_apres == 'bon' %}bs-disponible{% elif m.etat_apres == 'maintenance' %}bs-occupe{% else %}bs-panne{% endif %}"
-                   style="background:{% if m.etat_apres == 'bon' %}rgba(16,185,129,0.12){% elif m.etat_apres == 'maintenance' %}rgba(245,158,11,0.12){% else %}rgba(239,68,68,0.12){% endif %};
+                   style="border-radius:8px !important; background:{% if m.etat_apres == 'bon' %}rgba(16,185,129,0.12){% elif m.etat_apres == 'maintenance' %}rgba(245,158,11,0.12){% else %}rgba(239,68,68,0.12){% endif %};
                           color:{% if m.etat_apres == 'bon' %}#10b981{% elif m.etat_apres == 'maintenance' %}#f59e0b{% else %}#ef4444{% endif %};">
                 <i class="bi {% if m.etat_apres == 'bon' %}bi-check-circle-fill{% elif m.etat_apres == 'maintenance' %}bi-exclamation-circle-fill{% else %}bi-x-circle-fill{% endif %}"></i>
               </div>
-              <div class="sdp-tl-body">
+              <div class="sdp-tl-body" style="border-radius:8px !important;">
                 <div class="d-flex justify-content-between align-items-start mb-1">
-                  <span class="badge badge-status {% if m.etat_apres == 'bon' %}bs-disponible{% elif m.etat_apres == 'maintenance' %}bs-occupe{% else %}bs-panne{% endif %}">
+                  <span class="badge badge-status {% if m.etat_apres == 'bon' %}bs-disponible{% elif m.etat_apres == 'maintenance' %}bs-occupe{% else %}bs-panne{% endif %}" style="border-radius:8px !important;">
                     {{ m.get_etat_apres_display }}
                   </span>
                   <span class="sdp-tl-date">{{ m.date_intervention|date:"d/m/Y H:i" }}</span>
@@ -689,46 +720,50 @@
                 <div style="font-size:0.86rem; font-weight:600; color:#1e293b; margin:6px 0 4px;">
                   {{ m.description|default:"Intervention technique de routine" }}
                 </div>
-                <div style="font-size:0.75rem; color:#94a3b8;">
-                  <i class="bi bi-person me-1"></i>{{ m.effectue_par.get_full_name|default:m.effectue_par.username }}
+                <div class="d-flex justify-content-between align-items-center mt-2" style="font-size:0.75rem; color:#64748b;">
+                  <span><i class="bi bi-person me-1"></i>{{ m.effectue_par.get_full_name|default:m.effectue_par.username }}</span>
+                  {% if m.photo %}
+                  <a href="javascript:void(0)" onclick="sdpLightbox('{{ m.photo.url }}')" class="fw-semibold text-primary">
+                    <i class="bi bi-image me-1"></i>Voir photo
+                  </a>
+                  {% endif %}
                 </div>
               </div>
             </div>
             {% empty %}
             <div class="sdp-empty">
               <i class="sdp-empty-icon bi bi-shield-check" style="color:#10b981;"></i>
-              Aucune intervention ni anomalie signalée.
+              Aucune intervention ni incident technique répertorié.
             </div>
             {% endfor %}
           </div>
         </div>
       </div>
 
-      <!-- Galerie photos -->
+      <!-- Galerie photos d'interventions -->
       <div class="col-12 col-lg-5">
-        <div class="sdp-card">
+        <div class="sdp-card" style="border-radius:8px !important;">
           <div class="sdp-card-head">
-            <h2><i class="bi bi-camera-fill" style="color:#6366f1;"></i>Galerie d'Interventions</h2>
-            <span class="badge" style="background:#f1f5f9; color:#475569; border:1px solid #e2e8f0;">{{ photos|length }}</span>
+            <h2><i class="bi bi-camera-fill" style="color:var(--color-primary,#932e2b);"></i>Photos d'Intervention</h2>
+            <span class="badge" style="background:#f1f5f9; color:#475569; border:1px solid #e2e8f0; border-radius:8px !important;">
+              {{ support.maintenances.count }}
+            </span>
           </div>
           <div class="sdp-card-body">
-            {% if photos %}
-            <div class="sdp-gallery">
-              {% for p in photos %}
-              <div class="sdp-gallery-item" onclick="sdpLightbox('{{ p.photo.url }}')">
-                <img src="{{ p.photo.url }}" alt="Photo intervention" loading="lazy">
-                <div class="sdp-gallery-caption">
-                  {{ p.date_intervention|date:"d/m H:i" }} · {{ p.effectue_par.username }}
-                </div>
+            {% with photos_qs=support.maintenances.all %}
+              <div class="sdp-gallery">
+                {% for p in photos_qs %}
+                  {% if p.photo %}
+                  <div class="sdp-gallery-item" style="border-radius:8px !important;" onclick="sdpLightbox('{{ p.photo.url }}')">
+                    <img src="{{ p.photo.url }}" alt="Photo intervention" loading="lazy">
+                    <div class="sdp-gallery-caption">
+                      {{ p.date_intervention|date:"d/m H:i" }} · {{ p.effectue_par.username }}
+                    </div>
+                  </div>
+                  {% endif %}
+                {% endfor %}
               </div>
-              {% endfor %}
-            </div>
-            {% else %}
-            <div class="sdp-empty">
-              <i class="sdp-empty-icon bi bi-camera"></i>
-              Aucune photo d'intervention disponible.
-            </div>
-            {% endif %}
+            {% endwith %}
           </div>
         </div>
       </div>
@@ -738,19 +773,19 @@
 
 </div>
 
-<!-- Lightbox -->
+<!-- Lightbox Modal -->
 <div id="sdp-lb" class="sdp-lb" onclick="sdpLbClose(event)">
-  <div class="sdp-lb-inner" onclick="event.stopPropagation()">
+  <div class="sdp-lb-inner" style="border-radius:8px !important;" onclick="event.stopPropagation()">
     <button class="sdp-lb-close" onclick="sdpLbClose()">&times;</button>
-    <img id="sdp-lb-img" src="" alt="Aperçu HD" style="display:none;">
-    <video id="sdp-lb-vid" controls style="display:none; max-width:92vw; max-height:88vh;"></video>
+    <img id="sdp-lb-img" src="" alt="Aperçu HD" style="display:none; border-radius:8px !important;">
+    <video id="sdp-lb-vid" controls style="display:none; max-width:92vw; max-height:88vh; border-radius:8px !important;"></video>
   </div>
 </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-/* ── Tab System ── */
+/* ── Système d'onglets ── */
 function sdpTab(id, btn) {
   document.querySelectorAll('.sdp-section').forEach(el => el.classList.remove('active'));
   document.querySelectorAll('.sdp-tab').forEach(el => el.classList.remove('active'));
@@ -761,10 +796,12 @@ function sdpTab(id, btn) {
     sec.classList.add('active', 'sdp-section-enter');
   }
   if (btn) btn.classList.add('active');
-  if (id === 'map') setTimeout(initFullMap, 180);
+  if (id === 'map') {
+    setTimeout(initFullMap, 180);
+  }
 }
 
-/* ── Lightbox ── */
+/* ── Lightbox HD ── */
 function sdpLightbox(url) {
   if (!url) return;
   const lb = document.getElementById('sdp-lb');
@@ -780,24 +817,26 @@ function sdpLightbox(url) {
   }
   lb.classList.add('open');
 }
+
 function sdpLbClose(e) {
   if (!e || e.target === document.getElementById('sdp-lb') || e.type === 'click') {
     const lb = document.getElementById('sdp-lb');
     lb.classList.remove('open');
-    document.getElementById('sdp-lb-vid').src = '';
+    const vid = document.getElementById('sdp-lb-vid');
+    if (vid) vid.src = '';
   }
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') sdpLbClose(); });
 
-/* ── Copy GPS ── */
+/* ── Copier Coordonnées GPS ── */
 function sdpCopyGps(txt) {
   navigator.clipboard.writeText(txt).then(() => {
     const n = document.createElement('div');
-    n.textContent = '✓ Coordonnées copiées';
+    n.textContent = '✓ Coordonnées GPS copiées dans le presse-papier';
     Object.assign(n.style, {
-      position:'fixed', bottom:'24px', left:'50%', transform:'translateX(-50%)',
-      background:'#0f172a', color:'#fff', padding:'10px 22px', borderRadius:'10px',
-      fontSize:'0.85rem', fontWeight:'600', zIndex:'9999', boxShadow:'0 8px 24px rgba(0,0,0,0.25)'
+      position: 'fixed', bottom: '24px', left: '50%', transform: 'translateX(-50%)',
+      background: 'linear-gradient(135deg, #932e2b 0%, #1e40af 100%)', color: '#fff', padding: '10px 22px', borderRadius: '8px',
+      fontSize: '0.85rem', fontWeight: '700', zIndex: '9999', boxShadow: '0 8px 24px rgba(0,0,0,0.25)'
     });
     document.body.appendChild(n);
     setTimeout(() => n.remove(), 2500);
@@ -807,22 +846,27 @@ function sdpCopyGps(txt) {
 /* ── Cartes Leaflet ── */
 let fullMapInst = null;
 function initFullMap() {
-  if (fullMapInst) return;
+  if (fullMapInst) {
+    fullMapInst.invalidateSize();
+    return;
+  }
   const lat = parseFloat('{{ support.latitude }}'.replace(',', '.'));
   const lng = parseFloat('{{ support.longitude }}'.replace(',', '.'));
   const color = '{{ support.get_etat_color }}' || '#932e2b';
+  
   fullMapInst = window.initIntegralMap('full-tab-map', {
     center: isFinite(lat) && isFinite(lng) ? [lat, lng] : [12.3714, -1.5197],
     zoom: isFinite(lat) && isFinite(lng) ? 16 : 13
   });
+  
   if (fullMapInst && isFinite(lat) && isFinite(lng)) {
     const icon = L.divIcon({
-      html: `<div style="width:22px;height:22px;background:${color};border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 5px ${color}44;"></div>`,
-      iconSize: [22,22], iconAnchor: [11,11], className: ''
+      html: `<div style="width:24px;height:24px;background:${color};border-radius:50%;border:3px solid #fff;box-shadow:0 0 0 5px ${color}44;"></div>`,
+      iconSize: [24,24], iconAnchor: [12,12], className: ''
     });
     const popup = `
-      <div class="lp-card">
-        <div class="lp-header">
+      <div class="lp-card" style="border-radius:8px !important;">
+        <div class="lp-header" style="border-radius:8px 8px 0 0;">
           <div class="lp-icon"><i class="bi {% if support.type_support == 'panneau' %}bi-sign-merge-right-fill{% else %}bi-display-fill{% endif %}"></i></div>
           <div>
             <div class="lp-name">{{ support.nom }}</div>
@@ -834,10 +878,10 @@ function initFullMap() {
           {% if support.get_format_display %}<div class="lp-row"><i class="bi bi-aspect-ratio"></i><span>{{ support.get_format_display }}{% if support.surface_m2 %} · {{ support.surface_m2 }} m²{% endif %}</span></div>{% endif %}
         </div>
         <div class="lp-footer">
-          <span class="lp-badge {% if support.etat == 'bon' %}lp-badge-green{% elif support.etat == 'maintenance' %}lp-badge-amber{% else %}lp-badge-red{% endif %}">
+          <span class="lp-badge {% if support.etat == 'bon' %}lp-badge-green{% elif support.etat == 'maintenance' %}lp-badge-amber{% else %}lp-badge-red{% endif %}" style="border-radius:8px !important;">
             {{ support.get_etat_display }}
           </span>
-          <a href="/gestion/inventory/{{ support.uuid }}/" class="lp-btn">Voir →</a>
+          <a href="/gestion/inventory/{{ support.uuid }}/" class="lp-btn" style="border-radius:8px !important;">Voir →</a>
         </div>
       </div>`;
     L.marker([lat,lng], { icon }).addTo(fullMapInst)
@@ -866,7 +910,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
 });
 
-/* ── Visualisation Frise — HTML/CSS lisible ── */
+/* ── Visualisation Frise DOOH ── */
 const SPOT_COLORS = [
   { bg:'#ede9fe', border:'#c4b5fd', text:'#5b21b6', bar:'#8b5cf6' },
   { bg:'#fce7f3', border:'#f9a8d4', text:'#9d174d', bar:'#ec4899' },
@@ -908,7 +952,7 @@ function buildFrise() {
     container.innerHTML = `
       <div style="text-align:center; padding:32px 16px; color:#94a3b8;">
         <i class="bi bi-broadcast" style="font-size:2rem; display:block; margin-bottom:10px; opacity:0.4;"></i>
-        <div style="font-size:0.85rem; font-weight:600;">Aucun spot actif sur cet écran</div>
+        <div style="font-size:0.85rem; font-weight:700; color:#475569;">Aucun spot actif sur cet écran</div>
       </div>`;
     if (metricsEl) metricsEl.innerHTML = '';
     if (noteEl) { const s = noteEl.querySelector('span')||noteEl; s.textContent=''; }
@@ -918,10 +962,10 @@ function buildFrise() {
   const scale  = getCurrentScale();
   const sLabel = scaleLabel(scale);
 
-  // ── Calculs globaux ──
+  // Calculs globaux
   let totalAirSec = 0;
   const spotsCalc = spots.map((sp, i) => {
-    const perScale = Math.floor(scale / sp.interval) * sp.dur; // secondes de pub sur la période
+    const perScale = Math.floor(scale / sp.interval) * sp.dur;
     totalAirSec += perScale;
     const pct = Math.min(100, Math.round(perScale / scale * 100));
     const perHour = Math.round(3600 / sp.interval);
@@ -929,24 +973,24 @@ function buildFrise() {
   });
   const totalPct = Math.min(100, Math.round(totalAirSec / scale * 100));
 
-  // ── Bande métriques ──
+  // Bande métriques
   if (metricsEl) {
     metricsEl.innerHTML = `
-      <div class="tlm-kpi"><div class="tlm-kpi-label">Spots actifs</div><div class="tlm-kpi-value" style="color:#6366f1;">${spots.length}</div></div>
-      <div class="tlm-kpi"><div class="tlm-kpi-label">Pub totale / ${sLabel}</div><div class="tlm-kpi-value">${fmtDur(totalAirSec)}</div></div>
-      <div class="tlm-kpi"><div class="tlm-kpi-label">% antenne / ${sLabel}</div><div class="tlm-kpi-value" style="color:#10b981;">${totalPct}<span style="font-size:0.75rem;color:#94a3b8;"> %</span></div></div>
+      <div class="tlm-kpi" style="border-radius:8px !important;"><div class="tlm-kpi-label">Spots actifs</div><div class="tlm-kpi-value" style="color:#6366f1;">${spots.length}</div></div>
+      <div class="tlm-kpi" style="border-radius:8px !important;"><div class="tlm-kpi-label">Pub totale / ${sLabel}</div><div class="tlm-kpi-value">${fmtDur(totalAirSec)}</div></div>
+      <div class="tlm-kpi" style="border-radius:8px !important;"><div class="tlm-kpi-label">% antenne / ${sLabel}</div><div class="tlm-kpi-value" style="color:#10b981;">${totalPct}<span style="font-size:0.75rem;color:#94a3b8;"> %</span></div></div>
     `;
   }
 
-  // ── Carte par spot ──
+  // Cartes par spot
   const cardsHtml = spotsCalc.map(sp => `
-    <div style="background:${sp.color.bg}; border:1px solid ${sp.color.border}; border-radius:8px; padding:14px 16px; margin-bottom:10px;">
+    <div style="background:${sp.color.bg}; border:1px solid ${sp.color.border}; border-radius:8px !important; padding:14px 16px; margin-bottom:10px;">
       <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
         <div style="display:flex; align-items:center; gap:10px; min-width:0; flex:1;">
           <div style="width:10px; height:10px; border-radius:50%; background:${sp.color.bar}; flex-shrink:0; margin-top:3px;"></div>
           <div style="min-width:0;">
             <div style="font-size:0.86rem; font-weight:700; color:${sp.color.text}; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:320px;">${sp.name}</div>
-            <div style="font-size:0.72rem; color:${sp.color.text}; opacity:0.7; margin-top:2px; font-family:var(--font-mono,monospace);">
+            <div style="font-size:0.72rem; color:${sp.color.text}; opacity:0.8; margin-top:2px; font-family:'SFMono-Regular',Consolas,monospace;">
               <i class="bi bi-stopwatch me-1"></i>Durée : <strong>${fmtDur(sp.dur)}</strong>
               &nbsp;·&nbsp;
               <i class="bi bi-arrow-repeat me-1"></i>${fmtInterval(sp.interval)}
@@ -954,41 +998,41 @@ function buildFrise() {
           </div>
         </div>
         <div style="display:flex; gap:6px; flex-shrink:0;">
-          <span style="background:${sp.color.bar}22; border:1px solid ${sp.color.border}; color:${sp.color.text}; font-size:0.72rem; font-weight:700; padding:3px 9px; border-radius:8px; font-family:var(--font-mono,monospace);">
+          <span style="background:${sp.color.bar}22; border:1px solid ${sp.color.border}; color:${sp.color.text}; font-size:0.72rem; font-weight:700; padding:3px 9px; border-radius:8px !important; font-family:'SFMono-Regular',Consolas,monospace;">
             ${perHourLabel(sp)} passages/h
           </span>
-          <span style="background:${sp.color.bar}; color:#fff; font-size:0.72rem; font-weight:700; padding:3px 9px; border-radius:8px;">
+          <span style="background:${sp.color.bar}; color:#fff; font-size:0.72rem; font-weight:700; padding:3px 9px; border-radius:8px !important;">
             ${sp.pct}% du ${sLabel}
           </span>
         </div>
       </div>
       <!-- Barre de progression -->
-      <div style="background:rgba(255,255,255,0.5); border-radius:8px; height:10px; overflow:hidden; border:1px solid ${sp.color.border};">
-        <div style="height:100%; width:${sp.pct}%; background:${sp.color.bar}; border-radius:8px; transition:width 0.6s ease;"></div>
+      <div style="background:rgba(255,255,255,0.6); border-radius:8px !important; height:10px; overflow:hidden; border:1px solid ${sp.color.border};">
+        <div style="height:100%; width:${sp.pct}%; background:${sp.color.bar}; border-radius:8px !important; transition:width 0.6s ease;"></div>
       </div>
       <div style="display:flex; justify-content:space-between; margin-top:5px;">
-        <span style="font-size:0.68rem; color:${sp.color.text}; opacity:0.6; font-family:var(--font-mono,monospace);">${fmtDur(sp.perScale)} de diffusion / ${sLabel}</span>
-        <span style="font-size:0.68rem; color:${sp.color.text}; opacity:0.6; font-family:var(--font-mono,monospace);">${sp.pct}%</span>
+        <span style="font-size:0.68rem; color:${sp.color.text}; opacity:0.7; font-family:'SFMono-Regular',Consolas,monospace;">${fmtDur(sp.perScale)} de diffusion / ${sLabel}</span>
+        <span style="font-size:0.68rem; color:${sp.color.text}; opacity:0.8; font-weight:700; font-family:'SFMono-Regular',Consolas,monospace;">${sp.pct}%</span>
       </div>
     </div>
   `).join('');
 
-  // ── Barre globale ──
+  // Barre globale
   const globalHtml = `
-    <div style="margin-bottom:14px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:8px; padding:14px 16px;">
+    <div style="margin-bottom:14px; background:#f1f5f9; border:1px solid #e2e8f0; border-radius:8px !important; padding:14px 16px;">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
         <span style="font-size:0.78rem; font-weight:700; color:#334155;">
-          <i class="bi bi-broadcast me-1" style="color:#6366f1;"></i>
-          Occupation totale de l'antenne / ${sLabel}
+          <i class="bi bi-broadcast me-1" style="color:var(--color-primary,#932e2b);"></i>
+          Occupation globale de l'antenne / ${sLabel}
         </span>
-        <span style="font-size:0.85rem; font-weight:800; color:${totalPct > 80 ? '#ef4444' : totalPct > 50 ? '#f59e0b' : '#10b981'};">${totalPct}%</span>
+        <span style="font-size:0.88rem; font-weight:800; color:${totalPct > 80 ? '#ef4444' : totalPct > 50 ? '#f59e0b' : '#10b981'};">${totalPct}%</span>
       </div>
-      <div style="background:#e2e8f0; border-radius:8px; height:12px; overflow:hidden;">
-        <div style="height:100%; width:${totalPct}%; background:linear-gradient(90deg,#6366f1,#8b5cf6); border-radius:8px; transition:width 0.6s ease;"></div>
+      <div style="background:#e2e8f0; border-radius:8px !important; height:12px; overflow:hidden;">
+        <div style="height:100%; width:${totalPct}%; background:linear-gradient(90deg,#932e2b,#1e40af); border-radius:8px !important; transition:width 0.6s ease;"></div>
       </div>
       <div style="display:flex; justify-content:space-between; margin-top:6px;">
-        <span style="font-size:0.68rem; color:#94a3b8; font-family:var(--font-mono,monospace);">0%</span>
-        <span style="font-size:0.68rem; color:#94a3b8; font-family:var(--font-mono,monospace);">100% (saturation)</span>
+        <span style="font-size:0.68rem; color:#94a3b8; font-family:'SFMono-Regular',Consolas,monospace;">0%</span>
+        <span style="font-size:0.68rem; color:#94a3b8; font-family:'SFMono-Regular',Consolas,monospace;">100% (saturation)</span>
       </div>
     </div>
   `;
@@ -997,7 +1041,7 @@ function buildFrise() {
 
   if (noteEl) {
     const s = noteEl.querySelector('span') || noteEl;
-    s.textContent = `Échelle : 1 ${sLabel} · ${spots.length} spot${spots.length>1?'s':''} en diffusion simultanée`;
+    s.textContent = `Échelle : 1 ${sLabel} · ${spots.length} spot${spots.length>1?'s':''} en diffusion active`;
   }
 }
 
@@ -1007,11 +1051,6 @@ function perHourLabel(sp) {
   return Math.round(3600 / sp.interval);
 }
 
-// Compatibilité : garder render() qui appelle maintenant buildFrise
-function renderMetrics() {} // vide — géré dans buildFrise
-function renderFrise()   {} // vide — géré dans buildFrise
-
-/* ── Sélecteur d'échelle (pills) ── */
 function setScale(val, btn) {
   const sel = document.getElementById('viewdur');
   if (sel) { sel.value = val; }
@@ -1025,6 +1064,5 @@ function render(){ buildFrise(); }
 const vdEl=document.getElementById('viewdur');
 if(vdEl) vdEl.addEventListener('change',render);
 window.addEventListener('load',render);
-window.addEventListener('resize',renderFrise);
 </script>
 {% endblock %}

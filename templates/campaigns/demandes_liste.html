@@ -106,7 +106,7 @@
             </td>
             <td>
               <span class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace" style="border-radius: 8px;">
-                <i class="bi bi-grid me-1"></i>{{ demande.nb_emplacements }} emplacement{{ demande.nb_emplacements|pluralize }}
+                <i class="bi bi-signpost-split me-1"></i>{{ demande.nb_emplacements }} emplacement{{ demande.nb_emplacements|pluralize }}
               </span>
             </td>
             <td>
@@ -116,9 +116,24 @@
               <small class="text-muted font-monospace">{{ demande.duree_jours }} jour{{ demande.duree_jours|pluralize }}</small>
             </td>
             <td>
-              <span class="request-status bs-dem-{{ demande.statut }}">
-                <i class="bi {{ demande.get_statut_icon }}"></i>{{ demande.get_statut_display }}
-              </span>
+              {% if demande.get_statut_display == 'Nouvelle' %}
+                <span class="badge px-2.5 py-1.5 badge-statut-en-attente">
+                  <i class="bi bi-clock-history me-1"></i>En attente
+                </span>
+              {% elif demande.get_statut_display == 'En cours de traitement' %}
+                <span class="badge px-2.5 py-1.5 badge-statut-en-cours">
+                  <i class="bi bi-hourglass-split me-1"></i>En cours de traitement
+                </span>
+              {% elif demande.get_statut_display == 'Validée — Réservation créée' %}
+                <span class="badge px-2.5 py-1.5 badge-statut-confirmee">
+                  <i class="bi bi-check-circle me-1"></i>Validée
+                </span>
+              {% elif demande.get_statut_display == 'Refusée' %}
+                <span class="badge px-2.5 py-1.5 badge-statut-rejetee">
+                  <i class="bi bi-x-circle me-1"></i>Refusée
+                </span>
+              {% endif %}
+
               {% if demande.traite_par %}
                 <small class="text-muted d-block mt-1" style="font-size:0.72rem;">
                   par {{ demande.traite_par.get_short_name|default:demande.traite_par.username }}

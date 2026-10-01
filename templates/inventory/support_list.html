@@ -289,30 +289,22 @@
             <td class="text-end pe-3">
               <div class="d-inline-flex gap-1">
               <div class="d-inline-flex gap-1 align-items-center">
-                <a href="{% url 'preview_support_pdf' s.pk %}" class="btn btn-sm btn-outline-secondary btn-action-icon" title="Aperçu Rapport Web" style="border-radius:8px !important;">
-                  <i class="bi bi-eye-fill"></i>
-                </a>
-                <a href="{% url 'export_support_pdf' s.pk %}" class="btn btn-sm btn-outline-danger btn-action-icon" title="Télécharger Dossier PDF" style="border-radius:8px !important;">
-                  <i class="bi bi-file-earmark-pdf-fill"></i>
-                </a>
-                <a href="{% url 'support_detail' s.uuid %}" class="btn btn-sm btn-outline-primary btn-action-icon" title="Voir la fiche détaillée" style="border-radius:8px !important;">
-                  <i class="bi bi-arrow-right"></i>
-                </a>
                 {% if user.is_staff_regie_role %}
                   <a href="{% url 'support_detail' s.uuid %}" class="btn btn-sm btn-outline-primary btn-action-icon" title="Voir le détail">
                     <i class="bi bi-eye"></i>
                   </a>
-                  <a href="{% url 'support_edit' s.uuid %}" class="btn btn-sm btn-outline-secondary btn-action-icon" title="Modifier">
                   <a href="{% url 'support_edit' s.uuid %}" class="btn btn-sm btn-outline-secondary btn-action-icon" title="Modifier" style="border-radius:8px !important;">
                     <i class="bi bi-pencil"></i>
                   </a>
                 {% endif %}
                 {% if user.is_technicien_role or user.is_staff_regie_role %}
-                  <a href="{% url 'maintenance_create' s.pk %}" class="btn btn-sm btn-outline-warning btn-action-icon" title="Créer une maintenance">
                   <a href="{% url 'maintenance_create' s.pk %}" class="btn btn-sm btn-outline-warning btn-action-icon" title="Créer une maintenance" style="border-radius:8px !important;">
                     <i class="bi bi-tools"></i>
                   </a>
                 {% endif %}
+                <a href="{% url 'preview_support_pdf' s.pk %}" class="btn btn-sm btn-outline-view btn-action-icon" title="Aperçu Rapport Web" style="border-radius:8px !important;">
+                  <i class="bi bi-download"></i>
+                </a>
               </div>
             </td>
           </tr>
@@ -340,14 +332,40 @@
       </tbody>
     </table>
   </div>
+  <div class="m-4">
+    {% pagination_nav %}
+  </div>
 </div>
 
 {% endwith %}
 
-<div class="mt-4">
-  {% pagination_nav %}
-</div>
+  <div class="cld-export-section shadow-sm mb-4">
+    <div class="d-inline-flex align-items-center justify-content-center p-3 rounded-circle mb-3" style="background:rgba(147,46,43,0.08); color:#932e2b; width:64px; height:64px;">
+      <i class="bi bi-file-earmark-bar-graph-fill" style="font-size:1.9rem;"></i>
+    </div>
+    <div class="mb-2" style="font-size:0.72rem; letter-spacing:0.12em; text-transform:uppercase; color:#64748b; font-weight:700;">
+      {% if request.GET %}Supports filtrés{% else %}Portefeuille supports{% endif %}
+    </div>
+    <h5 class="mb-2" style="font-weight:800; color:#0f172a; letter-spacing:-0.2px; margin:0;">
+      Rapport global des supports
+    </h5>
+    <p class="cld-muted mb-4" style="max-width:680px; margin:0 auto 1.5rem; color:#64748b; font-size:0.86rem; line-height:1.6;">
+      {% if request.GET %}
+        Synthèse des supports correspondant aux filtres actifs : recherche, type, ville, état, occupation et format sélectionnés.
+      {% else %}
+        Consultez l’état général du parc support : disponibilité, occupation commerciale, état technique et couverture géographique globale.
+      {% endif %}
+    </p>
 
+    <div class="d-flex gap-3 justify-content-center flex-wrap">
+      <a href="{% url 'supports_report' %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}" class="cld-btn-export cld-btn-view">
+        <i class="bi bi-eye-fill"></i> Aperçu rapport web
+      </a>
+      <a href="{% url 'supports_export_pdf' %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}" class="cld-btn-export cld-btn-pdf">
+        <i class="bi bi-file-earmark-pdf-fill"></i> Télécharger le dossier PDF
+      </a>
+    </div>
+  </div>
 {% endblock %}
 
 {% block extra_js %}

@@ -292,8 +292,8 @@
     <div class="doc-header-right">
         Réf. Campagne : <strong>{{ infos.reference }}</strong><br>
         Date d'émission : <strong>{{ today|date:"d/m/Y" }}</strong><br>
-        {% if client.telephone %}Tél. : {{ client.telephone }}<br>{% endif %}
-        {% if client.email %}{{ client.email }}{% endif %}
+        Tél. : {{ CONTACT_TEL01|default:"+226 58 80 09 09" }}/{{ CONTACT_TEL02|default:"+226 58 80 09 09" }}<br>
+        {{ CONTACT_EMAIL1|default:"contact@promopub-integral.com" }}
     </div>
 </div>
 
@@ -535,45 +535,45 @@
 {% endif %}
 
 <!-- ══════════════════════════════════════════
-     SECTION 3 — CALENDRIER DES SPOTS (ÉCRAN)
+     SECTION 3 — DÉTAIL DES SPOTS PAR MOIS & ÉCRAN
 ════════════════════════════════════════════ -->
-{% if spots_par_mois %}
+{% if spots_par_mois_detail %}
 <div class="section-header">
-    <span class="section-title">3. Calendrier & Proratisation des Spots</span>
+    <span class="section-title">3. Détail des spots par mois et par écran</span>
 </div>
 
 <table>
     <colgroup>
-        <col class="m-mois">
-        <col class="m-spots">
-        <col class="m-ecran">
-        <col class="m-nb">
+        <col style="width: 4.5cm;">
+        <col style="width: auto;">
+        <col style="width: 3cm;">
     </colgroup>
     <thead>
         <tr>
-            <th class="left">PÉRIODE (MOIS)</th>
-            <th>VOLUME SPOTS TOTAL</th>
-            <th>SPOTS PAR ÉCRAN</th>
-            <th>NOMBRE D'ÉCRANS</th>
+            <th class="left">MOIS</th>
+            <th class="left">ÉCRAN</th>
+            <th>SPOTS</th>
         </tr>
     </thead>
     <tbody>
-        {% for mois in spots_par_mois %}
-        <tr {% if mois.is_total %}class="row-total"{% endif %}>
-            <td class="left">
-                {% if mois.is_total %}<strong>{{ mois.label }}</strong>
-                {% else %}{{ mois.label }}{% endif %}
-            </td>
-            <td><strong>{{ mois.spots|floatformat:0 }}</strong></td>
-            <td>{{ mois.spots_ecran|floatformat:0 }}</td>
-            <td>{{ mois.nb_ecrans }}</td>
-        </tr>
+        {% for mois in spots_par_mois_detail %}
+            {% for ecran in mois.screens %}
+            <tr>
+                {% if forloop.first %}
+                <td class="left" rowspan="{{ mois.screens|length }}"><strong>{{ mois.label }}</strong></td>
+                {% endif %}
+                <td class="left">{{ ecran.code }} — {{ ecran.nom }}</td>
+                <td><strong>{{ ecran.spots|floatformat:0 }}</strong></td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td class="left"><strong>{{ mois.label }}</strong></td>
+                <td colspan="2" style="text-align:center; color:var(--text-muted); font-style:italic;">Aucun écran pour ce mois.</td>
+            </tr>
+            {% endfor %}
         {% endfor %}
     </tbody>
 </table>
-<p class="section-note">
-    * Proratisation calculée automatiquement selon le nombre de jours effectifs d'affichage par mois.
-</p>
 {% endif %}
 
 </body>

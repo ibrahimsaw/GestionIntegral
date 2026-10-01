@@ -54,30 +54,33 @@ def _format_freq(campagne):
     return f"Toutes les {minutes} min"
 
 
-def _spots_du_mois(campagne, spots_total, annee, mois):
-    """
-    Calcule les spots d'une campagne pour un mois donné.
-    Proratise selon le nombre de jours de la campagne dans ce mois.
-    """
-    debut = campagne.date_debut
-    fin   = campagne.date_fin
+def _spots_sur_periode(date_debut, date_fin, spots_total, periode_debut, periode_fin):
+    """Calcule les spots d'une période donnée en fonction d'une durée totale."""
+    if not date_debut or not date_fin or not spots_total:
+        return 0
 
-    mois_debut = datetime.date(annee, mois, 1)
-    mois_fin   = datetime.date(annee, mois, monthrange(annee, mois)[1])
-
-    inter_debut = max(debut, mois_debut)
-    inter_fin   = min(fin,   mois_fin)
+    inter_debut = max(date_debut, periode_debut)
+    inter_fin   = min(date_fin, periode_fin)
 
     if inter_debut > inter_fin:
         return 0
 
-    jours_dans_mois    = (inter_fin - inter_debut).days + 1
-    duree_totale_jours = (fin - debut).days + 1
+    jours_dans_periode = (inter_fin - inter_debut).days + 1
+    duree_totale_jours = (date_fin - date_debut).days + 1
 
-    if duree_totale_jours == 0:
+    if duree_totale_jours <= 0:
         return 0
 
-    return round(spots_total * jours_dans_mois / duree_totale_jours)
+    return round(spots_total * jours_dans_periode / duree_totale_jours)
+
+
+def _spots_du_mois(campagne, spots_total, annee, mois):
+    """Compatibilité pour les anciens appels ; applique le prorata sur la campagne."""
+    debut = campagne.date_debut
+    fin   = campagne.date_fin
+    mois_debut = datetime.date(annee, mois, 1)
+    mois_fin   = datetime.date(annee, mois, monthrange(annee, mois)[1])
+    return _spots_sur_periode(debut, fin, spots_total, mois_debut, mois_fin)
 
 
 def _mois_couverts(date_debut, date_fin):
@@ -263,18 +266,46 @@ def _build_context_campagne(campagne):
 
     # ── Spots par mois (écran uniquement) ────────────────────────
     spots_par_mois = []
+    spots_par_mois_detail = []
 
     if infos["effective_type_support"] == "ecran":
         spots_by_month = {}
+        monthly_screen_spots = {}
         total_spots = 0
+
         for campagne_item in campagnes:
-            spots_total = campagne_item.calculer_nombre_spots()
-            total_spots += spots_total
-            for (annee, mois) in _mois_couverts(campagne_item.date_debut, campagne_item.date_fin):
-                spots_mois = _spots_du_mois(campagne_item, spots_total, annee, mois)
-                if spots_mois == 0:
+            for ligne in campagne_item.lignes.all():
+                support = ligne.support
+                if not support or support.type_support != "ecran":
                     continue
-                spots_by_month[(annee, mois)] = spots_by_month.get((annee, mois), 0) + spots_mois
+
+                ligne_total = ligne.calculer_spots()
+                total_spots += ligne_total
+
+                date_debut_ligne = ligne.date_debut or campagne_item.date_debut
+                date_fin_ligne = ligne.date_fin or campagne_item.date_fin
+
+                for (annee, mois) in _mois_couverts(date_debut_ligne, date_fin_ligne):
+                    mois_debut = datetime.date(annee, mois, 1)
+                    mois_fin = datetime.date(annee, mois, monthrange(annee, mois)[1])
+                    spots_mois = _spots_sur_periode(
+                        date_debut_ligne,
+                        date_fin_ligne,
+                        ligne_total,
+                        mois_debut,
+                        mois_fin,
+                    )
+                    if spots_mois == 0:
+                        continue
+
+                    spots_by_month[(annee, mois)] = spots_by_month.get((annee, mois), 0) + spots_mois
+
+                    monthly_screen_spots.setdefault((annee, mois), {})
+                    monthly_screen_spots[(annee, mois)].setdefault(
+                        support.pk,
+                        {"code": support.code, "nom": support.nom, "spots": 0},
+                    )
+                    monthly_screen_spots[(annee, mois)][support.pk]["spots"] += spots_mois
 
         nb_ecrans = len({
             ligne.support.pk
@@ -284,33 +315,46 @@ def _build_context_campagne(campagne):
 
         total_general = sum(spots_by_month.values())
         for (annee, mois), spots_mois in sorted(spots_by_month.items()):
+            ecrans = sorted(
+                monthly_screen_spots.get((annee, mois), {}).values(),
+                key=lambda item: item["code"],
+            )
             spots_par_mois.append({
-                "label"      : f"{MOIS_FR[mois]} {annee}",
-                "spots"      : spots_mois,
-                "spots_ecran": spots_mois // nb_ecrans if nb_ecrans else 0,
-                "nb_ecrans"  : nb_ecrans,
+                "label"     : f"{MOIS_FR[mois]} {annee}",
+                "spots"     : spots_mois,
+                "nb_ecrans" : nb_ecrans,
+            })
+            spots_par_mois_detail.append({
+                "label" : f"{MOIS_FR[mois]} {annee}",
+                "screens": ecrans,
             })
 
         if spots_par_mois:
             spots_par_mois.append({
-                "label"      : "TOTAL",
-                "spots"      : total_general,
-                "spots_ecran": total_general // nb_ecrans if nb_ecrans else 0,
-                "nb_ecrans"  : nb_ecrans,
-                "is_total"   : True,
+                "label"    : "TOTAL",
+                "spots"    : total_general,
+                "nb_ecrans": nb_ecrans,
+                "is_total" : True,
             })
 
     infos["support_count"] = len(supports)
     infos["total_spots"] = sum(c.calculer_nombre_spots() for c in campagnes)
+    infos["nb_ecrans"] = len({
+        ligne.support.pk
+        for ligne in lignes
+        if ligne.support and ligne.support.type_support == "ecran"
+    })
+    infos["spots_par_ecran"] = round(infos["total_spots"] / infos["nb_ecrans"]) if infos["nb_ecrans"] else 0
 
     return {
-        "campagne"         : campagne,
-        "client"           : campagne.client,
-        "today"            : datetime.date.today(),
-        "infos"            : infos,
-        "supports"         : supports,
-        "supports_by_child": supports_by_child,
-        "spots_par_mois"   : spots_par_mois,
+        "campagne"             : campagne,
+        "client"               : campagne.client,
+        "today"                : datetime.date.today(),
+        "infos"                : infos,
+        "supports"             : supports,
+        "supports_by_child"    : supports_by_child,
+        "spots_par_mois"       : spots_par_mois,
+        "spots_par_mois_detail": spots_par_mois_detail,
     }
 
 
@@ -344,7 +388,7 @@ class ExportCampagnePdfView(ClientStaffRequiredMixin, View):
 
         filename = (
             f"campagne_{campagne.reference}"
-            f"_{datetime.datetime.now():%Y%m%d}.pdf"
+            f"_{datetime.datetime.now():%Y%m%d_%H%M%S}.pdf"
         )
         response = HttpResponse(pdf, content_type="application/pdf")
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
@@ -972,7 +1016,7 @@ class ExportClientPdfView(ClientStaffRequiredMixin, View):
 
         filename = (
             f"rapport_diffusion_{client.nom.replace(' ', '_')}"
-            f"_{datetime.datetime.now():%Y%m%d}.pdf"
+            f"_{datetime.datetime.now():%Y%m%d_%H%M%S}.pdf"
         )
         response = HttpResponse(pdf, content_type="application/pdf")
         response["Content-Disposition"] = f'attachment; filename="{filename}"'

@@ -4,63 +4,95 @@
 {% block title %}{{ mode_title }} — Integral{% endblock %}
 
 {% block topbar_title %}
-  <i class="bi bi-calendar-check me-2" style="color:var(--color-primary)"></i>
-  {{ mode_title }} — {{ client.nom }}
+  <div class="d-flex align-items-center gap-2">
+    <div class="d-flex align-items-center justify-content-center rounded-2 text-white" style="width: 28px; height: 28px; background: var(--color-primary, #932e2b);">
+      <i class="bi bi-calendar-check" style="font-size: 0.85rem;"></i>
+    </div>
+    <span class="fw-bold">{{ mode_title }}</span>
+    <span class="text-muted small">/ {{ client.nom }}</span>
+  </div>
 {% endblock %}
 
 {% block content %}
-<div class="mb-4">
+<div class="reservation-form-page mb-4">
 
-  <!-- Bouton Retour & Titre -->
-  <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
-    <div class="d-flex align-items-center gap-3">
-      <a href="{% url 'client_detail' pk=client.pk %}" class="btn btn-light border btn-sm d-flex align-items-center justify-content-center shadow-sm" style="width: 38px; height: 38px; border-radius: 20px;" title="Retour à la fiche client">
-        <i class="bi bi-arrow-left fs-6"></i>
-      </a>
-      <div>
-        <h1 class="h4 fw-bold mb-0" style="color: #0f172a;">{{ mode_title }}</h1>
-        <p class="text-muted small mb-0">Client : <strong class="text-dark">{{ client.nom }}</strong></p>
+  <!-- En-tête / Hero Navigation -->
+  <div class="card border-0 shadow-sm mb-4" style="border-radius: 8px; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: #ffffff; overflow: hidden; position: relative;">
+    <div style="position: absolute; right: -20px; bottom: -20px; opacity: 0.05; font-size: 10rem; pointer-events: none;">
+      <i class="bi bi-calendar-range"></i>
+    </div>
+    <div class="card-body p-4 position-relative">
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+        <div class="d-flex align-items-center gap-3">
+          <a href="{% url 'client_detail' pk=client.pk %}" class="btn btn-outline-light btn-sm d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; border-radius: 8px; border-color: rgba(255,255,255,0.25);" title="Retour à la fiche client">
+            <i class="bi bi-arrow-left fs-5"></i>
+          </a>
+          <div>
+            <div class="d-flex align-items-center gap-2 mb-1">
+              <span class="badge" style="background: rgba(147, 46, 43, 0.85); color: #ffffff; border: 1px solid rgba(255,255,255,0.2); font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px;">
+                {% if is_modification %}Modification{% else %}Nouvelle Réservation{% endif %}
+              </span>
+              <span class="text-white-50 small">•</span>
+              <span class="text-white-50 small">Réseau d'affichage & panneaux</span>
+            </div>
+            <h1 class="h4 fw-bold mb-0 text-white">{{ mode_title }}</h1>
+          </div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+          <a href="{% url 'client_detail' pk=client.pk %}" class="btn btn-sm btn-outline-light px-3 py-2 fw-semibold" style="border-radius: 8px; border-color: rgba(255,255,255,0.25);">
+            <i class="bi bi-x-lg me-1"></i>Annuler
+          </a>
+        </div>
       </div>
     </div>
-    <a href="{% url 'client_detail' pk=client.pk %}" class="btn btn-outline-secondary btn-sm" style="border-radius: 8px;">
-      <i class="bi bi-x-lg me-1"></i>Annuler
-    </a>
   </div>
 
   <!-- Messages Django -->
   {% for message in messages %}
-  <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show py-2 shadow-sm mb-4" role="alert" style="border-radius: 8px;">
-    {{ message }}
+  <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show py-3 px-4 shadow-sm mb-4 d-flex align-items-center gap-2" role="alert" style="border-radius: 8px;">
+    <i class="bi {% if message.tags == 'error' %}bi-exclamation-octagon-fill text-danger{% else %}bi-check-circle-fill text-success{% endif %} fs-5"></i>
+    <div class="flex-grow-1">{{ message }}</div>
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
   </div>
   {% endfor %}
 
-  <!-- Fiche Client -->
-  <div class="card border-0 shadow-sm mb-4" style="border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden;">
-    <div class="card-header bg-white border-bottom py-3 px-4 d-flex align-items-center gap-2" style="border-color: #e2e8f0;">
-      <i class="bi bi-building text-primary"></i>
-      <h6 class="mb-0 fw-bold" style="color: #1e293b;">Client</h6>
-    </div>
+  <!-- Fiche Client Banner -->
+  <div class="card border-0 shadow-sm mb-4" style="border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden; background: #ffffff;">
     <div class="card-body p-4">
-      <div class="d-flex align-items-center gap-3 flex-wrap">
-        <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold shadow-sm flex-shrink-0" style="width: 52px; height: 52px; background: linear-gradient(135deg, var(--color-primary) 0%, #b91c1c 100%); font-size: 1.1rem;">
-          {% if client.logo %}
-            <img src="{{ client.logo.url }}" class="w-100 h-100 object-fit-contain rounded-circle" alt="Logo">
-          {% else %}
-            {{ client.nom|slice:":2"|upper }}
-          {% endif %}
-        </div>
-        <div class="flex-grow-1 min-width-0">
-          <h5 class="fw-bold mb-1 text-dark text-truncate">{{ client.nom }}</h5>
-          <div class="d-flex align-items-center gap-3 flex-wrap small text-muted">
-            {% if client.telephone %}<span><i class="bi bi-telephone text-secondary me-1"></i>{{ client.telephone }}</span>{% endif %}
-            {% if client.email %}<span><i class="bi bi-envelope text-secondary me-1"></i>{{ client.email }}</span>{% endif %}
+      <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+        <div class="d-flex align-items-center gap-3 min-width-0">
+          <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold shadow-sm flex-shrink-0" style="width: 54px; height: 54px; background: linear-gradient(135deg, var(--color-primary, #932e2b) 0%, #b91c1c 100%); font-size: 1.15rem;">
+            {% if client.logo %}
+              <img src="{{ client.logo.url }}" class="w-100 h-100 object-fit-contain rounded-circle" alt="Logo">
+            {% else %}
+              {{ client.nom|slice:":2"|upper }}
+            {% endif %}
+          </div>
+          <div class="min-width-0">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              <h5 class="fw-bold mb-0 text-dark text-truncate" style="font-size: 1.1rem;">{{ client.nom }}</h5>
+              <span class="badge bg-light text-dark border small" style="font-size: 0.72rem;">Client Référent</span>
+            </div>
+            <div class="d-flex align-items-center gap-3 flex-wrap small text-muted mt-1">
+              {% if client.telephone %}
+                <span class="d-inline-flex align-items-center gap-1"><i class="bi bi-telephone text-primary"></i>{{ client.telephone }}</span>
+              {% endif %}
+              {% if client.email %}
+                <span class="d-inline-flex align-items-center gap-1"><i class="bi bi-envelope text-primary"></i>{{ client.email }}</span>
+              {% endif %}
+              <span class="d-inline-flex align-items-center gap-1"><i class="bi bi-collection text-secondary"></i>{{ supports|length }} support{{ supports|length|pluralize }} configuré{{ supports|length|pluralize }}</span>
+            </div>
           </div>
         </div>
+        <a href="{% url 'client_detail' pk=client.pk %}" class="btn btn-sm btn-outline-secondary px-3 py-2 fw-semibold" style="border-radius: 8px;">
+          <i class="bi bi-person-lines-fill me-1"></i>Fiche client
+        </a>
       </div>
+
       {% if client.notes %}
-        <div class="p-3 bg-light rounded-3 border-start border-4 border-primary mt-3">
-          <p class="mb-0 small text-muted fst-italic"><i class="bi bi-chat-left-dots text-primary me-2"></i>{{ client.notes }}</p>
+        <div class="p-3 bg-light rounded-2 border-start border-4 border-primary mt-3">
+          <div class="small fw-bold text-muted text-uppercase mb-1" style="font-size: 0.68rem; letter-spacing: 0.5px;">Notes & Instructions client :</div>
+          <p class="mb-0 small text-dark fst-italic"><i class="bi bi-quote text-primary me-1"></i>{{ client.notes }}</p>
         </div>
       {% endif %}
     </div>
@@ -75,37 +107,70 @@
       <!-- COLONNE GAUCHE — Filtres + Grille des panneaux -->
       <div class="col-lg-8">
 
-        <!-- Barre de filtres -->
-        <div class="card border-0 shadow-sm mb-4" style="border-radius: 8px; border: 1px solid #e2e8f0;">
+        <!-- Barre de filtres moderne -->
+        <div class="card border-0 shadow-sm mb-4" style="border-radius: 8px; border: 1px solid #e2e8f0; background: #ffffff;">
           <div class="card-body p-3">
             <div class="d-flex flex-wrap align-items-center gap-2">
-              <div class="input-group flex-grow-1" style="min-width: 200px;">
-                <span class="input-group-text bg-white border-end-0 text-muted" style="border-radius: 10px 0 0 10px;"><i class="bi bi-search"></i></span>
-                <input type="search" id="search-panneau" class="form-control border-start-0 ps-0" placeholder="Rechercher code, quartier…" style="border-radius: 0 10px 10px 0;">
+              
+              <!-- Barre de recherche rapide -->
+              <div class="input-group flex-grow-1" style="min-width: 220px;">
+                <span class="input-group-text bg-light border-end-0 text-muted" style="border-radius: 8px 0 0 8px; border-color: #cbd5e1;">
+                  <i class="bi bi-search"></i>
+                </span>
+                <input type="search" id="search-panneau" class="form-control bg-light border-start-0 ps-0" placeholder="Rechercher code, ville, quartier…" style="border-radius: 0 8px 8px 0; border-color: #cbd5e1; font-size: 0.85rem;">
               </div>
-              <select id="filter-dispo" class="form-select" style="max-width: 160px; border-radius: 8px;">
-                <option value="">Tous les états</option>
-                <option value="libre">Libres uniquement</option>
-                <option value="occupe">Occupés</option>
-              </select>
-              <select id="filter-format" class="form-select" style="max-width: 160px; border-radius: 8px;">
-                <option value="">Tous formats</option>
-                {% for support in supports %}
-                  {% if support.format %}
-                    <option value="{{ support.format }}">{{ support.get_format_display }}</option>
-                  {% endif %}
-                {% endfor %}
-              </select>
-              <button type="button" class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1" id="btn-tout-cocher" style="border-radius: 8px;">
-                <i class="bi bi-check2-square"></i>Tout
-              </button>
-              <button type="button" class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1" id="btn-tout-decocher" style="border-radius: 8px;">
-                <i class="bi bi-square"></i>Rien
-              </button>
-              <div id="loading-spinner" class="spinner-border spinner-border-sm text-primary d-none ms-auto" role="status">
-                <span class="visually-hidden">Chargement…</span>
+
+              <!-- Filtre Statut Disponibilité -->
+              <div class="d-flex align-items-center">
+                <select id="filter-dispo" class="form-select form-select-sm" style="min-width: 145px; border-radius: 8px; border-color: #cbd5e1; font-size: 0.82rem; font-weight: 600;">
+                  <option value="">Tous les états</option>
+                  <option value="libre">🟢 Libres uniquement</option>
+                  <option value="occupe">🔴 Occupés</option>
+                </select>
+              </div>
+
+              <!-- Filtre Format -->
+              <div class="d-flex align-items-center">
+                <select id="filter-format" class="form-select form-select-sm" style="min-width: 140px; border-radius: 8px; border-color: #cbd5e1; font-size: 0.82rem; font-weight: 600;">
+                  <option value="">Tous formats</option>
+                  {% for support in supports %}
+                    {% if support.format %}
+                      <option value="{{ support.format }}">{{ support.get_format_display|default:support.format }}</option>
+                    {% endif %}
+                  {% endfor %}
+                </select>
+              </div>
+
+              <!-- Actions Tout / Rien -->
+              <div class="d-flex align-items-center gap-1 ms-auto">
+                <button type="button" class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1 fw-semibold" id="btn-tout-cocher" style="border-radius: 8px; font-size: 0.8rem;" title="Sélectionner toutes les faces disponibles">
+                  <i class="bi bi-check2-square text-success"></i>Tout
+                </button>
+                <button type="button" class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1 fw-semibold" id="btn-tout-decocher" style="border-radius: 8px; font-size: 0.8rem;" title="Désélectionner tout">
+                  <i class="bi bi-square text-muted"></i>Rien
+                </button>
+              </div>
+
+              <!-- Indicateur de chargement AJAX -->
+              <div id="loading-spinner" class="spinner-border spinner-border-sm text-primary d-none ms-2" role="status">
+                <span class="visually-hidden">Vérification en cours…</span>
               </div>
             </div>
+          </div>
+        </div>
+
+        <!-- En-tête de section Disponibilités -->
+        <div class="d-flex align-items-center justify-content-between mb-3 px-1">
+          <div class="d-flex align-items-center gap-2">
+            <h6 class="fw-bold mb-0 text-dark" style="font-size: 0.95rem;">
+              <i class="bi bi-grid-3x3-gap-fill text-primary me-1"></i>Supports & Faces disponibles
+            </h6>
+            <span class="badge bg-light text-muted border fw-semibold" style="font-size: 0.72rem;" id="supports-count-badge">{{ supports|length }} support{{ supports|length|pluralize }}</span>
+          </div>
+          <div class="d-flex align-items-center gap-3 small text-muted">
+            <span class="d-inline-flex align-items-center gap-1"><span class="badge rounded-circle p-1" style="background: #10b981;"> </span> Libre</span>
+            <span class="d-inline-flex align-items-center gap-1"><span class="badge rounded-circle p-1" style="background: #ef4444;"> </span> Occupé</span>
+            <span class="d-inline-flex align-items-center gap-1"><span class="badge rounded-circle p-1" style="background: var(--color-primary, #932e2b);"> </span> Sélectionné</span>
           </div>
         </div>
 
@@ -114,22 +179,30 @@
           {% for support in supports %}
           <div class="col-md-6 panneau-item"
                data-code="{{ support.code|lower }}"
-               data-quartier="{{ support.quartier|lower }}"
+               data-quartier="{{ support.quartier|default:''|lower }}"
+               data-ville="{{ support.ville|default:''|lower }}"
                data-format="{{ support.format }}">
-            <div class="card h-100 border-0 shadow-sm bg-white panneau-card" style="border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden; transition: all 0.15s ease;">
+            <div class="card h-100 border-0 shadow-sm bg-white panneau-card" style="border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden; transition: all 0.2s ease;">
 
+              <!-- Header du Support -->
               <div class="card-header bg-light border-bottom p-3 d-flex align-items-center justify-content-between" style="border-color: #e2e8f0;">
                 <div class="min-width-0">
-                  <h6 class="fw-bold mb-0 font-monospace text-truncate" style="color: var(--color-primary);">{{ support.code }}</h6>
-                  <div class="small text-muted text-capitalize">
-                    <i class="bi bi-geo-alt me-1"></i>{{ support.quartier|default:support.ville|default:"—" }}
+                  <div class="d-flex align-items-center gap-2">
+                    <span class="badge" style="background: var(--color-primary, #932e2b); color: #fff; border-radius: 6px; font-size: 0.75rem; font-weight: 800; font-family: monospace;">
+                      {{ support.code }}
+                    </span>
+                    <span class="fw-bold text-dark text-truncate" style="font-size: 0.85rem;">{{ support.nom|default:support.code }}</span>
+                  </div>
+                  <div class="small text-muted text-truncate mt-1" style="font-size: 0.75rem;">
+                    <i class="bi bi-geo-alt-fill text-secondary me-1"></i>{{ support.quartier|default:support.ville|default:"Non géolocalisé" }}
                   </div>
                 </div>
-                <span class="badge bg-white text-dark border small" style="font-size: 0.72rem;">
+                <span class="badge bg-white text-dark border flex-shrink-0" style="font-size: 0.7rem; font-weight: 700; border-radius: 6px;">
                   {{ support.get_format_display|default:support.format|default:"Standard" }}
                 </span>
               </div>
 
+              <!-- Faces du support -->
               <div class="card-body p-3">
                 <div class="row g-2">
                   {% for face in support.faces.all %}
@@ -145,59 +218,72 @@
                                autocomplete="off">
 
                         {% if statut == 'panne' %}
-                          <label class="btn btn-secondary w-100 text-start p-3 d-flex justify-content-between align-items-center rounded-3 opacity-50 face-label-element" for="face_{{ face.pk }}">
-                            <span class="d-flex align-items-center">
-                              <i class="bi bi-tools fs-5 me-2 check-icon"></i>
-                              <span><strong class="d-block">Face {{ face.label }}</strong></span>
+                          <label class="btn btn-light w-100 text-start p-3 d-flex justify-content-between align-items-center rounded-2 opacity-50 face-label-element border" for="face_{{ face.pk }}" style="cursor: not-allowed;">
+                            <span class="d-flex align-items-center gap-2">
+                              <i class="bi bi-tools fs-5 text-muted check-icon"></i>
+                              <div>
+                                <strong class="d-block text-dark" style="font-size: 0.86rem;">Face {{ face.label }}</strong>
+                                <small class="text-muted" style="font-size: 0.72rem;">Indisponible pour maintenance</small>
+                              </div>
                             </span>
-                            <span class="badge bg-secondary">Panne</span>
+                            <span class="badge bg-secondary">En panne</span>
                           </label>
                         {% elif face.pk in selectionnes %}
-                          <label class="btn btn-primary w-100 text-start p-3 d-flex justify-content-between align-items-center rounded-3 face-label-element" for="face_{{ face.pk }}" style="background: var(--color-primary); border-color: var(--color-primary);">
-                            <span class="d-flex align-items-center">
-                              <i class="bi bi-check-circle-fill fs-5 me-2 check-icon"></i>
-                              <span><strong class="d-block">Face {{ face.label }}</strong></span>
+                          <label class="btn btn-primary w-100 text-start p-3 d-flex justify-content-between align-items-center rounded-2 face-label-element shadow-sm" for="face_{{ face.pk }}" style="background: var(--color-primary, #932e2b); border-color: var(--color-primary, #932e2b); color: #ffffff;">
+                            <span class="d-flex align-items-center gap-2">
+                              <i class="bi bi-check-circle-fill fs-5 check-icon"></i>
+                              <div>
+                                <strong class="d-block text-white" style="font-size: 0.86rem;">Face {{ face.label }}</strong>
+                                <small class="text-white-50" style="font-size: 0.72rem;">Ajoutée au panier de réservation</small>
+                              </div>
                             </span>
                             <span class="badge bg-white text-dark border">Sélectionnée</span>
                           </label>
                         {% elif statut == 'occupe' %}
-                          <label class="btn btn-secondary w-100 text-start p-3 d-flex justify-content-between align-items-center rounded-3 opacity-75 face-label-element" for="face_{{ face.pk }}">
-                            <span class="d-flex align-items-center">
-                              <i class="bi bi-lock-fill fs-5 me-2 check-icon text-muted"></i>
-                              <span><strong class="d-block">Face {{ face.label }}</strong></span>
+                          <label class="btn btn-light w-100 text-start p-3 d-flex justify-content-between align-items-center rounded-2 opacity-75 face-label-element border" for="face_{{ face.pk }}">
+                            <span class="d-flex align-items-center gap-2">
+                              <i class="bi bi-lock-fill fs-5 text-danger check-icon"></i>
+                              <div>
+                                <strong class="d-block text-dark" style="font-size: 0.86rem;">Face {{ face.label }}</strong>
+                                {% with camp=face.get_campagne_active %}
+                                  {% if camp %}
+                                    <small class="text-muted" style="font-size: 0.72rem;">{{ camp.client.nom }} (jusqu'au {{ camp.date_fin|date:"d/m/Y" }})</small>
+                                  {% else %}
+                                    <small class="text-muted" style="font-size: 0.72rem;">Réservée sur cette plage</small>
+                                  {% endif %}
+                                {% endwith %}
+                              </div>
                             </span>
                             <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Occupée</span>
                           </label>
                         {% elif statut == 'reserve' %}
-                          <label class="btn btn-secondary w-100 text-start p-3 d-flex justify-content-between align-items-center rounded-3 opacity-75 face-label-element" for="face_{{ face.pk }}">
-                            <span class="d-flex align-items-center">
-                              <i class="bi bi-lock-fill fs-5 me-2 check-icon text-muted"></i>
-                              <span><strong class="d-block">Face {{ face.label }}</strong></span>
+                          <label class="btn btn-light w-100 text-start p-3 d-flex justify-content-between align-items-center rounded-2 opacity-75 face-label-element border" for="face_{{ face.pk }}">
+                            <span class="d-flex align-items-center gap-2">
+                              <i class="bi bi-clock-history fs-5 text-warning check-icon"></i>
+                              <div>
+                                <strong class="d-block text-dark" style="font-size: 0.86rem;">Face {{ face.label }}</strong>
+                                <small class="text-muted" style="font-size: 0.72rem;">Option en attente de confirmation</small>
+                              </div>
                             </span>
                             <span class="badge bg-warning-subtle text-warning border border-warning-subtle">Réservée</span>
                           </label>
                         {% else %}
-                          <label class="btn btn-outline-primary w-100 text-start p-3 d-flex justify-content-between align-items-center rounded-3 face-label-element" for="face_{{ face.pk }}">
-                            <span class="d-flex align-items-center">
-                              <i class="bi bi-circle fs-5 me-2 check-icon"></i>
-                              <span><strong class="d-block">Face {{ face.label }}</strong></span>
+                          <label class="btn btn-outline-secondary w-100 text-start p-3 d-flex justify-content-between align-items-center rounded-2 face-label-element border" for="face_{{ face.pk }}" style="border-color: #cbd5e1; background: #ffffff;">
+                            <span class="d-flex align-items-center gap-2">
+                              <i class="bi bi-circle fs-5 text-secondary check-icon"></i>
+                              <div>
+                                <strong class="d-block text-dark" style="font-size: 0.86rem;">Face {{ face.label }}</strong>
+                                <small class="text-muted" style="font-size: 0.72rem;">Prête à être réservée</small>
+                              </div>
                             </span>
                             <span class="badge bg-success-subtle text-success border border-success-subtle status-badge">Libre</span>
                           </label>
                         {% endif %}
-
-                        {% with camp=face.get_campagne_active %}
-                        {% if camp and face.pk not in selectionnes %}
-                          <small class="text-muted d-block ps-2 mt-1" style="font-size: 0.72rem;">
-                            {{ camp.client.nom }} · jusqu'au {{ camp.date_fin|date:"d/m/Y" }}
-                          </small>
-                        {% endif %}
-                        {% endwith %}
                       </div>
                     </div>
                     {% endwith %}
                   {% empty %}
-                    <div class="text-muted fst-italic small px-2">Aucune face configurée.</div>
+                    <div class="text-muted fst-italic small px-2 py-2">Aucune face configurée sur ce support.</div>
                   {% endfor %}
                 </div>
               </div>
@@ -206,9 +292,10 @@
           </div>
           {% empty %}
           <div class="col-12">
-            <div class="text-center py-5">
+            <div class="text-center py-5 bg-white rounded-3 border">
               <i class="bi bi-inbox text-muted" style="font-size: 3rem; opacity: 0.3;"></i>
-              <h5 class="mt-3 fw-bold text-muted">Aucun panneau disponible</h5>
+              <h6 class="mt-3 fw-bold text-dark">Aucun support disponible</h6>
+              <p class="small text-muted mb-0">Tous les supports sont actuellement non configurés ou hors réseau.</p>
             </div>
           </div>
           {% endfor %}
@@ -220,72 +307,104 @@
       <div class="col-lg-4">
         <div class="sidebar-sticky">
 
-          <!-- Période -->
-          <div class="card border-0 shadow-sm mb-4" style="border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden;">
+          <!-- Carte Période de réservation -->
+          <div class="card border-0 shadow-sm mb-4" style="border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden; background: #ffffff;">
             <div class="card-header bg-white border-bottom py-3 px-4 d-flex align-items-center gap-2" style="border-color: #e2e8f0;">
-              <i class="bi bi-calendar-week text-primary"></i>
-              <h6 class="mb-0 fw-bold" style="color: #1e293b;">Période de réservation</h6>
+              <div class="d-flex align-items-center justify-content-center rounded-2 text-primary" style="width: 28px; height: 28px; background: rgba(147,46,43,0.08);">
+                <i class="bi bi-calendar-range-fill" style="font-size: 0.9rem;"></i>
+              </div>
+              <h6 class="mb-0 fw-bold" style="color: #0f172a; font-size: 0.95rem;">Période de réservation</h6>
             </div>
             <div class="card-body p-4">
+              
+              <!-- Date Début -->
               <div class="mb-3">
-                <label for="date_debut" class="form-label small fw-bold text-muted text-uppercase">Date de début</label>
+                <label for="date_debut" class="form-label small fw-bold text-muted text-uppercase" style="font-size: 0.72rem; letter-spacing: 0.5px;">
+                  Date & Heure de début *
+                </label>
                 <div class="input-group">
-                  <span class="input-group-text bg-white border-end-0 text-success" style="border-radius: 10px 0 0 10px;"><i class="bi bi-calendar-plus"></i></span>
+                  <span class="input-group-text bg-light border-end-0 text-success" style="border-radius: 8px 0 0 8px; border-color: #cbd5e1;">
+                    <i class="bi bi-calendar-plus"></i>
+                  </span>
                   <input type="datetime-local" id="date_debut" name="date_debut"
-                         class="form-control border-start-0 ps-0" value="{{ date_debut }}" min="{{ today_iso }}" required style="border-radius: 0 10px 10px 0;">
+                         class="form-control border-start-0 ps-0 fw-semibold" value="{{ date_debut }}" min="{{ today_iso }}" required style="border-radius: 0 8px 8px 0; border-color: #cbd5e1; font-size: 0.85rem;">
                 </div>
               </div>
 
+              <!-- Date Fin -->
               <div class="mb-3">
-                <label for="date_fin" class="form-label small fw-bold text-muted text-uppercase">Date de fin</label>
+                <label for="date_fin" class="form-label small fw-bold text-muted text-uppercase" style="font-size: 0.72rem; letter-spacing: 0.5px;">
+                  Date & Heure de fin *
+                </label>
                 <div class="input-group">
-                  <span class="input-group-text bg-white border-end-0 text-danger" style="border-radius: 10px 0 0 10px;"><i class="bi bi-calendar-minus"></i></span>
+                  <span class="input-group-text bg-light border-end-0 text-danger" style="border-radius: 8px 0 0 8px; border-color: #cbd5e1;">
+                    <i class="bi bi-calendar-minus"></i>
+                  </span>
                   <input type="datetime-local" id="date_fin" name="date_fin"
-                         class="form-control border-start-0 ps-0" value="{{ date_fin }}" min="{{ today_iso }}" required style="border-radius: 0 10px 10px 0;">
+                         class="form-control border-start-0 ps-0 fw-semibold" value="{{ date_fin }}" min="{{ today_iso }}" required style="border-radius: 0 8px 8px 0; border-color: #cbd5e1; font-size: 0.85rem;">
                 </div>
-                <div id="date-error" class="alert alert-warning py-2 small d-none mt-2 mb-0" style="border-radius: 8px;">
-                  <i class="bi bi-exclamation-triangle me-1"></i>La date de fin doit être postérieure à la date de début.
+                <div id="date-error" class="alert alert-warning py-2 px-3 small d-none mt-2 mb-0 d-flex align-items-center gap-2" style="border-radius: 8px;">
+                  <i class="bi bi-exclamation-triangle-fill text-warning flex-shrink-0"></i>
+                  <span>La date de fin doit être postérieure à la date de début.</span>
                 </div>
               </div>
 
               {% if not is_modification %}
+              <!-- Nom de la réservation -->
               <div class="mb-0">
-                <label for="nom_reservation" class="form-label small fw-bold text-muted text-uppercase">Nom de la réservation</label>
+                <label for="nom_reservation" class="form-label small fw-bold text-muted text-uppercase" style="font-size: 0.72rem; letter-spacing: 0.5px;">
+                  Nom de la réservation (facultatif)
+                </label>
                 <div class="input-group">
-                  <span class="input-group-text bg-white border-end-0 text-muted" style="border-radius: 10px 0 0 10px;"><i class="bi bi-tag"></i></span>
+                  <span class="input-group-text bg-light border-end-0 text-muted" style="border-radius: 8px 0 0 8px; border-color: #cbd5e1;">
+                    <i class="bi bi-tag"></i>
+                  </span>
                   <input type="text" id="nom_reservation" name="nom_reservation"
-                         class="form-control border-start-0 ps-0" placeholder="Ex : Campagne Janvier 2026" style="border-radius: 0 10px 10px 0;">
+                         class="form-control border-start-0 ps-0" placeholder="Ex : Campagne Affichage T1" style="border-radius: 0 8px 8px 0; border-color: #cbd5e1; font-size: 0.85rem;">
                 </div>
               </div>
               {% endif %}
             </div>
           </div>
 
-          <!-- Récapitulatif -->
-          <div class="card border-0 shadow-sm mb-4" style="border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden;">
-            <div class="card-header bg-white border-bottom py-3 px-4 d-flex align-items-center gap-2" style="border-color: #e2e8f0;">
-              <i class="bi bi-clipboard-data text-secondary"></i>
-              <h6 class="mb-0 fw-bold" style="color: #1e293b;">Récapitulatif</h6>
+          <!-- Carte Récapitulatif -->
+          <div class="card border-0 shadow-sm mb-4" style="border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden; background: #ffffff;">
+            <div class="card-header bg-white border-bottom py-3 px-4 d-flex align-items-center justify-content-between" style="border-color: #e2e8f0;">
+              <div class="d-flex align-items-center gap-2">
+                <div class="d-flex align-items-center justify-content-center rounded-2 text-secondary" style="width: 28px; height: 28px; background: rgba(100,116,139,0.1);">
+                  <i class="bi bi-clipboard-data-fill" style="font-size: 0.9rem;"></i>
+                </div>
+                <h6 class="mb-0 fw-bold" style="color: #0f172a; font-size: 0.95rem;">Récapitulatif</h6>
+              </div>
+              <span class="badge bg-light text-dark border small" id="live-status-pill">En attente</span>
             </div>
             <div class="card-body p-0">
               <ul class="list-group list-group-flush">
-                <li class="list-group-item d-flex justify-content-between align-items-center py-3 px-4">
-                  <span class="text-muted small">Faces sélectionnées</span>
-                  <strong id="recap-count" class="badge px-3 py-2 text-white" style="background: var(--color-primary); font-size: 0.85rem; border-radius: 8px;">0</strong>
+                <li class="list-group-item d-flex justify-content-between align-items-center py-3 px-4" style="border-color: #f1f5f9;">
+                  <span class="text-muted small d-flex align-items-center gap-1">
+                    <i class="bi bi-collection text-primary"></i>Faces sélectionnées
+                  </span>
+                  <strong id="recap-count" class="badge px-3 py-2 text-white" style="background: var(--color-primary, #932e2b); font-size: 0.85rem; border-radius: 6px;">0</strong>
                 </li>
-                <li class="list-group-item d-flex justify-content-between align-items-center py-3 px-4">
-                  <span class="text-muted small">Durée</span>
-                  <strong id="recap-duree" class="text-dark">—</strong>
+                <li class="list-group-item d-flex justify-content-between align-items-center py-3 px-4" style="border-color: #f1f5f9;">
+                  <span class="text-muted small d-flex align-items-center gap-1">
+                    <i class="bi bi-hourglass-split text-primary"></i>Durée estimée
+                  </span>
+                  <strong id="recap-duree" class="text-dark font-monospace" style="font-size: 0.9rem;">—</strong>
+                </li>
+                <li class="list-group-item d-flex justify-content-between align-items-center py-3 px-4 bg-light" style="border-color: #f1f5f9;">
+                  <span class="text-muted small">Client bénéficiaire</span>
+                  <span class="fw-bold text-dark text-truncate" style="max-width: 160px; font-size: 0.85rem;">{{ client.nom }}</span>
                 </li>
               </ul>
             </div>
           </div>
 
-          <!-- Conflits clients -->
+          <!-- Conflits clients s'il y en a -->
           {% if clt %}
           <div class="card border-0 shadow-sm mb-4" style="border-radius: 8px; border: 1px solid #fde68a; background: #fffbeb;">
             <div class="card-header bg-transparent border-bottom py-3 px-4" style="border-color: #fde68a;">
-              <div class="fw-bold text-warning-emphasis d-flex align-items-center gap-2">
+              <div class="fw-bold text-warning-emphasis d-flex align-items-center gap-2" style="font-size: 0.88rem;">
                 <i class="bi bi-exclamation-triangle-fill text-warning"></i>Autres réservations détectées
               </div>
             </div>
@@ -299,14 +418,16 @@
           </div>
           {% endif %}
 
-          <!-- Actions -->
-          <div class="card border-0 shadow-sm" style="border-radius: 8px; border: 1px solid #e2e8f0;">
+          <!-- Actions de validation (placées en bas de colonne) -->
+          <div class="card border-0 shadow-sm" style="border-radius: 8px; border: 1px solid #e2e8f0; background: #ffffff;">
             <div class="card-body p-4 d-flex flex-column gap-2">
-              <button type="submit" id="btn-submit" class="btn btn-primary w-100 py-2 d-flex align-items-center justify-content-center gap-2 shadow-sm fw-bold" disabled style="border-radius: 8px; background: var(--color-primary); border-color: var(--color-primary);">
-                <i class="bi bi-check-lg fs-5"></i>
+              <button type="submit" id="btn-submit" class="btn btn-primary w-100 py-3 d-flex align-items-center justify-content-center gap-2 shadow fw-bold" disabled style="border-radius: 8px; background: var(--color-primary, #932e2b); border-color: var(--color-primary, #932e2b); font-size: 0.95rem;">
+                <i class="bi bi-check-circle-fill fs-5"></i>
                 <span>{% if is_modification %}Mettre à jour la réservation{% else %}Enregistrer la réservation{% endif %}</span>
               </button>
-              <a href="{% url 'client_detail' pk=client.pk %}" class="btn btn-light border w-100 py-2 fw-semibold" style="border-radius: 8px;">Annuler</a>
+              <a href="{% url 'client_detail' pk=client.pk %}" class="btn btn-light border w-100 py-2 fw-semibold text-muted" style="border-radius: 8px;">
+                <i class="bi bi-arrow-left me-1"></i>Annuler et revenir
+              </a>
             </div>
           </div>
 
@@ -318,21 +439,128 @@
 
 </div>
 
-<!-- Compteur flottant -->
-<div id="compteur-badge" class="position-fixed bottom-0 end-0 m-4 d-flex align-items-center gap-2 px-3 py-2 rounded-pill shadow bg-primary text-white" style="z-index: 1050; background: var(--color-primary) !important;">
+<!-- Compteur Flottant Mobile / Écran large -->
+<div id="compteur-badge" class="position-fixed bottom-0 end-0 m-4 d-flex align-items-center gap-2 px-3 py-2 rounded-pill shadow-lg text-white" style="z-index: 1050; background: var(--color-primary, #932e2b) !important; border: 1px solid rgba(255,255,255,0.2);">
   <i class="bi bi-images"></i>
   <span id="compteur-label" class="fw-semibold small">0 face sélectionnée</span>
 </div>
 
 <style>
+  .reservation-form-page {
+    --reservation-border: #dbe3ec;
+    --reservation-surface: #ffffff;
+    --reservation-muted-surface: #f6f8fb;
+    --reservation-ink: #17212f;
+    --reservation-muted: #66758a;
+    color: var(--reservation-ink);
+  }
+  .reservation-form-page > .card:first-child {
+    border: 1px solid rgba(255,255,255,.12) !important;
+    box-shadow: 0 12px 28px rgba(15,23,42,.14) !important;
+  }
+  .reservation-form-page .card:not(:first-child) {
+    border-color: var(--reservation-border) !important;
+    box-shadow: 0 3px 12px rgba(15,23,42,.045) !important;
+  }
+  .reservation-form-page .card-header {
+    font-weight: 700;
+  }
+  .reservation-form-page .form-control,
+  .reservation-form-page .form-select,
+  .reservation-form-page .input-group-text {
+    min-height: 42px;
+  }
+  .reservation-form-page .form-control:focus,
+  .reservation-form-page .form-select:focus {
+    border-color: var(--color-primary, #932e2b) !important;
+    box-shadow: 0 0 0 3px rgba(147,46,43,.12) !important;
+  }
+  .reservation-form-page #search-panneau {
+    min-width: 0 !important;
+  }
+  .reservation-form-page #panneau-grid {
+    align-items: stretch;
+  }
+  .panneau-card {
+    border: 1px solid var(--reservation-border) !important;
+    border-radius: 8px !important;
+    transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  }
+  .panneau-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 22px rgba(15,23,42,.09) !important;
+  }
   .panneau-card:has(.face-input:checked) {
     border-color: var(--color-primary, #932e2b) !important;
-    box-shadow: 0 0 0 3px rgba(147, 46, 43, 0.15) !important;
+    box-shadow: 0 0 0 2px rgba(147,46,43,.12), 0 8px 20px rgba(15,23,42,.07) !important;
   }
-  .face-label-element { transition: all 0.15s ease; }
-  #btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
+  .panneau-card .card-header {
+    background: var(--reservation-muted-surface) !important;
+  }
+  .face-wrapper {
+    min-width: 0;
+  }
+  .face-label-element {
+    min-height: 64px;
+    gap: 10px;
+    white-space: normal;
+    text-align: left;
+    border-radius: 8px !important;
+    transition: transform 0.16s ease, box-shadow 0.16s ease, border-color 0.16s ease, background-color 0.16s ease;
+    cursor: pointer;
+  }
+  .face-label-element:not(.opacity-50):not(.opacity-75):hover {
+    transform: translateY(-1px);
+    box-shadow: 0 5px 12px rgba(15,23,42,.08);
+  }
+  .face-label-element > span:first-child {
+    min-width: 0;
+  }
+  .face-label-element > span:last-child {
+    flex-shrink: 0;
+  }
+  .reservation-form-page .sidebar-sticky > .card {
+    overflow: hidden;
+  }
+  .reservation-form-page #btn-submit {
+    min-height: 48px;
+    transition: transform .16s ease, box-shadow .16s ease, background-color .16s ease;
+  }
+  .reservation-form-page #btn-submit:not(:disabled):hover {
+    transform: translateY(-1px);
+  }
+  .reservation-form-page #compteur-badge {
+    bottom: 16px !important;
+    right: 16px !important;
+    margin: 0 !important;
+    border-radius: 8px !important;
+    box-shadow: 0 8px 22px rgba(15,23,42,.2) !important;
+  }
+  #btn-submit:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+    background-color: #94a3b8 !important;
+    border-color: #94a3b8 !important;
+  }
   @media (min-width: 992px) {
-    .sidebar-sticky { position: sticky; top: 1rem; }
+    .sidebar-sticky { position: sticky; top: 1.5rem; }
+  }
+  @media (max-width: 575.98px) {
+    .reservation-form-page > .card:first-child .card-body {
+      padding: 1.15rem !important;
+    }
+    .reservation-form-page #panneau-grid > .panneau-item {
+      width: 100%;
+    }
+    .reservation-form-page .face-label-element {
+      padding: .75rem !important;
+    }
+    .reservation-form-page #compteur-badge {
+      right: 10px !important;
+      bottom: 10px !important;
+      padding: .55rem .75rem !important;
+      max-width: calc(100vw - 20px);
+    }
   }
 </style>
 
@@ -345,6 +573,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const compteurLbl   = document.getElementById('compteur-label');
     const recapCount    = document.getElementById('recap-count');
     const recapDuree    = document.getElementById('recap-duree');
+    const liveStatus    = document.getElementById('live-status-pill');
     const dateDebut     = document.getElementById('date_debut');
     const dateFin       = document.getElementById('date_fin');
     const btnSubmit     = document.getElementById('btn-submit');
@@ -367,7 +596,22 @@ document.addEventListener('DOMContentLoaded', function () {
                                     : `${checked} faces sélectionnées`;
         }
         if (recapCount) recapCount.textContent = checked;
-        btnSubmit.disabled = checked === 0 || !datesValides();
+        
+        const validDates = datesValides();
+        btnSubmit.disabled = (checked === 0 || !validDates);
+
+        if (liveStatus) {
+            if (!validDates) {
+                liveStatus.className = 'badge bg-warning-subtle text-warning border border-warning-subtle small';
+                liveStatus.textContent = 'Dates requises';
+            } else if (checked === 0) {
+                liveStatus.className = 'badge bg-light text-muted border small';
+                liveStatus.textContent = 'Sélectionnez des faces';
+            } else {
+                liveStatus.className = 'badge bg-success-subtle text-success border border-success-subtle small';
+                liveStatus.textContent = `${checked} prête${checked > 1 ? 's' : ''}`;
+            }
+        }
     }
 
     function reinitialiserFaces() {
@@ -378,9 +622,14 @@ document.addEventListener('DOMContentLoaded', function () {
             const icon  = wrapper.querySelector('.check-icon');
             cb.disabled = true;
             label.style.pointerEvents = 'none';
-            label.className = 'btn btn-outline-secondary w-100 text-start p-3 d-flex justify-content-between align-items-center rounded-3 opacity-75 face-label-element';
-            if (badge) { badge.className = 'badge bg-light text-muted border status-badge'; badge.textContent = 'En attente de dates'; }
-            if (icon)  { icon.className  = 'bi bi-calendar-event fs-5 me-2 check-icon'; }
+            label.className = 'btn btn-light w-100 text-start p-3 d-flex justify-content-between align-items-center rounded-2 opacity-75 face-label-element border';
+            if (badge) {
+                badge.className = 'badge bg-light text-muted border status-badge';
+                badge.textContent = 'En attente de dates';
+            }
+            if (icon) {
+                icon.className = 'bi bi-calendar-event fs-5 me-2 check-icon text-muted';
+            }
         });
         btnSubmit.disabled = true;
     }
@@ -411,6 +660,7 @@ document.addEventListener('DOMContentLoaded', function () {
             } else {
                 dateErrorEl.classList.add('d-none');
             }
+            updateCompteur();
             return;
         }
         dateErrorEl.classList.add('d-none');
@@ -419,7 +669,7 @@ document.addEventListener('DOMContentLoaded', function () {
         if (spinner) spinner.classList.remove('d-none');
         btnSubmit.disabled = true;
 
-        fetch(`/gestion/campaigns/api/check-dispo/{{ client.pk }}/?date_debut=${d1}&date_fin=${d2}`)
+        fetch(`/gestion/campaigns/api/check-dispo/{{ client.pk }}/?date_debut=${encodeURIComponent(d1)}&date_fin=${encodeURIComponent(d2)}`)
             .then(r => { if (!r.ok) throw new Error('Erreur API'); return r.json(); })
             .then(data => {
                 const facesData = data.faces || {};
@@ -439,24 +689,41 @@ document.addEventListener('DOMContentLoaded', function () {
                         cb.checked = false;
                         cb.disabled = true;
                         label.style.pointerEvents = 'none';
-                        label.className = 'btn btn-light w-100 text-start p-3 d-flex justify-content-between align-items-center rounded-3 opacity-50 face-label-element';
-                        if (badge) { badge.className = 'badge bg-danger-subtle text-danger border border-danger-subtle status-badge'; badge.textContent = 'Occupée'; }
-                        if (icon)  { icon.className  = 'bi bi-lock-fill text-muted fs-5 me-2 check-icon'; }
+                        label.className = 'btn btn-light w-100 text-start p-3 d-flex justify-content-between align-items-center rounded-2 opacity-50 face-label-element border';
+                        label.style.background = '';
+                        label.style.borderColor = '';
+                        if (badge) {
+                            badge.className = 'badge bg-danger-subtle text-danger border border-danger-subtle status-badge';
+                            badge.textContent = 'Occupée';
+                        }
+                        if (icon) {
+                            icon.className = 'bi bi-lock-fill text-danger fs-5 me-2 check-icon';
+                        }
                     } else {
                         cb.disabled = false;
                         label.style.pointerEvents = 'auto';
                         if (cb.checked) {
-                            label.className = 'btn btn-primary w-100 text-start p-3 d-flex justify-content-between align-items-center rounded-3 face-label-element';
-                            label.style.background = 'var(--color-primary)';
-                            label.style.borderColor = 'var(--color-primary)';
-                            if (badge) { badge.className = 'badge bg-white text-dark border status-badge'; badge.textContent = 'Sélectionnée'; }
-                            if (icon)  { icon.className  = 'bi bi-check-circle-fill fs-5 me-2 check-icon'; }
+                            label.className = 'btn btn-primary w-100 text-start p-3 d-flex justify-content-between align-items-center rounded-2 face-label-element shadow-sm';
+                            label.style.background = 'var(--color-primary, #932e2b)';
+                            label.style.borderColor = 'var(--color-primary, #932e2b)';
+                            if (badge) {
+                                badge.className = 'badge bg-white text-dark border status-badge';
+                                badge.textContent = 'Sélectionnée';
+                            }
+                            if (icon) {
+                                icon.className = 'bi bi-check-circle-fill fs-5 me-2 check-icon';
+                            }
                         } else {
-                            label.className = 'btn btn-outline-primary w-100 text-start p-3 d-flex justify-content-between align-items-center rounded-3 face-label-element';
-                            label.style.background = '';
-                            label.style.borderColor = '';
-                            if (badge) { badge.className = 'badge bg-success-subtle text-success border border-success-subtle status-badge'; badge.textContent = 'Libre'; }
-                            if (icon)  { icon.className  = 'bi bi-circle fs-5 me-2 check-icon'; }
+                            label.className = 'btn btn-outline-secondary w-100 text-start p-3 d-flex justify-content-between align-items-center rounded-2 face-label-element border';
+                            label.style.background = '#ffffff';
+                            label.style.borderColor = '#cbd5e1';
+                            if (badge) {
+                                badge.className = 'badge bg-success-subtle text-success border border-success-subtle status-badge';
+                                badge.textContent = 'Libre';
+                            }
+                            if (icon) {
+                                icon.className = 'bi bi-circle fs-5 me-2 check-icon text-secondary';
+                            }
                         }
                     }
                 });
@@ -469,9 +736,12 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (spinner) spinner.classList.add('d-none');
                 faceWrappers.forEach(w => {
                     const cb = w.querySelector('.face-input');
-                    if (cb) { cb.disabled = false; w.querySelector('.face-label-element').style.pointerEvents = 'auto'; }
+                    if (cb) {
+                        cb.disabled = false;
+                        w.querySelector('.face-label-element').style.pointerEvents = 'auto';
+                    }
                 });
-                btnSubmit.disabled = false;
+                updateCompteur();
             });
     }
 
@@ -482,14 +752,27 @@ document.addEventListener('DOMContentLoaded', function () {
         const q     = searchInput.value.toLowerCase().trim();
         const dispo = filterDispo.value;
         const fmt   = filterFormat.value;
+        let countVisible = 0;
+
         document.querySelectorAll('.panneau-item').forEach(item => {
-            const matchText   = !q   || item.dataset.code.includes(q) || item.dataset.quartier.includes(q);
+            const code = item.dataset.code || '';
+            const quartier = item.dataset.quartier || '';
+            const ville = item.dataset.ville || '';
+            const matchText = !q || code.includes(q) || quartier.includes(q) || ville.includes(q);
             const matchFormat = !fmt || item.dataset.format === fmt;
             let matchDispo = true;
             if (dispo === 'libre')  matchDispo = !!item.querySelector('[data-face-statut="libre"]');
             if (dispo === 'occupe') matchDispo = !!item.querySelector('[data-face-statut="occupe"]');
-            item.style.display = (matchText && matchFormat && matchDispo) ? '' : 'none';
+            
+            const visible = (matchText && matchFormat && matchDispo);
+            item.style.display = visible ? '' : 'none';
+            if (visible) countVisible++;
         });
+
+        const countBadge = document.getElementById('supports-count-badge');
+        if (countBadge) {
+            countBadge.textContent = `${countVisible} support${countVisible > 1 ? 's' : ''}`;
+        }
     }
 
     searchInput.addEventListener('input', applyFilters);
@@ -498,12 +781,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
     document.getElementById('btn-tout-cocher').addEventListener('click', function () {
         document.querySelectorAll('.face-input:not(:disabled)').forEach(cb => {
-            cb.checked = true; cb.dispatchEvent(new Event('change'));
+            cb.checked = true;
+            cb.dispatchEvent(new Event('change'));
         });
     });
     document.getElementById('btn-tout-decocher').addEventListener('click', function () {
         document.querySelectorAll('.face-input:not(:disabled)').forEach(cb => {
-            cb.checked = false; cb.dispatchEvent(new Event('change'));
+            cb.checked = false;
+            cb.dispatchEvent(new Event('change'));
         });
     });
 
@@ -514,17 +799,27 @@ document.addEventListener('DOMContentLoaded', function () {
             const badge   = wrapper.querySelector('.status-badge');
             const icon    = wrapper.querySelector('.check-icon');
             if (this.checked) {
-                label.className = 'btn btn-primary w-100 text-start p-3 d-flex justify-content-between align-items-center rounded-3 face-label-element';
-                label.style.background = 'var(--color-primary)';
-                label.style.borderColor = 'var(--color-primary)';
-                if (badge) { badge.className = 'badge bg-white text-dark border status-badge'; badge.textContent = 'Sélectionnée'; }
-                if (icon)  { icon.className  = 'bi bi-check-circle-fill fs-5 me-2 check-icon'; }
+                label.className = 'btn btn-primary w-100 text-start p-3 d-flex justify-content-between align-items-center rounded-2 face-label-element shadow-sm';
+                label.style.background = 'var(--color-primary, #932e2b)';
+                label.style.borderColor = 'var(--color-primary, #932e2b)';
+                if (badge) {
+                    badge.className = 'badge bg-white text-dark border status-badge';
+                    badge.textContent = 'Sélectionnée';
+                }
+                if (icon) {
+                    icon.className = 'bi bi-check-circle-fill fs-5 me-2 check-icon';
+                }
             } else {
-                label.className = 'btn btn-outline-primary w-100 text-start p-3 d-flex justify-content-between align-items-center rounded-3 face-label-element';
-                label.style.background = '';
-                label.style.borderColor = '';
-                if (badge) { badge.className = 'badge bg-success-subtle text-success border border-success-subtle status-badge'; badge.textContent = 'Libre'; }
-                if (icon)  { icon.className  = 'bi bi-circle fs-5 me-2 check-icon'; }
+                label.className = 'btn btn-outline-secondary w-100 text-start p-3 d-flex justify-content-between align-items-center rounded-2 face-label-element border';
+                label.style.background = '#ffffff';
+                label.style.borderColor = '#cbd5e1';
+                if (badge) {
+                    badge.className = 'badge bg-success-subtle text-success border border-success-subtle status-badge';
+                    badge.textContent = 'Libre';
+                }
+                if (icon) {
+                    icon.className = 'bi bi-circle fs-5 me-2 check-icon text-secondary';
+                }
             }
             updateCompteur();
         });
@@ -539,11 +834,11 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         if (document.querySelectorAll('.face-input:checked').length === 0) {
             e.preventDefault();
-            alert('Veuillez sélectionner au moins une face.');
+            alert('Veuillez sélectionner au moins une face pour la réservation.');
             return;
         }
         btnSubmit.disabled  = true;
-        btnSubmit.innerHTML = '<i class="bi bi-hourglass-split me-1"></i> Enregistrement en cours…';
+        btnSubmit.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Enregistrement en cours…';
     });
 
     if (dateDebut.value && dateFin.value && dateDebut.value < dateFin.value) {

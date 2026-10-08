@@ -8,6 +8,20 @@
   {{ mode_title }} — {{ client.nom }}
 {% endblock %}
 
+{% block page_toolbar_title %}
+  <div>
+    <h1 class="h4 fw-bold mb-0" style="color: #0f172a;">Sélection des faces & période</h1>
+    <p class="text-muted small mb-0">Étape 2 sur 3 — Client : <strong class="text-dark">{{ client.nom }}</strong></p>
+  </div>
+{% endblock %}
+
+{% block contentbouton %}
+  <a href="{% url 'reservation_wizard_cancel' %}" class="btn btn-danger btn-sm" style="border-radius: 8px;">
+    <i class="bi bi-x-lg me-1"></i>Annuler
+  </a>
+{% endblock %}
+
+
 {% block content %}
 <style>
   :root {
@@ -223,23 +237,7 @@
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
-<div class="mb-4">
-
-  <!-- Bouton Retour & Titre -->
-  <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-3">
-    <div class="d-flex align-items-center gap-3">
-      <a href="javascript:void(0)" onclick="history.back()" class="btn btn-light border btn-sm d-flex align-items-center justify-content-center shadow-sm" style="width: 38px; height: 38px; border-radius: 20px;" title="Étape précédente">
-        <i class="bi bi-arrow-left fs-6"></i>
-      </a>
-      <div>
-        <h1 class="h4 fw-bold mb-0" style="color: #0f172a;">Sélection des faces & période</h1>
-        <p class="text-muted small mb-0">Étape 2 sur 3 — Client : <strong class="text-dark">{{ client.nom }}</strong></p>
-      </div>
-    </div>
-    <a href="{% url 'reservation_wizard_cancel' %}" class="btn btn-link btn-sm text-danger text-decoration-none">
-      <i class="bi bi-x-circle me-1"></i>Annuler la création
-    </a>
-  </div>
+<div class="reservation-wizard-page mb-4">
 
   {% for message in messages %}
   <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show py-2 shadow-sm mb-3" role="alert" style="border-radius: 8px;">
@@ -253,10 +251,11 @@
   <div class="dates-bar">
     <span class="dates-bar-label">
       <i class="bi bi-calendar3" style="color:var(--color-primary)"></i>
-      Période
+      Période de diffusion
     </span>
 
     <div class="date-input-wrap">
+      <label for="date-debut" class="reservation-date-label">Début</label>
       <i class="bi bi-calendar-plus" style="color:#10b981"></i>
       <input type="date" id="date-debut" value="{{ date_debut|slice:':10' }}" required>
     </div>
@@ -270,14 +269,16 @@
       </button>
     </div>
 
-    <span class="dates-bar-sep">→</span>
+    <span class="dates-bar-sep"><i class="bi bi-arrow-right"></i></span>
 
     <div class="date-input-wrap" id="wrap-date-fin">
+      <label for="date-fin" class="reservation-date-label">Fin</label>
       <i class="bi bi-calendar-minus" style="color:#ef4444"></i>
       <input type="date" id="date-fin" value="{{ date_fin|slice:':10' }}" required>
     </div>
 
     <div class="date-input-wrap" id="wrap-duree-jours" style="display:none">
+      <span class="reservation-date-label">Durée</span>
       <i class="bi bi-hourglass-split" style="color:#f59e0b"></i>
       <input type="number" id="duree-jours" min="1" step="1" placeholder="Nombre" style="width:75px">
       <span style="font-size:.74rem;color:#64748b;white-space:nowrap;">jour(s)</span>
@@ -294,6 +295,11 @@
     <!-- Section Principale (Carte / Liste) -->
     <div class="main-section">
       <div class="section-header">
+
+        <div class="availability-heading">
+          <span class="reservation-eyebrow">Inventaire</span>
+          <strong>Supports disponibles</strong>
+        </div>
 
         <div class="view-toggle">
           <button class="vt-btn active" id="btn-vue-carte" onclick="switchView('carte')">

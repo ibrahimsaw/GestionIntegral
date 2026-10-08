@@ -4,37 +4,70 @@
 {% block title %}{{ mode_title }} — Integral{% endblock %}
 
 {% block topbar_title %}
-  <i class="bi bi-clipboard-check-fill me-2" style="color:var(--color-primary)"></i>
-  {{ mode_title }}
+  <div class="d-flex align-items-center gap-2">
+    <div class="d-flex align-items-center justify-content-center rounded-2 text-white" style="width: 28px; height: 28px; background: var(--color-primary, #932e2b);">
+      <i class="bi bi-clipboard-check-fill" style="font-size: 0.85rem;"></i>
+    </div>
+    <span class="fw-bold">{{ mode_title }}</span>
+    <span class="text-muted small">/ Étape 3 : Récapitulatif</span>
+  </div>
+{% endblock %}
+
+{% block page_toolbar_title %}
+  <div>
+    <h1 class="h4 fw-bold mb-0" style="color: #0f172a;">Vérification & Finalisation</h1>
+    <p class="text-muted small mb-0">Étape 3 sur 3 — Vérifiez l'ensemble des données avant d'enregistrer la réservation.</p>
+  </div>
+{% endblock %}
+
+{% block contentbouton %}
+  <a href="{% url 'reservation_wizard_cancel' %}" class="btn btn-outline-secondary btn-sm" style="border-radius: 8px;">
+    <i class="bi bi-x-lg me-1"></i>Annuler
+  </a>
 {% endblock %}
 
 {% block content %}
-<div class="mb-4">
-
-  <!-- Bouton Retour & Titre -->
-  <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
-    <div class="d-flex align-items-center gap-3">
-      <a href="{% url 'reservation_wizard_etape2' %}" class="btn btn-light border btn-sm d-flex align-items-center justify-content-center shadow-sm" style="width: 38px; height: 38px; border-radius: 10px;" title="Retour à l'étape 2">
-        <i class="bi bi-arrow-left fs-6"></i>
-      </a>
-      <div>
-        <h1 class="h4 fw-bold mb-0" style="color: #0f172a;">Vérification & Finalisation</h1>
-        <p class="text-muted small mb-0">Étape 3 sur 3 — Vérifiez l'ensemble des données avant d'enregistrer la réservation.</p>
-      </div>
-    </div>
-    <a href="{% url 'reservation_wizard_cancel' %}" class="btn btn-link btn-sm text-danger text-decoration-none">
-      <i class="bi bi-x-circle me-1"></i>Annuler la création
-    </a>
-  </div>
+<div class="reservation-wizard-page mb-4">
 
   {% for message in messages %}
-  <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show py-2 shadow-sm mb-4" role="alert" style="border-radius: 8px;">
-    {{ message }}
+  <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags }}{% endif %} alert-dismissible fade show py-3 px-4 shadow-sm mb-4 d-flex align-items-center gap-2" role="alert" style="border-radius: 8px;">
+    <i class="bi {% if message.tags == 'error' %}bi-exclamation-octagon-fill text-danger{% else %}bi-check-circle-fill text-success{% endif %} fs-5"></i>
+    <div class="flex-grow-1">{{ message }}</div>
     <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
   </div>
   {% endfor %}
 
   {% include 'campaigns/_wizard_steps.html' with step=3 client=client %}
+
+  <header class="reservation-step-intro reservation-review-intro">
+    <div>
+      <span class="reservation-eyebrow">Dernière étape · Contrôle avant enregistrement</span>
+      <h1>Vérifier la réservation</h1>
+      <p>Relisez le client, la période et les faces retenues avant de confirmer.</p>
+    </div>
+    <div class="reservation-intro-mark reservation-intro-mark-success" aria-hidden="true"><i class="bi bi-clipboard-check"></i></div>
+  </header>
+
+  <div class="row g-3 reservation-review-metrics" aria-label="Synthèse de la réservation">
+    <div class="col-12 col-md-4">
+      <div class="reservation-review-metric">
+        <span class="reservation-review-metric-icon"><i class="bi bi-building"></i></span>
+        <div><small>Client</small><strong>{{ client.nom }}</strong></div>
+      </div>
+    </div>
+    <div class="col-6 col-md-4">
+      <div class="reservation-review-metric">
+        <span class="reservation-review-metric-icon"><i class="bi bi-calendar3"></i></span>
+        <div><small>Période</small><strong>{{ date_debut|date:"d/m/Y" }} — {{ date_fin|date:"d/m/Y" }}</strong></div>
+      </div>
+    </div>
+    <div class="col-6 col-md-4">
+      <div class="reservation-review-metric">
+        <span class="reservation-review-metric-icon"><i class="bi bi-grid-3x3-gap"></i></span>
+        <div><small>Faces sélectionnées</small><strong>{{ faces|length }}</strong></div>
+      </div>
+    </div>
+  </div>
 
   {% if erreurs %}
   <div class="alert alert-danger shadow-sm mb-4" style="border-radius: 8px; border: 1px solid #fecaca; background: #fff5f5;">
@@ -46,28 +79,31 @@
     <ul class="mb-3 small text-danger ps-3">
       {% for err in erreurs %}<li>{{ err }}</li>{% endfor %}
     </ul>
-    <a href="{% url 'reservation_wizard_etape2' %}" class="btn btn-sm btn-danger shadow-sm" style="border-radius: 8px;">
+    <a href="{% url 'reservation_wizard_etape2' %}" class="btn btn-sm btn-danger shadow-sm fw-semibold" style="border-radius: 8px;">
       <i class="bi bi-arrow-left me-1"></i>Ajuster la sélection des faces
     </a>
   </div>
   {% endif %}
 
   <div class="row g-4 mb-4">
-    <!-- Colonne Client & Période -->
+    <!-- Colonne Gauche : Client & Période -->
     <div class="col-lg-6">
 
       <!-- Récap Client -->
-      <div class="card border-0 shadow-sm mb-4" style="border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden;">
+      <div class="card border-0 shadow-sm mb-4" style="border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden; background: #ffffff;">
         <div class="card-header bg-white py-3 px-4 d-flex justify-content-between align-items-center border-bottom" style="border-color: #e2e8f0;">
-          <h6 class="mb-0 fw-bold d-flex align-items-center gap-2" style="color: #1e293b;">
-            <i class="bi bi-person-circle text-primary"></i>Client associé
+          <h6 class="mb-0 fw-bold d-flex align-items-center gap-2" style="color: #0f172a; font-size: 0.95rem;">
+            <div class="d-flex align-items-center justify-content-center rounded-2 text-primary" style="width: 28px; height: 28px; background: rgba(147,46,43,0.08);">
+              <i class="bi bi-building" style="font-size: 0.85rem;"></i>
+            </div>
+            <span>Client associé</span>
           </h6>
-          <a href="{% url 'reservation_wizard_etape1' %}" class="btn btn-sm btn-outline-secondary" style="border-radius: 8px;">
-            <i class="bi bi-pencil me-1"></i>Modifier
+          <a href="{% url 'reservation_wizard_etape1' %}" class="btn btn-sm btn-outline-secondary" style="border-radius: 6px;">
+            <i class="bi bi-pencil me-1"></i>Changer
           </a>
         </div>
         <div class="card-body p-4 d-flex align-items-center gap-3">
-          <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold shadow-sm flex-shrink-0" style="width: 52px; height: 52px; background: linear-gradient(135deg, var(--color-primary) 0%, #b91c1c 100%); font-size: 1.2rem;">
+          <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold shadow-sm flex-shrink-0" style="width: 52px; height: 52px; background: linear-gradient(135deg, var(--color-primary, #932e2b) 0%, #b91c1c 100%); font-size: 1.2rem;">
             {% if client.logo %}
               <img src="{{ client.logo.url }}" class="w-100 h-100 object-fit-contain rounded-circle" alt="Logo">
             {% else %}
@@ -75,65 +111,75 @@
             {% endif %}
           </div>
           <div class="flex-grow-1 min-width-0">
-            <h5 class="fw-bold mb-1 text-dark text-truncate">{{ client.nom }}</h5>
-            <div class="small text-muted d-flex align-items-center gap-3 flex-wrap">
-              {% if client.telephone %}<span><i class="bi bi-telephone text-secondary me-1"></i>{{ client.telephone }}</span>{% endif %}
-              {% if client.email %}<span><i class="bi bi-envelope text-secondary me-1"></i>{{ client.email }}</span>{% endif %}
+            <h5 class="fw-bold mb-1 text-dark text-truncate" style="font-size: 1.05rem;">{{ client.nom }}</h5>
+            <div class="small text-muted d-flex align-items-center gap-3 flex-wrap" style="font-size: 0.8rem;">
+              {% if client.telephone %}
+                <span class="d-inline-flex align-items-center gap-1"><i class="bi bi-telephone text-primary"></i>{{ client.telephone }}</span>
+              {% endif %}
+              {% if client.email %}
+                <span class="d-inline-flex align-items-center gap-1"><i class="bi bi-envelope text-primary"></i>{{ client.email }}</span>
+              {% endif %}
             </div>
           </div>
         </div>
       </div>
 
       <!-- Récap Période -->
-      <div class="card border-0 shadow-sm" style="border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden;">
+      <div class="card border-0 shadow-sm" style="border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden; background: #ffffff;">
         <div class="card-header bg-white py-3 px-4 d-flex justify-content-between align-items-center border-bottom" style="border-color: #e2e8f0;">
-          <h6 class="mb-0 fw-bold d-flex align-items-center gap-2" style="color: #1e293b;">
-            <i class="bi bi-calendar-range text-primary"></i>Période & Intitulé
+          <h6 class="mb-0 fw-bold d-flex align-items-center gap-2" style="color: #0f172a; font-size: 0.95rem;">
+            <div class="d-flex align-items-center justify-content-center rounded-2 text-primary" style="width: 28px; height: 28px; background: rgba(147,46,43,0.08);">
+              <i class="bi bi-calendar-range-fill" style="font-size: 0.85rem;"></i>
+            </div>
+            <span>Période & Intitulé</span>
           </h6>
-          <a href="{% url 'reservation_wizard_etape2' %}" class="btn btn-sm btn-outline-secondary" style="border-radius: 8px;">
+          <a href="{% url 'reservation_wizard_etape2' %}" class="btn btn-sm btn-outline-secondary" style="border-radius: 6px;">
             <i class="bi bi-pencil me-1"></i>Modifier
           </a>
         </div>
         <div class="card-body p-4">
-          <div class="mb-3 p-3 rounded-3" style="background: #f8fafc; border: 1px solid #e2e8f0;">
-            <div class="text-uppercase text-muted fw-bold mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Nom de la réservation</div>
-            <div class="fw-bold text-dark" style="font-size: 1rem;">{{ nom_reservation }}</div>
+          <div class="mb-3 p-3 rounded-2" style="background: #f8fafc; border: 1px solid #e2e8f0;">
+            <div class="text-uppercase text-muted fw-bold mb-1" style="font-size: 0.68rem; letter-spacing: 0.5px;">Nom de la réservation</div>
+            <div class="fw-bold text-dark" style="font-size: 0.95rem;">{{ nom_reservation|default:"Sans nom spécifique" }}</div>
           </div>
 
           <div class="row g-3">
             <div class="col-6">
-              <div class="p-3 rounded-3" style="background: #f8fafc; border: 1px solid #e2e8f0;">
-                <div class="text-uppercase text-muted fw-bold mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Date début</div>
-                <div class="fw-bold font-monospace text-success">{{ date_debut|date:"d/m/Y" }}</div>
+              <div class="p-3 rounded-2" style="background: #f8fafc; border: 1px solid #e2e8f0;">
+                <div class="text-uppercase text-muted fw-bold mb-1" style="font-size: 0.68rem; letter-spacing: 0.5px;">Date début</div>
+                <div class="fw-bold font-monospace text-success" style="font-size: 0.95rem;">{{ date_debut|date:"d/m/Y" }}</div>
                 <small class="text-muted">{{ date_debut|date:"H:i" }}</small>
               </div>
             </div>
             <div class="col-6">
-              <div class="p-3 rounded-3" style="background: #f8fafc; border: 1px solid #e2e8f0;">
-                <div class="text-uppercase text-muted fw-bold mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Date fin</div>
-                <div class="fw-bold font-monospace text-danger">{{ date_fin|date:"d/m/Y" }}</div>
+              <div class="p-3 rounded-2" style="background: #f8fafc; border: 1px solid #e2e8f0;">
+                <div class="text-uppercase text-muted fw-bold mb-1" style="font-size: 0.68rem; letter-spacing: 0.5px;">Date fin</div>
+                <div class="fw-bold font-monospace text-danger" style="font-size: 0.95rem;">{{ date_fin|date:"d/m/Y" }}</div>
                 <small class="text-muted">{{ date_fin|date:"H:i" }}</small>
               </div>
             </div>
           </div>
 
-          <div class="mt-3 text-muted small d-flex align-items-center gap-2">
-            <i class="bi bi-hourglass-split text-primary"></i>
-            <span>Durée totale : <strong class="text-dark">{{ duree_jours }} jour{{ duree_jours|pluralize }}</strong></span>
+          <div class="mt-3 text-muted small d-flex align-items-center gap-2 pt-2 border-top">
+            <i class="bi bi-hourglass-split text-primary fs-6"></i>
+            <span>Durée de la réservation : <strong class="text-dark">{{ duree_jours }} jour{{ duree_jours|pluralize }}</strong></span>
           </div>
         </div>
       </div>
 
     </div>
 
-    <!-- Colonne Faces sélectionnées -->
+    <!-- Colonne Droite : Faces sélectionnées -->
     <div class="col-lg-6">
-      <div class="card border-0 shadow-sm h-100 d-flex flex-column" style="border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden;">
+      <div class="card border-0 shadow-sm h-100 d-flex flex-column" style="border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden; background: #ffffff;">
         <div class="card-header bg-white py-3 px-4 d-flex justify-content-between align-items-center border-bottom" style="border-color: #e2e8f0;">
-          <h6 class="mb-0 fw-bold d-flex align-items-center gap-2" style="color: #1e293b;">
-            <i class="bi bi-grid-3x3-gap-fill text-primary"></i>Faces sélectionnées ({{ faces|length }})
+          <h6 class="mb-0 fw-bold d-flex align-items-center gap-2" style="color: #0f172a; font-size: 0.95rem;">
+            <div class="d-flex align-items-center justify-content-center rounded-2 text-primary" style="width: 28px; height: 28px; background: rgba(147,46,43,0.08);">
+              <i class="bi bi-grid-3x3-gap-fill" style="font-size: 0.85rem;"></i>
+            </div>
+            <span>Faces sélectionnées ({{ faces|length }})</span>
           </h6>
-          <a href="{% url 'reservation_wizard_etape2' %}" class="btn btn-sm btn-outline-secondary" style="border-radius: 8px;">
+          <a href="{% url 'reservation_wizard_etape2' %}" class="btn btn-sm btn-outline-secondary" style="border-radius: 6px;">
             <i class="bi bi-pencil me-1"></i>Modifier
           </a>
         </div>
@@ -142,19 +188,19 @@
             {% for face in faces %}
             <li class="list-group-item d-flex justify-content-between align-items-center py-3 px-4" style="border-bottom: 1px solid #f1f5f9;">
               <div class="d-flex align-items-center gap-3">
-                <div class="rounded-2 bg-light border text-primary fw-bold d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; font-size: 0.8rem;">
+                <div class="rounded-2 bg-light border text-primary fw-bold d-flex align-items-center justify-content-center flex-shrink-0" style="width: 34px; height: 34px; font-size: 0.85rem;">
                   🪧
                 </div>
                 <div>
-                  <div class="fw-bold font-monospace" style="color: #0f172a; font-size: 0.9rem;">
+                  <div class="fw-bold font-monospace" style="color: #0f172a; font-size: 0.88rem;">
                     {{ face.support.code }} — Face {{ face.label }}
                   </div>
-                  <div class="small text-muted">
-                    <i class="bi bi-geo-alt me-1"></i>{{ face.support.quartier|default:face.support.ville|default:"—" }}
+                  <div class="small text-muted" style="font-size: 0.75rem;">
+                    <i class="bi bi-geo-alt-fill text-secondary me-1"></i>{{ face.support.quartier|default:face.support.ville|default:"—" }}
                   </div>
                 </div>
               </div>
-              <span class="badge bg-light text-dark border px-2 py-1" style="font-size: 0.75rem;">
+              <span class="badge bg-light text-dark border px-2 py-1 flex-shrink-0" style="font-size: 0.72rem; border-radius: 6px;">
                 {{ face.support.get_format_display|default:face.support.format|default:"Standard" }}
               </span>
             </li>
@@ -170,16 +216,16 @@
     </div>
   </div>
 
-  <!-- Validation & Création finale -->
+  <!-- Formulaire de Validation finale -->
   <form method="post">
     {% csrf_token %}
     <div class="card border-0 shadow-sm" style="border-radius: 8px; border: 1px solid #e2e8f0; background: #ffffff;">
       <div class="card-body p-4 d-flex justify-content-between align-items-center flex-wrap gap-3">
-        <a href="{% url 'reservation_wizard_etape2' %}" class="btn btn-outline-secondary px-4 py-2 d-flex align-items-center gap-2 fw-semibold" style="border-radius: 10px;">
+        <a href="{% url 'reservation_wizard_etape2' %}" class="btn btn-outline-secondary px-4 py-2 d-flex align-items-center gap-2 fw-semibold" style="border-radius: 8px;">
           <i class="bi bi-arrow-left"></i>
           <span>Retour à l'étape 2</span>
         </a>
-        <button type="submit" class="btn btn-primary px-4 py-2 d-flex align-items-center gap-2 shadow fw-bold" style="border-radius: 10px; background-color: var(--color-primary); border-color: var(--color-primary);" {% if erreurs %}disabled{% endif %}>
+        <button type="submit" class="btn btn-primary px-4 py-2 d-flex align-items-center gap-2 shadow fw-bold" style="border-radius: 8px; background-color: var(--color-primary, #932e2b); border-color: var(--color-primary, #932e2b);" {% if erreurs %}disabled{% endif %}>
           <i class="bi bi-check-circle-fill fs-5"></i>
           <span>Confirmer et créer la réservation</span>
         </button>

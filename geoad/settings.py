@@ -116,10 +116,11 @@ WSGI_APPLICATION = 'geoad.wsgi.application'
 # ─────────────────────────────────────────────────────────────────────────────
 # BASE DE DONNÉES
 # ─────────────────────────────────────────────────────────────────────────────
+_data_db = BASE_DIR / 'data' / 'db.sqlite3'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': os.environ.get('DATABASE_PATH') or BASE_DIR / 'db.sqlite3',
+        'NAME': os.environ.get('DATABASE_PATH') or (_data_db if _data_db.exists() else BASE_DIR / 'db.sqlite3'),
     }
 }
 

@@ -4,246 +4,321 @@
 {% block title %}{{ title }} — Integral{% endblock %}
 
 {% block topbar_title %}
-  <i class="bi bi-person me-2" style="color:var(--color-primary)"></i>{{ title }}
+  <i class="bi bi-people-fill me-2" style="color:var(--color-primary)"></i>{{ title }}
 {% endblock %}
 
-{% block content %}
+{% block page_toolbar_title %}
+  <div>
+    <h1 class="h4 fw-bold mb-0" style="color: #0f172a;">{{ title }}</h1>
+    <p class="text-muted small mb-0">{% if obj %}Mise à jour des coordonnées et paramètres du client{% else %}Création et intégration d'un nouveau compte client CRM{% endif %}</p>
+  </div>
+{% endblock %}
+
+{% block contentbouton %}
+  <a href="{% url 'client_list' %}" class="btn btn-outline-view btn-sm d-inline-flex align-items-center gap-1" style="border-radius:8px !important; font-weight:600;">
+    <i class="bi bi-list-ul"></i><span>Liste des clients</span>
+  </a>
+{% endblock %}
+
+{% block extra_css %}
 <style>
-  /* ── Form Card & Layout ── */
-  .clf-card {
+  /* ══════════════════════════════════════════════════════════════
+     STYLES STANDARDISÉS DES INPUTS & FORMULAIRES GEOAD
+     ══════════════════════════════════════════════════════════════ */
+  .geoad-form-card {
     background: #ffffff;
     border: 1px solid #e2e8f0;
-    border-radius: 8px;
+    border-radius: 8px !important;
     overflow: hidden;
-    box-shadow: 0 4px 20px rgba(0,0,0,0.03);
-    margin-bottom: 2rem;
+    box-shadow: 0 2px 12px rgba(15, 23, 42, 0.04);
   }
-  .clf-card-header {
+  .geoad-form-header {
     background: #ffffff;
-    padding: 1.2rem 1.5rem;
+    padding: 1rem 1.5rem;
     border-bottom: 1px solid #e2e8f0;
     display: flex;
     align-items: center;
-    gap: 0.6rem;
-    font-weight: 700;
-    font-size: 0.95rem;
-    color: #0f172a;
+    justify-content: space-between;
   }
-  .clf-card-header i { color: #932e2b; font-size: 1.1rem; }
-  .clf-card-body { padding: 1.5rem; }
-
-  /* ── Section Title inside Form ── */
-  .clf-sec-title {
-    font-size: 0.85rem;
-    font-weight: 700;
-    color: #334155;
+  .geoad-section-title {
+    font-size: 0.76rem;
+    font-weight: 800;
     text-transform: uppercase;
-    letter-spacing: 0.5px;
-    margin-bottom: 1rem;
+    letter-spacing: 0.6px;
+    color: #334155;
     display: flex;
     align-items: center;
     gap: 0.5rem;
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #f1f5f9;
   }
-  .clf-sec-title i { color: #932e2b; }
-
-  /* ── Form Controls & Labels ── */
+  .geoad-section-title i {
+    color: var(--color-primary, #932e2b);
+    font-size: 0.95rem;
+  }
   .form-label {
-    font-size: 0.8rem;
-    font-weight: 600;
-    color: #475569;
-    margin-bottom: 0.35rem;
+    font-size: 0.72rem !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    color: #475569 !important;
+    margin-bottom: 0.4rem !important;
+    display: block !important;
   }
   .form-control, .form-select {
-    border-radius: 8px;
-    border: 1px solid #cbd5e1;
-    padding: 0.6rem 0.9rem;
-    font-size: 0.85rem;
-    transition: all 0.15s ease;
+    border-radius: 8px !important;
+    border: 1.5px solid #cbd5e1 !important;
+    background-color: #ffffff !important;
+    font-size: 0.88rem !important;
+    color: #0f172a !important;
+    padding: 0.55rem 0.85rem !important;
+    transition: all 0.15s ease-in-out !important;
   }
   .form-control:focus, .form-select:focus {
-    border-color: #932e2b;
-    box-shadow: 0 0 0 3px rgba(147, 46, 43, 0.12);
+    border-color: var(--color-primary, #932e2b) !important;
+    box-shadow: 0 0 0 3px rgba(147, 46, 43, 0.12) !important;
+    outline: none !important;
   }
-
-  /* ── Logo Upload Preview Box ── */
-  .clf-logo-box {
+  .input-group {
+    border-radius: 8px !important;
+  }
+  .input-group .input-group-text {
+    background-color: #f8fafc !important;
+    border: 1.5px solid #cbd5e1 !important;
+    border-right: none !important;
+    border-radius: 8px 0 0 8px !important;
+    color: #64748b !important;
+    padding: 0 0.85rem !important;
+    font-size: 0.9rem !important;
+  }
+  .input-group .form-control, .input-group .form-select {
+    border-left: none !important;
+    border-radius: 0 8px 8px 0 !important;
+  }
+  .input-group:focus-within .input-group-text {
+    border-color: var(--color-primary, #932e2b) !important;
+  }
+  .form-check-input:checked {
+    background-color: var(--color-primary, #932e2b) !important;
+    border-color: var(--color-primary, #932e2b) !important;
+  }
+  .form-check-input:focus {
+    box-shadow: 0 0 0 3px rgba(147, 46, 43, 0.15) !important;
+    border-color: var(--color-primary, #932e2b) !important;
+  }
+  .geoad-logo-dropzone {
     background: #f8fafc;
     border: 2px dashed #cbd5e1;
-    border-radius: 8px;
+    border-radius: 8px !important;
     padding: 1.25rem;
     text-align: center;
     transition: all 0.2s ease;
   }
-  .clf-logo-box:hover {
-    border-color: #932e2b;
+  .geoad-logo-dropzone:hover {
+    border-color: var(--color-primary, #932e2b);
     background: #fff;
   }
-  .clf-logo-preview {
-    width: 100px;
-    height: 100px;
-    object-fit: contain;
-    border-radius: 8px;
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    padding: 6px;
-    margin-bottom: 0.75rem;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.05);
-  }
-
-  .clf-footer {
-    padding: 1rem 1.5rem;
-    background: #f8fafc;
-    border-top: 1px solid #e2e8f0;
-    display: flex;
-    justify-content: flex-end;
-    gap: 0.75rem;
-  }
-
-  .clf-link { color: #932e2b; text-decoration: none; font-weight: 600; }
-  .clf-link:hover { text-decoration: underline; }
 </style>
+{% endblock %}
 
-<div class="container-fluid py-3">
+{% block content %}
+<div class="mb-4">
 
-  {# ── RETOUR ── #}
-  <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
-    <a href="javascript:void(0)" onclick="history.back()" class="clf-link" style="font-size: 0.82rem;">
-      <i class="bi bi-arrow-left me-1"></i>Retour
-    </a>
-    <h5 class="fw-bold mb-0 text-dark">{{ title }}</h5>
+  <!-- Messages & Erreurs globales -->
+  {% if form.errors %}
+  <div class="alert alert-danger alert-dismissible fade show py-3 px-4 shadow-sm mb-4" role="alert" style="border-radius: 8px !important;">
+    <div class="d-flex align-items-center gap-2 mb-1">
+      <i class="bi bi-exclamation-octagon-fill text-danger fs-5"></i>
+      <strong class="text-danger">Le formulaire contient des erreurs à corriger :</strong>
+    </div>
+    <ul class="mb-0 small text-danger ps-3 mt-2">
+      {% for field in form %}
+        {% if field.errors %}
+          <li><strong>{{ field.label }}</strong> : {{ field.errors|striptags }}</li>
+        {% endif %}
+      {% endfor %}
+      {% if form.non_field_errors %}
+        <li>{{ form.non_field_errors|striptags }}</li>
+      {% endif %}
+    </ul>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
   </div>
+  {% endif %}
 
   <div class="row justify-content-center">
-    <div class="col-lg-10 col-xl-9">
-      
-      <form method="post" enctype="multipart/form-data">
+    <div class="col-12">
+
+      <form method="post" enctype="multipart/form-data" novalidate id="clientForm">
         {% csrf_token %}
 
-        <div class="clf-card">
-          <div class="clf-card-header">
-            <i class="bi bi-building"></i>
-            <span>{{ title }}</span>
+        <div class="geoad-form-card mb-4">
+          
+          <div class="geoad-form-header">
+            <div class="d-flex align-items-center gap-2">
+              <div class="d-flex align-items-center justify-content-center rounded-2 text-primary" style="width: 34px; height: 34px; background: rgba(147,46,43,0.08); border-radius: 8px !important;">
+                <i class="bi bi-person-lines-fill fs-6"></i>
+              </div>
+              <div>
+                <h6 class="mb-0 fw-bold text-dark" style="font-size: 0.95rem;">Informations du Client</h6>
+                <small class="text-muted" style="font-size: 0.74rem;">Renseignez les données administratives et contacts</small>
+              </div>
+            </div>
+            <span class="badge bg-light text-muted border px-2 py-1" style="border-radius: 6px; font-size: 0.72rem;">Champs obligatoires *</span>
           </div>
 
-          <div class="clf-card-body">
-            
-            {# ── SECTION 1: IDENTITÉ & LOGO ── #}
-            <div class="clf-sec-title">
-              <i class="bi bi-info-circle-fill"></i> 1. Identité de l'entreprise
+          <div class="card-body p-4">
+
+            <!-- SECTION 1 : IDENTITÉ & LOGO -->
+            <div class="geoad-section-title">
+              <i class="bi bi-building"></i>
+              <span>1. Identité de l'entreprise</span>
             </div>
-            
+
             <div class="row g-3 mb-4">
               <div class="col-md-7">
                 <div class="mb-3">
-                  <label class="form-label">Raison sociale / Nom du Client <span class="text-danger">*</span></label>
-                  {{ form.nom }}
-                  {% if form.nom.errors %}<div class="text-danger small mt-1">{{ form.nom.errors }}</div>{% endif %}
+                  <label class="form-label" for="id_nom">
+                    Raison sociale / Nom du Client <span class="text-danger">*</span>
+                  </label>
+                  <div class="input-group">
+                    <span class="input-group-text">
+                      <i class="bi bi-building"></i>
+                    </span>
+                    <input type="text" name="nom" id="id_nom" value="{{ form.nom.value|default:'' }}" class="form-control fw-semibold" placeholder="Ex : TotalEnergies Burkina" required>
+                  </div>
+                  {% if form.nom.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.nom.errors }}</div>{% endif %}
                 </div>
+
                 <div>
-                  <label class="form-label">Contact principal (Nom & Prénom)</label>
-                  {{ form.contact_nom }}
-                  {% if form.contact_nom.errors %}<div class="text-danger small mt-1">{{ form.contact_nom.errors }}</div>{% endif %}
+                  <label class="form-label" for="id_contact_nom">
+                    Contact principal (Nom & Prénom)
+                  </label>
+                  <div class="input-group">
+                    <span class="input-group-text">
+                      <i class="bi bi-person"></i>
+                    </span>
+                    <input type="text" name="contact_nom" id="id_contact_nom" value="{{ form.contact_nom.value|default:'' }}" class="form-control" placeholder="Ex : M. Jean OUEDRAOGO (Directeur Commercial)">
+                  </div>
+                  {% if form.contact_nom.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.contact_nom.errors }}</div>{% endif %}
                 </div>
               </div>
 
-              {# Zone Logo #}
+              <!-- Zone Logo moderne -->
               <div class="col-md-5">
-                <label class="form-label">Logo de l'entreprise</label>
-                <div class="clf-logo-box">
-                  <div>
+                <label class="form-label">
+                  Logo de l'entreprise
+                </label>
+                <div class="geoad-logo-dropzone">
+                  <div class="mb-2">
                     <img id="image-preview" 
                          src="{% if form.instance.logo %}{{ form.instance.logo.url }}{% else %}{% static 'img/logo.png' %}{% endif %}" 
                          alt="Aperçu logo" 
-                         class="clf-logo-preview {% if not form.instance.logo %}d-none{% endif %}">
+                         class="rounded-2 shadow-sm {% if not form.instance.logo %}d-none{% endif %}"
+                         style="width: 80px; height: 80px; object-fit: contain; background: #ffffff; border: 1px solid #e2e8f0; padding: 4px; border-radius: 8px !important;">
                   </div>
-                  <div class="small text-muted mb-2">Format JPEG, PNG ou SVG (max 5 Mo)</div>
-                  <div>
+                  <div class="small text-muted mb-2" style="font-size: 0.74rem;">Formats : PNG, JPG, SVG (Max 5 Mo)</div>
+                  <div class="d-inline-block">
                     {{ form.logo }}
                   </div>
                 </div>
-                {% if form.logo.errors %}<div class="text-danger small mt-1">{{ form.logo.errors }}</div>{% endif %}
+                {% if form.logo.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.logo.errors }}</div>{% endif %}
               </div>
             </div>
 
-            <hr class="my-4" style="border-color:#f1f5f9;">
-
-            {# ── SECTION 2: COORDONNÉES ── #}
-            <div class="clf-sec-title">
-              <i class="bi bi-telephone-fill"></i> 2. Coordonnées & Localisation
+            <!-- SECTION 2 : COORDONNÉES & LOCALISATION -->
+            <div class="geoad-section-title">
+              <i class="bi bi-geo-alt-fill"></i>
+              <span>2. Coordonnées & Localisation</span>
             </div>
 
             <div class="row g-3 mb-4">
               <div class="col-md-6">
-                <label class="form-label">Numéro de Téléphone <span class="text-danger">*</span></label>
+                <label class="form-label" for="id_telephone">
+                  Numéro de Téléphone <span class="text-danger">*</span>
+                </label>
                 <div class="input-group">
-                  <span class="input-group-text bg-light text-muted border-end-0" style="border-radius:8px 0 0 8px; border-color:#cbd5e1;">
-                    <i class="bi bi-telephone"></i>
+                  <span class="input-group-text">
+                    <i class="bi bi-telephone text-primary"></i>
                   </span>
-                  <input type="text" name="telephone" value="{{ form.telephone.value|default:'' }}" class="form-control border-start-0" placeholder="+226 XX XX XX XX" style="border-radius:0 8px 8px 0;" required>
+                  <input type="text" name="telephone" id="id_telephone" value="{{ form.telephone.value|default:'' }}" class="form-control" placeholder="+226 XX XX XX XX" required>
                 </div>
-                {% if form.telephone.errors %}<div class="text-danger small mt-1">{{ form.telephone.errors }}</div>{% endif %}
+                {% if form.telephone.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.telephone.errors }}</div>{% endif %}
               </div>
 
               <div class="col-md-6">
-                <label class="form-label">Adresse Email <span class="text-danger">*</span></label>
+                <label class="form-label" for="id_email">
+                  Adresse Email <span class="text-danger">*</span>
+                </label>
                 <div class="input-group">
-                  <span class="input-group-text bg-light text-muted border-end-0" style="border-radius:8px 0 0 8px; border-color:#cbd5e1;">
-                    <i class="bi bi-envelope"></i>
+                  <span class="input-group-text">
+                    <i class="bi bi-envelope text-primary"></i>
                   </span>
-                  <input type="email" name="email" value="{{ form.email.value|default:'' }}" class="form-control border-start-0" placeholder="contact@entreprise.com" style="border-radius:0 8px 8px 0;" required>
+                  <input type="email" name="email" id="id_email" value="{{ form.email.value|default:'' }}" class="form-control" placeholder="contact@entreprise.com" required>
                 </div>
-                {% if form.email.errors %}<div class="text-danger small mt-1">{{ form.email.errors }}</div>{% endif %}
+                {% if form.email.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.email.errors }}</div>{% endif %}
               </div>
 
               <div class="col-12">
-                <label class="form-label">Adresse géographique / Siège</label>
+                <label class="form-label" for="id_adresse">
+                  Adresse géographique / Siège social
+                </label>
                 <div class="input-group">
-                  <span class="input-group-text bg-light text-muted border-end-0" style="border-radius:8px 0 0 8px; border-color:#cbd5e1;">
+                  <span class="input-group-text">
                     <i class="bi bi-geo-alt"></i>
                   </span>
-                  <input type="text" name="adresse" value="{{ form.adresse.value|default:'' }}" class="form-control border-start-0" placeholder="Quartier, Rue, Porte, Ville..." style="border-radius:0 8px 8px 0;">
+                  <input type="text" name="adresse" id="id_adresse" value="{{ form.adresse.value|default:'' }}" class="form-control" placeholder="Ex : Secteur 15, Ouaga 2000, Avenue Pascal ZAGRE">
                 </div>
-                {% if form.adresse.errors %}<div class="text-danger small mt-1">{{ form.adresse.errors }}</div>{% endif %}
+                {% if form.adresse.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.adresse.errors }}</div>{% endif %}
               </div>
             </div>
 
-            <hr class="my-4" style="border-color:#f1f5f9;">
-
-            {# ── SECTION 3: NOTES INTERNES ── #}
-            <div class="clf-sec-title">
-              <i class="bi bi-sticky-fill"></i> 3. Informations complémentaires
+            <!-- SECTION 3 : NOTES & STATUT -->
+            <div class="geoad-section-title">
+              <i class="bi bi-journal-text"></i>
+              <span>3. Notes internes & Statut</span>
             </div>
 
             <div class="row g-3">
               <div class="col-12">
-                <label class="form-label">Notes internes & Remarques de gestion</label>
-                {{ form.notes }}
-                {% if form.notes.errors %}<div class="text-danger small mt-1">{{ form.notes.errors }}</div>{% endif %}
+                <label class="form-label" for="id_notes">
+                  Notes & Remarques de gestion
+                </label>
+                <textarea name="notes" id="id_notes" rows="3" class="form-control" placeholder="Ajoutez ici les spécificités du client, préférences d'affichage, délais de paiement...">{{ form.notes.value|default:'' }}</textarea>
+                {% if form.notes.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.notes.errors }}</div>{% endif %}
               </div>
 
               <div class="col-12">
-                <div class="form-check form-switch p-3 bg-light border" style="border-radius:8px;">
-                  {{ form.actif }}
-                  <label class="form-check-label fw-bold text-dark ms-2" for="{{ form.actif.id_for_label }}">
-                    Client actif
-                  </label>
-                  <div class="form-text mt-1 text-muted" style="font-size:0.75rem;">
-                    Si cette option est décochée, le client sera considéré comme inactif / archivé.
+                <div class="p-3 bg-light rounded-2 border d-flex align-items-center justify-content-between flex-wrap gap-2" style="border-radius: 8px !important;">
+                  <div class="d-flex align-items-center gap-3">
+                    <div class="form-check form-switch fs-5 mb-0">
+                      {{ form.actif }}
+                    </div>
+                    <div>
+                      <label class="form-check-label fw-bold text-dark mb-0" for="{{ form.actif.id_for_label }}" style="font-size: 0.88rem; cursor: pointer;">
+                        Client actif
+                      </label>
+                      <div class="small text-muted" style="font-size: 0.74rem;">
+                        Un client actif peut être sélectionné pour de nouvelles campagnes et réservations.
+                      </div>
+                    </div>
                   </div>
+                  <span class="badge bg-success-subtle text-success border border-success-subtle px-3 py-2" style="border-radius: 6px; font-weight: 700;">Compte CRM actif</span>
                 </div>
-                {% if form.actif.errors %}<div class="text-danger small mt-1">{{ form.actif.errors }}</div>{% endif %}
+                {% if form.actif.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.actif.errors }}</div>{% endif %}
               </div>
             </div>
 
           </div>
 
-          {# Pied de formulaire #}
-          <div class="clf-footer">
-            <a href="{% url 'client_list' %}" class="btn btn-outline-secondary" style="border-radius:8px; font-weight:600;">
-              Annuler
+          <!-- Pied de carte / Boutons d'action -->
+          <div class="card-footer bg-light border-top py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-2" style="border-color: #e2e8f0;">
+            <a href="{% url 'client_list' %}" class="btn btn-outline-secondary px-3 py-2 fw-semibold" style="border-radius: 8px !important;">
+              <i class="bi bi-arrow-left me-1"></i>Annuler
             </a>
-            <button type="submit" class="btn btn-primary px-4" style="border-radius:8px; font-weight:700;">
-              <i class="bi bi-check-lg me-1"></i>{% if obj %}Mettre à jour{% else %}Créer le client{% endif %}
+            <button type="submit" class="btn btn-primary px-4 py-2 d-flex align-items-center gap-2 shadow fw-bold" style="border-radius: 8px !important; background: var(--color-primary, #932e2b); border-color: var(--color-primary, #932e2b);">
+              <i class="bi bi-check-circle-fill fs-6"></i>
+              <span>{% if obj %}Mettre à jour le client{% else %}Enregistrer le client{% endif %}</span>
             </button>
           </div>
 
@@ -254,23 +329,30 @@
   </div>
 
 </div>
+{% endblock %}
 
+{% block extra_js %}
 <script>
 document.addEventListener("DOMContentLoaded", function () {
     const photoInput = document.querySelector('input[type="file"][name="logo"]');
     const previewImg = document.getElementById('image-preview');
-    if (!photoInput || !previewImg) return;
-    photoInput.addEventListener('change', function () {
-        const file = this.files[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onload = function (e) {
-                previewImg.src = e.target.result;
-                previewImg.classList.remove('d-none');
-            };
-            reader.readAsDataURL(file);
-        }
-    });
+    if (photoInput) {
+        photoInput.classList.add('form-control');
+        photoInput.style.borderRadius = '8px';
+        photoInput.style.fontSize = '0.82rem';
+
+        photoInput.addEventListener('change', function () {
+            const file = this.files[0];
+            if (file && previewImg) {
+                const reader = new FileReader();
+                reader.onload = function (e) {
+                    previewImg.src = e.target.result;
+                    previewImg.classList.remove('d-none');
+                };
+                reader.readAsDataURL(file);
+            }
+        });
+    }
 });
 </script>
 {% endblock %}

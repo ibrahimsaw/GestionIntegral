@@ -5,236 +5,643 @@
 {% block title %}{{ title }} — Integral{% endblock %}
 
 {% block topbar_title %}
-<i class="bi bi-megaphone me-2" style="color:var(--color-primary)"></i>{{ title }}
+  <i class="bi bi-megaphone-fill me-2" style="color:var(--color-primary)"></i>{{ title }}
+{% endblock %}
+
+{% block page_toolbar_title %}
+  <div>
+    <h1 class="h4 fw-bold mb-0" style="color: #0f172a;">{{ title }}</h1>
+    <p class="text-muted small mb-0">{% if obj %}Édition des paramètres, supports et plannings de la campagne{% else %}Création et configuration d'une nouvelle campagne publicitaire{% endif %}</p>
+  </div>
+{% endblock %}
+
+{% block contentbouton %}
+  <a href="{% url 'campagne_list' %}" class="btn btn-outline-view btn-sm d-inline-flex align-items-center gap-1" style="border-radius:8px !important; font-weight:600;">
+    <i class="bi bi-list-ul"></i><span>Toutes les campagnes</span>
+  </a>
+{% endblock %}
+
+{% block extra_css %}
+<style>
+  /* ══════════════════════════════════════════════════════════════
+     STYLES STANDARDISÉS DES INPUTS & FORMULAIRES GEOAD
+     ══════════════════════════════════════════════════════════════ */
+  .geoad-form-card {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px !important;
+    overflow: hidden;
+    box-shadow: 0 2px 12px rgba(15, 23, 42, 0.04);
+  }
+  .geoad-form-header {
+    background: #ffffff;
+    padding: 1rem 1.5rem;
+    border-bottom: 1px solid #e2e8f0;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .geoad-section-title {
+    font-size: 0.76rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    letter-spacing: 0.6px;
+    color: #334155;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin-bottom: 1.25rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  .geoad-section-title i {
+    color: var(--color-primary, #932e2b);
+    font-size: 0.95rem;
+  }
+  .form-label {
+    font-size: 0.72rem !important;
+    font-weight: 700 !important;
+    text-transform: uppercase !important;
+    letter-spacing: 0.5px !important;
+    color: #475569 !important;
+    margin-bottom: 0.4rem !important;
+    display: block !important;
+  }
+  .form-control, .form-select {
+    border-radius: 8px !important;
+    border: 1.5px solid #cbd5e1 !important;
+    background-color: #ffffff !important;
+    font-size: 0.88rem !important;
+    color: #0f172a !important;
+    padding: 0.55rem 0.85rem !important;
+    transition: all 0.15s ease-in-out !important;
+  }
+  .form-control:focus, .form-select:focus {
+    border-color: var(--color-primary, #932e2b) !important;
+    box-shadow: 0 0 0 3px rgba(147, 46, 43, 0.12) !important;
+    outline: none !important;
+  }
+  .input-group {
+    border-radius: 8px !important;
+  }
+  .input-group .input-group-text {
+    background-color: #f8fafc !important;
+    border: 1.5px solid #cbd5e1 !important;
+    border-right: none !important;
+    border-radius: 8px 0 0 8px !important;
+    color: #64748b !important;
+    padding: 0 0.85rem !important;
+    font-size: 0.9rem !important;
+  }
+  .input-group .form-control, .input-group .form-select {
+    border-left: none !important;
+    border-radius: 0 8px 8px 0 !important;
+  }
+  .input-group:focus-within .input-group-text {
+    border-color: var(--color-primary, #932e2b) !important;
+  }
+  .form-check-input:checked {
+    background-color: var(--color-primary, #932e2b) !important;
+    border-color: var(--color-primary, #932e2b) !important;
+  }
+  .form-check-input:focus {
+    box-shadow: 0 0 0 3px rgba(147, 46, 43, 0.15) !important;
+    border-color: var(--color-primary, #932e2b) !important;
+  }
+  .geoad-media-dropzone {
+    background: #f8fafc;
+    border: 2px dashed #cbd5e1;
+    border-radius: 8px !important;
+    padding: 1.5rem;
+    text-align: center;
+    transition: all 0.2s ease;
+  }
+  .geoad-media-dropzone:hover {
+    border-color: var(--color-primary, #932e2b);
+    background: #ffffff;
+  }
+</style>
 {% endblock %}
 
 {% block content %}
-<div class="row justify-content-center">
-  <div class="col-lg-12">
+<div class="mb-4">
 
-    <!-- HEADER -->
-    <div class="d-flex align-items-center gap-3 mb-4">
-    <a href="javascript:void(0)" onclick="history.back()" class="btn btn-outline-secondary btn-sm">
-        <i class="bi bi-arrow-left"></i>
-    </a>
-      <h1 style="font-size:1.4rem;font-weight:800;margin:0">{{ title }}</h1>
+  <!-- Messages d'erreurs globales -->
+  {% if form.errors %}
+  <div class="alert alert-danger alert-dismissible fade show py-3 px-4 shadow-sm mb-4" role="alert" style="border-radius: 8px !important;">
+    <div class="d-flex align-items-center gap-2 mb-1">
+      <i class="bi bi-exclamation-octagon-fill text-danger fs-5"></i>
+      <strong class="text-danger">Le formulaire contient des erreurs à corriger :</strong>
     </div>
-
-    <form method="post" enctype="multipart/form-data">
-      {% csrf_token %}
-    
-        <!-- BLOC DE DEBUG TEMPORAIRE -->
-        {% if form.errors %}
-        <div class="alert alert-danger">
-            <strong>Le formulaire contient des erreurs :</strong>
-            <ul>
-                {% for field in form %}
-                    {% if field.errors %}
-                        <li>{{ field.label }} : {{ field.errors|striptags }}</li>
-                    {% endif %}
-                {% endfor %}
-                {% if form.non_field_errors %}
-                    <li>{{ form.non_field_errors|striptags }}</li>
-                {% endif %}
-            </ul>
-        </div>
+    <ul class="mb-0 small text-danger ps-3 mt-2">
+      {% for field in form %}
+        {% if field.errors %}
+          <li><strong>{{ field.label }}</strong> : {{ field.errors|striptags }}</li>
         {% endif %}
+      {% endfor %}
+      {% if form.non_field_errors %}
+        <li>{{ form.non_field_errors|striptags }}</li>
+      {% endif %}
+    </ul>
+    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+  </div>
+  {% endif %}
 
-      <div class="card">
+  <div class="row justify-content-center">
+    <div class="col-12">
 
-        <div class="card-header">
-          <i class="bi bi-megaphone me-2"></i>Informations de la Campagne
-        </div>
+      <form method="post" enctype="multipart/form-data" novalidate id="campagneForm">
+        {% csrf_token %}
 
-        <div class="card-body">
-          <div class="row g-3">
+        <div class="d-flex flex-column gap-4">
 
-            <!-- CLIENT -->
-            <div class="col-md-4">
-              <label class="form-label">Client *</label>
-              {{ form.client }}
-              {{ form.client.errors }}
-            </div>
-
-            <!-- NOM -->
-            <div class="col-md-4">
-              <label class="form-label">Nom de la campagne *</label>
-              {{ form.nom }}
-            </div>
-            <div class="col-md-4">
-              <label class="form-label">Lieu</label>
-              {{ form.lieu }}
-            </div>
-            <div class="col-md-12">
-              <div class="form-check mt-4 pt-2">
-                {{ form.est_mere }}
-                <label class="form-check-label" for="id_est_mere">Campagne mère</label>
-                <div class="form-text">Cochez pour déclarer cette campagne comme conteneur de sous-campagnes.</div>
+          <!-- ══════════════════════════════════════════════════════════
+               CARTE 1 : INFORMATIONS GÉNÉRALES & CLIENT
+               ══════════════════════════════════════════════════════════ -->
+          <div class="geoad-form-card">
+            <div class="geoad-form-header">
+              <div class="d-flex align-items-center gap-2">
+                <div class="d-flex align-items-center justify-content-center rounded-2 text-primary" style="width: 34px; height: 34px; background: rgba(147,46,43,0.08); border-radius: 8px !important;">
+                  <i class="bi bi-info-circle-fill fs-6"></i>
+                </div>
+                <div>
+                  <h6 class="mb-0 fw-bold text-dark" style="font-size: 0.95rem;">1. Informations Générales & Client</h6>
+                  <small class="text-muted" style="font-size: 0.74rem;">Rattachement client et hiérarchie de la campagne</small>
+                </div>
               </div>
+              <span class="badge bg-light text-muted border px-2 py-1" style="border-radius: 6px; font-size: 0.72rem;">Obligatoire *</span>
             </div>
 
-            <div class="col-md-6">
-              <label class="form-label">Campagne mère</label>
-              {{ form.campagne_parente }}
-              <div class="form-text">Laisser vide pour créer une campagne autonome.</div>
-            </div>
-            <!-- TYPE SUPPORT -->
-            <div class="col-md-3" id="col-categorie">
-              <label class="form-label">Catégorie</label>
-              <select id="id_categorie_support" class="form-control">
-                <option value="">— Choisir —</option>
-                <option value="ecran">Écran</option>
-                {% for cat in categories_format %}
-                <option value="{{ cat }}">{{ cat }}</option>
-                {% endfor %}
-              </select>
-            </div>
-            <div class="col-md-3" id="col-format">
-              <label class="form-label">Format</label>
-              <select id="id_format_support" class="form-control" disabled>
-                <option value="">---------</option>
-              </select>
-              <div class="form-text" id="format-help">Choisissez d'abord une catégorie.</div>
-              <div style="display:none">{{ form.type_support }}</div>
-            </div>
+            <div class="card-body p-4">
+              <div class="row g-3">
+                
+                <!-- Client -->
+                <div class="col-md-4">
+                  <label class="form-label" for="id_client">
+                    Client Référent <span class="text-danger">*</span>
+                  </label>
+                  <div class="input-group">
+                    <span class="input-group-text">
+                      <i class="bi bi-building"></i>
+                    </span>
+                    {{ form.client }}
+                  </div>
+                  {% if form.client.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.client.errors }}</div>{% endif %}
+                </div>
 
+                <!-- Nom de la campagne -->
+                <div class="col-md-4">
+                  <label class="form-label" for="id_nom">
+                    Nom de la campagne <span class="text-danger">*</span>
+                  </label>
+                  <div class="input-group">
+                    <span class="input-group-text">
+                      <i class="bi bi-tag"></i>
+                    </span>
+                    <input type="text" name="nom" id="id_nom" value="{{ form.nom.value|default:'' }}" class="form-control fw-semibold" placeholder="Ex : Promo Rentrée 2026" required>
+                  </div>
+                  {% if form.nom.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.nom.errors }}</div>{% endif %}
+                </div>
 
-            <div class="col-md-4">
-                <label class="form-label">Date de début *</label>
-                <input type="date" name="date_debut" id="id_date_debut" class="form-control" 
-                      value="{{ form.date_debut.value|date:'Y-m-d' }}">
-                {{ form.date_debut.errors }}
-            </div>
-            <div class="col-md-4">
-                <label class="form-label">Durée (jours)</label>
-                <input type="number" min="1" id="id_duree_jours" class="form-control" placeholder="Ex: 15">
-                <div class="form-text">Calcule automatiquement la date de fin.</div>
-            </div>
-            <div class="col-md-4">
-                <label class="form-label">Date de fin *</label>
-                <input type="date" name="date_fin" id="id_date_fin" class="form-control" 
-                      value="{{ form.date_fin.value|date:'Y-m-d' }}" readonly
-                      style="background:var(--bg-card2); cursor:not-allowed;">
-                {{ form.date_fin.errors }}
-                <div class="form-text">Se remplit automatiquement à partir de la date de début + la durée. <a href="#" id="edit-date-fin-link">Modifier manuellement</a></div>
-            </div>
+                <!-- Lieu -->
+                <div class="col-md-4">
+                  <label class="form-label" for="id_lieu">
+                    Lieu / Zone géographique
+                  </label>
+                  <div class="input-group">
+                    <span class="input-group-text">
+                      <i class="bi bi-geo-alt"></i>
+                    </span>
+                    {{ form.lieu }}
+                  </div>
+                  {% if form.lieu.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.lieu.errors }}</div>{% endif %}
+                </div>
 
-
-            <!-- PRIX -->
-            <div class="col-md-4">
-            <label class="form-label">Prix Unitaire de la face/spot (FCFA)</label>
-            <input type="number" step="0.01" min="0" class="form-control" name="prix" id="id_prix" 
-                    value="{{ form.prix.value|default_if_none:''|unlocalize }}" autocomplete="off">
-            {{ form.prix.errors }}
-            </div>
-            <div class="col-md-4">
-            <label class="form-label">Prix Unitaire affichage (FCFA)</label>
-            <input type="number" step="0.01" min="0" class="form-control" name="prix_affichage" id="id_prix_affichage" 
-                    value="{{ form.prix_affichage.value|default_if_none:''|unlocalize }}" autocomplete="off">
-            {{ form.prix_affichage.errors }}
-            </div>
-            <div class="col-md-4">
-            <label class="form-label">Prix Unitaire de l'impression (FCFA)</label>
-            <input type="number" step="0.01" min="0" class="form-control" name="prix_impression" id="id_prix_impression" 
-                    value="{{ form.prix_impression.value|default_if_none:''|unlocalize }}" autocomplete="off">
-            {{ form.prix_impression.errors }}
-            </div>
-            <div class="col-md-12 ecran-fields d-none">
-                <label class="form-label" style="font-weight: 700; color: var(--color-primary);">Contrat associé *</label>
-                {{ form.contrat }}
-                {{ form.contrat.errors }}
-                <div class="form-text">Seuls les contrats actifs du client sélectionné et couvrant la période s'affichent ici.</div>
-            </div>
-
-            <!-- CHAMPS ÉCRAN -->
-            <div class="col-md-6 ecran-fields d-none">
-              <label class="form-label">Durée de passage (secondes) *</label>
-              {{ form.duree_passage }}
-            </div>
-
-            <div class="col-md-6 ecran-fields d-none">
-              <label class="form-label">Fréquence de diffusion *</label>
-              {{ form.frequence }}
-            </div>
-
-            <div class="col-md-6 ecran-fields d-none">
-              <label class="form-label">Nombre de visuels</label>
-              {{ form.nombre_visuels }}
-              <div class="form-text">Par défaut : 1. Le calcul des spots l’intègre automatiquement.</div>
-            </div>
-
-            <div class="col-12 ecran-fields d-none">
-              <label class="form-label">Tranches horaires *</label>
-              {{ form.tranches_horaires }}
-              <div class="form-text">
-                Exemple: 08:00-12:00, 14:00-18:00
-              </div>
-            </div>
-
-            <!-- VISUELS MULTIPLES -->
-            <div class="col-md-12">
-              <label class="form-label">Visuels / Vidéos (Sélectionnez plusieurs fichiers possibles)</label>
-              
-              <!-- Zone de prévisualisation dynamique pour les nouveaux fichiers -->
-              <div id="multi-preview-container" class="d-flex flex-wrap gap-2 mb-2">
-                <!-- Les vignettes apparaîtront ici via JavaScript -->
-              </div>
-
-              <!-- Affichage des visuels existants en mode édition -->
-              {% if obj.visuels.all %}
-                <div class="mb-3">
-                  <p class="small text-muted mb-2">Visuels déjà enregistrés :</p>
-                  <div class="d-flex flex-wrap gap-2">
-                    {% for v in obj.visuels.all %}
-                      <div class="position-relative">
-                        {% if v.fichier.url|lower|slice:"-4:" == ".mp4" %}
-                          <video src="{{ v.fichier.url }}" style="height:80px;width:100px;object-fit:cover;border-radius:6px;border:1px solid #ddd;"></video>
-                        {% else %}
-                          <img src="{{ v.fichier.url }}" style="height:80px;width:100px;object-fit:cover;border-radius:6px;border:1px solid #ddd;">
-                        {% endif %}
+                <!-- Campagne Mère switch -->
+                <div class="col-12">
+                  <div class="p-3 bg-light rounded-2 border d-flex align-items-center justify-content-between flex-wrap gap-2 mt-2" style="border-radius: 8px !important;">
+                    <div class="d-flex align-items-center gap-3">
+                      <div class="form-check form-switch fs-5 mb-0">
+                        {{ form.est_mere }}
                       </div>
-                    {% endfor %}
+                      <div>
+                        <label class="form-check-label fw-bold text-dark mb-0" for="id_est_mere" style="font-size: 0.88rem; cursor: pointer;">
+                          Campagne Mère (Conteneur de sous-campagnes)
+                        </label>
+                        <div class="small text-muted" style="font-size: 0.74rem;">
+                          Cochez pour regrouper plusieurs sous-campagnes avec des formats et supports distincts sous un même chapeau.
+                        </div>
+                      </div>
+                    </div>
+                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1" style="font-size: 0.72rem; border-radius: 6px;">Multi-supports</span>
                   </div>
                 </div>
-              {% endif %}
 
-              <!-- Utilisation du nouveau nom de champ défini dans CampagneForm -->
-              {{ form.visuels_multiples }}
-              <div class="form-text">Images ou vidéos (Sélectionnez plusieurs fichiers avec Ctrl ou Maj)</div>
-              {{ form.visuels_multiples.errors }}
-            </div>
+                <!-- Campagne parente si sous-campagne -->
+                <div class="col-md-12" id="wrap-campagne-parente">
+                  <label class="form-label" for="id_campagne_parente">
+                    Rattacher à une Campagne Mère
+                  </label>
+                  <div class="input-group">
+                    <span class="input-group-text">
+                      <i class="bi bi-diagram-3"></i>
+                    </span>
+                    {{ form.campagne_parente }}
+                  </div>
+                  <div class="form-text small text-muted">Laissez vide pour créer une campagne autonome.</div>
+                  {% if form.campagne_parente.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.campagne_parente.errors }}</div>{% endif %}
+                </div>
 
-            <!-- NOTES -->
-            <div class="col-12">
-              <label class="form-label">Notes</label>
-              {{ form.notes }}
-            </div>
-
-            <!-- ERREURS GLOBALES -->
-            {% for error in form.non_field_errors %}
-              <div class="col-12">
-                <div class="alert alert-danger">{{ error }}</div>
               </div>
-            {% endfor %}
-
+            </div>
           </div>
+
+          <!-- ══════════════════════════════════════════════════════════
+               CARTE 2 : SUPPORT & PÉRIODE DE DIFFUSION
+               ══════════════════════════════════════════════════════════ -->
+          <div class="geoad-form-card">
+            <div class="geoad-form-header">
+              <div class="d-flex align-items-center gap-2">
+                <div class="d-flex align-items-center justify-content-center rounded-2 text-primary" style="width: 34px; height: 34px; background: rgba(147,46,43,0.08); border-radius: 8px !important;">
+                  <i class="bi bi-calendar-range-fill fs-6"></i>
+                </div>
+                <div>
+                  <h6 class="mb-0 fw-bold text-dark" style="font-size: 0.95rem;">2. Type de Support & Période de Diffusion</h6>
+                  <small class="text-muted" style="font-size: 0.74rem;">Format du réseau et calendrier d'affichage</small>
+                </div>
+              </div>
+              <span class="badge bg-light text-muted border px-2 py-1" style="border-radius: 6px; font-size: 0.72rem;">Planning</span>
+            </div>
+
+            <div class="card-body p-4">
+              <div class="row g-3">
+                
+                <!-- Catégorie -->
+                <div class="col-md-6" id="col-categorie">
+                  <label class="form-label" for="id_categorie_support">
+                    Catégorie de Support
+                  </label>
+                  <div class="input-group">
+                    <span class="input-group-text">
+                      <i class="bi bi-grid"></i>
+                    </span>
+                    <select id="id_categorie_support" class="form-select">
+                      <option value="">— Choisir la catégorie —</option>
+                      <option value="ecran">Écran Numérique LED</option>
+                      {% for cat in categories_format %}
+                      <option value="{{ cat }}">{{ cat }}</option>
+                      {% endfor %}
+                    </select>
+                  </div>
+                </div>
+
+                <!-- Format -->
+                <div class="col-md-6" id="col-format">
+                  <label class="form-label" for="id_format_support">
+                    Format spécifique
+                  </label>
+                  <div class="input-group">
+                    <span class="input-group-text">
+                      <i class="bi bi-aspect-ratio"></i>
+                    </span>
+                    <select id="id_format_support" class="form-select" disabled>
+                      <option value="">---------</option>
+                    </select>
+                  </div>
+                  <div class="form-text small text-muted" id="format-help">Choisissez d'abord une catégorie.</div>
+                  <div style="display:none">{{ form.type_support }}</div>
+                  {% if form.type_support.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.type_support.errors }}</div>{% endif %}
+                </div>
+
+                <!-- Date Début -->
+                <div class="col-md-4">
+                  <label class="form-label" for="id_date_debut">
+                    Date de début <span class="text-danger">*</span>
+                  </label>
+                  <div class="input-group">
+                    <span class="input-group-text text-success">
+                      <i class="bi bi-calendar-plus"></i>
+                    </span>
+                    <input type="date" name="date_debut" id="id_date_debut" class="form-control fw-semibold" 
+                          value="{{ form.date_debut.value|date:'Y-m-d' }}" required>
+                  </div>
+                  {% if form.date_debut.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.date_debut.errors }}</div>{% endif %}
+                </div>
+
+                <!-- Durée en jours -->
+                <div class="col-md-4">
+                  <label class="form-label" for="id_duree_jours">
+                    Durée (jours)
+                  </label>
+                  <div class="input-group">
+                    <span class="input-group-text text-warning">
+                      <i class="bi bi-hourglass-split"></i>
+                    </span>
+                    <input type="number" min="1" id="id_duree_jours" class="form-control" placeholder="Ex: 15">
+                  </div>
+                  <div class="form-text small text-muted">Calcule automatiquement la date de fin.</div>
+                </div>
+
+                <!-- Date Fin -->
+                <div class="col-md-4">
+                  <label class="form-label" for="id_date_fin">
+                    Date de fin <span class="text-danger">*</span>
+                  </label>
+                  <div class="input-group">
+                    <span class="input-group-text text-danger">
+                      <i class="bi bi-calendar-minus"></i>
+                    </span>
+                    <input type="date" name="date_fin" id="id_date_fin" class="form-control fw-semibold" 
+                          value="{{ form.date_fin.value|date:'Y-m-d' }}" readonly
+                          style="background: #f8fafc; cursor: not-allowed;" required>
+                  </div>
+                  {% if form.date_fin.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.date_fin.errors }}</div>{% endif %}
+                  <div class="form-text small text-muted">
+                    Calculé auto. <a href="#" id="edit-date-fin-link" class="text-primary fw-semibold">Déverrouiller / Saisie manuelle</a>
+                  </div>
+                </div>
+
+              </div>
+            </div>
+          </div>
+
+          <!-- ══════════════════════════════════════════════════════════
+               CARTE 3 : TARIFICATION & PRIX (OPTIONNEL)
+               ══════════════════════════════════════════════════════════ -->
+          <div class="geoad-form-card">
+            <div class="geoad-form-header">
+              <div class="d-flex align-items-center gap-2">
+                <div class="d-flex align-items-center justify-content-center rounded-2 text-primary" style="width: 34px; height: 34px; background: rgba(147,46,43,0.08); border-radius: 8px !important;">
+                  <i class="bi bi-cash-stack fs-6"></i>
+                </div>
+                <div>
+                  <h6 class="mb-0 fw-bold text-dark" style="font-size: 0.95rem;">3. Tarification Unitaire (FCFA)</h6>
+                  <small class="text-muted" style="font-size: 0.74rem;">Barèmes de facturation pour spots et impressions</small>
+                </div>
+              </div>
+              <span class="badge bg-light text-muted border px-2 py-1" style="border-radius: 6px; font-size: 0.72rem;">Finances</span>
+            </div>
+
+            <div class="card-body p-4">
+              <div class="row g-3">
+                
+                <div class="col-md-4">
+                  <label class="form-label" for="id_prix">
+                    Prix Unitaire Face / Spot
+                  </label>
+                  <div class="input-group">
+                    <span class="input-group-text">
+                      <i class="bi bi-tag"></i>
+                    </span>
+                    <input type="number" step="0.01" min="0" class="form-control" name="prix" id="id_prix" 
+                           value="{{ form.prix.value|default_if_none:''|unlocalize }}" placeholder="0" autocomplete="off">
+                  </div>
+                  {% if form.prix.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.prix.errors }}</div>{% endif %}
+                </div>
+
+                <div class="col-md-4">
+                  <label class="form-label" for="id_prix_affichage">
+                    Prix Unitaire Affichage
+                  </label>
+                  <div class="input-group">
+                    <span class="input-group-text">
+                      <i class="bi bi-signpost-2"></i>
+                    </span>
+                    <input type="number" step="0.01" min="0" class="form-control" name="prix_affichage" id="id_prix_affichage" 
+                           value="{{ form.prix_affichage.value|default_if_none:''|unlocalize }}" placeholder="0" autocomplete="off">
+                  </div>
+                  {% if form.prix_affichage.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.prix_affichage.errors }}</div>{% endif %}
+                </div>
+
+                <div class="col-md-4">
+                  <label class="form-label" for="id_prix_impression">
+                    Prix Unitaire Impression
+                  </label>
+                  <div class="input-group">
+                    <span class="input-group-text">
+                      <i class="bi bi-printer"></i>
+                    </span>
+                    <input type="number" step="0.01" min="0" class="form-control" name="prix_impression" id="id_prix_impression" 
+                           value="{{ form.prix_impression.value|default_if_none:''|unlocalize }}" placeholder="0" autocomplete="off">
+                  </div>
+                  {% if form.prix_impression.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.prix_impression.errors }}</div>{% endif %}
+                </div>
+
+              </div>
+            </div>
+          </div>
+
+          <!-- ══════════════════════════════════════════════════════════
+               CARTE 4 : PARAMÈTRES SPÉCIFIQUES ÉCRAN NUMÉRIQUE LED
+               ══════════════════════════════════════════════════════════ -->
+          <div class="geoad-form-card ecran-fields d-none" style="border-color: #bae6fd !important;">
+            <div class="geoad-form-header" style="background: #f0f9ff; border-color: #bae6fd;">
+              <div class="d-flex align-items-center gap-2">
+                <div class="d-flex align-items-center justify-content-center rounded-2 text-info" style="width: 34px; height: 34px; background: #e0f2fe; border-radius: 8px !important;">
+                  <i class="bi bi-display fs-6"></i>
+                </div>
+                <div>
+                  <h6 class="mb-0 fw-bold" style="color: #0369a1; font-size: 0.95rem;">4. Paramètres de Diffusion LED Dynamique</h6>
+                  <small class="text-muted" style="font-size: 0.74rem;">Règles de passage et contrats d'écrans</small>
+                </div>
+              </div>
+              <span class="badge bg-info-subtle text-info border border-info-subtle px-2 py-1" style="border-radius: 6px; font-size: 0.72rem;">Écran numérique</span>
+            </div>
+
+            <div class="card-body p-4">
+              <div class="row g-3">
+                
+                <!-- Contrat -->
+                <div class="col-12">
+                  <label class="form-label" for="id_contrat">
+                    Contrat Associé <span class="text-danger">*</span>
+                  </label>
+                  <div class="input-group">
+                    <span class="input-group-text">
+                      <i class="bi bi-file-earmark-text"></i>
+                    </span>
+                    {{ form.contrat }}
+                  </div>
+                  <div class="form-text small text-muted">Seuls les contrats actifs du client couvrant cette période sont affichés.</div>
+                  {% if form.contrat.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.contrat.errors }}</div>{% endif %}
+                </div>
+
+                <!-- Durée passage -->
+                <div class="col-md-4">
+                  <label class="form-label" for="id_duree_passage">
+                    Durée de passage (secondes) *
+                  </label>
+                  <div class="input-group">
+                    <span class="input-group-text">
+                      <i class="bi bi-stopwatch"></i>
+                    </span>
+                    {{ form.duree_passage }}
+                  </div>
+                  {% if form.duree_passage.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.duree_passage.errors }}</div>{% endif %}
+                </div>
+
+                <!-- Fréquence -->
+                <div class="col-md-4">
+                  <label class="form-label" for="id_frequence">
+                    Fréquence de diffusion *
+                  </label>
+                  <div class="input-group">
+                    <span class="input-group-text">
+                      <i class="bi bi-arrow-repeat"></i>
+                    </span>
+                    {{ form.frequence }}
+                  </div>
+                  {% if form.frequence.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.frequence.errors }}</div>{% endif %}
+                </div>
+
+                <!-- Nombre visuels -->
+                <div class="col-md-4">
+                  <label class="form-label" for="id_nombre_visuels">
+                    Nombre de visuels
+                  </label>
+                  <div class="input-group">
+                    <span class="input-group-text">
+                      <i class="bi bi-images"></i>
+                    </span>
+                    {{ form.nombre_visuels }}
+                  </div>
+                  <div class="form-text small text-muted">Par défaut : 1.</div>
+                  {% if form.nombre_visuels.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.nombre_visuels.errors }}</div>{% endif %}
+                </div>
+
+                <!-- Tranches horaires -->
+                <div class="col-12">
+                  <label class="form-label" for="id_tranches_horaires">
+                    Tranches horaires de diffusion *
+                  </label>
+                  <div class="input-group">
+                    <span class="input-group-text">
+                      <i class="bi bi-clock"></i>
+                    </span>
+                    <input type="text" name="tranches_horaires" id="id_tranches_horaires" value="{{ form.tranches_horaires.value|default:'' }}" class="form-control" placeholder="08:00-12:00, 14:00-18:00">
+                  </div>
+                  <div class="form-text small text-muted">Exemple standard : 08:00-12:00, 14:00-18:00</div>
+                  {% if form.tranches_horaires.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.tranches_horaires.errors }}</div>{% endif %}
+                </div>
+
+              </div>
+            </div>
+          </div>
+
+          <!-- ══════════════════════════════════════════════════════════
+               CARTE 5 : VISUELS & MÉDIAS
+               ══════════════════════════════════════════════════════════ -->
+          <div class="geoad-form-card">
+            <div class="geoad-form-header">
+              <div class="d-flex align-items-center gap-2">
+                <div class="d-flex align-items-center justify-content-center rounded-2 text-primary" style="width: 34px; height: 34px; background: rgba(147,46,43,0.08); border-radius: 8px !important;">
+                  <i class="bi bi-images fs-6"></i>
+                </div>
+                <div>
+                  <h6 class="mb-0 fw-bold text-dark" style="font-size: 0.95rem;">5. Médias & Visuels Publicitaires</h6>
+                  <small class="text-muted" style="font-size: 0.74rem;">Fichiers graphiques et vidéos de diffusion</small>
+                </div>
+              </div>
+              <span class="badge bg-light text-muted border px-2 py-1" style="border-radius: 6px; font-size: 0.72rem;">Images & Vidéos</span>
+            </div>
+
+            <div class="card-body p-4">
+              <div class="row g-3">
+                <div class="col-12">
+                  <label class="form-label">
+                    Sélection des fichiers (Images JPEG/PNG ou Vidéos MP4)
+                  </label>
+                  
+                  <!-- Zone de prévisualisation dynamique -->
+                  <div id="multi-preview-container" class="d-flex flex-wrap gap-2 mb-2"></div>
+
+                  <!-- Visuels existants -->
+                  {% if obj.visuels.all %}
+                    <div class="p-3 bg-light rounded-2 border mb-3" style="border-radius: 8px !important;">
+                      <div class="small fw-bold text-muted text-uppercase mb-2" style="font-size: 0.7rem; letter-spacing: 0.5px;">
+                        Visuels déjà enregistrés pour cette campagne :
+                      </div>
+                      <div class="d-flex flex-wrap gap-2">
+                        {% for v in obj.visuels.all %}
+                          <div class="position-relative">
+                            {% if v.fichier.url|lower|slice:"-4:" == ".mp4" %}
+                              <video src="{{ v.fichier.url }}" style="height:80px;width:100px;object-fit:cover;border-radius:6px;border:1px solid #cbd5e1;"></video>
+                            {% else %}
+                              <img src="{{ v.fichier.url }}" style="height:80px;width:100px;object-fit:cover;border-radius:6px;border:1px solid #cbd5e1;">
+                            {% endif %}
+                          </div>
+                        {% endfor %}
+                      </div>
+                    </div>
+                  {% endif %}
+
+                  <div class="geoad-media-dropzone">
+                    <div class="mb-2">
+                      <i class="bi bi-cloud-arrow-up text-primary" style="font-size: 2.2rem;"></i>
+                    </div>
+                    <div class="fw-bold text-dark mb-1" style="font-size: 0.9rem;">Téléverser les créatifs</div>
+                    <div class="d-inline-block mt-2">
+                      {{ form.visuels_multiples }}
+                    </div>
+                    <div class="small text-muted mt-2">Sélectionnez plusieurs fichiers simultanément avec Ctrl ou Maj.</div>
+                  </div>
+                  {% if form.visuels_multiples.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.visuels_multiples.errors }}</div>{% endif %}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ══════════════════════════════════════════════════════════
+               CARTE 6 : NOTES & REMARQUES
+               ══════════════════════════════════════════════════════════ -->
+          <div class="geoad-form-card">
+            <div class="geoad-form-header">
+              <div class="d-flex align-items-center gap-2">
+                <div class="d-flex align-items-center justify-content-center rounded-2 text-primary" style="width: 34px; height: 34px; background: rgba(147,46,43,0.08); border-radius: 8px !important;">
+                  <i class="bi bi-journal-text fs-6"></i>
+                </div>
+                <div>
+                  <h6 class="mb-0 fw-bold text-dark" style="font-size: 0.95rem;">6. Notes & Remarques de Campagne</h6>
+                  <small class="text-muted" style="font-size: 0.74rem;">Instructions spéciales pour les équipes de pose</small>
+                </div>
+              </div>
+              <span class="badge bg-light text-muted border px-2 py-1" style="border-radius: 6px; font-size: 0.72rem;">Facultatif</span>
+            </div>
+
+            <div class="card-body p-4">
+              <label class="form-label" for="id_notes">
+                Notes internes / Instructions de pose
+              </label>
+              <textarea name="notes" id="id_notes" rows="3" class="form-control" placeholder="Renseignez ici toute consigne utile pour la pose des affiches ou la programmation...">{{ form.notes.value|default:'' }}</textarea>
+              {% if form.notes.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.notes.errors }}</div>{% endif %}
+            </div>
+          </div>
+
+          <!-- ══════════════════════════════════════════════════════════
+               PIED DE FORMULAIRE : ACTIONS DE VALIDATION EN BAS
+               ══════════════════════════════════════════════════════════ -->
+          <div class="geoad-form-card">
+            <div class="card-body p-4 d-flex align-items-center justify-content-between flex-wrap gap-3">
+              <a href="{% url 'campagne_list' %}" class="btn btn-outline-secondary px-4 py-2 fw-semibold" style="border-radius: 8px !important;">
+                <i class="bi bi-arrow-left me-1"></i>Annuler
+              </a>
+              <button type="submit" class="btn btn-primary px-4 py-2 d-flex align-items-center gap-2 shadow fw-bold" style="border-radius: 8px !important; background: var(--color-primary, #932e2b); border-color: var(--color-primary, #932e2b);">
+                <i class="bi bi-check-circle-fill fs-6"></i>
+                <span>{% if obj %}Enregistrer les modifications{% else %}Créer la campagne{% endif %}</span>
+              </button>
+            </div>
+          </div>
+
         </div>
 
-        <!-- ACTIONS -->
-        <div class="card-body pt-0 d-flex justify-content-end gap-2">
-          <a href="{% url 'campagne_list' %}" class="btn btn-outline-secondary">Annuler</a>
-          <button type="submit" class="btn btn-primary">
-            <i class="bi bi-check-lg me-1"></i>
-            {% if obj %}Enregistrer{% else %}Créer{% endif %}
-          </button>
-        </div>
+      </form>
 
-      </div>
-    </form>
-
+    </div>
   </div>
+
 </div>
 {% endblock %}
+
 {% block extra_js %}
 {{ formats_par_categorie|json_script:"formats-par-categorie" }}
 <script>
@@ -248,8 +655,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     /* =========================
        CASCADE CATÉGORIE → FORMAT
-       (le vrai champ soumis reste le select caché id_type_support,
-       synchronisé ici avec le choix catégorie+format)
     ========================= */
     function remplirFormats(categorie, preselect) {
         formatSelect.innerHTML = '';
@@ -265,8 +670,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
         const formats = FORMATS_PAR_CATEGORIE[categorie] || [];
 
-        // Catégorie à format unique (ex: Personnalisé, 12m2, Marché) : la catégorie
-        // EST le format, il n'y a rien à choisir de plus → on saute l'étape "Format".
         if (formats.length === 1) {
             typeSupport.value = formats[0].code;
             colFormat.style.display = 'none';
@@ -306,19 +709,19 @@ document.addEventListener('DOMContentLoaded', function () {
     if (categorieSelect) categorieSelect.addEventListener('change', onCategorieChange);
     if (formatSelect) formatSelect.addEventListener('change', onFormatChange);
 
-    // Pré-remplissage en modification : on retrouve la catégorie à partir
-    // de la valeur actuelle de type_support (soit 'ecran', soit un code de format).
+    // Pré-remplissage en modification
     (function initCascadeFromValue() {
+        if (!typeSupport) return;
         const valeurActuelle = typeSupport.value;
         if (!valeurActuelle) return;
         if (valeurActuelle === 'ecran') {
-            categorieSelect.value = 'ecran';
+            if (categorieSelect) categorieSelect.value = 'ecran';
             remplirFormats('ecran');
             return;
         }
         for (const [cat, formats] of Object.entries(FORMATS_PAR_CATEGORIE)) {
             if (formats.some(f => f.code === valeurActuelle)) {
-                categorieSelect.value = cat;
+                if (categorieSelect) categorieSelect.value = cat;
                 remplirFormats(cat, valeurActuelle);
                 return;
             }
@@ -355,15 +758,16 @@ document.addEventListener('DOMContentLoaded', function () {
         const isMere = estMereCheckbox && estMereCheckbox.checked;
 
         if (parentSelect) {
+            const wrapParent = document.getElementById('wrap-campagne-parente');
             if (isMere) {
-                parentSelect.parentElement.style.display = 'none';
+                if (wrapParent) wrapParent.style.display = 'none';
                 parentSelect.value = '';
                 parentSelect.disabled = true;
-                parentSelect.style.background = 'var(--bg-card2)';
+                parentSelect.style.background = '#f8fafc';
                 parentSelect.style.cursor = 'not-allowed';
                 appliquerHeritageParent('');
             } else {
-                parentSelect.parentElement.style.display = '';
+                if (wrapParent) wrapParent.style.display = '';
                 parentSelect.disabled = false;
                 parentSelect.style.background = '';
                 parentSelect.style.cursor = '';
@@ -371,77 +775,67 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         if (typeSupport) {
+            const colCat = document.getElementById('col-categorie');
+            const colFmt = document.getElementById('col-format');
             if (isMere) {
-                document.getElementById('col-categorie').style.display = 'none';
-                document.getElementById('col-format').style.display = 'none';
+                if (colCat) colCat.style.display = 'none';
+                if (colFmt) colFmt.style.display = 'none';
                 typeSupport.value = '';
                 typeSupport.disabled = true;
                 if (categorieSelect) categorieSelect.value = '';
                 if (formatSelect) { formatSelect.innerHTML = '<option value="">---------</option>'; formatSelect.disabled = true; }
             } else {
-                document.getElementById('col-categorie').style.display = '';
-                document.getElementById('col-format').style.display = '';
+                if (colCat) colCat.style.display = '';
+                if (colFmt) colFmt.style.display = '';
                 typeSupport.disabled = false;
             }
         }
 
         if (prix) {
+            const wrapPrix = prix.closest('.col-md-4');
             if (isMere) {
-                prix.parentElement.style.display = 'none';
+                if (wrapPrix) wrapPrix.style.display = 'none';
                 prix.value = '';
                 prix.disabled = true;
-                prix.style.background = 'var(--bg-card2)';
-                prix.style.cursor = 'not-allowed';
             } else {
-                prix.parentElement.style.display = '';
+                if (wrapPrix) wrapPrix.style.display = '';
                 prix.disabled = false;
-                prix.style.background = '';
-                prix.style.cursor = '';
             }
         }
 
         if (prixAffichage) {
+            const wrapAff = prixAffichage.closest('.col-md-4');
             if (isMere) {
-                prixAffichage.parentElement.style.display = 'none';
+                if (wrapAff) wrapAff.style.display = 'none';
                 prixAffichage.value = '';
                 prixAffichage.disabled = true;
-                prixAffichage.style.background = 'var(--bg-card2)';
-                prixAffichage.style.cursor = 'not-allowed';
             } else {
-                prixAffichage.parentElement.style.display = '';
+                if (wrapAff) wrapAff.style.display = '';
                 prixAffichage.disabled = false;
-                prixAffichage.style.background = '';
-                prixAffichage.style.cursor = '';
             }
         }
 
         if (prixImpression) {
+            const wrapImp = prixImpression.closest('.col-md-4');
             if (isMere) {
-                prixImpression.parentElement.style.display = 'none';
+                if (wrapImp) wrapImp.style.display = 'none';
                 prixImpression.value = '';
                 prixImpression.disabled = true;
-                prixImpression.style.background = 'var(--bg-card2)';
-                prixImpression.style.cursor = 'not-allowed';
             } else {
-                prixImpression.parentElement.style.display = '';
+                if (wrapImp) wrapImp.style.display = '';
                 prixImpression.disabled = false;
-                prixImpression.style.background = '';
-                prixImpression.style.cursor = '';
             }
         }
         
         if (lieuSelect) {
+            const wrapLieu = lieuSelect.closest('.col-md-4');
             if (isMere) {
-                lieuSelect.parentElement.style.display = 'none';
+                if (wrapLieu) wrapLieu.style.display = 'none';
                 lieuSelect.value = '';
                 lieuSelect.disabled = true;
-                lieuSelect.style.background = 'var(--bg-card2)';
-                lieuSelect.style.cursor = 'not-allowed';
             } else {
-                lieuSelect.parentElement.style.display = '';
+                if (wrapLieu) wrapLieu.style.display = '';
                 lieuSelect.disabled = false;
-                lieuSelect.style.background = '';
-                lieuSelect.style.cursor = '';
             }
         }
 
@@ -463,7 +857,7 @@ document.addEventListener('DOMContentLoaded', function () {
     ========================= */
     const statutSelect = document.getElementById('id_statut');
     if (statutSelect) {
-        statutSelect.style.background = 'var(--bg-card2)';
+        statutSelect.style.background = '#f8fafc';
         statutSelect.style.cursor = 'not-allowed';
         statutSelect.style.pointerEvents = 'none';
         statutSelect.setAttribute('tabindex', '-1');
@@ -498,11 +892,11 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     (function initDureeDepuisDates() {
-        if (dateDebutInput.value && dateFinInput.value) {
+        if (dateDebutInput && dateFinInput && dateDebutInput.value && dateFinInput.value) {
             const debut = new Date(dateDebutInput.value + 'T00:00:00');
             const fin = new Date(dateFinInput.value + 'T00:00:00');
             const diffJours = Math.round((fin - debut) / (1000 * 60 * 60 * 24)) + 1;
-            if (diffJours > 0) {
+            if (diffJours > 0 && dureeInput) {
                 dureeInput.value = diffJours;
             }
         }
@@ -517,8 +911,8 @@ document.addEventListener('DOMContentLoaded', function () {
             dateFinInput.readOnly = false;
             dateFinInput.style.background = '';
             dateFinInput.style.cursor = '';
-            dureeInput.value = '';
-            editDateFinLink.parentElement.textContent = '';
+            if (dureeInput) dureeInput.value = '';
+            editDateFinLink.parentElement.textContent = 'Mode saisie manuelle activé.';
         });
     }
 
@@ -535,9 +929,11 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function appliquerHeritageParent(parentId) {
         if (!parentId) {
-            dateDebutInput.removeAttribute('min');
-            dateDebutInput.removeAttribute('max');
-            dateFinInput.removeAttribute('max');
+            if (dateDebutInput) {
+                dateDebutInput.removeAttribute('min');
+                dateDebutInput.removeAttribute('max');
+            }
+            if (dateFinInput) dateFinInput.removeAttribute('max');
             visuelsHeritesContainer.innerHTML = '';
             return;
         }
@@ -547,12 +943,12 @@ document.addEventListener('DOMContentLoaded', function () {
             .then(data => {
                 if (data.error) return;
 
-                if (data.date_debut) {
+                if (data.date_debut && dateDebutInput) {
                     dateDebutInput.setAttribute('min', data.date_debut);
                 }
                 if (data.date_fin) {
-                    dateDebutInput.setAttribute('max', data.date_fin);
-                    dateFinInput.setAttribute('max', data.date_fin);
+                    if (dateDebutInput) dateDebutInput.setAttribute('max', data.date_fin);
+                    if (dateFinInput) dateFinInput.setAttribute('max', data.date_fin);
                 }
 
                 visuelsHeritesContainer.innerHTML = '';
@@ -560,7 +956,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (data.visuels && data.visuels.length > 0 && !aDejaVisuelsPropres) {
                     const titre = document.createElement('p');
                     titre.className = 'small text-muted mb-2';
-                    titre.innerHTML = '<i class="bi bi-link-45deg"></i> Visuels hérités de la campagne mère (utilisés automatiquement si vous n\'en ajoutez pas) :';
+                    titre.innerHTML = '<i class="bi bi-link-45deg text-primary"></i> Visuels hérités de la campagne mère (utilisés automatiquement si vous n\'en ajoutez pas) :';
                     visuelsHeritesContainer.appendChild(titre);
 
                     const row = document.createElement('div');
@@ -570,7 +966,7 @@ document.addEventListener('DOMContentLoaded', function () {
                         wrap.className = 'position-relative';
                         const media = document.createElement(v.is_video ? 'video' : 'img');
                         media.src = v.url;
-                        media.style = 'height:80px;width:100px;object-fit:cover;border-radius:6px;border:1px dashed var(--color-primary);opacity:0.85;';
+                        media.style = 'height:80px;width:100px;object-fit:cover;border-radius:6px;border:1px dashed var(--color-primary, #932e2b);opacity:0.85;';
                         if (v.is_video) media.setAttribute('muted', 'true');
                         wrap.appendChild(media);
                         row.appendChild(wrap);
@@ -600,15 +996,17 @@ document.addEventListener('DOMContentLoaded', function () {
                 contratSelect.innerHTML = '<option value="">--- Choisir un client d\'abord ---</option>';
                 return;
             }
-            const dateDebut = document.querySelector('input[name="date_debut"]').value;
-            const dateFin   = document.querySelector('input[name="date_fin"]').value;
+            const dateDebutEl = document.querySelector('input[name="date_debut"]');
+            const dateFinEl   = document.querySelector('input[name="date_fin"]');
+            const dateDebut = dateDebutEl ? dateDebutEl.value : '';
+            const dateFin   = dateFinEl ? dateFinEl.value : '';
 
             let url = `/gestion/campaigns/api/contrats-client/${clientId}/`;
             if (dateDebut && dateFin) {
                 url += `?date_debut=${dateDebut}&date_fin=${dateFin}`;
             }
 
-            contratSelect.innerHTML = '<option value="">Chargement...</option>';
+            contratSelect.innerHTML = '<option value="">Chargement des contrats...</option>';
             contratSelect.disabled = true;
 
             fetch(url)
@@ -633,8 +1031,6 @@ document.addEventListener('DOMContentLoaded', function () {
                 });
         }
 
-        // ownCampagneId : toujours exclu (une campagne ne peut pas être sa propre mère)
-        // preselectId   : la mère déjà liée à cette campagne, à sélectionner dans le <select>
         function chargerCampagnesMeres(clientId, ownCampagneId = null, preselectId = null) {
             if (!clientId || !parentSelect) {
                 return;
@@ -673,7 +1069,6 @@ document.addEventListener('DOMContentLoaded', function () {
         clientSelect.addEventListener('change', function() {
             chargerContrats(this.value);
             if (parentSelect) {
-                // Changement manuel de client : on ne présélectionne rien, l'utilisateur re-choisit
                 chargerCampagnesMeres(this.value, campagneId, null);
             }
         });
@@ -684,17 +1079,22 @@ document.addEventListener('DOMContentLoaded', function () {
         if (clientInitialId) {
             chargerContrats(clientInitialId, contratActuelId);
             if (parentSelect) {
-                // Chargement initial (édition) : on exclut la campagne courante, on présélectionne sa mère actuelle
                 chargerCampagnesMeres(clientInitialId, campagneId, campagneParenteActuelId);
             }
         }
 
-        document.querySelector('input[name="date_debut"]').addEventListener('change', function() {
-            if (clientSelect.value) chargerContrats(clientSelect.value, contratSelect.value);
-        });
-        document.querySelector('input[name="date_fin"]').addEventListener('change', function() {
-            if (clientSelect.value) chargerContrats(clientSelect.value, contratSelect.value);
-        });
+        const dateDeb = document.querySelector('input[name="date_debut"]');
+        if (dateDeb) {
+            dateDeb.addEventListener('change', function() {
+                if (clientSelect.value) chargerContrats(clientSelect.value, contratSelect.value);
+            });
+        }
+        const dateFn = document.querySelector('input[name="date_fin"]');
+        if (dateFn) {
+            dateFn.addEventListener('change', function() {
+                if (clientSelect.value) chargerContrats(clientSelect.value, contratSelect.value);
+            });
+        }
     }
 
     /* =========================
@@ -703,10 +1103,13 @@ document.addEventListener('DOMContentLoaded', function () {
     const inputMulti = document.querySelector('input[name="visuels_multiples"]');
     const previewContainer = document.getElementById('multi-preview-container');
 
-    if (inputMulti) {
+    if (inputMulti && previewContainer) {
+        inputMulti.classList.add('form-control');
+        inputMulti.style.borderRadius = '8px';
+        inputMulti.style.fontSize = '0.82rem';
+
         inputMulti.addEventListener('change', function () {
             previewContainer.innerHTML = '';
-
             const files = Array.from(this.files);
 
             files.forEach(file => {
@@ -725,7 +1128,7 @@ document.addEventListener('DOMContentLoaded', function () {
 
                     if (media) {
                         media.src = e.target.result;
-                        media.style = "height:100px;width:130px;object-fit:cover;border-radius:8px;border:2px solid var(--color-primary);";
+                        media.style = "height:90px;width:120px;object-fit:cover;border-radius:6px;border:2px solid var(--color-primary, #932e2b);box-shadow:0 2px 8px rgba(0,0,0,0.06);";
                         col.appendChild(media);
                         previewContainer.appendChild(col);
                     }

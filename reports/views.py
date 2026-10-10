@@ -461,10 +461,12 @@ class PreviewCampagnePdfView(ClientStaffRequiredMixin, View):
                             ),
             pk=pk,
         )
+        context = _build_context_campagne(campagne)
+        context["visuels_pdf"] = _prepare_visuels_pdf(campagne)
         return render(
             request,
             "reports/apercu_campagne.html",
-            _build_context_campagne(campagne),
+            context,
         )
 
 

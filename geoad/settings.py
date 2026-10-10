@@ -35,6 +35,7 @@ else:
         'http://integralcarte.regies.tech',
         'http://187.124.54.132:8086',
     ]
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CONFIGURATION EMAIL

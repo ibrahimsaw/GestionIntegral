@@ -1,4 +1,5 @@
 import datetime
+import base64
 from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
@@ -13,6 +14,7 @@ import io
 from django.views import View
 
 import pandas as pd
+from PIL import Image, ImageOps
 
 
 class ReportsIndexView(LoginRequiredMixin, View):
@@ -52,6 +54,55 @@ def _format_freq(campagne):
         return f"Toutes les {freq} sec"
     minutes = freq // 60
     return f"Toutes les {minutes} min"
+
+
+def _prepare_visuels_pdf(campagne):
+    """Réduit les affiches pour le PDF sans toucher aux fichiers originaux."""
+    visuels = []
+    for visuel in campagne.visuels.all():
+        nom = visuel.fichier.name.rsplit("/", 1)[-1]
+        extension = nom.rsplit(".", 1)[-1].lower() if "." in nom else ""
+        if extension in {"mp4", "webm", "mov", "avi"}:
+            visuels.append({"nom": nom, "is_video": True})
+            continue
+
+        try:
+            with visuel.fichier.open("rb") as fichier:
+                contenu = fichier.read()
+
+            with Image.open(io.BytesIO(contenu)) as image_source:
+                source_format = image_source.format
+                image = ImageOps.exif_transpose(image_source)
+                image.thumbnail((1200, 900), Image.Resampling.LANCZOS)
+                preserve_alpha = "A" in image.getbands() or "transparency" in image.info
+                buffer = io.BytesIO()
+
+                if preserve_alpha:
+                    image.convert("RGBA").save(buffer, format="PNG", optimize=True, compress_level=9)
+                    mime_type = "image/png"
+                elif source_format not in {"JPEG", "JPG", "WEBP"}:
+                    image.convert("RGB").save(buffer, format="PNG", optimize=True, compress_level=9)
+                    mime_type = "image/png"
+                else:
+                    image.convert("RGB").save(
+                        buffer,
+                        format="JPEG",
+                        quality=80,
+                        optimize=True,
+                        progressive=True,
+                    )
+                    mime_type = "image/jpeg"
+
+            encoded_image = base64.b64encode(buffer.getvalue()).decode("ascii")
+            visuels.append({
+                "nom": nom,
+                "is_video": False,
+                "src": f"data:{mime_type};base64,{encoded_image}",
+            })
+        except (OSError, ValueError):
+            visuels.append({"nom": nom, "is_video": False, "src": visuel.fichier.url})
+
+    return visuels
 
 
 def _spots_sur_periode(date_debut, date_fin, spots_total, periode_debut, periode_fin):
@@ -376,9 +427,11 @@ class ExportCampagnePdfView(ClientStaffRequiredMixin, View):
             pk=pk,
         )
 
+        context = _build_context_campagne(campagne)
+        context["visuels_pdf"] = _prepare_visuels_pdf(campagne)
         html_string = render_to_string(
             "reports/campagne_pdf.html",
-            _build_context_campagne(campagne),
+            context,
             request=request,
         )
         pdf = HTML(

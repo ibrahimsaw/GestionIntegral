@@ -5,331 +5,818 @@
 {% block topbar_title %}
   <i class="bi bi-calendar3" style="color:var(--color-primary)"></i>Planning — {{ mois_nom }} {{ annee }}
 {% endblock %}
+
 {% block extra_head %}
-<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.css" rel="stylesheet">
 <style>
-    /* ── Tokens ────────────────────────────────────────────────────────────────── */
+    /* ── Tokens & Variables ────────────────────────────────────────────────────── */
     :root {
-      --pl-bg:        #f6f7fb;
-      --pl-surface:   #ffffff;
-      --pl-surface2:  #f0f2f8;
-      --pl-border:    #e4e7f0;
-      --pl-text:      #111827;
-      --pl-muted:     #6b7280;
-      --pl-accent:    {{ DESIGN.COLOR_PRIMARY }};
-      --pl-accent2:   {{ DESIGN.COLOR_SECONDARY }};
-      --pl-success:   #059669;
-      --pl-warning:   #d97706;
-      --pl-danger:    #dc2626;
-      --pl-radius:    12px;
-      --pl-font:      'Outfit', sans-serif;
-      --pl-mono:      'JetBrains Mono', monospace;
-      --pl-shadow:    0 1px 3px rgba(0,0,0,.07), 0 4px 16px rgba(0,0,0,.04);
-      --pl-shadow-md: 0 4px 20px rgba(79,70,229,.12);
+      --pl-bg:             #f8fafc;
+      --pl-surface:        #ffffff;
+      --pl-surface-alt:    #f1f5f9;
+      --pl-surface-hover:  #f8fafc;
+      --pl-border:         #e2e8f0;
+      --pl-border-light:   #f1f5f9;
+      --pl-text:           #0f172a;
+      --pl-text-muted:     #64748b;
+      --pl-text-light:     #94a3b8;
+      --pl-primary:        {{ DESIGN.COLOR_PRIMARY|default:"#932e2b" }};
+      --pl-primary-rgb:    147, 46, 43;
+      --pl-secondary:      {{ DESIGN.COLOR_SECONDARY|default:"#ffd700" }};
+      --pl-success:        #10b981;
+      --pl-warning:        #f59e0b;
+      --pl-danger:         #ef4444;
+      --pl-blue:           #2563eb;
+      --pl-cyan:           #0891b2;
+      --pl-purple:         #7c3aed;
+      --pl-radius-sm:      6px;
+      --pl-radius:         12px;
+      --pl-radius-lg:      16px;
+      --pl-font:           'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --pl-mono:           'JetBrains Mono', monospace;
+      --pl-shadow-sm:      0 1px 2px 0 rgba(0, 0, 0, 0.04);
+      --pl-shadow:         0 2px 6px -1px rgba(0, 0, 0, 0.06), 0 1px 4px -1px rgba(0, 0, 0, 0.04);
+      --pl-shadow-md:      0 8px 18px -2px rgba(15, 23, 42, 0.08), 0 3px 6px -2px rgba(15, 23, 42, 0.04);
+      --pl-shadow-lg:      0 14px 28px -4px rgba(15, 23, 42, 0.12), 0 6px 12px -3px rgba(15, 23, 42, 0.06);
     }
 
-    /* ── Reset & base ──────────────────────────────────────────────────────────── */
-    .pl-page { font-family: var(--pl-font); background: var(--pl-bg); padding: 0; }
     *, *::before, *::after { box-sizing: border-box; }
 
-    /* ── Layout ────────────────────────────────────────────────────────────────── */
+    /* ── Layout Global ─────────────────────────────────────────────────────────── */
     .pl-wrap {
       display: grid;
       grid-template-rows: auto auto 1fr;
-      grid-template-columns: 1fr 300px;
+      grid-template-columns: 1fr 340px;
       grid-template-areas:
         "header header"
         "kpis   kpis"
         "cal    side";
-      gap: 18px;
-      max-width: 1440px;
+      gap: 20px;
+      /*
+      max-width: 1520px;
+      */
       margin: 0 auto;
+      font-family: var(--pl-font);
+      color: var(--pl-text);
     }
 
-    /* ── Header ────────────────────────────────────────────────────────────────── */
+    /* ── En-tête & Contrôles de Navigation ─────────────────────────────────────── */
     .pl-header {
       grid-area: header;
       display: flex;
       align-items: center;
       justify-content: space-between;
       flex-wrap: wrap;
-      gap: 12px;
+      gap: 16px;
       padding-bottom: 4px;
     }
-    .pl-title {
-      display: flex; align-items: center; gap: 10px;
-      font-size: 1.35rem; font-weight: 700;
-      color: var(--pl-text); margin: 0;
-      letter-spacing: -.4px;
+
+    .pl-title-group {
+      display: flex;
+      align-items: center;
+      gap: 14px;
     }
+
     .pl-title-icon {
-      width: 38px; height: 38px;
-      background: var(--pl-accent);
-      border-radius: 10px;
-      display: flex; align-items: center; justify-content: center;
-      box-shadow: 0 4px 12px rgba(79,70,229,.3);
+      width: 44px;
+      height: 44px;
+      background: linear-gradient(135deg, var(--pl-primary), color-mix(in srgb, var(--pl-primary) 78%, #000));
+      border-radius: var(--pl-radius);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 4px 14px rgba(147, 46, 43, 0.28);
+      color: #ffffff;
+      font-size: 1.25rem;
+      flex-shrink: 0;
     }
-    .pl-subtitle { font-size: .82rem; color: var(--pl-muted); margin: 3px 0 0 48px; }
 
-    /* ── Nav mois ──────────────────────────────────────────────────────────────── */
-    .pl-nav {
-      display: flex; align-items: center; gap: 6px;
-      background: var(--pl-surface);
-      border: 1.5px solid var(--pl-border);
-      border-radius: 8px;
-      padding: 5px 6px;
-      box-shadow: var(--pl-shadow);
-    }
-    .pl-nav-arrow {
-      width: 32px; height: 32px; border-radius: 50%;
-      display: flex; align-items: center; justify-content: center;
-      color: var(--pl-muted); text-decoration: none;
-      transition: background .15s, color .15s;
-      border: none; background: transparent;
-    }
-    .pl-nav-arrow:hover { background: var(--pl-surface2); color: var(--pl-text); }
-    .pl-nav-label {
-      font-size: .9rem; font-weight: 600;
-      min-width: 148px; text-align: center;
+    .pl-title {
+      font-size: 1.45rem;
+      font-weight: 800;
       color: var(--pl-text);
-      font-family: var(--pl-font);
+      margin: 0;
+      letter-spacing: -0.02em;
+      line-height: 1.2;
     }
-    .pl-today-btn {
-      display: inline-flex; align-items: center;
-      padding: 0 14px; height: 32px; border-radius: 8px;
-      background: var(--pl-accent); color: #fff;
-      text-decoration: none; font-size: .78rem; font-weight: 600;
-      transition: opacity .15s; letter-spacing: .01em;
-    }
-    .pl-today-btn:hover { opacity: .88; color: #fff; }
 
-    /* ── KPIs ──────────────────────────────────────────────────────────────────── */
+    .pl-subtitle {
+      font-size: 0.82rem;
+      color: var(--pl-text-muted);
+      margin: 3px 0 0 0;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .pl-pulse-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--pl-success);
+      box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7);
+      animation: pl-pulse 2s infinite;
+      display: inline-block;
+    }
+
+    @keyframes pl-pulse {
+      0% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.7); }
+      70% { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+
+    /* ── Barre de Navigation Mensuelle ─────────────────────────────────────────── */
+    .pl-nav-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--pl-surface);
+      border: 1px solid var(--pl-border);
+      border-radius: 12px;
+      padding: 5px 6px;
+      box-shadow: var(--pl-shadow-sm);
+    }
+
+    .pl-nav-group {
+      display: flex;
+      align-items: center;
+      background: var(--pl-surface-alt);
+      border-radius: 8px;
+      padding: 3px;
+    }
+
+    .pl-nav-arrow {
+      width: 32px;
+      height: 32px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: var(--pl-text-muted);
+      text-decoration: none;
+      transition: all 0.15s ease;
+      background: transparent;
+      border: none;
+    }
+
+    .pl-nav-arrow:hover {
+      background: var(--pl-surface);
+      color: var(--pl-primary);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    }
+
+    .pl-nav-label {
+      font-size: 0.92rem;
+      font-weight: 700;
+      min-width: 155px;
+      text-align: center;
+      color: var(--pl-text);
+      letter-spacing: -0.01em;
+      padding: 0 8px;
+      user-select: none;
+    }
+
+    .pl-today-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 0 14px;
+      height: 32px;
+      border-radius: 8px;
+      background: var(--pl-primary);
+      color: #ffffff;
+      text-decoration: none;
+      font-size: 0.78rem;
+      font-weight: 700;
+      transition: all 0.15s ease;
+      letter-spacing: 0.01em;
+      box-shadow: 0 2px 6px rgba(147, 46, 43, 0.22);
+    }
+
+    .pl-today-btn:hover {
+      background: color-mix(in srgb, var(--pl-primary) 85%, #000);
+      color: #ffffff;
+      transform: translateY(-1px);
+      box-shadow: 0 4px 10px rgba(147, 46, 43, 0.32);
+    }
+
+    /* ── Cartes Indicateurs (KPIs) ─────────────────────────────────────────────── */
     .pl-kpis {
       grid-area: kpis;
       display: grid;
       grid-template-columns: repeat(4, 1fr);
       gap: 14px;
     }
-    .pl-kpi {
+
+    .pl-kpi-card {
       background: var(--pl-surface);
-      border: 1.5px solid var(--pl-border);
+      border: 1px solid var(--pl-border);
       border-radius: var(--pl-radius);
       padding: 16px 18px;
-      box-shadow: var(--pl-shadow);
-      display: flex; align-items: center; gap: 14px;
-      transition: box-shadow .2s, transform .15s;
+      box-shadow: var(--pl-shadow-sm);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      transition: all 0.2s ease;
+      position: relative;
+      overflow: hidden;
     }
-    .pl-kpi:hover { box-shadow: var(--pl-shadow-md); transform: translateY(-1px); }
-    .pl-kpi-icon {
-      width: 42px; height: 42px; border-radius: 10px;
-      display: flex; align-items: center; justify-content: center;
-      flex-shrink: 0; font-size: 1.15rem;
-    }
-    .pl-kpi-icon.indigo { background: rgba(79,70,229,.1);  color: var(--pl-accent); }
-    .pl-kpi-icon.green  { background: rgba(5,150,105,.1);  color: var(--pl-success); }
-    .pl-kpi-icon.amber  { background: rgba(217,119,6,.1);  color: var(--pl-warning); }
-    .pl-kpi-icon.violet { background: rgba(124,58,237,.1); color: var(--pl-accent2); }
-    .pl-kpi-val  { font-size: 1.6rem; font-weight: 700; color: var(--pl-text); line-height: 1; }
-    .pl-kpi-lbl  { font-size: .72rem; color: var(--pl-muted); margin-top: 3px; text-transform: uppercase; letter-spacing: .06em; font-weight: 500; }
 
-    /* ── Calendrier ────────────────────────────────────────────────────────────── */
+    .pl-kpi-card::before {
+      content: '';
+      position: absolute;
+      top: 0;
+      left: 0;
+      bottom: 0;
+      width: 4px;
+      border-radius: 4px 0 0 4px;
+    }
+
+    .pl-kpi-card.kpi-crimson::before { background: var(--pl-primary); }
+    .pl-kpi-card.kpi-blue::before    { background: var(--pl-blue); }
+    .pl-kpi-card.kpi-cyan::before    { background: var(--pl-cyan); }
+    .pl-kpi-card.kpi-emerald::before { background: var(--pl-success); }
+
+    .pl-kpi-card:hover {
+      box-shadow: var(--pl-shadow-md);
+      transform: translateY(-2px);
+      border-color: #cbd5e1;
+    }
+
+    .pl-kpi-icon-wrap {
+      width: 46px;
+      height: 46px;
+      border-radius: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      font-size: 1.25rem;
+    }
+
+    .kpi-crimson .pl-kpi-icon-wrap { background: rgba(147, 46, 43, 0.08); color: var(--pl-primary); }
+    .kpi-blue .pl-kpi-icon-wrap    { background: rgba(37, 99, 235, 0.08);  color: var(--pl-blue); }
+    .kpi-cyan .pl-kpi-icon-wrap    { background: rgba(8, 145, 178, 0.08);  color: var(--pl-cyan); }
+    .kpi-emerald .pl-kpi-icon-wrap { background: rgba(16, 185, 129, 0.08); color: var(--pl-success); }
+
+    .pl-kpi-content {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .pl-kpi-val {
+      font-size: 1.65rem;
+      font-weight: 800;
+      color: var(--pl-text);
+      line-height: 1.1;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: -0.02em;
+    }
+
+    .pl-kpi-lbl {
+      font-size: 0.72rem;
+      color: var(--pl-text-muted);
+      margin-top: 3px;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-weight: 700;
+    }
+
+    .pl-kpi-sub {
+      font-size: 0.72rem;
+      color: var(--pl-text-light);
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* ── Bloc Calendrier Principal ─────────────────────────────────────────────── */
     .pl-cal-wrap {
       grid-area: cal;
       background: var(--pl-surface);
-      border: 1.5px solid var(--pl-border);
-      border-radius: var(--pl-radius);
+      border: 1px solid var(--pl-border);
+      border-radius: var(--pl-radius-lg);
       box-shadow: var(--pl-shadow);
       overflow: hidden;
-      display: flex; flex-direction: column;
+      display: flex;
+      flex-direction: column;
     }
+
     .pl-card-header {
       padding: 14px 20px;
-      border-bottom: 1.5px solid var(--pl-border);
-      display: flex; align-items: center; gap: 8px;
-      font-size: .78rem; font-weight: 600;
-      text-transform: uppercase; letter-spacing: .08em;
-      color: var(--pl-muted);
-      background: var(--pl-surface2);
+      border-bottom: 1px solid var(--pl-border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--pl-text-muted);
+      background: #fafbfc;
     }
+
+    .pl-card-header i {
+      font-size: 0.95rem;
+      color: var(--pl-primary);
+    }
+
     .pl-card-header span.pill {
       margin-left: auto;
-      background: var(--pl-accent);
-      color: #fff;
-      font-size: .7rem; font-weight: 600;
-      padding: 2px 9px; border-radius: 8px;
+      background: var(--pl-primary);
+      color: #ffffff;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 3px 10px;
+      border-radius: 20px;
+      letter-spacing: 0.02em;
+      box-shadow: 0 1px 3px rgba(147, 46, 43, 0.25);
     }
 
-    .fc-wrap { padding: 16px; flex: 1; }
+    .fc-wrap {
+      padding: 18px 20px;
+      flex: 1;
+      background: var(--pl-surface);
+    }
+
+    /* ── Personnalisation FullCalendar ─────────────────────────────────────────── */
     .fc {
-      --fc-border-color:    var(--pl-border);
-      --fc-today-bg-color:  rgba(79,70,229,.06);
-      --fc-page-bg-color:   transparent;
+      --fc-border-color:           var(--pl-border);
+      --fc-today-bg-color:         rgba(147, 46, 43, 0.03);
+      --fc-page-bg-color:          transparent;
+      --fc-neutral-bg-color:       var(--pl-surface-alt);
+      font-family:                 var(--pl-font);
     }
-    .fc .fc-button {
-      background: var(--pl-surface2) !important;
-      border-color: var(--pl-border) !important;
-      color: var(--pl-text) !important;
-      font-size: .8rem; border-radius: 7px !important;
-      box-shadow: none !important; font-family: var(--pl-font) !important;
+
+    .fc-theme-standard th {
+      border: 1px solid var(--pl-border) !important;
+      background: #f8fafc !important;
+      padding: 10px 0 !important;
     }
-    .fc .fc-button:hover { background: var(--pl-border) !important; }
-    .fc-day-today { background: rgba(79,70,229,.05) !important; }
-    .fc-day-today .fc-daygrid-day-number {
-      color: var(--pl-accent) !important; font-weight: 700;
-      background: rgba(79,70,229,.12); border-radius: 6px;
-      padding: 1px 6px !important;
-    }
-    .fc-col-header-cell { background: var(--pl-surface2); }
+
     .fc-col-header-cell-cushion {
-      color: var(--pl-muted) !important; font-size: .72rem;
-      font-family: var(--pl-mono) !important; text-transform: uppercase;
-      letter-spacing: .08em; text-decoration: none !important; font-weight: 500;
+      color: #475569 !important;
+      font-size: 0.74rem !important;
+      font-family: var(--pl-mono) !important;
+      text-transform: uppercase !important;
+      letter-spacing: 0.08em !important;
+      text-decoration: none !important;
+      font-weight: 700 !important;
+      display: inline-block;
     }
+
+    .fc-daygrid-day {
+      transition: background-color 0.12s ease;
+      min-height: 95px !important;
+    }
+
+    .fc-daygrid-day:hover {
+      background-color: rgba(248, 250, 252, 0.8) !important;
+    }
+
+    .fc-daygrid-day-top {
+      padding: 6px 8px 3px 8px !important;
+      display: flex;
+      justify-content: flex-end;
+    }
+
     .fc-daygrid-day-number {
-      color: var(--pl-muted) !important; font-family: var(--pl-mono) !important;
-      font-size: .75rem; text-decoration: none !important; padding: 5px 7px !important;
+      color: #64748b !important;
+      font-family: var(--pl-mono) !important;
+      font-size: 0.78rem !important;
+      font-weight: 600 !important;
+      text-decoration: none !important;
+      padding: 2px 6px !important;
+      border-radius: 6px;
+      transition: all 0.15s ease;
     }
+
+    /* Jour courant (Aujourd'hui) */
+    .fc-day-today {
+      background: rgba(147, 46, 43, 0.04) !important;
+      border: 1.5px solid rgba(147, 46, 43, 0.22) !important;
+    }
+
+    .fc-day-today .fc-daygrid-day-number {
+      color: #ffffff !important;
+      background: var(--pl-primary) !important;
+      font-weight: 800 !important;
+      box-shadow: 0 2px 6px rgba(147, 46, 43, 0.35);
+      padding: 2px 8px !important;
+    }
+
+    /* Jours des autres mois */
+    .fc-day-other {
+      opacity: 0.42;
+      background-color: #fafbfc !important;
+    }
+
+    /* Événements de campagne */
     .fc-event {
-      border-radius: 5px !important; border: none !important;
-      font-size: .72rem !important; font-weight: 500;
-      padding: 2px 6px !important; cursor: pointer;
+      border-radius: 6px !important;
+      border: none !important;
+      font-size: 0.72rem !important;
+      font-weight: 600 !important;
+      padding: 3px 7px !important;
+      margin: 2px 4px !important;
+      cursor: pointer;
       font-family: var(--pl-font) !important;
-      transition: filter .1s, transform .1s !important;
+      transition: transform 0.15s ease, filter 0.15s ease, box-shadow 0.15s ease !important;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12) !important;
     }
-    .fc-event:hover { filter: brightness(1.1); transform: translateY(-1px); }
-    .fc-daygrid-event-dot { display: none; }
-    .fc-more-link { color: var(--pl-accent) !important; font-size: .72rem !important; font-weight: 600 !important; }
+
+    .fc-event:hover {
+      filter: brightness(1.08) !important;
+      transform: translateY(-1px) !important;
+      box-shadow: 0 4px 10px rgba(0, 0, 0, 0.18) !important;
+      z-index: 5 !important;
+    }
+
+    .fc-daygrid-event-dot { display: none !important; }
+
+    /* Bouton +X en savoir plus */
+    .fc-more-link {
+      color: var(--pl-primary) !important;
+      font-size: 0.72rem !important;
+      font-weight: 700 !important;
+      background: rgba(147, 46, 43, 0.08) !important;
+      padding: 2px 7px !important;
+      border-radius: 6px !important;
+      text-decoration: none !important;
+      display: inline-block !important;
+      margin: 2px 4px !important;
+      transition: background 0.15s ease;
+    }
+
+    .fc-more-link:hover {
+      background: rgba(147, 46, 43, 0.16) !important;
+    }
+
+    /* Popover d'événements multiples */
     .fc-popover {
       background: var(--pl-surface) !important;
-      border: 1.5px solid var(--pl-border) !important;
+      border: 1px solid var(--pl-border) !important;
       border-radius: var(--pl-radius) !important;
-      box-shadow: var(--pl-shadow-md) !important;
+      box-shadow: var(--pl-shadow-lg) !important;
+      overflow: hidden;
+      z-index: 1000 !important;
     }
+
     .fc-popover-header {
-      background: var(--pl-surface2) !important;
+      background: #f8fafc !important;
       color: var(--pl-text) !important;
-      font-family: var(--pl-font) !important; font-size: .8rem !important;
+      font-family: var(--pl-font) !important;
+      font-size: 0.82rem !important;
+      font-weight: 700 !important;
+      padding: 8px 12px !important;
+      border-bottom: 1px solid var(--pl-border) !important;
     }
 
-    /* ── Légende ───────────────────────────────────────────────────────────────── */
+    .fc-popover-close {
+      opacity: 0.6 !important;
+      font-size: 0.85rem !important;
+    }
+
+    /* ── Barre de Légende ──────────────────────────────────────────────────────── */
     .pl-legend {
-      padding: 12px 20px;
-      border-top: 1.5px solid var(--pl-border);
-      background: var(--pl-surface2);
-      display: flex; flex-wrap: wrap; gap: 10px;
-      min-height: 42px;
+      padding: 14px 20px;
+      border-top: 1px solid var(--pl-border);
+      background: #f8fafc;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 10px;
+      min-height: 48px;
     }
-    .pl-legend-chip {
-      display: flex; align-items: center; gap: 6px;
-      font-size: .73rem; color: var(--pl-muted);
-      max-width: 180px;
-    }
-    .pl-legend-dot { width: 8px; height: 8px; border-radius: 3px; flex-shrink: 0; }
 
-    /* ── Sidebar ───────────────────────────────────────────────────────────────── */
+    .pl-legend-title {
+      font-size: 0.73rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--pl-text-muted);
+      margin-right: 4px;
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .pl-legend-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 0.75rem;
+      font-weight: 500;
+      color: #334155;
+      background: #ffffff;
+      padding: 4px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--pl-border);
+      box-shadow: var(--pl-shadow-sm);
+      max-width: 220px;
+      transition: all 0.15s ease;
+      cursor: default;
+    }
+
+    .pl-legend-chip:hover {
+      border-color: #cbd5e1;
+      transform: translateY(-1px);
+    }
+
+    .pl-legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
+      flex-shrink: 0;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
+    }
+
+    /* ── Barre Latérale (Sidebar) ──────────────────────────────────────────────── */
     .pl-side {
       grid-area: side;
-      display: flex; flex-direction: column; gap: 14px;
-      position: sticky; top: 24px; align-self: start;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      position: sticky;
+      top: 24px;
+      align-self: start;
     }
 
     .pl-card {
       background: var(--pl-surface);
-      border: 1.5px solid var(--pl-border);
-      border-radius: var(--pl-radius);
+      border: 1px solid var(--pl-border);
+      border-radius: var(--pl-radius-lg);
       box-shadow: var(--pl-shadow);
       overflow: hidden;
     }
 
-    /* ── Mini heatmap ──────────────────────────────────────────────────────────── */
+    /* ── Mini Heatmap (Densité) ────────────────────────────────────────────────── */
+    .pl-heatmap-wrap {
+      padding: 16px;
+    }
+
     .pl-heatmap {
-      padding: 14px 16px;
       display: grid;
       grid-template-columns: repeat(7, 1fr);
-      gap: 4px;
+      gap: 5px;
     }
+
     .pl-hm-label {
-      text-align: center; font-size: .62rem; font-weight: 600;
-      color: var(--pl-muted); text-transform: uppercase;
-      letter-spacing: .06em; padding-bottom: 4px;
+      text-align: center;
+      font-size: 0.65rem;
+      font-weight: 700;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      padding-bottom: 6px;
       font-family: var(--pl-mono);
     }
+
     .pl-hm-day {
       aspect-ratio: 1;
-      border-radius: 4px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: .62rem; font-weight: 500; font-family: var(--pl-mono);
-      cursor: default; transition: transform .1s;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.66rem;
+      font-weight: 600;
+      font-family: var(--pl-mono);
+      cursor: default;
+      transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
       position: relative;
     }
-    .pl-hm-day:hover { transform: scale(1.15); z-index: 2; }
-    .pl-hm-day.empty { background: transparent; color: transparent; }
-    .pl-hm-day.zero  { background: var(--pl-surface2); color: var(--pl-muted); }
-    .pl-hm-day.low   { background: rgba(79,70,229,.15); color: var(--pl-accent); }
-    .pl-hm-day.mid   { background: rgba(79,70,229,.35); color: var(--pl-accent); }
-    .pl-hm-day.high  { background: var(--pl-accent);    color: #fff; }
 
-    /* ── Supports list ─────────────────────────────────────────────────────────── */
-    .pl-supports { max-height: 400px; overflow-y: auto; }
-    .pl-supports::-webkit-scrollbar { width: 4px; }
-    .pl-supports::-webkit-scrollbar-thumb { background: var(--pl-border); border-radius: 4px; }
+    .pl-hm-day:hover {
+      transform: scale(1.18);
+      z-index: 3;
+      box-shadow: 0 3px 8px rgba(0, 0, 0, 0.12);
+    }
+
+    .pl-hm-day.empty { background: transparent; color: transparent; pointer-events: none; }
+    .pl-hm-day.zero  { background: #f1f5f9; color: #94a3b8; }
+    .pl-hm-day.low   { background: rgba(147, 46, 43, 0.14); color: var(--pl-primary); }
+    .pl-hm-day.mid   { background: rgba(147, 46, 43, 0.40); color: #ffffff; }
+    .pl-hm-day.high  { background: var(--pl-primary);        color: #ffffff; box-shadow: 0 1px 4px rgba(147, 46, 43, 0.3); }
+
+    .pl-heatmap-legend {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 12px;
+      padding-top: 10px;
+      border-top: 1px dashed var(--pl-border);
+      font-size: 0.68rem;
+      color: var(--pl-text-muted);
+    }
+
+    .pl-hm-steps {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .pl-hm-step-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 3px;
+    }
+
+    /* ── Liste des Supports & Barres d'Occupation ──────────────────────────────── */
+    .pl-supports {
+      max-height: 420px;
+      overflow-y: auto;
+    }
+
+    .pl-supports::-webkit-scrollbar {
+      width: 5px;
+    }
+
+    .pl-supports::-webkit-scrollbar-track {
+      background: #f8fafc;
+    }
+
+    .pl-supports::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 6px;
+    }
 
     .pl-sup-item {
-      padding: 11px 16px;
+      padding: 12px 18px;
       border-bottom: 1px solid var(--pl-border);
-      transition: background .12s;
+      transition: background 0.15s ease;
       cursor: default;
     }
-    .pl-sup-item:last-child { border-bottom: none; }
-    .pl-sup-item:hover { background: var(--pl-surface2); }
-    .pl-sup-row { display: flex; align-items: center; gap: 8px; margin-bottom: 5px; }
+
+    .pl-sup-item:last-child {
+      border-bottom: none;
+    }
+
+    .pl-sup-item:hover {
+      background: #f8fafc;
+    }
+
+    .pl-sup-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 6px;
+    }
+
     .pl-sup-type {
-      width: 20px; height: 20px; border-radius: 5px; flex-shrink: 0;
-      display: flex; align-items: center; justify-content: center;
-      font-size: .65rem;
+      width: 24px;
+      height: 24px;
+      border-radius: 6px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.72rem;
     }
-    .pl-sup-type.panneau { background: rgba(124,58,237,.12); color: var(--pl-accent2); }
-    .pl-sup-type.ecran   { background: rgba(14,165,233,.12); color: #0ea5e9; }
-    .pl-sup-code { font-family: var(--pl-mono); font-size: .73rem; color: var(--pl-accent); font-weight: 500; }
-    .pl-sup-nom  { font-size: .8rem; color: var(--pl-text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .pl-sup-pct  {
-      font-family: var(--pl-mono); font-size: .72rem; font-weight: 600;
-      padding: 2px 7px; border-radius: 5px; white-space: nowrap; flex-shrink: 0;
+
+    .pl-sup-type.panneau {
+      background: rgba(147, 46, 43, 0.08);
+      color: var(--pl-primary);
     }
-    .pl-sup-pct.high { background: rgba(220,38,38,.1);  color: var(--pl-danger); }
-    .pl-sup-pct.mid  { background: rgba(217,119,6,.1);  color: var(--pl-warning); }
-    .pl-sup-pct.low  { background: rgba(5,150,105,.1);  color: var(--pl-success); }
-    .pl-sup-pct.zero { background: var(--pl-surface2);  color: var(--pl-muted); }
 
-    .pl-bar-bg   { height: 3px; background: var(--pl-border); border-radius: 2px; overflow: hidden; }
-    .pl-bar-fill { height: 100%; border-radius: 2px; transition: width .4s ease; }
+    .pl-sup-type.ecran {
+      background: rgba(8, 145, 178, 0.1);
+      color: var(--pl-cyan);
+    }
 
-    /* ── Tooltip ───────────────────────────────────────────────────────────────── */
+    .pl-sup-code {
+      font-family: var(--pl-mono);
+      font-size: 0.74rem;
+      color: var(--pl-text);
+      font-weight: 700;
+      background: #f1f5f9;
+      padding: 1px 6px;
+      border-radius: 4px;
+    }
+
+    .pl-sup-nom {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--pl-text);
+      flex: 1;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .pl-sup-pct {
+      font-family: var(--pl-mono);
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 6px;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+
+    .pl-sup-pct.high { background: rgba(239, 68, 68, 0.1);  color: var(--pl-danger); }
+    .pl-sup-pct.mid  { background: rgba(245, 158, 11, 0.12); color: #d97706; }
+    .pl-sup-pct.low  { background: rgba(16, 185, 129, 0.1); color: var(--pl-success); }
+    .pl-sup-pct.zero { background: #f1f5f9;                  color: #94a3b8; }
+
+    .pl-bar-bg {
+      height: 5px;
+      background: #f1f5f9;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+
+    .pl-bar-fill {
+      height: 100%;
+      border-radius: 10px;
+      transition: width 0.4s ease;
+    }
+
+    /* ── Infobulle Flottante (Tooltip) ─────────────────────────────────────────── */
     .pl-tooltip {
-      position: fixed; z-index: 9999;
-      background: var(--pl-text); color: #fff;
-      padding: 8px 12px; border-radius: 8px;
-      font-size: .75rem; font-family: var(--pl-font);
-      box-shadow: 0 8px 24px rgba(0,0,0,.18);
-      pointer-events: none; opacity: 0;
-      transition: opacity .15s;
-      max-width: 220px; line-height: 1.5;
+      position: fixed;
+      z-index: 9999;
+      background: #0f172a;
+      color: #ffffff;
+      padding: 10px 14px;
+      border-radius: 10px;
+      font-size: 0.75rem;
+      font-family: var(--pl-font);
+      box-shadow: 0 10px 25px -4px rgba(0, 0, 0, 0.35);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s ease;
+      max-width: 250px;
+      line-height: 1.5;
     }
 
-    /* ── Responsive ────────────────────────────────────────────────────────────── */
-    @media (max-width: 960px) {
+    /* ── Responsive & Media Queries ────────────────────────────────────────────── */
+    @media (max-width: 1080px) {
       .pl-wrap {
         grid-template-columns: 1fr;
-        grid-template-areas: "header" "kpis" "cal" "side";
-        padding: 14px 16px 24px;
+        grid-template-areas:
+          "header"
+          "kpis"
+          "cal"
+          "side";
+        gap: 16px;
       }
-      .pl-kpis { grid-template-columns: repeat(2, 1fr); }
-      .pl-side { position: static; }
+      .pl-side {
+        position: static;
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+      }
+      .pl-kpis {
+        grid-template-columns: repeat(2, 1fr);
+      }
     }
+
+    @media (max-width: 768px) {
+      .pl-header {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .pl-nav-bar {
+        width: 100%;
+        justify-content: space-between;
+      }
+      .pl-nav-group {
+        flex: 1;
+        justify-content: space-between;
+      }
+      .pl-nav-label {
+        min-width: auto;
+      }
+      .pl-side {
+        grid-template-columns: 1fr;
+      }
+      .pl-kpis {
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+      .pl-kpi-card {
+        padding: 12px 14px;
+        gap: 10px;
+      }
+      .pl-kpi-val {
+        font-size: 1.35rem;
+      }
+      .pl-kpi-icon-wrap {
+        width: 38px;
+        height: 38px;
+        font-size: 1.05rem;
+      }
+      .fc-wrap {
+        padding: 12px 10px;
+      }
+    }
+
     @media (max-width: 480px) {
-      .pl-kpis { grid-template-columns: 1fr 1fr; }
-      .pl-nav-label { min-width: 110px; font-size: .82rem; }
+      .pl-kpis {
+        grid-template-columns: 1fr;
+      }
     }
 </style>
 {% endblock %}
@@ -337,98 +824,127 @@
 {% block content %}
 <div class="pl-wrap">
 
-  {# ── HEADER ── #}
+  {# ── HEADER & NAVIGATION ── #}
   <header class="pl-header">
-    <div>
-      <h1 class="pl-title">
-        <span class="pl-title-icon">
-          <i class="bi bi-calendar3" style="color:#fff;font-size:1rem;"></i>
-        </span>
-        Planning Publicitaire
-      </h1>
-      <p class="pl-subtitle">Campagnes actives et taux d'occupation des supports</p>
+    <div class="pl-title-group">
+      <div class="pl-title-icon">
+        <i class="bi bi-calendar3"></i>
+      </div>
+      <div>
+        <h1 class="pl-title">Planning Publicitaire</h1>
+        <p class="pl-subtitle">
+          <span class="pl-pulse-dot"></span>
+          Campagnes actives et occupation des supports en temps réel
+        </p>
+      </div>
     </div>
 
-    <nav class="pl-nav" aria-label="Navigation mensuelle">
-      <a class="pl-nav-arrow" href="?mois={{ prev.mois }}&annee={{ prev.annee }}" aria-label="Mois précédent">
-        <i class="bi bi-chevron-left" style="font-size:.8rem;"></i>
+    <nav class="pl-nav-bar" aria-label="Navigation mensuelle">
+      <div class="pl-nav-group">
+        <a class="pl-nav-arrow" href="?mois={{ prev.mois }}&annee={{ prev.annee }}" aria-label="Mois précédent" title="Mois précédent">
+          <i class="bi bi-chevron-left"></i>
+        </a>
+        <span class="pl-nav-label">{{ mois_nom }} {{ annee }}</span>
+        <a class="pl-nav-arrow" href="?mois={{ next.mois }}&annee={{ next.annee }}" aria-label="Mois suivant" title="Mois suivant">
+          <i class="bi bi-chevron-right"></i>
+        </a>
+      </div>
+      <a class="pl-today-btn" href="?mois={{ today.month }}&annee={{ today.year }}" title="Revenir à aujourd'hui">
+        <i class="bi bi-calendar-check"></i>
+        <span>Aujourd'hui</span>
       </a>
-      <span class="pl-nav-label">{{ mois_nom }} {{ annee }}</span>
-      <a class="pl-nav-arrow" href="?mois={{ next.mois }}&annee={{ next.annee }}" aria-label="Mois suivant">
-        <i class="bi bi-chevron-right" style="font-size:.8rem;"></i>
-      </a>
-      <a class="pl-today-btn" href="?mois={{ today.month }}&annee={{ today.year }}">Aujourd'hui</a>
     </nav>
   </header>
 
-  {# ── KPIs ── #}
+  {# ── KPIS (INDICATEURS CLÉS) ── #}
   <div class="pl-kpis">
-    <div class="pl-kpi">
-      <div class="pl-kpi-icon indigo"><i class="bi bi-megaphone-fill"></i></div>
-      <div>
+    <div class="pl-kpi-card kpi-crimson">
+      <div class="pl-kpi-icon-wrap"><i class="bi bi-megaphone-fill"></i></div>
+      <div class="pl-kpi-content">
         <div class="pl-kpi-val">{{ campagnes_count }}</div>
         <div class="pl-kpi-lbl">Campagnes actives</div>
+        <div class="pl-kpi-sub">Ce mois-ci</div>
       </div>
     </div>
-    <div class="pl-kpi">
-      <div class="pl-kpi-icon green"><i class="bi bi-sign-merge-right"></i></div>
-      <div>
+    <div class="pl-kpi-card kpi-blue">
+      <div class="pl-kpi-icon-wrap"><i class="bi bi-sign-merge-right"></i></div>
+      <div class="pl-kpi-content">
         <div class="pl-kpi-val">{{ nb_panneaux_occupe }}</div>
         <div class="pl-kpi-lbl">Panneaux occupés</div>
+        <div class="pl-kpi-sub">Affichage classique</div>
       </div>
     </div>
-    <div class="pl-kpi">
-      <div class="pl-kpi-icon amber"><i class="bi bi-display"></i></div>
-      <div>
+    <div class="pl-kpi-card kpi-cyan">
+      <div class="pl-kpi-icon-wrap"><i class="bi bi-display"></i></div>
+      <div class="pl-kpi-content">
         <div class="pl-kpi-val">{{ nb_ecrans_occupe }}</div>
         <div class="pl-kpi-lbl">Écrans occupés</div>
+        <div class="pl-kpi-sub">Réseau numérique LED</div>
       </div>
     </div>
-    <div class="pl-kpi">
-      <div class="pl-kpi-icon violet"><i class="bi bi-bar-chart-fill"></i></div>
-      <div>
+    <div class="pl-kpi-card kpi-emerald">
+      <div class="pl-kpi-icon-wrap"><i class="bi bi-pie-chart-fill"></i></div>
+      <div class="pl-kpi-content">
         <div class="pl-kpi-val">{{ taux_moyen }}%</div>
-        <div class="pl-kpi-lbl">Taux moy. occupation</div>
+        <div class="pl-kpi-lbl">Taux d'occupation</div>
+        <div class="pl-kpi-sub">Moyenne mensuelle</div>
       </div>
     </div>
   </div>
 
-  {# ── CALENDRIER ── #}
+  {# ── CALENDRIER DES CAMPAGNES ── #}
   <div class="pl-cal-wrap">
     <div class="pl-card-header">
-      <i class="bi bi-calendar3"></i>
-      Calendrier des campagnes
+      <i class="bi bi-calendar-week-fill"></i>
+      <span>Calendrier des campagnes</span>
       <span class="pill">{{ campagnes_count }} campagne{{ campagnes_count|pluralize }}</span>
     </div>
     <div class="fc-wrap">
       <div id="calendar"></div>
     </div>
-    <div class="pl-legend" id="pl-legend"></div>
+    <div class="pl-legend" id="pl-legend">
+      <span class="pl-legend-title">
+        <i class="bi bi-palette-fill" style="color:var(--pl-primary);"></i>
+        Campagnes :
+      </span>
+    </div>
   </div>
 
-  {# ── SIDEBAR ── #}
+  {# ── BARRE LATÉRALE (SIDEBAR) ── #}
   <aside class="pl-side">
 
-    {# Mini heatmap #}
+    {# Mini Heatmap (Densité) #}
     <div class="pl-card">
       <div class="pl-card-header">
         <i class="bi bi-grid-3x3-gap-fill"></i>
-        Densité — {{ mois_nom }}
+        <span>Densité de diffusion</span>
+        <span style="margin-left:auto;font-size:0.7rem;color:var(--pl-text-muted);font-weight:600;">{{ mois_nom }}</span>
       </div>
-      <div class="pl-heatmap" id="pl-heatmap">
-        {% for d in "LMMJVSD" %}
-        <div class="pl-hm-label">{{ d }}</div>
-        {% endfor %}
-        {# rempli par JS #}
+      <div class="pl-heatmap-wrap">
+        <div class="pl-heatmap" id="pl-heatmap">
+          {% for d in "LMMJVSD" %}
+          <div class="pl-hm-label">{{ d }}</div>
+          {% endfor %}
+          {# Rempli dynamiquement par JS #}
+        </div>
+        <div class="pl-heatmap-legend">
+          <span>Intensité :</span>
+          <div class="pl-hm-steps">
+            <span class="pl-hm-step-dot" style="background:#f1f5f9;" title="0 campagne"></span>
+            <span class="pl-hm-step-dot" style="background:rgba(147,46,43,0.18);" title="Faible"></span>
+            <span class="pl-hm-step-dot" style="background:rgba(147,46,43,0.45);" title="Moyen"></span>
+            <span class="pl-hm-step-dot" style="background:var(--pl-primary);" title="Élevé"></span>
+          </div>
+        </div>
       </div>
     </div>
 
-    {# Occupation supports #}
+    {# Occupation des Supports #}
     <div class="pl-card">
       <div class="pl-card-header">
         <i class="bi bi-bar-chart-line-fill"></i>
-        Occupation supports
-        <span style="margin-left:auto;font-size:.7rem;color:var(--pl-muted);">{{ mois_nom }}</span>
+        <span>Occupation supports</span>
+        <span style="margin-left:auto;font-size:0.7rem;color:var(--pl-text-muted);font-weight:600;">{{ mois_nom }}</span>
       </div>
       {% if supports_stats %}
       <div class="pl-supports">
@@ -446,7 +962,7 @@
               {% endif %}
             </span>
             <span class="pl-sup-code">{{ item.support.code }}</span>
-            <span class="pl-sup-nom" title="{{ item.support.nom }}">{{ item.support.nom|truncatechars:20 }}</span>
+            <span class="pl-sup-nom" title="{{ item.support.nom }}">{{ item.support.nom|truncatechars:18 }}</span>
             <span class="pl-sup-pct {% if t >= 80 %}high{% elif t >= 40 %}mid{% elif t > 0 %}low{% else %}zero{% endif %}">
               {{ t }}%
             </span>
@@ -454,7 +970,7 @@
           <div class="pl-bar-bg">
             <div class="pl-bar-fill" style="
               width:{{ t }}%;
-              background:{% if t >= 80 %}var(--pl-danger){% elif t >= 40 %}var(--pl-warning){% elif t > 0 %}var(--pl-success){% else %}var(--pl-border){% endif %};">
+              background:{% if t >= 80 %}var(--pl-danger){% elif t >= 40 %}var(--pl-warning){% elif t > 0 %}var(--pl-success){% else %}#e2e8f0{% endif %};">
             </div>
           </div>
         </div>
@@ -462,8 +978,8 @@
         {% endfor %}
       </div>
       {% else %}
-      <div style="padding:32px;text-align:center;color:var(--pl-muted);font-size:.85rem;">
-        <i class="bi bi-inbox" style="font-size:2rem;opacity:.3;display:block;margin-bottom:8px;"></i>
+      <div style="padding:36px 20px;text-align:center;color:var(--pl-text-muted);font-size:0.85rem;">
+        <i class="bi bi-inbox" style="font-size:2.2rem;opacity:0.3;display:block;margin-bottom:8px;"></i>
         Aucun support actif ce mois-ci.
       </div>
       {% endif %}
@@ -472,8 +988,7 @@
 
 </div>
 
-
-{# Tooltip #}
+{# Infobulle dynamique #}
 <div class="pl-tooltip" id="pl-tooltip"></div>
 {% endblock %}
 
@@ -481,12 +996,12 @@
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.11/index.global.min.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-  const events   = {{ events_json|safe }};
-  const heatmap  = {{ heatmap_json|safe }};
+  const events      = {{ events_json|safe }};
+  const heatmap     = {{ heatmap_json|safe }};
   const premierJour = '{{ premier_jour|date:"Y-m-d" }}';
-  const tooltip  = document.getElementById('pl-tooltip');
+  const tooltip     = document.getElementById('pl-tooltip');
 
-  // ── FullCalendar ──────────────────────────────────────────────────────────
+  // ── Initialisation FullCalendar ───────────────────────────────────────────
   const cal = new FullCalendar.Calendar(document.getElementById('calendar'), {
     initialView:   'dayGridMonth',
     locale:        'fr',
@@ -501,19 +1016,31 @@ document.addEventListener('DOMContentLoaded', function () {
     },
     eventDidMount: function (info) {
       const p = info.event.extendedProps;
-      info.el.title = `${p.client} — ${p.nb_supports} support(s) — ${p.statut}`;
+      info.el.title = `${p.client || ''} — ${p.nb_supports || 0} support(s) — ${p.statut || ''}`;
     },
     eventMouseEnter: function (info) {
       const p   = info.event.extendedProps;
       const ev  = info.event;
-      const fin = new Date(ev.end);
-      fin.setDate(fin.getDate() - 1);
+      let dateRangeStr = '';
+      if (ev.start) {
+        const fin = ev.end ? new Date(ev.end) : new Date(ev.start);
+        if (ev.end) fin.setDate(fin.getDate() - 1);
+        dateRangeStr = `${ev.start.toLocaleDateString('fr')} → ${fin.toLocaleDateString('fr')}`;
+      }
+
       tooltip.innerHTML =
-        `<strong>${ev.title}</strong><br>` +
-        `<span style="opacity:.7">${p.client}</span><br>` +
-        `${ev.start.toLocaleDateString('fr')} → ${fin.toLocaleDateString('fr')}<br>` +
-        `${p.nb_supports} ${p.type === 'ecran' ? 'support(s)' : 'face(s)'} · ${p.statut}` +
-        (p.reference ? `<br><span style="opacity:.6;font-size:.7rem">${p.reference}</span>` : '');
+        `<div style="font-weight:700;font-size:0.82rem;margin-bottom:3px;color:#ffffff;">${ev.title}</div>` +
+        `<div style="color:#94a3b8;font-size:0.74rem;margin-bottom:4px;">${p.client || 'Client'}</div>` +
+        `<div style="display:flex;align-items:center;gap:4px;color:#38bdf8;font-size:0.72rem;margin-bottom:4px;">` +
+          `<i class="bi bi-calendar3"></i><span>${dateRangeStr}</span>` +
+        `</div>` +
+        `<div style="display:flex;align-items:center;gap:6px;font-size:0.72rem;color:#cbd5e1;">` +
+          `<span>${p.nb_supports || 0} ${p.type === 'ecran' ? 'écran(s)' : 'face(s)'}</span>` +
+          `<span>·</span>` +
+          `<span style="background:rgba(255,255,255,0.12);padding:1px 6px;border-radius:4px;">${p.statut || 'Actif'}</span>` +
+        `</div>` +
+        (p.reference ? `<div style="margin-top:4px;color:#64748b;font-size:0.68rem;font-family:var(--pl-mono);">${p.reference}</div>` : '');
+
       tooltip.style.opacity = '1';
     },
     eventMouseLeave: function () {
@@ -521,73 +1048,104 @@ document.addEventListener('DOMContentLoaded', function () {
     },
     eventContent: function (arg) {
       const p = arg.event.extendedProps;
+      const isEcran = p.type === 'ecran';
       return {
-        html: `<span style="display:flex;align-items:center;gap:4px;overflow:hidden;">
-          <span style="opacity:.8;font-size:.65rem;">${p.type === 'ecran' ? '▣' : '▪'}</span>
-          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${arg.event.title}</span>
-        </span>`
+        html: `<div style="display:flex;align-items:center;gap:5px;overflow:hidden;width:100%;">
+          <span style="font-size:0.68rem;opacity:0.9;flex-shrink:0;">${isEcran ? '<i class="bi bi-display"></i>' : '<i class="bi bi-signpost-2"></i>'}</span>
+          <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;">${arg.event.title}</span>
+        </div>`
       };
     },
   });
   cal.render();
 
-  // Déplacement tooltip avec la souris
+  // Suivi de la souris pour l'infobulle
   document.addEventListener('mousemove', function (e) {
     tooltip.style.left = (e.clientX + 14) + 'px';
-    tooltip.style.top  = (e.clientY - 10) + 'px';
+    tooltip.style.top  = (e.clientY - 12) + 'px';
   });
 
-  // ── Légende ───────────────────────────────────────────────────────────────
+  // ── Rendu de la Légende ───────────────────────────────────────────────────
   const legendEl = document.getElementById('pl-legend');
   const seen = new Set();
-  events.forEach(ev => {
-    if (seen.has(ev.id)) return;
-    seen.add(ev.id);
-    const chip = document.createElement('span');
-    chip.className = 'pl-legend-chip';
-    chip.title = ev.extendedProps.client;
-    chip.innerHTML =
-      `<span class="pl-legend-dot" style="background:${ev.color}"></span>` +
-      `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${ev.title}</span>`;
-    legendEl.appendChild(chip);
-  });
+  if (events && events.length) {
+    events.forEach(ev => {
+      if (seen.has(ev.id)) return;
+      seen.add(ev.id);
+      const chip = document.createElement('span');
+      chip.className = 'pl-legend-chip';
+      chip.title = (ev.extendedProps && ev.extendedProps.client) ? ev.extendedProps.client : ev.title;
+      chip.innerHTML =
+        `<span class="pl-legend-dot" style="background:${ev.color}"></span>` +
+        `<span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${ev.title}</span>`;
+      legendEl.appendChild(chip);
+    });
+  } else {
+    const emptySpan = document.createElement('span');
+    emptySpan.style.cssText = 'font-size:0.75rem;color:var(--pl-text-muted);font-style:italic;';
+    emptySpan.textContent = 'Aucune campagne active ce mois-ci.';
+    legendEl.appendChild(emptySpan);
+  }
 
-  // ── Mini heatmap ──────────────────────────────────────────────────────────
+  // ── Rendu de la Mini Heatmap (Densité) ─────────────────────────────────────
   const hmEl = document.getElementById('pl-heatmap');
-  const [y, m] = premierJour.split('-').map(Number);
-  const daysInMonth = new Date(y, m, 0).getDate();
-  const firstDow = new Date(y, m - 1, 1).getDay(); // 0=dim
-  // Convertir dimanche=0 → lundi=0
-  const offset = (firstDow + 6) % 7;
+  if (hmEl && premierJour) {
+    const [y, m] = premierJour.split('-').map(Number);
+    const daysInMonth = new Date(y, m, 0).getDate();
+    const firstDow = new Date(y, m - 1, 1).getDay(); // 0 = Dimanche
+    // Convertir convention dimanche=0 → lundi=0
+    const offset = (firstDow + 6) % 7;
 
-  // Cases vides avant le 1er
-  for (let i = 0; i < offset; i++) {
-    const blank = document.createElement('div');
-    blank.className = 'pl-hm-day empty';
-    hmEl.appendChild(blank);
+    // Cases vides avant le 1er du mois
+    for (let i = 0; i < offset; i++) {
+      const blank = document.createElement('div');
+      blank.className = 'pl-hm-day empty';
+      hmEl.appendChild(blank);
+    }
+
+    const heatValues = Object.values(heatmap || {});
+    const maxVal = heatValues.length ? Math.max(...heatValues, 1) : 1;
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const iso  = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+      const val  = (heatmap && heatmap[iso]) ? heatmap[iso] : 0;
+      const cell = document.createElement('div');
+
+      let levelClass = 'zero';
+      if (val > 0) {
+        const ratio = val / maxVal;
+        if (ratio < 0.35) {
+          levelClass = 'low';
+        } else if (ratio < 0.75) {
+          levelClass = 'mid';
+        } else {
+          levelClass = 'high';
+        }
+      }
+
+      cell.className = `pl-hm-day ${levelClass}`;
+      cell.textContent = d;
+      cell.title = val > 0 ? `${d} ${mois_nom_js(m)} : ${val} campagne${val > 1 ? 's' : ''}` : `${d} : aucune campagne`;
+      hmEl.appendChild(cell);
+    }
   }
 
-  const maxVal = Math.max(...Object.values(heatmap), 1);
-
-  for (let d = 1; d <= daysInMonth; d++) {
-    const iso  = `${y}-${String(m).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const val  = heatmap[iso] || 0;
-    const cell = document.createElement('div');
-    cell.className = 'pl-hm-day ' + (val === 0 ? 'zero' : val / maxVal < .4 ? 'low' : val / maxVal < .75 ? 'mid' : 'high');
-    cell.textContent = d;
-    cell.title = val > 0 ? `${d} — ${val} campagne${val > 1 ? 's' : ''}` : String(d);
-    hmEl.appendChild(cell);
+  function mois_nom_js(m) {
+    const noms = ['', 'janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+    return noms[m] || '';
   }
 
-  // ── Tooltip supports ──────────────────────────────────────────────────────
+  // ── Infobulle des Supports de la Sidebar ───────────────────────────────────
   document.querySelectorAll('.pl-sup-item').forEach(el => {
-    el.addEventListener('mouseenter', function (e) {
+    el.addEventListener('mouseenter', function () {
       const camps = el.dataset.campagnes;
       const jours = el.dataset.jours;
       if (!camps && jours === '0') return;
       tooltip.innerHTML =
-        `<strong>${jours} jour${jours > 1 ? 's' : ''} occupé${jours > 1 ? 's' : ''}</strong>` +
-        (camps ? `<br><span style="opacity:.75">${camps}</span>` : '');
+        `<div style="font-weight:700;font-size:0.8rem;color:#ffffff;margin-bottom:2px;">` +
+          `${jours} jour${jours > 1 ? 's' : ''} occupé${jours > 1 ? 's' : ''}` +
+        `</div>` +
+        (camps ? `<div style="color:#94a3b8;font-size:0.72rem;line-height:1.4;">${camps}</div>` : '');
       tooltip.style.opacity = '1';
     });
     el.addEventListener('mouseleave', function () {

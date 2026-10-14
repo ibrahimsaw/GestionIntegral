@@ -116,6 +116,7 @@ from datetime import timedelta
 import calendar
 
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.urls import reverse
 from django.utils import timezone
 from django.views import View
 
@@ -199,7 +200,7 @@ class PlanningCalendrierView(LoginRequiredMixin, View):
                 'start':       c.date_debut.isoformat(),
                 'end':         (c.date_fin + timedelta(days=1)).isoformat(),
                 'color':       color,
-                'url':         f'/campaigns/campaigns/{c.pk}/',
+                'url':         reverse('campagne_detail', kwargs={'pk': c.pk}),
                 'extendedProps': {
                     'client':      c.client.nom,
                     'nb_supports': c.nb_supports(),

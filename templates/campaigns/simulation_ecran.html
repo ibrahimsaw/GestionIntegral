@@ -587,7 +587,7 @@
               </div>
               <div class="col-12">
                 <div class="input-group input-group-sm">
-                  <span class="input-group-text bg-white"><i class="bi bi-calendar-event me-1"></i>Nb de jours</span>
+                  <span class="input-group-text bg-light border-end-0" style="border-radius:8px 0 0 8px !important; border-color:#cbd5e1;"><i class="bi bi-calendar-event"></i></span>
                   {{ form.nb_jours }}
                 </div>
                 <div class="form-text mt-1" style="font-size:0.72rem;">
@@ -634,7 +634,7 @@
                 <div class="d-flex flex-wrap gap-1" id="tranche-presets">
                   <span class="preset-pill tranche-preset" data-tranche="06:00-23:00" title="17h/jour (06h-23h)">⚡ Plein temps</span>
                   <span class="preset-pill tranche-preset" data-tranche="07:00-21:00" title="14h/jour (07h-21h)">🏢 Journée</span>
-                  <span class="preset-pill tranche-preset" data-tranche="07:00-09:30,17:00-20:00" title="5h30/jour (07h-09h30, 17h-20h)">🚗 Matin & Soir</span>
+                  <span class="preset-pill tranche-preset" data-tranche="06:00-09:00,17:00-21:00" title="5h30/jour (06h-09h00, 17h-21h)">🚗 Matin & Soir</span>
                   <span class="preset-pill tranche-preset" data-tranche="08:00-18:00" title="10h/jour (08h-18h)">💼 Bureaux</span>
                   <span class="preset-pill tranche-preset" data-tranche="12:00-14:30,18:00-21:00" title="5h30/jour (12h-14h30, 18h-21h)">🍽️ Midi & Soir</span>
                   <span class="preset-pill tranche-preset" data-tranche="18:00-22:30" title="4h30/jour (18h-22h30)">🌙 Soirée</span>
@@ -683,7 +683,16 @@
               <div class="screen-checklist">
                 {{ form.ecrans }}
               </div>
-              <div class="form-text" style="font-size:0.72rem;">Si aucun n'est coché, l'ensemble des écrans actifs du parc est sélectionné.</div>
+              <div class="form-text" style="font-size:0.72rem;">Coche les écrans à imposer ou laisse la sélection vide pour comparer les écrans disponibles.</div>
+              {% if form.ecrans.errors %}
+                <div class="text-danger small mt-1">{{ form.ecrans.errors.0 }}</div>
+              {% endif %}
+              <div class="mt-2">
+                <label class="form-label small mb-1 text-muted">Nombre d’écrans à utiliser</label>
+                {{ form.nb_ecrans_cible }}
+                <div class="form-text" style="font-size:0.7rem;">Laisse vide pour comparer plusieurs nombres. Si tu saisis un nombre, les écrans seront choisis automatiquement.</div>
+                {% if form.nb_ecrans_cible.errors %}<div class="text-danger small mt-1">{{ form.nb_ecrans_cible.errors.0 }}</div>{% endif %}
+              </div>
             </div>
           </div>
 
@@ -732,18 +741,27 @@
 
           {# 5. Multivisuels & Objectif de spots #}
           <div class="row g-2 mb-3">
-            <div class="col-6">
+            <div class="col-12 col-md-4">
               <label class="form-label small mb-1 fw-semibold text-dark">
                 <i class="bi bi-images me-1 text-primary"></i>Nb Visuels
               </label>
               {{ form.nombre_visuels }}
             </div>
-            <div class="col-6">
+            <div class="col-6 col-md-4">
               <label class="form-label small mb-1 fw-semibold text-dark">
-                <i class="bi bi-bullseye me-1 text-info"></i>Spots Cible
+                <i class="bi bi-bullseye me-1 text-info"></i>Spots par écran
               </label>
               {{ form.nb_spots_cible }}
+              {% if form.nb_spots_cible.errors %}<div class="text-danger small mt-1">{{ form.nb_spots_cible.errors.0 }}</div>{% endif %}
             </div>
+            <div class="col-6 col-md-4">
+              <label class="form-label small mb-1 fw-semibold text-dark">
+                <i class="bi bi-bullseye-fill me-1 text-success"></i>Objectif total
+              </label>
+              {{ form.nb_spots_cible_total }}
+              {% if form.nb_spots_cible_total.errors %}<div class="text-danger small mt-1">{{ form.nb_spots_cible_total.errors.0 }}</div>{% endif %}
+            </div>
+            <div class="col-12 form-text" style="font-size:0.7rem;">Renseignez un seul des deux objectifs. L’objectif total n’est pas multiplié par le nombre d’écrans.</div>
           </div>
 
           {# 6. Mode Propositions (Mode B) #}
@@ -784,7 +802,7 @@
   <div class="col-12 col-xl-8 col-lg-7">
 
     {# ── ÉTAT INITIAL : AUCUNE SIMULATION LANCÉE ── #}
-    {% if not resultats and not propositions and not tranche_optimale and not erreur %}
+    {% if not resultats and not propositions and not exploration_scenarios and not tranche_optimale and not erreur %}
     <div class="sim-card p-5 text-center">
       <div class="mx-auto rounded-circle d-flex align-items-center justify-content-center mb-3" style="width:72px;height:72px;background:var(--color-primary-soft);color:var(--color-primary);">
         <i class="bi bi-display fs-1"></i>
@@ -991,7 +1009,7 @@
       <div class="d-flex align-items-center justify-content-between mb-2">
         <div class="d-flex align-items-center gap-2">
           <i class="bi bi-bullseye fs-5 {% if resultats.manque and resultats.manque > 0 %}text-warning{% elif resultats.depassement and resultats.depassement > 0 %}text-info{% else %}text-success{% endif %}"></i>
-          <span class="fw-bold text-dark">Objectif : {{ resultats.nb_spots_cible|format_number_fr }} spots</span>
+          <span class="fw-bold text-dark">Objectif : {{ resultats.nb_spots_cible|format_number_fr }} spots au total</span>
         </div>
         <span class="badge {% if resultats.manque and resultats.manque > 0 %}bg-warning text-dark{% elif resultats.depassement and resultats.depassement > 0 %}bg-info text-dark{% else %}bg-success text-white{% endif %} rounded-pill px-2.5 py-1">
           {{ resultats.pct_realisation_cible }}% atteint
@@ -1005,7 +1023,11 @@
 
       {% if resultats.manque and resultats.manque > 0 %}
         <div class="small text-muted mb-2">
-          <i class="bi bi-info-circle me-1"></i>Il manque <strong>{{ resultats.manque|format_number_fr }} spots</strong> pour atteindre la cible. Choisissez une solution ci-dessous pour combler l'écart en 1 clic :
+          {% if resultats.nb_spots_cible_par_ecran %}
+          <i class="bi bi-info-circle me-1"></i>Il manque <strong>{{ resultats.manque|format_number_fr }} spots</strong> pour atteindre l'objectif de {{ resultats.nb_spots_cible_par_ecran|format_number_fr }} spots par écran sur {{ resultats.nb_ecrans }} écran{{ resultats.nb_ecrans|pluralize }}.
+          {% else %}
+          <i class="bi bi-info-circle me-1"></i>Il manque <strong>{{ resultats.manque|format_number_fr }} spots</strong> pour atteindre l'objectif total.
+          {% endif %}
         </div>
       {% elif resultats.depassement and resultats.depassement > 0 %}
         <div class="small text-muted mb-2">
@@ -1017,9 +1039,46 @@
         </div>
       {% endif %}
 
-      {# Scénarios d'ajout pour combler le manque #}
+      {% if resultats.manque or resultats.depassement %}
+        {% if not resultats.ajustements_meme_periode and not resultats.combinaisons_complement %}
+        <div class="small text-muted mt-2">La période, la fréquence, les horaires et les écrans sont fixés ; le volume ne peut être ajusté sans libérer au moins un de ces paramètres.</div>
+        {% endif %}
+      {% endif %}
+
+      {% if resultats.ajustements_meme_periode %}
+      {{ resultats.ajustements_meme_periode|json_script:"ajustements-meme-periode-data" }}
+      <div class="mt-3">
+        <div class="fw-semibold small text-dark mb-2"><i class="bi bi-sliders me-1 text-primary"></i>Ajuster sans changer la période ni les écrans</div>
+        <div class="table-responsive border rounded-3 overflow-hidden">
+          <table class="table table-sm table-hover mb-0 align-middle sim-table">
+            <thead>
+              <tr><th>#</th><th>Fréquence</th><th>Tranche</th><th>Spots totaux</th><th>Écart cible</th><th class="text-end">Action</th></tr>
+            </thead>
+            <tbody>
+              {% for combo in resultats.ajustements_meme_periode %}
+              <tr>
+                <td class="text-muted">{{ forloop.counter }}</td>
+                <td>{{ combo.frequence_label }}</td>
+                <td>{{ combo.tranche_val }}</td>
+                <td class="fw-bold num">{{ combo.spots_obtenus|format_number_fr }}</td>
+                <td><span class="{% if combo.ecart >= 0 %}text-success{% else %}text-danger{% endif %} fw-semibold">{% if combo.ecart >= 0 %}+{% endif %}{{ combo.ecart|format_number_fr }}</span></td>
+                <td class="text-end">
+                  <button type="button" class="btn btn-sm btn-outline-primary apply-combo-btn py-0 px-2 rounded-pill" data-source="ajustements-meme-periode-data" data-index="{{ forloop.counter0 }}" data-same-period="true" style="font-size:0.75rem;">
+                    <i class="bi bi-check-lg me-1"></i>Appliquer
+                  </button>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      {% endif %}
+
+      {# Scénarios avec prolongation pour combler le manque #}
       {% if resultats.combinaisons_complement %}
       {{ resultats.combinaisons_complement|json_script:"combos-manque-data" }}
+      <div class="fw-semibold small text-dark mt-3 mb-2"><i class="bi bi-calendar-plus me-1 text-success"></i>Options avec prolongation de la campagne</div>
       <div class="table-responsive mt-3 border rounded-3 overflow-hidden">
         <table class="table table-sm table-hover mb-0 align-middle sim-table">
           <thead>
@@ -1268,18 +1327,70 @@
     {% endif %}
 
     {# ──────────────────────────────────────────────────────────────────────── #}
+    {# EXPLORATION : PERIODE FIXE, SANS OBJECTIF #}
+    {# ──────────────────────────────────────────────────────────────────────── #}
+    {% if exploration_scenarios %}
+    <div class="sim-card p-3 mb-3 bg-white border-start border-4 border-primary">
+      <div class="d-flex align-items-center gap-2 mb-1">
+        <span class="badge bg-primary text-white"><i class="bi bi-search me-1"></i>Scénarios de diffusion</span>
+        <span class="badge bg-light text-dark border">{{ nb_jours }} jour{{ nb_jours|pluralize }}</span>
+      </div>
+      <div class="text-muted small">Les propositions conservent la période et les paramètres saisis. Les écrans retenus sont libres sur la période indiquée.</div>
+    </div>
+    <div class="table-responsive sim-card mb-3">
+      <table class="table table-sm table-hover mb-0 align-middle sim-table">
+        <thead><tr><th>#</th><th>Jours</th><th>Écrans</th><th>Supports retenus</th><th>Fréquence</th><th>Tranche</th><th>Spots totaux</th><th>Spots/écran</th><th class="text-end">Action</th></tr></thead>
+        <tbody>
+          {% for p in exploration_scenarios %}
+          <tr>
+            <td class="text-muted">{{ forloop.counter }}</td>
+            <td>{{ p.nb_jours }}</td>
+            <td>{{ p.nb_ecrans }}</td>
+            <td>{{ p.supports_label }}</td>
+            <td>{{ p.frequence_label }}</td>
+            <td>{{ p.tranches_val }}</td>
+            <td class="fw-bold num">{{ p.spots_total|format_number_fr }}</td>
+            <td>{{ p.spots_total_par_ecran|format_number_fr }}</td>
+            <td class="text-end"><a href="?{{ p.query }}" class="btn btn-sm btn-outline-primary">Calculer</a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    {% endif %}
+
+    {# ──────────────────────────────────────────────────────────────────────── #}
     {#  MODE B : PROPOSITIONS MULTIPLES                                         #}
     {# ──────────────────────────────────────────────────────────────────────── #}
     {% if propositions %}
     <div class="sim-card p-3 mb-3 bg-white border-start border-4 border-info">
       <div class="d-flex align-items-center gap-2 mb-1">
         <span class="badge bg-info text-white"><i class="bi bi-lightbulb-fill me-1"></i>Mode Propositions</span>
-        <span class="badge bg-light text-dark border">Objectif : {{ nb_spots_cible|format_number_fr }} spots (±5%)</span>
+        <span class="badge bg-light text-dark border">{% if nb_spots_cible_par_ecran %}Objectif : {{ nb_spots_cible_par_ecran|format_number_fr }} spots par écran{% else %}Objectif : {{ nb_spots_cible_total_saisi|format_number_fr }} spots au total{% endif %} (±5%)</span>
       </div>
-      <div class="text-muted small">
-        Voici les meilleures combinaisons de diffusion pour atteindre votre objectif sur {{ nb_jours }} jours et {{ nb_ecrans }} écran{{ nb_ecrans|pluralize }}.
+      <div class="text-muted small">Scénarios compatibles avec les fréquences, tranches, périodes et écrans disponibles.</div>
+      {% if not propositions.0.dans_tolerance %}
+      <div class="alert alert-warning py-2 mt-2 mb-0 small"><i class="bi bi-exclamation-triangle me-1"></i>Aucune combinaison ne tombe dans la marge de ±5 %. Voici les scénarios les plus proches ; leur écart à l’objectif est indiqué.</div>
+      {% endif %}
+    </div>
+
+    {% if configuration_actuelle %}
+    <div class="sim-card p-3 mb-3 border-success">
+      <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+        <div>
+          <div class="fw-bold text-dark"><i class="bi bi-check-circle me-1 text-success"></i>Garder ma configuration actuelle</div>
+          <div class="small text-muted">{{ configuration_actuelle.frequence_label }} · {{ configuration_actuelle.tranches }} · {{ configuration_actuelle.nb_jours }} jours · {{ configuration_actuelle.nb_ecrans }} écrans</div>
+        </div>
+        <span class="badge {% if configuration_actuelle.ecart_pct|floatformat:1 == '0.0' %}bg-success{% else %}bg-light text-dark border{% endif %}">{{ configuration_actuelle.spots_total|format_number_fr }} spots · {% if configuration_actuelle.ecart_pct >= 0 %}+{% endif %}{{ configuration_actuelle.ecart_pct }}%</span>
+      </div>
+      <div class="small text-muted mb-2">Écrans : {{ configuration_actuelle.supports_label }}</div>
+      <div class="d-flex justify-content-end">
+        <a href="?{{ configuration_actuelle.query }}" class="btn btn-sm btn-outline-success">
+          <i class="bi bi-calculator me-1"></i>Calculer sans modifier
+        </a>
       </div>
     </div>
+    {% endif %}
 
     <div class="row g-3">
       {% for p in propositions %}
@@ -1291,6 +1402,7 @@
               <strong class="text-dark">{{ p.frequence_label }}</strong>
               <span class="text-muted">·</span>
               <span class="text-secondary fw-semibold">{{ p.tranches_label }}</span>
+              <span class="text-muted">· {{ p.nb_jours }} jour{{ p.nb_jours|pluralize }} · {{ p.nb_ecrans }} écran{{ p.nb_ecrans|pluralize }}</span>
             </div>
             <span class="badge {% if p.abs_ecart <= 1 %}bg-success{% elif p.abs_ecart <= 3 %}bg-warning text-dark{% else %}bg-secondary{% endif %} rounded-pill px-2.5 py-1">
               {% if p.ecart_pct >= 0 %}+{% endif %}{{ p.ecart_pct }}% écart
@@ -1323,9 +1435,10 @@
               <div class="fw-bold text-secondary fs-5">{{ p.heures_tranches|format_temps }}</div>
             </div>
           </div>
+          <div class="small text-muted">Écrans retenus : {{ p.supports_label }}</div>
 
           <div class="d-flex justify-content-end mt-2 pt-2 border-top">
-            <a href="?duree_passage={{ duree_passage }}&frequence={{ p.frequence }}&tranches_horaires={{ p.tranches_val|urlencode }}&nb_jours={{ nb_jours }}&nb_spots_cible={{ nb_spots_cible }}"
+            <a href="?{{ p.query }}"
                class="btn btn-outline-primary btn-sm px-3 fw-semibold rounded-pill">
               <i class="bi bi-calculator me-1"></i>Sélectionner et calculer en détail
             </a>
@@ -1343,7 +1456,7 @@
     <div class="sim-card p-3 mb-3 bg-white border-start border-4 border-primary">
       <div class="d-flex align-items-center gap-2 mb-1">
         <span class="badge bg-primary text-white"><i class="bi bi-clock-fill me-1"></i>Tranche Optimale Calculée</span>
-        <span class="badge bg-light text-dark border">Objectif : {{ nb_spots_cible|format_number_fr }} spots</span>
+        <span class="badge bg-light text-dark border">Objectif : {{ nb_spots_cible|format_number_fr }} spots au total</span>
       </div>
       <div class="text-muted small">
         Avec <strong>{{ tranche_optimale.frequence_label }}</strong>, <strong>{{ nb_jours }} jours</strong> et <strong>{{ nb_ecrans }} écran{{ nb_ecrans|pluralize }}</strong> fixés,
@@ -1384,13 +1497,13 @@
         </div>
       </div>
 
-      <div class="p-2.5 rounded-3 bg-light border">
+      <div class="bg-light border" style="padding:10px;">
         <div class="small fw-semibold text-dark mb-2">
           <i class="bi bi-clock me-1"></i>Choisissez un horaire de départ pour générer le détail complet :
         </div>
-        <div class="d-flex flex-wrap gap-1.5">
+        <div class="d-flex flex-wrap" style="gap:0.5rem; justify-content: center;">
           {% for v in tranche_optimale.variantes_horaires %}
-          <a href="?duree_passage={{ duree_passage }}&frequence={{ tranche_optimale.frequence }}&tranches_horaires={{ v.tranche_val|urlencode }}&nb_jours={{ nb_jours }}&nb_spots_cible={{ nb_spots_cible }}"
+          <a href="?duree_passage={{ duree_passage }}&frequence={{ tranche_optimale.frequence }}&tranches_horaires={{ v.tranche_val|urlencode }}&nb_jours={{ nb_jours }}&{{ target_query }}&{{ screen_query }}"
              class="btn btn-outline-primary btn-sm rounded-pill">
             <i class="bi bi-play-circle me-1"></i>{{ v.tranche_val }}
           </a>
@@ -1540,12 +1653,36 @@ document.addEventListener('DOMContentLoaded', function () {
   const modeBBadge = document.getElementById('mode-b-badge');
   const modeBHint = document.getElementById('mode-b-hint');
   const altInput = document.getElementById('id_tranches_horaires_alternatives');
+  const objectifParEcranInput = document.getElementById('id_nb_spots_cible');
+  const objectifTotalInput = document.getElementById('id_nb_spots_cible_total');
+  const joursInput = document.getElementById('id_nb_jours');
+  const dateDebutInput = document.getElementById('id_date_debut');
+  const dateFinInput = document.getElementById('id_date_fin');
 
   function refreshModeIndicator() {
     if (!trancheInput || !freqSelect || !modeBBox) return;
-    const modeADirectActif = !!(trancheInput.value.trim() && freqSelect.value);
+    const objectifRenseigne = !!(
+      (objectifParEcranInput && objectifParEcranInput.value) ||
+      (objectifTotalInput && objectifTotalInput.value)
+    );
+    const periodeRenseignee = !!(
+      (joursInput && joursInput.value) ||
+      (dateDebutInput && dateDebutInput.value && dateFinInput && dateFinInput.value)
+    );
+    const objectifEtPeriode = objectifRenseigne && periodeRenseignee;
+    const modeADirectActif = !!(trancheInput.value.trim() && freqSelect.value) && !objectifEtPeriode;
 
-    if (modeADirectActif) {
+    if (objectifEtPeriode) {
+      modeBBox.style.opacity = '1';
+      if (modeBBadge) {
+        modeBBadge.textContent = 'ajustement cible';
+        modeBBadge.className = 'badge bg-primary';
+      }
+      if (modeBHint) {
+        modeBHint.textContent = 'Objectif et période fixés : la fréquence et les tranches seront ajustées pour approcher la cible.';
+      }
+      if (altInput) altInput.disabled = false;
+    } else if (modeADirectActif) {
       modeBBox.style.opacity = '0.5';
       if (modeBBadge) {
         modeBBadge.textContent = 'inactif';
@@ -1570,8 +1707,14 @@ document.addEventListener('DOMContentLoaded', function () {
   if (trancheInput && freqSelect) {
     trancheInput.addEventListener('input', refreshModeIndicator);
     freqSelect.addEventListener('change', refreshModeIndicator);
-    refreshModeIndicator();
   }
+  [objectifParEcranInput, objectifTotalInput, joursInput, dateDebutInput, dateFinInput]
+    .filter(Boolean)
+    .forEach(input => {
+      input.addEventListener('input', refreshModeIndicator);
+      input.addEventListener('change', refreshModeIndicator);
+    });
+  refreshModeIndicator();
 
   // 8. Application des combinaisons d'ajustement
   const form = document.getElementById('sim-form');
@@ -1583,7 +1726,14 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function cocherPremiersEcrans(name, n) {
       const boxes = form.querySelectorAll(`input[name="${name}"]`);
-      boxes.forEach((box, i) => { box.checked = i < n; });
+      const ecransChoisis = name === 'ecrans_jours_ajout'
+        ? new Set(Array.from(form.querySelectorAll('input[name="ecrans"]:checked'), box => box.value))
+        : null;
+      let coches = 0;
+      boxes.forEach(box => {
+        box.checked = coches < n && (!ecransChoisis || ecransChoisis.has(box.value));
+        if (box.checked) coches += 1;
+      });
     }
 
     function appliquerReduction(reduction) {
@@ -1606,6 +1756,12 @@ document.addEventListener('DOMContentLoaded', function () {
       cocherPremiersEcrans('ecrans_jours_ajout', combo.ecrans_ajout);
     }
 
+    function appliquerAjustementMemePeriode(ajustement) {
+      setFieldValue('jours_ajout', 0);
+      setFieldValue('frequence', ajustement.frequence);
+      setFieldValue('tranches_horaires', ajustement.tranche_val);
+    }
+
     document.querySelectorAll('.apply-combo-btn').forEach(btn => {
       btn.addEventListener('click', function () {
         const sourceEl = document.getElementById(this.dataset.source);
@@ -1619,7 +1775,11 @@ document.addEventListener('DOMContentLoaded', function () {
           if (reductionEl) appliquerReduction(JSON.parse(reductionEl.textContent));
         }
 
-        appliquerCombo(combo);
+        if (this.dataset.samePeriod === 'true') {
+          appliquerAjustementMemePeriode(combo);
+        } else {
+          appliquerCombo(combo);
+        }
         form.submit();
       });
     });

@@ -59,9 +59,9 @@
         <a href="{% if user.is_client %}{% url 'client_detail' user.client_profile.pk %}{% else %}{% url 'dashboard' %}{% endif %}" class="brand-logo-wrap">
           <img class="brand-logo-img" src="{% static 'img/logo.png' %}" alt="Integral Logo" />
         </a>
-        <button class="btn btn-sm btn-outline-secondary d-lg-none" style="padding: 4px 8px;"
-          onclick="document.getElementById('sidebar').classList.remove('open')"
-          type="button" aria-label="Fermer le menu">
+        <button class="btn-sidebar-close d-lg-none"
+          onclick="closeSidebar()"
+          type="button" aria-label="Fermer le menu" title="Fermer">
           <i class="bi bi-x-lg"></i>
         </button>
       </div>
@@ -222,16 +222,20 @@
         {% endif %}
       </div>
     </aside>
+    <div class="sidebar-backdrop d-lg-none" id="sidebarBackdrop" onclick="closeSidebar()"></div>
 
     <!-- ══════════════════════════════════════════════════════════════════
          MAIN CONTENT AREA & TOPBAR
          ══════════════════════════════════════════════════════════════════ -->
     <div class="main-wrap">
       <header class="topbar">
-        <button class="btn btn-sm btn-outline-secondary d-lg-none" style="padding: 0.25rem 0.5rem;"
-          onclick="document.getElementById('sidebar').classList.toggle('open')"
-          type="button" aria-label="Ouvrir le menu">
-          <i class="bi bi-list fs-5"></i>
+        <button class="btn-sidebar-toggle d-lg-none"
+          id="sidebarToggle"
+          onclick="toggleSidebar()"
+          type="button"
+          aria-label="Ouvrir le menu de navigation"
+          title="Menu">
+          <i class="bi bi-list"></i>
         </button>
 
         <div class="topbar-title">
@@ -348,6 +352,23 @@
           offset: 40
         });
       }
+
+      function toggleSidebar() {
+        const sb = document.getElementById('sidebar');
+        const bd = document.getElementById('sidebarBackdrop');
+        if (!sb) return;
+        const isOpen = sb.classList.toggle('open');
+        if (bd) bd.classList.toggle('show', isOpen);
+      }
+      function closeSidebar() {
+        const sb = document.getElementById('sidebar');
+        const bd = document.getElementById('sidebarBackdrop');
+        if (sb) sb.classList.remove('open');
+        if (bd) bd.classList.remove('show');
+      }
+      document.addEventListener('keydown', function(e) {
+        if (e.key === 'Escape') closeSidebar();
+      });
     </script>
     {% block extra_js %}{% endblock %}
   </body>

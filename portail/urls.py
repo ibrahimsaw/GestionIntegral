@@ -15,6 +15,26 @@ urlpatterns = [
              views.AccueilViews.as_view(),
              name='accueils'),
 
+    path('v2',
+         views.AccueilV2View.as_view(),
+         name='accueil_v2'),
+
+    path('v3',
+         views.AccueilV3View.as_view(),
+         name='accueil_v3'),
+
+     path('v4',
+         views.AccueilV4View.as_view(),
+         name='accueil_v4'),
+
+    path('v5',
+         views.AccueilV5View.as_view(),
+         name='accueil_v5'),
+
+    path('v6',
+         views.AccueilV6View.as_view(),
+         name='accueil_v6'),
+
     path('catalogue/',
          views.CatalogueView.as_view(),
          name='catalogue'),

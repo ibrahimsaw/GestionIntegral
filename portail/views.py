@@ -464,6 +464,65 @@ class AccueilViews(View):
             'oua_center': [12.3714, -1.5197],
         })
 
+
+class AccueilV2View(View):
+    """Vitrine V2 — design éditorial bold."""
+    template_name = 'portail/vitrine_v2.html'
+
+    def get(self, request):
+        compteurs = _get_compteurs()
+        return render(request, self.template_name, {
+            **compteurs,
+            'oua_center': [12.3714, -1.5197],
+        })
+
+
+class AccueilV3View(View):
+    """Vitrine V3 — présentation éditoriale du réseau publicitaire."""
+    template_name = 'portail/vitrine_v3.html'
+
+    def get(self, request):
+        compteurs = _get_compteurs()
+        return render(request, self.template_name, {
+            **compteurs,
+            'oua_center': [12.3714, -1.5197],
+        })
+        
+class AccueilV4View(View):
+    """Vitrine V4 — présentation éditoriale du réseau publicitaire."""
+    template_name = 'portail/vitrine_v4.html'
+
+    def get(self, request):
+        compteurs = _get_compteurs()
+        return render(request, self.template_name, {
+            **compteurs,
+            'oua_center': [12.3714, -1.5197],
+        })
+
+class AccueilV5View(View):
+    """Vitrine V5 — composition éditoriale (même contexte que les autres vitrines)."""
+    template_name = 'portail/vitrine_v5.html'
+
+    def get(self, request):
+        compteurs = _get_compteurs()
+        return render(request, self.template_name, {
+            **compteurs,
+            'oua_center': [12.3714, -1.5197],
+        })
+
+
+class AccueilV6View(View):
+    """Vitrine V6 — thème sombre « tableau de bord du réseau » (même contexte que les autres vitrines)."""
+    template_name = 'portail/vitrine_v6.html'
+
+    def get(self, request):
+        compteurs = _get_compteurs()
+        return render(request, self.template_name, {
+            **compteurs,
+            'oua_center': [12.3714, -1.5197],
+        })
+
+
 from django.conf import settings
 from django.core.mail import EmailMessage
 from django.http import JsonResponse

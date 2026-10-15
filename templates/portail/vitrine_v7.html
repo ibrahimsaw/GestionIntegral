@@ -1,0 +1,880 @@
+{% load static %}<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Réseau d'affichage publicitaire : panneaux grand format, écrans numériques et sucettes. Formats, emplacements et disponibilités par ville." />
+  <meta name="theme-color" content="#932e2b" />
+  <link rel="icon" type="image/png" href="{% static 'img/Logo-Integral-2-768x768.png' %}" />
+  <title>Integral — Affichage extérieur · Formats et disponibilités</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Manrope:wght@400;500;600;800&display=swap" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <script>document.documentElement.classList.add('js');</script>
+
+<style>
+  :root {
+    --brand:  {{ DESIGN.COLOR_PRIMARY|default:'#932e2b' }};
+    --accent: {{ DESIGN.COLOR_SECONDARY|default:'#fddd48' }};
+    --ink:    #0d0d0d;
+    --white:  #ffffff;
+    --grey:   #f2f2ef;
+    --grey-2: #e3e3de;
+    --mut:    #55554f;
+    --ok:     #0f8a5f;
+    --err:    #c0261b;
+    --f-big:  'Anton', 'Impact', 'Arial Narrow', sans-serif;
+    --f-body: 'Manrope', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --gut: clamp(16px, 4vw, 44px);
+    --maxw: 1320px;
+    --bw: 2px;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 72px; }
+  body { margin: 0; background: var(--white); color: var(--ink); font-family: var(--f-body); font-size: 1rem; line-height: 1.6; overflow-x: clip; -webkit-font-smoothing: antialiased; }
+  img { max-width: 100%; display: block; }
+  a { color: inherit; }
+  h1, h2, h3, h4 { margin: 0; font-family: var(--f-big); font-weight: 400; text-transform: uppercase; letter-spacing: .005em; line-height: .98; overflow-wrap: anywhere; }
+  p { margin: 0; }
+  :focus-visible { outline: 3px solid var(--ink); outline-offset: 3px; box-shadow: 0 0 0 6px var(--accent); }
+  .wrap { width: 100%; max-width: var(--maxw); margin-inline: auto; padding-inline: var(--gut); }
+  .sec { padding-block: clamp(56px, 9vw, 116px); }
+  .kicker { display: inline-flex; align-items: center; gap: 10px; font-weight: 800; font-size: .76rem; letter-spacing: .16em; text-transform: uppercase; }
+  .kicker::before { content: ''; width: 14px; height: 14px; background: var(--brand); }
+  .h2 { font-size: clamp(2.4rem, 7.2vw, 5.6rem); margin-top: 14px; }
+  .h2 em { font-style: normal; color: var(--brand); }
+  .lead { color: var(--mut); max-width: 56ch; margin-top: 16px; font-size: 1.04rem; }
+  .on-brand .lead, .on-ink .lead { color: rgba(255,255,255,.82); }
+
+  /* Boutons : rectangles francs, ombre dure */
+  .btn-x {
+    display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 50px; padding: 12px 24px;
+    font: 800 .88rem var(--f-body); letter-spacing: .06em; text-transform: uppercase; text-decoration: none; text-align: center; line-height: 1.2;
+    border: var(--bw) solid var(--ink); border-radius: 0; cursor: pointer; transition: transform .12s, box-shadow .12s, background .12s, color .12s;
+    box-shadow: 4px 4px 0 var(--ink);
+  }
+  .btn-x:hover { transform: translate(-2px, -2px); box-shadow: 6px 6px 0 var(--ink); }
+  .btn-x:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
+  .btn-brand { background: var(--brand); color: #fff; }
+  .btn-yel { background: var(--accent); color: var(--ink); }
+  .btn-wht { background: #fff; color: var(--ink); }
+  .btn-sm { min-height: 42px; padding: 8px 16px; font-size: .76rem; box-shadow: 3px 3px 0 var(--ink); }
+  .on-brand .btn-x, .on-ink .btn-x { border-color: var(--ink); }
+
+  /* Barre du haut */
+  .topbar { background: var(--ink); color: #fff; font-size: .78rem; font-weight: 600; }
+  .topbar .wrap { display: flex; flex-wrap: wrap; gap: 4px 22px; justify-content: space-between; align-items: center; min-height: 36px; padding-block: 6px; }
+  .topbar a { text-decoration: none; display: inline-flex; gap: 6px; align-items: center; }
+  .topbar a:hover { color: var(--accent); }
+  .site-head { position: sticky; top: 0; z-index: 1000; background: #fff; border-bottom: var(--bw) solid var(--ink); }
+  .head-in { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 66px; }
+  .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; flex-shrink: 0; }
+  .brand img { height: 38px; width: auto; }
+  .brand-name { font-family: var(--f-big); font-size: 1.9rem; text-transform: uppercase; line-height: 1; letter-spacing: .01em; }
+  .brand-name span { color: var(--brand); }
+  .nav-links { display: flex; gap: clamp(12px, 2vw, 26px); list-style: none; margin: 0; padding: 0; }
+  .nav-links a { text-decoration: none; font-weight: 800; font-size: .78rem; letter-spacing: .1em; text-transform: uppercase; padding: 6px 0; border-bottom: 3px solid transparent; }
+  .nav-links a:hover, .nav-links a.active { border-color: var(--brand); }
+  .head-cta { display: flex; gap: 10px; align-items: center; }
+  .burger { display: none; width: 48px; height: 48px; border: var(--bw) solid var(--ink); background: var(--accent); font-size: 1.5rem; align-items: center; justify-content: center; color: var(--ink); border-radius: 0; }
+  .drawer { display: none; }
+  @media (max-width: 1023.98px) {
+    .nav-links, .head-cta { display: none; }
+    .burger { display: inline-flex; }
+    .drawer.open { display: block; position: fixed; inset: 0; top: 0; z-index: 1500; background: var(--brand); color: #fff; padding: 20px var(--gut) 32px; overflow-y: auto; }
+    .drawer-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 18px; }
+    .drawer a.dl { display: block; font-family: var(--f-big); text-transform: uppercase; font-size: clamp(2.2rem, 11vw, 3.4rem); text-decoration: none; line-height: 1.15; border-bottom: 1px solid rgba(255,255,255,.35); padding: 6px 0; }
+    .drawer a.dl:hover { color: var(--accent); }
+    .drawer .btn-x { width: 100%; margin-top: 14px; }
+  }
+  .dj-msgs { position: fixed; top: 76px; right: 16px; left: 16px; max-width: 420px; margin-left: auto; z-index: 2000; display: grid; gap: 8px; }
+
+  /* Hero */
+  .hero { background: var(--brand); color: #fff; position: relative; overflow: hidden; border-bottom: var(--bw) solid var(--ink); }
+  .hero-grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: clamp(24px, 4vw, 56px); align-items: stretch; padding-block: clamp(36px, 6vw, 80px); }
+  .hero h1 { font-size: clamp(3.4rem, 11.2vw, 9.6rem); line-height: .9; margin-top: 18px; }
+  .hero h1 em { font-style: normal; color: var(--accent); display: block; }
+  .hero .kicker::before { background: var(--accent); }
+  .hero-lead { margin-top: 24px; max-width: 50ch; font-size: clamp(1rem, 1.5vw, 1.15rem); color: rgba(255,255,255,.9); }
+  .hero-actions { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 32px; }
+  .poster { position: relative; background: var(--ink); border: var(--bw) solid var(--ink); box-shadow: 10px 10px 0 var(--accent); min-height: 360px; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; }
+  .poster img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .poster.noimg img { display: none; }
+  .poster::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 40%, rgba(0,0,0,.88)); }
+  .poster-cap { position: relative; z-index: 2; padding: 20px 22px 22px; color: #fff; }
+  .poster-cap small { display: block; font-weight: 800; font-size: .7rem; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); }
+  .poster-cap b { display: block; font-family: var(--f-big); font-weight: 400; font-size: clamp(2.2rem, 5vw, 3.6rem); text-transform: uppercase; line-height: 1; margin: 4px 0; }
+  .poster-cap span { font-size: .9rem; }
+  @media (max-width: 899.98px) {
+    .hero-grid { grid-template-columns: 1fr; }
+    .poster { min-height: 240px; box-shadow: 6px 6px 0 var(--accent); }
+  }
+  @media (max-width: 479.98px) { .hero h1 { font-size: clamp(3rem, 15vw, 4.4rem); } }
+
+  /* Bande de chiffres */
+  .figs { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); background: var(--accent); border-bottom: var(--bw) solid var(--ink); }
+  .fig { padding: clamp(18px, 3vw, 30px) var(--gut); border-right: var(--bw) solid var(--ink); min-width: 0; }
+  .fig:last-child { border-right: 0; }
+  .fig b { display: block; font-family: var(--f-big); font-weight: 400; font-size: clamp(3rem, 8vw, 6rem); line-height: .9; }
+  .fig span { font-weight: 800; font-size: .76rem; letter-spacing: .1em; text-transform: uppercase; }
+  @media (max-width: 575.98px) {
+    .fig { border-bottom: var(--bw) solid var(--ink); }
+    .figs { grid-template-columns: 1fr 1fr; }
+    .fig:nth-child(2n) { border-right: 0; }
+    .fig:nth-last-child(-n+2) { border-bottom: 0; }
+  }
+
+  /* Supports */
+  .fams { margin-top: 40px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: var(--bw) solid var(--ink); }
+  .fam { display: flex; flex-direction: column; text-decoration: none; padding: clamp(20px, 3vw, 34px); border-right: var(--bw) solid var(--ink); background: #fff; transition: background .15s; position: relative; min-width: 0; }
+  .fam:last-child { border-right: 0; }
+  .fam:hover { background: var(--accent); }
+  .fam-n { font-family: var(--f-big); font-size: clamp(4rem, 8vw, 6.5rem); line-height: .85; color: transparent; -webkit-text-stroke: 2px var(--ink); }
+  .fam-img { aspect-ratio: 4 / 3; background: var(--grey); border: var(--bw) solid var(--ink); margin: 18px 0; display: grid; place-items: center; overflow: hidden; }
+  .fam-img img { width: 100%; height: 100%; object-fit: contain; padding: 8px; }
+  .fam h3 { font-size: clamp(1.7rem, 3vw, 2.3rem); }
+  .fam p { color: var(--mut); margin-top: 10px; font-size: .94rem; }
+  .fam:hover p { color: var(--ink); }
+  .fam ul { margin: 12px 0 0; padding-left: 18px; font-size: .88rem; font-weight: 600; }
+  .fam-go { margin-top: auto; padding-top: 20px; font-weight: 800; font-size: .8rem; letter-spacing: .1em; text-transform: uppercase; display: inline-flex; gap: 8px; align-items: center; }
+  @media (max-width: 899.98px) {
+    .fams { grid-template-columns: 1fr; }
+    .fam { border-right: 0; border-bottom: var(--bw) solid var(--ink); }
+    .fam:last-child { border-bottom: 0; }
+  }
+
+  /* Réseau */
+  .sec-grey { background: var(--grey); border-block: var(--bw) solid var(--ink); }
+  .net-head { display: flex; flex-wrap: wrap; gap: 20px 40px; justify-content: space-between; align-items: end; }
+  .ftr { margin-top: 32px; display: flex; flex-wrap: wrap; gap: 8px 10px; align-items: center; }
+  .ftr-l { font-weight: 800; font-size: .74rem; letter-spacing: .14em; text-transform: uppercase; margin-right: 6px; }
+  .chip { min-height: 44px; padding: 8px 18px; border: var(--bw) solid var(--ink); background: #fff; color: var(--ink); font: 800 .8rem var(--f-body); letter-spacing: .06em; text-transform: uppercase; cursor: pointer; border-radius: 0; display: inline-flex; gap: 8px; align-items: center; }
+  .chip:hover { background: var(--accent); }
+  .chip[aria-pressed="true"] { background: var(--ink); color: #fff; }
+  .chip .dot { width: 8px; height: 8px; background: var(--ok); }
+  .ftr-tools { margin-left: auto; display: flex; gap: 8px; }
+  @media (max-width: 575.98px) {
+    .ftr { flex-wrap: nowrap; overflow-x: auto; margin-inline: calc(var(--gut) * -1); padding: 4px var(--gut) 10px; scrollbar-width: thin; }
+    .chip, .ftr-l { flex-shrink: 0; }
+    .ftr-tools { display: none; }
+  }
+  .acc { margin-top: 28px; border-top: var(--bw) solid var(--ink); }
+  .city { border-bottom: var(--bw) solid var(--ink); background: #fff; }
+  .city > summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: 64px minmax(0, 1fr) minmax(120px, 240px) 44px; gap: 8px 20px; align-items: center; padding: clamp(14px, 2vw, 22px) clamp(12px, 2vw, 22px); }
+  .city > summary::-webkit-details-marker { display: none; }
+  .city > summary:hover { background: var(--accent); }
+  .city[open] > summary { background: var(--ink); color: #fff; }
+  .c-idx { font-family: var(--f-big); font-size: 2rem; color: var(--brand); line-height: 1; }
+  .city[open] .c-idx { color: var(--accent); }
+  .c-name { font-family: var(--f-big); text-transform: uppercase; font-size: clamp(2rem, 6vw, 4.4rem); line-height: .95; overflow-wrap: anywhere; }
+  .c-meter { font-weight: 800; font-size: .8rem; letter-spacing: .04em; text-transform: uppercase; min-width: 0; }
+  .c-meter b { font-family: var(--f-big); font-weight: 400; font-size: 2rem; color: var(--ok); line-height: 1; margin-right: 4px; }
+  .city[open] .c-meter b { color: var(--accent); }
+  .c-bar { height: 8px; background: rgba(0,0,0,.14); margin-top: 6px; }
+  .city[open] .c-bar { background: rgba(255,255,255,.25); }
+  .c-bar i { display: block; height: 100%; width: var(--p, 0%); background: var(--ok); }
+  .city[open] .c-bar i { background: var(--accent); }
+  .c-tog { width: 44px; height: 44px; border: var(--bw) solid currentColor; display: grid; place-items: center; font-size: 1.2rem; transition: transform .2s; }
+  .city[open] .c-tog { transform: rotate(45deg); background: var(--accent); color: var(--ink); border-color: var(--accent); }
+  @media (max-width: 767.98px) {
+    .city > summary { grid-template-columns: 40px minmax(0, 1fr) 40px; }
+    .c-idx { font-size: 1.4rem; }
+    .c-meter { grid-column: 1 / -1; grid-row: 2; }
+    .c-tog { width: 38px; height: 38px; }
+  }
+  .city-body { display: flex; border-top: var(--bw) solid var(--ink); }
+  .city-ph { position: relative; flex: 1 1 0; background: var(--grey); border-right: var(--bw) solid var(--ink); min-height: 220px; }
+  .city-ph img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+  .city-ph.noimg { display: none; }
+  .city-list { flex: 3 1 0; min-width: 0; }
+  @media (max-width: 899.98px) {
+    .city-body { flex-direction: column; }
+    .city-ph { flex: none; min-height: 160px; border-right: 0; border-bottom: var(--bw) solid var(--ink); }
+  }
+  .cg { border-bottom: var(--bw) solid var(--ink); }
+  .cg:last-child { border-bottom: 0; }
+  .cg-h { display: flex; flex-wrap: wrap; gap: 8px 14px; justify-content: space-between; align-items: center; background: var(--grey); padding: 12px clamp(12px, 2vw, 22px); border-bottom: 1px solid var(--grey-2); }
+  .cg-h h4 { font-size: 1.5rem; display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+  .cg-h h4 small { font-family: var(--f-body); font-weight: 800; font-size: .74rem; letter-spacing: .08em; color: var(--mut); text-transform: uppercase; }
+  .rows { list-style: none; margin: 0; padding: 0; }
+  .rw { display: grid; grid-template-columns: 112px minmax(0, 1fr) minmax(130px, 210px) auto; gap: 8px 22px; align-items: center; padding: 16px clamp(12px, 2vw, 22px); border-bottom: 1px solid var(--grey-2); }
+  .rw:last-child { border-bottom: 0; }
+  .rw:hover { background: #fffbe0; }
+  .bp-box { width: 112px; height: 72px; display: grid; place-items: center; border: 1px dashed rgba(0,0,0,.35); background: repeating-linear-gradient(45deg, transparent 0 6px, rgba(0,0,0,.035) 6px 7px); }
+  .bp { background: var(--brand); border: 2px solid var(--ink); display: grid; place-items: center; color: #fff; font-family: var(--f-big); font-size: .78rem; line-height: 1; letter-spacing: .03em; max-width: 100%; }
+  .bp-ico { font-size: 1.6rem; color: var(--ink); }
+  .rw-t { font-family: var(--f-big); text-transform: uppercase; font-size: clamp(1.35rem, 2.4vw, 1.8rem); line-height: 1; overflow-wrap: anywhere; }
+  .rw-d { font-size: .86rem; color: var(--mut); margin-top: 4px; overflow-wrap: anywhere; }
+  .av { min-width: 0; }
+  .av-t { display: flex; justify-content: space-between; gap: 8px; font-weight: 800; font-size: .78rem; letter-spacing: .04em; text-transform: uppercase; }
+  .av-t .ok { color: var(--ok); }
+  .av-t .no { color: var(--err); }
+  .av-bar { display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; margin-top: 7px; height: 9px; }
+  .av-bar i { background: var(--grey-2); }
+  .av-bar i.on { background: var(--ok); }
+  @media (max-width: 767.98px) {
+    .rw { grid-template-columns: 88px minmax(0, 1fr); }
+    .bp-box { width: 88px; height: 62px; }
+    .av, .rw .btn-x { grid-column: 1 / -1; }
+    .rw .btn-x { width: 100%; }
+  }
+  .empty { display: none; text-align: center; padding: 56px 20px; border: var(--bw) dashed var(--ink); margin-top: 28px; background: #fff; }
+  .empty.show, .empty.always { display: block; }
+  .empty i { font-size: 2.2rem; color: var(--brand); }
+  .empty h3 { font-size: 2rem; margin: 10px 0 6px; }
+  .empty p { color: var(--mut); }
+
+  /* Carte */
+  .map-frame { margin-top: 30px; border: var(--bw) solid var(--ink); box-shadow: 10px 10px 0 var(--ink); background: #fff; }
+  #vMap { height: clamp(340px, 60vh, 560px); width: 100%; }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 22px; padding: 14px 18px; border-top: var(--bw) solid var(--ink); font-size: .8rem; font-weight: 700; background: var(--accent); }
+  .legend span { display: inline-flex; gap: 8px; align-items: center; }
+  .legend span::before { content: ''; width: 12px; height: 12px; background: var(--c); border: 2px solid var(--ink); }
+  .leaflet-popup-content-wrapper { border-radius: 0; border: var(--bw) solid var(--ink); box-shadow: 4px 4px 0 var(--ink); }
+  .leaflet-popup-tip { border: var(--bw) solid var(--ink); border-radius: 0; }
+  .leaflet-popup-content { font-family: var(--f-body); margin: 12px 14px; }
+
+  /* Processus */
+  .on-ink { background: var(--ink); color: #fff; }
+  .on-ink .kicker::before { background: var(--accent); }
+  .on-ink .h2 em { color: var(--accent); }
+  .steps { margin-top: 44px; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); border: 2px solid #fff; }
+  .step { padding: clamp(22px, 3vw, 36px); border-right: 2px solid #fff; position: relative; }
+  .step:last-child { border-right: 0; }
+  .step-n { font-family: var(--f-big); font-size: clamp(5rem, 11vw, 9rem); line-height: .8; color: var(--accent); }
+  .step h3 { font-size: clamp(1.6rem, 2.6vw, 2.1rem); margin: 18px 0 10px; }
+  .step p { color: rgba(255,255,255,.82); max-width: 34ch; }
+  @media (max-width: 767.98px) {
+    .steps { grid-template-columns: 1fr; }
+    .step { border-right: 0; border-bottom: 2px solid #fff; }
+    .step:last-child { border-bottom: 0; }
+    .step-n { font-size: 5rem; }
+  }
+
+  /* À propos / FAQ */
+  .two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(28px, 6vw, 80px); align-items: start; }
+  .pts { margin: 28px 0 0; padding: 0; list-style: none; border-top: var(--bw) solid var(--ink); }
+  .pts li { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 16px; padding: 18px 0; border-bottom: var(--bw) solid var(--ink); }
+  .pts i { width: 52px; height: 52px; background: var(--accent); border: var(--bw) solid var(--ink); display: grid; place-items: center; font-size: 1.3rem; }
+  .pts b { display: block; font-family: var(--f-big); font-weight: 400; text-transform: uppercase; font-size: 1.45rem; line-height: 1.05; }
+  .pts span { color: var(--mut); font-size: .93rem; }
+  .faq { margin-top: 24px; border-top: var(--bw) solid var(--ink); }
+  .faq details { border-bottom: var(--bw) solid var(--ink); }
+  .faq summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 18px 0; font-weight: 800; font-size: 1.05rem; }
+  .faq summary::-webkit-details-marker { display: none; }
+  .faq summary::after { content: '+'; font-family: var(--f-big); font-size: 2rem; line-height: 1; color: var(--brand); flex-shrink: 0; }
+  .faq details[open] summary::after { content: '–'; }
+  .faq p { color: var(--mut); padding: 0 0 18px; max-width: 52ch; }
+  @media (max-width: 899.98px) { .two { grid-template-columns: 1fr; } }
+
+  /* Contact */
+  .contact { margin-top: 38px; display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); border: var(--bw) solid var(--ink); background: #fff; }
+  .c-info { background: var(--accent); padding: clamp(20px, 3.4vw, 38px); border-right: var(--bw) solid var(--ink); }
+  .c-row { display: grid; grid-template-columns: 44px minmax(0, 1fr); gap: 14px; padding: 14px 0; border-bottom: var(--bw) solid var(--ink); }
+  .c-row:first-child { padding-top: 0; }
+  .c-row:last-child { border-bottom: 0; padding-bottom: 0; }
+  .c-row i { width: 44px; height: 44px; background: var(--ink); color: var(--accent); display: grid; place-items: center; font-size: 1.1rem; }
+  .c-row small { display: block; font-weight: 800; font-size: .68rem; letter-spacing: .14em; text-transform: uppercase; }
+  .c-row a, .c-row span { display: block; text-decoration: none; font-weight: 600; overflow-wrap: anywhere; }
+  .c-row a:hover { text-decoration: underline; }
+  .c-form { padding: clamp(20px, 3.4vw, 38px); }
+  .fgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .fgrid .full { grid-column: 1 / -1; }
+  .c-form label { display: block; font-weight: 800; font-size: .72rem; letter-spacing: .12em; text-transform: uppercase; margin-bottom: 6px; }
+  .f { width: 100%; min-height: 50px; padding: 10px 14px; border: var(--bw) solid var(--ink); border-radius: 0; background: #fff; font: inherit; color: var(--ink); }
+  .f:focus { outline: none; box-shadow: 4px 4px 0 var(--brand); }
+  textarea.f { min-height: 120px; resize: vertical; }
+  .f-msg { display: none; padding: 12px 14px; border: var(--bw) solid var(--ink); font-weight: 600; font-size: .92rem; margin-bottom: 16px; }
+  .f-msg.ok { display: block; background: #c9f2df; }
+  .f-msg.err { display: block; background: #ffd5d0; }
+  @media (max-width: 899.98px) { .contact { grid-template-columns: 1fr; } .c-info { border-right: 0; border-bottom: var(--bw) solid var(--ink); } }
+  @media (max-width: 575.98px) { .fgrid { grid-template-columns: 1fr; } }
+
+  /* CTA final + pied */
+  .cta { background: var(--accent); border-block: var(--bw) solid var(--ink); }
+  .cta-in { display: flex; flex-wrap: wrap; gap: 24px 48px; justify-content: space-between; align-items: center; }
+  .cta h2 { font-size: clamp(3rem, 9vw, 7.4rem); line-height: .9; max-width: 12ch; }
+  .cta p { margin-top: 16px; max-width: 46ch; font-weight: 600; }
+  .site-foot { background: var(--ink); color: #d6d6d0; padding: 56px 0 26px; }
+  .foot-grid { display: grid; grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr)); gap: 32px; }
+  .foot-grid h4 { font-family: var(--f-body); font-weight: 800; font-size: .74rem; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); margin-bottom: 14px; }
+  .foot-grid ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .foot-grid a { text-decoration: none; overflow-wrap: anywhere; }
+  .foot-grid a:hover { color: #fff; text-decoration: underline; }
+  .foot-grid p { max-width: 40ch; font-size: .92rem; margin-top: 12px; }
+  .foot-bot { margin-top: 40px; padding-top: 20px; border-top: 1px solid rgba(255,255,255,.2); font-size: .8rem; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 20px; color: #9a9a92; }
+  @media (max-width: 767.98px) { .foot-grid { grid-template-columns: 1fr 1fr; } .foot-grid > :first-child { grid-column: 1 / -1; } }
+
+  .m-bar { display: none; }
+  @media (max-width: 767.98px) {
+    .m-bar { display: flex; gap: 10px; position: fixed; left: 0; right: 0; bottom: 0; z-index: 900; padding: 10px var(--gut) calc(10px + env(safe-area-inset-bottom)); background: #fff; border-top: var(--bw) solid var(--ink); }
+    .m-bar .btn-x { flex: 1; min-height: 46px; padding-inline: 10px; box-shadow: 3px 3px 0 var(--ink); }
+    body { padding-bottom: 76px; }
+  }
+
+  .js .rv { opacity: 0; transform: translateY(22px); transition: opacity .6s ease, transform .6s ease; }
+  .js .rv.in { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .js .rv { opacity: 1; transform: none; transition: none; }
+    * { transition-duration: .01ms !important; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═════════ BARRE + EN-TÊTE ═════════ -->
+<div class="topbar">
+  <div class="wrap">
+    <span>Régie publicitaire · Affichage extérieur{% if nb_villes %} · {{ nb_villes }} ville{{ nb_villes|pluralize }}{% endif %}</span>
+    <a href="{% url 'portail:suivi_demande' %}"><i class="bi bi-search"></i> Suivre une demande</a>
+  </div>
+</div>
+<header class="site-head">
+  <div class="wrap head-in">
+    <a class="brand" href="#top" aria-label="Integral — accueil">
+      <img src="{% static 'img/logo.png' %}" alt="" onerror="this.style.display='none'" />
+      <span class="brand-name">Integral<span>.</span></span>
+    </a>
+    <ul class="nav-links">
+      <li><a href="#supports">Supports</a></li>
+      <li><a href="#reseau">Réseau</a></li>
+      <li><a href="#carte">Carte</a></li>
+      <li><a href="#processus">Processus</a></li>
+      <li><a href="#apropos">À propos</a></li>
+      <li><a href="#contact">Contact</a></li>
+    </ul>
+    <div class="head-cta">
+      <a href="{% url 'portail:reserver_etape1' %}" class="btn-x btn-brand btn-sm"><i class="bi bi-calendar-check"></i> Faire une demande</a>
+    </div>
+    <button class="burger" id="burger" type="button" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="drawer"><i class="bi bi-list"></i></button>
+  </div>
+</header>
+
+<div class="drawer" id="drawer" role="dialog" aria-label="Menu">
+  <div class="drawer-top">
+    <span class="brand-name">Integral<span style="color:var(--accent)">.</span></span>
+    <button class="burger" id="closeDrawer" type="button" aria-label="Fermer le menu"><i class="bi bi-x-lg"></i></button>
+  </div>
+  <a class="dl" href="#supports">Supports</a>
+  <a class="dl" href="#reseau">Réseau</a>
+  <a class="dl" href="#carte">Carte</a>
+  <a class="dl" href="#processus">Processus</a>
+  <a class="dl" href="#apropos">À propos</a>
+  <a class="dl" href="#contact">Contact</a>
+  <a href="{% url 'portail:reserver_etape1' %}" class="btn-x btn-yel"><i class="bi bi-calendar-check"></i> Faire une demande</a>
+  <a href="{% url 'portail:suivi_demande' %}" class="btn-x btn-wht"><i class="bi bi-search"></i> Suivre une demande</a>
+</div>
+
+{% if messages %}
+<div class="dj-msgs" role="status">
+  {% for message in messages %}
+  <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags|default:'info' }}{% endif %} alert-dismissible fade show mb-0 rounded-0" role="alert">
+    {{ message }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fermer"></button>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<main id="top">
+
+<!-- ═════════ HERO ═════════ -->
+<section class="hero on-brand">
+  <div class="wrap hero-grid">
+    <div>
+      <span class="kicker">Réseau d'affichage{% if nb_villes %} · {{ nb_villes }} ville{{ nb_villes|pluralize }}{% endif %}</span>
+      <h1>Soyez vu <em>par toute la ville.</em></h1>
+      <p class="hero-lead">Panneaux grand format, écrans numériques LED et sucettes urbaines. Consultez les formats, les emplacements et les faces disponibles, puis lancez votre demande en ligne.</p>
+      <div class="hero-actions">
+        <a href="{% url 'portail:reserver_etape1' %}" class="btn-x btn-yel"><i class="bi bi-calendar-check"></i> Faire une demande</a>
+        <a href="#reseau" class="btn-x btn-wht"><i class="bi bi-grid-3x3-gap"></i> Voir les disponibilités</a>
+      </div>
+    </div>
+    {% with top=villes_stats.0 %}
+    <figure class="poster{% if not top %} noimg{% endif %}" style="margin:0;">
+      {% if top %}
+      <img src="{% static top.image_url %}" alt="Panneaux publicitaires — {{ top.nom }}" onerror="this.parentNode.classList.add('noimg')" />
+      <figcaption class="poster-cap"><small>Principale ville du réseau</small><b>{{ top.nom }}</b><span>{{ top.faces_libres }} face{{ top.faces_libres|pluralize }} libre{{ top.faces_libres|pluralize }} sur {{ top.total_faces }}</span></figcaption>
+      {% else %}
+      <img src="{% static 'img/panneau 4x3 digitalVVV.png' %}" alt="Panneau publicitaire" onerror="this.parentNode.classList.add('noimg')" />
+      {% endif %}
+    </figure>
+    {% endwith %}
+  </div>
+</section>
+
+{% if total_faces_reseau or nb_villes or nb_formats %}
+<div class="figs">
+  {% if total_faces_reseau %}<div class="fig"><b>{{ total_faces_reseau }}</b><span>face{{ total_faces_reseau|pluralize }} publicitaire{{ total_faces_reseau|pluralize }}</span></div>{% endif %}
+  {% if total_faces_libres_reseau %}<div class="fig"><b>{{ total_faces_libres_reseau }}</b><span>disponible{{ total_faces_libres_reseau|pluralize }} aujourd'hui</span></div>{% endif %}
+  {% if nb_villes %}<div class="fig"><b>{{ nb_villes }}</b><span>ville{{ nb_villes|pluralize }} couverte{{ nb_villes|pluralize }}</span></div>{% endif %}
+  {% if nb_formats %}<div class="fig"><b>{{ nb_formats }}</b><span>format{{ nb_formats|pluralize }} d'affichage</span></div>{% endif %}
+</div>
+{% endif %}
+
+<!-- ═════════ SUPPORTS ═════════ -->
+<section class="sec" id="supports">
+  <div class="wrap">
+    <div class="rv">
+      <span class="kicker">Nos supports</span>
+      <h2 class="h2">Trois formats, <em>un seul réseau.</em></h2>
+      <p class="lead">Choisissez une famille de supports pour afficher directement les emplacements correspondants.</p>
+    </div>
+    <div class="fams">
+      <a href="#reseau" class="fam rv" data-pick-cat="all">
+        <span class="fam-n">01</span>
+        <div class="fam-img"><img src="{% static 'img/panneau 4x3 digitalVVV.png' %}" alt="Panneau 4x3" loading="lazy" /></div>
+        <h3>Panneaux 4×3 et géants</h3>
+        <p>Votre marque bénéficie d'une visibilité exceptionnelle sur les principaux axes de circulation.</p>
+        <ul><li>Lancement de produit</li><li>Campagne nationale</li><li>Notoriété de marque</li></ul>
+        <span class="fam-go">Voir les emplacements <i class="bi bi-arrow-right"></i></span>
+      </a>
+      <a href="#reseau" class="fam rv" data-pick-cat="ecran">
+        <span class="fam-n">02</span>
+        <div class="fam-img"><img src="{% static 'img/Ecran LED digital.png' %}" alt="Écran numérique LED" loading="lazy" /></div>
+        <h3>Écrans numériques LED</h3>
+        <p>Diffusez des contenus animés, programmés selon vos horaires et adaptés à vos objectifs.</p>
+        <ul><li>Diffusion dynamique</li><li>Changement instantané</li><li>Plusieurs messages dans une même campagne</li></ul>
+        <span class="fam-go">Voir les emplacements <i class="bi bi-arrow-right"></i></span>
+      </a>
+      <a href="#reseau" class="fam rv" data-pick-cat="sucette">
+        <span class="fam-n">03</span>
+        <div class="fam-img"><img src="{% static 'img/Sucette sur pied digital.png' %}" alt="Sucette publicitaire" loading="lazy" /></div>
+        <h3>Sucettes publicitaires</h3>
+        <p>Panneaux lumineux au cœur des trottoirs, à hauteur de regard. Visibilité piétonne maximale en centre-ville et zones commerçantes.</p>
+        <span class="fam-go">Voir les emplacements <i class="bi bi-arrow-right"></i></span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ═════════ RÉSEAU ═════════ -->
+<section class="sec sec-grey" id="reseau">
+  <div class="wrap">
+    <div class="net-head rv">
+      <div>
+        <span class="kicker">Fiches par ville</span>
+        <h2 class="h2">Formats et <em>disponibilités.</em></h2>
+        <p class="lead">Ouvrez une ville pour voir ses formats, dessinés à l'échelle, et le nombre de faces libres aujourd'hui.</p>
+      </div>
+      <a href="{% url 'portail:reserver_etape1' %}" class="btn-x btn-brand"><i class="bi bi-calendar-check"></i> Faire une demande</a>
+    </div>
+
+    {% if villes_stats %}
+    {% if categories_stats %}
+    <div class="ftr" role="group" aria-label="Filtrer par format">
+      <span class="ftr-l">Format</span>
+      <button type="button" class="chip" data-fc="all" aria-pressed="true">Tous</button>
+      {% for cat in categories_stats %}<button type="button" class="chip" data-fc="{{ cat.categorie|slugify }}" aria-pressed="false">{{ cat.categorie }}{% if cat.libre > 0 %}<span class="dot" title="Faces disponibles"></span>{% endif %}</button>{% endfor %}
+      <span class="ftr-tools">
+        <button type="button" class="chip" id="openAll"><i class="bi bi-arrows-expand"></i> Tout ouvrir</button>
+        <button type="button" class="chip" id="closeAll"><i class="bi bi-arrows-collapse"></i> Tout fermer</button>
+      </span>
+    </div>
+    {% endif %}
+
+    <div class="acc" id="cities">
+      {% for ville in villes_stats %}
+      <details class="city"{% if forloop.first %} open{% endif %}>
+        <summary>
+          <span class="c-idx">{{ forloop.counter|stringformat:"02d" }}</span>
+          <span class="c-name">{{ ville.nom }}</span>
+          <span class="c-meter"><b>{{ ville.faces_libres }}</b> libre{{ ville.faces_libres|pluralize }} / {{ ville.total_faces }}
+            <div class="c-bar" style="--p: {% widthratio ville.faces_libres ville.total_faces 100 %}%"><i></i></div>
+          </span>
+          <span class="c-tog" aria-hidden="true"><i class="bi bi-plus-lg"></i></span>
+        </summary>
+        <div class="city-body">
+          <div class="city-ph"><img src="{% static ville.image_url %}" alt="Panneaux publicitaires — {{ ville.nom }}" loading="lazy" onerror="this.parentNode.classList.add('noimg')" /></div>
+          <div class="city-list">
+            {% for cat in ville.supports %}
+            <section class="cg" data-cat="{{ cat.categorie|slugify }}">
+              <div class="cg-h">
+                <h4>{{ cat.categorie }} <small>{{ cat.libre }} libre{{ cat.libre|pluralize }} / {{ cat.total }}</small></h4>
+                {% if cat.categorie != "Écran" and cat.libre > 0 and cat.liste|length > 1 %}
+                <a class="btn-x btn-yel btn-sm" href="{% url 'portail:reserver_etape1' %}?ville={{ ville.nom|urlencode }}&amp;categorie={{ cat.categorie|urlencode }}"><i class="bi bi-bag-check"></i> Tout réserver</a>
+                {% endif %}
+              </div>
+              <ul class="rows">
+                {% for support in cat.liste %}
+                <li class="rw">
+                  <div class="bp-box">
+                    {% if support.format %}<span class="bp" data-fmt="{{ support.format }}">{{ support.format|upper }}</span>
+                    {% elif cat.categorie == "Écran" %}<i class="bi bi-tv bp-ico" aria-hidden="true"></i>
+                    {% else %}<i class="bi bi-shop bp-ico" aria-hidden="true"></i>{% endif %}
+                  </div>
+                  <div>
+                    <div class="rw-t">
+                      {% if cat.individuel %}{{ support.nom|default:support.code }}{% if support.face_label %} · {{ support.face_label }}{% endif %}{% if support.emplacement_code %} · {{ support.emplacement_code }}{% endif %}{% else %}{% if support.superficie %}{{ support.superficie }} {% endif %}{{ support.dimensions }}{% endif %}
+                    </div>
+                    <div class="rw-d">
+                      {% if cat.individuel %}Support {{ support.code }}{% if support.quartier %} · {{ support.quartier }}{% endif %}{% if support.marche %} · {{ support.marche }}{% endif %}{% else %}{{ cat.categorie }} · {{ ville.nom }}{% endif %}
+                    </div>
+                  </div>
+                  <div class="av">
+                    <div class="av-t">
+                      {% if support.libre > 0 %}<span class="ok">{{ support.libre }} libre{{ support.libre|pluralize }}</span>{% else %}<span class="no">Complet</span>{% endif %}
+                      <span>sur {{ support.count }}</span>
+                    </div>
+                    <div class="av-bar" data-libre="{{ support.libre }}" data-total="{{ support.count }}" aria-hidden="true"></div>
+                  </div>
+                  {% if support.libre > 0 and cat.categorie != "Écran" %}
+                  <a class="btn-x btn-brand btn-sm" href="{% url 'portail:reserver_etape1' %}?ville={{ ville.nom|urlencode }}&amp;categorie={{ cat.categorie|urlencode }}{% if support.format %}&amp;format={{ support.format|urlencode }}{% endif %}">Réserver <i class="bi bi-arrow-right"></i></a>
+                  {% elif cat.categorie == "Écran" %}
+                  <a class="btn-x btn-wht btn-sm" href="#contact">Nous contacter</a>
+                  {% else %}
+                  <a class="btn-x btn-wht btn-sm" href="#contact">Être notifié</a>
+                  {% endif %}
+                </li>
+                {% endfor %}
+              </ul>
+            </section>
+            {% endfor %}
+          </div>
+        </div>
+      </details>
+      {% endfor %}
+    </div>
+
+    <div class="empty" id="netEmpty" role="status">
+      <i class="bi bi-inboxes"></i>
+      <h3>Aucun emplacement pour ce format</h3>
+      <p>Essayez un autre format, ou <a href="#contact">contactez-nous</a>.</p>
+    </div>
+    {% else %}
+    <div class="empty always">
+      <i class="bi bi-hourglass-split"></i>
+      <h3>Inventaire en cours de mise à jour</h3>
+      <p>Les disponibilités ne sont pas affichées pour le moment. <a href="#contact">Contactez-nous</a> pour connaître les emplacements disponibles.</p>
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+<!-- ═════════ CARTE ═════════ -->
+<section class="sec" id="carte">
+  <div class="wrap">
+    <div class="rv">
+      <span class="kicker">Géolocalisation</span>
+      <h2 class="h2">Chaque face, <em>sur la carte.</em></h2>
+      <p class="lead">La couleur des points indique la disponibilité. Touchez un point pour lancer une demande dans cette ville.</p>
+    </div>
+    <div class="map-frame">
+      <div id="vMap" role="region" aria-label="Carte interactive des supports"></div>
+      <div class="legend">
+        <span style="--c:#22c55e">Au moins une face libre</span>
+        <span style="--c:#f97316">Réservé</span>
+        <span style="--c:#ef4444">Occupé</span>
+        <span style="--c:#3b82f6">Écran</span>
+        <span style="--c:#6b7280">Hors service</span>
+      </div>
+    </div>
+    <p id="mapFallback" class="lead" style="display:none;">La carte n'a pas pu être chargée. Consultez les fiches par ville ci-dessus.</p>
+  </div>
+</section>
+
+<!-- ═════════ PROCESSUS ═════════ -->
+<section class="sec on-ink" id="processus">
+  <div class="wrap">
+    <span class="kicker">Processus</span>
+    <h2 class="h2">Votre campagne en <em>3 étapes.</em></h2>
+    <div class="steps">
+      <div class="step rv"><div class="step-n">1</div><h3>Sélectionnez vos emplacements</h3><p>Choisissez les villes, les supports et les emplacements qui correspondent à votre cible.</p></div>
+      <div class="step rv"><div class="step-n">2</div><h3>Nous confirmons votre réservation</h3><p>Nos équipes vérifient les disponibilités et vous accompagnent jusqu'à la validation.</p></div>
+      <div class="step rv"><div class="step-n">3</div><h3>Votre campagne est en ligne</h3><p>Nous assurons l'installation, la diffusion et le suivi de votre campagne.</p></div>
+    </div>
+    <div style="margin-top:34px;"><a href="{% url 'portail:reserver_etape1' %}" class="btn-x btn-yel"><i class="bi bi-calendar-check"></i> Commencer ma demande</a></div>
+  </div>
+</section>
+
+<!-- ═════════ À PROPOS + FAQ ═════════ -->
+<section class="sec" id="apropos">
+  <div class="wrap two">
+    <div class="rv">
+      <span class="kicker">Qui sommes-nous</span>
+      <h2 class="h2">Une régie au service de <em>votre visibilité.</em></h2>
+      <p class="lead">Integral conçoit, exploite et commercialise un réseau de supports publicitaires extérieurs — panneaux grand format, écrans numériques LED et sucettes urbaines — répartis dans les principales villes du Burkina Faso.</p>
+      <ul class="pts">
+        <li><i class="bi bi-geo-alt-fill"></i><div><b>Emplacements stratégiques</b><span>Des supports positionnés sur les axes à plus fort trafic et dans les zones à forte affluence.</span></div></li>
+        <li><i class="bi bi-shield-check"></i><div><b>Disponibilités en ligne</b><span>Consultez l'état de chaque face publicitaire avant de faire votre demande.</span></div></li>
+        <li><i class="bi bi-headset"></i><div><b>Accompagnement personnalisé</b><span>Une équipe dédiée vous accompagne du choix de l'emplacement jusqu'à la diffusion.</span></div></li>
+      </ul>
+    </div>
+    <div class="rv">
+      <span class="kicker">Questions fréquentes</span>
+      <h2 class="h2" style="font-size:clamp(2rem,5vw,3.6rem);">Réponses <em>claires.</em></h2>
+      <div class="faq">
+        <details open><summary>Combien de temps à l'avance réserver ?</summary><p>Nous recommandons 2 à 3 semaines pour garantir l'emplacement et préparer votre visuel.</p></details>
+        <details><summary>Prenez-vous en charge l'impression ?</summary><p>Oui, nous pouvons gérer l'impression haute définition sur bâche résistante aux intempéries.</p></details>
+        <details><summary>Comment fonctionne un écran LED ?</summary><p>Vos spots sont diffusés en boucle selon une programmation adaptée à vos horaires de campagne.</p></details>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═════════ CONTACT ═════════ -->
+<section class="sec sec-grey" id="contact">
+  <div class="wrap">
+    <div class="rv">
+      <span class="kicker">Contact</span>
+      <h2 class="h2">Une question ? <em>Parlons-en.</em></h2>
+    </div>
+    <div class="contact rv">
+      <div class="c-info">
+        <div class="c-row"><i class="bi bi-geo-alt-fill"></i><div><small>Adresse</small><span>Ouagadougou, Burkina Faso</span></div></div>
+        {% if CONTACT_TEL01 or CONTACT_TEL02 or CONTACT_TEL03 %}
+        <div class="c-row"><i class="bi bi-telephone-fill"></i><div><small>Téléphone</small>
+          {% if CONTACT_TEL01 %}<a href="tel:{{ CONTACT_TEL01|cut:' ' }}">{{ CONTACT_TEL01 }}</a>{% endif %}
+          {% if CONTACT_TEL02 %}<a href="tel:{{ CONTACT_TEL02|cut:' ' }}">{{ CONTACT_TEL02 }}</a>{% endif %}
+          {% if CONTACT_TEL03 %}<a href="tel:{{ CONTACT_TEL03|cut:' ' }}">{{ CONTACT_TEL03 }}</a>{% endif %}
+        </div></div>
+        {% endif %}
+        {% if CONTACT_EMAIL or CONTACT_EMAIL1 or CONTACT_EMAIL2 %}
+        <div class="c-row"><i class="bi bi-envelope-fill"></i><div><small>Email</small>
+          {% if CONTACT_EMAIL %}<a href="mailto:{{ CONTACT_EMAIL }}">{{ CONTACT_EMAIL }}</a>{% endif %}
+          {% if CONTACT_EMAIL1 %}<a href="mailto:{{ CONTACT_EMAIL1 }}">{{ CONTACT_EMAIL1 }}</a>{% endif %}
+          {% if CONTACT_EMAIL2 %}<a href="mailto:{{ CONTACT_EMAIL2 }}">{{ CONTACT_EMAIL2 }}</a>{% endif %}
+        </div></div>
+        {% endif %}
+        {% if CONTACT_WHATSAPP %}
+        <div class="c-row"><i class="bi bi-whatsapp"></i><div><small>WhatsApp</small><a href="https://wa.me/{{ CONTACT_WHATSAPP }}" target="_blank" rel="noopener">Écrire sur WhatsApp</a></div></div>
+        {% endif %}
+        <div class="c-row"><i class="bi bi-clock-fill"></i><div><small>Délai de réponse</small><span>Notre équipe vous répond sous 48h ouvrables.</span></div></div>
+      </div>
+      <form class="c-form" id="contactForm" novalidate>
+        {% csrf_token %}
+        <div class="f-msg" id="formMsg" role="status" aria-live="polite"></div>
+        <div class="fgrid">
+          <div><label for="nom">Nom complet *</label><input class="f" type="text" id="nom" name="nom" autocomplete="name" required /></div>
+          <div><label for="email">Adresse email *</label><input class="f" type="email" id="email" name="email" autocomplete="email" required /></div>
+          <div><label for="telephone">Téléphone</label><input class="f" type="tel" id="telephone" name="telephone" autocomplete="tel" placeholder="+226 XX XX XX XX" /></div>
+          <div><label for="societe">Société / organisation</label><input class="f" type="text" id="societe" name="societe" autocomplete="organization" placeholder="Optionnel" /></div>
+          <div class="full">
+            <label for="sujet">Sujet *</label>
+            <select class="f" id="sujet" name="sujet" required>
+              <option value="">Sélectionnez un sujet</option>
+              <option value="demande-reservation">Demande de réservation</option>
+              <option value="info-tarif">Informations tarifaires</option>
+              <option value="probleme-technique">Problème technique</option>
+              <option value="autre">Autre</option>
+            </select>
+          </div>
+          <div class="full"><label for="message">Message *</label><textarea class="f" id="message" name="message" rows="4" required></textarea></div>
+          <div class="full"><button class="btn-x btn-brand" style="width:100%;" type="submit"><i class="bi bi-send-fill"></i> Envoyer le message</button></div>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- ═════════ CTA FINAL ═════════ -->
+<section class="sec cta">
+  <div class="wrap cta-in">
+    <div>
+      <h2>Faites la différence.</h2>
+      <p>Des emplacements stratégiques, des supports performants et un accompagnement personnalisé pour maximiser votre visibilité.</p>
+    </div>
+    <a href="{% url 'portail:reserver_etape1' %}" class="btn-x btn-brand"><i class="bi bi-calendar-check"></i> Faire une demande</a>
+  </div>
+</section>
+
+</main>
+
+<footer class="site-foot">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div>
+        <span class="brand-name" style="color:#fff;">Integral<span style="color:var(--accent)">.</span></span>
+        <p>Régie publicitaire spécialisée dans l'affichage extérieur : panneaux grand format, écrans numériques LED et sucettes urbaines.</p>
+      </div>
+      <div>
+        <h4>Navigation</h4>
+        <ul>
+          <li><a href="#supports">Supports</a></li>
+          <li><a href="#reseau">Réseau</a></li>
+          <li><a href="#carte">Carte</a></li>
+          <li><a href="#apropos">À propos</a></li>
+          <li><a href="#contact">Contact</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Services</h4>
+        <ul>
+          <li><a href="{% url 'portail:reserver_etape1' %}">Faire une demande</a></li>
+          <li><a href="{% url 'portail:suivi_demande' %}">Suivre une demande</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot-bot">
+      <span>&copy; {% now "Y" %} Promo Pub – Integral by Ibrahim SAWADOGO. All Rights Reserved</span>
+      <a href="#top" style="color:#d6d6d0;"><i class="bi bi-arrow-up"></i> Haut de page</a>
+    </div>
+  </div>
+</footer>
+
+<div class="m-bar">
+  <a href="{% url 'portail:suivi_demande' %}" class="btn-x btn-wht btn-sm"><i class="bi bi-search"></i> Suivi</a>
+  <a href="{% url 'portail:reserver_etape1' %}" class="btn-x btn-brand btn-sm"><i class="bi bi-calendar-check"></i> Faire une demande</a>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="{% static 'js/integral_map.js' %}"></script>
+<script>
+(function () {
+  'use strict';
+
+  // Tiroir mobile
+  var burger = document.getElementById('burger'), drawer = document.getElementById('drawer'), closeBtn = document.getElementById('closeDrawer');
+  function setDrawer(open) {
+    drawer.classList.toggle('open', open);
+    burger.setAttribute('aria-expanded', open ? 'true' : 'false');
+    document.body.style.overflow = open ? 'hidden' : '';
+  }
+  burger.addEventListener('click', function () { setDrawer(true); });
+  closeBtn.addEventListener('click', function () { setDrawer(false); });
+  drawer.querySelectorAll('a').forEach(function (a) { a.addEventListener('click', function () { setDrawer(false); }); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') setDrawer(false); });
+
+  // Apparition au scroll
+  var rv = document.querySelectorAll('.rv');
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (es) {
+      es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+    }, { threshold: 0.08 });
+    rv.forEach(function (el) { io.observe(el); });
+  } else { rv.forEach(function (el) { el.classList.add('in'); }); }
+
+  // Lien actif
+  var links = {};
+  document.querySelectorAll('.nav-links a').forEach(function (a) { links[a.getAttribute('href')] = a; });
+  if ('IntersectionObserver' in window) {
+    var so = new IntersectionObserver(function (es) {
+      es.forEach(function (e) {
+        if (e.isIntersecting) {
+          Object.keys(links).forEach(function (k) { links[k].classList.remove('active'); });
+          var l = links['#' + e.target.id]; if (l) l.classList.add('active');
+        }
+      });
+    }, { rootMargin: '-45% 0px -50% 0px' });
+    Object.keys(links).forEach(function (k) { var s = document.querySelector(k); if (s) so.observe(s); });
+  }
+
+  // Formats dessinés à l'échelle (code « LxH » → rectangle proportionnel)
+  document.querySelectorAll('.bp[data-fmt]').forEach(function (el) {
+    var m = String(el.dataset.fmt).match(/(\d+(?:[.,]\d+)?)\s*[x×]\s*(\d+(?:[.,]\d+)?)/i);
+    var box = el.parentNode;
+    if (!m) { el.style.width = '64px'; el.style.height = '40px'; return; }
+    var w = parseFloat(m[1].replace(',', '.')), h = parseFloat(m[2].replace(',', '.'));
+    if (!w || !h) return;
+    var BW = box.clientWidth ? box.clientWidth - 12 : 100, BH = box.clientHeight ? box.clientHeight - 12 : 60, r = w / h;
+    var pw = r >= BW / BH ? BW : BH * r, ph = r >= BW / BH ? BW / r : BH;
+    el.style.width = Math.round(pw) + 'px'; el.style.height = Math.round(ph) + 'px';
+    if (ph < 22) el.style.fontSize = '.6rem';
+    el.setAttribute('title', 'Format ' + m[1] + ' × ' + m[2] + ' m');
+  });
+
+  // Jauges de disponibilité (10 segments)
+  document.querySelectorAll('.av-bar').forEach(function (bar) {
+    var l = parseInt(bar.dataset.libre, 10) || 0, t = parseInt(bar.dataset.total, 10) || 0;
+    var on = t ? Math.round(l / t * 10) : 0; if (l > 0 && on === 0) on = 1;
+    for (var i = 0; i < 10; i++) { var s = document.createElement('i'); if (i < on) s.className = 'on'; bar.appendChild(s); }
+  });
+
+  // Filtre par format + ouvrir/fermer
+  var cityEls = document.querySelectorAll('.city'), empty = document.getElementById('netEmpty'), cur = 'all';
+  function applyFilter() {
+    var shown = 0;
+    document.querySelectorAll('[data-fc]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.fc === cur ? 'true' : 'false'); });
+    cityEls.forEach(function (c) {
+      var any = 0;
+      c.querySelectorAll('.cg').forEach(function (g) {
+        var ok = cur === 'all' || g.dataset.cat === cur; g.hidden = !ok; if (ok) any++;
+      });
+      c.hidden = !any; if (any) shown++;
+      if (cur !== 'all' && any) c.open = true;
+    });
+    if (empty) empty.classList.toggle('show', cityEls.length > 0 && shown === 0);
+  }
+  document.querySelectorAll('[data-fc]').forEach(function (b) { b.addEventListener('click', function () { cur = b.dataset.fc; applyFilter(); }); });
+  var oa = document.getElementById('openAll'), ca = document.getElementById('closeAll');
+  if (oa) oa.addEventListener('click', function () { cityEls.forEach(function (c) { if (!c.hidden) c.open = true; }); });
+  if (ca) ca.addEventListener('click', function () { cityEls.forEach(function (c) { c.open = false; }); });
+  document.querySelectorAll('[data-pick-cat]').forEach(function (a) {
+    a.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      var slug = a.dataset.pickCat;
+      cur = document.querySelector('[data-fc="' + slug + '"]') ? slug : 'all';   // catégorie absente : on affiche tout
+      applyFilter();
+      var t = document.getElementById('reseau'); if (t) t.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  });
+
+  // Carte Leaflet (chargée à l'approche de l'écran)
+  var mapEl = document.getElementById('vMap'), mapDone = false;
+  function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+  function initMap() {
+    if (mapDone) return; mapDone = true;
+    if (typeof L === 'undefined') { mapEl.parentNode.style.display = 'none'; document.getElementById('mapFallback').style.display = 'block'; return; }
+    var center = {{ oua_center|default:"[12.3714, -1.5197]" }};
+    var map = L.map(mapEl, { scrollWheelZoom: false }).setView(center, 12);
+    var opts = { attribution: '&copy; OpenStreetMap contributors', maxZoom: 19 };
+    if (typeof window.buildSafeLeafletTiles === 'function') { window.buildSafeLeafletTiles(map, opts); }
+    else { L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', opts).addTo(map); }
+    var reserveBase = "{% url 'portail:reserver_etape1' %}";
+    fetch("{% url 'portail:api_geojson' %}", { headers: { 'Accept': 'application/json' } })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (data) {
+        if (!data || !data.features || !data.features.length) return;
+        var layer = L.geoJSON(data, {
+          pointToLayer: function (f, ll) { return L.circleMarker(ll, { radius: 9, fillColor: f.properties.color || '#22c55e', color: '#0d0d0d', weight: 2.5, fillOpacity: 1 }); },
+          onEachFeature: function (f, l) {
+            var p = f.properties || {};
+            l.bindPopup(
+              '<strong>' + esc(p.nom || p.code) + '</strong>' +
+              '<div style="font-size:.8rem;color:#55554f;">' + esc(p.ville) + (p.quartier ? ' · ' + esc(p.quartier) : '') + '</div>' +
+              (p.format || p.type_support ? '<div style="font-size:.8rem;margin-top:4px;">Format : ' + esc(p.format || p.type_support) + '</div>' : '') +
+              '<a href="' + reserveBase + '?ville=' + encodeURIComponent(p.ville || '') + '" style="display:inline-block;margin-top:8px;background:var(--brand);color:#fff;border:2px solid #0d0d0d;padding:6px 12px;font-size:.74rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;text-decoration:none;">Réserver</a>'
+            );
+          }
+        }).addTo(map);
+        try { map.fitBounds(layer.getBounds(), { padding: [30, 30], maxZoom: 14 }); } catch (e) {}
+      })
+      .catch(function () { /* carte sans marqueurs : les fiches par ville restent consultables */ });
+    map.on('click', function () { map.scrollWheelZoom.enable(); });
+  }
+  if (mapEl) {
+    if ('IntersectionObserver' in window) {
+      var mo = new IntersectionObserver(function (es) { if (es[0].isIntersecting) { initMap(); mo.disconnect(); } }, { rootMargin: '300px' });
+      mo.observe(mapEl);
+    } else { initMap(); }
+  }
+
+  // Formulaire de contact (AJAX)
+  var form = document.getElementById('contactForm');
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var box = document.getElementById('formMsg'), btn = form.querySelector('button[type="submit"]'), html = btn.innerHTML;
+    box.className = 'f-msg';
+    if (!form.checkValidity()) { form.reportValidity(); return; }
+    btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Envoi en cours…';
+    fetch("{% url 'portail:contact_envoyer' %}", { method: 'POST', body: new FormData(form), headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        box.classList.add(d.success ? 'ok' : 'err');
+        box.textContent = d.success ? d.message : (d.error || 'Une erreur est survenue.');
+        if (d.success) form.reset();
+      })
+      .catch(function () { box.classList.add('err'); box.textContent = 'Erreur réseau. Veuillez réessayer.'; })
+      .finally(function () { btn.disabled = false; btn.innerHTML = html; });
+  });
+})();
+</script>
+</body>
+</html>

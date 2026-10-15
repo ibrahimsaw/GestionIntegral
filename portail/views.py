@@ -523,6 +523,53 @@ class AccueilV6View(View):
         })
 
 
+class AccueilV7View(View):
+    """Vitrine V7 — style affiche / fiches techniques (même contexte que les autres vitrines)."""
+    template_name = 'portail/vitrine_v7.html'
+
+    def get(self, request):
+        compteurs = _get_compteurs()
+        return render(request, self.template_name, {
+            **compteurs,
+            'oua_center': [12.3714, -1.5197],
+        })
+
+
+class AccueilV8View(View):
+    """Vitrine V8 — design inspiré des panneaux et des écrans LED (même contexte que les autres vitrines)."""
+    template_name = 'portail/vitrine_v8.html'
+
+    def get(self, request):
+        compteurs = _get_compteurs()
+        return render(request, self.template_name, {
+            **compteurs,
+            'oua_center': [12.3714, -1.5197],
+        })
+
+
+class AccueilV10View(View):
+    """Vitrine V10 — composition éditoriale (même contexte que les autres vitrines)."""
+    template_name = 'portail/vitrine_v10.html'
+
+    def get(self, request):
+        compteurs = _get_compteurs()
+        return render(request, self.template_name, {
+            **compteurs,
+            'oua_center': [12.3714, -1.5197],
+        })
+
+
+class AccueilV11View(View):
+    """Vitrine V11 — composition éditoriale (même contexte que les autres vitrines)."""
+    template_name = 'portail/vitrine_v11.html'
+
+    def get(self, request):
+        compteurs = _get_compteurs()
+        return render(request, self.template_name, {
+            **compteurs,
+            'oua_center': [12.3714, -1.5197],
+        })
+
 from django.conf import settings
 from django.core.mail import EmailMessage
 from django.http import JsonResponse

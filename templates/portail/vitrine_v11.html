@@ -1,0 +1,321 @@
+{% load static %}<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Integral — Panneaux et écrans numériques | Régie publicitaire</title>
+<meta name="description" content="Le réseau d'affichage Integral : panneaux grand format et écrans numériques. Formats, villes, disponibilités et demande de réservation en ligne.">
+<link rel="icon" href="{% static 'img/Logo-Integral-2-768x768.png' %}">
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Anton&family=Chakra+Petch:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{--brand:{{ DESIGN.COLOR_PRIMARY|default:'#1a3c6b' }};--led:{{ DESIGN.COLOR_SECONDARY|default:'#e8b84b' }};
+--bg:#080a0e;--pn:#12161d;--pn2:#1a2029;--ln:#2a303b;--tx:#e9edf3;--mu:#9aa4b2;--ok:#34d17a;--no:#ff6b57;
+--fd:'Anton','Impact',sans-serif;--fb:'Chakra Petch',system-ui,sans-serif}
+.v10{font-family:var(--fb);background:var(--bg);color:var(--tx);overflow-x:clip;line-height:1.55}
+.v10 *{min-width:0}.v10 img{max-width:100%}
+.v10 h1,.v10 h2,.v10 h3,.v10 h4{font-family:var(--fd);font-weight:400;text-transform:uppercase;letter-spacing:.01em;line-height:1.02;overflow-wrap:anywhere}
+.v10 a{color:inherit}.v10 :focus-visible{outline:3px solid var(--led);outline-offset:2px}
+.skip{position:absolute;left:-999px}.skip:focus{left:8px;top:8px;z-index:99;background:#fff;color:#000;padding:8px}
+.dots{background-image:radial-gradient(rgba(255,255,255,.1) 1.2px,transparent 1.5px);background-size:8px 8px}
+.lab{font-size:.78rem;letter-spacing:.14em;text-transform:uppercase;color:var(--led);font-weight:600}
+.sec{padding:clamp(56px,9vw,104px) 0}
+.h2{font-size:clamp(2.1rem,6vw,4rem);margin:.5rem 0 1rem}
+.lead2{color:var(--mu);max-width:58ch;font-size:1.05rem}
+.btn10{display:inline-flex;align-items:center;justify-content:center;gap:.6rem;min-height:48px;padding:.7rem 1.3rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;font-size:.9rem;text-decoration:none;border:2px solid var(--led);background:var(--led);color:#111!important;border-radius:3px;transition:.2s;text-align:center}
+.btn10:hover{box-shadow:0 0 22px color-mix(in srgb,var(--led) 60%,transparent);transform:translateY(-1px)}
+.btn10.ghost{background:transparent;color:var(--tx)!important;border-color:var(--ln)}.btn10.ghost:hover{border-color:var(--led);color:var(--led)!important}
+.btn10.sm{min-height:40px;padding:.35rem .9rem;font-size:.8rem}
+/* header */
+.hd{position:sticky;top:0;z-index:50;background:rgba(8,10,14,.92);backdrop-filter:blur(8px);border-bottom:1px solid var(--ln)}
+.hd .navbar{padding:.6rem 0}.hd .navbar-brand img{height:40px;width:auto;background:#fff;padding:3px 6px;border-radius:3px}
+.hd .nav-link{color:var(--tx);font-weight:500;text-transform:uppercase;font-size:.85rem;letter-spacing:.06em;padding:.5rem .9rem}.hd .nav-link:hover{color:var(--led)}
+.hd .navbar-toggler{border:2px solid var(--ln);color:var(--tx);border-radius:3px;padding:.3rem .55rem}
+.hd .acts{display:flex;gap:.5rem;flex-wrap:wrap;padding:.8rem 0}
+/* hero : panneau sur pieds */
+.hero{padding:clamp(32px,6vw,72px) 0 clamp(48px,8vw,90px);background:radial-gradient(ellipse at 75% 20%,color-mix(in srgb,var(--brand) 45%,transparent),transparent 60%)}
+.hero h1{font-size:clamp(2.7rem,9vw,6.6rem);margin:.7rem 0 1.2rem}.hero h1 span{color:var(--led);text-shadow:0 0 28px color-mix(in srgb,var(--led) 55%,transparent)}
+.hero .acts{display:flex;gap:.7rem;flex-wrap:wrap;margin-top:1.6rem}
+.bbw{position:relative;padding:18px 0 70px}
+.bbw:before{content:"";position:absolute;top:2px;left:12%;right:12%;height:8px;background:#3a4250;border-radius:4px;box-shadow:0 22px 46px 8px rgba(255,214,120,.22)}
+.bbw:after{content:"";position:absolute;bottom:0;left:22%;width:12px;height:76px;background:#2a303b;box-shadow:calc(min(46vw,200px)) 0 0 #2a303b}
+.bb{position:relative;border:10px solid #2e3541;outline:2px solid #4a5363;background:#000;aspect-ratio:4/3;box-shadow:0 0 0 2px #000,0 24px 50px rgba(0,0,0,.6)}
+.bb img{width:100%;height:100%;object-fit:cover;display:block}
+.bb .cap{position:absolute;left:0;right:0;bottom:0;padding:.6rem .9rem;background:linear-gradient(transparent,rgba(0,0,0,.85));font-size:.8rem;letter-spacing:.12em;text-transform:uppercase}
+/* ticker */
+.tk{overflow:hidden;background:#000;border-block:1px solid var(--ln)}
+.tk div{display:flex;gap:3rem;width:max-content;padding:.7rem 0;animation:mv 40s linear infinite;font-weight:600;font-size:.85rem;letter-spacing:.1em;text-transform:uppercase}
+.tk span{white-space:nowrap;color:var(--led)}.tk b{color:var(--ok);font-weight:600}
+@keyframes mv{to{transform:translateX(-50%)}}
+/* écran LED chiffres */
+.led{border:2px solid var(--ln);background-color:#000;border-radius:6px;padding:0}
+.led .row>div{padding:1.4rem 1rem;border-left:1px solid var(--ln)}.led .row>div:first-child{border-left:0}
+.led b{display:block;font:400 clamp(2.4rem,6vw,4.2rem)/1 var(--fd);color:var(--led);text-shadow:0 0 18px color-mix(in srgb,var(--led) 60%,transparent)}
+.led span{color:var(--mu);font-size:.82rem;text-transform:uppercase;letter-spacing:.08em}
+@media(max-width:767px){.led .row>div:nth-child(odd){border-left:0}.led .row>div:nth-child(n+3){border-top:1px solid var(--ln)}}
+/* supports */
+.ct2{position:relative;background:var(--pn);padding:1.4rem;height:100%;display:flex;flex-direction:column;gap:.7rem;border:8px solid #2e3541;outline:1px solid #4a5363}
+.ct2.scr{border:3px solid #3a4250;border-radius:12px;background-color:#05070a}
+.ct2 i.ic{font-size:1.8rem;color:var(--led)}.ct2 h3{font-size:2rem;margin:0}.ct2 small{color:var(--mu)}
+.ct2 .nb{font:400 2.4rem/1 var(--fd);color:var(--tx)}.ct2 .nb em{font-style:normal;color:var(--mu);font-size:1.2rem}
+.seg{height:10px;background:#0b0e13;border:1px solid var(--ln)}.seg i{display:block;height:100%;background:repeating-linear-gradient(90deg,var(--ok) 0 6px,transparent 6px 9px)}
+/* réseau */
+.tabs{display:flex;gap:.5rem;overflow-x:auto;padding-bottom:.6rem;margin:0 0 1.5rem;border:0;flex-wrap:nowrap}
+.tabs .nav-link{white-space:nowrap;border:2px solid var(--ln);border-radius:3px;color:var(--tx);font-weight:600;text-transform:uppercase;font-size:.85rem;letter-spacing:.06em;background:var(--pn);display:flex;gap:.5rem;align-items:center}
+.tabs .nav-link.active{background:var(--led);border-color:var(--led);color:#111}.tabs .nav-link small{opacity:.7}
+.city{position:relative;min-height:220px;border:8px solid #2e3541;outline:1px solid #4a5363;overflow:hidden;background:#000;display:flex;align-items:flex-end;margin-bottom:1.4rem}
+.city img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.6}
+.city .in{position:relative;padding:1.2rem;width:100%;display:flex;flex-wrap:wrap;gap:1rem;justify-content:space-between;align-items:flex-end;background:linear-gradient(transparent,rgba(0,0,0,.8))}
+.city h3{font-size:clamp(2.2rem,7vw,4rem);margin:0}
+.cat{display:flex;justify-content:space-between;gap:1rem;flex-wrap:wrap;align-items:baseline;margin:2rem 0 .5rem;padding-bottom:.5rem;border-bottom:2px solid var(--led)}
+.cat h4{font-size:1.6rem;margin:0}.cat span{color:var(--mu);font-size:.85rem;letter-spacing:.08em;text-transform:uppercase}
+.fr{display:grid;grid-template-columns:76px 1fr;gap:.5rem 1rem;align-items:center;padding:.9rem .6rem;border-bottom:1px solid var(--ln)}.fr:hover{background:var(--pn)}
+.fr .th{width:76px;height:58px;background:#000;border:3px solid #2e3541;display:flex;align-items:center;justify-content:center;overflow:hidden}
+.fr .th img{width:100%;height:100%;object-fit:cover}.fr .th.cut img{object-fit:contain;padding:3px}.fr .th i{font-size:1.5rem;color:var(--led)}
+.fr .t{font:400 1.3rem var(--fd);text-transform:uppercase;overflow-wrap:anywhere}.fr .s{color:var(--mu);font-size:.85rem;overflow-wrap:anywhere}
+.fr .av,.fr .ac{grid-column:1/-1}
+@media(min-width:768px){.fr{grid-template-columns:90px 1.4fr 1.2fr auto}.fr .th{width:90px}.fr .av,.fr .ac{grid-column:auto}}
+.chip{display:inline-flex;gap:.35rem;align-items:center;padding:.1rem .6rem;border-radius:3px;font-size:.8rem;font-weight:700;background:rgba(52,209,122,.14);color:var(--ok);border:1px solid rgba(52,209,122,.4)}
+.chip.off{background:rgba(255,107,87,.12);color:var(--no);border-color:rgba(255,107,87,.4)}
+.fr .seg{margin-top:.4rem}
+.empty{border:2px dashed var(--ln);padding:2rem;text-align:center;color:var(--mu)}.empty a{color:var(--led)}
+/* carte */
+.mapf{border:12px solid #2e3541;outline:1px solid #4a5363;border-radius:10px;background:#000}
+#map{height:clamp(320px,58vh,560px);position:relative;background:#0b0e13}
+.mapmsg{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;text-align:center;padding:1rem;z-index:500;background:#0b0e13;color:var(--mu)}
+.leg{display:flex;flex-wrap:wrap;gap:.4rem 1.1rem;margin-top:.9rem;font-size:.85rem;color:var(--mu)}.leg i{display:inline-block;width:11px;height:11px;border-radius:50%;margin-right:.35rem}
+/* étapes */
+.step{background:var(--pn);border:1px solid var(--ln);border-top:4px solid var(--led);padding:1.2rem;height:100%}
+.step b{font:400 3rem/1 var(--fd);color:var(--led)}.step h3{font-size:1.5rem;margin:.5rem 0}.step p{color:var(--mu);margin:0}
+/* contact */
+.ctc{background:var(--pn)}.ctc ul{padding:0}.ctc li{list-style:none;margin-bottom:.8rem}.ctc a{text-decoration:none}.ctc li i{color:var(--led);margin-right:.5rem}
+.frm{background:#f3f4f6;color:#111;padding:clamp(1.2rem,3vw,2rem);border:8px solid #2e3541;outline:1px solid #4a5363}
+.frm label{font-weight:700;font-size:.85rem;margin-bottom:.25rem;display:block}
+.frm .form-control,.frm .form-select{border:2px solid #111;border-radius:3px;min-height:46px}
+#fm{display:none;padding:.7rem 1rem;margin-bottom:1rem;font-weight:500}#fm.ok{display:block;background:#d9f5e5;color:#13693a}#fm.ko{display:block;background:#fbe0db;color:#8a2a1c}
+.band{background:var(--led);color:#111;padding:clamp(40px,6vw,70px) 0}.band h2{font-size:clamp(2rem,5.5vw,3.4rem);margin:0}
+.ft{background:#000;color:var(--mu);padding:48px 0 28px;font-size:.92rem;border-top:1px solid var(--ln)}
+.ft a{text-decoration:none}.ft a:hover{color:var(--led)}.ft h5{font:400 1.3rem var(--fd);text-transform:uppercase;color:var(--tx)}.ft ul{list-style:none;padding:0;margin:0}.ft li{margin-bottom:.5rem}
+.wa{position:fixed;right:max(14px,env(safe-area-inset-right));bottom:max(14px,env(safe-area-inset-bottom));z-index:60;width:52px;height:52px;border-radius:50%;background:#25d366;color:#fff!important;display:flex;align-items:center;justify-content:center;font-size:1.6rem;text-decoration:none}
+.js .rv{opacity:0;transform:translateY(18px);transition:.6s}.js .rv.in{opacity:1;transform:none}
+@media(prefers-reduced-motion:reduce){.js .rv{opacity:1;transform:none;transition:none}.tk div{animation:none}html{scroll-behavior:auto}}
+html{scroll-behavior:smooth}[id]{scroll-margin-top:76px}
+.leaflet-popup-content{color:#111}
+</style>
+</head>
+<body>
+<a class="skip" href="#contenu">Aller au contenu</a>
+<div class="v10">
+
+<header class="hd">
+  <nav class="navbar navbar-expand-lg" aria-label="Navigation principale"><div class="container">
+    <a class="navbar-brand" href="#top"><img src="{% static 'img/logo.png' %}" alt="Integral"></a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nv" aria-controls="nv" aria-expanded="false" aria-label="Ouvrir le menu"><i class="bi bi-list fs-4"></i></button>
+    <div class="collapse navbar-collapse" id="nv">
+      <ul class="navbar-nav mx-auto">
+        <li class="nav-item"><a class="nav-link" href="#supports">Supports</a></li>
+        <li class="nav-item"><a class="nav-link" href="#reseau">Réseau</a></li>
+        <li class="nav-item"><a class="nav-link" href="#carte">Carte</a></li>
+        <li class="nav-item"><a class="nav-link" href="#methode">Réserver</a></li>
+        <li class="nav-item"><a class="nav-link" href="#contact">Contact</a></li>
+      </ul>
+      <div class="acts">
+        <a class="btn10 ghost sm" href="{% url 'portail:suivi_demande' %}"><i class="bi bi-search"></i> Suivre ma demande</a>
+        <a class="btn10 sm" href="{% url 'portail:reserver_etape1' %}"><i class="bi bi-calendar-check"></i> Faire une demande</a>
+      </div>
+    </div>
+  </div></nav>
+</header>
+
+{% if messages %}<div class="container pt-3">{% for message in messages %}<div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show mb-2" role="alert">{{ message }}<button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fermer"></button></div>{% endfor %}</div>{% endif %}
+
+<main id="contenu">
+<section class="hero" id="top"><div class="container"><div class="row g-4 g-lg-5 align-items-center">
+  <div class="col-lg-7">
+    <div class="lab"><i class="bi bi-broadcast"></i> Régie publicitaire · Burkina Faso</div>
+    <h1>Votre marque, du panneau à <span>l'écran.</span></h1>
+    <p class="lead2">Integral conçoit, exploite et commercialise un réseau de supports publicitaires extérieurs : panneaux grand format, écrans numériques et supports urbains, répartis dans les principales villes du pays.</p>
+    <div class="acts">
+      <a class="btn10" href="{% url 'portail:reserver_etape1' %}">Faire une demande <i class="bi bi-arrow-right"></i></a>
+      <a class="btn10 ghost" href="#reseau">Explorer le réseau</a>
+    </div>
+  </div>
+  <div class="col-lg-5"><div class="bbw"><figure class="bb m-0">
+    {% with v=villes_stats.0 %}
+    {% if v %}<img src="{% static v.image_url %}" alt="Réseau d'affichage à {{ v.nom }}" onerror="this.remove()"><figcaption class="cap">{{ v.nom }} · {{ v.total_faces }} face{{ v.total_faces|pluralize }}</figcaption>
+    {% else %}<img src="{% static 'img/villes/image1 (6).jfif' %}" alt="Panneaux publicitaires Integral" onerror="this.remove()">{% endif %}
+    {% endwith %}
+  </figure></div></div>
+</div></div></section>
+
+{% if villes_stats %}<div class="tk" aria-label="Disponibilités par ville"><div>
+  {% for n in "ab" %}{% for v in villes_stats %}<span>● {{ v.nom }} — <b>{{ v.faces_libres }} libre{{ v.faces_libres|pluralize }}</b> / {{ v.total_faces }} face{{ v.total_faces|pluralize }}</span>{% endfor %}{% endfor %}
+</div></div>{% endif %}
+
+<section class="sec pb-0"><div class="container"><div class="led dots"><div class="row g-0">
+  <div class="col-6 col-md-3"><div><b>{{ total_faces_reseau|default:0 }}</b><span>face{{ total_faces_reseau|pluralize }} publicitaire{{ total_faces_reseau|pluralize }}</span></div></div>
+  <div class="col-6 col-md-3"><div><b>{{ total_faces_libres_reseau|default:0 }}</b><span>libre{{ total_faces_libres_reseau|pluralize }} actuellement</span></div></div>
+  <div class="col-6 col-md-3"><div><b>{{ nb_villes|default:0 }}</b><span>ville{{ nb_villes|pluralize }} couverte{{ nb_villes|pluralize }}</span></div></div>
+  <div class="col-6 col-md-3"><div><b>{{ nb_formats|default:0 }}</b><span>format{{ nb_formats|pluralize }} d'affichage</span></div></div>
+</div></div></div></section>
+
+<section class="sec" id="supports"><div class="container">
+  <div class="lab">Les supports</div><h2 class="h2">Panneaux, écrans, marchés.</h2>
+  <p class="lead2 mb-4">Chaque catégorie affiche son nombre de faces et celles qui sont libres aujourd'hui.</p>
+  <div class="row g-4">
+  {% for cat in categories_stats %}
+  <div class="col-md-6 col-lg-4 rv"><div class="ct2{% if cat.categorie == 'Écran' %} scr dots{% endif %}">
+    <i class="ic bi {% if cat.categorie == 'Écran' %}bi-display{% elif cat.categorie == 'Marché' %}bi-shop-window{% else %}bi-signpost-split{% endif %}"></i>
+    <h3>{{ cat.categorie }}</h3>
+    <small>{% if cat.categorie == 'Écran' %}Affichage numérique{% elif cat.categorie == 'Marché' %}Supports en marchés{% else %}Panneaux d'affichage{% endif %}</small>
+    <div class="nb">{{ cat.libre }} <em>libre{{ cat.libre|pluralize }} / {{ cat.total }}</em></div>
+    <div class="seg" aria-hidden="true"><i style="width:{% widthratio cat.libre cat.total 100 %}%"></i></div>
+    <a class="btn10 ghost sm mt-auto align-self-start" href="{% url 'portail:reserver_etape1' %}{% if cat.categorie != 'Écran' and cat.categorie != 'Marché' %}?categorie={{ cat.categorie|urlencode }}{% endif %}">Demander <i class="bi bi-arrow-right"></i></a>
+  </div></div>
+  {% empty %}<div class="col-12"><div class="empty">Le catalogue des supports est en cours de mise à jour. <a href="#contact">Contactez-nous</a> pour connaître les disponibilités.</div></div>
+  {% endfor %}
+  </div>
+</div></section>
+
+<section class="sec" id="reseau" style="background:var(--pn)"><div class="container">
+  <div class="lab">Le réseau</div><h2 class="h2">Ville par ville, face par face.</h2>
+  <p class="lead2 mb-4">Choisissez une ville pour voir ses formats, leur nombre de faces et leur disponibilité.</p>
+  {% if villes_stats %}
+  <ul class="nav tabs" role="tablist">
+    {% for v in villes_stats %}<li role="presentation"><button class="nav-link{% if forloop.first %} active{% endif %}" id="t{{ forloop.counter }}" data-bs-toggle="pill" data-bs-target="#p{{ forloop.counter }}" type="button" role="tab" aria-controls="p{{ forloop.counter }}" aria-selected="{% if forloop.first %}true{% else %}false{% endif %}">{{ v.nom }} <small>{{ v.total_faces }}</small></button></li>{% endfor %}
+  </ul>
+  <div class="tab-content">
+  {% for v in villes_stats %}
+  <div class="tab-pane fade{% if forloop.first %} show active{% endif %}" id="p{{ forloop.counter }}" role="tabpanel" aria-labelledby="t{{ forloop.counter }}" tabindex="0">
+    <div class="city">
+      <img src="{% static v.image_url %}" alt="" loading="lazy" onerror="this.remove()">
+      <div class="in"><div><div class="lab">{{ v.faces_libres }} libre{{ v.faces_libres|pluralize }} sur {{ v.total_faces }}</div><h3>{{ v.nom }}</h3></div>
+      <a class="btn10" href="{% url 'portail:reserver_etape1' %}?ville={{ v.nom|urlencode }}">Réserver à {{ v.nom }} <i class="bi bi-arrow-right"></i></a></div>
+    </div>
+    {% for cat in v.supports %}
+    <div class="cat"><h4>{{ cat.categorie }}</h4><span>{{ cat.libre }} libre{{ cat.libre|pluralize }} / {{ cat.total }}</span></div>
+    {% for s in cat.liste %}
+    <article class="fr">
+      {% if cat.individuel %}
+      <div class="th"><i class="bi {% if cat.categorie == 'Écran' %}bi-display{% else %}bi-shop-window{% endif %}"></i></div>
+      <div><div class="t">{{ s.nom|default:s.code }}{% if s.face_label %} · {{ s.face_label }}{% endif %}</div>
+        <div class="s">{{ s.code }}{% if s.quartier %} · {{ s.quartier }}{% endif %}{% if s.marche %} · {{ s.marche }}{% endif %}{% if s.emplacement_code %} · {{ s.emplacement_code }}{% endif %}</div></div>
+      <div class="av">{% if s.libre > 0 %}<span class="chip"><i class="bi bi-check-circle-fill"></i> Disponible</span>{% else %}<span class="chip off"><i class="bi bi-x-circle-fill"></i> Occupé</span>{% endif %}</div>
+      <div class="ac">{% if s.libre > 0 %}<a class="btn10 sm" href="{% url 'portail:reserver_etape1' %}?{% if cat.categorie == 'Marché' %}face={{ s.id }}{% else %}ville={{ v.nom|urlencode }}{% endif %}">Réserver</a>{% endif %}</div>
+      {% else %}
+      <div class="th{% if s.image_url|slice:'-4:' == '.png' %} cut{% endif %}"><img src="{% static s.image_url %}" alt="Format {{ s.format|default:s.dimensions }}" loading="lazy" onerror="this.remove()"></div>
+      <div><div class="t">{% if s.format %}{{ s.format }}{% else %}{{ s.dimensions }}{% endif %}</div><div class="s">{% if s.superficie %}{{ s.superficie }} · {% endif %}{{ s.count }} face{{ s.count|pluralize }}</div></div>
+      <div class="av">{% if s.libre > 0 %}<span class="chip"><i class="bi bi-check-circle-fill"></i> {{ s.libre }} libre{{ s.libre|pluralize }}</span>{% else %}<span class="chip off"><i class="bi bi-x-circle-fill"></i> Complet</span>{% endif %}<div class="seg" aria-hidden="true"><i style="width:{% widthratio s.libre s.count 100 %}%"></i></div></div>
+      <div class="ac">{% if s.libre > 0 %}<a class="btn10 sm" href="{% url 'portail:reserver_etape1' %}?ville={{ v.nom|urlencode }}&amp;categorie={{ cat.categorie|urlencode }}&amp;format={{ s.format|urlencode }}">Réserver</a>{% endif %}</div>
+      {% endif %}
+    </article>
+    {% endfor %}
+    {% endfor %}
+  </div>
+  {% endfor %}
+  </div>
+  {% else %}<div class="empty">Aucun emplacement n'est affiché pour le moment.<div class="mt-3"><a class="btn10" href="{% url 'portail:reserver_etape1' %}">Faire une demande</a></div></div>{% endif %}
+</div></section>
+
+<section class="sec" id="carte"><div class="container">
+  <div class="lab">Emplacements</div><h2 class="h2">Le réseau sur la carte.</h2>
+  <p class="lead2 mb-4">Chaque point est un support géolocalisé ; sa couleur indique la disponibilité du jour.</p>
+  <div class="mapf"><div id="map" role="region" aria-label="Carte des supports"><div class="mapmsg" id="mapmsg">Chargement de la carte…</div></div></div>
+  <div class="leg"><span><i style="background:#22c55e"></i>Face libre</span><span><i style="background:#f97316"></i>Réservé</span><span><i style="background:#ef4444"></i>Occupé</span><span><i style="background:#3b82f6"></i>Écran</span><span><i style="background:#6b7280"></i>En panne</span></div>
+</div></section>
+
+<section class="sec" id="methode" style="background:var(--pn)"><div class="container">
+  <div class="lab">Comment réserver</div><h2 class="h2">Une demande en quatre temps.</h2>
+  <div class="row g-4 mt-1">
+    <div class="col-sm-6 col-lg-3"><div class="step rv"><b>01</b><h3>Choisissez</h3><p>Sélectionnez vos emplacements sur la carte et indiquez la période souhaitée.</p></div></div>
+    <div class="col-sm-6 col-lg-3"><div class="step rv"><b>02</b><h3>Précisez</h3><p>Nom de campagne et message, si vous le souhaitez.</p></div></div>
+    <div class="col-sm-6 col-lg-3"><div class="step rv"><b>03</b><h3>Identifiez-vous</h3><p>Nouveau client, ou client existant avec votre référence.</p></div></div>
+    <div class="col-sm-6 col-lg-3"><div class="step rv"><b>04</b><h3>Suivez</h3><p>Retrouvez votre demande avec sa référence et votre email.</p></div></div>
+  </div>
+  <div class="d-flex flex-wrap gap-2 mt-4"><a class="btn10" href="{% url 'portail:reserver_etape1' %}">Commencer ma demande <i class="bi bi-arrow-right"></i></a><a class="btn10 ghost" href="{% url 'portail:suivi_demande' %}">Suivre une demande</a></div>
+</div></section>
+
+<section class="sec" id="contact"><div class="container"><div class="row g-4 g-lg-5">
+  <div class="col-lg-5 ctc p-4 align-self-start">
+    <div class="lab">Contact</div><h2 class="h2">Parlons de votre campagne.</h2>
+    <p class="lead2">Notre équipe vous répond sous 48 h ouvrables.</p>
+    <ul>
+      <li><i class="bi bi-geo-alt-fill"></i>Ouagadougou, Burkina Faso</li>
+      {% if CONTACT_TEL01 %}<li><i class="bi bi-telephone-fill"></i><a href="tel:{{ CONTACT_TEL01|cut:' ' }}">{{ CONTACT_TEL01 }}</a>{% if CONTACT_TEL02 %} · <a href="tel:{{ CONTACT_TEL02|cut:' ' }}">{{ CONTACT_TEL02 }}</a>{% endif %}</li>{% endif %}
+      {% if CONTACT_EMAIL %}<li><i class="bi bi-envelope-fill"></i><a href="mailto:{{ CONTACT_EMAIL }}">{{ CONTACT_EMAIL }}</a></li>{% endif %}
+      <li><i class="bi bi-clock-fill"></i>Lun–Ven 08h–18h · Sam 09h–13h</li>
+    </ul>
+  </div>
+  <div class="col-lg-7"><form class="frm" id="cf" novalidate>{% csrf_token %}<div id="fm" role="status"></div>
+    <div class="row g-3">
+      <div class="col-md-6"><label for="nom">Nom complet *</label><input class="form-control" id="nom" name="nom" required autocomplete="name"></div>
+      <div class="col-md-6"><label for="email">Email *</label><input class="form-control" type="email" id="email" name="email" required autocomplete="email"></div>
+      <div class="col-md-6"><label for="telephone">Téléphone</label><input class="form-control" type="tel" id="telephone" name="telephone" autocomplete="tel"></div>
+      <div class="col-md-6"><label for="societe">Société</label><input class="form-control" id="societe" name="societe" placeholder="Optionnel"></div>
+      <div class="col-12"><label for="sujet">Sujet *</label><select class="form-select" id="sujet" name="sujet" required><option value="">Sélectionnez un sujet</option><option value="demande-reservation">Demande de réservation</option><option value="info-tarif">Informations tarifaires</option><option value="probleme-technique">Problème technique</option><option value="autre">Autre</option></select></div>
+      <div class="col-12"><label for="message">Message *</label><textarea class="form-control" id="message" name="message" rows="4" required></textarea></div>
+      <div class="col-12"><button class="btn10 w-100" type="submit"><i class="bi bi-send-fill"></i> Envoyer le message</button></div>
+    </div></form></div>
+</div></div></section>
+
+<section class="band"><div class="container d-flex flex-wrap gap-3 justify-content-between align-items-center">
+  <h2>Votre message, à l'affiche.</h2>
+  <a class="btn10" href="{% url 'portail:reserver_etape1' %}" style="background:#111;border-color:#111;color:#fff!important">Faire une demande <i class="bi bi-arrow-right"></i></a>
+</div></section>
+</main>
+
+<footer class="ft"><div class="container"><div class="row g-4">
+  <div class="col-lg-5"><h5>Integral.</h5><p>Régie publicitaire spécialisée dans l'affichage extérieur : panneaux grand format, écrans numériques et supports urbains au Burkina Faso.</p></div>
+  <div class="col-6 col-lg-3"><h5>Explorer</h5><ul><li><a href="#supports">Supports</a></li><li><a href="#reseau">Réseau</a></li><li><a href="#carte">Carte</a></li><li><a href="{% url 'portail:catalogue' %}">Catalogue</a></li></ul></div>
+  <div class="col-6 col-lg-4"><h5>Services</h5><ul><li><a href="{% url 'portail:reserver_etape1' %}">Faire une demande</a></li><li><a href="{% url 'portail:suivi_demande' %}">Suivre une demande</a></li><li><a href="{% url 'portail:services' %}">Nos services</a></li><li><a href="{% url 'portail:contact' %}">Contact</a></li></ul></div>
+</div><p class="mt-4 mb-0 small">&copy; {% now "Y" %} Promo Pub – Integral</p></div></footer>
+</div>
+
+{% if CONTACT_WHATSAPP %}<a class="wa" href="https://wa.me/{{ CONTACT_WHATSAPP }}" target="_blank" rel="noopener" aria-label="Contacter Integral sur WhatsApp"><i class="bi bi-whatsapp"></i></a>{% endif %}
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="{% static 'js/integral_map.js' %}"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script>
+(function(){
+  document.documentElement.classList.add('js');
+  var rv=document.querySelectorAll('.rv');
+  if('IntersectionObserver' in window){var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){e.target.classList.add('in');io.unobserve(e.target)}})},{threshold:.1});rv.forEach(function(el){io.observe(el)})}else{rv.forEach(function(el){el.classList.add('in')})}
+  var nv=document.getElementById('nv');
+  nv.querySelectorAll('a[href^="#"]').forEach(function(a){a.addEventListener('click',function(){var c=bootstrap.Collapse.getInstance(nv);if(c)c.hide()})});
+  var RES="{% url 'portail:reserver_etape1' %}",msg=document.getElementById('mapmsg'),map=null;
+  function say(t){msg.textContent=t;msg.style.display='flex'}
+  function initMap(){
+    if(map||!window.L)return;
+    map=L.map('map').setView([12.3714,-1.5197],12);
+    if(window.buildSafeLeafletTiles){window.buildSafeLeafletTiles(map,{attribution:'&copy; OpenStreetMap',maxZoom:19})}
+    else{L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'&copy; OpenStreetMap',maxZoom:19}).addTo(map)}
+    fetch("{% url 'portail:api_geojson' %}").then(function(r){return r.json()}).then(function(d){
+      if(!d||!d.features||!d.features.length){say("Aucun emplacement géolocalisé pour le moment.");return}
+      var g=L.geoJSON(d,{pointToLayer:function(f,ll){return L.circleMarker(ll,{radius:9,fillColor:f.properties.color||'#22c55e',color:'#fff',weight:2.5,fillOpacity:.95})},
+        onEachFeature:function(f,l){var p=f.properties,w=document.createElement('div'),b=document.createElement('strong'),s=document.createElement('div'),a=document.createElement('a');
+          b.textContent=p.nom||p.code;s.textContent=[p.ville,p.quartier,p.format].filter(Boolean).join(' · ');s.style.fontSize='12px';
+          a.textContent='Réserver dans cette ville';a.href=RES+'?ville='+encodeURIComponent(p.ville||'');a.style.cssText='display:inline-block;margin-top:6px;font-weight:700';
+          w.appendChild(b);w.appendChild(s);w.appendChild(a);l.bindPopup(w)}}).addTo(map);
+      msg.style.display='none';try{map.fitBounds(g.getBounds(),{padding:[30,30],maxZoom:15})}catch(e){}
+    }).catch(function(){say("La carte est momentanément indisponible.")});
+  }
+  var mc=document.getElementById('map');
+  if('IntersectionObserver' in window){new IntersectionObserver(function(es,o){if(es[0].isIntersecting){initMap();o.disconnect()}},{rootMargin:'300px'}).observe(mc)}else{initMap()}
+  var f=document.getElementById('cf'),fm=document.getElementById('fm');
+  f.addEventListener('submit',function(e){
+    e.preventDefault();
+    if(!f.checkValidity()){f.reportValidity();return}
+    var b=f.querySelector('button[type=submit]'),h=b.innerHTML;b.disabled=true;b.textContent='Envoi en cours…';fm.className='';
+    fetch("{% url 'portail:contact_envoyer' %}",{method:'POST',body:new FormData(f),headers:{'X-Requested-With':'XMLHttpRequest'}})
+      .then(function(r){return r.json()}).then(function(d){fm.className=d.success?'ok':'ko';fm.textContent=d.success?d.message:(d.error||'Une erreur est survenue.');if(d.success)f.reset()})
+      .catch(function(){fm.className='ko';fm.textContent='Erreur réseau. Veuillez réessayer.'})
+      .finally(function(){b.disabled=false;b.innerHTML=h});
+  });
+})();
+</script>
+</body>
+</html>

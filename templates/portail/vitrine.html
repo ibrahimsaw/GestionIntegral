@@ -1176,6 +1176,7 @@
   }
   .rn-bdg.available { background: #10b981; }
   .rn-bdg.full { background: #ef4444; }
+  .rn-bdg.reserved { background: #f59e0b; }
 
   .rn-ville-pill {
     position: absolute; bottom: 10px; left: 10px;
@@ -2734,7 +2735,9 @@
 
                   <div class="rn-img">
                     <img src="{% static support.image_url %}" alt="{{ ville.nom }} — {{ support.dimensions }}" loading="lazy">
-                    {% if support.libre > 0 %}
+                    {% if cat.categorie == 'Écran' %}
+                      <div class="rn-bdg reserved"><i class="bi bi-infinity"></i> Infini</div>
+                    {% elif support.libre > 0 %}
                     <span class="pulse-dot" style="width:6px;height:6px;"></span>
                       <div class="rn-bdg available"><i class="bi bi-check-circle-fill"></i> {{ support.libre }} libre{{ support.libre|pluralize:",s" }}</div>
                     {% else %}
@@ -2821,6 +2824,9 @@
           <div class="rn-pop-desc" id="rnpDesc"></div>
           <a href="#" id="rnpReserveBtn" class="rn-pop-btn">
             <i class="bi bi-calendar-check"></i> Réserver cet emplacement
+          </a>
+          <a href="#contact-section" id="rnpContactBtn" class="rn-pop-btn" style="display:none">
+            <i class="bi bi-chat-dots-fill"></i> Nous contacter
           </a>
           <div id="rnpFullMsg" class="rn-pop-fullmsg" style="display:none">
             <i class="bi bi-info-circle"></i> Complet pour le moment — contactez-nous pour être notifié.
@@ -3775,14 +3781,21 @@
       : `Emplacement ${categorie.toLowerCase()} situé à ${ville}. ${libre > 0 ? 'Réservez dès maintenant votre créneau.' : 'Actuellement complet — contactez-nous pour être notifié dès qu\'une place se libère.'}`;
 
     const btn = document.getElementById('rnpReserveBtn');
+    const contactBtn = document.getElementById('rnpContactBtn');
     const fullMsg = document.getElementById('rnpFullMsg');
     if (reserveUrl) {
       btn.href = reserveUrl;
       btn.classList.remove('disabled');
       btn.style.display = 'flex';
+      contactBtn.style.display = 'none';
+      fullMsg.style.display = 'none';
+    } else if (isEcran) {
+      btn.style.display = 'none';
+      contactBtn.style.display = 'flex';
       fullMsg.style.display = 'none';
     } else {
       btn.style.display = 'none';
+      contactBtn.style.display = 'none';
       fullMsg.style.display = 'flex';
     }
 
@@ -3811,6 +3824,7 @@
     rnPop.classList.remove('open');
     document.body.style.overflow = '';
   }
+  document.getElementById('rnpContactBtn').addEventListener('click', closeRnPop);
 
   // ── OFFRE SPÉCIALE : compte à rebours réel jusqu'à la fin du mois ──────
   function updateOfferCountdown() {

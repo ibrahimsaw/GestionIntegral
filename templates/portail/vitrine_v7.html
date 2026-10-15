@@ -103,13 +103,18 @@
   .hero-lead { margin-top: 24px; max-width: 50ch; font-size: clamp(1rem, 1.5vw, 1.15rem); color: rgba(255,255,255,.9); }
   .hero-actions { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 32px; }
   .poster { position: relative; background: var(--ink); border: var(--bw) solid var(--ink); box-shadow: 10px 10px 0 var(--accent); min-height: 360px; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; }
+  .poster-slide { position: absolute; inset: 0; display: flex; align-items: flex-end; }
+  .poster-slide[hidden] { display: none; }
+  .poster-slide.noimg img { display: none; }
   .poster img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-  .poster.noimg img { display: none; }
   .poster::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 40%, rgba(0,0,0,.88)); }
   .poster-cap { position: relative; z-index: 2; padding: 20px 22px 22px; color: #fff; }
   .poster-cap small { display: block; font-weight: 800; font-size: .7rem; letter-spacing: .16em; text-transform: uppercase; color: var(--accent); }
   .poster-cap b { display: block; font-family: var(--f-big); font-weight: 400; font-size: clamp(2.2rem, 5vw, 3.6rem); text-transform: uppercase; line-height: 1; margin: 4px 0; }
   .poster-cap span { font-size: .9rem; }
+  .poster-controls { position: absolute; z-index: 3; top: 14px; right: 14px; display: flex; align-items: center; gap: 8px; }
+  .poster-controls button { width: 42px; height: 42px; border: 2px solid var(--ink); background: var(--accent); color: var(--ink); font-size: 1.2rem; cursor: pointer; }
+  .poster-count { min-width: 48px; padding: 8px; background: var(--ink); color: #fff; font-weight: 800; font-size: .8rem; text-align: center; }
   @media (max-width: 899.98px) {
     .hero-grid { grid-template-columns: 1fr; }
     .poster { min-height: 240px; box-shadow: 6px 6px 0 var(--accent); }
@@ -339,7 +344,9 @@
   <div class="wrap head-in">
     <a class="brand" href="#top" aria-label="Integral — accueil">
       <img src="{% static 'img/logo.png' %}" alt="" onerror="this.style.display='none'" />
+      <!--
       <span class="brand-name">Integral<span>.</span></span>
+      -->
     </a>
     <ul class="nav-links">
       <li><a href="#supports">Supports</a></li>
@@ -396,16 +403,23 @@
         <a href="#reseau" class="btn-x btn-wht"><i class="bi bi-grid-3x3-gap"></i> Voir les disponibilités</a>
       </div>
     </div>
-    {% with top=villes_stats.0 %}
-    <figure class="poster{% if not top %} noimg{% endif %}" style="margin:0;">
-      {% if top %}
-      <img src="{% static top.image_url %}" alt="Panneaux publicitaires — {{ top.nom }}" onerror="this.parentNode.classList.add('noimg')" />
-      <figcaption class="poster-cap"><small>Principale ville du réseau</small><b>{{ top.nom }}</b><span>{{ top.faces_libres }} face{{ top.faces_libres|pluralize }} libre{{ top.faces_libres|pluralize }} sur {{ top.total_faces }}</span></figcaption>
+    <figure class="poster" id="cityPoster" role="group" aria-roledescription="carrousel" aria-label="Villes du réseau Integral" style="margin:0;">
+      {% if villes_stats %}
+      {% for ville in villes_stats %}
+      <div class="poster-slide" data-poster-slide{% if not forloop.first %} hidden{% endif %} role="group" aria-roledescription="diapositive" aria-label="{{ forloop.counter }} sur {{ villes_stats|length }}">
+        <img src="{% static ville.image_url %}" alt="Panneaux publicitaires — {{ ville.nom }}" onerror="this.parentNode.classList.add('noimg')" />
+        <div class="poster-cap"><small>{% if forloop.first %}Principale ville du réseau{% else %}Autre ville du réseau{% endif %}</small><b>{{ ville.nom }}</b><span>{{ ville.faces_libres }} face{{ ville.faces_libres|pluralize }} libre{{ ville.faces_libres|pluralize }} sur {{ ville.total_faces }}</span></div>
+      </div>
+      {% endfor %}
+      {% if villes_stats|length > 1 %}
+      <div class="poster-controls" aria-label="Défilement automatique des villes">
+        <span class="poster-count" id="posterCount" aria-hidden="true">1 / {{ villes_stats|length }}</span>
+      </div>
+      {% endif %}
       {% else %}
       <img src="{% static 'img/panneau 4x3 digitalVVV.png' %}" alt="Panneau publicitaire" onerror="this.parentNode.classList.add('noimg')" />
       {% endif %}
     </figure>
-    {% endwith %}
   </div>
 </section>
 
@@ -729,6 +743,34 @@
 <script>
 (function () {
   'use strict';
+
+  var poster = document.getElementById('cityPoster');
+  if (poster) {
+    var posterSlides = Array.prototype.slice.call(poster.querySelectorAll('[data-poster-slide]'));
+    if (posterSlides.length > 1) {
+      var posterIndex = 0, posterTimer, posterCount = document.getElementById('posterCount');
+      function showPosterSlide(index) {
+        posterIndex = (index + posterSlides.length) % posterSlides.length;
+        posterSlides.forEach(function (slide, i) {
+          slide.hidden = i !== posterIndex;
+          slide.setAttribute('aria-hidden', i === posterIndex ? 'false' : 'true');
+        });
+        posterCount.textContent = (posterIndex + 1) + ' / ' + posterSlides.length;
+      }
+      function stopPosterRotation() {
+        window.clearInterval(posterTimer);
+        posterTimer = null;
+      }
+      function startPosterRotation() {
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches || document.hidden || posterTimer) return;
+        posterTimer = window.setInterval(function () { showPosterSlide(posterIndex + 1); }, 5000);
+      }
+      document.addEventListener('visibilitychange', function () {
+        if (document.hidden) stopPosterRotation(); else startPosterRotation();
+      });
+      startPosterRotation();
+    }
+  }
 
   // Tiroir mobile
   var burger = document.getElementById('burger'), drawer = document.getElementById('drawer'), closeBtn = document.getElementById('closeDrawer');

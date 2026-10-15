@@ -141,7 +141,7 @@ from django.conf import settings
 # En attendant, on mappe ici un chemin static + une valeur de repli.
 # ──────────────────────────────────────────────────────────────────────────
 VILLE_IMAGES = {
-    'Koudougou': 'img/villes/image1 (1).jfif',
+    'Koudougou': 'img/villes/177704_891_Image1.jpg',
     'Ouagadougou': 'img/villes/image1 (6).jfif',
     'Bobo-Dioulasso':     'img/villes/image1 (5).jfif',
 }

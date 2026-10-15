@@ -1813,24 +1813,59 @@ class SupportBulkActionView(StaffRequiredMixin, View):
             })
 
         else:
-            # Panneaux : on ne garde que les panneaux du format ciblé, éventuellement de la ville ciblée.
+            # Les campagnes historiques peuvent encore porter le type générique
+            # "panneau", tandis que les nouvelles campagnes stockent un code format.
             supports_qs = Support.objects.filter(
                 type_support='panneau',
                 format=type_support,
                 etat='bon'
             )
+            if type_support == Support.TYPE_PANNEAU:
+                supports_qs = Support.objects.filter(
+                    type_support=Support.TYPE_PANNEAU,
+                    etat='bon',
+                )
+            elif not FormatSupport.objects.filter(code=type_support).exists():
+                formats_categorie = FormatSupport.objects.filter(
+                    categorie__iexact=type_support,
+                ).values('code')
+                if formats_categorie.exists():
+                    supports_qs = Support.objects.filter(
+                        type_support=Support.TYPE_PANNEAU,
+                        format__in=formats_categorie,
+                        etat='bon',
+                    )
+            villes_disponibles = (
+                supports_qs.exclude(ville__exact='')
+                .order_by()
+                .values_list('ville', flat=True)
+                .distinct()
+                .order_by('ville')
+            )
             if ville:
                 supports_qs = supports_qs.filter(ville=ville)
             supports_qs = supports_qs.prefetch_related('faces').order_by('ville', 'quartier')
 
-            selectionnes = list(campagne.lignes.values_list('face_id', flat=True))
+            selectionnes = set(
+                campagne.lignes.filter(face__isnull=False).values_list('face_id', flat=True)
+            )
+            pending_face_ids = request.GET.getlist('pending_faces')
+            if pending_face_ids:
+                selectionnes.update(
+                    FacePanneau.objects.filter(pk__in=pending_face_ids)
+                    .values_list('pk', flat=True)
+                )
 
             for support in supports_qs:
                 faces_enrichies = []
                 for face in support.faces.all():
                     faces_enrichies.append({
                         'face': face,
-                        'statut': face.get_statut(client=campagne.client),
+                        'statut': face.get_statut(
+                            date_debut=campagne.date_debut,
+                            date_fin=campagne.date_fin,
+                            client=campagne.client,
+                        ),
                     })
                 supports_enrichis.append({
                     'support': support,
@@ -1874,9 +1909,16 @@ class SupportBulkActionView(StaffRequiredMixin, View):
             return redirect('campagne_detail', pk=campagne_pk)
 
         if type_support != 'ecran':
-            face_ids = request.POST.getlist('faces')
-
-            campagne.lignes.filter(face__isnull=False).exclude(face_id__in=face_ids).delete()
+            face_ids = set(request.POST.getlist('pending_faces'))
+            face_ids.update(request.POST.getlist('faces'))
+            ville = request.GET.get('ville', '').strip()
+            lignes_faces = campagne.lignes.filter(face__isnull=False)
+            if ville:
+                face_ids.update(
+                    lignes_faces.exclude(face__support__ville=ville)
+                    .values_list('face_id', flat=True)
+                )
+            lignes_faces.exclude(face_id__in=face_ids).delete()
 
             for face_id in face_ids:
                 face = get_object_or_404(FacePanneau, pk=face_id)

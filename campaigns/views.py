@@ -1859,13 +1859,28 @@ class SupportBulkActionView(StaffRequiredMixin, View):
             for support in supports_qs:
                 faces_enrichies = []
                 for face in support.faces.all():
+                    statut = face.get_statut(
+                        date_debut=campagne.date_debut,
+                        date_fin=campagne.date_fin,
+                        client=campagne.client,
+                    )
+                    ligne_occupee = None
+                    if statut == 'occupe':
+                        ligne_occupee = (
+                            LigneCampagne.objects
+                            .filter(
+                                face=face,
+                                campagne__date_debut__lte=campagne.date_fin,
+                                campagne__date_fin__gte=campagne.date_debut,
+                                campagne__statut='en_cours',
+                            )
+                            .select_related('campagne')
+                            .first()
+                        )
                     faces_enrichies.append({
                         'face': face,
-                        'statut': face.get_statut(
-                            date_debut=campagne.date_debut,
-                            date_fin=campagne.date_fin,
-                            client=campagne.client,
-                        ),
+                        'statut': statut,
+                        'campagne_occupee': ligne_occupee.campagne if ligne_occupee else None,
                     })
                 supports_enrichis.append({
                     'support': support,

@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load l10n %}
 
 {% block title %}{{ mode_title }} — Integral{% endblock %}
 
@@ -10,6 +11,20 @@
 {% block content %}
 <style>
   .panel-view-toggle .btn.active { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+  #panel-selection-map { height: min(65vh, 620px); min-height: 360px; border-radius: .5rem; z-index: 0; }
+  .panel-map-popup .btn { white-space: normal; text-align: left; }
+  .panel-map-legend { display: flex; flex-wrap: wrap; gap: .75rem; font-size: .8rem; }
+  .panel-map-legend span { display: inline-flex; align-items: center; gap: .35rem; }
+  .panel-map-legend i { width: .7rem; height: .7rem; border-radius: 50%; display: inline-block; }
+  .panel-selection-item .panel-title,
+  .panel-selection-item .panel-name {
+    white-space: normal;
+    overflow: visible;
+    overflow-wrap: anywhere;
+    word-break: normal;
+    text-overflow: clip;
+  }
+  .panel-selection-item .panel-name { display: block; line-height: 1.35; }
   .panel-selection-list .panel-selection-item { flex: 0 0 100%; width: 100%; max-width: 100%; }
   .panel-selection-list .panel-selection-item > .card {
     display: flex;
@@ -19,41 +34,45 @@
     box-shadow: none !important;
   }
   .panel-selection-list .panel-selection-item .card-header {
+    /*
     display: flex !important;
-    flex: 1 1 55%;
+    */
+    flex: 1 1 70%;
     flex-direction: row;
     align-items: center;
     justify-content: flex-start;
     gap: .6rem;
     min-width: 0;
-    overflow: hidden;
+    overflow: visible;
+    /*
     padding: .45rem .7rem !important;
+    */
   }
   .panel-selection-list .panel-selection-item .card-header h6 {
-    display: flex;
-    flex: 0 1 auto;
-    align-items: baseline;
-    gap: .45rem;
+    display: block;
+    flex: 1 1 auto;
     min-width: 0;
     margin: 0 !important;
-    white-space: nowrap;
+    white-space: normal;
   }
   .panel-selection-list .panel-selection-item .card-header h6 p {
-    flex: 0 0 auto;
     font-size: .82rem;
   }
   .panel-selection-list .panel-selection-item .card-header h6 .small {
-    overflow: hidden;
-    text-overflow: ellipsis;
+    display: block;
+    overflow: visible;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
   }
   .panel-selection-list .panel-selection-item .card-header > div {
     flex: 0 1 auto;
     min-width: 0;
     text-align: left !important;
     font-size: .7rem !important;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: normal;
+    overflow: visible;
+    overflow-wrap: anywhere;
+    text-overflow: clip;
   }
   .panel-selection-list .panel-selection-item .card-body {
     flex: 0 0 45%;
@@ -93,17 +112,18 @@
     font-size: .74rem;
   }
   .panel-selection-list .panel-selection-item .card-body .row > .col-12 > .d-flex small { display: none; }
+  .panel-selection-list .panel-selection-item .occupied-campaign-name {
+    display: block !important;
+    white-space: normal;
+    font-size: .65rem;
+  }
   .panel-selection-list .panel-selection-item .card-body .row > .col-12 > .d-flex .badge { font-size: .62rem; }
   @media (max-width: 900px) {
     .panel-selection-list .panel-selection-item .card-header {
       flex-basis: 50%;
       gap: .4rem;
     }
-    .panel-selection-list .panel-selection-item .card-header h6 {
-      flex-wrap: nowrap;
-      column-gap: .35rem;
-      row-gap: 0;
-    }
+    .panel-selection-list .panel-selection-item .card-header h6 { white-space: normal; }
     .panel-selection-list .panel-selection-item .card-body { flex-basis: 50%; }
   }
   @media (max-width: 575.98px) {
@@ -114,13 +134,6 @@
 <div class="container-fluid py-4">
   <div class="row justify-content-center">
     <div class="col-12">
-      
-      <div class="d-flex align-items-center gap-3 mb-4">
-        <a href="{% url 'campagne_detail' campagne.pk %}" class="btn btn-outline-secondary btn-sm shadow-sm">
-          <i class="bi bi-arrow-left"></i>
-        </a>
-        <h1 class="h4 fw-bold mb-0">{{ mode_title }}</h1>
-      </div>
 
       {# ── Infos campagne ── #}
       <div class="card shadow-sm border-0 mb-4" style="border-radius: 12px;">
@@ -214,6 +227,8 @@
       {# ── Filtre ville ── #}
       <form method="get" class="card shadow-sm border-0 mb-3" style="border-radius: 12px;">
         <input type="hidden" name="type_support" value="{{ campagne.type_support }}">
+        <input type="hidden" name="q" id="panel-search-state" value="{{ panel_search_query }}">
+        <input type="hidden" name="view" id="panel-view-state" value="{{ panel_view }}">
         {% for face_id in selectionnes %}
           <input type="hidden" name="pending_faces" value="{{ face_id }}">
         {% endfor %}
@@ -228,7 +243,7 @@
             {% endfor %}
           </select>
           {% if ville_filtree %}
-            <a href="?type_support={{ campagne.type_support }}" class="btn btn-sm btn-outline-secondary">
+            <a href="?type_support={{ campagne.type_support|urlencode }}&amp;q={{ panel_search_query|urlencode }}&amp;view={{ panel_view|urlencode }}" class="btn btn-sm btn-outline-secondary">
               <i class="bi bi-x-lg me-1"></i>Réinitialiser
             </a>
           {% endif %}
@@ -251,6 +266,10 @@
           </div>
           {% if not mode_marche and campagne.type_support != 'ecran' %}
           <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+            <div class="input-group input-group-sm" style="width: min(100%, 280px);">
+              <span class="input-group-text"><i class="bi bi-search"></i></span>
+              <input type="search" class="form-control" id="panel-search" value="{{ panel_search_query }}" placeholder="Rechercher panneau, face ou campagne..." aria-label="Rechercher panneau, face ou campagne">
+            </div>
             <span class="badge bg-primary-subtle text-primary border" aria-live="polite">
               <span id="selected-face-count">{{ selectionnes|length }}</span> face(s) sélectionnée(s)
             </span>
@@ -260,6 +279,9 @@
               </button>
               <button type="button" class="btn btn-outline-secondary" id="panel-list-view" aria-pressed="false">
                 <i class="bi bi-list-ul me-1"></i>Liste
+              </button>
+              <button type="button" class="btn btn-outline-secondary" id="panel-map-view" aria-pressed="false">
+                <i class="bi bi-map me-1"></i>Carte
               </button>
             </div>
           </div>
@@ -294,7 +316,7 @@
 
                   {% for marche_group in marche_group_list %}
                     {% with marche=marche_group.grouper %}
-                    <div class="quartier-section mb-4 ms-md-3">
+                    <div class="quartier-section">
                       <h3 class="h6 fw-bold text-muted mb-3 text-uppercase">
                         <i class="bi bi-shop me-2"></i>{{ marche.nom }}
                         <span class="badge bg-light text-dark border fw-normal ms-2">{{ marche.quartier|default:"Général" }}</span>
@@ -335,7 +357,7 @@
                                 </div>
                               {% elif item.jours_dispo == 0 %}
                                 {# ── Bloqué : intégralement réservé par une autre campagne ── #}
-                                <div class="d-flex justify-content-between align-items-center p-3 border rounded-3 bs-occupe opacity-50" style="cursor: not-allowed;">
+                                <div class="d-flex justify-content-between align-items-center p-1 border rounded-3 bs-occupe opacity-50" style="cursor: not-allowed;">
                                   <span class="small fw-bold text-danger-emphasis">
                                     <i class="bi bi-lock-fill me-2"></i>{{ emplacement.code }}
                                     <small class="d-block fw-normal opacity-75">{{ emplacement.notes|default:"—"|truncatechars:40 }}</small>
@@ -372,6 +394,20 @@
 
           {% elif supports_enrichis or supports %}
             
+            <div id="panel-selection-map-wrap" class="mb-4 d-none">
+              <div class="panel-map-legend mb-2" aria-label="Légende de la carte">
+                <span><i style="background:#16a34a"></i>Faces disponibles</span>
+                <span><i style="background:#ea580c"></i>Partiellement occupé</span>
+                <span><i style="background:#dc2626"></i>Occupé</span>
+                <span><i style="background:#7c3aed"></i>Réservé</span>
+                <span><i style="background:#64748b"></i>En panne</span>
+              </div>
+              <div id="panel-selection-map" role="region" aria-label="Carte de sélection des panneaux"></div>
+            </div>
+            <div id="panel-search-empty" class="alert alert-light border d-none" role="status">
+              Aucun panneau ne correspond à cette recherche.
+            </div>
+
             {# 1. Premier niveau : Regroupement par VILLE #}
             {% regroup supports_enrichis by support.ville as ville_list %}
 
@@ -390,7 +426,7 @@
                       <i class="bi bi-signpost-split me-2"></i>Quartier : {{ quartier.grouper|default:"Général / Non spécifié" }}
                     </h3>
 
-                    <div class="row g-4">
+                    <div class="row g-4" style="margin-top: 0px !important;">
 
                       {# ═══════════════ ÉCRANS ═══════════════ #}
                       {% if campagne.type_support == 'ecran' %}
@@ -507,12 +543,15 @@
                       {% else %}
                         {% for item in quartier.list %}
                           {% with support=item.support %}
-                            <div class="col-md-6 col-xl-4 panel-selection-item">
+                            <div class="col-md-6 col-xl-4 panel-selection-item" style="margin: 0px !important;"
+                                 data-lat="{{ support.latitude|unlocalize }}"
+                                 data-lng="{{ support.longitude|unlocalize }}"
+                                 data-search="{{ support.code }} {{ support.nom }} {{ support.ville }} {{ support.quartier }}">
                               <div class="card h-100 border rounded-3 overflow-hidden shadow-sm">
                                 <div class="card-header bg-light border-bottom p-3" style="display: block;">
-                                  <h6 class="fw-bold mb-1 text-truncate">
+                                  <h6 class="fw-bold mb-1 panel-title">
                                     <p class="mb-0" style="color: var(--color-primary);">{{ support.code }}</p>
-                                    <span class="small text-muted">{{ support.nom }}</span>
+                                    <span class="small text-muted panel-name">{{ support.nom }}</span>
                                   </h6>
                                   <div class="small text-muted" style="text-align: center;">
                                     <i class="bi bi-geo-alt me-1"></i>{{ support.quartier|default:"" }} ({{ support.ville|default:"Ouagadougou" }})
@@ -530,7 +569,7 @@
                                               <input type="checkbox" name="faces" value="{{ face.pk }}" id="face_{{ face.pk }}"
                                                     class="btn-check face-checkbox" autocomplete="off"
                                                     {% if face.pk in selectionnes %}checked{% endif %}>
-                                              <label class="btn bs-disponible w-100 text-start p-3 d-flex justify-content-between align-items-center rounded-3 face-label-element"
+                                              <label class="btn bs-disponible w-100 text-start p-1 d-flex justify-content-between align-items-center rounded-3 face-label-element"
                                                     for="face_{{ face.pk }}">
                                                 <span class="d-flex align-items-center">
                                                   <i class="bi {% if face.pk in selectionnes %}bi-check-circle-fill{% else %}bi-circle{% endif %} fs-5 me-2 check-icon"></i>
@@ -558,18 +597,16 @@
                                             <div class="d-flex justify-content-between align-items-center p-3 border rounded-3 bs-panne opacity-75" style="cursor: not-allowed;">
                                               <span class="small fw-bold">
                                                 <i class="bi bi-tools me-2"></i>Face {{ face.label }}
-                                                <small class="d-block fw-normal opacity-75">{{ face.get_eclairage_display }}</small>
                                               </span>
                                               <span class="badge border bs-panne">En Panne</span>
                                             </div>
                                           {% else %}
-                                            <div class="d-flex justify-content-between align-items-center p-3 border rounded-3 bs-occupe opacity-50" style="cursor: not-allowed;">
+                                            <div class="d-flex justify-content-between align-items-center p-1 border rounded-3 bs-occupe opacity-50" style="cursor: not-allowed;">
                                               <span class="small fw-bold text-danger-emphasis">
                                                 <i class="bi bi-lock-fill me-2"></i>Face {{ face.label }}
-                                                <small class="d-block fw-normal opacity-75">{{ face.get_eclairage_display }}</small>
-                                                {% if fd.campagne_occupee %}
-                                                  <small class="d-block fw-normal opacity-75">{{ fd.campagne_occupee.nom }}</small>
-                                                {% endif %}
+                                                {% for campagne_occupee in fd.campagnes_occupees %}
+                                                  <small class="d-block fw-normal opacity-75 occupied-campaign-name">{{ campagne_occupee.nom }}</small>
+                                                {% endfor %}
                                               </span>
                                               <span class="badge border bs-occupe">Occupée</span>
                                             </div>
@@ -672,21 +709,169 @@ syncPendingFaces();
 const panelSelectionContent = document.getElementById('panel-selection-content');
 const panelGridViewButton = document.getElementById('panel-grid-view');
 const panelListViewButton = document.getElementById('panel-list-view');
+const panelMapViewButton = document.getElementById('panel-map-view');
+const panelSearchInput = document.getElementById('panel-search');
+const panelSearchState = document.getElementById('panel-search-state');
+const panelViewState = document.getElementById('panel-view-state');
+const panelMapElement = document.getElementById('panel-selection-map');
+const panelMapWrap = document.getElementById('panel-selection-map-wrap');
+const panelSearchEmpty = document.getElementById('panel-search-empty');
+const panelItems = Array.from(document.querySelectorAll('.panel-selection-item'));
+let panelMap;
+let panelMarkers = [];
+let currentPanelView = panelViewState?.value || 'grid';
 
 function setPanelView(view) {
   if (!panelSelectionContent) return;
   const isList = view === 'list';
+  const isMap = view === 'map';
+  currentPanelView = view;
+  if (panelViewState) panelViewState.value = view;
   panelSelectionContent.classList.toggle('panel-selection-list', isList);
-  panelGridViewButton.classList.toggle('active', !isList);
-  panelListViewButton.classList.toggle('active', isList);
-  panelGridViewButton.setAttribute('aria-pressed', String(!isList));
-  panelListViewButton.setAttribute('aria-pressed', String(isList));
+  if (panelMapWrap) panelMapWrap.classList.toggle('d-none', !isMap);
+  applyPanelSearch();
+  [[panelGridViewButton, view === 'grid'], [panelListViewButton, isList], [panelMapViewButton, isMap]]
+    .forEach(function([button, active]) {
+      if (!button) return;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-pressed', String(active));
+    });
+  if (isMap) {
+    initializePanelMap();
+    window.setTimeout(function() {
+      panelMap.invalidateSize();
+      refreshPanelMarkers();
+    }, 0);
+  }
 }
 
-if (panelGridViewButton && panelListViewButton) {
+if (panelGridViewButton && panelListViewButton && panelMapViewButton) {
   panelGridViewButton.addEventListener('click', function() { setPanelView('grid'); });
   panelListViewButton.addEventListener('click', function() { setPanelView('list'); });
+  panelMapViewButton.addEventListener('click', function() { setPanelView('map'); });
 }
+
+function createPanelPopup(item) {
+  const popup = document.createElement('div');
+  popup.className = 'panel-map-popup';
+  const title = document.createElement('strong');
+  title.textContent = item.querySelector('.card-header h6')?.innerText.trim() || 'Panneau';
+  popup.appendChild(title);
+
+  const location = document.createElement('div');
+  location.className = 'small text-muted mb-2';
+  location.textContent = item.querySelector('.card-header > div')?.innerText.trim() || '';
+  popup.appendChild(location);
+
+  item.querySelectorAll('.card-body .row > .col-12').forEach(function(faceItem) {
+    const faceName = faceItem.querySelector('strong')?.innerText.trim() || faceItem.innerText.trim().split('\n')[0];
+    const checkbox = faceItem.querySelector('.face-checkbox');
+    if (!checkbox) {
+      const blocked = document.createElement('div');
+      blocked.className = 'small border rounded p-2 mb-1';
+      blocked.textContent = faceItem.innerText.trim();
+      popup.appendChild(blocked);
+      return;
+    }
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `btn btn-sm w-100 mb-1 ${checkbox.checked ? 'btn-primary' : 'btn-outline-primary'}`;
+    button.textContent = `${checkbox.checked ? 'Retirer' : 'Sélectionner'} — ${faceName}`;
+    button.addEventListener('click', function() {
+      checkbox.checked = !checkbox.checked;
+      checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+      button.className = `btn btn-sm w-100 mb-1 ${checkbox.checked ? 'btn-primary' : 'btn-outline-primary'}`;
+      button.textContent = `${checkbox.checked ? 'Retirer' : 'Sélectionner'} — ${faceName}`;
+    });
+    popup.appendChild(button);
+  });
+  return popup;
+}
+
+function refreshPanelMarkers() {
+  if (!panelMap) return;
+  const query = (panelSearchInput?.value || '').trim().toLocaleLowerCase();
+  const shownMarkers = [];
+  panelMarkers.forEach(function(entry) {
+    const visible = !entry.item.classList.contains('d-none') && (!query || entry.item.textContent.toLocaleLowerCase().includes(query));
+    if (visible) {
+      entry.marker.addTo(panelMap);
+      shownMarkers.push(entry.marker);
+    } else {
+      entry.marker.remove();
+    }
+  });
+  if (shownMarkers.length) {
+    const bounds = L.featureGroup(shownMarkers).getBounds();
+    if (bounds.isValid()) panelMap.fitBounds(bounds, { padding: [24, 24], maxZoom: 15 });
+  }
+}
+
+function initializePanelMap() {
+  if (!panelMapElement || panelMap) return;
+  if (typeof L === 'undefined') {
+    throw new Error('Leaflet est nécessaire pour afficher la carte de sélection.');
+  }
+  panelMap = L.map(panelMapElement, { scrollWheelZoom: false }).setView([12.3714, -1.5197], 12);
+  if (typeof window.buildSafeLeafletTiles === 'function') {
+    window.buildSafeLeafletTiles(panelMap, { attribution: '&copy; OpenStreetMap contributors', maxZoom: 19 });
+  } else {
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors',
+      maxZoom: 19
+    }).addTo(panelMap);
+  }
+
+  panelItems.forEach(function(item) {
+    const lat = Number(item.dataset.lat);
+    const lng = Number(item.dataset.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    const faceItems = Array.from(item.querySelectorAll('.card-body .row > .col-12'));
+    const hasAvailable = faceItems.some(function(faceItem) { return Boolean(faceItem.querySelector('.face-checkbox')); });
+    const hasOccupied = faceItems.some(function(faceItem) { return faceItem.querySelector('.bs-occupe'); });
+    const hasReserved = faceItems.some(function(faceItem) { return faceItem.querySelector('.bs-reserve'); });
+    const hasBroken = faceItems.some(function(faceItem) { return faceItem.querySelector('.bs-panne'); });
+    const fillColor = hasOccupied
+      ? (hasAvailable ? '#ea580c' : '#dc2626')
+      : hasReserved
+        ? '#7c3aed'
+        : hasBroken && !hasAvailable
+          ? '#64748b'
+          : '#16a34a';
+    const marker = L.circleMarker([lat, lng], {
+      radius: 9,
+      color: '#fff',
+      weight: 2,
+      fillColor: fillColor,
+      fillOpacity: 0.9
+    }).bindPopup(function() { return createPanelPopup(item); });
+    panelMarkers.push({ item: item, marker: marker });
+  });
+  refreshPanelMarkers();
+}
+
+function applyPanelSearch() {
+  const query = (panelSearchInput?.value || '').trim().toLocaleLowerCase();
+  if (panelSearchState) panelSearchState.value = panelSearchInput?.value.trim() || '';
+  let visibleCount = 0;
+  panelItems.forEach(function(item) {
+    const visible = !query || item.textContent.toLocaleLowerCase().includes(query);
+    item.classList.toggle('d-none', !visible);
+    if (visible) visibleCount += 1;
+  });
+  if (panelSearchEmpty) panelSearchEmpty.classList.toggle('d-none', !query || visibleCount > 0);
+  panelSelectionContent.querySelectorAll('.quartier-section, .ville-section').forEach(function(section) {
+    const hasVisibleItems = section.querySelector('.panel-selection-item:not(.d-none)');
+    section.classList.toggle('d-none', currentPanelView === 'map' || !hasVisibleItems);
+  });
+  refreshPanelMarkers();
+}
+
+if (panelSearchInput) {
+  panelSearchInput.addEventListener('input', applyPanelSearch);
+}
+setPanelView(currentPanelView);
 
 document.querySelectorAll('.ecran-checkbox').forEach(function(checkbox) {
   checkbox.addEventListener('change', function() {

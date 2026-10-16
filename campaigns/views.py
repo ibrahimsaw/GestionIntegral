@@ -208,7 +208,7 @@ from .models import (
 
 
 class DashboardView(LoginRequiredMixin, TemplateView):
-    template_name = 'campaigns/dashboard.html'
+    template_name = 'campaigns/accueil_parc.html'
 
     CATEGORY_COLORS = {
         'Standard': 'var(--color-primary)',
@@ -351,6 +351,60 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         format_category_stats = self._build_format_category_stats(
             format_categories_codes, ville_active, faces_occupees_ids, faces_reservees_ids
         )
+        formats_stats = self._build_format_stats(
+            ville_active, faces_occupees_ids, faces_reservees_ids
+        )
+        categories_detail = {}
+        for format_stats in formats_stats:
+            categorie = format_stats['categorie']
+            category_stats = categories_detail.setdefault(categorie, {
+                'label': categorie,
+                'color': self.CATEGORY_COLORS.get(categorie, self.DEFAULT_CATEGORY_COLOR),
+                'formats': [],
+                'format_codes': set(),
+                'campagnes': {},
+                'nb_formats': 0,
+                'nb_supports': 0,
+                'nb_faces': 0,
+                'nb_faces_libres': 0,
+                'nb_faces_occupees': 0,
+                'nb_faces_reservees': 0,
+                'nb_faces_panne': 0,
+            })
+            category_stats['formats'].append(format_stats)
+            category_stats['format_codes'].add(format_stats['code'])
+            category_stats['nb_formats'] += 1
+            for field in (
+                'nb_supports',
+                'nb_faces',
+                'nb_faces_libres',
+                'nb_faces_occupees',
+                'nb_faces_reservees',
+                'nb_faces_panne',
+            ):
+                category_stats[field] += format_stats[field]
+
+        for campaign in campagnes_actives_list + campagnes_a_venir_list:
+            campaign_formats_by_category = {}
+            for ligne in campaign.lignes.all():
+                support = ligne.support
+                if support is None and ligne.face_id:
+                    support = ligne.face.support
+                if support is None:
+                    continue
+                for category_stats in categories_detail.values():
+                    if support.format in category_stats['format_codes']:
+                        campaign_formats_by_category.setdefault(category_stats['label'], category_stats)
+            for category_stats in campaign_formats_by_category.values():
+                category_stats['campagnes'][campaign.pk] = campaign
+
+        categories_detail = list(categories_detail.values())
+        for category_stats in categories_detail:
+            category_stats['format_codes'] = None
+            category_stats['campagnes'] = sorted(
+                category_stats['campagnes'].values(),
+                key=lambda campaign: (campaign.date_debut, campaign.nom),
+            )
 
         total_faces_occupe = sum(cat['nb_occupe'] for cat in format_category_stats)
         total_faces_reserve = sum(cat['nb_reserve'] for cat in format_category_stats)
@@ -406,6 +460,10 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             'villes': villes,
 
             'total_supports': parc['total'],
+            'total_campagnes': campagnes_qs.count(),
+            'total_villes': len(villes),
+            'total_formats': len(formats_stats),
+            'categories_detail': categories_detail,
             'supports_bon': parc['nb_supports_bon'],
             'supports_panne': parc['nb_supports_panne'],
             'total_clients': clients_qs.count(),
@@ -424,6 +482,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             'nb_ecrans_panne': parc['nb_ecrans_panne'],
             'nb_ecrans': parc['nb_ecrans'],
             'format_categories': format_category_stats,
+            'formats_stats': formats_stats,
             'total_faces': total_faces,
             'total_faces_occupe': total_faces_occupe,
             'total_faces_reserve': total_faces_reserve,
@@ -447,6 +506,72 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             'types_stats_json': types_stats_json,
         })
         return context
+
+    def _build_format_stats(self, ville_active, faces_occupees_ids, faces_reservees_ids):
+        """Construit les indicateurs pour chaque format individuel du parc."""
+        formats = list(FormatSupport.objects.exclude(categorie__iexact='Ecran').order_by('categorie', 'code'))
+        if not formats:
+            return []
+
+        format_codes = [format_support.code for format_support in formats]
+        supports_qs = Support.objects.filter(
+            type_support=Support.TYPE_PANNEAU,
+            format__in=format_codes,
+        )
+        faces_qs = FacePanneau.objects.filter(support__format__in=format_codes)
+        if ville_active:
+            supports_qs = supports_qs.filter(ville__iexact=ville_active)
+            faces_qs = faces_qs.filter(support__ville__iexact=ville_active)
+
+        supports_by_format = {
+            row['format']: row
+            for row in supports_qs.values('format').annotate(
+                total=Count('id'),
+                bon=Count('id', filter=Q(etat=Support.ETAT_BON)),
+                maintenance=Count('id', filter=Q(etat=Support.ETAT_MAINTENANCE)),
+                panne=Count('id', filter=Q(etat=Support.ETAT_PANNE)),
+            )
+        }
+
+        faces_by_format = {}
+        for face_id, format_code, etat in faces_qs.values_list('id', 'support__format', 'etat'):
+            counts = faces_by_format.setdefault(format_code, {
+                'total': 0, 'bon': 0, 'panne': 0, 'occupe': 0, 'reserve': 0,
+            })
+            counts['total'] += 1
+            if etat == Support.ETAT_PANNE:
+                counts['panne'] += 1
+            elif etat == Support.ETAT_BON:
+                counts['bon'] += 1
+                if face_id in faces_occupees_ids:
+                    counts['occupe'] += 1
+                elif face_id in faces_reservees_ids:
+                    counts['reserve'] += 1
+
+        stats = []
+        for format_support in formats:
+            support_counts = supports_by_format.get(format_support.code, {})
+            face_counts = faces_by_format.get(format_support.code, {})
+            nb_faces_bon = face_counts.get('bon', 0)
+            stats.append({
+                'code': format_support.code,
+                'categorie': format_support.categorie or 'Sans catégorie',
+                'dimensions': format_support.dimensions,
+                'superficie': format_support.superficie,
+                'nb_supports': support_counts.get('total', 0),
+                'nb_supports_bon': support_counts.get('bon', 0),
+                'nb_supports_maintenance': support_counts.get('maintenance', 0),
+                'nb_supports_panne': support_counts.get('panne', 0),
+                'nb_faces': face_counts.get('total', 0),
+                'nb_faces_libres': max(
+                    0,
+                    nb_faces_bon - face_counts.get('occupe', 0) - face_counts.get('reserve', 0),
+                ),
+                'nb_faces_occupees': face_counts.get('occupe', 0),
+                'nb_faces_reservees': face_counts.get('reserve', 0),
+                'nb_faces_panne': face_counts.get('panne', 0),
+            })
+        return stats
 
     def _build_format_category_stats(self, format_categories_codes, ville_active, faces_occupees_ids, faces_reservees_ids):
         """Calcule les stats par catégorie de format en 3 requêtes fixes,
@@ -1742,6 +1867,10 @@ class SupportBulkActionView(StaffRequiredMixin, View):
         campagne = self.get_campagne(campagne_pk)
         type_support = request.GET.get('type_support', campagne.type_support or '').strip()
         ville = request.GET.get('ville', campagne.lieu or '').strip()
+        panel_search_query = request.GET.get('q', '').strip()
+        panel_view = request.GET.get('view', 'grid')
+        if panel_view not in {'grid', 'list', 'map'}:
+            panel_view = 'grid'
 
         is_modification = campagne.lignes.exists()
         mode_title = "Modifier la sélection" if is_modification else "Ajouter des supports"
@@ -1864,23 +1993,23 @@ class SupportBulkActionView(StaffRequiredMixin, View):
                         date_fin=campagne.date_fin,
                         client=campagne.client,
                     )
-                    ligne_occupee = None
+                    campagnes_occupees = []
                     if statut == 'occupe':
-                        ligne_occupee = (
-                            LigneCampagne.objects
+                        campagnes_occupees = list(
+                            Campagne.objects
                             .filter(
-                                face=face,
-                                campagne__date_debut__lte=campagne.date_fin,
-                                campagne__date_fin__gte=campagne.date_debut,
-                                campagne__statut='en_cours',
+                                lignes__face=face,
+                                date_debut__lte=campagne.date_fin,
+                                date_fin__gte=campagne.date_debut,
+                                statut='en_cours',
                             )
-                            .select_related('campagne')
-                            .first()
+                            .order_by('nom')
+                            .distinct()
                         )
                     faces_enrichies.append({
                         'face': face,
                         'statut': statut,
-                        'campagne_occupee': ligne_occupee.campagne if ligne_occupee else None,
+                        'campagnes_occupees': campagnes_occupees,
                     })
                 supports_enrichis.append({
                     'support': support,
@@ -1899,6 +2028,8 @@ class SupportBulkActionView(StaffRequiredMixin, View):
             # ✅ Nouveau : contexte pour le filtre ville
             'ville_filtree': ville,
             'villes_disponibles': villes_disponibles,
+            'panel_search_query': panel_search_query,
+            'panel_view': panel_view,
         })
 
     def post(self, request, campagne_pk):

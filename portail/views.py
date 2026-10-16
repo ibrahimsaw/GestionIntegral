@@ -545,6 +545,18 @@ class AccueilV8View(View):
             **compteurs,
             'oua_center': [12.3714, -1.5197],
         })
+        
+
+class AccueilV9View(View):
+    """Vitrine V9 — design inspiré des panneaux et des écrans LED (même contexte que les autres vitrines)."""
+    template_name = 'portail/vitrine_v9.html'
+
+    def get(self, request):
+        compteurs = _get_compteurs()
+        return render(request, self.template_name, {
+            **compteurs,
+            'oua_center': [12.3714, -1.5197],
+        })
 
 
 class AccueilV10View(View):

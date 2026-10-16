@@ -8,6 +8,109 @@
 {% endblock %}
 
 {% block content %}
+<style>
+  .panel-view-toggle .btn.active { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+  .panel-selection-list .panel-selection-item { flex: 0 0 100%; width: 100%; max-width: 100%; }
+  .panel-selection-list .panel-selection-item > .card {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    overflow: visible !important;
+    box-shadow: none !important;
+  }
+  .panel-selection-list .panel-selection-item .card-header {
+    display: flex !important;
+    flex: 1 1 55%;
+    flex-direction: row;
+    align-items: center;
+    justify-content: flex-start;
+    gap: .6rem;
+    min-width: 0;
+    overflow: hidden;
+    padding: .45rem .7rem !important;
+  }
+  .panel-selection-list .panel-selection-item .card-header h6 {
+    display: flex;
+    flex: 0 1 auto;
+    align-items: baseline;
+    gap: .45rem;
+    min-width: 0;
+    margin: 0 !important;
+    white-space: nowrap;
+  }
+  .panel-selection-list .panel-selection-item .card-header h6 p {
+    flex: 0 0 auto;
+    font-size: .82rem;
+  }
+  .panel-selection-list .panel-selection-item .card-header h6 .small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .panel-selection-list .panel-selection-item .card-header > div {
+    flex: 0 1 auto;
+    min-width: 0;
+    text-align: left !important;
+    font-size: .7rem !important;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .panel-selection-list .panel-selection-item .card-body {
+    flex: 0 0 45%;
+    min-width: 0;
+    overflow-x: auto;
+    padding: .35rem .6rem !important;
+  }
+  .panel-selection-list .panel-selection-item .card-body > p { display: none; }
+  .panel-selection-list .panel-selection-item .card-body .row {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    flex-wrap: nowrap;
+    gap: .4rem;
+    margin: 0;
+    min-width: max-content;
+  }
+  .panel-selection-list .panel-selection-item .card-body .row > .col-12 {
+    flex: 0 0 auto;
+    width: auto;
+    padding: 0;
+  }
+  .panel-selection-list .panel-selection-item .face-label-element {
+    min-height: 0;
+    gap: .5rem;
+    padding: .35rem .55rem !important;
+    font-size: .76rem;
+    white-space: nowrap;
+  }
+  .panel-selection-list .panel-selection-item .face-label-element .check-icon { font-size: .9rem !important; }
+  .panel-selection-list .panel-selection-item .face-label-element strong { display: inline !important; }
+  .panel-selection-list .panel-selection-item .face-label-element small { display: none; }
+  .panel-selection-list .panel-selection-item .face-label-element .badge { font-size: .62rem; }
+  .panel-selection-list .panel-selection-item .card-body .row > .col-12 > .d-flex {
+    padding: .35rem .55rem !important;
+    gap: .5rem;
+    font-size: .74rem;
+  }
+  .panel-selection-list .panel-selection-item .card-body .row > .col-12 > .d-flex small { display: none; }
+  .panel-selection-list .panel-selection-item .card-body .row > .col-12 > .d-flex .badge { font-size: .62rem; }
+  @media (max-width: 900px) {
+    .panel-selection-list .panel-selection-item .card-header {
+      flex-basis: 50%;
+      gap: .4rem;
+    }
+    .panel-selection-list .panel-selection-item .card-header h6 {
+      flex-wrap: nowrap;
+      column-gap: .35rem;
+      row-gap: 0;
+    }
+    .panel-selection-list .panel-selection-item .card-body { flex-basis: 50%; }
+  }
+  @media (max-width: 575.98px) {
+    .panel-selection-list .panel-selection-item > .card { min-width: 540px; }
+    .panel-selection-list .panel-selection-item { overflow-x: auto; }
+  }
+</style>
 <div class="container-fluid py-4">
   <div class="row justify-content-center">
     <div class="col-12">
@@ -146,6 +249,21 @@
               {% if mode_marche %}{{ emplacements_enrichis|length }}{% else %}{{ supports|length }}{% endif %} disponible(s)
             </span>
           </div>
+          {% if not mode_marche and campagne.type_support != 'ecran' %}
+          <div class="d-flex align-items-center gap-2 flex-wrap justify-content-end">
+            <span class="badge bg-primary-subtle text-primary border" aria-live="polite">
+              <span id="selected-face-count">{{ selectionnes|length }}</span> face(s) sélectionnée(s)
+            </span>
+            <div class="btn-group btn-group-sm panel-view-toggle" role="group" aria-label="Mode d'affichage des panneaux">
+              <button type="button" class="btn btn-outline-secondary active" id="panel-grid-view" aria-pressed="true">
+                <i class="bi bi-grid-3x3-gap-fill me-1"></i>Grille
+              </button>
+              <button type="button" class="btn btn-outline-secondary" id="panel-list-view" aria-pressed="false">
+                <i class="bi bi-list-ul me-1"></i>Liste
+              </button>
+            </div>
+          </div>
+          {% endif %}
         </div>
 
         {% if supports or emplacements_enrichis %}
@@ -158,7 +276,7 @@
           </div>
         {% endif %}
 
-        <div class="card-body">
+        <div class="card-body{% if not mode_marche and campagne.type_support != 'ecran' %} panel-selection-content{% endif %}" id="panel-selection-content">
           {% if mode_marche %}
             {% if emplacements_enrichis %}
 
@@ -389,7 +507,7 @@
                       {% else %}
                         {% for item in quartier.list %}
                           {% with support=item.support %}
-                            <div class="col-md-6 col-xl-4">
+                            <div class="col-md-6 col-xl-4 panel-selection-item">
                               <div class="card h-100 border rounded-3 overflow-hidden shadow-sm">
                                 <div class="card-header bg-light border-bottom p-3" style="display: block;">
                                   <h6 class="fw-bold mb-1 text-truncate">
@@ -520,6 +638,9 @@ function syncPendingFaces() {
       form.appendChild(input);
     });
   });
+
+  const count = document.getElementById('selected-face-count');
+  if (count) count.textContent = selected.size;
 }
 
 document.querySelectorAll('.face-checkbox').forEach(function(checkbox) {
@@ -544,6 +665,25 @@ document.querySelectorAll('form[method="get"], form[method="post"]').forEach(fun
   form.addEventListener('submit', syncPendingFaces);
 });
 syncPendingFaces();
+
+const panelSelectionContent = document.getElementById('panel-selection-content');
+const panelGridViewButton = document.getElementById('panel-grid-view');
+const panelListViewButton = document.getElementById('panel-list-view');
+
+function setPanelView(view) {
+  if (!panelSelectionContent) return;
+  const isList = view === 'list';
+  panelSelectionContent.classList.toggle('panel-selection-list', isList);
+  panelGridViewButton.classList.toggle('active', !isList);
+  panelListViewButton.classList.toggle('active', isList);
+  panelGridViewButton.setAttribute('aria-pressed', String(!isList));
+  panelListViewButton.setAttribute('aria-pressed', String(isList));
+}
+
+if (panelGridViewButton && panelListViewButton) {
+  panelGridViewButton.addEventListener('click', function() { setPanelView('grid'); });
+  panelListViewButton.addEventListener('click', function() { setPanelView('list'); });
+}
 
 document.querySelectorAll('.ecran-checkbox').forEach(function(checkbox) {
   checkbox.addEventListener('change', function() {

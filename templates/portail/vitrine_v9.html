@@ -1,0 +1,947 @@
+{% load static %}<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Réseau de panneaux et d'écrans LED : formats cotés à l'échelle, nomenclature par ville et disponibilités en ligne." />
+  <meta name="theme-color" content="#10233b" />
+  <link rel="icon" type="image/png" href="{% static 'img/Logo-Integral-2-768x768.png' %}" />
+  <title>Integral — Réseau d'affichage · Planches et disponibilités</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Big+Shoulders+Display:wght@700;800;900&family=Roboto+Mono:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <script>document.documentElement.classList.add('js');</script>
+
+<style>
+  :root {
+    --brand:  {{ DESIGN.COLOR_PRIMARY|default:'#932e2b' }};
+    --accent: {{ DESIGN.COLOR_SECONDARY|default:'#fddd48' }};
+    --ink:    #10233b;
+    --ink-2:  #3c4f68;
+    --paper:  #f3f6fa;
+    --paper-2:#e6ecf4;
+    --white:  #ffffff;
+    --grid:   rgba(16, 35, 59, .07);
+    --grid-2: rgba(16, 35, 59, .14);
+    --ok:     #0c8a5a;
+    --err:    #b3261e;
+    --f-head: 'Big Shoulders Display', 'Arial Narrow', Impact, sans-serif;
+    --f-body: 'Barlow', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --f-mono: 'Roboto Mono', ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+    --gut: clamp(16px, 4vw, 40px);
+    --maxw: 1280px;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 76px; }
+  body {
+    margin: 0; color: var(--ink); font-family: var(--f-body); font-size: 1.04rem; line-height: 1.6; overflow-x: clip; -webkit-font-smoothing: antialiased;
+    background-color: var(--paper);
+    background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px),
+                      linear-gradient(var(--grid-2) 1px, transparent 1px), linear-gradient(90deg, var(--grid-2) 1px, transparent 1px);
+    background-size: 20px 20px, 20px 20px, 100px 100px, 100px 100px;
+  }
+  img { max-width: 100%; display: block; }
+  a { color: inherit; }
+  h1, h2, h3, h4 { margin: 0; font-family: var(--f-head); font-weight: 800; text-transform: uppercase; line-height: .95; letter-spacing: .005em; overflow-wrap: anywhere; }
+  p { margin: 0; }
+  :focus-visible { outline: 3px solid var(--brand); outline-offset: 3px; background-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+  .wrap { width: 100%; max-width: var(--maxw); margin-inline: auto; padding-inline: var(--gut); }
+  .sec { padding-block: clamp(56px, 9vw, 108px); }
+  .mono { font-family: var(--f-mono); }
+  .sheet-tag { display: inline-flex; align-items: center; gap: 10px; font-family: var(--f-mono); font-size: .76rem; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; color: var(--brand); }
+  .sheet-tag b { background: var(--brand); color: #fff; padding: 2px 8px; font-weight: 700; }
+  .h2 { font-size: clamp(2.5rem, 7vw, 5.2rem); margin-top: 14px; }
+  .h2 em { font-style: normal; color: var(--brand); }
+  .lead { color: var(--ink-2); max-width: 58ch; margin-top: 16px; }
+
+  /* Repères d'angle (planche) */
+  .frame { position: relative; background: var(--white); border: 2px solid var(--ink); }
+  .frame::before, .frame::after { content: ''; position: absolute; width: 14px; height: 14px; border: 2px solid var(--brand); pointer-events: none; }
+  .frame::before { top: -8px; left: -8px; border-right: 0; border-bottom: 0; }
+  .frame::after { bottom: -8px; right: -8px; border-left: 0; border-top: 0; }
+
+  /* Boutons */
+  .btn-x {
+    display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 50px; padding: 12px 24px;
+    font: 600 .86rem var(--f-mono); letter-spacing: .06em; text-transform: uppercase; text-decoration: none; text-align: center; line-height: 1.2;
+    border: 2px solid var(--ink); border-radius: 0; cursor: pointer; transition: background .15s, color .15s, transform .12s;
+    position: relative;
+  }
+  .btn-x:hover { transform: translate(-2px, -2px); box-shadow: 4px 4px 0 var(--ink); }
+  .btn-x:active { transform: none; box-shadow: none; }
+  .btn-brand { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .btn-brand:hover { box-shadow: 4px 4px 0 var(--ink); }
+  .btn-yel { background: var(--accent); color: var(--ink); }
+  .btn-line { background: var(--white); color: var(--ink); }
+  .btn-ink { background: var(--ink); color: #fff; }
+  .btn-sm { min-height: 40px; padding: 8px 14px; font-size: .72rem; }
+
+  /* En-tête */
+  .site-head { position: sticky; top: 0; z-index: 1000; background: color-mix(in srgb, var(--paper) 94%, transparent); backdrop-filter: blur(8px); border-bottom: 2px solid var(--ink); }
+  .head-in { display: flex; align-items: center; justify-content: space-between; gap: 14px; min-height: 64px; }
+  .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; flex-shrink: 0; }
+  .brand img { height: 36px; width: auto; }
+  .brand-name { font-family: var(--f-head); font-weight: 900; font-size: 1.9rem; text-transform: uppercase; line-height: 1; }
+  .brand-name span { color: var(--brand); }
+  .nav-links { display: flex; gap: clamp(12px, 2vw, 26px); list-style: none; margin: 0; padding: 0; }
+  .nav-links a { text-decoration: none; font-family: var(--f-mono); font-size: .76rem; font-weight: 500; letter-spacing: .08em; text-transform: uppercase; padding: 6px 0; border-bottom: 2px solid transparent; }
+  .nav-links a:hover, .nav-links a.active { border-color: var(--brand); color: var(--brand); }
+  .head-cta { display: flex; gap: 10px; align-items: center; }
+  .burger { display: none; width: 46px; height: 46px; border: 2px solid var(--ink); background: var(--accent); color: var(--ink); font-size: 1.5rem; align-items: center; justify-content: center; }
+  .drawer { display: none; }
+  @media (max-width: 1023.98px) {
+    .nav-links, .head-cta { display: none; }
+    .burger { display: inline-flex; }
+    .drawer.open { display: block; position: fixed; inset: 0; z-index: 1500; background: var(--paper); padding: 16px var(--gut) 32px; overflow-y: auto;
+      background-image: linear-gradient(var(--grid-2) 1px, transparent 1px), linear-gradient(90deg, var(--grid-2) 1px, transparent 1px); background-size: 24px 24px; }
+    .drawer-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+    .drawer a.dl { display: flex; justify-content: space-between; font-family: var(--f-head); font-weight: 800; text-transform: uppercase; font-size: clamp(2.2rem, 11vw, 3.2rem); text-decoration: none; padding: 6px 0; border-bottom: 2px solid var(--ink); line-height: 1.1; }
+    .drawer a.dl:hover { color: var(--brand); }
+    .drawer .btn-x { width: 100%; margin-top: 14px; }
+  }
+  .dj-msgs { position: fixed; top: 76px; right: 16px; left: 16px; max-width: 420px; margin-left: auto; z-index: 2000; display: grid; gap: 8px; }
+
+  /* ───── Hero : planche cotée ───── */
+  .hero { padding-block: clamp(36px, 6vw, 76px) clamp(48px, 7vw, 90px); }
+  .hero-grid { display: grid; grid-template-columns: minmax(0, 7fr) minmax(0, 5fr); gap: clamp(32px, 5vw, 72px); align-items: center; }
+  .hero h1 { font-size: clamp(2.8rem, 7.4vw, 6.4rem); line-height: .9; margin-top: 18px; font-weight: 900; overflow-wrap: break-word; }
+  .hero h1 em { font-style: normal; color: var(--brand); display: block; }
+  .hero-lead { margin-top: 24px; max-width: 48ch; color: var(--ink-2); font-size: clamp(1.02rem, 1.5vw, 1.18rem); }
+  .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; margin-top: 30px; }
+
+  .dwg { margin: 0; }
+  .dwg-bar { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 14px; padding: 10px 14px; border-bottom: 2px solid var(--ink); font-family: var(--f-mono); font-size: .72rem; letter-spacing: .06em; text-transform: uppercase; background: var(--paper-2); }
+  .dwg-stage { padding: clamp(18px, 3vw, 30px); min-height: 330px; display: grid; place-items: center; position: relative; overflow: hidden;
+    background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size: 14px 14px; }
+  .dwg-stage::after { content: ''; position: absolute; left: 0; right: 0; bottom: 34px; border-top: 3px solid var(--ink); }
+  .dwg-obj { display: grid; grid-template-columns: auto 34px; grid-template-rows: 34px auto; position: relative; z-index: 1; margin-bottom: 34px; }
+  .dim { position: relative; color: var(--ink); font-family: var(--f-mono); font-size: .76rem; font-weight: 700; }
+  .dim span { position: absolute; background: var(--white); padding: 0 6px; white-space: nowrap; }
+  .dim-h { grid-column: 1; grid-row: 1; border-left: 2px solid currentColor; border-right: 2px solid currentColor; height: 16px; align-self: center; }
+  .dim-h::before { content: ''; position: absolute; left: 0; right: 0; top: 50%; border-top: 2px solid currentColor; }
+  .dim-h span { left: 50%; top: 50%; transform: translate(-50%, -50%); }
+  .dim-v { grid-column: 2; grid-row: 2; border-top: 2px solid currentColor; border-bottom: 2px solid currentColor; width: 16px; justify-self: center; }
+  .dim-v::before { content: ''; position: absolute; top: 0; bottom: 0; left: 50%; border-left: 2px solid currentColor; }
+  .dim-v span { left: 50%; top: 50%; transform: translate(-50%, -50%); padding: 6px 0; }
+  .dwg-panel { grid-column: 1; grid-row: 2; position: relative; background: var(--brand); border: 5px solid var(--ink); color: #fff; display: grid; place-items: center; text-align: center; box-shadow: 0 0 0 2px var(--white), 0 0 0 4px var(--ink); transition: width .35s ease, height .35s ease; width: 200px; height: 150px; max-width: 100%; }
+  .dwg-panel::before, .dwg-panel::after { content: ''; position: absolute; top: 100%; width: 12px; height: 70px; background: repeating-linear-gradient(180deg, var(--ink) 0 6px, var(--ink-2) 6px 8px); }
+  .dwg-panel::before { left: 20%; } .dwg-panel::after { right: 20%; }
+  .dwg-panel b { font-family: var(--f-head); font-weight: 900; font-size: clamp(2rem, 5vw, 3.6rem); line-height: 1; }
+  .dwg-panel small { display: block; font-family: var(--f-mono); font-size: .76rem; color: var(--accent); }
+  .dwg-fmt { display: flex; flex-wrap: wrap; gap: 8px; padding: 12px 14px; border-top: 2px solid var(--ink); align-items: center; }
+  .dwg-fmt .l { font-family: var(--f-mono); font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; margin-right: 4px; }
+  .fchip { min-height: 38px; padding: 6px 14px; border: 2px solid var(--ink); background: var(--white); color: var(--ink); font: 700 .78rem var(--f-mono); letter-spacing: .04em; text-transform: uppercase; cursor: pointer; border-radius: 0; }
+  .fchip:hover { background: var(--accent); }
+  .fchip[aria-pressed="true"] { background: var(--ink); color: #fff; }
+  .titleblock { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 2px solid var(--ink); }
+  .tb { padding: 10px 14px; border-right: 1px solid var(--ink); min-width: 0; }
+  .tb:last-child { border-right: 0; }
+  .tb small { display: block; font-family: var(--f-mono); font-size: .62rem; letter-spacing: .1em; text-transform: uppercase; color: var(--ink-2); }
+  .tb b { display: block; font-family: var(--f-head); font-weight: 900; font-size: 1.9rem; line-height: 1; margin-top: 2px; }
+  .tb b.ok { color: var(--ok); }
+  @media (max-width: 899.98px) { .hero-grid { grid-template-columns: 1fr; } }
+  @media (max-width: 479.98px) {
+    .titleblock { grid-template-columns: 1fr 1fr; }
+    .tb:nth-child(2) { border-right: 0; } .tb:nth-child(-n+2) { border-bottom: 1px solid var(--ink); }
+    .dwg-stage { min-height: 290px; }
+  }
+
+  /* ───── Supports ───── */
+  .duo { margin-top: 40px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(22px, 3vw, 40px); }
+  .u-card { padding: clamp(20px, 3vw, 34px); display: flex; flex-direction: column; gap: 18px; min-width: 0; }
+  .u-card header { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; border-bottom: 2px solid var(--ink); padding-bottom: 12px; }
+  .u-card h3 { font-size: clamp(2.2rem, 4.4vw, 3.4rem); font-weight: 900; }
+  .u-card header span { font-family: var(--f-mono); font-size: .72rem; letter-spacing: .08em; text-transform: uppercase; color: var(--brand); }
+  .u-item { display: grid; grid-template-columns: minmax(0, 140px) minmax(0, 1fr); gap: 18px; align-items: center; }
+  .u-img { aspect-ratio: 4 / 3; background: var(--paper-2); border: 2px solid var(--ink); display: grid; place-items: center; overflow: hidden; }
+  .u-img img { width: 100%; height: 100%; object-fit: contain; padding: 6px; }
+  .u-item h4 { font-size: 1.5rem; font-weight: 800; }
+  .u-item p { font-size: .94rem; color: var(--ink-2); margin-top: 6px; }
+  .u-item ul { margin: 8px 0 0; padding: 0; list-style: none; font-family: var(--f-mono); font-size: .76rem; display: grid; gap: 3px; }
+  .u-item li::before { content: '▸ '; color: var(--brand); }
+  .u-card .btn-x { align-self: flex-start; margin-top: auto; }
+  @media (max-width: 899.98px) { .duo { grid-template-columns: 1fr; } }
+  @media (max-width: 479.98px) { .u-item { grid-template-columns: 1fr; } .u-img { max-width: 210px; } }
+
+  /* ───── Nomenclature (réseau) ───── */
+  .net-head { display: flex; flex-wrap: wrap; gap: 20px 40px; justify-content: space-between; align-items: end; }
+  .ctrls { margin-top: 32px; display: grid; gap: 14px; }
+  .layers { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+  .ctl-l { font-family: var(--f-mono); font-size: .72rem; font-weight: 500; letter-spacing: .1em; text-transform: uppercase; min-width: 72px; }
+  .layer { display: inline-flex; align-items: center; gap: 12px; min-height: 52px; padding: 8px 16px 8px 12px; border: 2px solid var(--ink); background: var(--white); color: var(--ink); cursor: pointer; font: inherit; text-align: left; border-radius: 0; }
+  .layer .box { width: 22px; height: 22px; border: 2px solid var(--ink); display: grid; place-items: center; flex-shrink: 0; font-size: .9rem; line-height: 1; color: transparent; background: var(--white); }
+  .layer[aria-pressed="true"] .box { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .layer[data-layer="ecran"][aria-pressed="true"] .box { background: var(--ink); border-color: var(--ink); color: var(--accent); }
+  .layer b { display: block; font-family: var(--f-head); font-weight: 800; font-size: 1.25rem; text-transform: uppercase; line-height: 1; }
+  .layer small { display: block; font-family: var(--f-mono); font-size: .68rem; color: var(--ink-2); }
+  .layer:disabled { opacity: .4; cursor: not-allowed; }
+  .layer:hover:not(:disabled) { background: var(--paper-2); }
+  .vchips { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .chip { min-height: 40px; padding: 6px 14px; border: 2px solid var(--ink); background: var(--white); color: var(--ink); font: 700 .76rem var(--f-mono); letter-spacing: .04em; text-transform: uppercase; cursor: pointer; border-radius: 0; display: inline-flex; gap: 8px; align-items: center; }
+  .chip:hover { background: var(--accent); }
+  .chip[aria-pressed="true"] { background: var(--ink); color: #fff; }
+  .chip .dot { width: 8px; height: 8px; background: var(--ok); }
+  @media (max-width: 575.98px) {
+    .vchips { flex-wrap: nowrap; overflow-x: auto; margin-inline: calc(var(--gut) * -1); padding: 4px var(--gut) 10px; scrollbar-width: thin; }
+    .chip, .ctl-l { flex-shrink: 0; }
+    .layer { flex: 1 1 100%; }
+  }
+  .plate { margin-top: clamp(34px, 5vw, 60px); }
+  .plate-h { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 8px 18px; align-items: end; padding-bottom: 12px; border-bottom: 3px solid var(--ink); }
+  .plate-n { font-family: var(--f-mono); font-size: .76rem; font-weight: 700; background: var(--ink); color: #fff; padding: 4px 10px; align-self: start; letter-spacing: .06em; text-transform: uppercase; }
+  .plate-h h3 { font-size: clamp(2.2rem, 6vw, 4.2rem); font-weight: 900; }
+  .plate-st { font-family: var(--f-mono); font-size: .76rem; text-transform: uppercase; letter-spacing: .04em; text-align: right; }
+  .plate-st b { font-family: var(--f-head); font-weight: 900; font-size: 2rem; color: var(--ok); line-height: 1; display: block; }
+  @media (max-width: 575.98px) { .plate-h { grid-template-columns: 1fr; } .plate-st { text-align: left; display: flex; gap: 8px; align-items: baseline; } }
+  .cg { margin-top: 20px; }
+  .cg-h { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+  .cg-h h4 { font-size: 1.55rem; display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+  .cg-h h4 small { font-family: var(--f-mono); font-weight: 500; font-size: .72rem; letter-spacing: .04em; color: var(--ink-2); text-transform: uppercase; }
+  .bom { list-style: none; margin: 0; padding: 0; background: var(--white); border: 2px solid var(--ink); }
+  .bom-h, .bom-r { display: grid; grid-template-columns: 110px minmax(0, 1.4fr) 120px minmax(150px, 1fr) auto; gap: 8px 20px; align-items: center; padding: 12px 16px; }
+  .bom-h { background: var(--ink); color: #fff; font-family: var(--f-mono); font-size: .68rem; letter-spacing: .1em; text-transform: uppercase; padding-block: 8px; }
+  .bom-r { border-top: 1px solid var(--grid-2); }
+  .bom-r:first-of-type { border-top: 0; }
+  .bom-r:hover { background: color-mix(in srgb, var(--accent) 22%, var(--white)); }
+  .ref { font-family: var(--f-mono); font-weight: 700; font-size: .84rem; overflow-wrap: anywhere; }
+  .des-t { font-family: var(--f-head); font-weight: 800; text-transform: uppercase; font-size: 1.45rem; line-height: 1; overflow-wrap: anywhere; }
+  .des-d { font-size: .86rem; color: var(--ink-2); margin-top: 3px; overflow-wrap: anywhere; }
+  .mini-box { width: 120px; height: 64px; display: grid; place-items: center; background-image: linear-gradient(var(--grid) 1px, transparent 1px), linear-gradient(90deg, var(--grid) 1px, transparent 1px); background-size: 8px 8px; border: 1px dashed var(--ink-2); }
+  .bp { background: var(--brand); border: 2px solid var(--ink); color: #fff; font: 700 .62rem var(--f-mono); display: grid; place-items: center; text-transform: uppercase; max-width: 100%; }
+  .scr { width: 74%; height: 62%; background: var(--ink); border: 2px solid var(--ink); position: relative; display: grid; place-items: center; color: var(--accent); font-size: .9rem; }
+  .scr::after { content: ''; position: absolute; left: 50%; bottom: -8px; width: 22px; height: 6px; transform: translateX(-50%); background: var(--ink); }
+  .mini-ico { font-size: 1.6rem; color: var(--ink); }
+  .av-t { display: flex; justify-content: space-between; gap: 8px; font-family: var(--f-mono); font-size: .74rem; font-weight: 700; text-transform: uppercase; }
+  .av-t .ok { color: var(--ok); } .av-t .no { color: var(--err); }
+  .av-bar { display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; height: 9px; margin-top: 6px; }
+  .av-bar i { background: var(--paper-2); border: 1px solid var(--grid-2); }
+  .av-bar i.on { background: var(--ok); border-color: var(--ok); }
+  @media (max-width: 899.98px) {
+    .bom-h { display: none; }
+    .bom-r { grid-template-columns: 120px minmax(0, 1fr); grid-template-areas: "mini des" "ref ref" "av av" "act act"; gap: 10px 16px; padding: 16px; }
+    .bom-r .mini-box { grid-area: mini; } .bom-r .des { grid-area: des; } .bom-r .ref { grid-area: ref; } .bom-r .av { grid-area: av; } .bom-r .act { grid-area: act; }
+    .bom-r .act .btn-x { width: 100%; }
+    .ref::before { content: 'Réf. '; color: var(--ink-2); font-weight: 500; }
+  }
+  .empty { display: none; text-align: center; padding: 56px 20px; border: 2px dashed var(--ink); margin-top: 30px; background: var(--white); }
+  .empty.show, .empty.always { display: block; }
+  .empty i { font-size: 2.2rem; color: var(--brand); }
+  .empty h3 { font-size: 2.2rem; margin: 10px 0 6px; }
+  .empty p { color: var(--ink-2); }
+  .empty a { color: var(--brand); }
+
+  /* Plan de situation */
+  .map-sheet { margin-top: 32px; }
+  #vMap { height: clamp(340px, 60vh, 560px); width: 100%; border-bottom: 2px solid var(--ink); }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 22px; padding: 12px 16px; font-family: var(--f-mono); font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; background: var(--paper-2); }
+  .legend span { display: inline-flex; gap: 8px; align-items: center; }
+  .legend span::before { content: ''; width: 12px; height: 12px; background: var(--c); border: 2px solid var(--ink); }
+  .leaflet-popup-content-wrapper { border-radius: 0; border: 2px solid var(--ink); box-shadow: 4px 4px 0 var(--ink); }
+  .leaflet-popup-tip { border-radius: 0; }
+  .leaflet-popup-content { font-family: var(--f-body); margin: 12px 14px; }
+
+  /* Phases */
+  .gantt { margin-top: 40px; display: grid; gap: 0; border: 2px solid var(--ink); background: var(--white); }
+  .gr { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 20px; padding: clamp(16px, 2.6vw, 28px); border-top: 2px solid var(--ink); align-items: center; }
+  .gr:first-child { border-top: 0; }
+  .gr-n { font-family: var(--f-mono); font-size: .72rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--brand); }
+  .gr h3 { font-size: clamp(1.8rem, 3.4vw, 2.6rem); font-weight: 900; margin: 6px 0; }
+  .gr p { color: var(--ink-2); font-size: .96rem; max-width: 42ch; }
+  .track { position: relative; height: 38px; background: repeating-linear-gradient(90deg, var(--paper-2) 0 calc(10% - 1px), var(--grid-2) calc(10% - 1px) 10%); border: 1px solid var(--ink-2); }
+  .track i { position: absolute; top: 5px; bottom: 5px; left: var(--l); width: var(--w); background: var(--brand); border: 2px solid var(--ink); }
+  .gr:nth-child(2) .track i { background: var(--accent); }
+  .gr:nth-child(3) .track i { background: var(--ink); }
+  @media (max-width: 767.98px) { .gr { grid-template-columns: 1fr; gap: 12px; } }
+
+  /* Notes générales + FAQ */
+  .two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(28px, 6vw, 76px); align-items: start; }
+  .notes { margin: 26px 0 0; padding: 0; list-style: none; counter-reset: n; border-top: 2px solid var(--ink); }
+  .notes li { counter-increment: n; display: grid; grid-template-columns: 54px minmax(0, 1fr); gap: 14px; padding: 18px 0; border-bottom: 2px solid var(--ink); }
+  .notes li::before { content: counter(n, decimal-leading-zero); font-family: var(--f-head); font-weight: 900; font-size: 2.6rem; line-height: .9; color: var(--brand); }
+  .notes b { display: block; font-family: var(--f-head); font-weight: 800; text-transform: uppercase; font-size: 1.5rem; line-height: 1.05; }
+  .notes span { color: var(--ink-2); font-size: .95rem; }
+  .faq { margin-top: 22px; border-top: 2px solid var(--ink); }
+  .faq details { border-bottom: 2px solid var(--ink); background: var(--white); }
+  .faq summary { cursor: pointer; list-style: none; display: grid; grid-template-columns: 36px minmax(0, 1fr) 24px; gap: 8px; align-items: center; padding: 16px 12px; font-weight: 600; }
+  .faq summary::-webkit-details-marker { display: none; }
+  .faq summary::before { content: 'Q'; font-family: var(--f-mono); font-weight: 700; background: var(--ink); color: #fff; width: 28px; height: 28px; display: grid; place-items: center; font-size: .8rem; }
+  .faq summary::after { content: '+'; font-family: var(--f-mono); font-size: 1.4rem; color: var(--brand); text-align: right; }
+  .faq details[open] summary::after { content: '–'; }
+  .faq p { color: var(--ink-2); padding: 0 12px 18px 56px; font-size: .96rem; }
+  @media (max-width: 899.98px) { .two { grid-template-columns: 1fr; } }
+
+  /* Bon de demande (contact) */
+  .contact { margin-top: 36px; display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: clamp(20px, 3vw, 36px); }
+  .c-info { padding: clamp(20px, 3vw, 34px); }
+  .c-row { display: grid; grid-template-columns: 46px minmax(0, 1fr); gap: 14px; padding: 14px 0; border-bottom: 1px dashed var(--ink-2); }
+  .c-row:first-child { padding-top: 0; } .c-row:last-child { border-bottom: 0; padding-bottom: 0; }
+  .c-row i { width: 46px; height: 46px; background: var(--ink); color: var(--accent); display: grid; place-items: center; font-size: 1.15rem; }
+  .c-row small { display: block; font-family: var(--f-mono); font-size: .66rem; letter-spacing: .1em; text-transform: uppercase; color: var(--brand); font-weight: 700; }
+  .c-row a, .c-row span { display: block; text-decoration: none; overflow-wrap: anywhere; font-weight: 500; }
+  .c-row a:hover { color: var(--brand); text-decoration: underline; }
+  .c-form { padding: clamp(20px, 3vw, 34px); }
+  .fgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+  .fgrid .full { grid-column: 1 / -1; }
+  .c-form label { display: block; font-family: var(--f-mono); font-size: .68rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; margin-bottom: 4px; }
+  .f { width: 100%; min-height: 48px; padding: 8px 4px; border: 0; border-bottom: 2px solid var(--ink); border-radius: 0; background: transparent; font: inherit; color: var(--ink); }
+  .f:focus { outline: none; background: color-mix(in srgb, var(--accent) 30%, transparent); border-bottom-color: var(--brand); }
+  textarea.f { min-height: 112px; resize: vertical; border: 2px solid var(--ink); padding: 8px 10px; }
+  select.f { border: 2px solid var(--ink); padding: 8px 10px; background: var(--white); }
+  .f-msg { display: none; padding: 12px 14px; border: 2px solid var(--ink); font-weight: 500; font-size: .94rem; margin-bottom: 16px; }
+  .f-msg.ok { display: block; background: #c9f2df; } .f-msg.err { display: block; background: #ffd5d0; }
+  @media (max-width: 899.98px) { .contact { grid-template-columns: 1fr; } }
+  @media (max-width: 575.98px) { .fgrid { grid-template-columns: 1fr; } }
+
+  /* CTA + pied (cartouche) */
+  .cta { background: var(--brand); color: #fff; border-block: 2px solid var(--ink); position: relative; overflow: hidden; }
+  .cta::before { content: ''; position: absolute; inset: 0; background-image: linear-gradient(rgba(255,255,255,.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.1) 1px, transparent 1px); background-size: 24px 24px; pointer-events: none; }
+  .cta-in { position: relative; display: flex; flex-wrap: wrap; gap: 24px 48px; justify-content: space-between; align-items: center; }
+  .cta h2 { font-size: clamp(2.8rem, 8vw, 6.4rem); font-weight: 900; line-height: .88; max-width: 12ch; }
+  .cta h2 em { font-style: normal; color: var(--accent); }
+  .cta p { margin-top: 14px; max-width: 46ch; color: rgba(255,255,255,.9); }
+  .site-foot { background: var(--ink); color: #c6d0de; padding: 48px 0 24px; }
+  .foot-grid { display: grid; grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr)); gap: 32px; }
+  .foot-grid h4 { font-family: var(--f-mono); font-weight: 700; font-size: .72rem; letter-spacing: .14em; text-transform: uppercase; color: var(--accent); margin-bottom: 14px; }
+  .foot-grid ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+  .foot-grid a { text-decoration: none; overflow-wrap: anywhere; }
+  .foot-grid a:hover { color: #fff; text-decoration: underline; }
+  .foot-grid p { max-width: 40ch; font-size: .94rem; margin-top: 12px; }
+  .foot-bot { margin-top: 36px; border: 1px solid #3c4f68; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); font-family: var(--f-mono); font-size: .72rem; }
+  .foot-bot div { padding: 10px 14px; border-right: 1px solid #3c4f68; min-width: 0; overflow-wrap: anywhere; }
+  .foot-bot div:last-child { border-right: 0; }
+  .foot-bot small { display: block; font-size: .6rem; letter-spacing: .1em; text-transform: uppercase; color: #8496ad; }
+  @media (max-width: 767.98px) {
+    .foot-grid { grid-template-columns: 1fr 1fr; } .foot-grid > :first-child { grid-column: 1 / -1; }
+    .foot-bot { grid-template-columns: 1fr 1fr; }
+    .foot-bot div:nth-child(2) { border-right: 0; } .foot-bot div:nth-child(-n+2) { border-bottom: 1px solid #3c4f68; }
+  }
+
+  .m-bar { display: none; }
+  @media (max-width: 767.98px) {
+    .m-bar { display: flex; gap: 10px; position: fixed; left: 0; right: 0; bottom: 0; z-index: 900; padding: 10px var(--gut) calc(10px + env(safe-area-inset-bottom)); background: var(--paper); border-top: 2px solid var(--ink); }
+    .m-bar .btn-x { flex: 1; min-height: 46px; padding-inline: 10px; }
+    body { padding-bottom: 76px; }
+  }
+
+  .js .rv { opacity: 0; transform: translateY(20px); transition: opacity .6s ease, transform .6s ease; }
+  .js .rv.in { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .js .rv { opacity: 1; transform: none; transition: none; }
+    * { transition-duration: .01ms !important; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═════════ EN-TÊTE ═════════ -->
+<header class="site-head">
+  <div class="wrap head-in">
+    <a class="brand" href="#top" aria-label="Integral — accueil">
+      <img src="{% static 'img/logo.png' %}" alt="" onerror="this.style.display='none'" />
+      <span class="brand-name">Integral<span>.</span></span>
+    </a>
+    <ul class="nav-links">
+      <li><a href="#supports">Supports</a></li>
+      <li><a href="#reseau">Réseau</a></li>
+      <li><a href="#carte">Plan</a></li>
+      <li><a href="#processus">Phases</a></li>
+      <li><a href="#apropos">Notes</a></li>
+      <li><a href="#contact">Contact</a></li>
+    </ul>
+    <div class="head-cta">
+      <a href="{% url 'portail:suivi_demande' %}" class="btn-x btn-line btn-sm"><i class="bi bi-search"></i> Suivre une demande</a>
+      <a href="{% url 'portail:reserver_etape1' %}" class="btn-x btn-brand btn-sm"><i class="bi bi-calendar-check"></i> Faire une demande</a>
+    </div>
+    <button class="burger" id="burger" type="button" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="drawer"><i class="bi bi-list"></i></button>
+  </div>
+</header>
+
+<div class="drawer" id="drawer" role="dialog" aria-label="Menu">
+  <div class="drawer-top">
+    <span class="brand-name">Integral<span>.</span></span>
+    <button class="burger" id="closeDrawer" type="button" aria-label="Fermer le menu"><i class="bi bi-x-lg"></i></button>
+  </div>
+  <a class="dl" href="#supports">Supports <span>01</span></a>
+  <a class="dl" href="#reseau">Réseau <span>02</span></a>
+  <a class="dl" href="#carte">Plan <span>03</span></a>
+  <a class="dl" href="#processus">Phases <span>04</span></a>
+  <a class="dl" href="#apropos">Notes <span>05</span></a>
+  <a class="dl" href="#contact">Contact <span>06</span></a>
+  <a href="{% url 'portail:reserver_etape1' %}" class="btn-x btn-brand"><i class="bi bi-calendar-check"></i> Faire une demande</a>
+  <a href="{% url 'portail:suivi_demande' %}" class="btn-x btn-line"><i class="bi bi-search"></i> Suivre une demande</a>
+</div>
+
+{% if messages %}
+<div class="dj-msgs" role="status">
+  {% for message in messages %}
+  <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags|default:'info' }}{% endif %} alert-dismissible fade show mb-0 rounded-0" role="alert">
+    {{ message }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fermer"></button>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<main id="top">
+
+<!-- ═════════ HERO : planche cotée ═════════ -->
+<section class="hero">
+  <div class="wrap hero-grid">
+    <div>
+      <span class="sheet-tag"><b>Planche 00</b> Réseau d'affichage{% if nb_villes %} · {{ nb_villes }} ville{{ nb_villes|pluralize }}{% endif %}</span>
+      <h1>Vos messages, <em>à la bonne échelle.</em></h1>
+      <p class="hero-lead">Panneaux grand format, écrans numériques LED et sucettes urbaines. Chaque format est coté, chaque face affiche sa disponibilité : choisissez vos emplacements et lancez votre demande en ligne.</p>
+      <div class="hero-actions">
+        <a href="{% url 'portail:reserver_etape1' %}" class="btn-x btn-brand"><i class="bi bi-calendar-check"></i> Faire une demande</a>
+        <a href="#reseau" class="btn-x btn-line"><i class="bi bi-list-columns-reverse"></i> Voir la nomenclature</a>
+      </div>
+    </div>
+
+    <figure class="dwg frame" aria-label="Schéma coté d'un format de panneau">
+      <div class="dwg-bar"><span>Vue de face · échelle réelle</span><span id="dwgSurf">&nbsp;</span></div>
+      <div class="dwg-stage">
+        <div class="dwg-obj">
+          <div class="dim dim-h" aria-hidden="true"><span id="dimW">—</span></div>
+          <div class="dwg-panel" id="dwgPanel"><div><b id="dwgLbl">Panneau</b><small id="dwgSub">&nbsp;</small></div></div>
+          <div class="dim dim-v" aria-hidden="true"><span id="dimH">—</span></div>
+        </div>
+      </div>
+      {% if formats_utilises %}
+      <div class="dwg-fmt" role="group" aria-label="Choisir un format">
+        <span class="l">Format</span>
+        {% for f in formats_utilises %}<button type="button" class="fchip" data-f="{{ f }}" aria-pressed="false">{{ f|upper }}</button>{% endfor %}
+      </div>
+      {% endif %}
+      <div class="titleblock">
+        <div class="tb"><small>Faces</small><b>{{ total_faces_reseau|default:"0" }}</b></div>
+        <div class="tb"><small>Disponibles</small><b class="ok">{{ total_faces_libres_reseau|default:"0" }}</b></div>
+        <div class="tb"><small>Villes</small><b>{{ nb_villes|default:"0" }}</b></div>
+        <div class="tb"><small>Formats</small><b>{{ nb_formats|default:"0" }}</b></div>
+      </div>
+    </figure>
+  </div>
+</section>
+
+<!-- ═════════ SUPPORTS ═════════ -->
+<section class="sec" id="supports" style="padding-top:0;">
+  <div class="wrap">
+    <div class="rv">
+      <span class="sheet-tag"><b>Planche 01</b> Nos supports</span>
+      <h2 class="h2">Deux supports, <em>un seul réseau.</em></h2>
+      <p class="lead">Le panneau s'impose dans la durée ; l'écran LED fait vivre votre message. Choisissez un support pour afficher directement ses emplacements.</p>
+    </div>
+    <div class="duo">
+      <article class="u-card frame rv">
+        <header><h3>Panneaux</h3><span>Affichage statique</span></header>
+        <div class="u-item">
+          <div class="u-img"><img src="{% static 'img/panneau 4x3 digitalVVV.png' %}" alt="Panneau 4x3" loading="lazy" onerror="this.style.display='none'" /></div>
+          <div>
+            <h4>Panneaux 4×3 et géants</h4>
+            <p>Votre marque bénéficie d'une visibilité exceptionnelle sur les principaux axes de circulation.</p>
+            <ul><li>Lancement de produit</li><li>Campagne nationale</li><li>Notoriété de marque</li></ul>
+          </div>
+        </div>
+        <div class="u-item">
+          <div class="u-img"><img src="{% static 'img/Sucette sur pied digital.png' %}" alt="Sucette publicitaire" loading="lazy" onerror="this.style.display='none'" /></div>
+          <div>
+            <h4>Sucettes publicitaires</h4>
+            <p>Panneaux lumineux au cœur des trottoirs, à hauteur de regard. Visibilité piétonne maximale en centre-ville et zones commerçantes.</p>
+          </div>
+        </div>
+        <a href="#reseau" class="btn-x btn-brand" data-pick="panneau"><i class="bi bi-signpost-2"></i> Voir les panneaux</a>
+      </article>
+
+      <article class="u-card frame rv">
+        <header><h3>Écrans LED</h3><span>Affichage numérique</span></header>
+        <div class="u-item">
+          <div class="u-img"><img src="{% static 'img/Ecran LED digital.png' %}" alt="Écran numérique LED" loading="lazy" onerror="this.style.display='none'" /></div>
+          <div>
+            <h4>Écrans numériques LED</h4>
+            <p>Diffusez des contenus animés, programmés selon vos horaires et adaptés à vos objectifs.</p>
+            <ul><li>Diffusion dynamique</li><li>Changement instantané</li><li>Plusieurs messages dans une même campagne</li></ul>
+          </div>
+        </div>
+        <a href="#reseau" class="btn-x btn-ink" data-pick="ecran"><i class="bi bi-tv"></i> Voir les écrans</a>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- ═════════ NOMENCLATURE ═════════ -->
+<section class="sec" id="reseau" style="padding-top:0;">
+  <div class="wrap">
+    <div class="net-head rv">
+      <div>
+        <span class="sheet-tag"><b>Planche 02</b> Nomenclature</span>
+        <h2 class="h2">Le réseau, <em>ville par ville.</em></h2>
+        <p class="lead">Une fiche par ville. Activez ou masquez les calques pour afficher les panneaux, les écrans, ou les deux.</p>
+      </div>
+      <a href="{% url 'portail:reserver_etape1' %}" class="btn-x btn-brand"><i class="bi bi-calendar-check"></i> Faire une demande</a>
+    </div>
+
+    {% if villes_stats %}
+    <div class="ctrls">
+      <div class="layers" role="group" aria-label="Calques">
+        <span class="ctl-l">Calques</span>
+        <button type="button" class="layer" data-layer="panneau" aria-pressed="true"><span class="box"><i class="bi bi-check-lg"></i></span><span><b>Panneaux</b><small id="cntPan">&nbsp;</small></span></button>
+        <button type="button" class="layer" data-layer="ecran" aria-pressed="true"><span class="box"><i class="bi bi-check-lg"></i></span><span><b>Écrans LED</b><small id="cntEcr">&nbsp;</small></span></button>
+      </div>
+      <div class="vchips" role="group" aria-label="Filtrer par ville">
+        <span class="ctl-l">Ville</span>
+        <button type="button" class="chip" data-fv="all" aria-pressed="true">Toutes</button>
+        {% for v in villes_stats %}<button type="button" class="chip" data-fv="{{ v.nom|slugify }}" aria-pressed="false">{{ v.nom }}{% if v.faces_libres > 0 %}<span class="dot" title="Faces disponibles"></span>{% endif %}</button>{% endfor %}
+      </div>
+    </div>
+
+    <div id="cities">
+      {% for ville in villes_stats %}
+      <article class="plate" data-v="{{ ville.nom|slugify }}">
+        <div class="plate-h">
+          <span class="plate-n">Ville {{ forloop.counter|stringformat:"02d" }}</span>
+          <h3>{{ ville.nom }}</h3>
+          <div class="plate-st"><b>{{ ville.faces_libres }}</b> libre{{ ville.faces_libres|pluralize }} / {{ ville.total_faces }}</div>
+        </div>
+        {% for cat in ville.supports %}
+        <section class="cg" data-kind="{% if cat.categorie == 'Écran' %}ecran{% else %}panneau{% endif %}" data-libre="{{ cat.libre }}" data-total="{{ cat.total }}">
+          <div class="cg-h">
+            <h4>{{ cat.categorie }} <small>{{ cat.libre }} libre{{ cat.libre|pluralize }} / {{ cat.total }}</small></h4>
+            {% if cat.categorie != "Écran" and cat.libre > 0 and cat.liste|length > 1 %}
+            <a class="btn-x btn-line btn-sm" href="{% url 'portail:reserver_etape1' %}?ville={{ ville.nom|urlencode }}&amp;categorie={{ cat.categorie|urlencode }}"><i class="bi bi-bag-check"></i> Tout réserver</a>
+            {% endif %}
+          </div>
+          <ul class="bom">
+            <li class="bom-h" aria-hidden="true"><span>Réf.</span><span>Désignation</span><span>Plan</span><span>Disponibilité</span><span>Action</span></li>
+            {% for support in cat.liste %}
+            <li class="bom-r">
+              <span class="ref">{% if support.format %}{{ support.format|upper }}{% else %}{{ support.code|default:"—" }}{% endif %}</span>
+              <div class="des">
+                <div class="des-t">
+                  {% if cat.individuel %}{{ support.nom|default:support.code }}{% if support.face_label %} · {{ support.face_label }}{% endif %}{% if support.emplacement_code %} · {{ support.emplacement_code }}{% endif %}{% else %}{% if support.superficie %}{{ support.superficie }} {% endif %}{{ support.dimensions }}{% endif %}
+                </div>
+                <div class="des-d">
+                  {% if cat.individuel %}Support {{ support.code }}{% if support.quartier %} · {{ support.quartier }}{% endif %}{% if support.marche %} · {{ support.marche }}{% endif %}{% else %}{{ cat.categorie }} · {{ ville.nom }}{% endif %}
+                </div>
+              </div>
+              <div class="mini-box" aria-hidden="true">
+                {% if support.format %}<span class="bp" data-fmt="{{ support.format }}">{{ support.format|upper }}</span>
+                {% elif cat.categorie == "Écran" %}<span class="scr"><i class="bi bi-tv"></i></span>
+                {% else %}<i class="bi bi-shop mini-ico"></i>{% endif %}
+              </div>
+              <div class="av">
+                <div class="av-t">
+                  {% if support.libre > 0 %}<span class="ok">{{ support.libre }} libre{{ support.libre|pluralize }}</span>{% else %}<span class="no">Complet</span>{% endif %}
+                  <span>sur {{ support.count }}</span>
+                </div>
+                <div class="av-bar" data-libre="{{ support.libre }}" data-total="{{ support.count }}" aria-hidden="true"></div>
+              </div>
+              <div class="act">
+                {% if support.libre > 0 and cat.categorie != "Écran" %}
+                <a class="btn-x btn-brand btn-sm" href="{% url 'portail:reserver_etape1' %}?ville={{ ville.nom|urlencode }}&amp;categorie={{ cat.categorie|urlencode }}{% if support.format %}&amp;format={{ support.format|urlencode }}{% endif %}">Réserver <i class="bi bi-arrow-right"></i></a>
+                {% elif cat.categorie == "Écran" %}
+                <a class="btn-x btn-ink btn-sm" href="#contact">Nous contacter</a>
+                {% else %}
+                <a class="btn-x btn-line btn-sm" href="#contact">Être notifié</a>
+                {% endif %}
+              </div>
+            </li>
+            {% endfor %}
+          </ul>
+        </section>
+        {% endfor %}
+      </article>
+      {% endfor %}
+    </div>
+
+    <div class="empty" id="netEmpty" role="status">
+      <i class="bi bi-layers"></i>
+      <h3>Aucun calque affiché</h3>
+      <p>Activez au moins un calque ou changez de ville, ou <a href="#contact">contactez-nous</a>.</p>
+    </div>
+    {% else %}
+    <div class="empty always">
+      <i class="bi bi-hourglass-split"></i>
+      <h3>Inventaire en cours de mise à jour</h3>
+      <p>Les disponibilités ne sont pas affichées pour le moment. <a href="#contact">Contactez-nous</a> pour connaître les emplacements disponibles.</p>
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+<!-- ═════════ PLAN DE SITUATION ═════════ -->
+<section class="sec" id="carte" style="padding-top:0;">
+  <div class="wrap">
+    <div class="rv">
+      <span class="sheet-tag"><b>Planche 03</b> Plan de situation</span>
+      <h2 class="h2">Chaque face, <em>sur le plan.</em></h2>
+      <p class="lead">La couleur des repères indique la disponibilité. Touchez un repère pour lancer une demande dans cette ville.</p>
+    </div>
+    <div class="map-sheet frame">
+      <div id="vMap" role="region" aria-label="Carte interactive des supports"></div>
+      <div class="legend">
+        <span style="--c:#22c55e">Face libre</span>
+        <span style="--c:#f97316">Réservé</span>
+        <span style="--c:#ef4444">Occupé</span>
+        <span style="--c:#3b82f6">Écran</span>
+        <span style="--c:#6b7280">Hors service</span>
+      </div>
+    </div>
+    <p id="mapFallback" class="lead" style="display:none;">La carte n'a pas pu être chargée. Consultez la nomenclature ci-dessus.</p>
+  </div>
+</section>
+
+<!-- ═════════ PHASES ═════════ -->
+<section class="sec" id="processus" style="padding-top:0;">
+  <div class="wrap">
+    <div class="rv">
+      <span class="sheet-tag"><b>Planche 04</b> Phases</span>
+      <h2 class="h2">Votre campagne en <em>3 phases.</em></h2>
+    </div>
+    <div class="gantt frame rv">
+      <div class="gr"><div><span class="gr-n">Phase 01</span><h3>Sélectionnez vos emplacements</h3><p>Choisissez les villes, les supports et les emplacements qui correspondent à votre cible.</p></div><div class="track" aria-hidden="true"><i style="--l:0%; --w:34%"></i></div></div>
+      <div class="gr"><div><span class="gr-n">Phase 02</span><h3>Nous confirmons votre réservation</h3><p>Nos équipes vérifient les disponibilités et vous accompagnent jusqu'à la validation.</p></div><div class="track" aria-hidden="true"><i style="--l:30%; --w:30%"></i></div></div>
+      <div class="gr"><div><span class="gr-n">Phase 03</span><h3>Votre campagne est en ligne</h3><p>Nous assurons l'installation, la diffusion et le suivi de votre campagne.</p></div><div class="track" aria-hidden="true"><i style="--l:60%; --w:40%"></i></div></div>
+    </div>
+    <div style="margin-top:28px;"><a href="{% url 'portail:reserver_etape1' %}" class="btn-x btn-brand"><i class="bi bi-calendar-check"></i> Commencer ma demande</a></div>
+  </div>
+</section>
+
+<!-- ═════════ NOTES GÉNÉRALES + FAQ ═════════ -->
+<section class="sec" id="apropos" style="padding-top:0;">
+  <div class="wrap two">
+    <div class="rv">
+      <span class="sheet-tag"><b>Planche 05</b> Notes générales</span>
+      <h2 class="h2">Une régie au service de <em>votre visibilité.</em></h2>
+      <p class="lead">Integral conçoit, exploite et commercialise un réseau de supports publicitaires extérieurs — panneaux grand format, écrans numériques LED et sucettes urbaines — répartis dans les principales villes du Burkina Faso.</p>
+      <ul class="notes">
+        <li><div><b>Emplacements stratégiques</b><span>Des supports positionnés sur les axes à plus fort trafic et dans les zones à forte affluence.</span></div></li>
+        <li><div><b>Disponibilités consultables en ligne</b><span>Consultez l'état de chaque face publicitaire avant de faire votre demande.</span></div></li>
+        <li><div><b>Accompagnement personnalisé</b><span>Une équipe dédiée vous accompagne du choix de l'emplacement jusqu'à la diffusion.</span></div></li>
+      </ul>
+    </div>
+    <div class="rv">
+      <span class="sheet-tag"><b>FAQ</b> Questions fréquentes</span>
+      <h2 class="h2" style="font-size:clamp(2.2rem,5vw,3.8rem);">Réponses <em>claires.</em></h2>
+      <div class="faq">
+        <details open><summary>Combien de temps à l'avance réserver ?</summary><p>Nous recommandons 2 à 3 semaines pour garantir l'emplacement et préparer votre visuel.</p></details>
+        <details><summary>Prenez-vous en charge l'impression ?</summary><p>Oui, nous pouvons gérer l'impression haute définition sur bâche résistante aux intempéries.</p></details>
+        <details><summary>Comment fonctionne un écran LED ?</summary><p>Vos spots sont diffusés en boucle selon une programmation adaptée à vos horaires de campagne.</p></details>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═════════ CONTACT ═════════ -->
+<section class="sec" id="contact" style="padding-top:0;">
+  <div class="wrap">
+    <div class="rv">
+      <span class="sheet-tag"><b>Planche 06</b> Contact</span>
+      <h2 class="h2">Une question ? <em>Parlons-en.</em></h2>
+    </div>
+    <div class="contact">
+      <div class="c-info frame rv">
+        <div class="c-row"><i class="bi bi-geo-alt-fill"></i><div><small>Adresse</small><span>Ouagadougou, Burkina Faso</span></div></div>
+        {% if CONTACT_TEL01 or CONTACT_TEL02 or CONTACT_TEL03 %}
+        <div class="c-row"><i class="bi bi-telephone-fill"></i><div><small>Téléphone</small>
+          {% if CONTACT_TEL01 %}<a href="tel:{{ CONTACT_TEL01|cut:' ' }}">{{ CONTACT_TEL01 }}</a>{% endif %}
+          {% if CONTACT_TEL02 %}<a href="tel:{{ CONTACT_TEL02|cut:' ' }}">{{ CONTACT_TEL02 }}</a>{% endif %}
+          {% if CONTACT_TEL03 %}<a href="tel:{{ CONTACT_TEL03|cut:' ' }}">{{ CONTACT_TEL03 }}</a>{% endif %}
+        </div></div>
+        {% endif %}
+        {% if CONTACT_EMAIL or CONTACT_EMAIL1 or CONTACT_EMAIL2 %}
+        <div class="c-row"><i class="bi bi-envelope-fill"></i><div><small>Email</small>
+          {% if CONTACT_EMAIL %}<a href="mailto:{{ CONTACT_EMAIL }}">{{ CONTACT_EMAIL }}</a>{% endif %}
+          {% if CONTACT_EMAIL1 %}<a href="mailto:{{ CONTACT_EMAIL1 }}">{{ CONTACT_EMAIL1 }}</a>{% endif %}
+          {% if CONTACT_EMAIL2 %}<a href="mailto:{{ CONTACT_EMAIL2 }}">{{ CONTACT_EMAIL2 }}</a>{% endif %}
+        </div></div>
+        {% endif %}
+        {% if CONTACT_WHATSAPP %}
+        <div class="c-row"><i class="bi bi-whatsapp"></i><div><small>WhatsApp</small><a href="https://wa.me/{{ CONTACT_WHATSAPP }}" target="_blank" rel="noopener">Écrire sur WhatsApp</a></div></div>
+        {% endif %}
+        <div class="c-row"><i class="bi bi-clock-fill"></i><div><small>Délai de réponse</small><span>Notre équipe vous répond sous 48h ouvrables.</span></div></div>
+      </div>
+      <form class="c-form frame rv" id="contactForm" novalidate>
+        {% csrf_token %}
+        <div class="f-msg" id="formMsg" role="status" aria-live="polite"></div>
+        <div class="fgrid">
+          <div><label for="nom">Nom complet *</label><input class="f" type="text" id="nom" name="nom" autocomplete="name" required /></div>
+          <div><label for="email">Adresse email *</label><input class="f" type="email" id="email" name="email" autocomplete="email" required /></div>
+          <div><label for="telephone">Téléphone</label><input class="f" type="tel" id="telephone" name="telephone" autocomplete="tel" placeholder="+226 XX XX XX XX" /></div>
+          <div><label for="societe">Société / organisation</label><input class="f" type="text" id="societe" name="societe" autocomplete="organization" placeholder="Optionnel" /></div>
+          <div class="full">
+            <label for="sujet">Sujet *</label>
+            <select class="f" id="sujet" name="sujet" required>
+              <option value="">Sélectionnez un sujet</option>
+              <option value="demande-reservation">Demande de réservation</option>
+              <option value="info-tarif">Informations tarifaires</option>
+              <option value="probleme-technique">Problème technique</option>
+              <option value="autre">Autre</option>
+            </select>
+          </div>
+          <div class="full"><label for="message">Message *</label><textarea class="f" id="message" name="message" rows="4" required></textarea></div>
+          <div class="full"><button class="btn-x btn-brand" style="width:100%;" type="submit"><i class="bi bi-send-fill"></i> Envoyer le message</button></div>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- ═════════ CTA FINAL ═════════ -->
+<section class="sec cta">
+  <div class="wrap cta-in">
+    <div>
+      <h2>Faites la <em>différence.</em></h2>
+      <p>Des emplacements stratégiques, des supports performants et un accompagnement personnalisé pour maximiser votre visibilité.</p>
+    </div>
+    <a href="{% url 'portail:reserver_etape1' %}" class="btn-x btn-yel"><i class="bi bi-calendar-check"></i> Faire une demande</a>
+  </div>
+</section>
+
+</main>
+
+<footer class="site-foot">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div>
+        <span class="brand-name" style="color:#fff;">Integral<span style="color:var(--accent)">.</span></span>
+        <p>Régie publicitaire spécialisée dans l'affichage extérieur : panneaux grand format, écrans numériques LED et sucettes urbaines.</p>
+      </div>
+      <div>
+        <h4>Navigation</h4>
+        <ul>
+          <li><a href="#supports">Supports</a></li>
+          <li><a href="#reseau">Réseau</a></li>
+          <li><a href="#carte">Plan</a></li>
+          <li><a href="#apropos">Notes</a></li>
+          <li><a href="#contact">Contact</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Services</h4>
+        <ul>
+          <li><a href="{% url 'portail:reserver_etape1' %}">Faire une demande</a></li>
+          <li><a href="{% url 'portail:suivi_demande' %}">Suivre une demande</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot-bot">
+      <div><small>Projet</small>Réseau d'affichage</div>
+      <div><small>Société</small>Promo Pub – Integral</div>
+      <div><small>Auteur</small>Ibrahim SAWADOGO</div>
+      <div><small>Date</small>{% now "d/m/Y" %}</div>
+    </div>
+    <p style="margin-top:14px;font-size:.78rem;color:#8496ad;">&copy; {% now "Y" %} Promo Pub – Integral by Ibrahim SAWADOGO. All Rights Reserved</p>
+  </div>
+</footer>
+
+<div class="m-bar">
+  <a href="{% url 'portail:suivi_demande' %}" class="btn-x btn-line btn-sm"><i class="bi bi-search"></i> Suivi</a>
+  <a href="{% url 'portail:reserver_etape1' %}" class="btn-x btn-brand btn-sm"><i class="bi bi-calendar-check"></i> Faire une demande</a>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="{% static 'js/integral_map.js' %}"></script>
+<script>
+(function () {
+  'use strict';
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Tiroir mobile
+  var burger = document.getElementById('burger'), drawer = document.getElementById('drawer'), closeBtn = document.getElementById('closeDrawer');
+  function setDrawer(open) {
+    drawer.classList.toggle('open', open);
+    burger.setAttribute('aria-expanded', open ? 'true' : 'false');
+    document.body.style.overflow = open ? 'hidden' : '';
+  }
+  burger.addEventListener('click', function () { setDrawer(true); });
+  closeBtn.addEventListener('click', function () { setDrawer(false); });
+  drawer.querySelectorAll('a').forEach(function (a) { a.addEventListener('click', function () { setDrawer(false); }); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') setDrawer(false); });
+
+  // Apparition au scroll
+  var rv = document.querySelectorAll('.rv');
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (es) {
+      es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+    }, { threshold: 0.08 });
+    rv.forEach(function (el) { io.observe(el); });
+  } else { rv.forEach(function (el) { el.classList.add('in'); }); }
+
+  // Lien actif
+  var links = {};
+  document.querySelectorAll('.nav-links a').forEach(function (a) { links[a.getAttribute('href')] = a; });
+  if ('IntersectionObserver' in window) {
+    var so = new IntersectionObserver(function (es) {
+      es.forEach(function (e) {
+        if (e.isIntersecting) {
+          Object.keys(links).forEach(function (k) { links[k].classList.remove('active'); });
+          var l = links['#' + e.target.id]; if (l) l.classList.add('active');
+        }
+      });
+    }, { rootMargin: '-45% 0px -50% 0px' });
+    Object.keys(links).forEach(function (k) { var s = document.querySelector(k); if (s) so.observe(s); });
+  }
+
+  // Lecture d'un code de format « LxH » (4x3, gm-12x3, 10x4…)
+  function parseFmt(code) {
+    var m = String(code || '').match(/(\d+(?:[.,]\d+)?)\s*[x×]\s*(\d+(?:[.,]\d+)?)/i);
+    if (!m) return null;
+    var w = parseFloat(m[1].replace(',', '.')), h = parseFloat(m[2].replace(',', '.'));
+    return (w > 0 && h > 0) ? { w: w, h: h } : null;
+  }
+  function nf(n) { return String(Math.round(n * 100) / 100).replace('.', ','); }
+
+  // Planche cotée du hero
+  var panel = document.getElementById('dwgPanel'), stage = panel ? panel.closest('.dwg-stage') : null;
+  var fchips = document.querySelectorAll('.fchip'), curCode = null;
+  function drawHero(code) {
+    if (!panel) return;
+    curCode = code;
+    var d = parseFmt(code), lbl = document.getElementById('dwgLbl'), sub = document.getElementById('dwgSub');
+    var dw = document.getElementById('dimW'), dh = document.getElementById('dimH'), sf = document.getElementById('dwgSurf');
+    fchips.forEach(function (c) { c.setAttribute('aria-pressed', c.dataset.f === code ? 'true' : 'false'); });
+    if (!d) {
+      panel.style.width = '200px'; panel.style.height = '150px';
+      lbl.textContent = 'Panneau'; sub.textContent = 'Format variable'; dw.textContent = '—'; dh.textContent = '—'; sf.textContent = ' ';
+      return;
+    }
+    var BW = Math.max(120, (stage.clientWidth || 360) - 34 - 70), BH = 220, r = d.w / d.h;
+    var pw = r >= BW / BH ? BW : BH * r, ph = r >= BW / BH ? BW / r : BH;
+    panel.style.width = Math.round(pw) + 'px'; panel.style.height = Math.round(ph) + 'px';
+    lbl.textContent = String(code).toUpperCase(); sub.textContent = nf(d.w * d.h) + ' m²';
+    dw.textContent = nf(d.w) + ' m'; dh.textContent = nf(d.h) + ' m'; sf.textContent = 'Surface ' + nf(d.w * d.h) + ' m²';
+  }
+  if (panel) {
+    var codes = Array.prototype.map.call(fchips, function (c) { return c.dataset.f; });
+    var start = codes.filter(function (c) { return /^4x3$/i.test(c); })[0] || codes.filter(parseFmt)[0] || codes[0] || null;
+    drawHero(start);
+    fchips.forEach(function (c) { c.addEventListener('click', function () { drawHero(c.dataset.f); }); });
+  }
+
+  // Jauges de disponibilité (10 segments)
+  document.querySelectorAll('.av-bar').forEach(function (bar) {
+    var l = parseInt(bar.dataset.libre, 10) || 0, t = parseInt(bar.dataset.total, 10) || 0;
+    var on = t ? Math.round(l / t * 10) : 0; if (l > 0 && on === 0) on = 1;
+    for (var i = 0; i < 10; i++) { var s = document.createElement('i'); if (i < on) s.className = 'on'; bar.appendChild(s); }
+  });
+
+  // Mini-plans à l'échelle dans la nomenclature
+  function sizeMini() {
+    document.querySelectorAll('.bp[data-fmt]').forEach(function (el) {
+      var box = el.parentNode; if (!box.clientWidth) return;
+      var d = parseFmt(el.dataset.fmt);
+      if (!d) { el.style.width = '52px'; el.style.height = '34px'; return; }
+      var BW = box.clientWidth - 14, BH = box.clientHeight - 14, r = d.w / d.h;
+      var pw = r >= BW / BH ? BW : BH * r, ph = r >= BW / BH ? BW / r : BH;
+      el.style.width = Math.round(pw) + 'px'; el.style.height = Math.round(ph) + 'px';
+      el.style.fontSize = ph < 26 ? '.5rem' : '.62rem';
+      el.setAttribute('title', 'Format ' + nf(d.w) + ' × ' + nf(d.h) + ' m');
+    });
+  }
+
+  // Calques (panneaux / écrans) + filtre ville
+  var plates = document.querySelectorAll('.plate'), empty = document.getElementById('netEmpty');
+  var st = { panneau: true, ecran: true, v: 'all' };
+  var kinds = { panneau: { libre: 0, total: 0 }, ecran: { libre: 0, total: 0 } };
+  document.querySelectorAll('.cg').forEach(function (g) {
+    var k = kinds[g.dataset.kind]; if (!k) return;
+    k.libre += parseInt(g.dataset.libre, 10) || 0; k.total += parseInt(g.dataset.total, 10) || 0;
+  });
+  function label(k) { return k.total ? k.libre + ' libre' + (k.libre > 1 ? 's' : '') + ' / ' + k.total : 'Aucun support'; }
+  var cp = document.getElementById('cntPan'), ce = document.getElementById('cntEcr');
+  if (cp) cp.textContent = label(kinds.panneau); if (ce) ce.textContent = label(kinds.ecran);
+  document.querySelectorAll('.layer').forEach(function (b) { if (!kinds[b.dataset.layer].total) { b.disabled = true; b.setAttribute('aria-pressed', 'false'); st[b.dataset.layer] = false; } });
+  function apply() {
+    var shown = 0;
+    document.querySelectorAll('.layer').forEach(function (b) { b.setAttribute('aria-pressed', st[b.dataset.layer] ? 'true' : 'false'); });
+    document.querySelectorAll('[data-fv]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.fv === st.v ? 'true' : 'false'); });
+    plates.forEach(function (p) {
+      var okV = st.v === 'all' || p.dataset.v === st.v, any = 0;
+      p.querySelectorAll('.cg').forEach(function (g) { var ok = okV && st[g.dataset.kind]; g.hidden = !ok; if (ok) any++; });
+      p.hidden = !any; if (any) shown++;
+    });
+    if (empty) empty.classList.toggle('show', plates.length > 0 && shown === 0);
+    sizeMini();
+  }
+  document.querySelectorAll('.layer').forEach(function (b) { b.addEventListener('click', function () { st[b.dataset.layer] = !st[b.dataset.layer]; apply(); }); });
+  document.querySelectorAll('[data-fv]').forEach(function (b) { b.addEventListener('click', function () { st.v = b.dataset.fv; apply(); }); });
+  document.querySelectorAll('[data-pick]').forEach(function (a) {
+    a.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      var m = a.dataset.pick, o = m === 'panneau' ? 'ecran' : 'panneau';
+      if (kinds[m] && kinds[m].total) { st[m] = true; st[o] = false; st.v = 'all'; apply(); }
+      var t = document.getElementById('reseau'); if (t) t.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' });
+    });
+  });
+  apply();
+  var rt; window.addEventListener('resize', function () { clearTimeout(rt); rt = setTimeout(function () { sizeMini(); if (curCode) drawHero(curCode); }, 120); });
+  window.addEventListener('load', function () { sizeMini(); if (curCode) drawHero(curCode); });
+
+  // Carte Leaflet (chargée à l'approche de l'écran)
+  var mapEl = document.getElementById('vMap'), mapDone = false;
+  function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+  function initMap() {
+    if (mapDone) return; mapDone = true;
+    if (typeof L === 'undefined') { mapEl.closest('.map-sheet').style.display = 'none'; document.getElementById('mapFallback').style.display = 'block'; return; }
+    var center = {{ oua_center|default:"[12.3714, -1.5197]" }};
+    var map = L.map(mapEl, { scrollWheelZoom: false }).setView(center, 12);
+    var opts = { attribution: '&copy; OpenStreetMap contributors', maxZoom: 19 };
+    if (typeof window.buildSafeLeafletTiles === 'function') { window.buildSafeLeafletTiles(map, opts); }
+    else { L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', opts).addTo(map); }
+    var reserveBase = "{% url 'portail:reserver_etape1' %}";
+    fetch("{% url 'portail:api_geojson' %}", { headers: { 'Accept': 'application/json' } })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (data) {
+        if (!data || !data.features || !data.features.length) return;
+        var layer = L.geoJSON(data, {
+          pointToLayer: function (f, ll) { return L.circleMarker(ll, { radius: 9, fillColor: f.properties.color || '#22c55e', color: '#10233b', weight: 3, fillOpacity: 1 }); },
+          onEachFeature: function (f, l) {
+            var p = f.properties || {};
+            l.bindPopup(
+              '<strong>' + esc(p.nom || p.code) + '</strong>' +
+              '<div style="font-size:.8rem;color:#3c4f68;">' + esc(p.ville) + (p.quartier ? ' · ' + esc(p.quartier) : '') + '</div>' +
+              (p.format || p.type_support ? '<div style="font-size:.8rem;margin-top:4px;">Format : ' + esc(p.format || p.type_support) + '</div>' : '') +
+              '<a href="' + reserveBase + '?ville=' + encodeURIComponent(p.ville || '') + '" style="display:inline-block;margin-top:8px;background:var(--brand);color:#fff;border:2px solid #10233b;padding:6px 12px;font:700 .7rem \'Roboto Mono\',monospace;letter-spacing:.06em;text-transform:uppercase;text-decoration:none;">Réserver</a>'
+            );
+          }
+        }).addTo(map);
+        try { map.fitBounds(layer.getBounds(), { padding: [30, 30], maxZoom: 14 }); } catch (e) {}
+      })
+      .catch(function () { /* carte sans marqueurs : la nomenclature reste consultable */ });
+    map.on('click', function () { map.scrollWheelZoom.enable(); });
+  }
+  if (mapEl) {
+    if ('IntersectionObserver' in window) {
+      var mo = new IntersectionObserver(function (es) { if (es[0].isIntersecting) { initMap(); mo.disconnect(); } }, { rootMargin: '300px' });
+      mo.observe(mapEl);
+    } else { initMap(); }
+  }
+
+  // Formulaire de contact (AJAX)
+  var form = document.getElementById('contactForm');
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var box = document.getElementById('formMsg'), btn = form.querySelector('button[type="submit"]'), html = btn.innerHTML;
+    box.className = 'f-msg';
+    if (!form.checkValidity()) { form.reportValidity(); return; }
+    btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Envoi en cours…';
+    fetch("{% url 'portail:contact_envoyer' %}", { method: 'POST', body: new FormData(form), headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        box.classList.add(d.success ? 'ok' : 'err');
+        box.textContent = d.success ? d.message : (d.error || 'Une erreur est survenue.');
+        if (d.success) form.reset();
+      })
+      .catch(function () { box.classList.add('err'); box.textContent = 'Erreur réseau. Veuillez réessayer.'; })
+      .finally(function () { btn.disabled = false; btn.innerHTML = html; });
+  });
+})();
+</script>
+</body>
+</html>

@@ -253,7 +253,7 @@
             <div class="position-relative">
               <i class="bi bi-bell fs-5 text-secondary"></i>
               {% if alertes %}
-              <span class="position-absolute top-0 start-100 translate-middle badge-alerte rounded-pill bg-danger border border-2 border-white alert-badge" style="border-radius: 20px !important;">
+              <span class="position-absolute top-0 start-100 translate-middle badge-alerte rounded-pill bg-danger border border-2 border-white alert-badge" data-alert-count style="border-radius: 20px !important;">
                 {{ alertes|length }}
               </span>
               {% endif %}
@@ -266,17 +266,23 @@
             style="width:340px; border-radius:14px;">
             <li class="px-3 py-3 border-bottom d-flex justify-content-between align-items-center bg-white">
               <h6 class="m-0 fw-bold text-dark">Notifications</h6>
-              {% if alertes %}
-              <span class="badge text-primary" style="background-color:rgba(147,46,43,0.1)">
-                {{ alertes|length }} nouvelle{{ alertes|length|pluralize:",s" }}
-              </span>
-              {% endif %}
+              <div class="d-flex align-items-center gap-2">
+                {% if alertes %}
+                <span class="badge text-primary" style="background-color:rgba(147,46,43,0.1)">
+                  {{ alertes|length }} nouvelle{{ alertes|length|pluralize:",s" }}
+                </span>
+                {% endif %}
+                <button type="button" class="btn btn-sm btn-light py-0 px-2" data-alert-fold="alertsList"
+                  aria-expanded="true" aria-controls="alertsList" aria-label="Replier les notifications">
+                  <i class="bi bi-chevron-up" aria-hidden="true"></i>
+                </button>
+              </div>
             </li>
-            <div style="max-height:360px; overflow-y:auto;">
+            <div id="alertsList" style="max-height:360px; overflow-y:auto;">
               {% if alertes %}
                 {% for a in alertes %}
-                <li>
-                  <a class="dropdown-item p-3 border-bottom d-flex align-items-start alerte-item-hover" href="{{ a.url }}">
+                <li class="border-bottom">
+                  <a class="dropdown-item p-3 d-flex align-items-start alerte-item-hover" href="{{ a.url }}">
                     <div class="icon-circle me-3 bg-{{ a.type }}-light text-{{ a.type }}">
                       <i class="bi {% if a.type == 'danger' %}bi-exclamation-octagon-fill{% else %}bi-exclamation-triangle-fill{% endif %}"></i>
                     </div>
@@ -291,14 +297,14 @@
                 </li>
                 {% endfor %}
               {% else %}
-                <li class="py-5 text-center">
-                  <i class="bi bi-shield-check fs-1 text-success opacity-50"></i>
-                  <p class="small text-muted mt-2 mb-0">Aucune alerte critique</p>
-                </li>
+              <li class="py-5 text-center">
+                <i class="bi bi-shield-check fs-1 text-success opacity-50"></i>
+                <p class="small text-muted mt-2 mb-0">Aucune alerte critique</p>
+              </li>
               {% endif %}
             </div>
             {% if alertes %}
-            <li class="bg-light p-2 text-center">
+            <li class="bg-light p-2 text-center" data-alerts-footer>
               <small class="text-muted fw-semibold">Toutes vos alertes sont à jour</small>
             </li>
             {% endif %}
@@ -343,6 +349,26 @@
     <script src="{% static 'js/integral_map.js' %}"></script>
     <script src="https://unpkg.com/aos@2.3.1/dist/aos.js"></script>
     <script>
+      (function() {
+        document.addEventListener('click', function(event) {
+          const button = event.target.closest('[data-alert-fold]');
+          if (!button) return;
+          const panel = document.getElementById(button.dataset.alertFold);
+          if (!panel) return;
+          const isExpanded = button.getAttribute('aria-expanded') === 'true';
+          button.setAttribute('aria-expanded', String(!isExpanded));
+          button.setAttribute('aria-label', isExpanded ? 'Déplier les alertes' : 'Replier les alertes');
+          panel.classList.toggle('d-none', isExpanded);
+          const label = button.querySelector('[data-alert-fold-label]');
+          if (label) label.textContent = isExpanded ? 'Déplier' : 'Replier';
+          const icon = button.querySelector('i');
+          if (icon) {
+            icon.classList.toggle('bi-chevron-up', !isExpanded);
+            icon.classList.toggle('bi-chevron-down', isExpanded);
+          }
+        });
+      })();
+
       if (typeof AOS !== 'undefined') {
         AOS.init({
           once: true,

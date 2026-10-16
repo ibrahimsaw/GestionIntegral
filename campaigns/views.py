@@ -673,6 +673,7 @@ def _build_alertes():
     supports_panne = Support.objects.filter(etat='panne').only('code', 'pk')
     for s in supports_panne:
         alertes.append({
+            'id': f'support-panne-{s.pk}',
             'type': 'danger',
             'msg': f'Support {s.code} en panne',
             'url': reverse('support_detail', args=[s.uuid])
@@ -687,6 +688,7 @@ def _build_alertes():
         jours = (c.date_fin - today).days
         msg = f'Campagne "{c.nom}" se termine ' + (f"dans {jours}j" if jours > 0 else "aujourd'hui")
         alertes.append({
+            'id': f'campagne-fin-{c.pk}',
             'type': 'warning',
             'msg': msg,
             'url': reverse('campagne_detail', args=[c.pk])
@@ -713,6 +715,7 @@ def _build_alertes():
     for campagne in campagnes_commerciales:
         if campagne.bon_commande_en_attente:
             alertes.append({
+                'id': f'bon-commande-attente-{campagne.pk}',
                 'type': 'warning',
                 'msg': f'Bon de commande en attente pour la campagne « {campagne.nom} »',
                 'url': reverse('campagne_detail', args=[campagne.pk]),
@@ -724,12 +727,14 @@ def _build_alertes():
         )
         if contrat is None:
             alertes.append({
+                'id': f'campagne-sans-document-{campagne.pk}',
                 'type': 'danger',
                 'msg': f'Aucun contrat ni bon de commande associé à la campagne « {campagne.nom} »',
                 'url': reverse('campagne_detail', args=[campagne.pk]),
             })
         elif contrat.type_document == 'bon_commande' and not contrat.document:
             alertes.append({
+                'id': f'bon-commande-pdf-manquant-{contrat.pk}-{campagne.pk}',
                 'type': 'warning',
                 'msg': f'Le PDF du bon de commande {contrat.reference} manque pour « {campagne.nom} »',
                 'url': reverse('contrat_detail', args=[contrat.pk]),

@@ -234,23 +234,29 @@
         <h2 id="parc-alertes-title"><i class="bi bi-bell-fill text-warning me-2"></i>Alertes et documents commerciaux</h2>
         <p>Campagnes sans document associé, bons de commande en attente ou PDF manquant.</p>
       </div>
-      <span class="badge {% if alertes %}text-bg-warning{% else %}text-bg-success{% endif %}">
-        {{ alertes|length }} alerte{{ alertes|length|pluralize }}
-      </span>
+      <div class="d-flex align-items-center gap-2">
+        <span class="badge {% if alertes %}text-bg-warning{% else %}text-bg-success{% endif %}">
+          {{ alertes|length }} alerte{{ alertes|length|pluralize }}
+        </span>
+        <button type="button" class="btn btn-sm btn-outline-secondary" data-alert-fold="parcAlertsContent"
+          aria-expanded="true" aria-controls="parcAlertsContent" aria-label="Replier les alertes">
+          <i class="bi bi-chevron-up me-1" aria-hidden="true"></i><span data-alert-fold-label>Replier</span>
+        </button>
+      </div>
     </div>
-    {% if alertes %}
-      <div class="d-grid gap-2">
+    <div id="parcAlertsContent">
+      <div id="parcAlertList" class="d-grid gap-2{% if not alertes %} d-none{% endif %}">
         {% for alerte in alertes %}
-          <a href="{{ alerte.url }}" class="alert alert-{{ alerte.type }} d-flex align-items-start gap-2 mb-0 text-decoration-none">
+          <div class="alert alert-{{ alerte.type }} d-flex align-items-start gap-2 mb-0">
             <i class="bi {% if alerte.type == 'danger' %}bi-exclamation-octagon-fill{% else %}bi-exclamation-triangle-fill{% endif %} mt-1"></i>
-            <span>{{ alerte.msg }}</span>
-            <i class="bi bi-arrow-up-right ms-auto mt-1"></i>
-          </a>
+            <a href="{{ alerte.url }}" class="flex-grow-1 text-decoration-none text-reset">{{ alerte.msg }} <i class="bi bi-arrow-up-right small ms-1"></i></a>
+          </div>
         {% endfor %}
       </div>
-    {% else %}
-      <div class="text-success small"><i class="bi bi-check-circle-fill me-2"></i>Aucune alerte : les campagnes actives ou à venir ont leurs documents commerciaux.</div>
-    {% endif %}
+      <div class="text-success small{% if alertes %} d-none{% endif %}">
+        <i class="bi bi-check-circle-fill me-2"></i>Aucune alerte : les campagnes actives ou à venir ont leurs documents commerciaux.
+      </div>
+    </div>
   </section>
 
   <section class="row g-3 mb-4" aria-label="Indicateurs du parc">

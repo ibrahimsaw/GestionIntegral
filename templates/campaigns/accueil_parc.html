@@ -129,7 +129,12 @@
   .parc-category-title p { margin: .2rem 0 0; color: var(--parc-muted); font-size: .75rem; }
   .parc-category-summary { display: flex; flex-wrap: wrap; gap: .4rem .8rem; margin-top: .9rem; }
   .parc-category-summary span { color: #374151; font-size: .75rem; font-weight: 700; }
-  .parc-formats { padding: .35rem 1.1rem 1rem; }
+  .parc-formats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    column-gap: 1.1rem;
+    padding: .35rem 1.1rem 1rem;
+  }
   .parc-format-row { padding: .85rem 0; border-top: 1px solid #edf0f4; }
   .parc-format-row:first-child { border-top: 0; }
   .parc-format-heading { display: flex; align-items: start; justify-content: space-between; gap: .75rem; }
@@ -165,6 +170,7 @@
   .parc-muted { color: var(--parc-muted); font-size: .78rem; }
   @media (max-width: 575.98px) {
     .parc-section { padding: 1rem; }
+    .parc-formats { grid-template-columns: 1fr; }
   }
 </style>
 
@@ -255,7 +261,7 @@
   </section>
 
   <div class="row g-4">
-    <section class="col-12 col-xl-7" aria-labelledby="parc-formats-title">
+    <section class="col-12 col-xl-12" aria-labelledby="parc-formats-title">
       <div class="parc-section">
         <div class="parc-section-heading">
           <div>
@@ -266,8 +272,8 @@
         </div>
         <div class="row g-3">
           {% for categorie in categories_detail %}
-            <div class="col-12 col-md-6">
-              <article class="parc-category-card" style="--category-color:{{ categorie.color }}">
+            <div class="col-12 col-md-6 col-xl-{% if categorie.label|slugify == 'geant' %}8{% else %}4{% endif %}">
+              <article class="parc-category-card{% if categorie.label|slugify == 'geant' %} is-geant{% endif %}" style="--category-color:{{ categorie.color }}">
                 <header class="parc-category-header">
                   <div class="parc-category-title">
                     <span class="parc-category-icon"><i class="bi bi-grid-3x3-gap-fill"></i></span>
@@ -285,7 +291,7 @@
                     {% if categorie.nb_faces_panne %}<span>{{ categorie.nb_faces_panne }} en panne</span>{% endif %}
                   </div>
                 </header>
-                <div class="parc-formats">
+                <div class="parc-formats" style="{% if categorie.label|slugify == 'geant' %}grid-template-columns: repeat(2, minmax(0, 1fr)) !important;{% else %}grid-template-columns: repeat(1, minmax(0, 1fr)) !important;{% endif %}">
                   {% for format in categorie.formats %}
                     <div class="parc-format-row">
                       <div class="parc-format-heading">
@@ -331,7 +337,7 @@
       </div>
     </section>
 
-    <section class="col-12 col-xl-5" aria-labelledby="parc-campagnes-title">
+    <section class="col-12 col-xl-12" aria-labelledby="parc-campagnes-title">
       <div class="parc-section">
         <div class="parc-section-heading">
           <div>

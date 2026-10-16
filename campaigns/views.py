@@ -398,7 +398,13 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             for category_stats in campaign_formats_by_category.values():
                 category_stats['campagnes'][campaign.pk] = campaign
 
-        categories_detail = list(categories_detail.values())
+        categories_detail = sorted(
+            categories_detail.values(),
+            key=lambda category_stats: (
+                slugify(category_stats['label']) == 'geant',
+                category_stats['label'].casefold(),
+            ),
+        )
         for category_stats in categories_detail:
             category_stats['format_codes'] = None
             category_stats['campagnes'] = sorted(
@@ -551,6 +557,8 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         stats = []
         for format_support in formats:
             support_counts = supports_by_format.get(format_support.code, {})
+            if not support_counts.get('total'):
+                continue
             face_counts = faces_by_format.get(format_support.code, {})
             nb_faces_bon = face_counts.get('bon', 0)
             stats.append({

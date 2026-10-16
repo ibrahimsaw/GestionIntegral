@@ -139,12 +139,17 @@
   .parc-formats {
     display: grid;
     grid-template-columns: repeat(var(--category-span, 1), minmax(0, 1fr));
+    grid-auto-rows: 125px;
+    max-height: 375px;
     column-gap: 1.1rem;
     padding: .35rem 1.1rem 1rem;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
   }
   .parc-format-row {
     grid-column: span var(--item-span, 1);
     min-width: 0;
+    overflow: hidden;
     padding: .85rem 0;
     border-top: 1px solid #edf0f4;
   }
@@ -168,7 +173,11 @@
   .parc-category-campaigns-grid {
     display: grid;
     grid-template-columns: repeat(var(--category-span, 1), minmax(0, 1fr));
+    grid-auto-rows: 48px;
+    max-height: 240px;
     column-gap: 1rem;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
   }
   .parc-category-campaign {
     grid-column: span var(--item-span, 1);
@@ -177,6 +186,7 @@
     align-items: center;
     justify-content: space-between;
     gap: .75rem;
+    overflow: hidden;
     padding: .55rem 0;
   }
   .parc-category-campaign + .parc-category-campaign { border-top: 1px solid #edf0f4; }
@@ -188,9 +198,28 @@
   .parc-category-meta { color: var(--parc-muted); font-size: .75rem; margin-top: .45rem; }
   .parc-progress { height: .4rem; margin-top: .75rem; border-radius: 10px; background: #edf0f4; overflow: hidden; }
   .parc-progress > span { display: block; height: 100%; border-radius: inherit; background: var(--category-color, #932e2b); }
-  .parc-campaign { padding: .9rem 0; border-bottom: 1px solid #edf0f4; }
+  .parc-campaign {
+    height: 86px;
+    box-sizing: border-box;
+    overflow: hidden;
+    padding: .9rem 0;
+    border-bottom: 1px solid #edf0f4;
+  }
+  .parc-recent-campaigns {
+    max-height: 1720px;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+  }
   .parc-campaign:last-child { padding-bottom: 0; border-bottom: 0; }
-  .parc-campaign-name { color: var(--parc-ink); font-weight: 700; text-decoration: none; }
+  .parc-campaign-name {
+    display: -webkit-box;
+    overflow: hidden;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: 1;
+    color: var(--parc-ink);
+    font-weight: 700;
+    text-decoration: none;
+  }
   .parc-campaign-name:hover { color: #932e2b; }
   .parc-muted { color: var(--parc-muted); font-size: .78rem; }
   @media (max-width: 575.98px) {
@@ -245,11 +274,11 @@
       </div>
     </div>
     <div id="parcAlertsContent">
-      <div id="parcAlertList" class="d-grid gap-2{% if not alertes %} d-none{% endif %}">
+      <div id="parcAlertList" class="d-grid gap-2{% if not alertes %} d-none{% endif %}" style="max-height:392px; overflow-y:auto;">
         {% for alerte in alertes %}
-          <div class="alert alert-{{ alerte.type }} d-flex align-items-start gap-2 mb-0">
+          <div class="alert alert-{{ alerte.type }} d-flex align-items-center gap-2 mb-0" style="height:72px; min-height:72px;">
             <i class="bi {% if alerte.type == 'danger' %}bi-exclamation-octagon-fill{% else %}bi-exclamation-triangle-fill{% endif %} mt-1"></i>
-            <a href="{{ alerte.url }}" class="flex-grow-1 text-decoration-none text-reset">{{ alerte.msg }} <i class="bi bi-arrow-up-right small ms-1"></i></a>
+            <a href="{{ alerte.url }}" class="flex-grow-1 text-decoration-none text-reset" style="display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">{{ alerte.msg }} <i class="bi bi-arrow-up-right small ms-1"></i></a>
           </div>
         {% endfor %}
       </div>
@@ -422,20 +451,22 @@
           </div>
           <a href="{% url 'campagne_list' %}" class="btn btn-sm btn-outline-secondary">Toutes</a>
         </div>
-        {% for campagne in campagnes_recentes %}
-          <article class="parc-campaign">
-            <div class="d-flex align-items-start justify-content-between gap-2">
-              <div class="min-w-0">
-                <a href="{% url 'campagne_detail' campagne.pk %}" class="parc-campaign-name">{{ campagne.nom }}</a>
-                <div class="parc-muted">{{ campagne.client.nom }}</div>
-                <div class="parc-muted">{{ campagne.date_debut|date:"d/m/Y" }} – {{ campagne.date_fin|date:"d/m/Y" }}</div>
+        <div class="parc-recent-campaigns">
+          {% for campagne in campagnes_recentes %}
+            <article class="parc-campaign">
+              <div class="d-flex align-items-start justify-content-between gap-2">
+                <div class="min-w-0">
+                  <a href="{% url 'campagne_detail' campagne.pk %}" class="parc-campaign-name">{{ campagne.nom }}</a>
+                  <div class="parc-muted">{{ campagne.client.nom }}</div>
+                  <div class="parc-muted">{{ campagne.date_debut|date:"d/m/Y" }} – {{ campagne.date_fin|date:"d/m/Y" }}</div>
+                </div>
+                <span class="badge bg-{{ campagne.statut }}">{{ campagne.get_statut_display }}</span>
               </div>
-              <span class="badge bg-{{ campagne.statut }}">{{ campagne.get_statut_display }}</span>
-            </div>
-          </article>
-        {% empty %}
-          <p class="parc-muted mb-0">Aucune campagne à afficher pour cette sélection.</p>
-        {% endfor %}
+            </article>
+          {% empty %}
+            <p class="parc-muted mb-0">Aucune campagne à afficher pour cette sélection.</p>
+          {% endfor %}
+        </div>
       </div>
     </section>
   </div>

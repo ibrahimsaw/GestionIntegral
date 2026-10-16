@@ -500,7 +500,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             'total_clients': clients_qs.count(),
             'campagnes_actives': len(campagnes_actives_list),
             'campagnes_a_venir': len(campagnes_a_venir_list),
-            'campagnes_recentes': campagnes_qs[:8],
+            'campagnes_recentes': campagnes_qs[:20],
             'alertes': get_cached_alertes(),
 
             'clients_actifs_list': clients_qs.order_by('nom')[:8],

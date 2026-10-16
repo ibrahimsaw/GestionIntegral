@@ -96,9 +96,9 @@ class ClientAdmin(admin.ModelAdmin):
 
 @admin.register(Contrat)
 class ContratAdmin(admin.ModelAdmin):
-    list_display = ['client', 'nom', 'type_contrat', 'date_debut', 'date_fin', 'nb_spots', 'actif']
-    list_filter = ['type_contrat', 'actif']
-    search_fields = ['client__nom']
+    list_display = ['reference', 'type_document', 'client', 'nom', 'type_contrat', 'date_debut', 'date_fin', 'nb_spots', 'actif']
+    list_filter = ['type_document', 'type_contrat', 'actif']
+    search_fields = ['reference', 'client__nom', 'nom']
 
 
 @admin.register(Campagne)

@@ -1,9 +1,9 @@
 import datetime
 from types import MethodType
 
-from django.test import SimpleTestCase
+from django.test import SimpleTestCase, TestCase
 
-from campaigns.models import Campagne, LigneCampagne
+from campaigns.models import Campagne, Client, Contrat, LigneCampagne
 from campaigns.simulation_view import (
     _enrich_resultat_metriques,
     _spots,
@@ -17,6 +17,33 @@ from campaigns.simulation_view import (
     normaliser_objectif_spots,
 )
 from inventory.models import Support
+
+
+class ContractDocumentTests(TestCase):
+    def setUp(self):
+        self.client_obj = Client.objects.create(
+            nom='Client contrat test',
+            telephone='00000000',
+            email='contrat-test@example.com',
+        )
+
+    def test_contract_reference_is_generated_using_document_type(self):
+        contract = Contrat.objects.create(
+            client=self.client_obj,
+            type_document='contrat',
+            date_debut=datetime.date(2026, 1, 1),
+            date_fin=datetime.date(2026, 12, 31),
+        )
+        purchase_order = Contrat.objects.create(
+            client=self.client_obj,
+            type_document='bon_commande',
+            date_debut=datetime.date(2026, 1, 1),
+            date_fin=datetime.date(2026, 12, 31),
+        )
+
+        self.assertEqual(contract.reference, f'CTR-2026-{contract.pk:06d}')
+        self.assertEqual(purchase_order.reference, f'BC-2026-{purchase_order.pk:06d}')
+        self.assertNotEqual(contract.reference, purchase_order.reference)
 
 
 class NombreVisuelsSpotsTests(SimpleTestCase):

@@ -21,7 +21,7 @@
       </a>
       <a href="{% url 'contrat_create_for_client' client.pk %}" class="btn btn-outline-dark btn-sm shadow-sm" style="border-radius: 8px; font-weight: 600;">
         <i class="bi bi-file-earmark-plus me-1"></i>
-        <span class="d-none d-md-inline ms-1">Nouveau Contrat</span>
+        <span class="d-none d-md-inline ms-1">Nouveau contrat / bon de commande</span>
       </a>
       <a href="{% url 'client_edit' client.pk %}" class="btn btn-outline-secondary btn-sm shadow-sm" style="border-radius: 8px;">
         <i class="bi bi-pencil me-1"></i>
@@ -168,7 +168,7 @@
     <div class="card-header bg-white py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-2 border-bottom">
       <div class="d-flex align-items-center gap-2 flex-wrap">
         <i class="bi bi-file-earmark-ruled-fill" style="color:#932e2b; font-size: 1.1rem;"></i>
-        <span class="fw-bold text-dark fs-6">Portefeuille Multi-Contrats</span>
+        <span class="fw-bold text-dark fs-6">Contrats et bons de commande</span>
         <span class="badge bg-light text-dark border ms-1" style="font-size:0.7rem; border-radius: 8px;">{{ contrats_enrichis|length }} souscrit{{ contrats_enrichis|length|pluralize }}</span>
         {% if selected_contrat_obj %}
           <span class="badge bg-primary text-white ms-1" style="font-size:0.7rem; border-radius:8px;">
@@ -179,7 +179,7 @@
       <div class="d-flex align-items-center gap-2 flex-wrap">
         {% if user.is_staff_regie_role %}
           <a href="{% url 'contrat_create_for_client' client.pk %}" class="btn btn-sm btn-primary py-1 px-2.5 shadow-sm" style="font-size:0.75rem; border-radius: 8px; font-weight:600;">
-            <i class="bi bi-plus-lg me-1"></i>Nouveau Contrat
+            <i class="bi bi-plus-lg me-1"></i>Nouveau document
           </a>
         {% endif %}
       </div>
@@ -198,7 +198,7 @@
                   <div class="cld-contract-header">
                     <div>
                       <div class="d-flex align-items-center gap-2 flex-wrap">
-                        <span class="cld-badge-sub cld-badge-mere">{{ c.get_type_contrat_display }}</span>
+                        <span class="cld-badge-sub cld-badge-mere">{{ c.get_type_document_display }}</span>
                         {% if item.is_active %}
                           <span class="badge bg-success-subtle text-success border border-success-subtle" style="font-size:0.62rem; border-radius:8px;">
                             <span class="cld-status-dot-active" style="background:#16a34a;"></span> Actif
@@ -210,8 +210,16 @@
                         {% endif %}
                       </div>
                       <h6 class="cld-contract-title mt-1.5 mb-0">
-                        {{ c.nom|default:c.get_type_contrat_display }}
+                        {% if user.is_staff_regie_role %}
+                          <a class="text-reset text-decoration-none" href="{% url 'contrat_detail' c.pk %}">{{ c.nom|default:c.get_type_document_display }}</a>
+                        {% else %}
+                          {{ c.nom|default:c.get_type_document_display }}
+                        {% endif %}
                       </h6>
+                      <div class="small text-muted mt-1">
+                        <i class="bi bi-hash me-1"></i>{{ c.reference }}
+                        {% if c.document %}<a href="{{ c.document.url }}" target="_blank" rel="noopener" class="ms-2 text-danger" title="Ouvrir le PDF"><i class="bi bi-file-earmark-pdf"></i> PDF</a>{% endif %}
+                      </div>
                       <div class="cld-contract-dates">
                         <i class="bi bi-calendar3 me-1"></i>{{ c.date_debut|date:"d/m/Y" }} → {{ c.date_fin|date:"d/m/Y" }}
                       </div>
@@ -223,6 +231,11 @@
                         <i class="bi bi-three-dots-vertical" style="font-size:0.75rem;"></i>
                       </button>
                       <ul class="dropdown-menu dropdown-menu-end shadow-sm" style="border-radius:8px; font-size:0.78rem;">
+                        <li>
+                          <a class="dropdown-item" href="{% url 'contrat_detail' c.pk %}">
+                            <i class="bi bi-eye me-1.5 text-primary"></i>Voir les détails
+                          </a>
+                        </li>
                         <li>
                           <a class="dropdown-item" href="{% url 'campagne_create' %}?client={{ client.pk }}&contrat={{ c.pk }}">
                             <i class="bi bi-plus-circle me-1.5 text-primary"></i>Créer campagne liée

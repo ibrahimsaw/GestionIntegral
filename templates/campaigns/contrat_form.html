@@ -1,104 +1,195 @@
 {% extends 'base.html' %}
+
 {% block title %}{{ title }} — Integral{% endblock %}
-{% block topbar_title %}<i class="bi bi-file-earmark-text me-2" style="color:var(--color-primary)"></i>{{ title }}{% endblock %}
+
+{% block topbar_title %}
+  <i class="bi bi-file-earmark-text me-2 text-primary"></i>{{ title }}
+{% endblock %}
+
 {% block content %}
-<div class="row justify-content-center">
-  <div class="col-lg-12">
-    <div class="d-flex align-items-center gap-3 mb-4">
-      {% if client %}
-      <a href="{% url 'client_detail' client.pk %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i></a>
-      {% else %}
-      <a href="{% url 'client_list' %}" class="btn btn-outline-secondary btn-sm"><i class="bi bi-arrow-left"></i></a>
-      {% endif %}
-      <h1 style="font-size:1.4rem;font-weight:800;margin:0">{{ title }}</h1>
-    </div>
-    <form method="post">
-      {% csrf_token %}
-      <div class="card">
-        <div class="card-header"><i class="bi bi-file-earmark-text me-2"></i>Détails du Contrat</div>
-        <div class="card-body">
-          <div class="row g-3">
-            {% if form.client.field.widget.input_type != 'hidden' %}
-            <div class="col-12"><label class="form-label">Client *</label>{{ form.client }}</div>
-            {% else %}
+<style>
+  .contract-page { margin: 0 auto; }
+  .contract-hero {
+    position: relative;
+    overflow: hidden;
+    padding: clamp(1.35rem, 3vw, 2rem);
+    border-radius: 1rem;
+    background: linear-gradient(125deg, #702522, #932e2b 65%, #ad4940);
+    color: #fff;
+    box-shadow: 0 .8rem 2rem rgba(80, 25, 25, .14);
+  }
+  .contract-hero h1 { margin: .4rem 0 .25rem; font-size: clamp(1.35rem, 3vw, 1.8rem); font-weight: 800; }
+  .contract-hero p { margin: 0; color: rgba(255,255,255,.76); font-size: .9rem; }
+  .contract-form-card { overflow: hidden; border: 1px solid #e7eaf0; border-radius: 1rem; box-shadow: 0 .5rem 1.5rem rgba(22, 34, 54, .055); }
+  .contract-section { padding: clamp(1rem, 2.5vw, 1.5rem); }
+  .contract-section + .contract-section { border-top: 1px solid #edf0f4; }
+  .contract-section-title { display: flex; align-items: center; gap: .75rem; margin-bottom: 1.15rem; }
+  .contract-section-icon { width: 2.35rem; height: 2.35rem; display: grid; place-items: center; border-radius: .75rem; color: #932e2b; background: #fff1ef; }
+  .contract-section-title h2 { margin: 0; font-size: 1rem; font-weight: 800; }
+  .contract-section-title p { margin: .15rem 0 0; color: #718096; font-size: .76rem; }
+  .contract-page .form-label { color: #344054; font-size: .82rem; font-weight: 700; }
+  .contract-page .form-control, .contract-page .form-select { min-height: 43px; border-color: #dfe4eb; border-radius: .65rem; }
+  .contract-page textarea.form-control { min-height: auto; }
+  .contract-page .form-control:focus, .contract-page .form-select:focus { border-color: #b65a54; box-shadow: 0 0 0 .2rem rgba(147,46,43,.12); }
+  .contract-help { color: #778195; font-size: .75rem; }
+  .contract-error { color: #b42318; font-size: .78rem; }
+  .contract-footer { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.5rem; border-top: 1px solid #edf0f4; background: #fafbfc; }
+  @media (max-width: 575.98px) {
+    .contract-footer { align-items: stretch; flex-direction: column-reverse; }
+    .contract-footer .btn { width: 100%; }
+  }
+</style>
+
+<main class="container-fluid py-3 py-lg-4 contract-page">
+  <section class="contract-hero mb-4">
+    <div class="small text-uppercase fw-bold opacity-75">Gestion commerciale</div>
+    <h1>{{ title }}</h1>
+    <p>
+      {% if client %}Document commercial pour {{ client.nom }}.{% else %}Renseignez les informations du client, du document et sa période de validité.{% endif %}
+      Le numéro est généré automatiquement s’il n’est pas fourni.
+    </p>
+  </section>
+
+  {% if form.non_field_errors %}
+    <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+  {% endif %}
+
+  <form method="post" enctype="multipart/form-data" class="contract-form-card bg-white">
+    {% csrf_token %}
+    <section class="contract-section">
+      <div class="contract-section-title">
+        <span class="contract-section-icon"><i class="bi bi-person-vcard"></i></span>
+        <div><h2>Client et référence</h2><p>Identifiez le document commercial.</p></div>
+      </div>
+      <div class="row g-3">
+        {% if form.client.field.widget.input_type != 'hidden' %}
+          <div class="col-12">
+            <label class="form-label" for="{{ form.client.id_for_label }}">Client <span class="text-danger">*</span></label>
             {{ form.client }}
-            {% endif %}
-            <div class="col-md-6"><label class="form-label">Type de contrat *</label>{{ form.type_contrat }}</div>
-            <div class="col-md-6"><label class="form-label">Nombre de spots</label>{{ form.nb_spots }}</div>
-            <div class="col-md-6"><label class="form-label">Nom du contrat</label>{{ form.nom }}</div>
-            <div class="col-md-6">
-                <label class="form-label">Date de début *</label>
-                <input type="date" name="date_debut" class="form-control" 
-                      value="{{ form.date_debut.value|date:'Y-m-d' }}">
-                {{ form.date_debut.errors }}
-            </div>
-            <div class="col-md-6">
-                <label class="form-label">Date de fin *</label>
-                <input type="date" name="date_fin" class="form-control" 
-                      value="{{ form.date_fin.value|date:'Y-m-d' }}">
-                {{ form.date_fin.errors }}
-            </div>
-            <div class="col-12"><label class="form-label">Notes</label>{{ form.notes }}</div>
-            <div class="col-12">
-              <div class="form-check">
-                {{ form.actif }}
-                <label class="form-check-label" for="{{ form.actif.id_for_label }}">Contrat actif</label>
-              </div>
-            </div>
+            {% for error in form.client.errors %}<div class="contract-error">{{ error }}</div>{% endfor %}
           </div>
+        {% else %}
+          {{ form.client }}
+        {% endif %}
+        <div class="col-md-6">
+          <label class="form-label" for="{{ form.type_document.id_for_label }}">Type de document <span class="text-danger">*</span></label>
+          {{ form.type_document }}
+          {% for error in form.type_document.errors %}<div class="contract-error">{{ error }}</div>{% endfor %}
         </div>
-        <div class="card-body pt-0 d-flex justify-content-end gap-2">
-          {% if client %}
-          <a href="{% url 'client_detail' client.pk %}" class="btn btn-outline-secondary">Annuler</a>
-          {% else %}
-          <a href="{% url 'client_list' %}" class="btn btn-outline-secondary">Annuler</a>
-          {% endif %}
-          <button type="submit" class="btn btn-primary"><i class="bi bi-check-lg me-1"></i>{% if obj %}Enregistrer{% else %}Créer{% endif %}</button>
+        <div class="col-md-6">
+          <label class="form-label" for="{{ form.reference.id_for_label }}">Numéro de référence</label>
+          {{ form.reference }}
+          <div class="contract-help mt-1">Ex. CTR-2026-000123 ou BC-2026-000124.</div>
+          {% for error in form.reference.errors %}<div class="contract-error">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-12">
+          <label class="form-label" for="{{ form.nom.id_for_label }}">Intitulé / objet</label>
+          {{ form.nom }}
+          {% for error in form.nom.errors %}<div class="contract-error">{{ error }}</div>{% endfor %}
         </div>
       </div>
-    </form>
-  </div>
-</div>
+    </section>
+
+    <section class="contract-section">
+      <div class="contract-section-title">
+        <span class="contract-section-icon"><i class="bi bi-calendar2-range"></i></span>
+        <div><h2>Conditions et validité</h2><p>Précisez la durée et le quota associé.</p></div>
+      </div>
+      <div class="row g-3">
+        <div class="col-md-4">
+          <label class="form-label" for="{{ form.type_contrat.id_for_label }}">Périodicité <span class="text-danger">*</span></label>
+          {{ form.type_contrat }}
+          {% for error in form.type_contrat.errors %}<div class="contract-error">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label" for="{{ form.date_debut.id_for_label }}">Date de début <span class="text-danger">*</span></label>
+          {{ form.date_debut }}
+          {% for error in form.date_debut.errors %}<div class="contract-error">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-md-4">
+          <label class="form-label" for="{{ form.date_fin.id_for_label }}">Date de fin <span class="text-danger">*</span></label>
+          {{ form.date_fin }}
+          {% for error in form.date_fin.errors %}<div class="contract-error">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-md-6">
+          <label class="form-label" for="{{ form.nb_spots.id_for_label }}">Nombre de spots</label>
+          {{ form.nb_spots }}
+          {% for error in form.nb_spots.errors %}<div class="contract-error">{{ error }}</div>{% endfor %}
+        </div>
+        <div class="col-md-6 d-flex align-items-end">
+          <div class="form-check mb-2">
+            {{ form.actif }}
+            <label class="form-check-label fw-semibold small" for="{{ form.actif.id_for_label }}">Document actif</label>
+            {% for error in form.actif.errors %}<div class="contract-error">{{ error }}</div>{% endfor %}
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="contract-section">
+      <div class="contract-section-title">
+        <span class="contract-section-icon"><i class="bi bi-paperclip"></i></span>
+        <div><h2>Document signé</h2><p>Joignez le contrat ou le bon de commande au format PDF (facultatif, 15 Mo maximum).</p></div>
+      </div>
+      <div class="mb-3">
+        <label class="form-label" for="{{ form.document.id_for_label }}">Fichier PDF</label>
+        {{ form.document }}
+        {% if obj.document %}
+          <div class="mt-2 small">
+            <i class="bi bi-file-earmark-pdf text-danger me-1"></i>
+            PDF actuel : <a href="{{ obj.document.url }}" target="_blank" rel="noopener">{{ obj.document.name|cut:"documents/contrats/" }}</a>
+          </div>
+        {% endif %}
+        {% for error in form.document.errors %}<div class="contract-error">{{ error }}</div>{% endfor %}
+      </div>
+      <div>
+        <label class="form-label" for="{{ form.notes.id_for_label }}">Détails / notes</label>
+        {{ form.notes }}
+        {% for error in form.notes.errors %}<div class="contract-error">{{ error }}</div>{% endfor %}
+      </div>
+    </section>
+
+    <footer class="contract-footer">
+      {% if client %}
+        <a href="{% url 'client_detail' client.pk %}" class="btn btn-outline-secondary">Annuler</a>
+      {% elif obj %}
+        <a href="{% url 'contrat_detail' obj.pk %}" class="btn btn-outline-secondary">Annuler</a>
+      {% else %}
+        <a href="{% url 'client_list' %}" class="btn btn-outline-secondary">Annuler</a>
+      {% endif %}
+      <button type="submit" class="btn btn-primary px-4">
+        <i class="bi bi-check2-circle me-1"></i>{% if obj %}Enregistrer les modifications{% else %}Créer le document{% endif %}
+      </button>
+    </footer>
+  </form>
+</main>
 {% endblock %}
 
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function() {
-    const typeSelect = document.getElementById('id_type_contrat');
-    const dateDebutInput = document.getElementById('id_date_debut');
-    const dateFinInput = document.getElementById('id_date_fin');
+  const typeSelect = document.getElementById('id_type_contrat');
+  const dateDebutInput = document.getElementById('id_date_debut');
+  const dateFinInput = document.getElementById('id_date_fin');
+  if (!typeSelect || !dateDebutInput || !dateFinInput) return;
 
-    function calculateDateFin() {
-        const type = typeSelect.value;
-        const dateDebut = new Date(dateDebutInput.value);
-
-        if (!dateDebutInput.value || !type) return;
-
-        let dateFin = new Date(dateDebut);
-
-        switch(type) {
-            case 'annuel':
-                dateFin.setFullYear(dateFin.getFullYear() + 1);
-                dateFin.setDate(dateFin.getDate() - 1); // -1 jour pour finir le dernier jour
-                break;
-            case 'mensuel':
-                dateFin.setMonth(dateFin.getMonth() + 1);
-                dateFin.setDate(dateFin.getDate() - 1);
-                break;
-            case 'ponctuel':
-                // Pour ponctuel, on ne calcule pas automatiquement
-                return;
-        }
-
-        // Formater en YYYY-MM-DD
-        const year = dateFin.getFullYear();
-        const month = String(dateFin.getMonth() + 1).padStart(2, '0');
-        const day = String(dateFin.getDate()).padStart(2, '0');
-        dateFinInput.value = `${year}-${month}-${day}`;
+  function calculateDateFin() {
+    if (!dateDebutInput.value || !typeSelect.value) return;
+    const dateFin = new Date(dateDebutInput.value);
+    if (typeSelect.value === 'annuel') {
+      dateFin.setFullYear(dateFin.getFullYear() + 1);
+      dateFin.setDate(dateFin.getDate() - 1);
+    } else if (typeSelect.value === 'mensuel') {
+      dateFin.setMonth(dateFin.getMonth() + 1);
+      dateFin.setDate(dateFin.getDate() - 1);
+    } else {
+      return;
     }
+    dateFinInput.value = `${dateFin.getFullYear()}-${String(dateFin.getMonth() + 1).padStart(2, '0')}-${String(dateFin.getDate()).padStart(2, '0')}`;
+  }
 
-    typeSelect.addEventListener('change', calculateDateFin);
-    dateDebutInput.addEventListener('change', calculateDateFin);
+  typeSelect.addEventListener('change', calculateDateFin);
+  dateDebutInput.addEventListener('change', calculateDateFin);
 });
 </script>
 {% endblock %}

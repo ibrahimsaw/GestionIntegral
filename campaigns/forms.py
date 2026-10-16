@@ -34,17 +34,29 @@ class ContratForm(forms.ModelForm):
 
     class Meta:
         model = Contrat
-        fields = ['client', 'nom', 'type_contrat', 'date_debut', 'date_fin', 'nb_spots', 'actif', 'notes']
+        fields = [
+            'client', 'type_document', 'reference', 'nom', 'type_contrat',
+            'date_debut', 'date_fin', 'nb_spots', 'document', 'actif', 'notes',
+        ]
         widgets = {
             'client': forms.Select(attrs=S),
+            'type_document': forms.Select(attrs=S),
+            'reference': forms.TextInput(attrs={**W, 'placeholder': 'Généré automatiquement si laissé vide'}),
             'nom': forms.TextInput(attrs=W),
             'type_contrat': forms.Select(attrs=S),
             'date_debut': forms.DateInput(attrs=D),
             'date_fin': forms.DateInput(attrs=D),
             'nb_spots': forms.NumberInput(attrs={**W, 'min': 0}),
+            'document': forms.ClearableFileInput(attrs={'class': 'form-control', 'accept': 'application/pdf,.pdf'}),
             'notes': forms.Textarea(attrs={**W, 'rows': 3}),
             'actif': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
+
+    def clean_document(self):
+        document = self.cleaned_data.get('document')
+        if document and document.size > 15 * 1024 * 1024:
+            raise forms.ValidationError("Le PDF ne doit pas dépasser 15 Mo.")
+        return document
 
 
 class MultipleFileInput(forms.ClearableFileInput):
@@ -110,7 +122,7 @@ class CampagneForm(forms.ModelForm):
             'client', 'nom', 'prix', 'prix_affichage', 'prix_impression', 'campagne_parente', 'est_mere',
             'date_debut', 'date_fin', 'statut', 'lieu',
             'type_support', 'duree_passage', 'frequence', 'nombre_visuels',
-            'tranches_horaires', 'notes', 'contrat'
+            'tranches_horaires', 'notes', 'contrat', 'bon_commande_en_attente'
         ]
         widgets = {
             'client': forms.Select(attrs=S),
@@ -131,6 +143,7 @@ class CampagneForm(forms.ModelForm):
             'tranches_horaires': forms.TextInput(attrs=W),
             'notes': forms.Textarea(attrs={**W, 'rows': 3}),
             'contrat': forms.Select(attrs=S),
+            'bon_commande_en_attente': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -152,6 +165,10 @@ class CampagneForm(forms.ModelForm):
         if client_id:
             qs = Contrat.objects.filter(client_id=client_id, actif=True)
             self.fields['contrat'].queryset = qs
+            self.fields['contrat'].label_from_instance = lambda contrat: (
+                f"{contrat.reference} — {contrat.nom or contrat.get_type_document_display()} "
+                f"({contrat.date_debut:%d/%m/%Y} – {contrat.date_fin:%d/%m/%Y})"
+            )
             self.fields['campagne_parente'].queryset = Campagne.objects.filter(
                 client_id=client_id,
                 est_mere=True,
@@ -183,7 +200,14 @@ class CampagneForm(forms.ModelForm):
         d2 = cleaned.get('date_fin')
         type_support = cleaned.get('type_support')
         contrat = cleaned.get('contrat')
+        bon_commande_en_attente = cleaned.get('bon_commande_en_attente')
         parent = cleaned.get('campagne_parente')
+
+        if bon_commande_en_attente and contrat:
+            self.add_error(
+                'contrat',
+                "Retirez le contrat associé si le bon de commande est encore en attente.",
+            )
 
         # 1. Validation des dates de campagne
         if d1 and d2 and d1 > d2:

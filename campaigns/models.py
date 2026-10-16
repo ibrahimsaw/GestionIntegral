@@ -3,6 +3,7 @@ import uuid
 from decimal import Decimal
 from django.conf import settings
 from django.core.exceptions import ValidationError
+from django.core.validators import FileExtensionValidator
 from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
@@ -71,6 +72,11 @@ TYPE_CONTRAT_CHOICES = [
     ('annuel',   'Contrat Annuel'),
     ('mensuel',  'Contrat Mensuel'),
     ('ponctuel', 'Ponctuel'),
+]
+
+TYPE_DOCUMENT_CONTRAT_CHOICES = [
+    ('contrat', 'Contrat'),
+    ('bon_commande', 'Bon de commande'),
 ]
 
 def get_type_support_choices():
@@ -181,13 +187,33 @@ class Client(models.Model):
         return client
 
 class Contrat(models.Model):
-    """Contrat signé par un client."""
+    """Contrat ou bon de commande rattaché à un client."""
     client       = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='contrats')
+    type_document = models.CharField(
+        max_length=20,
+        choices=TYPE_DOCUMENT_CONTRAT_CHOICES,
+        default='contrat',
+        verbose_name="Type de document",
+    )
+    reference = models.CharField(
+        max_length=40,
+        unique=True,
+        null=True,
+        blank=True,
+        verbose_name="Numéro",
+    )
     type_contrat = models.CharField(max_length=20, choices=TYPE_CONTRAT_CHOICES, default='ponctuel')
     nom          = models.CharField(max_length=200, blank=True, verbose_name="Nom du contrat (optionnel)")
     date_debut   = models.DateField(verbose_name="Date de début")
     date_fin     = models.DateField(verbose_name="Date de fin")
     nb_spots     = models.PositiveIntegerField(default=0, verbose_name="Nombre de spots")
+    document = models.FileField(
+        upload_to='documents/contrats/',
+        blank=True,
+        null=True,
+        validators=[FileExtensionValidator(allowed_extensions=['pdf'])],
+        verbose_name="Document PDF",
+    )
     actif        = models.BooleanField(default=True)
     archive      = models.BooleanField(default=True)
     notes        = models.TextField(blank=True)
@@ -199,7 +225,23 @@ class Contrat(models.Model):
         ordering = ['-date_debut']
 
     def __str__(self):
-        return f"{self.client.nom} — {self.get_type_contrat_display()} ({self.date_debut:%d/%m/%Y} → {self.date_fin:%d/%m/%Y})"
+        return f"{self.reference or self.get_type_document_display()} — {self.client.nom}"
+
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        if not is_new and not self.reference:
+            self.reference = self._build_reference()
+            if kwargs.get('update_fields') is not None:
+                kwargs['update_fields'] = set(kwargs['update_fields']) | {'reference'}
+        super().save(*args, **kwargs)
+        if is_new and not self.reference:
+            self.reference = self._build_reference()
+            type(self).objects.filter(pk=self.pk).update(reference=self.reference)
+
+    def _build_reference(self):
+        prefix = 'BC' if self.type_document == 'bon_commande' else 'CTR'
+        year = self.date_debut.year if self.date_debut else timezone.localdate().year
+        return f'{prefix}-{year}-{self.pk:06d}'
     
     def get_nom(self):
         if self.nom:
@@ -839,6 +881,11 @@ class Campagne(models.Model):
     )
     est_mere = models.BooleanField(default=False, verbose_name="Campagne mère")
     actif        = models.BooleanField(default=True)
+    bon_commande_en_attente = models.BooleanField(
+        default=False,
+        verbose_name="Bon de commande en attente",
+        help_text="À cocher si la campagne est créée sans contrat car le bon de commande n’a pas encore été reçu.",
+    )
     
     duree_passage = models.PositiveIntegerField(choices=DUREE_CHOICES, null=True, blank=True, verbose_name="Durée de passage (secondes)")
     frequence = models.PositiveIntegerField(choices=FREQUENCE_CHOICES, default=120, null=True, blank=True, verbose_name="Fréquence de diffusion")

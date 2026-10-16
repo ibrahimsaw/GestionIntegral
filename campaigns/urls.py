@@ -46,6 +46,7 @@ urlpatterns = [
     # Contrats
     path('contrats/creer/', views.ContratCreateView.as_view(), name='contrat_create'),
     path('contrats/creer/<int:client_pk>/', views.ContratCreateView.as_view(), name='contrat_create_for_client'),
+    path('contrats/<int:pk>/', views.ContratDetailView.as_view(), name='contrat_detail'),
     path('contrats/<int:pk>/modifier/', views.ContratUpdateView.as_view(), name='contrat_edit'),
     path('contrats/<int:pk>/supprimer/', views.ContratDeleteView.as_view(), name='contrat_delete'),
 

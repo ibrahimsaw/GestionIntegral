@@ -407,10 +407,35 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         )
         for category_stats in categories_detail:
             category_stats['format_codes'] = None
-            category_stats['campagnes'] = sorted(
+            campagnes = sorted(
                 category_stats['campagnes'].values(),
                 key=lambda campaign: (campaign.date_debut, campaign.nom),
             )
+            category_stats['campagnes'] = campagnes
+            category_stats['grid_span'] = 1
+            if slugify(category_stats['label']) == 'geant':
+                columns_used = (len(categories_detail) - 1) % 3
+                category_stats['grid_span'] = 3 - columns_used
+            for collection_name in ('formats', 'campagnes'):
+                items = category_stats[collection_name]
+                columns = category_stats['grid_span']
+                remainder = len(items) % columns
+                final_span = (
+                    columns if len(items) > 1 and remainder == 1
+                    else remainder or 1
+                )
+                items_with_spans = []
+                for index, item in enumerate(items):
+                    span = final_span if index == len(items) - 1 else 1
+                    if collection_name == 'formats':
+                        item['grid_span'] = span
+                        items_with_spans.append(item)
+                    else:
+                        items_with_spans.append({
+                            'campagne': item,
+                            'grid_span': span,
+                        })
+                category_stats[collection_name] = items_with_spans
 
         total_faces_occupe = sum(cat['nb_occupe'] for cat in format_category_stats)
         total_faces_reserve = sum(cat['nb_reserve'] for cat in format_category_stats)
@@ -666,6 +691,49 @@ def _build_alertes():
             'msg': msg,
             'url': reverse('campagne_detail', args=[c.pk])
         })
+
+    campagnes_commerciales = Campagne.objects.filter(
+        statut__in=[Campagne.STATUT_EN_COURS, Campagne.STATUT_A_VENIR],
+        est_mere=False,
+    ).select_related('contrat', 'campagne_parente__contrat').only(
+        'pk',
+        'nom',
+        'contrat_id',
+        'bon_commande_en_attente',
+        'campagne_parente_id',
+        'contrat__id',
+        'contrat__type_document',
+        'contrat__document',
+        'campagne_parente__id',
+        'campagne_parente__contrat_id',
+        'campagne_parente__contrat__id',
+        'campagne_parente__contrat__type_document',
+        'campagne_parente__contrat__document',
+    )
+    for campagne in campagnes_commerciales:
+        if campagne.bon_commande_en_attente:
+            alertes.append({
+                'type': 'warning',
+                'msg': f'Bon de commande en attente pour la campagne « {campagne.nom} »',
+                'url': reverse('campagne_detail', args=[campagne.pk]),
+            })
+            continue
+
+        contrat = campagne.contrat or (
+            campagne.campagne_parente.contrat if campagne.campagne_parente_id else None
+        )
+        if contrat is None:
+            alertes.append({
+                'type': 'danger',
+                'msg': f'Aucun contrat ni bon de commande associé à la campagne « {campagne.nom} »',
+                'url': reverse('campagne_detail', args=[campagne.pk]),
+            })
+        elif contrat.type_document == 'bon_commande' and not contrat.document:
+            alertes.append({
+                'type': 'warning',
+                'msg': f'Le PDF du bon de commande {contrat.reference} manque pour « {campagne.nom} »',
+                'url': reverse('contrat_detail', args=[contrat.pk]),
+            })
     return alertes
 
 
@@ -673,7 +741,7 @@ def get_cached_alertes():
     res = cache.get('dashboard_alertes')
     if not res:
         res = _build_alertes()
-        cache.set('dashboard_alertes', res, 3600)
+        cache.set('dashboard_alertes', res, 60)
     return res
 
 # ── Clients ──────────────────────────────────────────────────────────────────
@@ -1055,15 +1123,22 @@ class ContratCreateView(StaffRequiredMixin, CreateView):
         context = super().get_context_data(**kwargs)
         client_pk = self.kwargs.get('client_pk')
         context['client'] = get_object_or_404(Client, pk=client_pk) if client_pk else None
-        context['title'] = 'Nouveau Contrat'
+        context['title'] = 'Nouveau contrat / bon de commande'
         return context
 
     def form_valid(self, form):
         if client_pk := self.kwargs.get('client_pk'):
             form.instance.client_id = client_pk
         response = super().form_valid(form)
-        log_action(self.request, AuditLog.ACTION_CREATE, 'commercial', obj=self.object, detail=f"Création contrat pour {self.object.client.nom}")
-        messages.success(self.request, f'Contrat créé pour {self.object.client.nom}.')
+        transaction.on_commit(lambda: cache.delete('dashboard_alertes'))
+        log_action(
+            self.request,
+            AuditLog.ACTION_CREATE,
+            'commercial',
+            obj=self.object,
+            detail=f"Création de {self.object.get_type_document_display()} {self.object.reference} pour {self.object.client.nom}",
+        )
+        messages.success(self.request, f'{self.object.get_type_document_display()} {self.object.reference} créé pour {self.object.client.nom}.')
         return response
 
     def form_invalid(self, form):
@@ -1071,7 +1146,7 @@ class ContratCreateView(StaffRequiredMixin, CreateView):
         return super().form_invalid(form)
 
     def get_success_url(self):
-        return reverse('client_detail', kwargs={'pk': self.object.client.pk})
+        return reverse('contrat_detail', kwargs={'pk': self.object.pk})
 
 
 class ContratUpdateView(StaffRequiredMixin, UpdateView):
@@ -1081,18 +1156,29 @@ class ContratUpdateView(StaffRequiredMixin, UpdateView):
 
     def form_valid(self, form):
         response = super().form_valid(form)
+        transaction.on_commit(lambda: cache.delete('dashboard_alertes'))
         log_action(self.request, AuditLog.ACTION_UPDATE, 'commercial', obj=self.object, detail=f"Modification contrat: {self.object}")
-        messages.success(self.request, 'Contrat mis à jour.')
+        messages.success(self.request, f'{self.object.get_type_document_display()} {self.object.reference} mis à jour.')
         return response
 
     def get_success_url(self):
-        return reverse('client_detail', kwargs={'pk': self.object.client.pk})
+        return reverse('contrat_detail', kwargs={'pk': self.object.pk})
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['title'] = f'Modifier Contrat — {self.object}'
         context['obj'] = self.object
+        context['client'] = self.object.client
         return context
+
+
+class ContratDetailView(StaffRequiredMixin, DetailView):
+    model = Contrat
+    template_name = 'campaigns/contrat_detail.html'
+    context_object_name = 'contrat'
+
+    def get_queryset(self):
+        return Contrat.objects.select_related('client').prefetch_related('campagnes')
 
 
 class ContratDeleteView(StaffRequiredMixin, DeleteView):
@@ -1107,6 +1193,7 @@ class ContratDeleteView(StaffRequiredMixin, DeleteView):
             contrat = self.get_object()
             contrat_str = str(contrat)
             response = super().delete(request, *args, **kwargs)
+            transaction.on_commit(lambda: cache.delete('dashboard_alertes'))
             log_action(request, AuditLog.ACTION_DELETE, 'commercial', detail=f"Suppression contrat: {contrat_str}")
             messages.success(request, 'Contrat supprimé.')
             return response
@@ -1116,6 +1203,7 @@ class ContratDeleteView(StaffRequiredMixin, DeleteView):
             contrat_str = str(contrat)
             contrat.archive = False
             contrat.save()
+            transaction.on_commit(lambda: cache.delete('dashboard_alertes'))
             log_action(request, AuditLog.ACTION_UPDATE, 'commercial', detail=f"Archivage contrat: {contrat_str}")
             messages.success(request, 'Contrat archivé.')
             return response
@@ -1639,6 +1727,7 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
             form.instance.actif = False
         
         self.object = form.save()
+        transaction.on_commit(lambda: cache.delete('dashboard_alertes'))
 
         if not is_create:
             changed_line_fields = {

@@ -1,0 +1,89 @@
+{% extends 'base.html' %}
+
+{% block title %}{{ contrat.reference }} — {{ contrat.client.nom }}{% endblock %}
+
+{% block topbar_title %}
+  <i class="bi bi-file-earmark-text me-2 text-primary"></i>{{ contrat.reference }}
+{% endblock %}
+
+{% block content %}
+<style>
+  .contract-detail {  margin: 0 auto; }
+  .contract-detail-hero { padding: clamp(1.35rem, 3vw, 2rem); border-radius: 1rem; color: white; background: linear-gradient(125deg, #702522, #932e2b 65%, #ad4940); }
+  .contract-detail-hero h1 { margin: .5rem 0; font-size: clamp(1.4rem, 3vw, 2rem); font-weight: 800; }
+  .contract-detail-hero p { margin: 0; color: rgba(255,255,255,.78); }
+  .contract-detail-card { border: 1px solid #e8ebf0; border-radius: 1rem; background: #fff; box-shadow: 0 .5rem 1.5rem rgba(22,34,54,.05); }
+  .contract-detail-card h2 { font-size: 1rem; font-weight: 800; }
+  .contract-detail-value { font-weight: 700; overflow-wrap: anywhere; }
+  .contract-detail-label { margin-bottom: .25rem; color: #778195; font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+  .contract-document { display: flex; align-items: center; gap: .9rem; padding: 1rem; border: 1px solid #edf0f4; border-radius: .8rem; background: #fafbfc; }
+  .contract-document-icon { color: #c62828; font-size: 1.7rem; }
+</style>
+
+<main class="container-fluid py-3 py-lg-4 contract-detail">
+  <section class="contract-detail-hero mb-4">
+    <div class="small text-uppercase fw-bold opacity-75">{{ contrat.get_type_document_display }} · {{ contrat.reference }}</div>
+    <h1>{{ contrat.nom|default:contrat.get_type_contrat_display }}</h1>
+    <p>{{ contrat.client.nom }} · {{ contrat.date_debut|date:"d/m/Y" }} – {{ contrat.date_fin|date:"d/m/Y" }}</p>
+  </section>
+
+  <section class="contract-detail-card p-3 p-md-4 mb-4">
+    <div class="d-flex justify-content-between align-items-center gap-2 flex-wrap mb-3">
+      <h2 class="mb-0"><i class="bi bi-card-list text-primary me-2"></i>Détails du document</h2>
+      <span class="badge {% if contrat.actif %}bg-success-subtle text-success{% else %}bg-secondary-subtle text-secondary{% endif %}">
+        {% if contrat.actif %}Actif{% else %}Inactif{% endif %}
+      </span>
+    </div>
+    <div class="row g-3">
+      <div class="col-sm-6 col-lg-4"><div class="contract-detail-label">Numéro</div><div class="contract-detail-value">{{ contrat.reference }}</div></div>
+      <div class="col-sm-6 col-lg-4"><div class="contract-detail-label">Type</div><div class="contract-detail-value">{{ contrat.get_type_document_display }}</div></div>
+      <div class="col-sm-6 col-lg-4"><div class="contract-detail-label">Client</div><div class="contract-detail-value"><a href="{% url 'client_detail' contrat.client.pk %}">{{ contrat.client.nom }}</a></div></div>
+      <div class="col-sm-6 col-lg-4"><div class="contract-detail-label">Périodicité</div><div class="contract-detail-value">{{ contrat.get_type_contrat_display }}</div></div>
+      <div class="col-sm-6 col-lg-4"><div class="contract-detail-label">Période</div><div class="contract-detail-value">{{ contrat.date_debut|date:"d/m/Y" }} – {{ contrat.date_fin|date:"d/m/Y" }}</div></div>
+      <div class="col-sm-6 col-lg-4"><div class="contract-detail-label">Quota de spots</div><div class="contract-detail-value">{{ contrat.nb_spots }}</div></div>
+    </div>
+    {% if contrat.notes %}
+      <hr>
+      <div class="contract-detail-label">Détails / notes</div>
+      <div>{{ contrat.notes|linebreaks }}</div>
+    {% endif %}
+  </section>
+
+  <section class="contract-detail-card p-3 p-md-4 mb-4">
+    <h2 class="mb-3"><i class="bi bi-file-earmark-pdf text-danger me-2"></i>Fichier associé</h2>
+    {% if contrat.document %}
+      <div class="contract-document">
+        <i class="bi bi-file-earmark-pdf contract-document-icon"></i>
+        <div class="flex-grow-1 min-w-0">
+          <div class="fw-bold text-break">{{ contrat.document.name|cut:"documents/contrats/" }}</div>
+          <div class="small text-muted">Document PDF</div>
+        </div>
+        <a href="{{ contrat.document.url }}" target="_blank" rel="noopener" class="btn btn-outline-primary btn-sm">
+          <i class="bi bi-box-arrow-up-right me-1"></i>Ouvrir
+        </a>
+      </div>
+    {% else %}
+      <p class="text-muted mb-0">Aucun PDF n’a été joint à ce document.</p>
+    {% endif %}
+  </section>
+
+  <section class="contract-detail-card p-3 p-md-4 mb-4">
+    <h2 class="mb-3"><i class="bi bi-megaphone text-primary me-2"></i>Campagnes liées ({{ contrat.campagnes.count }})</h2>
+    {% for campagne in contrat.campagnes.all %}
+      <div class="d-flex align-items-center justify-content-between gap-2 py-2 border-top">
+        <a href="{% url 'campagne_detail' campagne.pk %}" class="fw-semibold">{{ campagne.nom }}</a>
+        <span class="badge bg-{{ campagne.statut }}">{{ campagne.get_statut_display }}</span>
+      </div>
+    {% empty %}
+      <p class="text-muted mb-0">Aucune campagne n’est liée à ce document pour le moment.</p>
+    {% endfor %}
+  </section>
+
+  <div class="d-flex flex-wrap justify-content-between gap-2">
+    <a href="{% url 'client_detail' contrat.client.pk %}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left me-1"></i>Retour au client</a>
+    <div class="d-flex gap-2">
+      <a href="{% url 'contrat_edit' contrat.pk %}" class="btn btn-primary"><i class="bi bi-pencil me-1"></i>Modifier</a>
+    </div>
+  </div>
+</main>
+{% endblock %}

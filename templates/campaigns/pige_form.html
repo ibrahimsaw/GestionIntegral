@@ -7,70 +7,174 @@
 {% endblock %}
 
 {% block content %}
-<div class="container py-4">
-  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
-    <div>
-      <h1 class="h4 fw-bold mb-1">{{ campagne.nom }}</h1>
-      <p class="text-muted mb-0">{{ campagne.client.nom }} · {{ campagne.date_debut|date:"d/m/Y" }} au {{ campagne.date_fin|date:"d/m/Y" }}</p>
-    </div>
-    <a href="{% url 'campagne_detail' campagne.pk %}#piges" class="btn btn-outline-secondary btn-sm">
-      <i class="bi bi-arrow-left me-1"></i>Retour à la campagne
-    </a>
-  </div>
+<style>
+  .pige-page { max-width: 1050px; margin: 0 auto; color: #172033; }
+  .pige-hero {
+    position: relative;
+    overflow: hidden;
+    padding: clamp(1.35rem, 4vw, 2.25rem);
+    border-radius: 1rem;
+    background: linear-gradient(120deg, #762321 0%, #932e2b 58%, #b64a40 100%);
+    color: #fff;
+    box-shadow: 0 1rem 2.2rem rgba(92, 35, 32, .16);
+  }
+  .pige-hero::after {
+    position: absolute;
+    top: -5rem;
+    right: -2rem;
+    width: 15rem;
+    height: 15rem;
+    border: 1px solid rgba(255,255,255,.18);
+    border-radius: 50%;
+    box-shadow: 0 0 0 2rem rgba(255,255,255,.05), 0 0 0 4rem rgba(255,255,255,.035);
+    content: "";
+    pointer-events: none;
+  }
+  .pige-hero-content { position: relative; z-index: 1; }
+  .pige-eyebrow { margin-bottom: .45rem; color: rgba(255,255,255,.76); font-size: .72rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+  .pige-hero h1 { margin: 0; font-size: clamp(1.45rem, 3vw, 2rem); font-weight: 800; }
+  .pige-hero-description { margin: .5rem 0 0; color: rgba(255,255,255,.83); }
+  .pige-campaign-meta { display: flex; flex-wrap: wrap; gap: .55rem; margin-top: 1.15rem; }
+  .pige-meta-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    padding: .42rem .7rem;
+    border: 1px solid rgba(255,255,255,.25);
+    border-radius: 999px;
+    background: rgba(255,255,255,.12);
+    color: #fff;
+    font-size: .78rem;
+    font-weight: 650;
+  }
+  .pige-back { color: #fff; border-color: rgba(255,255,255,.55); }
+  .pige-back:hover { color: #762321; background: #fff; border-color: #fff; }
+  .pige-card {
+    overflow: hidden;
+    border: 1px solid #e8ebf0;
+    border-radius: 1rem;
+    background: #fff;
+    box-shadow: 0 .55rem 1.8rem rgba(25, 35, 55, .06);
+  }
+  .pige-card-heading { display: flex; align-items: center; gap: .85rem; padding: 1.25rem 1.5rem; border-bottom: 1px solid #edf0f4; }
+  .pige-card-icon { width: 2.7rem; height: 2.7rem; display: grid; flex: 0 0 auto; place-items: center; border-radius: .85rem; background: #fff1ef; color: #932e2b; font-size: 1.2rem; }
+  .pige-card-heading h2 { margin: 0; font-size: 1rem; font-weight: 800; }
+  .pige-card-heading p { margin: .2rem 0 0; color: #6b7280; font-size: .8rem; }
+  .pige-card-body { padding: clamp(1rem, 3vw, 1.6rem); }
+  .pige-section-title { display: flex; align-items: center; gap: .55rem; margin: 0 0 .9rem; color: #344054; font-size: .82rem; font-weight: 800; }
+  .pige-section-title i { color: #932e2b; }
+  .pige-field { min-width: 0; }
+  .pige-field .form-label { margin-bottom: .4rem; color: #344054; font-size: .8rem; font-weight: 750; }
+  .pige-field .form-control, .pige-field .form-select { min-height: 2.8rem; border-color: #dce1e8; border-radius: .65rem; }
+  .pige-field .form-control:focus, .pige-field .form-select:focus { border-color: #b64a40; box-shadow: 0 0 0 .2rem rgba(147,46,43,.12); }
+  .pige-field textarea.form-control { min-height: 6rem; }
+  .pige-hint { margin-top: .45rem; color: #737b89; font-size: .75rem; line-height: 1.45; }
+  .pige-upload { padding: 1rem; border: 1px dashed #cbd2dc; border-radius: .75rem; background: #fafbfc; }
+  .pige-upload .form-control { background: #fff; }
+  .pige-current-photo { display: inline-flex; align-items: center; gap: .4rem; margin-top: .65rem; color: #932e2b; font-size: .78rem; font-weight: 700; text-decoration: none; }
+  .pige-current-photo:hover { text-decoration: underline; }
+  .pige-footer { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: 1.5rem; padding-top: 1.15rem; border-top: 1px solid #edf0f4; }
+  .pige-footer-note { color: #737b89; font-size: .76rem; }
+  .pige-submit { padding: .65rem 1rem; border: 0; border-radius: .65rem; background: #932e2b; font-weight: 750; box-shadow: 0 .35rem .8rem rgba(147,46,43,.18); }
+  .pige-submit:hover { background: #762321; }
+  .pige-empty { padding: 1.25rem; border: 1px solid #f4d58b; border-radius: .75rem; background: #fff9e8; color: #6b4d12; }
+  @media (max-width: 575.98px) {
+    .pige-hero { border-radius: .8rem; }
+    .pige-card-heading { padding: 1rem; }
+    .pige-footer { align-items: stretch; flex-direction: column; }
+    .pige-submit { width: 100%; }
+  }
+</style>
 
-  <div class="card border-0 shadow-sm">
-    <div class="card-header bg-white">
-      <h2 class="h6 fw-bold mb-0">{% if preuve_modifiee %}Modifier la pige terrain{% else %}Nouvelle pige terrain{% endif %}</h2>
-    </div>
-    <div class="card-body">
-      {% if not form.fields.ligne.queryset.exists %}
-        <div class="alert alert-warning mb-0">
-          Aucun support ou emplacement n’est associé à cette campagne. Ajoutez d’abord les supports à la campagne.
+<main class="container-fluid py-3 py-lg-4">
+  <div class="pige-page">
+    <section class="pige-hero mb-4">
+      <div class="pige-hero-content">
+        <div class="d-flex flex-wrap justify-content-between align-items-start gap-3">
+          <div>
+            <div class="pige-eyebrow"><i class="bi bi-camera me-1"></i>Suivi terrain</div>
+            <h1>{% if preuve_modifiee %}Modifier la preuve de diffusion{% else %}Ajouter une preuve de diffusion{% endif %}</h1>
+            <p class="pige-hero-description">Enregistrez la diffusion et joignez une photo comme justificatif.</p>
+          </div>
+          <a href="{% url 'campagne_detail' campagne.pk %}#piges" class="btn btn-sm btn-outline-light pige-back">
+            <i class="bi bi-arrow-left me-1"></i>Retour à la campagne
+          </a>
         </div>
-      {% else %}
-        <form method="post" enctype="multipart/form-data" novalidate>
-          {% csrf_token %}
-          {% if form.non_field_errors %}
-            <div class="alert alert-danger">{{ form.non_field_errors }}</div>
-          {% endif %}
-          <div class="row g-3">
-            <div class="col-12">
-              <label for="{{ form.ligne.id_for_label }}" class="form-label">{{ form.ligne.label }}</label>
-              {{ form.ligne }}
-              {% for error in form.ligne.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
-            </div>
-            <div class="col-md-6">
-              <label for="{{ form.date_heure.id_for_label }}" class="form-label">{{ form.date_heure.label }}</label>
-              {{ form.date_heure }}
-              {% for error in form.date_heure.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
-              <div class="form-text">La date doit être dans la période de diffusion de la campagne.</div>
-            </div>
-            <div class="col-md-6">
-              <label for="{{ form.photo.id_for_label }}" class="form-label">{{ form.photo.label }}</label>
-              {{ form.photo }}
-              {% for error in form.photo.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
-              <div class="form-text">
-                {% if preuve_modifiee and preuve_modifiee.photo %}
-                  La photo actuelle est conservée si vous n’en choisissez pas une nouvelle.
-                  <a href="{{ preuve_modifiee.photo.url }}" target="_blank" rel="noopener">Voir la photo actuelle</a>.
-                {% endif %}
-                Photo JPG, PNG ou WebP, 10 Mo maximum. Vous pouvez prendre une photo avec votre téléphone.
+        <div class="pige-campaign-meta">
+          <span class="pige-meta-chip"><i class="bi bi-megaphone"></i>{{ campagne.nom }}</span>
+          <span class="pige-meta-chip"><i class="bi bi-person"></i>{{ campagne.client.nom }}</span>
+          <span class="pige-meta-chip"><i class="bi bi-calendar3"></i>{{ campagne.date_debut|date:"d/m/Y" }} – {{ campagne.date_fin|date:"d/m/Y" }}</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="pige-card">
+      <div class="pige-card-heading">
+        <span class="pige-card-icon"><i class="bi bi-clipboard2-check"></i></span>
+        <div>
+          <h2>{% if preuve_modifiee %}Informations de la preuve{% else %}Nouvelle pige terrain{% endif %}</h2>
+          <p>Renseignez les informations de diffusion et ajoutez une photo justificative.</p>
+        </div>
+      </div>
+      <div class="pige-card-body">
+        {% if not form.fields.ligne.queryset.exists %}
+          <div class="pige-empty">
+            <div class="fw-bold mb-1"><i class="bi bi-exclamation-circle me-1"></i>Aucun support disponible</div>
+            <div class="small">Aucun support ou emplacement n’est associé à cette campagne. Ajoutez d’abord les supports à la campagne.</div>
+          </div>
+        {% else %}
+          <form method="post" enctype="multipart/form-data" novalidate>
+            {% csrf_token %}
+            {% if form.non_field_errors %}
+              <div class="alert alert-danger rounded-3">{{ form.non_field_errors }}</div>
+            {% endif %}
+
+            <h3 class="pige-section-title"><i class="bi bi-geo-alt"></i>Support et date de diffusion</h3>
+            <div class="row g-3">
+              <div class="col-12 pige-field">
+                <label for="{{ form.ligne.id_for_label }}" class="form-label">{{ form.ligne.label }}</label>
+                {{ form.ligne }}
+                {% for error in form.ligne.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                <div class="pige-hint">Seuls les supports de cette campagne sans preuve enregistrée sont proposés.</div>
+              </div>
+              <div class="col-12 col-md-6 pige-field">
+                <label for="{{ form.date_heure.id_for_label }}" class="form-label">{{ form.date_heure.label }}</label>
+                {{ form.date_heure }}
+                {% for error in form.date_heure.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                <div class="pige-hint">La date doit se situer dans la période de diffusion de la campagne.</div>
+              </div>
+              <div class="col-12 col-md-6 pige-field">
+                <label for="{{ form.photo.id_for_label }}" class="form-label">{{ form.photo.label }}</label>
+                <div class="pige-upload">
+                  {{ form.photo }}
+                  {% for error in form.photo.errors %}<div class="text-danger small mt-2">{{ error }}</div>{% endfor %}
+                  <div class="pige-hint">JPG, PNG ou WebP, 10 Mo maximum. Sur téléphone, vous pouvez prendre une photo directement.</div>
+                  {% if preuve_modifiee and preuve_modifiee.photo %}
+                    <a class="pige-current-photo" href="{{ preuve_modifiee.photo.url }}" target="_blank" rel="noopener">
+                      <i class="bi bi-image"></i>Voir la photo actuelle
+                    </a>
+                    <div class="pige-hint mt-1">La photo actuelle est conservée si vous n’en choisissez pas une nouvelle.</div>
+                  {% endif %}
+                </div>
+              </div>
+              <div class="col-12 pige-field">
+                <label for="{{ form.observations.id_for_label }}" class="form-label">{{ form.observations.label }}</label>
+                {{ form.observations }}
+                {% for error in form.observations.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+                <div class="pige-hint">Ajoutez un détail utile sur la diffusion ou les conditions constatées sur place.</div>
               </div>
             </div>
-            <div class="col-12">
-              <label for="{{ form.observations.id_for_label }}" class="form-label">{{ form.observations.label }}</label>
-              {{ form.observations }}
-              {% for error in form.observations.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+
+            <div class="pige-footer">
+              <span class="pige-footer-note"><i class="bi bi-shield-check me-1"></i>La preuve sera rattachée à cette campagne.</span>
+              <button type="submit" class="btn btn-primary pige-submit">
+                <i class="bi bi-check-lg me-1"></i>{% if preuve_modifiee %}Enregistrer les modifications{% else %}Enregistrer la preuve{% endif %}
+              </button>
             </div>
-          </div>
-          <div class="d-flex justify-content-end mt-4">
-            <button type="submit" class="btn btn-primary">
-              <i class="bi bi-check-lg me-1"></i>{% if preuve_modifiee %}Enregistrer les modifications{% else %}Enregistrer la preuve{% endif %}
-            </button>
-          </div>
-        </form>
-      {% endif %}
-    </div>
+          </form>
+        {% endif %}
+      </div>
+    </section>
   </div>
-</div>
+</main>
 {% endblock %}

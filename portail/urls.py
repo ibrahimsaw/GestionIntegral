@@ -53,6 +53,8 @@ urlpatterns = [
          name='accueil_v10'),
     
     path('v11', views.AccueilV11View.as_view(), name='accueil_v11'),
+    
+    path('v12', views.AccueilV12View.as_view(), name='accueil_v12'),
 
     path('catalogue/',
          views.CatalogueView.as_view(),

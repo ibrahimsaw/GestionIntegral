@@ -582,6 +582,17 @@ class AccueilV11View(View):
             'oua_center': [12.3714, -1.5197],
         })
 
+class AccueilV12View(View):
+    """Vitrine V12 — style noir/blanc minimaliste avec mini-jeu (même contexte que les autres vitrines)."""
+    template_name = 'portail/vitrine_v12.html'
+
+    def get(self, request):
+        compteurs = _get_compteurs()
+        return render(request, self.template_name, {
+            **compteurs,
+            'oua_center': [12.3714, -1.5197],
+        })
+        
 from django.conf import settings
 from django.core.mail import EmailMessage
 from django.http import JsonResponse

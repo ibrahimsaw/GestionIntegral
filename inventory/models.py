@@ -293,6 +293,7 @@ class Support(models.Model):
             blank=True     # Permet de laisser le champ vide dans les formulaires admin/front
         )
     nom         = models.CharField(max_length=200, verbose_name="Nom / Libellé")
+    ancien_nom  = models.CharField(max_length=200, blank=True, verbose_name="Ancien nom")
     type_support = models.CharField(max_length=10, choices=TYPE_CHOICES, verbose_name="Type")
     actif        = models.BooleanField(default=True)
     

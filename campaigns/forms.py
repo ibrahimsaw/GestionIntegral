@@ -307,6 +307,10 @@ class LigneCampagneForm(forms.ModelForm):
             self.fields['support'].queryset = supports_qs.filter(type_support=selected_type)
         else:
             self.fields['support'].queryset = supports_qs
+        self.fields['support'].label_from_instance = lambda support: (
+            f"{support.code} — {support.nom}"
+            + (f" (Ancien nom : {support.ancien_nom})" if support.ancien_nom else "")
+        )
 
         # Gestion dynamique des faces pour les panneaux
         self.fields['face'].queryset = FacePanneau.objects.none()

@@ -13,7 +13,7 @@ class EcranInline(admin.StackedInline):
 class SupportAdmin(admin.ModelAdmin):
     list_display = ['code', 'nom','code_ext', 'type_support', 'etat', 'ville', 'quartier', 'actif']
     list_filter = ['type_support', 'etat', 'ville']
-    search_fields = ['code', 'nom', 'adresse']
+    search_fields = ['code', 'nom', 'ancien_nom', 'adresse']
     inlines = [FaceInline, EcranInline]
 # Dans inventory/admin.py
 

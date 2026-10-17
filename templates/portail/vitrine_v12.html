@@ -1,0 +1,1011 @@
+{% load static %}<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Panneaux, écrans LED et sucettes : consultez les emplacements et les faces disponibles par ville, puis faites votre demande en ligne." />
+  <meta name="theme-color" content="#000000" />
+  <link rel="icon" type="image/png" href="{% static 'img/Logo-Integral-2-768x768.png' %}" />
+  <title>Integral — L'affichage qui met votre marque en grand</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@500;600;700;800&family=Inter:wght@400;500;600&family=Silkscreen:wght@400;700&display=swap" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.css" rel="stylesheet" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+  <script>document.documentElement.classList.add('js');</script>
+
+<style>
+  :root {
+    --brand:  {{ DESIGN.COLOR_PRIMARY|default:'#932e2b' }};
+    --accent: {{ DESIGN.COLOR_SECONDARY|default:'#fddd48' }};
+    --bg:   #000000;
+    --s1:   #0c0c0e;
+    --s2:   #141417;
+    --s3:   #1d1d22;
+    --tx:   #f5f5f7;
+    --mut:  #9b9ba5;
+    --line: rgba(255,255,255,.14);
+    --line2:rgba(255,255,255,.30);
+    --ok:   #4ade80;
+    --err:  #ff6b5e;
+    --f-disp: 'Inter Tight', 'Helvetica Neue', Arial, sans-serif;
+    --f-body: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+    --f-arc:  'Silkscreen', 'Courier New', ui-monospace, monospace;
+    --gut: clamp(18px, 4.4vw, 56px);
+    --maxw: 1360px;
+  }
+  *, *::before, *::after { box-sizing: border-box; }
+  html { scroll-behavior: smooth; scroll-padding-top: 84px; }
+  body { margin: 0; background: var(--bg); color: var(--tx); font-family: var(--f-body); font-size: 1.02rem; line-height: 1.6; overflow-x: clip; -webkit-font-smoothing: antialiased; }
+  img { max-width: 100%; display: block; }
+  a { color: inherit; }
+  h1, h2, h3, h4 { margin: 0; font-family: var(--f-disp); font-weight: 700; letter-spacing: -.035em; line-height: 1; overflow-wrap: anywhere; text-wrap: balance; }
+  p { margin: 0; }
+  button { font-family: inherit; }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 6px; }
+  .wrap { width: 100%; max-width: var(--maxw); margin-inline: auto; padding-inline: var(--gut); }
+  .sec { padding-block: clamp(64px, 10vw, 140px); }
+  .arc { font-family: var(--f-arc); text-transform: uppercase; letter-spacing: .06em; font-weight: 400; }
+  .pill { display: inline-flex; align-items: center; gap: 10px; padding: 8px 16px; border: 1px solid var(--line2); border-radius: 999px; font-size: .68rem; color: var(--tx); }
+  .pill::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--ok); box-shadow: 0 0 0 0 rgba(74,222,128,.6); animation: ping 2s infinite; flex-shrink: 0; }
+  @keyframes ping { 70% { box-shadow: 0 0 0 9px rgba(74,222,128,0); } 100% { box-shadow: 0 0 0 0 rgba(74,222,128,0); } }
+  .h2 { font-size: clamp(2.4rem, 6.6vw, 5.6rem); font-weight: 700; margin-top: 18px; }
+  .h2 span { color: var(--mut); }
+  .lead { color: var(--mut); max-width: 52ch; margin-top: 20px; font-size: clamp(1rem, 1.4vw, 1.14rem); }
+
+  /* Boutons */
+  .btn-x { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 52px; padding: 12px 28px; border-radius: 999px; border: 1.5px solid transparent; font: 600 .95rem var(--f-body); text-decoration: none; text-align: center; line-height: 1.2; cursor: pointer; transition: background .2s, color .2s, border-color .2s, transform .15s; }
+  .btn-x i { transition: transform .2s; }
+  .btn-x:hover i.bi-arrow-right, .btn-x:hover i.bi-arrow-up-right { transform: translateX(4px); }
+  .btn-white { background: #fff; color: #000; }
+  .btn-white:hover { background: var(--accent); color: #000; }
+  .btn-brand { background: var(--brand); color: #fff; }
+  .btn-brand:hover { background: color-mix(in srgb, var(--brand) 70%, #fff); color: #fff; }
+  .btn-ghost { background: transparent; color: var(--tx); border-color: var(--line2); }
+  .btn-ghost:hover { border-color: #fff; background: rgba(255,255,255,.08); }
+  .btn-sm { min-height: 42px; padding: 8px 20px; font-size: .86rem; }
+  .link-arrow { display: inline-flex; gap: 8px; align-items: center; font-weight: 600; font-size: .94rem; text-decoration: none; border-bottom: 1.5px solid var(--line2); padding-bottom: 2px; }
+  .link-arrow:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* En-tête */
+  .site-head { position: sticky; top: 0; z-index: 1000; background: rgba(0,0,0,.78); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); border-bottom: 1px solid var(--line); }
+  .head-in { display: flex; align-items: center; justify-content: space-between; gap: 18px; min-height: 70px; }
+  .brand { display: inline-flex; align-items: center; gap: 10px; text-decoration: none; flex-shrink: 0; }
+  .brand img { height: 34px; width: auto; }
+  .brand-name { font-family: var(--f-disp); font-weight: 800; font-size: 1.5rem; letter-spacing: -.05em; }
+  .brand-name b { color: var(--accent); }
+  .nav-links { display: flex; gap: clamp(14px, 2.2vw, 34px); list-style: none; margin: 0; padding: 0; }
+  .nav-links a { text-decoration: none; font-size: .92rem; font-weight: 500; color: var(--mut); padding: 8px 0; position: relative; }
+  .nav-links a::after { content: ''; position: absolute; left: 0; bottom: 2px; width: 0; height: 1.5px; background: var(--accent); transition: width .25s; }
+  .nav-links a:hover, .nav-links a.active { color: #fff; }
+  .nav-links a:hover::after, .nav-links a.active::after { width: 100%; }
+  .head-cta { display: flex; gap: 10px; align-items: center; }
+  .burger { display: none; width: 46px; height: 46px; border-radius: 50%; border: 1px solid var(--line2); background: transparent; color: #fff; font-size: 1.5rem; align-items: center; justify-content: center; }
+  .drawer { display: none; }
+  @media (max-width: 1099.98px) {
+    .nav-links, .head-cta { display: none; }
+    .burger { display: inline-flex; }
+    .drawer.open { display: flex; flex-direction: column; position: fixed; inset: 0; z-index: 1500; background: #000; padding: 14px var(--gut) 28px; overflow-y: auto; }
+    .drawer-top { display: flex; justify-content: space-between; align-items: center; min-height: 56px; margin-bottom: 12px; }
+    .drawer a.dl { display: flex; justify-content: space-between; align-items: baseline; font-family: var(--f-disp); font-weight: 700; font-size: clamp(2.2rem, 11vw, 3.4rem); letter-spacing: -.04em; text-decoration: none; padding: 10px 0; border-bottom: 1px solid var(--line); line-height: 1.05; }
+    .drawer a.dl small { font-family: var(--f-arc); font-size: .62rem; color: var(--accent); letter-spacing: .08em; }
+    .drawer a.dl:hover { color: var(--accent); }
+    .drawer .d-cta { margin-top: auto; padding-top: 24px; display: grid; gap: 10px; }
+  }
+  .dj-msgs { position: fixed; top: 80px; right: 16px; left: 16px; max-width: 420px; margin-left: auto; z-index: 2000; display: grid; gap: 8px; }
+
+  /* Hero */
+  .hero { position: relative; padding-block: clamp(44px, 8vw, 110px) 0; overflow: hidden; }
+  .hero::before { content: ''; position: absolute; inset: -20% -10% auto auto; width: min(900px, 90vw); height: 700px; background: radial-gradient(closest-side, color-mix(in srgb, var(--brand) 60%, transparent), transparent); opacity: .55; pointer-events: none; }
+  .hero::after { content: ''; position: absolute; inset: 0; background-image: radial-gradient(rgba(255,255,255,.09) 1px, transparent 1.4px); background-size: 28px 28px; mask-image: linear-gradient(180deg, #000, transparent 75%); -webkit-mask-image: linear-gradient(180deg, #000, transparent 75%); pointer-events: none; }
+  .hero .wrap { position: relative; z-index: 1; }
+  .display { font-size: clamp(2.9rem, 9.4vw, 8.6rem); font-weight: 700; letter-spacing: -.055em; line-height: .93; margin-top: 26px; }
+  .display .ln { display: block; }
+  .display .hl { color: var(--accent); }
+  .hero-row { margin-top: clamp(28px, 4vw, 52px); display: flex; flex-wrap: wrap; gap: 24px 48px; justify-content: space-between; align-items: flex-end; }
+  .hero-lead { color: var(--mut); max-width: 46ch; font-size: clamp(1.02rem, 1.5vw, 1.2rem); }
+  .hero-actions { display: flex; flex-wrap: wrap; gap: 12px; }
+
+  /* Mini-jeu */
+  .arcade { margin-top: clamp(40px, 6vw, 80px); border: 1px solid var(--line2); border-radius: 28px; background: var(--s1); overflow: hidden; position: relative; z-index: 1; }
+  .arc-hud { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 20px; align-items: center; padding: 13px 20px; border-bottom: 1px solid var(--line); font-size: .66rem; }
+  .arc-hud span { display: inline-flex; gap: 10px; align-items: center; }
+  .arc-hud b { font-weight: 700; color: var(--accent); }
+  .lives i { font-size: .95rem; color: var(--brand); filter: brightness(1.7); transition: opacity .2s; }
+  .lives i.off { opacity: .2; }
+  .arena { position: relative; height: clamp(230px, 32vw, 340px); overflow: hidden; touch-action: manipulation; background-image: radial-gradient(rgba(255,255,255,.1) 1px, transparent 1.4px); background-size: 22px 22px; }
+  .gface { position: absolute; width: var(--fw, 84px); height: calc(var(--fw, 84px) * .66); padding: 0; border-radius: 6px; border: 2px solid #fff; background: var(--brand); color: #fff; font-family: var(--f-arc); font-size: .62rem; text-transform: uppercase; display: grid; place-items: center; cursor: pointer; box-shadow: 0 0 0 3px #000, 0 0 26px color-mix(in srgb, var(--brand) 80%, transparent); animation: pop .18s ease-out; overflow: hidden; }
+  .gface::after { content: ''; position: absolute; left: 0; bottom: 0; height: 5px; width: 100%; background: var(--accent); transform-origin: left; animation: shrink var(--life, 2s) linear forwards; }
+  .gface:hover { filter: brightness(1.25); }
+  .gface.hit { animation: hit .22s ease-out forwards; pointer-events: none; }
+  .gface.miss { animation: miss .3s ease-out forwards; pointer-events: none; }
+  @keyframes pop { from { transform: scale(.3); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+  @keyframes shrink { to { transform: scaleX(0); } }
+  @keyframes hit { to { transform: scale(1.5); opacity: 0; } }
+  @keyframes miss { to { transform: scale(.7); opacity: 0; filter: grayscale(1); } }
+  .gfloat { position: absolute; font-family: var(--f-arc); font-size: .8rem; color: var(--accent); pointer-events: none; animation: floatUp .7s ease-out forwards; }
+  @keyframes floatUp { to { transform: translateY(-34px); opacity: 0; } }
+  .arena-ov { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; padding: 20px; background: rgba(0,0,0,.76); z-index: 5; }
+  .arena-ov[hidden] { display: none; }
+  .arena-ov .t { font-family: var(--f-arc); text-transform: uppercase; font-size: clamp(1.1rem, 3vw, 1.7rem); letter-spacing: .04em; }
+  .arena-ov .s { color: var(--mut); max-width: 42ch; margin: 12px auto 20px; font-size: .94rem; }
+  .arena-ov .row { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
+
+  /* Bandeau défilant */
+  .marq { margin-top: clamp(40px, 6vw, 80px); border-block: 1px solid var(--line); overflow: hidden; }
+  .marq-track { display: flex; width: max-content; animation: marq 45s linear infinite; }
+  .marq:hover .marq-track { animation-play-state: paused; }
+  .half { display: flex; flex-shrink: 0; }
+  .half ul { display: flex; gap: clamp(28px, 4vw, 56px); padding: 22px clamp(14px, 2vw, 28px); margin: 0; list-style: none; flex-shrink: 0; }
+  .half li { font-family: var(--f-disp); font-weight: 700; font-size: clamp(1.2rem, 2.4vw, 1.9rem); letter-spacing: -.03em; white-space: nowrap; display: inline-flex; align-items: center; gap: clamp(28px, 4vw, 56px); }
+  .half li::after { content: ''; width: 8px; height: 8px; background: var(--accent); transform: rotate(45deg); flex-shrink: 0; }
+  .half li.f { font-family: var(--f-arc); font-weight: 400; font-size: clamp(.8rem, 1.5vw, 1.1rem); letter-spacing: .06em; text-transform: uppercase; color: var(--mut); }
+  @keyframes marq { to { transform: translateX(-50%); } }
+
+  /* Chiffres */
+  .figs { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 1px solid var(--line2); }
+  .fig { padding: clamp(24px, 3.4vw, 44px) 20px clamp(24px, 3.4vw, 44px) 0; min-width: 0; }
+  .fig + .fig { padding-left: clamp(16px, 2.4vw, 32px); border-left: 1px solid var(--line); }
+  .fig b { display: block; font-family: var(--f-disp); font-weight: 700; font-size: clamp(3.4rem, 9vw, 8rem); letter-spacing: -.06em; line-height: .9; }
+  .fig b.ok { color: var(--ok); }
+  .fig span { display: block; margin-top: 14px; color: var(--mut); font-size: .92rem; }
+  @media (max-width: 767.98px) {
+    .figs { grid-template-columns: 1fr 1fr; }
+    .fig:nth-child(3) { border-left: 0; padding-left: 0; }
+    .fig:nth-child(n+3) { border-top: 1px solid var(--line); }
+  }
+
+  /* Trois supports */
+  .cards3 { margin-top: clamp(36px, 5vw, 64px); display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  .sup { display: flex; flex-direction: column; text-decoration: none; background: var(--s1); border: 1px solid var(--line); border-radius: 28px; padding: clamp(20px, 2.4vw, 30px); transition: border-color .25s, transform .25s, background .25s; min-width: 0; }
+  .sup:hover { border-color: var(--line2); transform: translateY(-6px); background: var(--s2); }
+  .sup-top { display: flex; justify-content: space-between; align-items: center; font-size: .66rem; color: var(--accent); }
+  .sup-top i { font-size: 1.5rem; color: #fff; }
+  .sup-img { aspect-ratio: 4 / 3; margin: 22px 0; border-radius: 18px; background: var(--s2); display: grid; place-items: center; overflow: hidden; }
+  .sup-img img { width: 100%; height: 100%; object-fit: contain; padding: 10px; transition: transform .5s; }
+  .sup:hover .sup-img img { transform: scale(1.06); }
+  .sup h3 { font-size: clamp(1.6rem, 2.4vw, 2.1rem); }
+  .sup p { color: var(--mut); margin-top: 12px; font-size: .96rem; }
+  .sup ul { list-style: none; margin: 14px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px; }
+  .sup li { border: 1px solid var(--line2); border-radius: 999px; padding: 4px 12px; font-size: .78rem; }
+  .sup .go { margin-top: auto; padding-top: 22px; font-weight: 600; font-size: .94rem; display: inline-flex; gap: 8px; align-items: center; }
+  .sup:hover .go { color: var(--accent); }
+  @media (max-width: 899.98px) {
+    .cards3 { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 12px; margin-inline: calc(var(--gut) * -1); padding: 4px var(--gut) 14px; scrollbar-width: thin; }
+    .sup { flex: 0 0 min(84%, 360px); scroll-snap-align: start; }
+  }
+
+  /* Réseau : cartes de villes + détail */
+  .net-head { display: flex; flex-wrap: wrap; gap: 24px 48px; justify-content: space-between; align-items: flex-end; }
+  .ccards { margin-top: clamp(32px, 5vw, 56px); display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); gap: 16px; }
+  .ccard { display: flex; flex-direction: column; text-align: left; padding: 0; background: var(--s1); border: 1px solid var(--line); border-radius: 28px; color: var(--tx); cursor: pointer; overflow: hidden; transition: border-color .2s, transform .2s; min-width: 0; font: inherit; }
+  .ccard:hover { transform: translateY(-4px); border-color: var(--line2); }
+  .ccard[aria-pressed="true"] { border-color: #fff; box-shadow: 0 0 0 1px #fff; }
+  .cc-img { position: relative; display: block; aspect-ratio: 16 / 9; background: linear-gradient(135deg, var(--s3), var(--s1)); overflow: hidden; }
+  .cc-img img { width: 100%; height: 100%; object-fit: cover; transition: transform .6s; }
+  .ccard:hover .cc-img img { transform: scale(1.05); }
+  .cc-img::after { content: ''; position: absolute; inset: 0; background: linear-gradient(180deg, transparent 50%, rgba(0,0,0,.7)); }
+  .cc-sel { position: absolute; top: 14px; right: 14px; z-index: 2; width: 34px; height: 34px; border-radius: 50%; background: #fff; color: #000; display: none; place-items: center; font-size: 1.1rem; }
+  .ccard[aria-pressed="true"] .cc-sel { display: grid; }
+  .cc-body { display: block; padding: 20px 22px 24px; }
+  .cc-top { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; font-size: .66rem; color: var(--accent); }
+  .cc-top .free { font-family: var(--f-body); text-transform: none; letter-spacing: 0; font-size: .9rem; color: var(--mut); }
+  .cc-top .free b { color: var(--ok); font-family: var(--f-disp); font-size: 1.5rem; font-weight: 700; margin-right: 4px; }
+  .cc-name { display: block; margin-top: 10px; font-family: var(--f-disp); font-weight: 700; font-size: clamp(1.8rem, 3vw, 2.5rem); letter-spacing: -.04em; line-height: 1; overflow-wrap: anywhere; }
+  .cc-tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+  .tag { display: inline-block; border: 1px solid var(--line2); border-radius: 999px; padding: 4px 12px; font-size: .76rem; color: var(--tx); white-space: nowrap; }
+  .tag-f { font-family: var(--f-arc); font-size: .6rem; letter-spacing: .06em; text-transform: uppercase; color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, transparent); padding-block: 6px; }
+  @media (max-width: 767.98px) {
+    .ccards { display: flex; overflow-x: auto; scroll-snap-type: x mandatory; gap: 12px; margin-inline: calc(var(--gut) * -1); padding: 4px var(--gut) 14px; scrollbar-width: thin; }
+    .ccard { flex: 0 0 min(84%, 340px); scroll-snap-align: start; }
+  }
+
+  .detail { margin-top: clamp(40px, 6vw, 80px); scroll-margin-top: 90px; }
+  .detail-head { display: flex; flex-wrap: wrap; gap: 16px 32px; justify-content: space-between; align-items: flex-end; padding-bottom: 22px; border-bottom: 1px solid var(--line2); }
+  .detail-head h3 { font-size: clamp(2rem, 4.6vw, 3.6rem); }
+  .detail-head .sub { font-size: .66rem; color: var(--accent); display: block; margin-bottom: 10px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  .chip { min-height: 42px; padding: 8px 18px; border-radius: 999px; border: 1px solid var(--line2); background: transparent; color: var(--tx); font: 500 .88rem var(--f-body); cursor: pointer; display: inline-flex; gap: 8px; align-items: center; transition: background .15s, color .15s; }
+  .chip:hover { background: rgba(255,255,255,.1); }
+  .chip[aria-pressed="true"] { background: #fff; color: #000; border-color: #fff; }
+  .chip .dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ok); }
+  @media (max-width: 575.98px) {
+    .chips { flex-wrap: nowrap; overflow-x: auto; margin-inline: calc(var(--gut) * -1); padding: 2px var(--gut) 8px; width: calc(100% + var(--gut) * 2); scrollbar-width: thin; }
+    .chip { flex-shrink: 0; }
+  }
+  .cg { margin-top: 36px; }
+  .cg-h { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; }
+  .cg-h h4 { font-size: 1.5rem; display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+  .cg-h h4 small { font-family: var(--f-arc); font-weight: 400; font-size: .62rem; letter-spacing: .06em; text-transform: uppercase; color: var(--mut); }
+  .rows { list-style: none; margin: 14px 0 0; padding: 0; border-top: 1px solid var(--line); }
+  .rw { display: grid; grid-template-columns: 84px minmax(0, 1fr) 96px minmax(150px, 210px) auto; gap: 8px 22px; align-items: center; padding: 18px 8px; border-bottom: 1px solid var(--line); transition: background .15s; }
+  .rw:hover { background: var(--s1); }
+  .rw-img { width: 84px; height: 62px; border-radius: 12px; background: var(--s2); overflow: hidden; }
+  .rw-img img { width: 100%; height: 100%; object-fit: cover; }
+  .rw-t { font-family: var(--f-disp); font-weight: 700; font-size: 1.3rem; letter-spacing: -.03em; line-height: 1.1; overflow-wrap: anywhere; }
+  .rw-d { font-size: .86rem; color: var(--mut); margin-top: 4px; overflow-wrap: anywhere; }
+  .rw-av .t { display: flex; justify-content: space-between; gap: 8px; font-size: .82rem; font-weight: 600; }
+  .rw-av .ok { color: var(--ok); } .rw-av .no { color: var(--err); }
+  .bar { display: grid; grid-template-columns: repeat(10, 1fr); gap: 3px; height: 6px; margin-top: 8px; }
+  .bar i { background: var(--s3); border-radius: 2px; }
+  .bar i.on { background: var(--ok); }
+  @media (max-width: 899.98px) {
+    .rw { grid-template-columns: 76px minmax(0, 1fr); grid-template-areas: "img main" "tag tag" "av av" "act act"; gap: 12px 16px; padding: 20px 4px; }
+    .rw-img { grid-area: img; width: 76px; height: 58px; } .rw-main { grid-area: main; } .rw-tag { grid-area: tag; } .rw-av { grid-area: av; } .rw-act { grid-area: act; }
+    .rw-act .btn-x { width: 100%; }
+    .rw-tag:empty { display: none; }
+  }
+  .empty { display: none; text-align: center; padding: 64px 20px; border: 1px dashed var(--line2); border-radius: 28px; margin-top: 32px; }
+  .empty.show, .empty.always { display: block; }
+  .empty i { font-size: 2.2rem; color: var(--accent); }
+  .empty h3 { font-size: 1.8rem; margin: 12px 0 8px; }
+  .empty p { color: var(--mut); }
+  .empty a { color: var(--accent); }
+
+  /* Carte */
+  .map-box { margin-top: clamp(32px, 5vw, 56px); border: 1px solid var(--line2); border-radius: 28px; overflow: hidden; background: var(--s1); }
+  #vMap { height: clamp(360px, 62vh, 600px); width: 100%; background: #0b0b0d; }
+  #vMap .leaflet-tile-pane { filter: invert(1) hue-rotate(180deg) brightness(.82) contrast(.9) saturate(.55); }
+  .legend { display: flex; flex-wrap: wrap; gap: 8px 24px; padding: 14px 20px; border-top: 1px solid var(--line); font-size: .84rem; color: var(--mut); }
+  .legend span { display: inline-flex; gap: 8px; align-items: center; }
+  .legend span::before { content: ''; width: 10px; height: 10px; border-radius: 50%; background: var(--c); }
+  .leaflet-popup-content-wrapper, .leaflet-popup-tip { background: #141417; color: var(--tx); border: 1px solid var(--line2); border-radius: 16px; }
+  .leaflet-popup-content { font-family: var(--f-body); margin: 14px 16px; }
+  .leaflet-container a.leaflet-popup-close-button { color: var(--mut); }
+
+  /* Processus */
+  .proc { margin-top: clamp(36px, 5vw, 64px); border-top: 1px solid var(--line2); }
+  .pr { display: grid; grid-template-columns: minmax(70px, 140px) minmax(0, 1fr) minmax(0, 1fr); gap: 12px clamp(16px, 4vw, 56px); align-items: baseline; padding: clamp(24px, 3.4vw, 44px) 8px; border-bottom: 1px solid var(--line); transition: background .2s; }
+  .pr:hover { background: var(--s1); }
+  .pr-n { font-family: var(--f-arc); font-size: clamp(1.6rem, 4vw, 3rem); color: var(--accent); }
+  .pr h3 { font-size: clamp(1.7rem, 3.4vw, 2.8rem); }
+  .pr p { color: var(--mut); max-width: 40ch; }
+  @media (max-width: 767.98px) { .pr { grid-template-columns: 56px minmax(0, 1fr); } .pr p { grid-column: 2; } }
+
+  /* À propos + FAQ */
+  .two { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: clamp(36px, 7vw, 110px); align-items: start; }
+  .pts { list-style: none; margin: 34px 0 0; padding: 0; border-top: 1px solid var(--line2); }
+  .pts li { display: grid; grid-template-columns: 52px minmax(0, 1fr); gap: 16px; padding: 22px 0; border-bottom: 1px solid var(--line); }
+  .pts i { width: 48px; height: 48px; border-radius: 50%; border: 1px solid var(--line2); display: grid; place-items: center; color: var(--accent); font-size: 1.2rem; }
+  .pts b { display: block; font-family: var(--f-disp); font-size: 1.3rem; letter-spacing: -.03em; }
+  .pts span { color: var(--mut); font-size: .95rem; }
+  .faq { margin-top: 28px; border-top: 1px solid var(--line2); }
+  .faq details { border-bottom: 1px solid var(--line); }
+  .faq summary { cursor: pointer; list-style: none; display: flex; justify-content: space-between; align-items: center; gap: 16px; padding: 22px 0; font-family: var(--f-disp); font-weight: 600; font-size: 1.25rem; letter-spacing: -.02em; }
+  .faq summary::-webkit-details-marker { display: none; }
+  .faq summary::after { content: '+'; font-family: var(--f-arc); font-size: 1.3rem; color: var(--accent); flex-shrink: 0; }
+  .faq details[open] summary::after { content: '–'; }
+  .faq p { color: var(--mut); padding: 0 0 22px; max-width: 50ch; }
+  @media (max-width: 899.98px) { .two { grid-template-columns: 1fr; } }
+
+  /* Contact */
+  .contact { margin-top: clamp(32px, 5vw, 56px); display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 7fr); gap: 16px; }
+  .c-info, .c-form { background: var(--s1); border: 1px solid var(--line); border-radius: 28px; padding: clamp(22px, 3.4vw, 42px); }
+  .c-row { display: grid; grid-template-columns: 46px minmax(0, 1fr); gap: 16px; padding: 18px 0; border-bottom: 1px solid var(--line); }
+  .c-row:first-child { padding-top: 0; } .c-row:last-child { border-bottom: 0; padding-bottom: 0; }
+  .c-row i { width: 46px; height: 46px; border-radius: 50%; border: 1px solid var(--line2); display: grid; place-items: center; color: var(--accent); font-size: 1.1rem; }
+  .c-row small { display: block; font-family: var(--f-arc); font-size: .6rem; letter-spacing: .08em; text-transform: uppercase; color: var(--mut); }
+  .c-row a, .c-row span { display: block; text-decoration: none; overflow-wrap: anywhere; }
+  .c-row a:hover { color: var(--accent); }
+  .fgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .fgrid .full { grid-column: 1 / -1; }
+  .c-form label { display: block; font-size: .8rem; font-weight: 500; color: var(--mut); margin-bottom: 6px; }
+  .f { width: 100%; min-height: 52px; padding: 12px 16px; border-radius: 14px; border: 1px solid var(--line2); background: #000; color: var(--tx); font: inherit; }
+  .f::placeholder { color: #61616b; }
+  .f:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent); }
+  textarea.f { min-height: 130px; resize: vertical; }
+  select.f option { background: #141417; }
+  .f-msg { display: none; padding: 14px 16px; border-radius: 14px; font-size: .94rem; margin-bottom: 16px; }
+  .f-msg.ok { display: block; background: rgba(74,222,128,.12); color: var(--ok); border: 1px solid rgba(74,222,128,.4); }
+  .f-msg.err { display: block; background: rgba(255,107,94,.12); color: var(--err); border: 1px solid rgba(255,107,94,.4); }
+  @media (max-width: 899.98px) { .contact { grid-template-columns: 1fr; } }
+  @media (max-width: 575.98px) { .fgrid { grid-template-columns: 1fr; } }
+
+  /* Appel final + pied */
+  .bigcta { text-align: left; border-top: 1px solid var(--line2); }
+  .bigcta h2 { font-size: clamp(3rem, 10vw, 9rem); font-weight: 700; letter-spacing: -.06em; line-height: .92; }
+  .bigcta h2 span { color: var(--accent); }
+  .bigcta .row { display: flex; flex-wrap: wrap; gap: 24px 40px; align-items: center; justify-content: space-between; margin-top: clamp(28px, 4vw, 48px); }
+  .bigcta p { color: var(--mut); max-width: 44ch; }
+  .site-foot { border-top: 1px solid var(--line); padding: 56px 0 28px; color: var(--mut); }
+  .foot-grid { display: grid; grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr)); gap: 32px; }
+  .foot-grid h4 { font-family: var(--f-arc); font-weight: 400; font-size: .64rem; letter-spacing: .1em; text-transform: uppercase; color: var(--accent); margin-bottom: 16px; }
+  .foot-grid ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+  .foot-grid a { text-decoration: none; overflow-wrap: anywhere; }
+  .foot-grid a:hover { color: #fff; }
+  .foot-grid p { max-width: 38ch; font-size: .94rem; margin-top: 14px; }
+  .foot-bot { margin-top: 44px; padding-top: 20px; border-top: 1px solid var(--line); font-size: .82rem; display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px 20px; }
+  @media (max-width: 767.98px) { .foot-grid { grid-template-columns: 1fr 1fr; } .foot-grid > :first-child { grid-column: 1 / -1; } }
+
+  .m-bar { display: none; }
+  @media (max-width: 767.98px) {
+    .m-bar { display: flex; gap: 10px; position: fixed; left: 0; right: 0; bottom: 0; z-index: 900; padding: 10px var(--gut) calc(10px + env(safe-area-inset-bottom)); background: rgba(0,0,0,.92); backdrop-filter: blur(12px); border-top: 1px solid var(--line2); }
+    .m-bar .btn-x { flex: 1; padding-inline: 12px; }
+    body { padding-bottom: 76px; }
+  }
+
+  .js .rv { opacity: 0; transform: translateY(26px); transition: opacity .7s ease, transform .7s ease; }
+  .js .rv.in { opacity: 1; transform: none; }
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    .marq-track, .pill::before { animation: none; }
+    .js .rv { opacity: 1; transform: none; transition: none; }
+    * { transition-duration: .01ms !important; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═════════ EN-TÊTE ═════════ -->
+<header class="site-head">
+  <div class="wrap head-in">
+    <a class="brand" href="#top" aria-label="Integral — accueil">
+      <img src="{% static 'img/logo.png' %}" alt="" onerror="this.style.display='none'" />
+      <span class="brand-name">Integral<b>.</b></span>
+    </a>
+    <ul class="nav-links">
+      <li><a href="#supports">Supports</a></li>
+      <li><a href="#reseau">Réseau</a></li>
+      <li><a href="#carte">Carte</a></li>
+      <li><a href="#processus">Processus</a></li>
+      <li><a href="#apropos">À propos</a></li>
+      <li><a href="#contact">Contact</a></li>
+    </ul>
+    <div class="head-cta">
+      <a href="{% url 'portail:suivi_demande' %}" class="btn-x btn-ghost btn-sm"><i class="bi bi-search"></i> Suivre une demande</a>
+      <a href="{% url 'portail:reserver_etape1' %}" class="btn-x btn-white btn-sm">Faire une demande <i class="bi bi-arrow-right"></i></a>
+    </div>
+    <button class="burger" id="burger" type="button" aria-label="Ouvrir le menu" aria-expanded="false" aria-controls="drawer"><i class="bi bi-list"></i></button>
+  </div>
+</header>
+
+<div class="drawer" id="drawer" role="dialog" aria-label="Menu">
+  <div class="drawer-top">
+    <span class="brand-name">Integral<b style="color:var(--accent)">.</b></span>
+    <button class="burger" id="closeDrawer" type="button" aria-label="Fermer le menu"><i class="bi bi-x-lg"></i></button>
+  </div>
+  <a class="dl" href="#supports">Supports <small>01</small></a>
+  <a class="dl" href="#reseau">Réseau <small>02</small></a>
+  <a class="dl" href="#carte">Carte <small>03</small></a>
+  <a class="dl" href="#processus">Processus <small>04</small></a>
+  <a class="dl" href="#apropos">À propos <small>05</small></a>
+  <a class="dl" href="#contact">Contact <small>06</small></a>
+  <div class="d-cta">
+    <a href="{% url 'portail:reserver_etape1' %}" class="btn-x btn-white">Faire une demande <i class="bi bi-arrow-right"></i></a>
+    <a href="{% url 'portail:suivi_demande' %}" class="btn-x btn-ghost"><i class="bi bi-search"></i> Suivre une demande</a>
+  </div>
+</div>
+
+{% if messages %}
+<div class="dj-msgs" role="status">
+  {% for message in messages %}
+  <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags|default:'info' }}{% endif %} alert-dismissible fade show mb-0" role="alert">
+    {{ message }}
+    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fermer"></button>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
+<main id="top">
+
+<!-- ═════════ HERO + MINI-JEU ═════════ -->
+<section class="hero">
+  <div class="wrap">
+    <span class="pill arc">Réseau d'affichage{% if nb_villes %} · {{ nb_villes }} ville{{ nb_villes|pluralize }}{% endif %}</span>
+    <h1 class="display">
+      <span class="ln">L'affichage qui</span>
+      <span class="ln">met votre marque</span>
+      <span class="ln hl">en grand.</span>
+    </h1>
+    <div class="hero-row">
+      <p class="hero-lead">Panneaux grand format, écrans numériques LED et sucettes urbaines. Consultez les emplacements et les faces disponibles, puis lancez votre demande en ligne.</p>
+      <div class="hero-actions">
+        <a href="{% url 'portail:reserver_etape1' %}" class="btn-x btn-white">Faire une demande <i class="bi bi-arrow-right"></i></a>
+        <a href="#reseau" class="btn-x btn-ghost">Voir les disponibilités</a>
+      </div>
+    </div>
+
+    <div class="arcade rv" id="jeu" role="group" aria-label="Mini-jeu : chasse aux faces">
+      <div class="arc-hud arc">
+        <span>Jeu · Chasse aux faces</span>
+        <span>Score <b id="gScore">0</b></span>
+        <span>Record <b id="gBest">0</b></span>
+        <span class="lives" id="gLives" aria-label="Vies restantes"><i class="bi bi-heart-fill"></i><i class="bi bi-heart-fill"></i><i class="bi bi-heart-fill"></i></span>
+      </div>
+      <div class="arena" id="arena">
+        <div class="arena-ov" id="gOv">
+          <div>
+            <p class="t" id="gOvT">Chasse aux faces</p>
+            <p class="s" id="gOvS">Réservez un maximum de faces avant qu'elles ne disparaissent. Trois faces manquées et la partie est terminée.</p>
+            <div class="row">
+              <button type="button" class="btn-x btn-white" id="gStart">Appuyer pour jouer</button>
+              <a href="{% url 'portail:reserver_etape1' %}" class="btn-x btn-ghost" id="gCta" hidden>Faire une vraie demande</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {{ formats_utilises|json_script:"fmtData" }}
+  </div>
+
+  {% if villes_stats or formats_utilises %}
+  <div class="marq" aria-label="Villes et formats du réseau">
+    <div class="marq-track">
+      <div class="half">
+        <ul>
+          {% for v in villes_stats %}<li>{{ v.nom }}</li>{% endfor %}
+          {% for f in formats_utilises %}<li class="f">{{ f|upper }}</li>{% endfor %}
+        </ul>
+      </div>
+      <div class="half" aria-hidden="true">
+        <ul>
+          {% for v in villes_stats %}<li>{{ v.nom }}</li>{% endfor %}
+          {% for f in formats_utilises %}<li class="f">{{ f|upper }}</li>{% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</section>
+
+<!-- ═════════ CHIFFRES ═════════ -->
+{% if total_faces_reseau or nb_villes or nb_formats %}
+<section class="sec" style="padding-bottom:0;">
+  <div class="wrap">
+    <div class="figs rv">
+      {% if total_faces_reseau %}<div class="fig"><b>{{ total_faces_reseau }}</b><span>face{{ total_faces_reseau|pluralize }} publicitaire{{ total_faces_reseau|pluralize }}</span></div>{% endif %}
+      {% if total_faces_libres_reseau %}<div class="fig"><b class="ok">{{ total_faces_libres_reseau }}</b><span>disponible{{ total_faces_libres_reseau|pluralize }} aujourd'hui</span></div>{% endif %}
+      {% if nb_villes %}<div class="fig"><b>{{ nb_villes }}</b><span>ville{{ nb_villes|pluralize }} couverte{{ nb_villes|pluralize }}</span></div>{% endif %}
+      {% if nb_formats %}<div class="fig"><b>{{ nb_formats }}</b><span>format{{ nb_formats|pluralize }} d'affichage</span></div>{% endif %}
+    </div>
+  </div>
+</section>
+{% endif %}
+
+<!-- ═════════ TROIS SUPPORTS ═════════ -->
+<section class="sec" id="supports">
+  <div class="wrap">
+    <div class="rv">
+      <span class="pill arc">Nos supports</span>
+      <h2 class="h2">Trois supports.<br /><span>Un seul réseau.</span></h2>
+      <p class="lead">Choisissez le support qui sert votre objectif : l'écran de sa famille affiche directement les emplacements correspondants.</p>
+    </div>
+    <div class="cards3">
+      <a href="#reseau" class="sup rv" data-pick-cat="all">
+        <span class="sup-top arc"><span>01</span><i class="bi bi-signpost-2"></i></span>
+        <span class="sup-img"><img src="{% static 'img/panneau 4x3 digitalVVV.png' %}" alt="Panneau 4x3" loading="lazy" onerror="this.style.display='none'" /></span>
+        <h3>Panneaux 4×3 et géants</h3>
+        <p>Votre marque bénéficie d'une visibilité exceptionnelle sur les principaux axes de circulation.</p>
+        <ul><li>Lancement de produit</li><li>Campagne nationale</li><li>Notoriété de marque</li></ul>
+        <span class="go">Voir les emplacements <i class="bi bi-arrow-right"></i></span>
+      </a>
+      <a href="#reseau" class="sup rv" data-pick-cat="ecran">
+        <span class="sup-top arc"><span>02</span><i class="bi bi-tv"></i></span>
+        <span class="sup-img"><img src="{% static 'img/Ecran LED digital.png' %}" alt="Écran numérique LED" loading="lazy" onerror="this.style.display='none'" /></span>
+        <h3>Écrans numériques LED</h3>
+        <p>Diffusez des contenus animés, programmés selon vos horaires et adaptés à vos objectifs.</p>
+        <ul><li>Diffusion dynamique</li><li>Changement instantané</li><li>Plusieurs messages dans une même campagne</li></ul>
+        <span class="go">Voir les emplacements <i class="bi bi-arrow-right"></i></span>
+      </a>
+      <a href="#reseau" class="sup rv" data-pick-cat="sucette">
+        <span class="sup-top arc"><span>03</span><i class="bi bi-lightbulb"></i></span>
+        <span class="sup-img"><img src="{% static 'img/Sucette sur pied digital.png' %}" alt="Sucette publicitaire" loading="lazy" onerror="this.style.display='none'" /></span>
+        <h3>Sucettes publicitaires</h3>
+        <p>Panneaux lumineux au cœur des trottoirs, à hauteur de regard. Visibilité piétonne maximale en centre-ville et zones commerçantes.</p>
+        <span class="go">Voir les emplacements <i class="bi bi-arrow-right"></i></span>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ═════════ RÉSEAU ═════════ -->
+<section class="sec" id="reseau" style="padding-top:0;">
+  <div class="wrap">
+    <div class="net-head rv">
+      <div>
+        <span class="pill arc">Disponibilités</span>
+        <h2 class="h2">Où nous<br /><span>affichons.</span></h2>
+        <p class="lead">Une carte par ville : les faces libres aujourd'hui et les formats disponibles. Sélectionnez-en une pour voir le détail des emplacements.</p>
+      </div>
+      <a href="{% url 'portail:reserver_etape1' %}" class="btn-x btn-white">Faire une demande <i class="bi bi-arrow-right"></i></a>
+    </div>
+
+    {% if villes_stats %}
+    <div class="ccards" role="group" aria-label="Choisir une ville">
+      {% for ville in villes_stats %}
+      <button type="button" class="ccard rv" data-fv="{{ ville.nom|slugify }}" data-name="{{ ville.nom }}" aria-pressed="false">
+        <span class="cc-img">
+          <img src="{% static ville.image_url %}" alt="Panneaux publicitaires — {{ ville.nom }}" loading="lazy" onerror="this.style.display='none'" />
+          <span class="cc-sel"><i class="bi bi-check-lg"></i></span>
+        </span>
+        <span class="cc-body">
+          <span class="cc-top arc"><span>{{ forloop.counter|stringformat:"02d" }}</span><span class="free"><b>{{ ville.faces_libres }}</b>libre{{ ville.faces_libres|pluralize }} / {{ ville.total_faces }}</span></span>
+          <span class="cc-name">{{ ville.nom }}</span>
+          <span class="cc-tags">
+            {% for cat in ville.supports|slice:":3" %}<span class="tag">{{ cat.categorie }} · {{ cat.libre }}/{{ cat.total }}</span>{% endfor %}
+            {% for cat in ville.supports %}{% if not cat.individuel %}{% for s in cat.liste|slice:":4" %}{% if s.format %}<span class="tag tag-f">{{ s.format|upper }}</span>{% endif %}{% endfor %}{% endif %}{% endfor %}
+          </span>
+        </span>
+      </button>
+      {% endfor %}
+    </div>
+
+    <div class="detail" id="detail">
+      <div class="detail-head">
+        <div>
+          <span class="sub arc">Emplacements</span>
+          <h3 id="detailTitle">Toutes les villes</h3>
+        </div>
+        <div class="chips" role="group" aria-label="Filtrer">
+          <button type="button" class="chip" data-fv="all" aria-pressed="false">Toutes les villes</button>
+          {% if categories_stats %}
+          <button type="button" class="chip" data-fc="all" aria-pressed="true">Tous les formats</button>
+          {% for cat in categories_stats %}<button type="button" class="chip" data-fc="{{ cat.categorie|slugify }}" aria-pressed="false">{{ cat.categorie }}{% if cat.libre > 0 %}<span class="dot" title="Faces disponibles"></span>{% endif %}</button>{% endfor %}
+          {% endif %}
+        </div>
+      </div>
+
+      <div id="cities">
+        {% for ville in villes_stats %}
+        <article class="cpanel" data-v="{{ ville.nom|slugify }}">
+          {% for cat in ville.supports %}
+          <section class="cg" data-cat="{{ cat.categorie|slugify }}">
+            <div class="cg-h">
+              <h4><span class="cityname">{{ ville.nom }}</span> · {{ cat.categorie }} <small>{{ cat.libre }} libre{{ cat.libre|pluralize }} / {{ cat.total }}</small></h4>
+              {% if cat.categorie != "Écran" and cat.libre > 0 and cat.liste|length > 1 %}
+              <a class="btn-x btn-ghost btn-sm" href="{% url 'portail:reserver_etape1' %}?ville={{ ville.nom|urlencode }}&amp;categorie={{ cat.categorie|urlencode }}"><i class="bi bi-bag-check"></i> Tout réserver</a>
+              {% endif %}
+            </div>
+            <ul class="rows">
+              {% for support in cat.liste %}
+              <li class="rw">
+                <span class="rw-img"><img src="{% static support.image_url %}" alt="" loading="lazy" onerror="this.style.display='none'" /></span>
+                <div class="rw-main">
+                  <div class="rw-t">
+                    {% if cat.individuel %}{{ support.nom|default:support.code }}{% if support.face_label %} · {{ support.face_label }}{% endif %}{% if support.emplacement_code %} · {{ support.emplacement_code }}{% endif %}{% else %}{% if support.superficie %}{{ support.superficie }} {% endif %}{{ support.dimensions }}{% endif %}
+                  </div>
+                  <div class="rw-d">
+                    {% if cat.individuel %}Support {{ support.code }}{% if support.quartier %} · {{ support.quartier }}{% endif %}{% if support.marche %} · {{ support.marche }}{% endif %}{% else %}{{ cat.categorie }} · {{ ville.nom }}{% endif %}
+                  </div>
+                </div>
+                <div class="rw-tag">{% if support.format %}<span class="tag tag-f">{{ support.format|upper }}</span>{% endif %}</div>
+                <div class="rw-av">
+                  <div class="t">
+                    {% if support.libre > 0 %}<span class="ok">{{ support.libre }} libre{{ support.libre|pluralize }}</span>{% else %}<span class="no">Complet</span>{% endif %}
+                    <span>sur {{ support.count }}</span>
+                  </div>
+                  <div class="bar" data-libre="{{ support.libre }}" data-total="{{ support.count }}" aria-hidden="true"></div>
+                </div>
+                <div class="rw-act">
+                  {% if support.libre > 0 and cat.categorie != "Écran" %}
+                  <a class="btn-x btn-white btn-sm" href="{% url 'portail:reserver_etape1' %}?ville={{ ville.nom|urlencode }}&amp;categorie={{ cat.categorie|urlencode }}{% if support.format %}&amp;format={{ support.format|urlencode }}{% endif %}">Réserver <i class="bi bi-arrow-right"></i></a>
+                  {% elif cat.categorie == "Écran" %}
+                  <a class="btn-x btn-ghost btn-sm" href="#contact">Nous contacter</a>
+                  {% else %}
+                  <a class="btn-x btn-ghost btn-sm" href="#contact">Être notifié</a>
+                  {% endif %}
+                </div>
+              </li>
+              {% endfor %}
+            </ul>
+          </section>
+          {% endfor %}
+        </article>
+        {% endfor %}
+      </div>
+
+      <div class="empty" id="netEmpty" role="status">
+        <i class="bi bi-inboxes"></i>
+        <h3>Aucun emplacement</h3>
+        <p>Rien à afficher pour cette combinaison. Essayez une autre ville ou un autre format, ou <a href="#contact">contactez-nous</a>.</p>
+      </div>
+    </div>
+    {% else %}
+    <div class="empty always">
+      <i class="bi bi-hourglass-split"></i>
+      <h3>Inventaire en cours de mise à jour</h3>
+      <p>Les disponibilités ne sont pas affichées pour le moment. <a href="#contact">Contactez-nous</a> pour connaître les emplacements disponibles.</p>
+    </div>
+    {% endif %}
+  </div>
+</section>
+
+<!-- ═════════ CARTE ═════════ -->
+<section class="sec" id="carte" style="padding-top:0;">
+  <div class="wrap">
+    <div class="rv">
+      <span class="pill arc">Géolocalisation</span>
+      <h2 class="h2">Chaque face,<br /><span>sur la carte.</span></h2>
+      <p class="lead">La couleur des points indique la disponibilité. Touchez un point pour lancer une demande dans cette ville.</p>
+    </div>
+    <div class="map-box">
+      <div id="vMap" role="region" aria-label="Carte interactive des supports"></div>
+      <div class="legend">
+        <span style="--c:#22c55e">Au moins une face libre</span>
+        <span style="--c:#f97316">Réservé</span>
+        <span style="--c:#ef4444">Occupé</span>
+        <span style="--c:#3b82f6">Écran</span>
+        <span style="--c:#6b7280">Hors service</span>
+      </div>
+    </div>
+    <p id="mapFallback" class="lead" style="display:none;">La carte n'a pas pu être chargée. Consultez la liste des emplacements ci-dessus.</p>
+  </div>
+</section>
+
+<!-- ═════════ PROCESSUS ═════════ -->
+<section class="sec" id="processus" style="padding-top:0;">
+  <div class="wrap">
+    <div class="rv">
+      <span class="pill arc">Processus</span>
+      <h2 class="h2">Votre campagne<br /><span>en trois étapes.</span></h2>
+    </div>
+    <div class="proc">
+      <div class="pr rv"><span class="pr-n arc">01</span><h3>Sélectionnez vos emplacements</h3><p>Choisissez les villes, les supports et les emplacements qui correspondent à votre cible.</p></div>
+      <div class="pr rv"><span class="pr-n arc">02</span><h3>Nous confirmons votre réservation</h3><p>Nos équipes vérifient les disponibilités et vous accompagnent jusqu'à la validation.</p></div>
+      <div class="pr rv"><span class="pr-n arc">03</span><h3>Votre campagne est en ligne</h3><p>Nous assurons l'installation, la diffusion et le suivi de votre campagne.</p></div>
+    </div>
+    <div style="margin-top:36px;"><a href="{% url 'portail:reserver_etape1' %}" class="btn-x btn-white">Commencer ma demande <i class="bi bi-arrow-right"></i></a></div>
+  </div>
+</section>
+
+<!-- ═════════ À PROPOS + FAQ ═════════ -->
+<section class="sec" id="apropos" style="padding-top:0;">
+  <div class="wrap two">
+    <div class="rv">
+      <span class="pill arc">Qui sommes-nous</span>
+      <h2 class="h2">Une régie au service<br /><span>de votre visibilité.</span></h2>
+      <p class="lead">Integral conçoit, exploite et commercialise un réseau de supports publicitaires extérieurs — panneaux grand format, écrans numériques LED et sucettes urbaines — répartis dans les principales villes du Burkina Faso.</p>
+      <ul class="pts">
+        <li><i class="bi bi-geo-alt"></i><div><b>Emplacements stratégiques</b><span>Des supports positionnés sur les axes à plus fort trafic et dans les zones à forte affluence.</span></div></li>
+        <li><i class="bi bi-shield-check"></i><div><b>Disponibilités consultables en ligne</b><span>Consultez l'état de chaque face publicitaire avant de faire votre demande.</span></div></li>
+        <li><i class="bi bi-headset"></i><div><b>Accompagnement personnalisé</b><span>Une équipe dédiée vous accompagne du choix de l'emplacement jusqu'à la diffusion.</span></div></li>
+      </ul>
+    </div>
+    <div class="rv">
+      <span class="pill arc">Questions fréquentes</span>
+      <h2 class="h2" style="font-size:clamp(2rem,4.6vw,3.8rem);">Réponses<br /><span>claires.</span></h2>
+      <div class="faq">
+        <details open><summary>Combien de temps à l'avance réserver ?</summary><p>Nous recommandons 2 à 3 semaines pour garantir l'emplacement et préparer votre visuel.</p></details>
+        <details><summary>Prenez-vous en charge l'impression ?</summary><p>Oui, nous pouvons gérer l'impression haute définition sur bâche résistante aux intempéries.</p></details>
+        <details><summary>Comment fonctionne un écran LED ?</summary><p>Vos spots sont diffusés en boucle selon une programmation adaptée à vos horaires de campagne.</p></details>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ═════════ CONTACT ═════════ -->
+<section class="sec" id="contact" style="padding-top:0;">
+  <div class="wrap">
+    <div class="rv">
+      <span class="pill arc">Contact</span>
+      <h2 class="h2">Une question ?<br /><span>Parlons-en.</span></h2>
+    </div>
+    <div class="contact">
+      <div class="c-info rv">
+        <div class="c-row"><i class="bi bi-geo-alt-fill"></i><div><small>Adresse</small><span>Ouagadougou, Burkina Faso</span></div></div>
+        {% if CONTACT_TEL01 or CONTACT_TEL02 or CONTACT_TEL03 %}
+        <div class="c-row"><i class="bi bi-telephone-fill"></i><div><small>Téléphone</small>
+          {% if CONTACT_TEL01 %}<a href="tel:{{ CONTACT_TEL01|cut:' ' }}">{{ CONTACT_TEL01 }}</a>{% endif %}
+          {% if CONTACT_TEL02 %}<a href="tel:{{ CONTACT_TEL02|cut:' ' }}">{{ CONTACT_TEL02 }}</a>{% endif %}
+          {% if CONTACT_TEL03 %}<a href="tel:{{ CONTACT_TEL03|cut:' ' }}">{{ CONTACT_TEL03 }}</a>{% endif %}
+        </div></div>
+        {% endif %}
+        {% if CONTACT_EMAIL or CONTACT_EMAIL1 or CONTACT_EMAIL2 %}
+        <div class="c-row"><i class="bi bi-envelope-fill"></i><div><small>Email</small>
+          {% if CONTACT_EMAIL %}<a href="mailto:{{ CONTACT_EMAIL }}">{{ CONTACT_EMAIL }}</a>{% endif %}
+          {% if CONTACT_EMAIL1 %}<a href="mailto:{{ CONTACT_EMAIL1 }}">{{ CONTACT_EMAIL1 }}</a>{% endif %}
+          {% if CONTACT_EMAIL2 %}<a href="mailto:{{ CONTACT_EMAIL2 }}">{{ CONTACT_EMAIL2 }}</a>{% endif %}
+        </div></div>
+        {% endif %}
+        {% if CONTACT_WHATSAPP %}
+        <div class="c-row"><i class="bi bi-whatsapp"></i><div><small>WhatsApp</small><a href="https://wa.me/{{ CONTACT_WHATSAPP }}" target="_blank" rel="noopener">Écrire sur WhatsApp</a></div></div>
+        {% endif %}
+        <div class="c-row"><i class="bi bi-clock-fill"></i><div><small>Délai de réponse</small><span>Notre équipe vous répond sous 48h ouvrables.</span></div></div>
+      </div>
+      <form class="c-form rv" id="contactForm" novalidate>
+        {% csrf_token %}
+        <div class="f-msg" id="formMsg" role="status" aria-live="polite"></div>
+        <div class="fgrid">
+          <div><label for="nom">Nom complet *</label><input class="f" type="text" id="nom" name="nom" autocomplete="name" required /></div>
+          <div><label for="email">Adresse email *</label><input class="f" type="email" id="email" name="email" autocomplete="email" required /></div>
+          <div><label for="telephone">Téléphone</label><input class="f" type="tel" id="telephone" name="telephone" autocomplete="tel" placeholder="+226 XX XX XX XX" /></div>
+          <div><label for="societe">Société / organisation</label><input class="f" type="text" id="societe" name="societe" autocomplete="organization" placeholder="Optionnel" /></div>
+          <div class="full">
+            <label for="sujet">Sujet *</label>
+            <select class="f" id="sujet" name="sujet" required>
+              <option value="">Sélectionnez un sujet</option>
+              <option value="demande-reservation">Demande de réservation</option>
+              <option value="info-tarif">Informations tarifaires</option>
+              <option value="probleme-technique">Problème technique</option>
+              <option value="autre">Autre</option>
+            </select>
+          </div>
+          <div class="full"><label for="message">Message *</label><textarea class="f" id="message" name="message" rows="4" required></textarea></div>
+          <div class="full"><button class="btn-x btn-white" style="width:100%;" type="submit"><i class="bi bi-send-fill"></i> Envoyer le message</button></div>
+        </div>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- ═════════ APPEL FINAL ═════════ -->
+<section class="sec bigcta">
+  <div class="wrap">
+    <h2 class="rv">Prêt à passer<br /><span>en grand ?</span></h2>
+    <div class="row rv">
+      <p>Des emplacements stratégiques, des supports performants et un accompagnement personnalisé pour maximiser votre visibilité.</p>
+      <a href="{% url 'portail:reserver_etape1' %}" class="btn-x btn-white">Faire une demande <i class="bi bi-arrow-right"></i></a>
+    </div>
+  </div>
+</section>
+
+</main>
+
+<footer class="site-foot">
+  <div class="wrap">
+    <div class="foot-grid">
+      <div>
+        <span class="brand-name" style="color:#fff;">Integral<b style="color:var(--accent)">.</b></span>
+        <p>Régie publicitaire spécialisée dans l'affichage extérieur : panneaux grand format, écrans numériques LED et sucettes urbaines.</p>
+      </div>
+      <div>
+        <h4>Navigation</h4>
+        <ul>
+          <li><a href="#supports">Supports</a></li>
+          <li><a href="#reseau">Réseau</a></li>
+          <li><a href="#carte">Carte</a></li>
+          <li><a href="#apropos">À propos</a></li>
+          <li><a href="#contact">Contact</a></li>
+        </ul>
+      </div>
+      <div>
+        <h4>Services</h4>
+        <ul>
+          <li><a href="{% url 'portail:reserver_etape1' %}">Faire une demande</a></li>
+          <li><a href="{% url 'portail:suivi_demande' %}">Suivre une demande</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="foot-bot">
+      <span>&copy; {% now "Y" %} Promo Pub – Integral by Ibrahim SAWADOGO. All Rights Reserved</span>
+      <a href="#top"><i class="bi bi-arrow-up"></i> Haut de page</a>
+    </div>
+  </div>
+</footer>
+
+<div class="m-bar">
+  <a href="{% url 'portail:suivi_demande' %}" class="btn-x btn-ghost btn-sm"><i class="bi bi-search"></i> Suivi</a>
+  <a href="{% url 'portail:reserver_etape1' %}" class="btn-x btn-white btn-sm">Faire une demande</a>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="{% static 'js/integral_map.js' %}"></script>
+<script>
+(function () {
+  'use strict';
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  // Tiroir mobile
+  var burger = document.getElementById('burger'), drawer = document.getElementById('drawer'), closeBtn = document.getElementById('closeDrawer');
+  function setDrawer(open) {
+    drawer.classList.toggle('open', open);
+    burger.setAttribute('aria-expanded', open ? 'true' : 'false');
+    document.body.style.overflow = open ? 'hidden' : '';
+  }
+  burger.addEventListener('click', function () { setDrawer(true); });
+  closeBtn.addEventListener('click', function () { setDrawer(false); });
+  drawer.querySelectorAll('a').forEach(function (a) { a.addEventListener('click', function () { setDrawer(false); }); });
+  document.addEventListener('keydown', function (e) { if (e.key === 'Escape') setDrawer(false); });
+
+  // Apparition au scroll
+  var rv = document.querySelectorAll('.rv');
+  if ('IntersectionObserver' in window) {
+    var io = new IntersectionObserver(function (es) {
+      es.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+    }, { threshold: 0.08 });
+    rv.forEach(function (el) { io.observe(el); });
+  } else { rv.forEach(function (el) { el.classList.add('in'); }); }
+
+  // Lien actif
+  var links = {};
+  document.querySelectorAll('.nav-links a').forEach(function (a) { links[a.getAttribute('href')] = a; });
+  if ('IntersectionObserver' in window) {
+    var so = new IntersectionObserver(function (es) {
+      es.forEach(function (e) {
+        if (e.isIntersecting) {
+          Object.keys(links).forEach(function (k) { links[k].classList.remove('active'); });
+          var l = links['#' + e.target.id]; if (l) l.classList.add('active');
+        }
+      });
+    }, { rootMargin: '-45% 0px -50% 0px' });
+    Object.keys(links).forEach(function (k) { var s = document.querySelector(k); if (s) so.observe(s); });
+  }
+
+  // Bandeau défilant : répéter la liste jusqu'à dépasser la largeur de l'écran
+  document.querySelectorAll('.marq .half').forEach(function (half) {
+    var ul = half.querySelector('ul'); if (!ul || !ul.children.length) return;
+    var guard = 0;
+    while (half.scrollWidth < window.innerWidth + 40 && guard++ < 12) { half.appendChild(ul.cloneNode(true)); }
+  });
+
+  // ───────── Mini-jeu « Chasse aux faces » ─────────
+  (function game() {
+    var arena = document.getElementById('arena'); if (!arena) return;
+    var ov = document.getElementById('gOv'), ovT = document.getElementById('gOvT'), ovS = document.getElementById('gOvS');
+    var btn = document.getElementById('gStart'), cta = document.getElementById('gCta');
+    var elScore = document.getElementById('gScore'), elBest = document.getElementById('gBest'), hearts = document.querySelectorAll('#gLives i');
+    var labels = [];
+    try { var d = JSON.parse(document.getElementById('fmtData').textContent); if (Array.isArray(d)) labels = d.filter(Boolean); } catch (e) {}
+    if (!labels.length) labels = ['Face'];
+    var S = { on: false, score: 0, lives: 3, best: 0, t: null };
+    try { S.best = parseInt(localStorage.getItem('integral_v12_best'), 10) || 0; } catch (e) {}
+    elBest.textContent = S.best;
+
+    function hud() {
+      elScore.textContent = S.score;
+      hearts.forEach(function (h, i) { h.classList.toggle('off', i >= S.lives); });
+    }
+    function clearFaces() {
+      arena.querySelectorAll('.gface, .gfloat').forEach(function (f) { clearTimeout(f._t); f.remove(); });
+    }
+    function float(x, y, txt) {
+      var f = document.createElement('span'); f.className = 'gfloat'; f.textContent = txt; f.style.left = x + 'px'; f.style.top = y + 'px';
+      arena.appendChild(f); setTimeout(function () { f.remove(); }, 750);
+    }
+    function addFace() {
+      var W = arena.clientWidth, H = arena.clientHeight;
+      var fw = Math.round(Math.max(64, Math.min(96, W * 0.22))), fh = Math.round(fw * 0.66);
+      var life = Math.max(900, 2300 - S.score * 8);
+      var f = document.createElement('button'); f.type = 'button'; f.className = 'gface';
+      f.setAttribute('aria-label', 'Réserver cette face');
+      f.textContent = labels[Math.floor(Math.random() * labels.length)];
+      f.style.setProperty('--fw', fw + 'px'); f.style.setProperty('--life', life + 'ms');
+      f.style.left = Math.round(8 + Math.random() * Math.max(1, W - fw - 16)) + 'px';
+      f.style.top = Math.round(8 + Math.random() * Math.max(1, H - fh - 16)) + 'px';
+      f.addEventListener('click', function () {
+        if (!S.on || f.classList.contains('hit')) return;
+        clearTimeout(f._t); S.score += 10; hud();
+        float(f.offsetLeft + fw / 2 - 10, f.offsetTop, '+10');
+        f.classList.add('hit'); setTimeout(function () { f.remove(); }, 230);
+      });
+      f._t = setTimeout(function () {
+        if (!S.on || !f.parentNode) return;
+        f.classList.add('miss'); setTimeout(function () { f.remove(); }, 320);
+        S.lives -= 1; hud(); if (S.lives <= 0) end(false);
+      }, life);
+      arena.appendChild(f);
+    }
+    function spawn() {
+      if (!S.on) return;
+      if (arena.querySelectorAll('.gface:not(.hit):not(.miss)').length < 5) addFace();
+      var gap = Math.max(420, 1100 - S.score * 4) * (0.7 + Math.random() * 0.6);
+      S.t = setTimeout(spawn, gap);
+    }
+    function start() {
+      clearFaces(); S.on = true; S.score = 0; S.lives = 3; hud();
+      ov.hidden = true; cta.hidden = true; spawn();
+    }
+    function end(silent) {
+      S.on = false; clearTimeout(S.t); clearFaces();
+      if (S.score > S.best) { S.best = S.score; elBest.textContent = S.best; try { localStorage.setItem('integral_v12_best', S.best); } catch (e) {} }
+      ovT.textContent = silent ? 'Chasse aux faces' : 'Partie terminée';
+      ovS.textContent = silent ? 'Partie interrompue.' : 'Score : ' + S.score + ' · Record : ' + S.best + '. Prêt à réserver pour de vrai ?';
+      btn.textContent = 'Rejouer'; ov.hidden = false; cta.hidden = silent;
+      btn.focus({ preventScroll: true });
+    }
+    btn.addEventListener('click', start);
+    document.addEventListener('visibilitychange', function () { if (document.hidden && S.on) end(true); });
+    hud();
+  })();
+
+  // ───────── Réseau : sélection ville + format ─────────
+  var panels = document.querySelectorAll('.cpanel'), empty = document.getElementById('netEmpty'), title = document.getElementById('detailTitle');
+  var firstCard = document.querySelector('.ccard');
+  var st = { v: firstCard ? firstCard.dataset.fv : 'all', c: 'all' };
+  function bars() {
+    document.querySelectorAll('.bar').forEach(function (bar) {
+      var l = parseInt(bar.dataset.libre, 10) || 0, t = parseInt(bar.dataset.total, 10) || 0;
+      var on = t ? Math.round(l / t * 10) : 0; if (l > 0 && on === 0) on = 1;
+      for (var i = 0; i < 10; i++) { var s = document.createElement('i'); if (i < on) s.className = 'on'; bar.appendChild(s); }
+    });
+  }
+  bars();
+  function apply() {
+    var shown = 0;
+    document.querySelectorAll('[data-fv]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.fv === st.v ? 'true' : 'false'); });
+    document.querySelectorAll('[data-fc]').forEach(function (b) { b.setAttribute('aria-pressed', b.dataset.fc === st.c ? 'true' : 'false'); });
+    panels.forEach(function (p) {
+      var okV = st.v === 'all' || p.dataset.v === st.v, any = 0;
+      p.querySelectorAll('.cg').forEach(function (g) {
+        var ok = okV && (st.c === 'all' || g.dataset.cat === st.c); g.hidden = !ok; if (ok) any++;
+        var cn = g.querySelector('.cityname'); if (cn) cn.style.display = st.v === 'all' ? '' : 'none';
+      });
+      p.hidden = !any; if (any) shown++;
+    });
+    if (title) {
+      var sel = document.querySelector('.ccard[data-fv="' + st.v + '"]');
+      title.textContent = (st.v !== 'all' && sel) ? sel.dataset.name : 'Toutes les villes';
+    }
+    if (empty) empty.classList.toggle('show', panels.length > 0 && shown === 0);
+  }
+  function goDetail() { var d = document.getElementById('detail'); if (d) d.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block: 'start' }); }
+  document.querySelectorAll('.ccard').forEach(function (b) { b.addEventListener('click', function () { st.v = b.dataset.fv; apply(); goDetail(); }); });
+  document.querySelectorAll('.chips [data-fv]').forEach(function (b) { b.addEventListener('click', function () { st.v = b.dataset.fv; apply(); }); });
+  document.querySelectorAll('[data-fc]').forEach(function (b) { b.addEventListener('click', function () { st.c = b.dataset.fc; apply(); }); });
+  document.querySelectorAll('[data-pick-cat]').forEach(function (a) {
+    a.addEventListener('click', function (ev) {
+      ev.preventDefault();
+      var slug = a.dataset.pickCat;
+      st.c = document.querySelector('[data-fc="' + slug + '"]') ? slug : 'all';   // catégorie absente : on affiche tout
+      st.v = 'all'; apply(); goDetail();
+    });
+  });
+  apply();
+
+  // Carte Leaflet (chargée à l'approche de l'écran)
+  var mapEl = document.getElementById('vMap'), mapDone = false;
+  function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
+  function initMap() {
+    if (mapDone) return; mapDone = true;
+    if (typeof L === 'undefined') { mapEl.closest('.map-box').style.display = 'none'; document.getElementById('mapFallback').style.display = 'block'; return; }
+    var center = {{ oua_center|default:"[12.3714, -1.5197]" }};
+    var map = L.map(mapEl, { scrollWheelZoom: false }).setView(center, 12);
+    var opts = { attribution: '&copy; OpenStreetMap contributors', maxZoom: 19 };
+    if (typeof window.buildSafeLeafletTiles === 'function') { window.buildSafeLeafletTiles(map, opts); }
+    else { L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', opts).addTo(map); }
+    var reserveBase = "{% url 'portail:reserver_etape1' %}";
+    fetch("{% url 'portail:api_geojson' %}", { headers: { 'Accept': 'application/json' } })
+      .then(function (r) { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(function (data) {
+        if (!data || !data.features || !data.features.length) return;
+        var layer = L.geoJSON(data, {
+          pointToLayer: function (f, ll) { return L.circleMarker(ll, { radius: 9, fillColor: f.properties.color || '#22c55e', color: '#000', weight: 3, fillOpacity: 1 }); },
+          onEachFeature: function (f, l) {
+            var p = f.properties || {};
+            l.bindPopup(
+              '<strong>' + esc(p.nom || p.code) + '</strong>' +
+              '<div style="font-size:.82rem;color:#9b9ba5;">' + esc(p.ville) + (p.quartier ? ' · ' + esc(p.quartier) : '') + '</div>' +
+              (p.format || p.type_support ? '<div style="font-size:.82rem;margin-top:4px;">Format : ' + esc(p.format || p.type_support) + '</div>' : '') +
+              '<a href="' + reserveBase + '?ville=' + encodeURIComponent(p.ville || '') + '" style="display:inline-block;margin-top:10px;background:#fff;color:#000;padding:7px 16px;border-radius:999px;font-size:.82rem;font-weight:600;text-decoration:none;">Réserver</a>'
+            );
+          }
+        }).addTo(map);
+        try { map.fitBounds(layer.getBounds(), { padding: [30, 30], maxZoom: 14 }); } catch (e) {}
+      })
+      .catch(function () { /* carte sans marqueurs : la liste des emplacements reste consultable */ });
+    map.on('click', function () { map.scrollWheelZoom.enable(); });
+  }
+  if (mapEl) {
+    if ('IntersectionObserver' in window) {
+      var mo = new IntersectionObserver(function (es) { if (es[0].isIntersecting) { initMap(); mo.disconnect(); } }, { rootMargin: '300px' });
+      mo.observe(mapEl);
+    } else { initMap(); }
+  }
+
+  // Formulaire de contact (AJAX)
+  var form = document.getElementById('contactForm');
+  form.addEventListener('submit', function (e) {
+    e.preventDefault();
+    var box = document.getElementById('formMsg'), sbtn = form.querySelector('button[type="submit"]'), html = sbtn.innerHTML;
+    box.className = 'f-msg';
+    if (!form.checkValidity()) { form.reportValidity(); return; }
+    sbtn.disabled = true; sbtn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Envoi en cours…';
+    fetch("{% url 'portail:contact_envoyer' %}", { method: 'POST', body: new FormData(form), headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+      .then(function (r) { return r.json(); })
+      .then(function (d) {
+        box.classList.add(d.success ? 'ok' : 'err');
+        box.textContent = d.success ? d.message : (d.error || 'Une erreur est survenue.');
+        if (d.success) form.reset();
+      })
+      .catch(function () { box.classList.add('err'); box.textContent = 'Erreur réseau. Veuillez réessayer.'; })
+      .finally(function () { sbtn.disabled = false; sbtn.innerHTML = html; });
+  });
+})();
+</script>
+</body>
+</html>

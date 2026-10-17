@@ -764,7 +764,8 @@ class SupportListView(TechnicienStaffRequiredMixin,SortableListMixin, ListView):
 
         if q:
             queryset = queryset.filter(
-                Q(code__icontains=q) | Q(nom__icontains=q) | Q(adresse__icontains=q)
+                Q(code__icontains=q) | Q(nom__icontains=q)
+                | Q(ancien_nom__icontains=q) | Q(adresse__icontains=q)
             )
 
         if type_f:

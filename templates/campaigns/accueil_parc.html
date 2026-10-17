@@ -4,14 +4,33 @@
 {% block title %}Accueil — Parc Integral{% endblock %}
 
 {% block topbar_title %}
+
   <div class="d-flex align-items-center gap-2">
     <i class="bi bi-speedometer2 fs-5 text-primary"></i>
     <span class="fw-bold">Accueil du parc</span>
   </div>
+
+  <!--
+  <div class="parc-city-list">
+    <a class="parc-city {% if not ville_active %}active{% endif %}" href="{% url 'dashboard' %}">
+      <i class="bi bi-globe2"></i>Toutes les villes
+    </a>
+    {% for ville in villes %}
+      <a class="parc-city {% if ville_active == ville %}active{% endif %}" href="{% url 'dashboard' %}?ville={{ ville|urlencode }}">
+        <i class="bi bi-geo-alt"></i>{{ ville }}
+      </a>
+    {% empty %}
+      <span class="parc-muted">Aucune ville renseignée dans l’inventaire.</span>
+    {% endfor %}
+  </div>
+  -->
 {% endblock %}
 
 {% block topbar_actions %}
   <div class="d-flex align-items-center gap-2">
+    <a href="{% url 'carte' %}" class="btn btn-sm btn-outline-view">
+      <i class="bi bi-map me-1"></i>Voir la carte
+    </a>
     <a href="{% url 'support_list' %}" class="btn btn-outline-secondary btn-sm">
       <i class="bi bi-collection me-1"></i>Supports
     </a>
@@ -30,7 +49,7 @@
     position: relative;
     overflow: hidden;
     padding: clamp(1.35rem, 4vw, 2.4rem);
-    border-radius: 1.25rem;
+    border-radius: 8px;
     background: linear-gradient(120deg, #762321 0%, #932e2b 56%, #b64a40 100%);
     color: #fff;
     box-shadow: 0 1rem 2.5rem rgba(75, 25, 24, .18);
@@ -57,7 +76,7 @@
     gap: 1rem;
     padding: 1.15rem;
     border: 1px solid #e9edf2;
-    border-radius: 10px;
+    border-radius: 8px;
     background: #fff;
     box-shadow: 0 .4rem 1.2rem rgba(25, 35, 55, .04);
   }
@@ -78,7 +97,7 @@
     height: 100%;
     padding: 1.25rem;
     border: 1px solid #e9edf2;
-    border-radius: 10px;
+    border-radius: 8px;
     background: #fff;
     box-shadow: 0 .4rem 1.2rem rgba(25, 35, 55, .04);
   }
@@ -118,7 +137,7 @@
     height: 100%;
     overflow: hidden;
     border: 1px solid #e8ebf0;
-    border-radius: 10px;
+    border-radius: 8px;
     background: #fff;
     box-shadow: 0 .45rem 1.35rem rgba(25, 35, 55, .045);
   }
@@ -141,13 +160,27 @@
   }
   .parc-category-title h3 { margin: 0; font-size: 1rem; font-weight: 800; }
   .parc-category-title p { margin: .2rem 0 0; color: var(--parc-muted); font-size: .75rem; }
-  .parc-category-summary { display: flex; flex-wrap: wrap; gap: .4rem .8rem; margin-top: .9rem; }
-  .parc-category-summary span { color: #374151; font-size: .75rem; font-weight: 700; }
+  .parc-category-summary { display: flex; flex-wrap: wrap; gap: .45rem; margin-top: 1rem; }
+  .parc-category-stat { display: flex; flex: 0 0 3.5rem; flex-direction: column; align-items: center; gap: .35rem; text-align: center; }
+  .parc-category-stat-value {
+    width: 2.65rem;
+    height: 2.65rem;
+    display: grid;
+    place-items: center;
+    border: 2px solid color-mix(in srgb, var(--stat-color) 22%, white);
+    border-radius: 50%;
+    background: color-mix(in srgb, var(--stat-color) 11%, white);
+    color: var(--stat-color);
+    font-size: .95rem;
+    font-weight: 800;
+    line-height: 1;
+  }
+  .parc-category-stat-label { color: #4b5563; font-size: .66rem; font-weight: 700; line-height: 1.15; }
   .parc-formats {
     display: grid;
     grid-template-columns: repeat(var(--category-span, 1), minmax(0, 1fr));
-    grid-auto-rows: 125px;
-    max-height: 375px;
+    grid-auto-rows: 150px;
+    max-height: 450px;
     column-gap: 1.1rem;
     padding: .35rem 1.1rem 1rem;
     overflow-y: auto;
@@ -164,17 +197,11 @@
   .parc-format-heading { display: flex; align-items: start; justify-content: space-between; gap: .75rem; }
   .parc-format-code { font-weight: 800; color: var(--parc-ink); }
   .parc-format-description { margin-top: .2rem; color: var(--parc-muted); font-size: .75rem; }
-  .parc-format-count {
-    white-space: nowrap;
-    padding: .28rem .55rem;
-    border-radius: 8px;
-    color: var(--category-color, #932e2b);
-    background: color-mix(in srgb, var(--category-color, #932e2b) 10%, white);
-    font-size: .7rem;
-    font-weight: 750;
-  }
-  .parc-format-stats { margin-top: .5rem; color: var(--parc-muted); font-size: .73rem; line-height: 1.5; }
-  .parc-format-stats strong { color: #374151; font-weight: 750; }
+  .parc-format-stats { display: flex; flex-wrap: wrap; gap: .35rem .4rem; margin-top: .5rem; }
+  .parc-format-stat { min-width: 0; gap: .2rem; }
+  .parc-format-stat { flex: 0 0 2.8rem; }
+  .parc-format-stat .parc-category-stat-value { width: 2rem; height: 2rem; font-size: .78rem; }
+  .parc-format-stat .parc-category-stat-label { font-size: .59rem; }
   .parc-category-campaigns { padding: .8rem 1.1rem 1rem; border-top: 1px solid #edf0f4; background: #fafbfc; }
   .parc-category-campaigns-title { margin-bottom: .5rem; color: #4b5563; font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
   .parc-category-campaigns-grid {
@@ -203,7 +230,7 @@
   .parc-category-name { font-weight: 750; }
   .parc-category-total { white-space: nowrap; font-size: .8rem; color: var(--parc-muted); }
   .parc-category-meta { color: var(--parc-muted); font-size: .75rem; margin-top: .45rem; }
-  .parc-progress { height: .4rem; margin-top: .75rem; border-radius: 10px; background: #edf0f4; overflow: hidden; }
+  .parc-progress { height: .4rem; margin-top: .75rem; border-radius: 8px; background: #edf0f4; overflow: hidden; }
   .parc-progress > span { display: block; height: 100%; border-radius: inherit; background: var(--category-color, #932e2b); }
   .parc-campaign {
     height: 86px;
@@ -252,6 +279,27 @@
 </style>
 
 <main class="container-fluid py-3 py-lg-4 parc-home">
+  <section class="parc-section mb-4" aria-labelledby="parc-villes-title">
+    <div class="parc-section-heading">
+      <div>
+        <h2 id="parc-villes-title"><i class="bi bi-geo-alt-fill text-primary me-2"></i>Parc par ville</h2>
+        <p>Choisissez une ville pour filtrer les indicateurs et les campagnes.</p>
+      </div>
+      <a href="{% url 'carte' %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-map me-1"></i>Voir la carte</a>
+    </div>
+    <div class="parc-city-list">
+      <a class="parc-city {% if not ville_active %}active{% endif %}" href="{% url 'dashboard' %}">
+        <i class="bi bi-globe2"></i>Toutes les villes
+      </a>
+      {% for ville in villes %}
+        <a class="parc-city {% if ville_active == ville %}active{% endif %}" href="{% url 'dashboard' %}?ville={{ ville|urlencode }}">
+          <i class="bi bi-geo-alt"></i>{{ ville }}
+        </a>
+      {% empty %}
+        <span class="parc-muted">Aucune ville renseignée dans l’inventaire.</span>
+      {% endfor %}
+    </div>
+  </section>
   <section class="parc-hero mb-4">
     <div class="parc-hero-content">
       <div class="parc-eyebrow">Gestion du réseau publicitaire</div>
@@ -346,27 +394,7 @@
     </div>
   </section>
 
-  <section class="parc-section mb-4" aria-labelledby="parc-villes-title">
-    <div class="parc-section-heading">
-      <div>
-        <h2 id="parc-villes-title"><i class="bi bi-geo-alt-fill text-primary me-2"></i>Parc par ville</h2>
-        <p>Choisissez une ville pour filtrer les indicateurs et les campagnes.</p>
-      </div>
-      <a href="{% url 'carte' %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-map me-1"></i>Voir la carte</a>
-    </div>
-    <div class="parc-city-list">
-      <a class="parc-city {% if not ville_active %}active{% endif %}" href="{% url 'dashboard' %}">
-        <i class="bi bi-globe2"></i>Toutes les villes
-      </a>
-      {% for ville in villes %}
-        <a class="parc-city {% if ville_active == ville %}active{% endif %}" href="{% url 'dashboard' %}?ville={{ ville|urlencode }}">
-          <i class="bi bi-geo-alt"></i>{{ ville }}
-        </a>
-      {% empty %}
-        <span class="parc-muted">Aucune ville renseignée dans l’inventaire.</span>
-      {% endfor %}
-    </div>
-  </section>
+
 
   <section class="parc-section mb-4" aria-labelledby="parc-map-title">
     <div class="parc-section-heading">
@@ -405,12 +433,34 @@
                     </div>
                   </div>
                   <div class="parc-category-summary">
-                    <span>{{ categorie.nb_supports }} supports</span>
-                    <span>{{ categorie.nb_faces }} faces</span>
-                    <span>{{ categorie.nb_faces_libres }} libres</span>
-                    <span>{{ categorie.nb_faces_occupees }} occupées</span>
-                    {% if categorie.nb_faces_reservees %}<span>{{ categorie.nb_faces_reservees }} réservées</span>{% endif %}
-                    {% if categorie.nb_faces_panne %}<span>{{ categorie.nb_faces_panne }} en panne</span>{% endif %}
+                    <div class="parc-category-stat" style="--stat-color:#2563eb">
+                      <span class="parc-category-stat-value">{{ categorie.nb_supports }}</span>
+                      <span class="parc-category-stat-label">Supports</span>
+                    </div>
+                    <div class="parc-category-stat" style="--stat-color:#7c3aed">
+                      <span class="parc-category-stat-value">{{ categorie.nb_faces }}</span>
+                      <span class="parc-category-stat-label">Faces</span>
+                    </div>
+                    <div class="parc-category-stat" style="--stat-color:#16a34a">
+                      <span class="parc-category-stat-value">{{ categorie.nb_faces_libres }}</span>
+                      <span class="parc-category-stat-label">Libres</span>
+                    </div>
+                    <div class="parc-category-stat" style="--stat-color:#dc2626">
+                      <span class="parc-category-stat-value">{{ categorie.nb_faces_occupees }}</span>
+                      <span class="parc-category-stat-label">Occupées</span>
+                    </div>
+                    {% if categorie.nb_faces_reservees %}
+                      <div class="parc-category-stat" style="--stat-color:#d97706">
+                        <span class="parc-category-stat-value">{{ categorie.nb_faces_reservees }}</span>
+                        <span class="parc-category-stat-label">Réservées</span>
+                      </div>
+                    {% endif %}
+                    {% if categorie.nb_faces_panne %}
+                      <div class="parc-category-stat" style="--stat-color:#64748b">
+                        <span class="parc-category-stat-value">{{ categorie.nb_faces_panne }}</span>
+                        <span class="parc-category-stat-label">En panne</span>
+                      </div>
+                    {% endif %}
                   </div>
                 </header>
                 <div class="parc-formats">
@@ -424,15 +474,36 @@
                             {% if format.superficie %} · {{ format.superficie|floatformat:"-2" }} m²{% endif %}
                           </div>
                         </div>
-                        <span class="parc-format-count">{{ format.nb_supports }} support(s)</span>
                       </div>
                       <div class="parc-format-stats">
-                        <strong>{{ format.nb_supports }}</strong> supports
-                        · <strong>{{ format.nb_faces }}</strong> faces
-                        · <strong>{{ format.nb_faces_libres }}</strong> libres
-                        · <strong>{{ format.nb_faces_occupees }}</strong> occupées
-                        {% if format.nb_faces_reservees %}· <strong>{{ format.nb_faces_reservees }}</strong> réservées{% endif %}
-                        {% if format.nb_faces_panne %}· <strong>{{ format.nb_faces_panne }}</strong> en panne{% endif %}
+                        <div class="parc-category-stat parc-format-stat" style="--stat-color:#2563eb">
+                          <span class="parc-category-stat-value">{{ format.nb_supports }}</span>
+                          <span class="parc-category-stat-label">Supports</span>
+                        </div>
+                        <div class="parc-category-stat parc-format-stat" style="--stat-color:#7c3aed">
+                          <span class="parc-category-stat-value">{{ format.nb_faces }}</span>
+                          <span class="parc-category-stat-label">Faces</span>
+                        </div>
+                        <div class="parc-category-stat parc-format-stat" style="--stat-color:#16a34a">
+                          <span class="parc-category-stat-value">{{ format.nb_faces_libres }}</span>
+                          <span class="parc-category-stat-label">Libres</span>
+                        </div>
+                        <div class="parc-category-stat parc-format-stat" style="--stat-color:#dc2626">
+                          <span class="parc-category-stat-value">{{ format.nb_faces_occupees }}</span>
+                          <span class="parc-category-stat-label">Occupées</span>
+                        </div>
+                        {% if format.nb_faces_reservees %}
+                          <div class="parc-category-stat parc-format-stat" style="--stat-color:#d97706">
+                            <span class="parc-category-stat-value">{{ format.nb_faces_reservees }}</span>
+                            <span class="parc-category-stat-label">Réservées</span>
+                          </div>
+                        {% endif %}
+                        {% if format.nb_faces_panne %}
+                          <div class="parc-category-stat parc-format-stat" style="--stat-color:#64748b">
+                            <span class="parc-category-stat-value">{{ format.nb_faces_panne }}</span>
+                            <span class="parc-category-stat-label">En panne</span>
+                          </div>
+                        {% endif %}
                       </div>
                     </div>
                   {% endfor %}

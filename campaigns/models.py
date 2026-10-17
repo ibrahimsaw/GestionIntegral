@@ -1236,3 +1236,63 @@ class LigneCampagne(models.Model):
 
         jours_dispo = self.support.jours_disponibles_sur_periode(date_debut, date_fin)
         return round(spots_par_jour * jours_dispo)
+
+
+class PreuveDiffusion(models.Model):
+    """Preuve photo d'une diffusion sur une ligne de campagne."""
+
+    campagne = models.ForeignKey(
+        Campagne,
+        on_delete=models.CASCADE,
+        related_name='preuves_diffusion',
+    )
+    ligne = models.ForeignKey(
+        LigneCampagne,
+        on_delete=models.CASCADE,
+        related_name='preuves_diffusion',
+        verbose_name="Support / emplacement",
+    )
+    date_heure = models.DateTimeField(default=timezone.now, verbose_name="Date et heure de diffusion")
+    photo = models.ImageField(upload_to='piges/%Y/%m/', verbose_name="Photo de preuve")
+    observations = models.TextField(blank=True, verbose_name="Observations")
+    cree_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='preuves_diffusion_creees',
+    )
+    cree_le = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-date_heure', '-pk']
+        verbose_name = "Preuve de diffusion"
+        verbose_name_plural = "Preuves de diffusion"
+        constraints = [
+            models.UniqueConstraint(
+                fields=['campagne', 'ligne'],
+                name='unique_pige_campagne_ligne',
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.campagne.reference} — {self.ligne} — {self.date_heure:%d/%m/%Y %H:%M}"
+
+    def clean(self):
+        super().clean()
+        if self.ligne_id and self.campagne_id and self.ligne.campagne_id != self.campagne_id:
+            raise ValidationError({
+                'ligne': "Le support sélectionné n'appartient pas à cette campagne."
+            })
+
+        if self.date_heure and self.campagne_id:
+            date_debut = self.campagne.date_debut
+            date_fin = self.campagne.date_fin
+            if self.ligne_id:
+                date_debut = self.ligne.date_debut or date_debut
+                date_fin = self.ligne.date_fin or date_fin
+            date_diffusion = timezone.localtime(self.date_heure).date() if timezone.is_aware(self.date_heure) else self.date_heure.date()
+            if date_diffusion < date_debut or date_diffusion > date_fin:
+                raise ValidationError({
+                    'date_heure': "La date de diffusion doit être comprise dans la période de la campagne."
+                })

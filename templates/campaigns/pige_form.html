@@ -1,0 +1,76 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if preuve_modifiee %}Modifier{% else %}Ajouter{% endif %} une preuve de diffusion — {{ campagne.nom }}{% endblock %}
+
+{% block topbar_title %}
+  <i class="bi bi-camera-fill me-2 text-primary"></i>{% if preuve_modifiee %}Modifier{% else %}Ajouter{% endif %} une preuve de diffusion
+{% endblock %}
+
+{% block content %}
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-4">
+    <div>
+      <h1 class="h4 fw-bold mb-1">{{ campagne.nom }}</h1>
+      <p class="text-muted mb-0">{{ campagne.client.nom }} · {{ campagne.date_debut|date:"d/m/Y" }} au {{ campagne.date_fin|date:"d/m/Y" }}</p>
+    </div>
+    <a href="{% url 'campagne_detail' campagne.pk %}#piges" class="btn btn-outline-secondary btn-sm">
+      <i class="bi bi-arrow-left me-1"></i>Retour à la campagne
+    </a>
+  </div>
+
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-white">
+      <h2 class="h6 fw-bold mb-0">{% if preuve_modifiee %}Modifier la pige terrain{% else %}Nouvelle pige terrain{% endif %}</h2>
+    </div>
+    <div class="card-body">
+      {% if not form.fields.ligne.queryset.exists %}
+        <div class="alert alert-warning mb-0">
+          Aucun support ou emplacement n’est associé à cette campagne. Ajoutez d’abord les supports à la campagne.
+        </div>
+      {% else %}
+        <form method="post" enctype="multipart/form-data" novalidate>
+          {% csrf_token %}
+          {% if form.non_field_errors %}
+            <div class="alert alert-danger">{{ form.non_field_errors }}</div>
+          {% endif %}
+          <div class="row g-3">
+            <div class="col-12">
+              <label for="{{ form.ligne.id_for_label }}" class="form-label">{{ form.ligne.label }}</label>
+              {{ form.ligne }}
+              {% for error in form.ligne.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+            </div>
+            <div class="col-md-6">
+              <label for="{{ form.date_heure.id_for_label }}" class="form-label">{{ form.date_heure.label }}</label>
+              {{ form.date_heure }}
+              {% for error in form.date_heure.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+              <div class="form-text">La date doit être dans la période de diffusion de la campagne.</div>
+            </div>
+            <div class="col-md-6">
+              <label for="{{ form.photo.id_for_label }}" class="form-label">{{ form.photo.label }}</label>
+              {{ form.photo }}
+              {% for error in form.photo.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+              <div class="form-text">
+                {% if preuve_modifiee and preuve_modifiee.photo %}
+                  La photo actuelle est conservée si vous n’en choisissez pas une nouvelle.
+                  <a href="{{ preuve_modifiee.photo.url }}" target="_blank" rel="noopener">Voir la photo actuelle</a>.
+                {% endif %}
+                Photo JPG, PNG ou WebP, 10 Mo maximum. Vous pouvez prendre une photo avec votre téléphone.
+              </div>
+            </div>
+            <div class="col-12">
+              <label for="{{ form.observations.id_for_label }}" class="form-label">{{ form.observations.label }}</label>
+              {{ form.observations }}
+              {% for error in form.observations.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+            </div>
+          </div>
+          <div class="d-flex justify-content-end mt-4">
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-check-lg me-1"></i>{% if preuve_modifiee %}Enregistrer les modifications{% else %}Enregistrer la preuve{% endif %}
+            </button>
+          </div>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+</div>
+{% endblock %}

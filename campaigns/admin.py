@@ -5,6 +5,7 @@ from .models import (
     Campagne,
     LigneCampagne,
     CampagneVisuel,
+    PreuveDiffusion,
     Reservation,
     ReservationLigne,
 )
@@ -107,6 +108,14 @@ class CampagneAdmin(admin.ModelAdmin):
     list_filter = ['statut', 'type_support']
     search_fields = ['nom', 'reference', 'client__nom']
     inlines = [CampagneVisuelInline, LigneCampagneInline]
+
+
+@admin.register(PreuveDiffusion)
+class PreuveDiffusionAdmin(admin.ModelAdmin):
+    list_display = ['campagne', 'ligne', 'date_heure', 'cree_par']
+    list_filter = ['date_heure', 'campagne__type_support']
+    search_fields = ['campagne__nom', 'campagne__reference', 'ligne__support__code', 'ligne__emplacement__code']
+    readonly_fields = ['cree_le']
 
 
 @admin.register(Reservation)

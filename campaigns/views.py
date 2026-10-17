@@ -21,7 +21,7 @@ from accounts.decorators import *
 from accounts.audit import log_action
 from .models import *
 from inventory.models import Support, FacePanneau, EcranNumerique, FormatSupport, Emplacement, Marche
-from .forms import ClientForm, ContratForm, CampagneForm, LigneCampagneForm
+from .forms import ClientForm, ContratForm, CampagneForm, LigneCampagneForm, PreuveDiffusionForm
 # from .mixins import *
 from datetime import datetime, date, timedelta
 today = timezone.now().date()
@@ -1611,6 +1611,15 @@ class CampagneDetailView(ClientStaffRequiredMixin, DetailView):
 
         context['lignes'] = lignes
         context['sous_campagnes'] = campagne.sous_campagnes.all()
+        campagne_ids = [campagne.pk]
+        if campagne.est_mere:
+            campagne_ids.extend(context['sous_campagnes'].values_list('pk', flat=True))
+        context['preuves_diffusion'] = PreuveDiffusion.objects.filter(
+            campagne_id__in=campagne_ids
+        ).select_related(
+            'campagne', 'ligne__support', 'ligne__face__support',
+            'ligne__emplacement__marche', 'cree_par',
+        )
 
         if campagne.est_mere:
             enfants = campagne.sous_campagnes.all()
@@ -1957,6 +1966,124 @@ class VisuelDeleteView(StaffRequiredMixin, View):
 
     def get(self, request, pk):
         return redirect('campagne_detail', pk=pk)
+
+
+class PreuveDiffusionCreateView(StaffRequiredMixin, View):
+    template_name = 'campaigns/pige_form.html'
+
+    def get_campagne(self, campagne_pk):
+        return get_object_or_404(Campagne, pk=campagne_pk)
+
+    def get(self, request, campagne_pk):
+        campagne = self.get_campagne(campagne_pk)
+        form = PreuveDiffusionForm(campagne=campagne)
+        preuves = campagne.preuves_diffusion.select_related(
+            'ligne__support', 'ligne__face__support', 'ligne__emplacement__marche', 'cree_par'
+        )
+        return render(request, self.template_name, {
+            'campagne': campagne,
+            'form': form,
+            'preuves': preuves,
+        })
+
+    def post(self, request, campagne_pk):
+        campagne = self.get_campagne(campagne_pk)
+        form = PreuveDiffusionForm(request.POST, request.FILES, campagne=campagne)
+        if form.is_valid():
+            preuve = form.save(commit=False)
+            preuve.campagne = campagne
+            preuve.cree_par = request.user
+            preuve.save()
+            messages.success(request, "La preuve de diffusion a été enregistrée.")
+            return redirect('campagne_detail', pk=campagne.pk)
+
+        preuves = campagne.preuves_diffusion.select_related(
+            'ligne__support', 'ligne__face__support', 'ligne__emplacement__marche', 'cree_par'
+        )
+        return render(request, self.template_name, {
+            'campagne': campagne,
+            'form': form,
+            'preuves': preuves,
+        })
+
+
+class PreuveDiffusionUpdateView(StaffRequiredMixin, View):
+    template_name = 'campaigns/pige_form.html'
+
+    def get_preuve(self, campagne_pk, preuve_pk):
+        return get_object_or_404(
+            PreuveDiffusion.objects.select_related('campagne', 'ligne'),
+            pk=preuve_pk,
+            campagne_id=campagne_pk,
+        )
+
+    def get(self, request, campagne_pk, preuve_pk):
+        preuve = self.get_preuve(campagne_pk, preuve_pk)
+        form = PreuveDiffusionForm(instance=preuve, campagne=preuve.campagne)
+        return render(request, self.template_name, {
+            'campagne': preuve.campagne,
+            'form': form,
+            'preuve_modifiee': preuve,
+        })
+
+    def post(self, request, campagne_pk, preuve_pk):
+        preuve = self.get_preuve(campagne_pk, preuve_pk)
+        ancienne_photo = preuve.photo
+        form = PreuveDiffusionForm(
+            request.POST,
+            request.FILES,
+            instance=preuve,
+            campagne=preuve.campagne,
+        )
+        if form.is_valid():
+            preuve = form.save()
+            if ancienne_photo.name and ancienne_photo.name != preuve.photo.name:
+                ancienne_photo.storage.delete(ancienne_photo.name)
+            messages.success(request, "La preuve de diffusion a été modifiée.")
+            return redirect('campagne_detail', pk=preuve.campagne_id)
+
+        return render(request, self.template_name, {
+            'campagne': preuve.campagne,
+            'form': form,
+            'preuve_modifiee': preuve,
+        })
+
+
+class PreuveDiffusionDeleteView(StaffRequiredMixin, View):
+    template_name = 'partials/confirm_delete.html'
+
+    def get_preuve(self, campagne_pk, preuve_pk):
+        return get_object_or_404(
+            PreuveDiffusion.objects.select_related(
+                'campagne', 'ligne__support', 'ligne__face__support',
+                'ligne__emplacement__marche',
+            ),
+            pk=preuve_pk,
+            campagne_id=campagne_pk,
+        )
+
+    def get(self, request, campagne_pk, preuve_pk):
+        preuve = self.get_preuve(campagne_pk, preuve_pk)
+        return render(request, self.template_name, {
+            'title': "Supprimer la preuve de diffusion",
+            'header': "Suppression d'une pige",
+            'message_title': "Supprimer cette preuve ?",
+            'message_body': "Vous allez supprimer la preuve du support",
+            'obj': preuve.ligne,
+            'hint': "Le support redeviendra disponible dans la liste de pige. Cette action est définitive.",
+            'confirm_label': "Supprimer la preuve",
+            'cancel_url': reverse('campagne_detail', kwargs={'pk': preuve.campagne_id}) + '#piges',
+        })
+
+    def post(self, request, campagne_pk, preuve_pk):
+        preuve = self.get_preuve(campagne_pk, preuve_pk)
+        campagne_pk = preuve.campagne_id
+        photo = preuve.photo
+        preuve.delete()
+        if photo:
+            photo.delete(save=False)
+        messages.success(request, "La preuve a été supprimée. Le support est de nouveau disponible pour une pige.")
+        return redirect('campagne_detail', pk=campagne_pk)
 
 
 class SupportBulkActionView(StaffRequiredMixin, View):

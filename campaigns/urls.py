@@ -4,9 +4,6 @@ from .simulation_view import SimulationCampagneEcranView
 
 
 urlpatterns = [
-    # Dashboard
-    path('', views.DashboardView.as_view(), name='dashboard'),
-
     # Clients
     path('clients/', views.ClientListView.as_view(), name='client_list'),
     path('clients/creer/', views.ClientCreateView.as_view(), name='client_create'),
@@ -57,9 +54,20 @@ urlpatterns = [
     path('campaigns/<int:pk>/modifier/', views.CampagneCreateUpdateView.as_view(), name='campagne_edit'),
     path('campaigns/<int:pk>/lancer/', views.CampagneLancerView.as_view(), name='campagne_lancer'),
     path('campaigns/<int:pk>/supprimer/', views.CampagneDeleteView.as_view(), name='campagne_delete'),
+    path('campaigns/<int:campagne_pk>/piges/ajouter/', views.PreuveDiffusionCreateView.as_view(), name='pige_create'),
     path('campaigns/selectionne/supprimer/', views.CampagneSelectedDeleteView.as_view(), name='campagne_selected_delete'),
     # Visuels
     path('visuels/<int:pk>/supprimer/', views.VisuelDeleteView.as_view(), name='supprimer_visuel'),
+    path(
+        'campaigns/<int:campagne_pk>/piges/<int:preuve_pk>/modifier/',
+        views.PreuveDiffusionUpdateView.as_view(),
+        name='pige_update',
+    ),
+    path(
+        'campaigns/<int:campagne_pk>/piges/<int:preuve_pk>/supprimer/',
+        views.PreuveDiffusionDeleteView.as_view(),
+        name='pige_delete',
+    ),
 
     # Lignes
     path('campaigns/<int:campagne_pk>/supports/manage/', views.SupportBulkActionView.as_view(), name='supports_add_bulk'),

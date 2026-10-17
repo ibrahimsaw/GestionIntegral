@@ -4,7 +4,7 @@ from django.shortcuts import render, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from accounts.decorators import *
-from campaigns.models import Campagne, Client
+from campaigns.models import Campagne, Client, PreuveDiffusion
 from django.http import HttpResponse
 from calendar import monthrange
 from django.template.loader import render_to_string
@@ -105,6 +105,39 @@ def _prepare_visuels_pdf(campagne):
     return visuels
 
 
+def _prepare_preuves_diffusion_pdf(preuves):
+    preuves_prepared = []
+    for preuve in preuves:
+        with preuve.photo.open("rb") as fichier:
+            contenu = fichier.read()
+
+        with Image.open(io.BytesIO(contenu)) as image_source:
+            image = ImageOps.exif_transpose(image_source)
+            image.thumbnail((1200, 900), Image.Resampling.LANCZOS)
+            preserve_alpha = "A" in image.getbands() or "transparency" in image.info
+            buffer = io.BytesIO()
+
+            if preserve_alpha:
+                image.convert("RGBA").save(buffer, format="PNG", optimize=True, compress_level=9)
+                mime_type = "image/png"
+            else:
+                image.convert("RGB").save(
+                    buffer,
+                    format="JPEG",
+                    quality=80,
+                    optimize=True,
+                    progressive=True,
+                )
+                mime_type = "image/jpeg"
+
+        encoded_image = base64.b64encode(buffer.getvalue()).decode("ascii")
+        preuves_prepared.append({
+            "preuve": preuve,
+            "src": f"data:{mime_type};base64,{encoded_image}",
+        })
+    return preuves_prepared
+
+
 def _spots_sur_periode(date_debut, date_fin, spots_total, periode_debut, periode_fin):
     """Calcule les spots d'une période donnée en fonction d'une durée totale."""
     if not date_debut or not date_fin or not spots_total:
@@ -159,6 +192,12 @@ def _build_context_campagne(campagne):
     if campagne.est_mere:
         enfants = list(campagne.sous_campagnes.all())
         campagnes = enfants
+
+    preuves_diffusion = PreuveDiffusion.objects.filter(
+        campagne__in=campagnes
+    ).select_related(
+        "campagne", "ligne__support", "ligne__face__support", "ligne__emplacement__marche"
+    )
 
     # ── Infos générales ──────────────────────────────────────────
     infos = {
@@ -404,6 +443,7 @@ def _build_context_campagne(campagne):
         "infos"                : infos,
         "supports"             : supports,
         "supports_by_child"    : supports_by_child,
+        "preuves_diffusion"    : preuves_diffusion,
         "spots_par_mois"       : spots_par_mois,
         "spots_par_mois_detail": spots_par_mois_detail,
     }
@@ -426,9 +466,12 @@ class ExportCampagnePdfView(ClientStaffRequiredMixin, View):
                             ),
             pk=pk,
         )
+        if request.user.role == 'client' and campagne.client_id != request.user.client_profile_id:
+            raise PermissionDenied
 
         context = _build_context_campagne(campagne)
         context["visuels_pdf"] = _prepare_visuels_pdf(campagne)
+        context["preuves_diffusion_pdf"] = _prepare_preuves_diffusion_pdf(context["preuves_diffusion"])
         html_string = render_to_string(
             "reports/campagne_pdf.html",
             context,
@@ -461,8 +504,11 @@ class PreviewCampagnePdfView(ClientStaffRequiredMixin, View):
                             ),
             pk=pk,
         )
+        if request.user.role == 'client' and campagne.client_id != request.user.client_profile_id:
+            raise PermissionDenied
         context = _build_context_campagne(campagne)
         context["visuels_pdf"] = _prepare_visuels_pdf(campagne)
+        context["preuves_diffusion_pdf"] = _prepare_preuves_diffusion_pdf(context["preuves_diffusion"])
         return render(
             request,
             "reports/apercu_campagne.html",
@@ -1745,5 +1791,3 @@ class PreviewEmplacementPdfView(ClientStaffRequiredMixin, View):
             "reports/apercu_emplacement_detail.html",
             context,
         )
-
-

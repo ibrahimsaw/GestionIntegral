@@ -1198,6 +1198,64 @@
     </div>
   {% endif %}
 
+  <section class="card border-0 shadow-sm mt-4" id="piges">
+    <div class="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
+      <div>
+        <h5 class="mb-1 fw-bold"><i class="bi bi-camera-fill text-primary me-2"></i>Preuves de diffusion</h5>
+        <p class="text-muted small mb-0">Photos relevées sur les supports pendant la campagne.</p>
+      </div>
+      {% if not campagne.est_mere %}
+        {% if user.is_staff_regie_role %}
+          <a href="{% url 'pige_create' campagne.pk %}" class="btn btn-sm btn-primary">
+            <i class="bi bi-plus-lg me-1"></i>Ajouter une preuve
+          </a>
+        {% endif %}
+      {% endif %}
+    </div>
+    <div class="card-body">
+      {% if preuves_diffusion %}
+        <div class="row g-3">
+          {% for preuve in preuves_diffusion %}
+            <div class="col-12 col-md-6 col-xl-4">
+              <article class="border rounded-3 h-100 overflow-hidden">
+                <a href="{{ preuve.photo.url }}" target="_blank" rel="noopener">
+                  <img src="{{ preuve.photo.url }}" alt="Preuve de diffusion" class="w-100"
+                       loading="lazy" style="height:220px; object-fit:cover;">
+                </a>
+                <div class="p-3">
+                  {% if campagne.est_mere %}<div class="small text-primary fw-semibold mb-1">{{ preuve.campagne.nom }}</div>{% endif %}
+                  <div class="fw-semibold">
+                    {% if preuve.ligne.face %}
+                      {{ preuve.ligne.face.support.code }} · {{ preuve.ligne.face.support.nom }} — Face {{ preuve.ligne.face.label }}
+                    {% elif preuve.ligne.support %}
+                      {{ preuve.ligne.support.code }} · {{ preuve.ligne.support.nom }}
+                    {% elif preuve.ligne.emplacement %}
+                      {{ preuve.ligne.emplacement.marche.nom }} · {{ preuve.ligne.emplacement.code }}
+                    {% endif %}
+                  </div>
+                  <div class="small text-muted">{{ preuve.date_heure|date:"d/m/Y à H:i" }}{% if preuve.cree_par %} · {{ preuve.cree_par.get_full_name|default:preuve.cree_par.username }}{% endif %}</div>
+                  {% if preuve.observations %}<p class="small mb-0 mt-2">{{ preuve.observations }}</p>{% endif %}
+                  {% if user.is_staff_regie_role %}
+                    <div class="d-flex gap-2 mt-3">
+                      <a href="{% url 'pige_update' preuve.campagne_id preuve.pk %}" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-pencil me-1"></i>Modifier
+                      </a>
+                      <a href="{% url 'pige_delete' preuve.campagne_id preuve.pk %}" class="btn btn-sm btn-outline-danger">
+                        <i class="bi bi-trash me-1"></i>Supprimer
+                      </a>
+                    </div>
+                  {% endif %}
+                </div>
+              </article>
+            </div>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="text-muted mb-0">Aucune preuve de diffusion n’a encore été enregistrée.</p>
+      {% endif %}
+    </div>
+  </section>
+
   {# ═══════════════════════════════════════════ #}
   {# ── SECTION 5: EXPORTS & RAPPORTS ── #}
   {# ═══════════════════════════════════════════ #}

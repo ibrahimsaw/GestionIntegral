@@ -1,5 +1,8 @@
 from django import forms
-from .models import Client, Campagne, Contrat, LigneCampagne, CampagneVisuel
+from django.db.models import Q
+from django.utils import timezone
+from datetime import datetime
+from .models import Client, Campagne, Contrat, LigneCampagne, CampagneVisuel, PreuveDiffusion
 from inventory.models import Support, FacePanneau, FormatSupport
 
 W = {'class': 'form-control'}
@@ -408,3 +411,81 @@ class LigneCampagneForm(forms.ModelForm):
                     raise forms.ValidationError(f"Disponibilité insuffisante : {message}")
 
         return cleaned
+
+
+class PreuveDiffusionForm(forms.ModelForm):
+    date_heure = forms.DateTimeField(
+        input_formats=['%Y-%m-%dT%H:%M', '%Y-%m-%dT%H:%M:%S'],
+        widget=forms.DateTimeInput(
+            attrs={'class': 'form-control', 'type': 'datetime-local'},
+            format='%Y-%m-%dT%H:%M',
+        ),
+        label="Date et heure de diffusion",
+    )
+
+    class Meta:
+        model = PreuveDiffusion
+        fields = ['ligne', 'date_heure', 'photo', 'observations']
+        widgets = {
+            'ligne': forms.Select(attrs={'class': 'form-select'}),
+            'photo': forms.ClearableFileInput(attrs={
+                'class': 'form-control',
+                'accept': 'image/*',
+                'capture': 'environment',
+            }),
+            'observations': forms.Textarea(attrs={
+                'class': 'form-control',
+                'rows': 3,
+                'placeholder': 'Observations facultatives sur la diffusion',
+            }),
+        }
+
+    def __init__(self, *args, campagne, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.campagne = campagne
+        self.instance.campagne = campagne
+        lignes = LigneCampagne.objects.filter(campagne=campagne).select_related(
+            'support', 'face__support', 'emplacement__marche'
+        )
+        lignes = lignes.filter(
+            Q(preuves_diffusion__isnull=True)
+            | Q(preuves_diffusion__pk=self.instance.pk)
+        ).distinct()
+        self.fields['ligne'].queryset = lignes
+        self.fields['ligne'].label_from_instance = self._label_ligne
+        if self.instance.pk:
+            self.fields['photo'].required = False
+        if not self.is_bound and not self.instance.pk:
+            now = timezone.localtime()
+            date_diffusion = min(max(now.date(), campagne.date_debut), campagne.date_fin)
+            self.initial.setdefault(
+                'date_heure',
+                timezone.make_aware(
+                    datetime.combine(date_diffusion, now.time().replace(second=0, microsecond=0)),
+                    timezone.get_current_timezone(),
+                ),
+            )
+
+    @staticmethod
+    def _label_ligne(ligne):
+        if ligne.face_id:
+            support = ligne.face.support
+            return f"{support.code} — {support.nom} · Face {ligne.face.label}"
+        if ligne.support_id:
+            return f"{ligne.support.code} — {ligne.support.nom}"
+        if ligne.emplacement_id:
+            return f"{ligne.emplacement.marche.nom} · {ligne.emplacement.code}"
+        return str(ligne)
+
+    def clean_photo(self):
+        photo = self.cleaned_data.get('photo')
+        if photo and photo.size > 10 * 1024 * 1024:
+            raise forms.ValidationError("La photo ne doit pas dépasser 10 Mo.")
+        return photo
+
+    def clean(self):
+        cleaned_data = super().clean()
+        ligne = cleaned_data.get('ligne')
+        if ligne and ligne.campagne_id != self.campagne.pk:
+            self.add_error('ligne', "Choisissez un support rattaché à cette campagne.")
+        return cleaned_data

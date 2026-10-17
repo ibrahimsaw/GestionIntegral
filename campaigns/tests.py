@@ -1,9 +1,11 @@
 import datetime
 from types import MethodType
 
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import SimpleTestCase, TestCase
 
-from campaigns.models import Campagne, Client, Contrat, LigneCampagne
+from campaigns.forms import PreuveDiffusionForm
+from campaigns.models import Campagne, Client, Contrat, LigneCampagne, PreuveDiffusion
 from campaigns.simulation_view import (
     _enrich_resultat_metriques,
     _spots,
@@ -44,6 +46,105 @@ class ContractDocumentTests(TestCase):
         self.assertEqual(contract.reference, f'CTR-2026-{contract.pk:06d}')
         self.assertEqual(purchase_order.reference, f'BC-2026-{purchase_order.pk:06d}')
         self.assertNotEqual(contract.reference, purchase_order.reference)
+
+
+class PreuveDiffusionFormTests(TestCase):
+    def setUp(self):
+        client_obj = Client.objects.create(
+            nom='Client pige test',
+            telephone='00000000',
+            email='pige-test@example.com',
+        )
+        self.campagne = Campagne.objects.create(
+            client=client_obj,
+            nom='Campagne pige test',
+            date_debut=datetime.date(2026, 10, 16),
+            date_fin=datetime.date(2026, 10, 18),
+            type_support='ecran',
+        )
+        support = Support.objects.create(
+            code='PIGE-TEST-001',
+            nom='Écran pige test',
+            type_support='ecran',
+            latitude=12.34,
+            longitude=-1.23,
+        )
+        self.ligne = LigneCampagne.objects.create(
+            campagne=self.campagne,
+            support=support,
+        )
+
+    @staticmethod
+    def image_file():
+        from io import BytesIO
+        from PIL import Image
+
+        image = Image.new('RGB', (2, 2), color='red')
+        buffer = BytesIO()
+        image.save(buffer, format='PNG')
+        return SimpleUploadedFile('preuve.png', buffer.getvalue(), content_type='image/png')
+
+    def test_accepts_photo_for_a_campaign_support(self):
+        form = PreuveDiffusionForm(
+            data={
+                'ligne': self.ligne.pk,
+                'date_heure': '2026-10-17T10:15',
+                'observations': 'Photo prise sur place',
+            },
+            files={'photo': self.image_file()},
+            campagne=self.campagne,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        preuve = form.save(commit=False)
+        self.assertEqual(preuve.campagne, self.campagne)
+        self.assertEqual(preuve.ligne, self.ligne)
+
+    def test_rejects_a_photo_date_outside_the_campaign_period(self):
+        form = PreuveDiffusionForm(
+            data={
+                'ligne': self.ligne.pk,
+                'date_heure': '2026-10-20T10:15',
+                'observations': '',
+            },
+            files={'photo': self.image_file()},
+            campagne=self.campagne,
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn('date_heure', form.errors)
+
+    def test_a_line_with_an_existing_proof_is_not_available_for_a_new_proof(self):
+        PreuveDiffusion.objects.create(
+            campagne=self.campagne,
+            ligne=self.ligne,
+            date_heure=datetime.datetime(2026, 10, 17, 10, 15),
+            photo='piges/existing-proof.png',
+        )
+
+        form = PreuveDiffusionForm(campagne=self.campagne)
+
+        self.assertNotIn(self.ligne, form.fields['ligne'].queryset)
+
+    def test_existing_proof_can_be_edited_without_uploading_another_photo(self):
+        preuve = PreuveDiffusion.objects.create(
+            campagne=self.campagne,
+            ligne=self.ligne,
+            date_heure=datetime.datetime(2026, 10, 17, 10, 15),
+            photo='piges/existing-proof.png',
+        )
+        form = PreuveDiffusionForm(
+            data={
+                'ligne': self.ligne.pk,
+                'date_heure': '2026-10-17T11:30',
+                'observations': 'Observation corrigée',
+            },
+            instance=preuve,
+            campagne=self.campagne,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data['photo'].name, 'piges/existing-proof.png')
 
 
 class NombreVisuelsSpotsTests(SimpleTestCase):

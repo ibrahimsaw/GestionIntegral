@@ -367,8 +367,16 @@ class ApiGeojsonView(View):
         type_filtre = request.GET.get('type', '')
         etat_filtre = request.GET.get('etat', '')
         type_panneau_filtre = request.GET.get('type_panneau', '')
+        ville_filtre = request.GET.get('ville', '').strip()
         
-        qs = Support.objects.prefetch_related('faces').all()
+        qs = Support.objects.prefetch_related('faces').exclude(
+            latitude__isnull=True,
+        ).exclude(
+            longitude__isnull=True,
+        )
+
+        if ville_filtre:
+            qs = qs.filter(ville__iexact=ville_filtre)
         
         if type_filtre:
             qs = qs.filter(type_support=type_filtre)  # ✅ corrigé : 'type' au lieu de 'type_support'

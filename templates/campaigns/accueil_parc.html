@@ -99,6 +99,13 @@
     text-decoration: none;
   }
   .parc-city:hover, .parc-city.active { border-color: #932e2b; color: #932e2b; background: #fff7f6; }
+  .parc-home-map {
+    height: 390px;
+    overflow: hidden;
+    border: 1px solid #e5e7eb;
+    border-radius: .8rem;
+    background: #eef2f7;
+  }
   .parc-category-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -361,6 +368,20 @@
     </div>
   </section>
 
+  <section class="parc-section mb-4" aria-labelledby="parc-map-title">
+    <div class="parc-section-heading">
+      <div>
+        <h2 id="parc-map-title"><i class="bi bi-map-fill text-primary me-2"></i>Carte du parc</h2>
+        <p>{% if ville_active %}Supports géolocalisés à {{ ville_active }}.{% else %}Supports géolocalisés sur l’ensemble du Burkina Faso.{% endif %}</p>
+      </div>
+      <span class="badge text-bg-light border" id="parc-map-count" aria-live="polite">Chargement…</span>
+    </div>
+    <div id="parc-home-map" class="parc-home-map" role="application" aria-label="Carte des supports publicitaires"></div>
+    <div id="parc-map-error" class="alert alert-danger mt-3 mb-0 d-none" role="alert">
+      Impossible de charger la carte du parc. Réessayez plus tard.
+    </div>
+  </section>
+
   <div class="row g-4">
     <section class="col-12 col-xl-12" aria-labelledby="parc-formats-title">
       <div class="parc-section">
@@ -471,4 +492,167 @@
     </section>
   </div>
 </main>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (function() {
+    const mapElement = document.getElementById('parc-home-map');
+    const countElement = document.getElementById('parc-map-count');
+    const errorElement = document.getElementById('parc-map-error');
+    function showMapError(message) {
+      countElement.textContent = 'Carte indisponible';
+      errorElement.textContent = message;
+      errorElement.classList.remove('d-none');
+    }
+
+    if (!mapElement) return;
+    if (typeof L === 'undefined') {
+      showMapError('La bibliothèque cartographique ne s’est pas chargée. Vérifiez votre connexion puis rechargez la page.');
+      return;
+    }
+
+    try {
+      const map = L.map(mapElement, { scrollWheelZoom: false });
+      if (typeof window.buildSafeLeafletTiles === 'function') {
+        window.buildSafeLeafletTiles(map, {
+          attribution: '&copy; OpenStreetMap contributors',
+          maxZoom: 19
+        });
+      } else {
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '&copy; OpenStreetMap contributors',
+          maxZoom: 19
+        }).addTo(map);
+      }
+      const markersLayer = L.layerGroup().addTo(map);
+
+      const countryBounds = L.latLngBounds([[9.3, -5.6], [15.1, 2.5]]);
+      const selectedCity = '{{ ville_active|escapejs }}';
+      if (selectedCity) {
+        map.fitBounds(countryBounds, { padding: [20, 20] });
+      } else {
+        map.fitBounds(countryBounds, { padding: [12, 12] });
+        map.setMaxBounds(countryBounds.pad(0.12));
+        map.setMaxBoundsViscosity(0.8);
+      }
+
+      const endpoint = new URL('{% url "api_geojson" %}', window.location.origin);
+      if (selectedCity) endpoint.searchParams.set('ville', selectedCity);
+
+      fetch(endpoint, { headers: { 'Accept': 'application/json' } })
+        .then(function(response) {
+          if (!response.ok) throw new Error('La requête cartographique a échoué.');
+          return response.json();
+        })
+        .then(function(data) {
+          const features = (data.features || []).filter(function(feature) {
+            return feature.geometry &&
+              Array.isArray(feature.geometry.coordinates) &&
+              Number.isFinite(Number(feature.geometry.coordinates[0])) &&
+              Number.isFinite(Number(feature.geometry.coordinates[1]));
+          });
+
+          function getLatLng(feature) {
+            return [
+              Number(feature.geometry.coordinates[1]),
+              Number(feature.geometry.coordinates[0])
+            ];
+          }
+
+          function showCitySupports(cityFeatures) {
+            markersLayer.clearLayers();
+            const markers = [];
+            cityFeatures.forEach(function(feature) {
+              const properties = feature.properties || {};
+              const marker = L.circleMarker(getLatLng(feature), {
+                radius: 8,
+                color: '#ffffff',
+                weight: 2,
+                fillColor: properties.color || '#932e2b',
+                fillOpacity: 0.95
+              });
+              const popup = document.createElement('div');
+              const name = document.createElement('strong');
+              name.textContent = properties.nom || properties.code || 'Support';
+              popup.appendChild(name);
+              const details = document.createElement('div');
+              details.textContent = [properties.code, properties.ville, properties.quartier]
+                .filter(Boolean)
+                .join(' · ');
+              popup.appendChild(details);
+              marker.bindPopup(popup);
+              marker.addTo(markersLayer);
+              markers.push(marker);
+            });
+
+            const bounds = L.featureGroup(markers).getBounds();
+            if (bounds.isValid()) map.fitBounds(bounds, { padding: [28, 28], maxZoom: 14 });
+          }
+
+          if (selectedCity) {
+            showCitySupports(features);
+          } else {
+            const cities = new Map();
+            features.forEach(function(feature) {
+              const properties = feature.properties || {};
+              const city = properties.ville || 'Ville non renseignée';
+              if (!cities.has(city)) cities.set(city, []);
+              cities.get(city).push(feature);
+            });
+
+            cities.forEach(function(cityFeatures, city) {
+              const center = cityFeatures.reduce(function(total, feature) {
+                const point = getLatLng(feature);
+                total.lat += point[0];
+                total.lng += point[1];
+                return total;
+              }, { lat: 0, lng: 0 });
+              center.lat /= cityFeatures.length;
+              center.lng /= cityFeatures.length;
+
+              const marker = L.circleMarker([center.lat, center.lng], {
+                radius: Math.min(24, 10 + Math.sqrt(cityFeatures.length) * 1.5),
+                color: '#ffffff',
+                weight: 2,
+                fillColor: '#932e2b',
+                fillOpacity: 0.9
+              });
+              marker.bindTooltip(city + ' · ' + cityFeatures.length + ' support(s)');
+              marker.on('click', function() {
+                showCitySupports(cityFeatures);
+              });
+              marker.addTo(markersLayer);
+            });
+
+            if (!cities.size) {
+              showMapError('Aucun support géolocalisé n’a été renvoyé pour la carte.');
+            }
+          }
+
+          countElement.textContent = selectedCity
+            ? features.length + ' support' + (features.length === 1 ? '' : 's')
+            : citiesCountLabel(features);
+          if (selectedCity && !features.length) {
+            showMapError('Aucun support géolocalisé n’a été trouvé pour cette ville.');
+          }
+          window.setTimeout(function() { map.invalidateSize(); }, 0);
+        })
+        .catch(function(error) {
+          console.error('Erreur de chargement de la carte du parc:', error);
+          showMapError('Les supports cartographiques n’ont pas pu être chargés. Vérifiez l’accès aux données puis rechargez la page.');
+        });
+    } catch (error) {
+      console.error('Erreur d’initialisation de la carte du parc:', error);
+      showMapError('La carte n’a pas pu être initialisée. Rechargez la page ou vérifiez le chargement de Leaflet.');
+    }
+
+    function citiesCountLabel(features) {
+      const cities = new Set(features.map(function(feature) {
+        return (feature.properties && feature.properties.ville) || 'Ville non renseignée';
+      }));
+      return cities.size + ' ville' + (cities.size === 1 ? '' : 's');
+    }
+  })();
+</script>
 {% endblock %}

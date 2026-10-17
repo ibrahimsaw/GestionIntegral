@@ -17,7 +17,108 @@
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid py-2">
+<style>
+  .client-list-page {
+    --client-list-accent: var(--color-primary, #932e2b);
+    padding: 1rem;
+    border-radius: 1.25rem;
+    background: #f4f6fa;
+  }
+  .client-list-page .cl-hero {
+    position: relative;
+    overflow: hidden;
+    padding: clamp(1.35rem, 3vw, 2.2rem) !important;
+    border: 1px solid rgba(255,255,255,.2) !important;
+    border-radius: 1.1rem !important;
+    background:
+      radial-gradient(circle at 88% 12%, rgba(255,255,255,.18), transparent 18rem),
+      linear-gradient(115deg, #5e1c1a, #932e2b 58%, #bd5144) !important;
+    box-shadow: 0 1rem 2rem rgba(92,35,32,.17) !important;
+  }
+  .client-list-page .cl-hero-title { font-size: clamp(1.25rem, 3vw, 1.8rem); line-height: 1.25; }
+  .client-list-page .cl-hero-sub { max-width: 55rem; line-height: 1.55; }
+  .client-list-page .cl-kpi-card {
+    min-height: 94px;
+    border-radius: .9rem !important;
+    box-shadow: 0 .4rem 1.1rem rgba(25,35,55,.055) !important;
+  }
+  .client-list-page .cl-kpi-icon { border-radius: .8rem !important; }
+  .client-list-page .cl-filter-card {
+    padding: 1.15rem;
+    border: 1px solid #e2e7ef;
+    border-radius: 1rem !important;
+    background: #fff;
+    box-shadow: 0 .45rem 1.2rem rgba(25,35,55,.055);
+  }
+  .client-list-page .cl-search-input { min-height: 2.8rem; border-color: #d7dde6; }
+  .client-list-page .cl-search-input:focus { border-color: var(--client-list-accent); box-shadow: 0 0 0 .2rem rgba(147,46,43,.12); }
+  .client-list-page .cl-filter-pill { border-radius: 999px !important; }
+  .client-list-page .cl-view-btn { min-width: 2.7rem; min-height: 2.6rem; border-radius: .6rem !important; }
+  .client-list-page .cl-card {
+    border: 1px solid #e1e6ee;
+    border-radius: 1rem !important;
+    box-shadow: 0 .45rem 1.2rem rgba(25,35,55,.06);
+    transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+  }
+  .client-list-page .cl-card:hover {
+    transform: translateY(-4px);
+    border: 1px solid rgba(147,46,43,.45);
+    box-shadow: 0 1rem 1.8rem rgba(25,35,55,.12);
+  }
+  .client-list-page .cl-card-inactive { border-left: 4px solid #94a3b8; }
+  .client-list-page .cl-card-head { padding: 1.15rem 1.25rem; background: linear-gradient(110deg, #fff, #fafbfc); }
+  .client-list-page .cl-avatar { border-radius: .85rem !important; box-shadow: 0 .2rem .55rem rgba(25,35,55,.06); }
+  .client-list-page .cl-badge-ref { padding: .22rem .55rem; border: 1px solid #e8ebf0; border-radius: 999px; background: #f8fafc; }
+  .client-list-page .cl-badge-status { border-radius: 999px !important; padding: .25rem .55rem; }
+  .client-list-page .cl-card-body { gap: .9rem; }
+  .client-list-page .cl-contact-pill { min-height: 2.35rem; border-color: #e5e9ef; border-radius: .65rem !important; background: #fafbfc; }
+  .client-list-page .cl-stats-box { border-color: #e5e9ef; border-radius: .8rem !important; background: linear-gradient(135deg, #f8fafc, #fff); }
+  .client-list-page .cl-stat-num { font-size: 1.05rem; }
+  .client-list-page .cl-card-foot { gap: .65rem; border-radius: 0 0 1rem 1rem; background: #f8f9fb; }
+  .client-list-page .cl-card-foot .btn { min-height: 2rem; display: inline-flex; align-items: center; justify-content: center; border-radius: .6rem !important; }
+  .client-list-page .table-custom-card {
+    overflow: hidden;
+    border: 1px solid #e1e6ee !important;
+    border-radius: 1rem !important;
+    background: #fff;
+    box-shadow: 0 .45rem 1.2rem rgba(25,35,55,.06) !important;
+  }
+  .client-list-page #clientsTableView thead th {
+    padding: .9rem .75rem;
+    border-bottom: 1px solid #e4e8ef;
+    background: #f7f8fb;
+    color: #667085;
+    font-size: .68rem;
+    font-weight: 800;
+    letter-spacing: .045em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .client-list-page #clientsTableView tbody td { padding: .8rem .75rem; border-color: #edf0f4; }
+  .client-list-page #clientsTableView tbody tr:nth-child(even) { background: #fafbfc; }
+  .client-list-page #clientsTableView tbody tr:hover { background: #fff5f3; }
+  .client-list-page #clientsTableView .btn { border-radius: .55rem !important; }
+  .client-list-page .cld-btn-export { border-radius: .7rem !important; box-shadow: 0 .3rem .8rem rgba(25,35,55,.06); }
+  @media (max-width: 767.98px) {
+    .client-list-page .cl-filter-card { padding: .9rem; }
+    .client-list-page .cl-card-foot { align-items: flex-start; flex-direction: column; }
+    .client-list-page .cl-card-foot > .d-flex { width: 100%; justify-content: flex-end; }
+  }
+  @media (max-width: 575.98px) {
+    .client-list-page { padding: .55rem; border-radius: .85rem; }
+    .client-list-page .cl-hero { border-radius: .85rem !important; }
+    .client-list-page .cl-kpi-card { min-height: 78px; gap: .65rem; padding: .8rem !important; }
+    .client-list-page .cl-kpi-icon { width: 2.35rem; height: 2.35rem; font-size: 1rem; }
+    .client-list-page .cl-kpi-val { font-size: 1.1rem; }
+    .client-list-page .cl-kpi-lbl { font-size: .68rem; }
+    .client-list-page .cl-filter-card .cl-filter-pill { flex: 1 1 auto; justify-content: center; }
+    .client-list-page .cl-filter-card form > div:last-child { justify-content: stretch !important; }
+    .client-list-page .cl-card-foot { padding-inline: 1rem; }
+    .client-list-page .cld-btn-export { justify-content: center; flex: 1 1 100%; }
+  }
+</style>
+
+<div class="container-fluid py-2 client-list-page">
 
   {# ═══════════════════════════════════════════ #}
   {# ── BANNIÈRE HÉRO DU PORTEFEUILLE ── #}

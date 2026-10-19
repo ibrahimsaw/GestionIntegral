@@ -83,6 +83,36 @@ def _match_filter(occupation_label, filter_occupation):
     return fn(occupation_label) if fn else True
 
 
+def _group_supports_by_quartier(panneaux):
+    grouped = {}
+    category_order = {"Panneau": 0, "Écran": 1, "Marché": 2, "Sucette": 3}
+    for panneau in panneaux:
+        ville = (panneau.get("ville") or "").strip()
+        quartier = (panneau.get("quartier") or "").strip()
+        key = (ville.casefold(), quartier.casefold())
+        grouped.setdefault(key, {
+            "ville": ville or "Ville non renseignée",
+            "quartier": quartier or "Quartier non renseigné",
+            "items": [],
+        })["items"].append(panneau)
+
+    sections = list(grouped.values())
+    for section in sections:
+        section["nom"] = f'{section["ville"]} · {section["quartier"]}'
+        section["total"] = len(section["items"])
+        section["unites"] = sum(item["nb_faces"] for item in section["items"])
+        section["items"].sort(key=lambda item: (
+            category_order.get(item["type"], 99),
+            item["nom"] or "",
+            item["code"] or "",
+        ))
+
+    return sorted(sections, key=lambda section: (
+        section["ville"].casefold(),
+        section["quartier"].casefold(),
+    ))
+
+
 # ══════════════════════════════════════════════════════════════════
 # CONSTRUCTION DU CONTEXTE
 # ══════════════════════════════════════════════════════════════════
@@ -337,6 +367,7 @@ def _build_context_panneaux(filters: dict) -> dict:
         "afficher_client": filters.get("afficher_client", "1") == "1",
         "categories_rapport": ["Panneau", "Écran", "Marché", "Sucette"],
         "categories_sections": categories_sections,
+        "quartier_sections": _group_supports_by_quartier(panneaux),
         "villes"            : villes,
         "quartiers"         : quartiers,
         "statuts"           : statuts,
@@ -730,8 +761,6 @@ class ExportSupportsExcelView(ClientStaffRequiredMixin, View):
         )
         response["Content-Disposition"] = f'attachment; filename="{filename}"'
         return response
-
-
 
 
 

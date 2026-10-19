@@ -5,6 +5,7 @@ from types import SimpleNamespace
 from django.test import SimpleTestCase
 from PIL import Image
 
+from reports.supports_report_view import _group_supports_by_quartier
 from reports.views import _prepare_visuels_pdf
 
 
@@ -48,3 +49,30 @@ class PrepareVisuelsPdfTests(SimpleTestCase):
 
         self.assertLessEqual(max(optimized_image.size), 1200)
         self.assertEqual(optimized_image.format, "PNG")
+
+
+class GroupSupportsByQuartierTests(SimpleTestCase):
+    def test_groups_supports_by_city_and_quartier_and_sorts_groups(self):
+        supports = [
+            {"ville": "Ouagadougou", "quartier": "Dapoya", "type": "Panneau", "nom": "Support B", "code": "B", "nb_faces": 2},
+            {"ville": "Bobo-Dioulasso", "quartier": "Dapoya", "type": "Écran", "nom": "Écran A", "code": "A", "nb_faces": 1},
+            {"ville": "Ouagadougou", "quartier": "Dapoya", "type": "Écran", "nom": "Écran A", "code": "A", "nb_faces": 1},
+            {"ville": "", "quartier": "", "type": "Marché", "nom": "Marché sans zone", "code": "M", "nb_faces": 3},
+        ]
+
+        sections = _group_supports_by_quartier(supports)
+
+        self.assertEqual(
+            [section["nom"] for section in sections],
+            [
+                "Bobo-Dioulasso · Dapoya",
+                "Ouagadougou · Dapoya",
+                "Ville non renseignée · Quartier non renseigné",
+            ],
+        )
+        self.assertEqual(sections[1]["total"], 2)
+        self.assertEqual(sections[1]["unites"], 3)
+        self.assertEqual(
+            [item["code"] for item in sections[1]["items"]],
+            ["B", "A"],
+        )

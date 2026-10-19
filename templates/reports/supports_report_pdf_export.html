@@ -75,25 +75,13 @@
     .k-indigo  .kpi-val { color: #5b21b6; }
     .k-occupe  .kpi-val { color: #92400e; }
 
-    /* ── Bandeau section ── */
-    .section-header {
-      background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-      border-radius: 6px 6px 0 0;
-      padding: 8px 14px;
-      margin-top: 14px;
-      color: #ffffff;
-      font-size: 8pt;
-      font-weight: bold;
-      text-transform: uppercase;
-      letter-spacing: 1.2px;
-      page-break-after: avoid;
-    }
     .section-count {
       font-size: 6.5pt;
       font-weight: normal;
-      color: rgba(255,255,255,0.7);
+      color: #64748b;
       letter-spacing: 0;
       text-transform: none;
+      float: right;
     }
 
     /* ── Tableau ── */
@@ -104,13 +92,13 @@
       margin-bottom: 0;
       table-layout: fixed;
     }
+    col.c-type     { width: 70px; }
     col.c-code     { width: 65px; }
     col.c-mairie   { width: 55px; }
-    col.c-nom      { width: 250px; }
-    col.c-ville    { width: 85px; }
-    col.c-adresse  { width: 110px; }
+    col.c-nom      { width: 190px; }
+    col.c-adresse  { width: 145px; }
     col.c-statut   { width: 68px; }
-    col.c-faces    { width: 180px; }
+    col.c-faces    { width: 240px; }
 
     thead th {
       background: #932e2b;
@@ -141,6 +129,24 @@
       background: #fff7ed !important;
       color: #9a3412;
       border-color: #fed7aa;
+    }
+    tbody tr.ville-separator-row td {
+      background: #1e293b;
+      color: #ffffff;
+      font-weight: bold;
+      text-align: left;
+      padding: 7px 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      page-break-after: avoid;
+    }
+    tbody tr.quartier-separator-row td {
+      background: #f1f5f9;
+      color: #334155;
+      font-weight: bold;
+      text-align: left;
+      padding: 6px 10px;
+      page-break-after: avoid;
     }
     tbody tr { page-break-inside: avoid; }
 
@@ -273,47 +279,56 @@
     </tr>
   </table>
 
-  <!-- ══ TABLEAUX PAR CATÉGORIE ══ -->
-  {% for section in categories_sections %}
-  <div class="section-header">
-    ◆ &nbsp; {{ section.nom }} &nbsp;
-    <span class="section-count">({{ section.total }} support{{ section.total|pluralize }}, {{ section.unites }} unité{{ section.unites|pluralize }})</span>
-  </div>
+  <!-- ══ INVENTAIRE REGROUPÉ PAR QUARTIER ══ -->
   <table class="category-table">
     <colgroup>
+      <col class="c-type">
       <col class="c-code">
       <col class="c-mairie">
       <col class="c-nom">
-      <col class="c-ville">
       <col class="c-adresse">
       {% if afficher_etat %}<col class="c-statut">{% endif %}
       <col class="c-faces">
     </colgroup>
     <thead>
       <tr>
+        <th>TYPE</th>
         <th>CODE</th>
         <th>MAIRIE</th>
         <th class="left">NOM</th>
-        <th>VILLE</th>
         <th class="left">ADRESSE</th>
         {% if afficher_etat %}<th>ÉTAT</th>{% endif %}
-        <th class="left">{% if section.nom == "Écran" %}STATUT ÉCRAN{% elif section.nom == "Marché" %}EMPLACEMENTS{% else %}FACES{% endif %}</th>
+        <th class="left">FACES / EMPLACEMENTS</th>
       </tr>
     </thead>
     <tbody>
+      {% for section in quartier_sections %}
+      {% ifchanged section.ville %}
+      <tr class="ville-separator-row">
+        <td colspan="{% if afficher_etat %}7{% else %}6{% endif %}">
+          <i class="bi bi-building"></i> {{ section.ville }}
+        </td>
+      </tr>
+      {% endifchanged %}
+      <tr class="quartier-separator-row">
+        <td colspan="{% if afficher_etat %}7{% else %}6{% endif %}">
+          <i class="bi bi-signpost-split"></i> Quartier : {{ section.quartier }}
+          <span class="section-count">{{ section.total }} support{{ section.total|pluralize }} · {{ section.unites }} unité{{ section.unites|pluralize }}</span>
+        </td>
+      </tr>
       {% for panneau in section.items %}
       <tr class="{% if panneau.etat_raw == 'panne' %}row-panne{% else %}row-normal{% endif %}">
+        <td>{{ panneau.type }}</td>
         <td><strong>{{ panneau.code }}</strong></td>
         <td style="font-family:monospace; font-size:7pt; color:#64748b;">{{ panneau.code_ext }}</td>
         <td class="left">{{ panneau.nom }}</td>
-        <td>{% if panneau.quartier %}{{ panneau.quartier|default:"—" }}/{% endif %}{{ panneau.ville|default:"—" }}</td>
         <td class="left" style="font-size:7pt;">{% if panneau.adresse %}{{ panneau.adresse }}{% elif panneau.localisation %}{{ panneau.localisation }}{% else %}—{% endif %}</td>
         {% if afficher_etat %}<td>
           {% if panneau.etat_raw == 'panne' %}<span class="badge-panne">En panne</span>
           {% else %}<span class="badge-bon">Bon état</span>{% endif %}
         </td>{% endif %}
         <td class="left">
-          {% if section.nom == "Écran" %}
+          {% if panneau.type == "Écran" %}
             {% for face in panneau.faces %}
               {% if afficher_etat %}
                 {% if face.statut == 'panne' %}<span class="face-tag panne">⚠ Écran en panne</span>
@@ -321,7 +336,7 @@
                 {% else %}<span class="face-tag libre">○ Écran libre</span>{% endif %}
               {% else %}<span class="face-tag libre">Écran</span>{% endif %}
             {% endfor %}
-          {% elif section.nom == "Marché" %}
+          {% elif panneau.type == "Marché" %}
             {% for emplacement in panneau.faces %}
               {% if emplacement.occupee %}<span class="face-tag occupe">● {{ emplacement.label }}{% if emplacement.support_code %} — {{ emplacement.support_code }}{% endif %}{% if afficher_etat %} — Occupé{% endif %}</span>
               {% else %}<span class="face-tag libre">○ {{ emplacement.label }}{% if emplacement.support_code %} — {{ emplacement.support_code }}{% endif %}{% if afficher_etat %} — Libre{% endif %}</span>{% endif %}
@@ -345,11 +360,11 @@
         </td>
       </tr>
       {% endfor %}
+      {% empty %}
+      <tr><td colspan="{% if afficher_etat %}7{% else %}6{% endif %}" class="empty-report">Aucun support trouvé.</td></tr>
+      {% endfor %}
     </tbody>
   </table>
-  {% empty %}
-  <div style="padding:18px;text-align:center;color:#94a3b8;background:#fff;border-radius:8px;margin-top:8px;font-size:8pt;">Aucun support trouvé.</div>
-  {% endfor %}
 
   <!-- ══ LÉGENDE ══ -->
   <table class="legend-table">

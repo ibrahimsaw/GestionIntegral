@@ -1,29 +1,12 @@
 {% extends 'base.html' %}
-{% load static %}
 
 {% block title %}Accueil — Parc Integral{% endblock %}
 
 {% block topbar_title %}
-
   <div class="d-flex align-items-center gap-2">
     <i class="bi bi-speedometer2 fs-5 text-primary"></i>
     <span class="fw-bold">Accueil du parc</span>
   </div>
-
-  <!--
-  <div class="parc-city-list">
-    <a class="parc-city {% if not ville_active %}active{% endif %}" href="{% url 'dashboard' %}">
-      <i class="bi bi-globe2"></i>Toutes les villes
-    </a>
-    {% for ville in villes %}
-      <a class="parc-city {% if ville_active == ville %}active{% endif %}" href="{% url 'dashboard' %}?ville={{ ville|urlencode }}">
-        <i class="bi bi-geo-alt"></i>{{ ville }}
-      </a>
-    {% empty %}
-      <span class="parc-muted">Aucune ville renseignée dans l’inventaire.</span>
-    {% endfor %}
-  </div>
-  -->
 {% endblock %}
 
 {% block topbar_actions %}
@@ -44,524 +27,652 @@
 
 {% block content %}
 <style>
-  .parc-home { --parc-ink: #172033; --parc-muted: #6b7280; color: var(--parc-ink); }
-  .parc-hero {
-    position: relative;
-    overflow: hidden;
-    padding: clamp(1.35rem, 4vw, 2.4rem);
-    border-radius: 8px;
-    background: linear-gradient(120deg, #762321 0%, #932e2b 56%, #b64a40 100%);
-    color: #fff;
-    box-shadow: 0 1rem 2.5rem rgba(75, 25, 24, .18);
+  .parc {
+    --ink: #1f1d1a;
+    --muted: #6e6a64;
+    --line: #e4dfd7;
+    --paper: #f7f5f1;
+    --card: #ffffff;
+    --brique: #932e2b;
+    --ok: #2f6b4f;
+    --warn: #b7791f;
+    --ko: #b42318;
+    color: var(--ink);
+    max-width: 1600px;
+    margin: 0 auto;
+    padding: clamp(1rem, 2.5vw, 2rem);
   }
-  .parc-hero::after {
-    position: absolute;
-    content: "";
-    width: 18rem;
-    height: 18rem;
-    top: -9rem;
-    right: -3rem;
-    border: 1px solid rgba(255,255,255,.16);
-    border-radius: 50%;
-    box-shadow: 0 0 0 2.4rem rgba(255,255,255,.05), 0 0 0 4.8rem rgba(255,255,255,.04);
-  }
-  .parc-hero-content { position: relative; z-index: 1; }
-  .parc-eyebrow { letter-spacing: .12em; font-size: .72rem; font-weight: 700; text-transform: uppercase; opacity: .75; }
-  .parc-hero h1 { font-size: clamp(1.65rem, 4vw, 2.5rem); font-weight: 800; margin: .45rem 0; }
-  .parc-hero p { color: rgba(255,255,255,.78); margin: 0; max-width: 44rem; }
-  .parc-kpi {
-    height: 100%;
+  .parc *, .parc *::before, .parc *::after { box-sizing: border-box; }
+  .parc a { color: inherit; }
+
+  /* ── En-tête ── */
+  .parc-head {
     display: flex;
-    align-items: center;
-    gap: 1rem;
-    padding: 1.15rem;
-    border: 1px solid #e9edf2;
-    border-radius: 8px;
-    background: #fff;
-    box-shadow: 0 .4rem 1.2rem rgba(25, 35, 55, .04);
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 1rem 2rem;
+    padding-bottom: 1.1rem;
   }
-  .parc-kpi-icon {
-    width: 3rem;
-    height: 3rem;
-    display: grid;
-    flex: 0 0 auto;
-    place-items: center;
-    border-radius: .9rem;
-    background: var(--kpi-bg, #f3e8e8);
-    color: var(--kpi-color, #932e2b);
-    font-size: 1.25rem;
+  .parc-kicker { font-size: .72rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--brique); }
+  .parc-title { margin: .25rem 0 0; font-size: clamp(1.5rem, 3vw, 2.1rem); font-weight: 750; letter-spacing: -.02em; line-height: 1.15; }
+  .parc-scope { margin: .35rem 0 0; color: var(--muted); font-size: .9rem; }
+
+  .parc-tabs {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: .2rem;
+    max-width: 100%;
+    padding: .25rem;
+    overflow-x: auto;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--card);
+    scrollbar-width: thin;
   }
-  .parc-kpi-value { font-size: clamp(1.45rem, 3vw, 2rem); font-weight: 800; line-height: 1; }
-  .parc-kpi-label { margin-top: .35rem; color: var(--parc-muted); font-size: .82rem; }
-  .parc-section {
-    height: 100%;
-    padding: 1.25rem;
-    border: 1px solid #e9edf2;
-    border-radius: 8px;
-    background: #fff;
-    box-shadow: 0 .4rem 1.2rem rgba(25, 35, 55, .04);
-  }
-  .parc-section-heading { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
-  .parc-section-heading h2 { margin: 0; font-size: 1rem; font-weight: 750; }
-  .parc-section-heading p { margin: .25rem 0 0; color: var(--parc-muted); font-size: .78rem; }
-  .parc-city-list { display: flex; flex-wrap: wrap; gap: .55rem; }
-  .parc-city {
-    display: inline-flex;
-    align-items: center;
-    gap: .4rem;
-    padding: .48rem .75rem;
-    border: 1px solid #e5e7eb;
-    border-radius: 8px;
-    color: #374151;
-    background: #fff;
-    font-size: .82rem;
+  .parc-tab {
+    padding: .42rem .9rem;
+    border-radius: 999px;
+    color: var(--muted);
+    font-size: .85rem;
     text-decoration: none;
+    white-space: nowrap;
+    transition: background-color .15s ease, color .15s ease;
   }
-  .parc-city:hover, .parc-city.active { border-color: #932e2b; color: #932e2b; background: #fff7f6; }
-  .parc-home-map {
-    height: 390px;
-    overflow: hidden;
-    border: 1px solid #e5e7eb;
-    border-radius: .8rem;
-    background: #eef2f7;
+  .parc-tab:hover { color: var(--ink); background: var(--paper); }
+  .parc-tab.is-active { background: var(--ink); color: #fff; }
+  .parc-tab i { margin-right: .3rem; opacity: .8; }
+
+  /* ── Chiffres clés : une seule bande ── */
+  .parc-figures {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    margin: 1.25rem 0;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--card);
   }
-  .parc-category-grid {
+  .parc-fig { padding: 1.05rem 1.25rem; border-left: 1px solid var(--line); }
+  .parc-fig:first-child { border-left: 0; border-radius: 14px 0 0 14px; }
+  .parc-fig:last-child { border-radius: 0 14px 14px 0; }
+  .parc-fig strong { display: block; font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 750; line-height: 1; font-variant-numeric: tabular-nums; }
+  .parc-fig span { display: block; margin-top: .4rem; color: var(--muted); font-size: .8rem; }
+  .parc-fig.is-alert strong { color: var(--ko); }
+  .parc-inventory-grid {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 1rem;
+    gap: .9rem;
+    margin: 1.25rem 0;
   }
-  .parc-category-grid-item { min-width: 0; }
-  .parc-category-grid-item.is-geant { grid-column: span var(--category-span, 1); }
-  .parc-category { padding: .9rem; border: 1px solid #edf0f4; border-radius: .85rem; }
-  .parc-category-card {
-    height: 100%;
-    overflow: hidden;
-    border: 1px solid #e8ebf0;
+  .parc-inventory-card {
+    --inventory-accent: var(--brique);
+    min-width: 0;
+    padding: 1rem;
+    border: 1px solid var(--line);
+    border-top: 3px solid var(--inventory-accent);
     border-radius: 8px;
-    background: #fff;
-    box-shadow: 0 .45rem 1.35rem rgba(25, 35, 55, .045);
+    background: linear-gradient(145deg, #fff 55%, color-mix(in srgb, var(--inventory-accent) 5%, #fff));
+    box-shadow: 0 4px 14px rgba(31, 29, 26, .035);
   }
-  .parc-category-header {
-    padding: 1.05rem 1.1rem;
-    border-top: 3px solid var(--category-color, #932e2b);
-    background: linear-gradient(135deg, #fff 45%, color-mix(in srgb, var(--category-color, #932e2b) 8%, #fff));
-  }
-  .parc-category-title { display: flex; align-items: center; gap: .7rem; }
-  .parc-category-icon {
-    width: 2.5rem;
-    height: 2.5rem;
-    display: grid;
-    place-items: center;
-    flex: 0 0 auto;
-    border-radius: .8rem;
-    color: var(--category-color, #932e2b);
-    background: color-mix(in srgb, var(--category-color, #932e2b) 12%, white);
-    font-size: 1.1rem;
-  }
-  .parc-category-title h3 { margin: 0; font-size: 1rem; font-weight: 800; }
-  .parc-category-title p { margin: .2rem 0 0; color: var(--parc-muted); font-size: .75rem; }
-  .parc-category-summary { display: flex; flex-wrap: wrap; gap: .45rem; margin-top: 1rem; }
-  .parc-category-stat { display: flex; flex: 0 0 3.5rem; flex-direction: column; align-items: center; gap: .35rem; text-align: center; }
-  .parc-category-stat-value {
-    width: 2.65rem;
-    height: 2.65rem;
-    display: grid;
-    place-items: center;
-    border: 2px solid color-mix(in srgb, var(--stat-color) 22%, white);
-    border-radius: 50%;
-    background: color-mix(in srgb, var(--stat-color) 11%, white);
-    color: var(--stat-color);
-    font-size: .95rem;
-    font-weight: 800;
-    line-height: 1;
-  }
-  .parc-category-stat-label { color: #4b5563; font-size: .66rem; font-weight: 700; line-height: 1.15; }
-  .parc-formats {
-    display: grid;
-    grid-template-columns: repeat(var(--category-span, 1), minmax(0, 1fr));
-    grid-auto-rows: 150px;
-    max-height: 450px;
-    column-gap: 1.1rem;
-    padding: .35rem 1.1rem 1rem;
-    overflow-y: auto;
-    scrollbar-gutter: stable;
-  }
-  .parc-format-row {
-    grid-column: span var(--item-span, 1);
-    min-width: 0;
-    overflow: hidden;
-    padding: .85rem 0;
-    border-top: 1px solid #edf0f4;
-  }
-  .parc-format-row:first-child { border-top: 0; }
-  .parc-format-heading { display: flex; align-items: start; justify-content: space-between; gap: .75rem; }
-  .parc-format-code { font-weight: 800; color: var(--parc-ink); }
-  .parc-format-description { margin-top: .2rem; color: var(--parc-muted); font-size: .75rem; }
-  .parc-format-stats { display: flex; flex-wrap: wrap; gap: .35rem .4rem; margin-top: .5rem; }
-  .parc-format-stat { min-width: 0; gap: .2rem; }
-  .parc-format-stat { flex: 0 0 2.8rem; }
-  .parc-format-stat .parc-category-stat-value { width: 2rem; height: 2rem; font-size: .78rem; }
-  .parc-format-stat .parc-category-stat-label { font-size: .59rem; }
-  .parc-category-campaigns { padding: .8rem 1.1rem 1rem; border-top: 1px solid #edf0f4; background: #fafbfc; }
-  .parc-category-campaigns-title { margin-bottom: .5rem; color: #4b5563; font-size: .72rem; font-weight: 800; text-transform: uppercase; letter-spacing: .04em; }
-  .parc-category-campaigns-grid {
-    display: grid;
-    grid-template-columns: repeat(var(--category-span, 1), minmax(0, 1fr));
-    grid-auto-rows: 48px;
-    max-height: 240px;
-    column-gap: 1rem;
-    overflow-y: auto;
-    scrollbar-gutter: stable;
-  }
-  .parc-category-campaign {
-    grid-column: span var(--item-span, 1);
-    min-width: 0;
+  .parc-inventory-card.is-panels { --inventory-accent: #932e2b; }
+  .parc-inventory-card.is-screens { --inventory-accent: #087da5; }
+  .parc-inventory-card.is-markets { --inventory-accent: #c36b16; }
+  .parc-inventory-card-head {
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    gap: .75rem;
-    overflow: hidden;
-    padding: .55rem 0;
+    gap: .7rem;
+    margin-bottom: .9rem;
   }
-  .parc-category-campaign + .parc-category-campaign { border-top: 1px solid #edf0f4; }
-  .parc-category-campaign a { min-width: 0; color: #253047; font-size: .78rem; font-weight: 700; text-decoration: none; }
-  .parc-category-campaign a:hover { color: #932e2b; }
-  .parc-category-top { display: flex; justify-content: space-between; gap: .75rem; align-items: start; }
-  .parc-category-name { font-weight: 750; }
-  .parc-category-total { white-space: nowrap; font-size: .8rem; color: var(--parc-muted); }
-  .parc-category-meta { color: var(--parc-muted); font-size: .75rem; margin-top: .45rem; }
-  .parc-progress { height: .4rem; margin-top: .75rem; border-radius: 8px; background: #edf0f4; overflow: hidden; }
-  .parc-progress > span { display: block; height: 100%; border-radius: inherit; background: var(--category-color, #932e2b); }
-  .parc-campaign {
-    height: 86px;
-    box-sizing: border-box;
-    overflow: hidden;
-    padding: .9rem 0;
-    border-bottom: 1px solid #edf0f4;
+  .parc-inventory-icon {
+    display: grid;
+    width: 2.45rem;
+    height: 2.45rem;
+    flex: 0 0 auto;
+    place-items: center;
+    border-radius: .75rem;
+    background: color-mix(in srgb, var(--inventory-accent) 11%, white);
+    color: var(--inventory-accent);
+    font-size: 1.1rem;
   }
-  .parc-recent-campaigns {
-    max-height: 1720px;
-    overflow-y: auto;
-    scrollbar-gutter: stable;
+  .parc-inventory-title { margin: 0; color: var(--ink); font-size: .95rem; font-weight: 750; }
+  .parc-inventory-caption { margin: .12rem 0 0; color: var(--muted); font-size: .72rem; }
+  .parc-inventory-metrics {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: rgba(255,255,255,.82);
   }
-  .parc-campaign:last-child { padding-bottom: 0; border-bottom: 0; }
-  .parc-campaign-name {
-    display: -webkit-box;
-    overflow: hidden;
-    -webkit-box-orient: vertical;
-    -webkit-line-clamp: 1;
-    color: var(--parc-ink);
-    font-weight: 700;
+  .parc-inventory-metric { min-width: 0; padding: .7rem .8rem; }
+  .parc-inventory-metric + .parc-inventory-metric { border-left: 1px solid var(--line); }
+  .parc-inventory-value {
+    display: block;
+    color: var(--ink);
+    font-size: clamp(1.25rem, 2vw, 1.65rem);
+    font-weight: 800;
+    line-height: 1.1;
+    font-variant-numeric: tabular-nums;
+  }
+  .parc-inventory-metric.is-good .parc-inventory-value { color: var(--ok); }
+  .parc-inventory-metric.is-current .parc-inventory-value { color: var(--inventory-accent); }
+  .parc-inventory-metric.is-upcoming .parc-inventory-value { color: #596b83; }
+  .parc-inventory-label { display: block; margin-top: .25rem; color: var(--muted); font-size: .68rem; line-height: 1.25; }
+
+  /* ── Panneaux ── */
+  .parc-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.25rem; align-items: start; }
+  .parc-panel { padding: 1.2rem; border: 1px solid var(--line); border-radius: 8px; background: var(--card); min-width: 0; }
+  .parc-panel + .parc-panel { margin-top: 1.25rem; }
+  .parc-panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+  .parc-panel-head h2 { margin: 0; font-size: 1rem; font-weight: 700; display: flex; align-items: center; gap: .5rem; }
+  .parc-panel-head h2 i { color: var(--brique); }
+  .parc-panel-head p { margin: .25rem 0 0; color: var(--muted); font-size: .8rem; }
+  .parc-sub-label { margin: 1.25rem 0 .6rem; color: var(--muted); font-size: .7rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+  .parc-sub-label:first-of-type { margin-top: 0; }
+  .parc-muted { color: var(--muted); font-size: .8rem; }
+
+  /* ── Carte ── */
+  #parc-home-map {
+    height: clamp(320px, 38vw, 480px);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: #eceae5;
+  }
+  #parc-map-error { margin-top: .75rem; }
+
+  /* ── Alertes ── */
+  .parc-alerts { display: grid; gap: .5rem; max-height: 440px; overflow-y: auto; padding-right: .15rem; }
+  .parc-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: .6rem;
+    padding: .75rem .85rem;
+    border: 1px solid var(--line);
+    border-left: 3px solid var(--muted);
+    border-radius: 10px;
+    background: #fff;
+    font-size: .86rem;
+    line-height: 1.35;
     text-decoration: none;
+    transition: background-color .15s ease;
   }
-  .parc-campaign-name:hover { color: #932e2b; }
-  .parc-muted { color: var(--parc-muted); font-size: .78rem; }
+  .parc-alert:hover { background: var(--paper); }
+  .parc-alert i { margin-top: .1rem; }
+  .parc-alert.is-danger { border-left-color: var(--ko); background: #fdf5f4; }
+  .parc-alert.is-danger i { color: var(--ko); }
+  .parc-alert.is-warning { border-left-color: var(--warn); background: #fdf9f0; }
+  .parc-alert.is-warning i { color: var(--warn); }
+  .parc-alert-arrow { margin-left: auto; color: var(--muted); }
+  .parc-ok { display: flex; align-items: center; gap: .5rem; padding: .75rem .85rem; border-radius: 10px; background: #f1f8f4; color: var(--ok); font-size: .86rem; }
+
+  /* ── Catégories (supports et campagnes) ── */
+  .parc-cats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
+    align-items: start;
+    gap: .75rem;
+  }
+  .parc-cat {
+    --cat: var(--brique);
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: #fff;
+  }
+  .parc-cat > summary {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: .9rem;
+    padding: .95rem 1rem .95rem 1.15rem;
+    list-style: none;
+    cursor: pointer;
+  }
+  .parc-cat > summary::-webkit-details-marker { display: none; }
+  .parc-cat > summary::before { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 4px; background: var(--cat); }
+  .parc-cat > summary:hover { background: var(--paper); }
+  .parc-cat-icon {
+    display: grid;
+    width: 2.35rem;
+    height: 2.35rem;
+    place-items: center;
+    border-radius: 10px;
+    color: var(--cat);
+    background: color-mix(in srgb, var(--cat) 12%, #fff);
+  }
+  .parc-cat-name { font-size: .93rem; font-weight: 700; line-height: 1.2; }
+  .parc-cat-sub { margin-top: .15rem; color: var(--muted); font-size: .76rem; }
+  .parc-cat-count { display: flex; align-items: center; gap: .5rem; color: var(--cat); font-size: 1.45rem; font-weight: 750; font-variant-numeric: tabular-nums; line-height: 1; }
+  .parc-cat-count i { color: #a9a39b; font-size: .72rem; transition: transform .15s ease; }
+  .parc-cat[open] .parc-cat-count i { transform: rotate(180deg); }
+  .parc-cat-body { display: grid; gap: .85rem; padding: .95rem 1.15rem 1.1rem; border-top: 1px solid var(--line); background: var(--paper); }
+
+  /* Barre d'état : bon / maintenance / panne */
+  .parc-bar { display: flex; height: 6px; margin-top: .6rem; overflow: hidden; border-radius: 99px; background: #ebe6dd; }
+  .parc-bar > span { display: block; height: 100%; }
+  .parc-legend { display: flex; flex-wrap: wrap; gap: .25rem .85rem; margin-top: .45rem; color: var(--muted); font-size: .72rem; }
+  .parc-legend i { display: inline-block; width: .5rem; height: .5rem; margin-right: .3rem; border-radius: 50%; }
+
+  .parc-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(105px, 1fr)); gap: .5rem; }
+  .parc-fact { padding: .6rem .7rem; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
+  .parc-fact strong { display: block; font-size: 1.1rem; font-variant-numeric: tabular-nums; }
+  .parc-fact span { color: var(--muted); font-size: .72rem; }
+
+  /* Lignes de campagnes */
+  .parc-row { display: flex; align-items: center; justify-content: space-between; gap: .6rem; padding: .55rem 0; border-top: 1px solid var(--line); }
+  .parc-row:first-child { border-top: 0; padding-top: 0; }
+  .parc-row-main { min-width: 0; }
+  .parc-row-name { display: block; overflow: hidden; color: var(--ink); font-size: .84rem; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; text-decoration: none; }
+  .parc-row-name:hover { color: var(--brique); }
+  .parc-row-meta { color: var(--muted); font-size: .74rem; }
+  .parc-list-scroll { max-height: 340px; overflow-y: auto; }
+
+  .parc-recent > summary { display: flex; align-items: center; justify-content: space-between; padding: .8rem 0; cursor: pointer; list-style: none; font-weight: 700; font-size: .92rem; }
+  .parc-recent > summary::-webkit-details-marker { display: none; }
+  .parc-recent > summary i { color: #a9a39b; transition: transform .15s ease; }
+  .parc-recent[open] > summary i { transform: rotate(180deg); }
+
+  /* ── Responsive ── */
+  @media (max-width: 1199.98px) {
+    .parc-figures { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .parc-fig:nth-child(odd) { border-left: 0; }
+    .parc-fig:nth-child(n+3) { border-top: 1px solid var(--line); }
+    .parc-fig:nth-child(1) { border-radius: 14px 0 0 0; }
+    .parc-fig:nth-child(2) { border-radius: 0 14px 0 0; }
+    .parc-fig:nth-child(3) { border-radius: 0 0 0 14px; }
+    .parc-fig:nth-child(4) { border-radius: 0 0 14px 0; }
+    .parc-inventory-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 991.98px) {
+    .parc-grid { grid-template-columns: minmax(0, 1fr); }
+    .parc-alerts { max-height: none; }
+  }
   @media (max-width: 575.98px) {
-    .parc-section { padding: 1rem; }
-    .parc-formats { grid-template-columns: 1fr; }
-    .parc-format-row,
-    .parc-category-campaign { grid-column: span 1; }
-    .parc-category-campaigns-grid { grid-template-columns: 1fr; }
-    .parc-category-grid { grid-template-columns: 1fr; }
-    .parc-category-grid-item.is-geant { grid-column: span 1; }
+    .parc-head { align-items: stretch; }
+    .parc-tabs { width: 100%; }
+    .parc-panel { padding: 1rem; }
+    .parc-cats { grid-template-columns: minmax(0, 1fr); }
+    .parc-fig { padding: .9rem 1rem; }
+    .parc-fig strong { font-size: 1.4rem; }
+    .parc-inventory-grid { grid-template-columns: minmax(0, 1fr); gap: .65rem; }
+    .parc-inventory-card { padding: .85rem; }
   }
-  @media (min-width: 576px) and (max-width: 1199.98px) {
-    .parc-category-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .parc-category-grid-item.is-geant { grid-column: span 2; }
-    .parc-category-grid-item.is-geant .parc-category-card { --category-span: 2 !important; }
-    .parc-formats,
-    .parc-category-campaigns-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .parc-format-row[style*="--item-span:3"],
-    .parc-category-campaign[style*="--item-span:3"] { grid-column: span 2; }
-    .parc-format-row[style*="--item-span:2"],
-    .parc-category-campaign[style*="--item-span:2"] { grid-column: span 2; }
+  @media (prefers-reduced-motion: reduce) {
+    .parc *, .parc *::before, .parc *::after { transition: none !important; }
   }
 </style>
 
-<main class="container-fluid py-3 py-lg-4 parc-home">
-  <section class="parc-section mb-4" aria-labelledby="parc-villes-title">
-    <div class="parc-section-heading">
-      <div>
-        <h2 id="parc-villes-title"><i class="bi bi-geo-alt-fill text-primary me-2"></i>Parc par ville</h2>
-        <p>Choisissez une ville pour filtrer les indicateurs et les campagnes.</p>
-      </div>
-      <a href="{% url 'carte' %}" class="btn btn-sm btn-outline-secondary"><i class="bi bi-map me-1"></i>Voir la carte</a>
+<main class="parc">
+
+  {# ── En-tête et filtre par ville ── #}
+  <header class="parc-head">
+    <div>
+      <div class="parc-kicker">Tableau de bord</div>
+      <h1 class="parc-title">Parc publicitaire</h1>
+      <p class="parc-scope">
+        {% if ville_active %}Supports et campagnes à {{ ville_active }}.{% else %}Ensemble du parc, toutes villes confondues.{% endif %}
+      </p>
     </div>
-    <div class="parc-city-list">
-      <a class="parc-city {% if not ville_active %}active{% endif %}" href="{% url 'dashboard' %}">
-        <i class="bi bi-globe2"></i>Toutes les villes
+    <nav class="parc-tabs" aria-label="Filtrer par ville">
+      <a class="parc-tab {% if not ville_active %}is-active{% endif %}" href="{% url 'dashboard' %}">
+        <i class="bi bi-globe2"></i>Toutes
       </a>
       {% for ville in villes %}
-        <a class="parc-city {% if ville_active == ville %}active{% endif %}" href="{% url 'dashboard' %}?ville={{ ville|urlencode }}">
+        <a class="parc-tab {% if ville_active == ville %}is-active{% endif %}" href="{% url 'dashboard' %}?ville={{ ville|urlencode }}">
           <i class="bi bi-geo-alt"></i>{{ ville }}
         </a>
       {% empty %}
-        <span class="parc-muted">Aucune ville renseignée dans l’inventaire.</span>
+        <span class="parc-muted px-3 py-2">Aucune ville renseignée dans l’inventaire.</span>
       {% endfor %}
-    </div>
-  </section>
-  <section class="parc-hero mb-4">
-    <div class="parc-hero-content">
-      <div class="parc-eyebrow">Gestion du réseau publicitaire</div>
-      <h1>Bienvenue, {{ request.user.get_full_name|default:request.user.username }}</h1>
-      <p>
-        Vue d’ensemble du parc, de son implantation par ville, des formats disponibles
-        et des campagnes en cours.
-        {% if ville_active %}<strong class="text-white">Ville sélectionnée : {{ ville_active }}</strong>{% endif %}
-      </p>
-    </div>
-  </section>
+    </nav>
+  </header>
 
-  <section class="parc-section mb-4" aria-labelledby="parc-alertes-title">
-    <div class="parc-section-heading">
-      <div>
-        <h2 id="parc-alertes-title"><i class="bi bi-bell-fill text-warning me-2"></i>Alertes et documents commerciaux</h2>
-        <p>Campagnes sans document associé, bons de commande en attente ou PDF manquant.</p>
-      </div>
-      <div class="d-flex align-items-center gap-2">
-        <span class="badge {% if alertes %}text-bg-warning{% else %}text-bg-success{% endif %}">
-          {{ alertes|length }} alerte{{ alertes|length|pluralize }}
-        </span>
-        <button type="button" class="btn btn-sm btn-outline-secondary" data-alert-fold="parcAlertsContent"
-          aria-expanded="false" aria-controls="parcAlertsContent" aria-label="Déplier les alertes">
-          <i class="bi bi-chevron-down me-1" aria-hidden="true"></i><span data-alert-fold-label>Déplier</span>
-        </button>
-      </div>
-    </div>
-    <div id="parcAlertsContent" class="d-none">
-      <div id="parcAlertList" class="d-grid gap-2{% if not alertes %} d-none{% endif %}" style="max-height:392px; overflow-y:auto;">
-        {% for alerte in alertes %}
-          <div class="alert alert-{{ alerte.type }} d-flex align-items-center gap-2 mb-0" style="height:72px; min-height:72px;">
-            <i class="bi {% if alerte.type == 'danger' %}bi-exclamation-octagon-fill{% else %}bi-exclamation-triangle-fill{% endif %} mt-1"></i>
-            <a href="{{ alerte.url }}" class="flex-grow-1 text-decoration-none text-reset" style="display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">{{ alerte.msg }} <i class="bi bi-arrow-up-right small ms-1"></i></a>
-          </div>
-        {% endfor %}
-      </div>
-      <div class="text-success small{% if alertes %} d-none{% endif %}">
-        <i class="bi bi-check-circle-fill me-2"></i>Aucune alerte : les campagnes actives ou à venir ont leurs documents commerciaux.
-      </div>
-    </div>
-  </section>
-
-  <section class="row g-3 mb-4" aria-label="Indicateurs du parc">
-    <div class="col-6 col-xl-3">
-      <div class="parc-kpi">
-        <div class="parc-kpi-icon" style="--kpi-bg:#f3e8e8;--kpi-color:#932e2b"><i class="bi bi-building"></i></div>
-        <div><div class="parc-kpi-value">{{ total_supports }}</div><div class="parc-kpi-label">Supports au total</div></div>
-      </div>
-    </div>
-    <div class="col-6 col-xl-3">
-      <div class="parc-kpi">
-        <div class="parc-kpi-icon" style="--kpi-bg:#e9f7ef;--kpi-color:#16834a"><i class="bi bi-signpost-2"></i></div>
-        <div><div class="parc-kpi-value">{{ nb_panneaux }}</div><div class="parc-kpi-label">Panneaux</div></div>
-      </div>
-    </div>
-    <div class="col-6 col-xl-3">
-      <div class="parc-kpi">
-        <div class="parc-kpi-icon" style="--kpi-bg:#e8f5fb;--kpi-color:#087da5"><i class="bi bi-display"></i></div>
-        <div><div class="parc-kpi-value">{{ nb_ecrans }}</div><div class="parc-kpi-label">Écrans numériques</div></div>
-      </div>
-    </div>
-    <div class="col-6 col-xl-3">
-      <div class="parc-kpi">
-        <div class="parc-kpi-icon" style="--kpi-bg:#fff4e5;--kpi-color:#bd6a08"><i class="bi bi-megaphone"></i></div>
-        <div><div class="parc-kpi-value">{{ total_campagnes }}</div><div class="parc-kpi-label">Campagnes au total</div></div>
-      </div>
-    </div>
-    <div class="col-6 col-xl-3">
-      <div class="parc-kpi">
-        <div class="parc-kpi-icon" style="--kpi-bg:#eaf0ff;--kpi-color:#3856a6"><i class="bi bi-play-circle"></i></div>
-        <div><div class="parc-kpi-value">{{ campagnes_actives }}</div><div class="parc-kpi-label">Campagnes en cours</div></div>
-      </div>
-    </div>
-    <div class="col-6 col-xl-3">
-      <div class="parc-kpi">
-        <div class="parc-kpi-icon" style="--kpi-bg:#f1edff;--kpi-color:#7048b8"><i class="bi bi-calendar2-check"></i></div>
-        <div><div class="parc-kpi-value">{{ campagnes_a_venir }}</div><div class="parc-kpi-label">Campagnes à venir</div></div>
-      </div>
-    </div>
-    <div class="col-6 col-xl-3">
-      <div class="parc-kpi">
-        <div class="parc-kpi-icon" style="--kpi-bg:#e8f7f4;--kpi-color:#16806d"><i class="bi bi-geo-alt"></i></div>
-        <div><div class="parc-kpi-value">{{ total_villes }}</div><div class="parc-kpi-label">Villes couvertes</div></div>
-      </div>
-    </div>
-    <div class="col-6 col-xl-3">
-      <div class="parc-kpi">
-        <div class="parc-kpi-icon" style="--kpi-bg:#f0f2f5;--kpi-color:#4b5563"><i class="bi bi-grid-3x3-gap"></i></div>
-        <div><div class="parc-kpi-value">{{ total_formats }}</div><div class="parc-kpi-label">Formats enregistrés</div></div>
-      </div>
-    </div>
-  </section>
-
-
-
-  <section class="parc-section mb-4" aria-labelledby="parc-map-title">
-    <div class="parc-section-heading">
-      <div>
-        <h2 id="parc-map-title"><i class="bi bi-map-fill text-primary me-2"></i>Carte du parc</h2>
-        <p>{% if ville_active %}Supports géolocalisés à {{ ville_active }}.{% else %}Supports géolocalisés sur l’ensemble du Burkina Faso.{% endif %}</p>
-      </div>
-      <span class="badge text-bg-light border" id="parc-map-count" aria-live="polite">Chargement…</span>
-    </div>
-    <div id="parc-home-map" class="parc-home-map" role="application" aria-label="Carte des supports publicitaires"></div>
-    <div id="parc-map-error" class="alert alert-danger mt-3 mb-0 d-none" role="alert">
-      Impossible de charger la carte du parc. Réessayez plus tard.
-    </div>
-  </section>
-
-  <div class="row g-4">
-    <section class="col-12 col-xl-12" aria-labelledby="parc-formats-title">
-      <div class="parc-section">
-        <div class="parc-section-heading">
-          <div>
-                <h2 id="parc-formats-title"><i class="bi bi-grid-3x3-gap-fill text-primary me-2"></i>Parc par catégorie</h2>
-                <p>Formats et disponibilité regroupés par catégorie pour {% if ville_active %}{{ ville_active }}{% else %}l’ensemble du parc{% endif %}. Les campagnes sont présentées séparément.</p>
-          </div>
-          <a href="{% url 'format_list' %}" class="btn btn-sm btn-outline-secondary">Gérer les formats</a>
+    {# ── Carte et alertes ── #}
+  <div class="parc-grid">
+    <aside class="parc-panel" aria-labelledby="parc-alertes-title">
+      <div class="parc-panel-head">
+        <div>
+          <h2 id="parc-alertes-title"><i class="bi bi-bell-fill"></i>Alertes</h2>
+          <p>Campagnes sans document commercial ou bon de commande en attente.</p>
         </div>
-        <div class="parc-category-grid">
-          {% for categorie in categories_detail %}
-            <div class="parc-category-grid-item{% if categorie.label|slugify == 'geant' %} is-geant{% endif %}" style="--category-span:{{ categorie.grid_span }}">
-              <article class="parc-category-card{% if categorie.label|slugify == 'geant' %} is-geant{% endif %}" style="--category-color:{{ categorie.color }};--category-span:{{ categorie.grid_span }}">
-                <header class="parc-category-header">
-                  <div class="parc-category-title">
-                    <span class="parc-category-icon"><i class="bi bi-grid-3x3-gap-fill"></i></span>
-                    <div>
-                      <h3>{{ categorie.label }}</h3>
-                      <p>{{ categorie.nb_formats }} format(s) enregistré(s)</p>
-                    </div>
-                  </div>
-                  <div class="parc-category-summary">
-                    <div class="parc-category-stat" style="--stat-color:#2563eb">
-                      <span class="parc-category-stat-value">{{ categorie.nb_supports }}</span>
-                      <span class="parc-category-stat-label">Supports</span>
-                    </div>
-                    <div class="parc-category-stat" style="--stat-color:#7c3aed">
-                      <span class="parc-category-stat-value">{{ categorie.nb_faces }}</span>
-                      <span class="parc-category-stat-label">Faces</span>
-                    </div>
-                    <div class="parc-category-stat" style="--stat-color:#16a34a">
-                      <span class="parc-category-stat-value">{{ categorie.nb_faces_libres }}</span>
-                      <span class="parc-category-stat-label">Libres</span>
-                    </div>
-                    <div class="parc-category-stat" style="--stat-color:#dc2626">
-                      <span class="parc-category-stat-value">{{ categorie.nb_faces_occupees }}</span>
-                      <span class="parc-category-stat-label">Occupées</span>
-                    </div>
-                    {% if categorie.nb_faces_reservees %}
-                      <div class="parc-category-stat" style="--stat-color:#d97706">
-                        <span class="parc-category-stat-value">{{ categorie.nb_faces_reservees }}</span>
-                        <span class="parc-category-stat-label">Réservées</span>
-                      </div>
-                    {% endif %}
-                    {% if categorie.nb_faces_panne %}
-                      <div class="parc-category-stat" style="--stat-color:#64748b">
-                        <span class="parc-category-stat-value">{{ categorie.nb_faces_panne }}</span>
-                        <span class="parc-category-stat-label">En panne</span>
-                      </div>
-                    {% endif %}
-                  </div>
-                </header>
-                <div class="parc-formats">
-                  {% for format in categorie.formats %}
-                    <div class="parc-format-row" style="--item-span:{{ format.grid_span }}">
-                      <div class="parc-format-heading">
-                        <div>
-                          <div class="parc-format-code">{{ format.code }}</div>
-                          <div class="parc-format-description">
-                            {% if format.dimensions %}{{ format.dimensions }}{% else %}Dimensions non précisées{% endif %}
-                            {% if format.superficie %} · {{ format.superficie|floatformat:"-2" }} m²{% endif %}
-                          </div>
-                        </div>
-                      </div>
-                      <div class="parc-format-stats">
-                        <div class="parc-category-stat parc-format-stat" style="--stat-color:#2563eb">
-                          <span class="parc-category-stat-value">{{ format.nb_supports }}</span>
-                          <span class="parc-category-stat-label">Supports</span>
-                        </div>
-                        <div class="parc-category-stat parc-format-stat" style="--stat-color:#7c3aed">
-                          <span class="parc-category-stat-value">{{ format.nb_faces }}</span>
-                          <span class="parc-category-stat-label">Faces</span>
-                        </div>
-                        <div class="parc-category-stat parc-format-stat" style="--stat-color:#16a34a">
-                          <span class="parc-category-stat-value">{{ format.nb_faces_libres }}</span>
-                          <span class="parc-category-stat-label">Libres</span>
-                        </div>
-                        <div class="parc-category-stat parc-format-stat" style="--stat-color:#dc2626">
-                          <span class="parc-category-stat-value">{{ format.nb_faces_occupees }}</span>
-                          <span class="parc-category-stat-label">Occupées</span>
-                        </div>
-                        {% if format.nb_faces_reservees %}
-                          <div class="parc-category-stat parc-format-stat" style="--stat-color:#d97706">
-                            <span class="parc-category-stat-value">{{ format.nb_faces_reservees }}</span>
-                            <span class="parc-category-stat-label">Réservées</span>
-                          </div>
-                        {% endif %}
-                        {% if format.nb_faces_panne %}
-                          <div class="parc-category-stat parc-format-stat" style="--stat-color:#64748b">
-                            <span class="parc-category-stat-value">{{ format.nb_faces_panne }}</span>
-                            <span class="parc-category-stat-label">En panne</span>
-                          </div>
-                        {% endif %}
-                      </div>
-                    </div>
-                  {% endfor %}
-                </div>
-                {% if categorie.campagnes %}
-                  <div class="parc-category-campaigns">
-                    <div class="parc-category-campaigns-title">Campagnes de cette catégorie</div>
-                    <div class="parc-category-campaigns-grid">
-                    {% for campagne_item in categorie.campagnes %}
-                      <div class="parc-category-campaign" style="--item-span:{{ campagne_item.grid_span }}">
-                        <a href="{% url 'campagne_detail' campagne_item.campagne.pk %}">{{ campagne_item.campagne.nom }}</a>
-                        <span class="cld-hero-badge cld-badge-actif" style="color: #000;">
-                          <span class="cld-status-dot-active" style="background:#22c55e;"></span>{{campagne_item.campagne.get_statut_display}}
-                        </span>
-                      </div>
-                    {% endfor %}
-                    </div>
-                  </div>
-                {% else %}
-                  <div class="parc-category-campaigns parc-muted">Aucune campagne en cours ou à venir pour cette catégorie.</div>
-                {% endif %}
-              </article>
-            </div>
-          {% empty %}
-            <div class="col-12"><p class="parc-muted mb-0">Aucune catégorie de format n’est renseignée pour cette sélection.</p></div>
-          {% endfor %}
+        <div class="d-flex align-items-center gap-2">
+          <span class="badge {% if alertes %}text-bg-warning{% else %}text-bg-success{% endif %}">
+            {{ alertes|length }}
+          </span>
+          <button type="button" class="btn btn-sm btn-outline-secondary"
+            data-alert-fold="parcAlertsContent" aria-expanded="false"
+            aria-controls="parcAlertsContent" aria-label="Déplier les alertes">
+            <i class="bi bi-chevron-down me-1" aria-hidden="true"></i>
+            <span data-alert-fold-label>Déplier</span>
+          </button>
+        </div>
+      </div>
+      <div id="parcAlertsContent" class="d-none">
+        {% if alertes %}
+          <div class="parc-alerts">
+            {% for alerte in alertes %}
+              <a href="{{ alerte.url }}" class="parc-alert is-{{ alerte.type }}">
+                <i class="bi {% if alerte.type == 'danger' %}bi-exclamation-octagon-fill{% else %}bi-exclamation-triangle-fill{% endif %}"></i>
+                <span>{{ alerte.msg }}</span>
+                <i class="bi bi-arrow-up-right parc-alert-arrow"></i>
+              </a>
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="parc-ok">
+            <i class="bi bi-check-circle-fill"></i>
+            <span>Aucune alerte : les campagnes actives ou à venir ont leurs documents.</span>
+          </div>
+        {% endif %}
+      </div>
+    </aside>
+  </div>
+
+
+  {# ── Chiffres clés ── #}
+  <div class="parc-inventory-grid" aria-label="État du parc par type de support">
+    <section class="parc-inventory-card is-panels" aria-labelledby="inventory-panels-title">
+      <header class="parc-inventory-card-head">
+        <span class="parc-inventory-icon"><i class="bi bi-signpost-2-fill" aria-hidden="true"></i></span>
+        <div>
+          <h2 class="parc-inventory-title" id="inventory-panels-title">Panneaux</h2>
+          <p class="parc-inventory-caption">Supports statiques</p>
+        </div>
+      </header>
+      <div class="parc-inventory-metrics">
+        <div class="parc-inventory-metric">
+          <strong class="parc-inventory-value">{{ panneaux_total }}</strong>
+          <span class="parc-inventory-label">Au total</span>
+        </div>
+        <div class="parc-inventory-metric is-good">
+          <strong class="parc-inventory-value">{{ panneaux_bon_etat }}</strong>
+          <span class="parc-inventory-label">En bon état</span>
         </div>
       </div>
     </section>
-
-    <section class="col-12 col-xl-12" aria-labelledby="parc-campagnes-title">
-      <div class="parc-section">
-        <div class="parc-section-heading">
-          <div>
-            <h2 id="parc-campagnes-title"><i class="bi bi-megaphone-fill text-primary me-2"></i>Campagnes récentes</h2>
-            <p>{{ campagnes_actives }} en cours · {{ campagnes_a_venir }} à venir</p>
-          </div>
-          <a href="{% url 'campagne_list' %}" class="btn btn-sm btn-outline-secondary">Toutes</a>
+    <section class="parc-inventory-card is-screens" aria-labelledby="inventory-screens-title">
+      <header class="parc-inventory-card-head">
+        <span class="parc-inventory-icon"><i class="bi bi-display" aria-hidden="true"></i></span>
+        <div>
+          <h2 class="parc-inventory-title" id="inventory-screens-title">Écrans</h2>
+          <p class="parc-inventory-caption">Affichage numérique</p>
         </div>
-        <div class="parc-recent-campaigns">
-          {% for campagne in campagnes_recentes %}
-            <article class="parc-campaign">
-              <div class="d-flex align-items-start justify-content-between gap-2">
-                <div class="min-w-0">
-                  <a href="{% url 'campagne_detail' campagne.pk %}" class="parc-campaign-name">{{ campagne.nom }}</a>
-                  <div class="parc-muted">{{ campagne.client.nom }}</div>
-                  <div class="parc-muted">{{ campagne.date_debut|date:"d/m/Y" }} – {{ campagne.date_fin|date:"d/m/Y" }}</div>
-                </div>
-                <span class="badge bg-{{ campagne.statut }}">{{ campagne.get_statut_display }}</span>
-              </div>
-            </article>
-          {% empty %}
-            <p class="parc-muted mb-0">Aucune campagne à afficher pour cette sélection.</p>
-          {% endfor %}
+      </header>
+      <div class="parc-inventory-metrics">
+        <div class="parc-inventory-metric">
+          <strong class="parc-inventory-value">{{ ecrans_total }}</strong>
+          <span class="parc-inventory-label">Au total</span>
+        </div>
+        <div class="parc-inventory-metric is-good">
+          <strong class="parc-inventory-value">{{ ecrans_bon_etat }}</strong>
+          <span class="parc-inventory-label">En bon état</span>
+        </div>
+      </div>
+    </section>
+    <section class="parc-inventory-card is-markets" aria-labelledby="inventory-markets-title">
+      <header class="parc-inventory-card-head">
+        <span class="parc-inventory-icon"><i class="bi bi-shop" aria-hidden="true"></i></span>
+        <div>
+          <h2 class="parc-inventory-title" id="inventory-markets-title">Marchés</h2>
+          <p class="parc-inventory-caption">Emplacements publicitaires</p>
+        </div>
+      </header>
+      <div class="parc-inventory-metrics">
+        <div class="parc-inventory-metric">
+          <strong class="parc-inventory-value">{{ marches_total }}</strong>
+          <span class="parc-inventory-label">Au total</span>
+        </div>
+        <div class="parc-inventory-metric is-good">
+          <strong class="parc-inventory-value">{{ marches_bon_etat }}</strong>
+          <span class="parc-inventory-label">En bon état</span>
         </div>
       </div>
     </section>
   </div>
+
+  {# ── Supports par catégorie ── #}
+  <section class="parc-panel mt-4" aria-labelledby="parc-supports-title">
+    <div class="parc-panel-head">
+      <div>
+        <h2 id="parc-supports-title"><i class="bi bi-signpost-2-fill"></i>Supports par catégorie</h2>
+        <p>Répartition et état du parc {% if ville_active %}à {{ ville_active }}{% else %}— toutes villes{% endif %}.</p>
+      </div>
+      <a href="{% url 'format_list' %}" class="btn btn-sm btn-outline-secondary">Gérer les formats</a>
+    </div>
+
+    {% if has_static_support_groups %}
+      <h3 class="parc-sub-label">Statique</h3>
+      <div class="parc-cats">
+        {% for groupe in support_groups_present %}
+          {% if groupe.kind == 'statique' %}
+          <details class="parc-cat" style="--cat: {{ groupe.color }}">
+            <summary>
+              <span class="parc-cat-icon"><i class="bi bi-signpost-2"></i></span>
+              <span class="min-w-0">
+                <span class="parc-cat-name d-block">{{ groupe.label }}</span>
+                <span class="parc-cat-sub d-block">{{ groupe.nb_actifs }} actif{{ groupe.nb_actifs|pluralize }} · {{ groupe.nb_inactifs }} inactif{{ groupe.nb_inactifs|pluralize }}</span>
+                <span class="parc-bar" aria-hidden="true">
+                  <span style="width: {% widthratio groupe.nb_bon groupe.nb_supports 100 %}%; background: var(--ok)"></span>
+                  <span style="width: {% widthratio groupe.nb_maintenance groupe.nb_supports 100 %}%; background: var(--warn)"></span>
+                  <span style="width: {% widthratio groupe.nb_panne groupe.nb_supports 100 %}%; background: var(--ko)"></span>
+                </span>
+              </span>
+              <span class="parc-cat-count">{{ groupe.nb_supports }}<i class="bi bi-chevron-down" aria-hidden="true"></i></span>
+            </summary>
+            <div class="parc-cat-body">
+              <div class="parc-facts">
+                <div class="parc-fact"><strong>{{ groupe.nb_bon }}</strong><span>Bon état</span></div>
+                <div class="parc-fact"><strong>{{ groupe.nb_maintenance }}</strong><span>En maintenance</span></div>
+                <div class="parc-fact"><strong>{{ groupe.nb_panne }}</strong><span>En panne</span></div>
+                <div class="parc-fact"><strong>{{ groupe.nb_faces }}</strong><span>Faces au total</span></div>
+              </div>
+              <div class="parc-muted">
+                Faces : {{ groupe.nb_faces_bon }} en bon état · {{ groupe.nb_faces_maintenance }} en maintenance · {{ groupe.nb_faces_panne }} en panne
+              </div>
+            </div>
+          </details>
+          {% endif %}
+        {% endfor %}
+      </div>
+    {% endif %}
+
+    {% if has_other_support_groups %}
+      <h3 class="parc-sub-label mt-4">Écrans et marchés</h3>
+      <div class="parc-cats">
+        {% for groupe in support_groups_present %}
+          {% if groupe.kind != 'statique' %}
+          <details class="parc-cat" style="--cat: {{ groupe.color }}">
+            <summary>
+              <span class="parc-cat-icon"><i class="bi {% if groupe.kind == 'ecrans' %}bi-display{% elif groupe.kind == 'marches' %}bi-shop{% else %}bi-signpost-2{% endif %}"></i></span>
+              <span class="min-w-0">
+                <span class="parc-cat-name d-block">{{ groupe.label }}</span>
+                <span class="parc-cat-sub d-block">{{ groupe.nb_actifs }} actif{{ groupe.nb_actifs|pluralize }} · {{ groupe.nb_inactifs }} inactif{{ groupe.nb_inactifs|pluralize }}</span>
+                <span class="parc-bar" aria-hidden="true">
+                  <span style="width: {% widthratio groupe.nb_bon groupe.nb_supports 100 %}%; background: var(--ok)"></span>
+                  <span style="width: {% widthratio groupe.nb_maintenance groupe.nb_supports 100 %}%; background: var(--warn)"></span>
+                  <span style="width: {% widthratio groupe.nb_panne groupe.nb_supports 100 %}%; background: var(--ko)"></span>
+                </span>
+              </span>
+              <span class="parc-cat-count">{{ groupe.nb_supports }}<i class="bi bi-chevron-down" aria-hidden="true"></i></span>
+            </summary>
+            <div class="parc-cat-body">
+              <div class="parc-facts">
+                <div class="parc-fact"><strong>{{ groupe.nb_bon }}</strong><span>Bon état</span></div>
+                <div class="parc-fact"><strong>{{ groupe.nb_maintenance }}</strong><span>En maintenance</span></div>
+                <div class="parc-fact"><strong>{{ groupe.nb_panne }}</strong><span>En panne</span></div>
+              </div>
+            </div>
+          </details>
+          {% endif %}
+        {% endfor %}
+      </div>
+    {% endif %}
+    {% if not support_groups_present %}
+      <p class="parc-muted mb-0">Aucun support avec format ou catégorie renseigné pour cette sélection.</p>
+    {% endif %}
+  </section>
+
+  {# ── Campagnes clés après les catégories de supports ── #}
+  <div class="parc-figures" aria-label="Indicateurs des campagnes">
+    <div class="parc-fig">
+      <strong>{{ campagnes_actives }}</strong>
+      <span>Campagnes en cours</span>
+    </div>
+    <div class="parc-fig">
+      <strong>{{ campagnes_a_venir }}</strong>
+      <span>Campagnes à venir</span>
+    </div>
+  </div>
+
+  <section class="parc-panel mt-4" aria-labelledby="parc-campaign-summary-title">
+    <div class="parc-panel-head">
+      <div>
+        <h2 id="parc-campaign-summary-title"><i class="bi bi-megaphone-fill"></i>Campagnes par type de support</h2>
+        <p>Campagnes en cours et à venir{% if ville_active %} à {{ ville_active }}{% else %}, toutes villes confondues{% endif %}.</p>
+      </div>
+      <a href="{% url 'campagne_list' %}" class="btn btn-sm btn-outline-secondary">Toutes les campagnes</a>
+    </div>
+    <div class="parc-inventory-grid mb-0" aria-label="Campagnes en cours et à venir par type de support">
+      <section class="parc-inventory-card is-panels" aria-labelledby="campaign-panels-title">
+        <header class="parc-inventory-card-head">
+          <span class="parc-inventory-icon"><i class="bi bi-signpost-2-fill" aria-hidden="true"></i></span>
+          <div>
+            <h3 class="parc-inventory-title" id="campaign-panels-title">Panneaux</h3>
+            <p class="parc-inventory-caption">Campagnes statiques</p>
+          </div>
+        </header>
+        <div class="parc-inventory-metrics">
+          <div class="parc-inventory-metric is-current">
+            <strong class="parc-inventory-value">{{ panneaux_campagnes_en_cours }}</strong>
+            <span class="parc-inventory-label">En cours</span>
+          </div>
+          <div class="parc-inventory-metric is-upcoming">
+            <strong class="parc-inventory-value">{{ panneaux_campagnes_a_venir }}</strong>
+            <span class="parc-inventory-label">À venir</span>
+          </div>
+        </div>
+      </section>
+      <section class="parc-inventory-card is-screens" aria-labelledby="campaign-screens-title">
+        <header class="parc-inventory-card-head">
+          <span class="parc-inventory-icon"><i class="bi bi-display" aria-hidden="true"></i></span>
+          <div>
+            <h3 class="parc-inventory-title" id="campaign-screens-title">Écrans</h3>
+            <p class="parc-inventory-caption">Campagnes numériques</p>
+          </div>
+        </header>
+        <div class="parc-inventory-metrics">
+          <div class="parc-inventory-metric is-current">
+            <strong class="parc-inventory-value">{{ ecrans_campagnes_en_cours }}</strong>
+            <span class="parc-inventory-label">En cours</span>
+          </div>
+          <div class="parc-inventory-metric is-upcoming">
+            <strong class="parc-inventory-value">{{ ecrans_campagnes_a_venir }}</strong>
+            <span class="parc-inventory-label">À venir</span>
+          </div>
+        </div>
+      </section>
+      <section class="parc-inventory-card is-markets" aria-labelledby="campaign-markets-title">
+        <header class="parc-inventory-card-head">
+          <span class="parc-inventory-icon"><i class="bi bi-shop" aria-hidden="true"></i></span>
+          <div>
+            <h3 class="parc-inventory-title" id="campaign-markets-title">Marchés</h3>
+            <p class="parc-inventory-caption">Campagnes en marché</p>
+          </div>
+        </header>
+        <div class="parc-inventory-metrics">
+          <div class="parc-inventory-metric is-current">
+            <strong class="parc-inventory-value">{{ marches_campagnes_en_cours }}</strong>
+            <span class="parc-inventory-label">En cours</span>
+          </div>
+          <div class="parc-inventory-metric is-upcoming">
+            <strong class="parc-inventory-value">{{ marches_campagnes_a_venir }}</strong>
+            <span class="parc-inventory-label">À venir</span>
+          </div>
+        </div>
+      </section>
+    </div>
+  </section>
+
+  {# ── Campagnes ── #}
+  <section class="parc-panel mt-4" aria-labelledby="parc-campagnes-title">
+    <div class="parc-panel-head">
+      <div>
+        <h2 id="parc-campagnes-title"><i class="bi bi-megaphone-fill"></i>Campagnes par catégorie</h2>
+        <p>Campagnes en cours ou à venir, regroupées selon les supports réservés.</p>
+      </div>
+      <div class="d-flex gap-2 flex-wrap justify-content-end">
+        <a href="{% url 'campagne_list' %}" class="btn btn-sm btn-outline-secondary">Toutes les campagnes</a>
+      </div>
+    </div>
+
+    <div class="parc-cats">
+      {% for groupe in campaign_category_groups_present %}
+        <details class="parc-cat" style="--cat: {{ groupe.color }}">
+          <summary>
+            <span class="parc-cat-icon"><i class="bi {% if groupe.kind == 'ecrans' %}bi-display{% elif groupe.kind == 'marches' %}bi-shop{% else %}bi-megaphone{% endif %}"></i></span>
+            <span class="min-w-0">
+              <span class="parc-cat-name d-block">{{ groupe.label }}</span>
+              <span class="parc-cat-sub d-block">campagne{{ groupe.nb_campagnes|pluralize }} en cours ou à venir</span>
+            </span>
+            <span class="parc-cat-count">{{ groupe.nb_campagnes }}<i class="bi bi-chevron-down" aria-hidden="true"></i></span>
+          </summary>
+          <div class="parc-cat-body">
+            {% if groupe.campagnes %}
+              <div class="parc-list-scroll">
+                {% for campagne in groupe.campagnes %}
+                  <div class="parc-row">
+                    <div class="parc-row-main">
+                      <a href="{% url 'campagne_detail' campagne.pk %}" class="parc-row-name">{{ campagne.nom }}</a>
+                      <div class="parc-row-meta">{{ campagne.date_debut|date:"d/m/Y" }} – {{ campagne.date_fin|date:"d/m/Y" }}</div>
+                    </div>
+                    <span class="badge bg-{{ campagne.get_statut_badge }}">{{ campagne.get_statut_display }}</span>
+                  </div>
+                {% endfor %}
+              </div>
+            {% else %}
+              <p class="parc-muted mb-0">Aucune campagne en cours ou à venir pour cette catégorie.</p>
+            {% endif %}
+          </div>
+        </details>
+      {% endfor %}
+    </div>
+
+    <details class="parc-recent mt-3">
+      <summary>
+        <span>Campagnes récentes <span class="parc-muted fw-normal">({{ campagnes_recentes|length }})</span></span>
+        <i class="bi bi-chevron-down" aria-hidden="true"></i>
+      </summary>
+      <div class="parc-list-scroll pb-2">
+        {% for campagne in campagnes_recentes %}
+          <div class="parc-row">
+            <div class="parc-row-main">
+              <a href="{% url 'campagne_detail' campagne.pk %}" class="parc-row-name">{{ campagne.nom }}</a>
+              <div class="parc-row-meta">{{ campagne.client.nom }} · {{ campagne.date_debut|date:"d/m/Y" }} – {{ campagne.date_fin|date:"d/m/Y" }}</div>
+            </div>
+            <span class="badge bg-{{ campagne.get_statut_badge }}">{{ campagne.get_statut_display }}</span>
+          </div>
+        {% empty %}
+          <p class="parc-muted mb-0">Aucune campagne à afficher pour cette sélection.</p>
+        {% endfor %}
+      </div>
+    </details>
+  </section>
+
+  {# ── Carte en bas de page ── #}
+  <section class="parc-panel mt-4" aria-labelledby="parc-map-title">
+    <div class="parc-panel-head">
+      <div>
+        <h2 id="parc-map-title"><i class="bi bi-map-fill"></i>Carte du parc</h2>
+        <p>{% if ville_active %}Supports géolocalisés à {{ ville_active }}.{% else %}Supports géolocalisés sur l’ensemble du Burkina Faso.{% endif %}</p>
+      </div>
+      <span class="badge text-bg-light border" id="parc-map-count" aria-live="polite">Chargement…</span>
+    </div>
+    <div id="parc-home-map" role="application" aria-label="Carte des supports publicitaires"></div>
+    <div id="parc-map-error" class="alert alert-danger d-none" role="alert">
+      Impossible de charger la carte du parc. Réessayez plus tard.
+    </div>
+  </section>
+
 </main>
 {% endblock %}
 
@@ -571,10 +682,18 @@
     const mapElement = document.getElementById('parc-home-map');
     const countElement = document.getElementById('parc-map-count');
     const errorElement = document.getElementById('parc-map-error');
+
     function showMapError(message) {
       countElement.textContent = 'Carte indisponible';
       errorElement.textContent = message;
       errorElement.classList.remove('d-none');
+    }
+
+    function citiesCountLabel(features) {
+      const cities = new Set(features.map(function(feature) {
+        return (feature.properties && feature.properties.ville) || 'Ville non renseignée';
+      }));
+      return cities.size + ' ville' + (cities.size === 1 ? '' : 's');
     }
 
     if (!mapElement) return;
@@ -716,13 +835,6 @@
     } catch (error) {
       console.error('Erreur d’initialisation de la carte du parc:', error);
       showMapError('La carte n’a pas pu être initialisée. Rechargez la page ou vérifiez le chargement de Leaflet.');
-    }
-
-    function citiesCountLabel(features) {
-      const cities = new Set(features.map(function(feature) {
-        return (feature.properties && feature.properties.ville) || 'Ville non renseignée';
-      }));
-      return cities.size + ' ville' + (cities.size === 1 ? '' : 's');
     }
   })();
 </script>

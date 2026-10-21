@@ -642,6 +642,14 @@ class DemandeReservation(models.Model):
         verbose_name="Réservation créée",
         help_text="Réservation officielle créée par le staff après validation.",
     )
+    campagne = models.ForeignKey(
+        'Campagne',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='demandes_suivi',
+        verbose_name="Campagne associée au suivi",
+        help_text="Campagne sélectionnée par le staff pour afficher ses piges sur la page de suivi.",
+    )
 
     # ── Horodatage ────────────────────────────────────────────────────────────
     created_at = models.DateTimeField(
@@ -868,6 +876,11 @@ class Campagne(models.Model):
     # lieu de la campagne donne des chois des ville des support
     lieu = models.CharField(max_length=200, blank=True, verbose_name="Lieu de la campagne", help_text="Ville ou zone géographique de la campagne.")
     reference    = models.CharField(max_length=50, unique=True, blank=True)
+    lien_piges   = models.URLField(
+        blank=True,
+        verbose_name="Lien des piges",
+        help_text="Lien en lecture seule vers les preuves photo de cette campagne sur Google Drive.",
+    )
     date_debut   = models.DateField(verbose_name="Date de début")
     date_fin     = models.DateField(verbose_name="Date de fin")
     statut       = models.CharField(max_length=20, choices=STATUT_CHOICES, default=STATUT_EN_COURS,blank=True)

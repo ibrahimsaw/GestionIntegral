@@ -74,6 +74,7 @@ INSTALLED_APPS = [
     'accounts',
     'inventory',
     'campaigns',
+    'piges',
     'planning',
     'reports',
     'core',

@@ -93,6 +93,7 @@ urlpatterns = [
     path('api/campagne-parente-info/<int:campagne_id>/', views.api_campagne_parente_info, name='api_campagne_parente_info'),
     path('demandes/', views.DemandesListView.as_view(), name='demandes_liste'),
     path('demandes/<uuid:uuid>/', views.DemandeDetailView.as_view(), name='demande_detail'),
+    path('demandes/<uuid:uuid>/campagne/', views.DemandeAssocierCampagneView.as_view(), name='demande_associer_campagne'),
     path('demandes/<uuid:uuid>/valider/', views.DemandeValiderView.as_view(), name='demande_valider'),
     path('demandes/<uuid:uuid>/refuser/', views.DemandeRefuserView.as_view(), name='demande_refuser'),
     

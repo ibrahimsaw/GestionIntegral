@@ -6,6 +6,17 @@ from django.conf import settings
 from django.db import migrations, models
 
 
+def add_field_if_not_exists(apps, schema_editor, table, column, sql):
+    connection = schema_editor.connection
+    with connection.cursor() as cursor:
+        columns = {
+            field.name
+            for field in connection.introspection.get_table_description(cursor, table)
+        }
+    if column not in columns:
+        schema_editor.execute(sql)
+
+
 class Migration(migrations.Migration):
 
     dependencies = [
@@ -15,30 +26,71 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name='lignecampagne',
-            name='date_debut',
-            field=models.DateField(blank=True, null=True, verbose_name='Date de début (écran)'),
-        ),
-        migrations.AddField(
-            model_name='lignecampagne',
-            name='date_fin',
-            field=models.DateField(blank=True, null=True, verbose_name='Date de fin (écran)'),
-        ),
-        migrations.AddField(
-            model_name='lignecampagne',
-            name='duree_passage',
-            field=models.PositiveIntegerField(blank=True, choices=[(5, '5 secondes'), (10, '10 secondes'), (15, '15 secondes'), (20, '20 secondes')], null=True, verbose_name='Durée de passage (secondes)'),
-        ),
-        migrations.AddField(
-            model_name='lignecampagne',
-            name='frequence',
-            field=models.PositiveIntegerField(blank=True, choices=[(60, 'Toutes les 1 min'), (120, 'Toutes les 2 min'), (180, 'Toutes les 3 min'), (240, 'Toutes les 4 min'), (300, 'Toutes les 5 min'), (600, 'Toutes les 10 min'), (900, 'Toutes les 15 min'), (1200, 'Toutes les 20 min'), (1800, 'Toutes les 30 min')], null=True, verbose_name='Fréquence de diffusion'),
-        ),
-        migrations.AddField(
-            model_name='lignecampagne',
-            name='tranches_horaires',
-            field=models.CharField(blank=True, max_length=500, verbose_name='Tranches horaires spécifiques'),
+        migrations.SeparateDatabaseAndState(
+            database_operations=[
+                migrations.RunPython(
+                    lambda apps, schema_editor: add_field_if_not_exists(
+                        apps, schema_editor, 'campaigns_lignecampagne', 'date_debut',
+                        'ALTER TABLE campaigns_lignecampagne ADD COLUMN date_debut date NULL',
+                    ),
+                    migrations.RunPython.noop,
+                ),
+                migrations.RunPython(
+                    lambda apps, schema_editor: add_field_if_not_exists(
+                        apps, schema_editor, 'campaigns_lignecampagne', 'date_fin',
+                        'ALTER TABLE campaigns_lignecampagne ADD COLUMN date_fin date NULL',
+                    ),
+                    migrations.RunPython.noop,
+                ),
+                migrations.RunPython(
+                    lambda apps, schema_editor: add_field_if_not_exists(
+                        apps, schema_editor, 'campaigns_lignecampagne', 'duree_passage',
+                        'ALTER TABLE campaigns_lignecampagne ADD COLUMN duree_passage integer NULL',
+                    ),
+                    migrations.RunPython.noop,
+                ),
+                migrations.RunPython(
+                    lambda apps, schema_editor: add_field_if_not_exists(
+                        apps, schema_editor, 'campaigns_lignecampagne', 'frequence',
+                        'ALTER TABLE campaigns_lignecampagne ADD COLUMN frequence integer NULL',
+                    ),
+                    migrations.RunPython.noop,
+                ),
+                migrations.RunPython(
+                    lambda apps, schema_editor: add_field_if_not_exists(
+                        apps, schema_editor, 'campaigns_lignecampagne', 'tranches_horaires',
+                        "ALTER TABLE campaigns_lignecampagne ADD COLUMN tranches_horaires varchar(500) NOT NULL DEFAULT ''",
+                    ),
+                    migrations.RunPython.noop,
+                ),
+            ],
+            state_operations=[
+                migrations.AddField(
+                    model_name='lignecampagne',
+                    name='date_debut',
+                    field=models.DateField(blank=True, null=True, verbose_name='Date de début (écran)'),
+                ),
+                migrations.AddField(
+                    model_name='lignecampagne',
+                    name='date_fin',
+                    field=models.DateField(blank=True, null=True, verbose_name='Date de fin (écran)'),
+                ),
+                migrations.AddField(
+                    model_name='lignecampagne',
+                    name='duree_passage',
+                    field=models.PositiveIntegerField(blank=True, choices=[(5, '5 secondes'), (10, '10 secondes'), (15, '15 secondes'), (20, '20 secondes')], null=True, verbose_name='Durée de passage (secondes)'),
+                ),
+                migrations.AddField(
+                    model_name='lignecampagne',
+                    name='frequence',
+                    field=models.PositiveIntegerField(blank=True, choices=[(60, 'Toutes les 1 min'), (120, 'Toutes les 2 min'), (180, 'Toutes les 3 min'), (240, 'Toutes les 4 min'), (300, 'Toutes les 5 min'), (600, 'Toutes les 10 min'), (900, 'Toutes les 15 min'), (1200, 'Toutes les 20 min'), (1800, 'Toutes les 30 min')], null=True, verbose_name='Fréquence de diffusion'),
+                ),
+                migrations.AddField(
+                    model_name='lignecampagne',
+                    name='tranches_horaires',
+                    field=models.CharField(blank=True, max_length=500, verbose_name="Tranches horaires spécifiques"),
+                ),
+            ],
         ),
         migrations.CreateModel(
             name='DemandeReservation',

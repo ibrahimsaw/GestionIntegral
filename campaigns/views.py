@@ -21,7 +21,15 @@ from accounts.decorators import *
 from accounts.audit import log_action
 from .models import *
 from inventory.models import Support, FacePanneau, EcranNumerique, FormatSupport, Emplacement, Marche
-from .forms import ClientForm, ContratForm, CampagneForm, LigneCampagneForm, PreuveDiffusionForm
+from .forms import (
+    ClientForm,
+    ContratForm,
+    CampagneForm,
+    LigneCampagneForm,
+    PreuveDiffusionForm,
+    DemandeCampagneForm,
+)
+from piges.models import PigeFichier
 # from .mixins import *
 from datetime import datetime, date, timedelta
 today = timezone.now().date()
@@ -210,6 +218,15 @@ from .models import (
 class DashboardView(LoginRequiredMixin, TemplateView):
     template_name = 'campaigns/accueil_parc.html'
 
+    SUPPORT_GROUP_DEFINITIONS = (
+        ('statique_12m2', 'Statique — 12 m²', '12m2'),
+        ('statique_sucettes', 'Statique — Sucettes', 'sucette'),
+        ('statique_geants', 'Statique — Géant', 'geant'),
+        ('ecrans', 'Écrans numériques', 'ecran'),
+        ('marches', 'Marchés', 'marche'),
+        ('autres_statiques', 'Autres supports statiques', 'autres'),
+    )
+
     CATEGORY_COLORS = {
         'Standard': 'var(--color-primary)',
         'Géant': '#f59e0b',
@@ -220,10 +237,126 @@ class DashboardView(LoginRequiredMixin, TemplateView):
     COLOR_ECRANS = '#06b6d4'
     COLOR_PANNE = '#94a3b8'
 
+    @staticmethod
+    def _support_category_key(support, format_categories):
+        """Classe un support depuis son type, son rattachement marché et son format."""
+        if support.type_support == Support.TYPE_ECRAN:
+            return 'ecrans'
+        categorie = format_categories.get(support.format, '')
+        categorie_slug = slugify(categorie)
+        if support.emplacement_id or categorie_slug == 'marche':
+            return 'marches'
+        if categorie_slug in ('12m2', 'standard'):
+            return 'statique_12m2'
+        if categorie_slug == 'sucette':
+            return 'statique_sucettes'
+        if categorie_slug == 'geant':
+            return 'statique_geants'
+        return 'autres_statiques'
+
+    def _build_support_and_campaign_groups(
+        self, ville_active, campagnes_actives_list, campagnes_a_venir_list
+    ):
+        format_categories = dict(
+            FormatSupport.objects.values_list('code', 'categorie')
+        )
+        groups = {
+            key: {
+                'key': key,
+                'label': label,
+                'kind': 'statique' if key.startswith('statique_') or key == 'autres_statiques' else key,
+                'color': {
+                    'statique_12m2': 'var(--color-primary)',
+                    'statique_sucettes': '#a78bfa',
+                    'statique_geants': '#f59e0b',
+                    'ecrans': self.COLOR_ECRANS,
+                    'marches': '#f97316',
+                    'autres_statiques': self.DEFAULT_CATEGORY_COLOR,
+                }[key],
+                'campagnes': [],
+                'nb_supports': 0,
+                'nb_actifs': 0,
+                'nb_inactifs': 0,
+                'nb_bon': 0,
+                'nb_maintenance': 0,
+                'nb_panne': 0,
+                'nb_faces': 0,
+                'nb_faces_bon': 0,
+                'nb_faces_maintenance': 0,
+                'nb_faces_panne': 0,
+                'nb_campagnes': 0,
+            }
+            for key, label, _ in self.SUPPORT_GROUP_DEFINITIONS
+        }
+        supports_qs = Support.objects.prefetch_related('faces')
+        if ville_active:
+            supports_qs = supports_qs.filter(ville__iexact=ville_active)
+        for support in supports_qs:
+            key = self._support_category_key(support, format_categories)
+            group = groups[key]
+            group['nb_supports'] += 1
+            group['nb_actifs' if support.actif else 'nb_inactifs'] += 1
+            state_key = {
+                Support.ETAT_BON: 'nb_bon',
+                Support.ETAT_MAINTENANCE: 'nb_maintenance',
+                Support.ETAT_PANNE: 'nb_panne',
+            }.get(support.etat)
+            if state_key:
+                group[state_key] += 1
+
+            if support.type_support == Support.TYPE_PANNEAU:
+                for face in support.faces.all():
+                    group['nb_faces'] += 1
+                    face_state_key = {
+                        Support.ETAT_BON: 'nb_faces_bon',
+                        Support.ETAT_MAINTENANCE: 'nb_faces_maintenance',
+                        Support.ETAT_PANNE: 'nb_faces_panne',
+                    }.get(face.etat)
+                    if face_state_key:
+                        group[face_state_key] += 1
+
+        for campaign in campagnes_actives_list + campagnes_a_venir_list:
+            campaign_keys = set()
+            for ligne in campaign.lignes.all():
+                support = ligne.support
+                if support is None and ligne.face_id:
+                    support = ligne.face.support
+                if support is not None:
+                    campaign_keys.add(self._support_category_key(support, format_categories))
+                elif ligne.emplacement_id:
+                    campaign_keys.add('marches')
+            for key in campaign_keys:
+                groups[key]['campagnes'].append(campaign)
+
+        support_groups = []
+        campaign_groups = []
+        for key, label, _ in self.SUPPORT_GROUP_DEFINITIONS:
+            group = groups[key]
+            group['campagnes'].sort(key=lambda campaign: (campaign.date_debut, campaign.nom.casefold()))
+            group['nb_campagnes'] = len(group['campagnes'])
+            support_groups.append(group)
+            campaign_groups.append(group)
+        return support_groups, campaign_groups
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         today = timezone.now().date()
         ville_active = self.request.GET.get("ville", "").strip()
+        supports_classes = Support.objects.filter(
+            Q(type_support=Support.TYPE_ECRAN)
+            | Q(emplacement__isnull=False)
+            | Q(format__in=FormatSupport.objects.exclude(categorie='').values('code'))
+        )
+        villes = list(
+            supports_classes.exclude(ville='')
+            .values_list('ville', flat=True)
+            .distinct()
+            .order_by('ville')
+        )
+        ville_active = next(
+            (ville for ville in villes if ville.casefold() == ville_active.casefold()),
+            '',
+        )
 
         # ── Mise à jour des statuts en masse : 2 requêtes au lieu d'une
         # écriture par campagne (auto_update_statut() en boucle coûtait
@@ -259,17 +392,34 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
         if ville_active:
             supports = supports.filter(ville__iexact=ville_active)
-            campagnes_qs = campagnes_qs.filter(lignes__support__ville__iexact=ville_active).distinct()
-            clients_qs = clients_qs.filter(campagnes__lignes__support__ville__iexact=ville_active).distinct()
-            campagnes_actives_qs = campagnes_actives_qs.filter(lignes__support__ville__iexact=ville_active).distinct()
-            campagnes_a_venir_qs = campagnes_a_venir_qs.filter(lignes__support__ville__iexact=ville_active).distinct()
+            campagne_ville = (
+                Q(lignes__support__ville__iexact=ville_active)
+                | Q(lignes__face__support__ville__iexact=ville_active)
+                | Q(lignes__emplacement__marche__ville__iexact=ville_active)
+            )
+            campagnes_qs = campagnes_qs.filter(campagne_ville).distinct()
+            clients_qs = clients_qs.filter(
+                Q(campagnes__lignes__support__ville__iexact=ville_active)
+                | Q(campagnes__lignes__face__support__ville__iexact=ville_active)
+                | Q(campagnes__lignes__emplacement__marche__ville__iexact=ville_active)
+            ).distinct()
+            campagnes_actives_qs = campagnes_actives_qs.filter(campagne_ville).distinct()
+            campagnes_a_venir_qs = campagnes_a_venir_qs.filter(campagne_ville).distinct()
 
         # Prefetch pour limiter les requêtes N+1 déclenchées par montant_total()
-        campagnes_actives_list = list(
-            campagnes_actives_qs.prefetch_related('lignes__face__support', 'lignes__support')
-        )
         campagnes_a_venir_list = list(
-            campagnes_a_venir_qs.prefetch_related('lignes__face__support', 'lignes__support')
+            campagnes_a_venir_qs.prefetch_related(
+                'lignes__face__support', 'lignes__support',
+                'lignes__support__emplacement__marche', 'lignes__support__ecran_info',
+                'lignes__emplacement__marche',
+            )
+        )
+        campagnes_actives_list = list(
+            campagnes_actives_qs.prefetch_related(
+                'lignes__face__support', 'lignes__support',
+                'lignes__support__emplacement__marche', 'lignes__support__ecran_info',
+                'lignes__emplacement__marche',
+            )
         )
 
         revenu_actif = sum(c.montant_total() for c in campagnes_actives_list)
@@ -354,88 +504,49 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         formats_stats = self._build_format_stats(
             ville_active, faces_occupees_ids, faces_reservees_ids
         )
-        categories_detail = {}
-        for format_stats in formats_stats:
-            categorie = format_stats['categorie']
-            category_stats = categories_detail.setdefault(categorie, {
-                'label': categorie,
-                'color': self.CATEGORY_COLORS.get(categorie, self.DEFAULT_CATEGORY_COLOR),
-                'formats': [],
-                'format_codes': set(),
-                'campagnes': {},
-                'nb_formats': 0,
-                'nb_supports': 0,
-                'nb_faces': 0,
-                'nb_faces_libres': 0,
-                'nb_faces_occupees': 0,
-                'nb_faces_reservees': 0,
-                'nb_faces_panne': 0,
-            })
-            category_stats['formats'].append(format_stats)
-            category_stats['format_codes'].add(format_stats['code'])
-            category_stats['nb_formats'] += 1
-            for field in (
-                'nb_supports',
-                'nb_faces',
-                'nb_faces_libres',
-                'nb_faces_occupees',
-                'nb_faces_reservees',
-                'nb_faces_panne',
-            ):
-                category_stats[field] += format_stats[field]
-
-        for campaign in campagnes_actives_list + campagnes_a_venir_list:
-            campaign_formats_by_category = {}
-            for ligne in campaign.lignes.all():
-                support = ligne.support
-                if support is None and ligne.face_id:
-                    support = ligne.face.support
-                if support is None:
-                    continue
-                for category_stats in categories_detail.values():
-                    if support.format in category_stats['format_codes']:
-                        campaign_formats_by_category.setdefault(category_stats['label'], category_stats)
-            for category_stats in campaign_formats_by_category.values():
-                category_stats['campagnes'][campaign.pk] = campaign
-
-        categories_detail = sorted(
-            categories_detail.values(),
-            key=lambda category_stats: (
-                slugify(category_stats['label']) == 'geant',
-                category_stats['label'].casefold(),
-            ),
+        support_groups, campaign_category_groups = self._build_support_and_campaign_groups(
+            ville_active, campagnes_actives_list, campagnes_a_venir_list
         )
-        for category_stats in categories_detail:
-            category_stats['format_codes'] = None
-            campagnes = sorted(
-                category_stats['campagnes'].values(),
-                key=lambda campaign: (campaign.date_debut, campaign.nom),
-            )
-            category_stats['campagnes'] = campagnes
-            category_stats['grid_span'] = 1
-            if slugify(category_stats['label']) == 'geant':
-                columns_used = (len(categories_detail) - 1) % 3
-                category_stats['grid_span'] = 3 - columns_used
-            for collection_name in ('formats', 'campagnes'):
-                items = category_stats[collection_name]
-                columns = category_stats['grid_span']
-                remainder = len(items) % columns
-                final_span = (
-                    columns if len(items) > 1 and remainder == 1
-                    else remainder or 1
-                )
-                items_with_spans = []
-                for index, item in enumerate(items):
-                    span = final_span if index == len(items) - 1 else 1
-                    if collection_name == 'formats':
-                        item['grid_span'] = span
-                        items_with_spans.append(item)
-                    else:
-                        items_with_spans.append({
-                            'campagne': item,
-                            'grid_span': span,
-                        })
-                category_stats[collection_name] = items_with_spans
+        campaign_category_groups_present = [
+            group for group in campaign_category_groups if group['nb_supports'] > 0
+        ]
+        support_groups_present = [
+            group for group in support_groups if group['nb_supports'] > 0
+        ]
+        support_totals_by_kind = {
+            kind: {
+                'total': sum(
+                    group['nb_supports'] for group in support_groups
+                    if group['kind'] == kind
+                ),
+                'bon': sum(
+                    group['nb_bon'] for group in support_groups
+                    if group['kind'] == kind
+                ),
+            }
+            for kind in ('statique', 'ecrans', 'marches')
+        }
+        campaign_ids_by_kind_and_status = {
+            kind: {
+                Campagne.STATUT_EN_COURS: set(),
+                Campagne.STATUT_A_VENIR: set(),
+            }
+            for kind in ('statique', 'ecrans', 'marches')
+        }
+        for group in campaign_category_groups:
+            kind = group['kind']
+            if kind not in campaign_ids_by_kind_and_status:
+                continue
+            for campaign in group['campagnes']:
+                if campaign.statut in campaign_ids_by_kind_and_status[kind]:
+                    campaign_ids_by_kind_and_status[kind][campaign.statut].add(campaign.pk)
+        campaign_totals_by_kind = {
+            kind: {
+                'en_cours': len(statuses[Campagne.STATUT_EN_COURS]),
+                'a_venir': len(statuses[Campagne.STATUT_A_VENIR]),
+            }
+            for kind, statuses in campaign_ids_by_kind_and_status.items()
+        }
 
         total_faces_occupe = sum(cat['nb_occupe'] for cat in format_category_stats)
         total_faces_reserve = sum(cat['nb_reserve'] for cat in format_category_stats)
@@ -481,11 +592,6 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             types_stats.append({'label': 'En panne', 'count': parc['nb_supports_panne'], 'color': self.COLOR_PANNE})
         types_stats_json = json.dumps(types_stats)
 
-        # ── Villes disponibles : distinct côté base plutôt qu'en Python ──
-        villes = list(
-            Support.objects.exclude(ville='').values_list('ville', flat=True).distinct().order_by('ville')
-        )
-
         context.update({
             'ville_active': ville_active,
             'villes': villes,
@@ -494,7 +600,28 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             'total_campagnes': campagnes_qs.count(),
             'total_villes': len(villes),
             'total_formats': len(formats_stats),
-            'categories_detail': categories_detail,
+            'support_groups': support_groups,
+            'support_groups_present': support_groups_present,
+            'panneaux_total': support_totals_by_kind['statique']['total'],
+            'panneaux_bon_etat': support_totals_by_kind['statique']['bon'],
+            'ecrans_total': support_totals_by_kind['ecrans']['total'],
+            'ecrans_bon_etat': support_totals_by_kind['ecrans']['bon'],
+            'marches_total': support_totals_by_kind['marches']['total'],
+            'marches_bon_etat': support_totals_by_kind['marches']['bon'],
+            'panneaux_campagnes_en_cours': campaign_totals_by_kind['statique']['en_cours'],
+            'panneaux_campagnes_a_venir': campaign_totals_by_kind['statique']['a_venir'],
+            'ecrans_campagnes_en_cours': campaign_totals_by_kind['ecrans']['en_cours'],
+            'ecrans_campagnes_a_venir': campaign_totals_by_kind['ecrans']['a_venir'],
+            'marches_campagnes_en_cours': campaign_totals_by_kind['marches']['en_cours'],
+            'marches_campagnes_a_venir': campaign_totals_by_kind['marches']['a_venir'],
+            'has_static_support_groups': any(
+                group['kind'] == 'statique' for group in support_groups_present
+            ),
+            'has_other_support_groups': any(
+                group['kind'] != 'statique' for group in support_groups_present
+            ),
+            'campaign_category_groups': campaign_category_groups,
+            'campaign_category_groups_present': campaign_category_groups_present,
             'supports_bon': parc['nb_supports_bon'],
             'supports_panne': parc['nb_supports_panne'],
             'total_clients': clients_qs.count(),
@@ -1619,6 +1746,12 @@ class CampagneDetailView(ClientStaffRequiredMixin, DetailView):
         ).select_related(
             'campagne', 'ligne__support', 'ligne__face__support',
             'ligne__emplacement__marche', 'cree_par',
+        )
+        context['pige_fichiers_drive'] = PigeFichier.objects.filter(
+            campagne_id__in=campagne_ids
+        ).select_related(
+            'campagne', 'ligne__support', 'ligne__face__support',
+            'ligne__emplacement__marche', 'support', 'ajoute_par',
         )
 
         if campagne.est_mere:
@@ -3810,7 +3943,7 @@ class DemandeDetailView(LoginRequiredMixin, View):
     def get(self, request, uuid):
         demande = get_object_or_404(
             DemandeReservation.objects
-                .select_related('client', 'reservation', 'traite_par')
+                .select_related('client', 'reservation', 'reservation__client', 'campagne', 'traite_par')
                 .prefetch_related('faces_souhaitees__support', 'supports_souhaites'),
             uuid=uuid,
         )
@@ -3819,7 +3952,30 @@ class DemandeDetailView(LoginRequiredMixin, View):
         if demande.est_nouvelle:
             demande.marquer_en_cours(user=request.user)
 
-        return render(request, self.template_name, {'demande': demande})
+        return render(request, self.template_name, {
+            'demande': demande,
+            'campagne_form': DemandeCampagneForm(demande=demande),
+        })
+
+
+class DemandeAssocierCampagneView(StaffRequiredMixin, View):
+    def post(self, request, uuid):
+        demande = get_object_or_404(
+            DemandeReservation.objects.select_related('client', 'reservation__client', 'campagne'),
+            uuid=uuid,
+        )
+        form = DemandeCampagneForm(request.POST, demande=demande)
+        if not form.is_valid():
+            messages.error(request, "La campagne sélectionnée n'est pas valide pour ce client.")
+            return redirect('demande_detail', uuid=uuid)
+
+        demande.campagne = form.cleaned_data['campagne']
+        demande.save(update_fields=['campagne', 'updated_at'])
+        if demande.campagne_id:
+            messages.success(request, "La campagne a été associée à la page de suivi du client.")
+        else:
+            messages.success(request, "L'association de campagne a été retirée.")
+        return redirect('demande_detail', uuid=uuid)
 
 
 class DemandeValiderView(LoginRequiredMixin, View):

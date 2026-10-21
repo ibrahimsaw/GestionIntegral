@@ -2,7 +2,14 @@ from django import forms
 from django.db.models import Q
 from django.utils import timezone
 from datetime import datetime
-from .models import Client, Campagne, Contrat, LigneCampagne, CampagneVisuel, PreuveDiffusion
+from .models import (
+    Client,
+    Campagne,
+    Contrat,
+    LigneCampagne,
+    CampagneVisuel,
+    PreuveDiffusion,
+)
 from inventory.models import Support, FacePanneau, FormatSupport
 
 W = {'class': 'form-control'}
@@ -489,3 +496,30 @@ class PreuveDiffusionForm(forms.ModelForm):
         if ligne and ligne.campagne_id != self.campagne.pk:
             self.add_error('ligne', "Choisissez un support rattaché à cette campagne.")
         return cleaned_data
+
+
+class DemandeCampagneForm(forms.Form):
+    campagne = forms.ModelChoiceField(
+        queryset=Campagne.objects.none(),
+        required=False,
+        empty_label="— Aucune campagne associée —",
+        label="Campagne du suivi",
+        widget=forms.Select(attrs={'class': 'form-select'}),
+    )
+
+    def __init__(self, *args, demande, **kwargs):
+        super().__init__(*args, **kwargs)
+        client_id = demande.client_id
+        if not client_id and demande.reservation_id:
+            client_id = demande.reservation.client_id
+
+        campagnes = (
+            Campagne.objects.filter(client_id=client_id)
+            if client_id
+            else Campagne.objects.none()
+        )
+        if demande.campagne_id:
+            campagnes = campagnes | Campagne.objects.filter(pk=demande.campagne_id)
+        self.fields['campagne'].queryset = campagnes.order_by('nom', 'pk')
+        if not self.is_bound:
+            self.initial['campagne'] = demande.campagne_id

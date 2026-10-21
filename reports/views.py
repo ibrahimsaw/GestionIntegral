@@ -5,6 +5,8 @@ from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from accounts.decorators import *
 from campaigns.models import Campagne, Client, PreuveDiffusion
+from piges.drive_piges import DrivePigesError, download_photo, get_drive_service
+from piges.models import PigeFichier
 from django.http import HttpResponse
 from calendar import monthrange
 from django.template.loader import render_to_string
@@ -138,6 +140,38 @@ def _prepare_preuves_diffusion_pdf(preuves):
     return preuves_prepared
 
 
+def _prepare_piges_drive_pdf(piges):
+    if not piges:
+        return []
+
+    service = get_drive_service()
+    prepared = []
+    for pige in piges:
+        contenu = download_photo(service, pige.drive_file_id)
+        with Image.open(io.BytesIO(contenu)) as image_source:
+            image = ImageOps.exif_transpose(image_source)
+            image.thumbnail((1200, 900), Image.Resampling.LANCZOS)
+            preserve_alpha = "A" in image.getbands() or "transparency" in image.info
+            buffer = io.BytesIO()
+            if preserve_alpha:
+                image.convert("RGBA").save(buffer, format="PNG", optimize=True, compress_level=9)
+                mime_type = "image/png"
+            else:
+                image.convert("RGB").save(
+                    buffer,
+                    format="JPEG",
+                    quality=80,
+                    optimize=True,
+                    progressive=True,
+                )
+                mime_type = "image/jpeg"
+        prepared.append({
+            "pige": pige,
+            "src": f"data:{mime_type};base64,{base64.b64encode(buffer.getvalue()).decode('ascii')}",
+        })
+    return prepared
+
+
 def _spots_sur_periode(date_debut, date_fin, spots_total, periode_debut, periode_fin):
     """Calcule les spots d'une période donnée en fonction d'une durée totale."""
     if not date_debut or not date_fin or not spots_total:
@@ -186,17 +220,19 @@ def _build_context_campagne(campagne):
     """
     Construit le contexte complet pour le PDF / aperçu d'une campagne.
     """
-    enfants = []
-    campagnes = [campagne]
-
-    if campagne.est_mere:
-        enfants = list(campagne.sous_campagnes.all())
-        campagnes = enfants
+    enfants = list(campagne.sous_campagnes.all()) if campagne.est_mere else []
+    campagnes = [campagne, *enfants]
 
     preuves_diffusion = PreuveDiffusion.objects.filter(
         campagne__in=campagnes
     ).select_related(
         "campagne", "ligne__support", "ligne__face__support", "ligne__emplacement__marche"
+    )
+    piges_drive = PigeFichier.objects.filter(
+        campagne__in=campagnes
+    ).select_related(
+        "campagne", "ligne__support", "ligne__face__support",
+        "ligne__emplacement__marche", "support",
     )
 
     # ── Infos générales ──────────────────────────────────────────
@@ -444,6 +480,7 @@ def _build_context_campagne(campagne):
         "supports"             : supports,
         "supports_by_child"    : supports_by_child,
         "preuves_diffusion"    : preuves_diffusion,
+        "piges_drive"          : piges_drive,
         "spots_par_mois"       : spots_par_mois,
         "spots_par_mois_detail": spots_par_mois_detail,
     }
@@ -472,6 +509,20 @@ class ExportCampagnePdfView(ClientStaffRequiredMixin, View):
         context = _build_context_campagne(campagne)
         context["visuels_pdf"] = _prepare_visuels_pdf(campagne)
         context["preuves_diffusion_pdf"] = _prepare_preuves_diffusion_pdf(context["preuves_diffusion"])
+        try:
+            context["piges_drive_pdf"] = _prepare_piges_drive_pdf(context["piges_drive"])
+        except DrivePigesError as exc:
+            context["piges_drive_pdf"] = []
+            context["piges_drive_error"] = (
+                str(exc) if request.user.is_staff_regie_role
+                else "Les photos Google Drive sont temporairement indisponibles. Veuillez réessayer plus tard."
+            )
+            return render(
+                request,
+                "reports/apercu_campagne.html",
+                context,
+                status=503,
+            )
         html_string = render_to_string(
             "reports/campagne_pdf.html",
             context,
@@ -509,10 +560,19 @@ class PreviewCampagnePdfView(ClientStaffRequiredMixin, View):
         context = _build_context_campagne(campagne)
         context["visuels_pdf"] = _prepare_visuels_pdf(campagne)
         context["preuves_diffusion_pdf"] = _prepare_preuves_diffusion_pdf(context["preuves_diffusion"])
+        try:
+            context["piges_drive_pdf"] = _prepare_piges_drive_pdf(context["piges_drive"])
+        except DrivePigesError as exc:
+            context["piges_drive_pdf"] = []
+            context["piges_drive_error"] = (
+                str(exc) if request.user.is_staff_regie_role
+                else "Les photos Google Drive sont temporairement indisponibles. Veuillez réessayer plus tard."
+            )
         return render(
             request,
             "reports/apercu_campagne.html",
             context,
+            status=503 if context.get("piges_drive_error") else 200,
         )
 
 

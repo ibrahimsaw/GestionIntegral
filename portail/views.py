@@ -1437,7 +1437,10 @@ class ConfirmationView(View):
     template_name = 'portail/confirmation.html'
 
     def get(self, request, uuid):
-        demande = get_object_or_404(DemandeReservation, uuid=uuid)
+        demande = get_object_or_404(
+            DemandeReservation.objects.select_related('campagne'),
+            uuid=uuid,
+        )
         return render(request, self.template_name, {'demande': demande})
 
 

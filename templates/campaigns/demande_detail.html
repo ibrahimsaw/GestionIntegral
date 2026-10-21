@@ -106,6 +106,42 @@
       </div>
     </div>
 
+    {% if user.is_staff_regie_role %}
+    <div class="card mb-3">
+      <div class="card-header"><i class="bi bi-camera-fill me-2"></i>Campagne et piges du suivi</div>
+      <div class="card-body">
+        {% if demande.campagne and demande.campagne.lien_piges %}
+          <a href="{{ demande.campagne.lien_piges }}" target="_blank" rel="noopener noreferrer"
+             class="btn btn-sm btn-outline-primary mb-3">
+            <i class="bi bi-folder2-open me-1"></i>Ouvrir les piges de la campagne
+          </a>
+        {% endif %}
+        {% if demande.client or demande.reservation %}
+          <form method="post" action="{% url 'demande_associer_campagne' demande.uuid %}">
+            {% csrf_token %}
+            <label class="form-label" for="{{ campagne_form.campagne.id_for_label }}">
+              {{ campagne_form.campagne.label }}
+            </label>
+            {{ campagne_form.campagne }}
+            {% for error in campagne_form.campagne.errors %}
+              <div class="invalid-feedback d-block">{{ error }}</div>
+            {% endfor %}
+            <div class="form-text mb-3">
+              Seules les campagnes du client associé sont proposées. Le lien Drive apparaîtra dans son suivi s'il existe.
+            </div>
+            <button type="submit" class="btn btn-primary btn-sm">
+              <i class="bi bi-link-45deg me-1"></i>Enregistrer l'association
+            </button>
+          </form>
+        {% else %}
+          <p class="small text-muted mb-0">
+            Associez d'abord cette demande à un client pour sélectionner l'une de ses campagnes.
+          </p>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+
     <!-- Historique -->
     <div class="card">
       <div class="card-header"><i class="bi bi-clock-history me-2"></i>Historique</div>

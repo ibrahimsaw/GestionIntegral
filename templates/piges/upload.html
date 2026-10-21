@@ -1,0 +1,208 @@
+{% extends 'base.html' %}
+
+{% block title %}Ajouter des piges — {{ campagne.reference }}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .piges-upload-progress[hidden] { display: none !important; }
+  .piges-upload-progress .progress { height: 1rem; }
+</style>
+{% endblock %}
+
+{% block topbar_title %}
+  <i class="bi bi-camera-fill me-2" style="color:var(--color-primary)"></i>
+  Ajouter des piges
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3" style="max-width: 920px;">
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-white border-bottom p-4">
+      <div class="d-flex align-items-center gap-3">
+        <span class="d-grid place-items-center rounded-3 p-3 bg-danger-subtle text-danger">
+          <i class="bi bi-camera-fill fs-4"></i>
+        </span>
+        <div>
+          <h1 class="h5 fw-bold mb-1">Preuves photo de diffusion</h1>
+          <p class="text-muted small mb-0">
+            {{ campagne.client.nom }} · {{ campagne.reference }} · {{ campagne.nom }}
+          </p>
+        </div>
+      </div>
+    </div>
+    <div class="card-body p-4">
+      <p class="text-muted mb-4">
+        Les photos seront ajoutées au dossier Drive existant de cette campagne.
+        Elles sont redimensionnées et converties en JPEG avant l'envoi.
+      </p>
+
+      {% if campagne.lien_piges %}
+        <div class="alert alert-info d-flex align-items-center justify-content-between flex-wrap gap-2">
+          <span><i class="bi bi-link-45deg me-1"></i>Un dossier partagé existe déjà ; son lien restera inchangé.</span>
+          <a class="btn btn-sm btn-outline-primary" href="{{ campagne.lien_piges }}" target="_blank" rel="noopener noreferrer">
+            Ouvrir le dossier
+          </a>
+        </div>
+      {% endif %}
+
+      <form method="post" enctype="multipart/form-data" novalidate>
+        {% csrf_token %}
+
+        <div id="upload-errors" class="alert alert-danger" role="alert" {% if not form.non_field_errors %}hidden{% endif %}>
+          {% if form.non_field_errors %}
+            {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
+          {% endif %}
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold" for="{{ form.ligne.id_for_label }}">{{ form.ligne.label }}</label>
+          {{ form.ligne }}
+          {% for error in form.ligne.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+          <div class="form-text">
+            Seuls les supports et emplacements de cette campagne sans pige Drive existante sont proposés.
+            Vous pouvez joindre jusqu’à 20 photos pour la ligne sélectionnée.
+          </div>
+        </div>
+
+        <div class="mb-3">
+          <label class="form-label fw-semibold" for="{{ form.date_prise.id_for_label }}">{{ form.date_prise.label }}</label>
+          {{ form.date_prise }}
+          {% for error in form.date_prise.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+        </div>
+
+        <div class="mb-4">
+          <label class="form-label fw-semibold" for="{{ form.photos.id_for_label }}">{{ form.photos.label }}</label>
+          {{ form.photos }}
+          {% for error in form.photos.errors %}<div class="invalid-feedback d-block">{{ error }}</div>{% endfor %}
+          <div class="form-text">{{ form.photos.help_text }}</div>
+        </div>
+
+        <div id="upload-progress" class="piges-upload-progress mb-4" hidden aria-live="polite">
+          <div class="d-flex justify-content-between align-items-center small mb-2">
+            <span id="upload-progress-label">Préparation de l'envoi…</span>
+            <span id="upload-progress-percent" class="fw-semibold"></span>
+          </div>
+          <div class="progress" role="progressbar" aria-label="Progression de l'envoi des photos"
+               aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+            <div id="upload-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated"
+                 style="width:0%"></div>
+          </div>
+          <div class="form-text mt-2">
+            Une fois les photos transmises, elles sont traitées et envoyées sur Google Drive.
+            Gardez cette page ouverte jusqu'à la fin.
+          </div>
+        </div>
+
+        <div class="d-flex justify-content-between flex-wrap gap-2">
+          <a href="{% url 'campagne_detail' campagne.pk %}" class="btn btn-outline-secondary">
+            <i class="bi bi-arrow-left me-1"></i>Retour à la campagne
+          </a>
+          <button id="upload-submit" type="submit" class="btn btn-primary">
+            <i class="bi bi-cloud-arrow-up-fill me-1"></i>Envoyer les photos
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  (() => {
+    const form = document.querySelector('form[enctype="multipart/form-data"]');
+    const progressContainer = document.getElementById('upload-progress');
+    if (!form || !progressContainer) return;
+
+    const progressBar = document.getElementById('upload-progress-bar');
+    const progressTrack = progressContainer.querySelector('[role="progressbar"]');
+    const progressLabel = document.getElementById('upload-progress-label');
+    const progressPercent = document.getElementById('upload-progress-percent');
+    const errorBox = document.getElementById('upload-errors');
+    const submitButton = document.getElementById('upload-submit');
+
+    function setProgress(percent) {
+      const value = Math.max(0, Math.min(100, Math.round(percent)));
+      progressBar.style.width = value + '%';
+      progressTrack.setAttribute('aria-valuenow', String(value));
+      progressPercent.textContent = value + '%';
+    }
+
+    function restoreForm(message) {
+      errorBox.textContent = message;
+      errorBox.hidden = false;
+      progressContainer.hidden = true;
+      submitButton.disabled = false;
+      submitButton.innerHTML = '<i class="bi bi-cloud-arrow-up-fill me-1"></i>Réessayer l’envoi';
+    }
+
+    form.addEventListener('submit', (event) => {
+      event.preventDefault();
+      errorBox.hidden = true;
+      errorBox.textContent = '';
+      progressContainer.hidden = false;
+      progressLabel.textContent = 'Transfert des photos vers le serveur…';
+      progressPercent.textContent = '0%';
+      progressBar.classList.remove('progress-bar-striped', 'progress-bar-animated');
+      setProgress(0);
+      submitButton.disabled = true;
+
+      const request = new XMLHttpRequest();
+      request.open('POST', form.action || window.location.href);
+      request.setRequestHeader('X-Requested-With', 'XMLHttpRequest');
+      request.timeout = 15 * 60 * 1000;
+
+      request.upload.addEventListener('progress', (progressEvent) => {
+        if (!progressEvent.lengthComputable) return;
+        const percent = progressEvent.total
+          ? (progressEvent.loaded / progressEvent.total) * 100
+          : 0;
+        setProgress(percent);
+      });
+
+      request.upload.addEventListener('load', () => {
+        progressLabel.textContent = 'Photos reçues. Envoi et traitement sur Google Drive en cours…';
+        progressPercent.textContent = '';
+        progressBar.classList.add('progress-bar-striped', 'progress-bar-animated');
+        progressBar.style.width = '100%';
+        progressTrack.removeAttribute('aria-valuenow');
+      });
+
+      request.addEventListener('load', () => {
+        if (request.status >= 200 && request.status < 400) {
+          const responseUrl = new URL(request.responseURL || window.location.href);
+          const requestUrl = new URL(form.action || window.location.href, window.location.href);
+          if (responseUrl.pathname !== requestUrl.pathname) {
+            window.location.assign(responseUrl.href);
+            return;
+          }
+        }
+
+        let message = 'L’envoi a échoué. Vérifiez les photos puis réessayez.';
+        if (request.responseText) {
+          const responseDocument = new DOMParser().parseFromString(request.responseText, 'text/html');
+          const errors = responseDocument.querySelectorAll(
+            '#upload-errors, .invalid-feedback.d-block'
+          );
+          const details = Array.from(errors)
+            .map((error) => error.textContent.trim())
+            .filter(Boolean);
+          if (details.length) message = details.join(' ');
+        }
+        restoreForm(message);
+      });
+
+      request.addEventListener('error', () => {
+        restoreForm('La connexion a été interrompue. Vérifiez votre réseau et réessayez.');
+      });
+      request.addEventListener('timeout', () => {
+        restoreForm('Le délai d’envoi est dépassé. Vérifiez si des photos ont été reçues avant de relancer.');
+      });
+      request.addEventListener('abort', () => {
+        restoreForm('L’envoi a été interrompu.');
+      });
+      request.send(new FormData(form));
+    });
+  })();
+</script>
+{% endblock %}

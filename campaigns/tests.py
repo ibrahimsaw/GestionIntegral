@@ -2,10 +2,15 @@ import datetime
 from types import MethodType
 
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import SimpleTestCase, TestCase
+from django.core.cache import cache
+from django.template.loader import render_to_string
+from django.test import RequestFactory, SimpleTestCase, TestCase
+from django.utils import timezone
 
 from campaigns.forms import PreuveDiffusionForm
 from campaigns.models import Campagne, Client, Contrat, LigneCampagne, PreuveDiffusion
+from campaigns.views import CampagneDetailView, DashboardView
+from piges.models import PigeFichier
 from campaigns.simulation_view import (
     _enrich_resultat_metriques,
     _spots,
@@ -18,7 +23,245 @@ from campaigns.simulation_view import (
     generer_scenarios_simulation,
     normaliser_objectif_spots,
 )
-from inventory.models import Support
+from inventory.models import (
+    EcranNumerique,
+    Emplacement,
+    FacePanneau,
+    FormatSupport,
+    Marche,
+    Support,
+)
+
+
+class DashboardParcGroupingTests(TestCase):
+    def setUp(self):
+        self.client_obj = Client.objects.create(
+            nom='Client dashboard test',
+            telephone='00000000',
+            email='dashboard-test@example.com',
+        )
+        self.formats = {
+            '12m2': FormatSupport.objects.create(
+                code='DASH-12', categorie='12m²', dimensions='4m × 3m',
+            ),
+            'sucette': FormatSupport.objects.create(
+                code='DASH-SUC', categorie='Sucette', dimensions='1m × 2m',
+            ),
+            'geant': FormatSupport.objects.create(
+                code='DASH-GEA', categorie='Géant', dimensions='8m × 6m',
+            ),
+            'marche': FormatSupport.objects.create(
+                code='DASH-MAR', categorie='Marché', dimensions='Marché',
+            ),
+        }
+
+    def create_support(self, code, format_code, ville='Ouagadougou'):
+        return Support.objects.create(
+            code=code,
+            nom=f'Support {code}',
+            type_support=Support.TYPE_PANNEAU,
+            format=format_code,
+            latitude=12.34,
+            longitude=-1.52,
+            ville=ville,
+        )
+
+    def create_campaign(self, name, start_date, end_date, status):
+        return Campagne.objects.create(
+            client=self.client_obj,
+            nom=name,
+            date_debut=start_date,
+            date_fin=end_date,
+            statut=status,
+        )
+
+    def test_supports_and_campaigns_are_classified_from_lines_and_formats(self):
+        today = datetime.date.today()
+        standard = self.create_support('DASH-P12', 'DASH-12')
+        sucette = self.create_support('DASH-PSU', 'DASH-SUC', ville='Bobo-Dioulasso')
+        giant = self.create_support('DASH-PGE', 'DASH-GEA')
+        FacePanneau.objects.create(support=standard, label='A')
+
+        screen = Support.objects.create(
+            code='DASH-ECR',
+            nom='Écran dashboard',
+            type_support=Support.TYPE_ECRAN,
+            latitude=12.34,
+            longitude=-1.52,
+        )
+        EcranNumerique.objects.create(support=screen)
+
+        market = Marche.objects.create(nom='Marché dashboard', ville='Ouagadougou')
+        emplacement = Emplacement.objects.create(marche=market, code='D-01')
+        market_support = self.create_support('DASH-PMA', 'DASH-MAR')
+        market_support.emplacement = emplacement
+        market_support.save()
+
+        campaign = self.create_campaign(
+            'Campagne multi-supports',
+            today,
+            today + datetime.timedelta(days=2),
+            Campagne.STATUT_EN_COURS,
+        )
+        LigneCampagne.objects.create(campagne=campaign, face=standard.faces.get(label='A'))
+        LigneCampagne.objects.create(campagne=campaign, support=standard)
+        LigneCampagne.objects.create(campagne=campaign, support=screen)
+        LigneCampagne.objects.create(campagne=campaign, emplacement=emplacement)
+
+        view = DashboardView()
+        support_groups, campaign_groups = view._build_support_and_campaign_groups(
+            'Ouagadougou', [campaign], []
+        )
+        supports_by_key = {group['key']: group for group in support_groups}
+        campaigns_by_key = {group['key']: group for group in campaign_groups}
+
+        self.assertEqual(supports_by_key['statique_12m2']['nb_supports'], 1)
+        self.assertEqual(supports_by_key['statique_sucettes']['nb_supports'], 0)
+        self.assertEqual(supports_by_key['statique_geants']['nb_supports'], 1)
+        self.assertEqual(supports_by_key['ecrans']['nb_supports'], 1)
+        self.assertEqual(supports_by_key['marches']['nb_supports'], 1)
+        self.assertEqual(supports_by_key['statique_12m2']['nb_faces'], 1)
+        self.assertEqual(supports_by_key['statique_12m2']['nb_faces_bon'], 1)
+        self.assertNotIn('supports', supports_by_key['statique_12m2'])
+
+        self.assertEqual(campaigns_by_key['statique_12m2']['campagnes'], [campaign])
+        self.assertEqual(campaigns_by_key['ecrans']['campagnes'], [campaign])
+        self.assertEqual(campaigns_by_key['marches']['campagnes'], [campaign])
+        self.assertEqual(campaigns_by_key['statique_sucettes']['campagnes'], [])
+
+    def test_dashboard_counts_campaigns_separately_and_filters_by_city(self):
+        today = timezone.now().date()
+        ouaga_support = self.create_support('DASH-OUA', 'DASH-12')
+        bobo_support = self.create_support('DASH-BOB', 'DASH-12', ville='Bobo-Dioulasso')
+        ouaga_face = FacePanneau.objects.create(support=ouaga_support, label='A')
+        bobo_face = FacePanneau.objects.create(support=bobo_support, label='A')
+
+        active_campaign = self.create_campaign(
+            'Campagne à Ouagadougou',
+            today,
+            today + datetime.timedelta(days=2),
+            Campagne.STATUT_EN_COURS,
+        )
+        future_campaign = self.create_campaign(
+            'Campagne à Bobo',
+            today + datetime.timedelta(days=10),
+            today + datetime.timedelta(days=12),
+            Campagne.STATUT_A_VENIR,
+        )
+        LigneCampagne.objects.create(campagne=active_campaign, face=ouaga_face)
+        LigneCampagne.objects.create(campagne=future_campaign, face=bobo_face)
+
+        cache.clear()
+        request = RequestFactory().get('/', {'ville': 'Ouagadougou'})
+        view = DashboardView()
+        view.setup(request)
+        context = view.get_context_data()
+        rendered = render_to_string(view.template_name, context, request=request)
+
+        self.assertEqual(context['total_campagnes'], 1)
+        self.assertEqual(context['campagnes_actives'], 1)
+        self.assertEqual(context['campagnes_a_venir'], 0)
+        self.assertEqual(
+            next(group for group in context['support_groups'] if group['key'] == 'statique_12m2')['nb_supports'],
+            1,
+        )
+        self.assertIn('Supports', rendered)
+        self.assertIn('Campagnes', rendered)
+        self.assertNotIn('Supports au total', rendered)
+        self.assertNotIn('Supports recensés', rendered)
+        self.assertNotIn('Supports en panne', rendered)
+        self.assertIn('Campagnes en cours', rendered)
+        self.assertIn('Campagnes à venir', rendered)
+        self.assertIn('data-alert-fold="parcAlertsContent"', rendered)
+        self.assertIn('aria-expanded="false"', rendered)
+        self.assertIn('id="parcAlertsContent" class="d-none"', rendered)
+        self.assertNotIn('DASH-OUA', rendered)
+        self.assertNotIn('DASH-BOB', rendered)
+        self.assertIn('<strong>1</strong><span>Bon état</span>', rendered)
+
+    def test_dashboard_hides_cities_without_classified_supports_and_empty_categories(self):
+        self.create_support('DASH-VALID', 'DASH-12')
+        Support.objects.create(
+            code='DASH-NO-FORMAT',
+            nom='Support sans format',
+            type_support=Support.TYPE_PANNEAU,
+            latitude=12.34,
+            longitude=-1.52,
+            ville='Ville sans catégorie',
+        )
+        screen = Support.objects.create(
+            code='DASH-SCREEN-CITY',
+            nom='Écran dans une ville distincte',
+            type_support=Support.TYPE_ECRAN,
+            latitude=12.34,
+            longitude=-1.52,
+            ville='Ville avec écran',
+        )
+        EcranNumerique.objects.create(support=screen)
+
+        cache.clear()
+        request = RequestFactory().get('/', {'ville': 'Ville sans catégorie'})
+        view = DashboardView()
+        view.setup(request)
+        context = view.get_context_data()
+        rendered = render_to_string(view.template_name, context, request=request)
+
+        self.assertIn('Ouagadougou', context['villes'])
+        self.assertIn('Ville avec écran', context['villes'])
+        self.assertNotIn('Ville sans catégorie', context['villes'])
+        self.assertEqual(context['ville_active'], '')
+        self.assertNotIn(
+            'statique_sucettes',
+            [group['key'] for group in context['support_groups_present']],
+        )
+        self.assertLess(
+            rendered.index('id="parc-campagnes-title"'),
+            rendered.index('id="parc-map-title"'),
+        )
+
+    def test_campaign_categories_follow_city_supports_even_without_campaigns(self):
+        self.create_support('DASH-OUA-12', 'DASH-12', ville='Ouagadougou')
+        self.create_support('DASH-OUA-SUC', 'DASH-SUC', ville='Ouagadougou')
+        screen = Support.objects.create(
+            code='DASH-BOB-SCREEN',
+            nom='Écran à Bobo',
+            type_support=Support.TYPE_ECRAN,
+            latitude=11.18,
+            longitude=-4.29,
+            ville='Bobo-Dioulasso',
+        )
+        EcranNumerique.objects.create(support=screen)
+        cache.clear()
+
+        city_request = RequestFactory().get('/', {'ville': 'Ouagadougou'})
+        city_view = DashboardView()
+        city_view.setup(city_request)
+        city_context = city_view.get_context_data()
+        city_categories = city_context['campaign_category_groups_present']
+        city_keys = {group['key'] for group in city_categories}
+
+        self.assertEqual(city_keys, {'statique_12m2', 'statique_sucettes'})
+        self.assertTrue(all(group['nb_campagnes'] == 0 for group in city_categories))
+        city_rendered = render_to_string(
+            city_view.template_name, city_context, request=city_request
+        )
+        campaign_section = city_rendered.split(
+            'aria-labelledby="parc-campagnes-title"', 1
+        )[1].split('aria-labelledby="parc-map-title"', 1)[0]
+        self.assertIn('Statique — 12 m²', campaign_section)
+        self.assertIn('Statique — Sucettes', campaign_section)
+        self.assertNotIn('Écrans numériques', campaign_section)
+
+        global_request = RequestFactory().get('/')
+        global_view = DashboardView()
+        global_view.setup(global_request)
+        global_context = global_view.get_context_data()
+        global_keys = {
+            group['key'] for group in global_context['campaign_category_groups_present']
+        }
+        self.assertEqual(
+            global_keys, {'statique_12m2', 'statique_sucettes', 'ecrans'}
+        )
 
 
 class ContractDocumentTests(TestCase):
@@ -145,6 +388,38 @@ class PreuveDiffusionFormTests(TestCase):
 
         self.assertTrue(form.is_valid(), form.errors)
         self.assertEqual(form.cleaned_data['photo'].name, 'piges/existing-proof.png')
+
+    def test_campaign_detail_context_includes_existing_proofs(self):
+        preuve = PreuveDiffusion.objects.create(
+            campagne=self.campagne,
+            ligne=self.ligne,
+            date_heure=datetime.datetime(2026, 10, 17, 10, 15),
+            photo='piges/existing-proof.png',
+        )
+
+        view = CampagneDetailView()
+        view.object = self.campagne
+        context = view.get_context_data()
+
+        self.assertIn(preuve, context['preuves_diffusion'])
+
+    def test_campaign_detail_context_includes_drive_piges(self):
+        pige = PigeFichier.objects.create(
+            campagne=self.campagne,
+            ligne=self.ligne,
+            support=self.ligne.support,
+            support_nom='Écran pige test',
+            ville='Ouagadougou',
+            date_prise=datetime.date(2026, 10, 17),
+            nom_fichier='Ouagadougou_Ecran_2026-10-17_1.jpg',
+            drive_file_id='drive-file-campaign-detail-test',
+        )
+
+        view = CampagneDetailView()
+        view.object = self.campagne
+        context = view.get_context_data()
+
+        self.assertIn(pige, context['pige_fichiers_drive'])
 
 
 class NombreVisuelsSpotsTests(SimpleTestCase):

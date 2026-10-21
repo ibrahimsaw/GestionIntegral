@@ -24,4 +24,4 @@ RUN pip install --no-cache-dir --upgrade pip \
 
 COPY . /app/
 
-CMD ["python", "geoad.wsgi:application", "--bind", "0.0.0.0:8000", "--chdir"]
+CMD ["gunicorn", "geoad.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3", "--timeout", "120"]

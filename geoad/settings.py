@@ -5,37 +5,43 @@ Settings Django
 import os  # <--- CRITIQUE : Ne pas oublier d'importer os pour os.environ
 from pathlib import Path
 from dotenv import load_dotenv
+from django.core.exceptions import ImproperlyConfigured
 
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 load_dotenv(BASE_DIR / '.env')
-# Mode de débogage (Mettre à False en production)
-DEBUG = True  # <--- CRITIQUE : Toujours désactiver le mode debug en production
+DEBUG = os.environ.get('DEBUG', 'False').strip().lower() in {'1', 'true', 'yes', 'on'}
+SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
+
+if not SECRET_KEY:
+    raise ImproperlyConfigured('DJANGO_SECRET_KEY must be set in the environment.')
+
+ALLOWED_HOSTS = [
+    host.strip()
+    for host in os.environ.get(
+        'ALLOWED_HOSTS',
+        'localhost,127.0.0.1' if DEBUG else 'integralcarte.regies.tech',
+    ).split(',')
+    if host.strip()
+]
+CSRF_TRUSTED_ORIGINS = [
+    origin.strip()
+    for origin in os.environ.get(
+        'CSRF_TRUSTED_ORIGINS',
+        'https://integralcarte.regies.tech' if not DEBUG else '',
+    ).split(',')
+    if origin.strip()
+]
+
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 if not DEBUG:
-    SECRET_KEY = os.environ.get('DJANGO_SECRET_KEY')
-    ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS', 'integralcarte.regies.tech').split(',')
-    CSRF_TRUSTED_ORIGINS = os.environ.get(
-        'CSRF_TRUSTED_ORIGINS',
-        'https://integralcarte.regies.tech'
-    ).split(',')
-
-    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-    SECURE_SSL_REDIRECT = False  # Nginx Proxy Manager gère le SSL
+    SECURE_SSL_REDIRECT = True
     SECURE_HSTS_SECONDS = 31536000
     SECURE_HSTS_INCLUDE_SUBDOMAINS = True
     SECURE_HSTS_PRELOAD = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
-else:
-    SECRET_KEY = 'Integral-secret-key-change-in-production-2024'
-    ALLOWED_HOSTS = ['*', 'localhost', '127.0.0.1', '187.124.54.132']
-    CSRF_TRUSTED_ORIGINS = [
-        'https://integralcarte.regies.tech',
-        'http://integralcarte.regies.tech',
-        'http://187.124.54.132:8086',
-    ]
-    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # ─────────────────────────────────────────────────────────────────────────────
 # CONFIGURATION EMAIL

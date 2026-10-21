@@ -93,6 +93,25 @@ python manage.py createsuperuser
 python manage.py runserver
 ```
 
+### Déploiement Docker en production
+
+Le service Docker utilise Gunicorn avec `DEBUG=False`. Avant son premier démarrage,
+créez le fichier de configuration local (ignoré par Git) et renseignez les secrets :
+
+```bash
+cp .env.example .env
+openssl rand -base64 48  # copier le résultat dans DJANGO_SECRET_KEY dans .env
+chmod 600 .env
+```
+
+Renseignez également les identifiants OAuth Google Drive dans `GOOGLE_CLIENT_ID`,
+`GOOGLE_CLIENT_SECRET` et `GOOGLE_REFRESH_TOKEN` pour activer l’envoi des piges.
+Ne partagez pas ce fichier et ne le commitez pas. Puis déployez :
+
+```bash
+docker compose up -d --build web
+```
+
 ---
 
 ## 🌐 URLs Principales

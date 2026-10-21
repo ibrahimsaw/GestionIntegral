@@ -95,7 +95,8 @@ python manage.py runserver
 
 ### Déploiement Docker en production
 
-Le service Docker utilise Gunicorn avec `DEBUG=False`. Avant son premier démarrage,
+Le service Docker utilise Gunicorn avec `DEBUG=False` et Nginx sert les fichiers
+statiques et médias. Avant son premier démarrage,
 créez le fichier de configuration local (ignoré par Git) et renseignez les secrets :
 
 ```bash
@@ -109,7 +110,7 @@ Renseignez également les identifiants OAuth Google Drive dans `GOOGLE_CLIENT_ID
 Ne partagez pas ce fichier et ne le commitez pas. Puis déployez :
 
 ```bash
-docker compose up -d --build web
+docker compose up -d --build
 ```
 
 ---

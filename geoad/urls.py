@@ -3,8 +3,10 @@ from django.urls import path, include
 from django.conf import settings
 from django.conf.urls.static import static
 from django.views.generic import RedirectView
+from core.media_views import protected_media
 
 urlpatterns = [
+    path('protected-media/<path:media_path>', protected_media, name='protected_media'),
     path('favicon.ico', RedirectView.as_view(url=settings.STATIC_URL + 'img/logo.png', permanent=True)),
     path('gestion/admin/', admin.site.urls),
     path('gestion/accounts/', include('accounts.urls')),

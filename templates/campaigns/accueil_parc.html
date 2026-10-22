@@ -27,651 +27,633 @@
 
 {% block content %}
 <style>
-  .parc {
-    --ink: #1f1d1a;
-    --muted: #6e6a64;
-    --line: #e4dfd7;
-    --paper: #f7f5f1;
+  .pg {
+    --bg: #f4f5f7;
     --card: #ffffff;
-    --brique: #932e2b;
-    --ok: #2f6b4f;
-    --warn: #b7791f;
+    --tile: #eceef2;
+    --ink: #16181d;
+    --ink-2: #434956;
+    --muted: #6f7681;
+    --line: #e2e5ea;
+    --accent: #932e2b;
+    --ok: #1d7a4b;
+    --warn: #a35f0a;
     --ko: #b42318;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+
+    background: var(--bg);
     color: var(--ink);
+    font-family: var(--sans);
+    font-size: .9rem;
     max-width: 1600px;
     margin: 0 auto;
-    padding: clamp(1rem, 2.5vw, 2rem);
+    padding: clamp(1rem, 2.2vw, 1.5rem);
   }
-  .parc *, .parc *::before, .parc *::after { box-sizing: border-box; }
-  .parc a { color: inherit; }
+  .pg *, .pg *::before, .pg *::after { box-sizing: border-box; }
+  .pg a { color: inherit; }
 
   /* ── En-tête ── */
-  .parc-head {
+  .pg-head {
     display: flex;
     flex-wrap: wrap;
     align-items: flex-end;
     justify-content: space-between;
-    gap: 1rem 2rem;
-    padding-bottom: 1.1rem;
+    gap: 1rem;
+    margin-bottom: 1.1rem;
   }
-  .parc-kicker { font-size: .72rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--brique); }
-  .parc-title { margin: .25rem 0 0; font-size: clamp(1.5rem, 3vw, 2.1rem); font-weight: 750; letter-spacing: -.02em; line-height: 1.15; }
-  .parc-scope { margin: .35rem 0 0; color: var(--muted); font-size: .9rem; }
-
-  .parc-tabs {
-    display: flex;
-    flex-wrap: nowrap;
-    gap: .2rem;
-    max-width: 100%;
-    padding: .25rem;
-    overflow-x: auto;
+  .pg-kicker { margin: 0; color: var(--muted); font-size: .74rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
+  .pg-head h1 { margin: .2rem 0 0; font-size: 1.6rem; font-weight: 700; letter-spacing: -.02em; line-height: 1.15; }
+  .pg-sub { margin: .25rem 0 0; color: var(--muted); }
+  .pg-cities { display: flex; flex-wrap: nowrap; gap: .4rem; max-width: 100%; overflow-x: auto; }
+  .pg-city {
+    flex: 0 0 auto;
+    padding: .42rem .8rem;
     border: 1px solid var(--line);
-    border-radius: 999px;
+    border-radius: 6px;
     background: var(--card);
-    scrollbar-width: thin;
-  }
-  .parc-tab {
-    padding: .42rem .9rem;
-    border-radius: 999px;
-    color: var(--muted);
+    color: var(--ink-2);
     font-size: .85rem;
     text-decoration: none;
     white-space: nowrap;
-    transition: background-color .15s ease, color .15s ease;
   }
-  .parc-tab:hover { color: var(--ink); background: var(--paper); }
-  .parc-tab.is-active { background: var(--ink); color: #fff; }
-  .parc-tab i { margin-right: .3rem; opacity: .8; }
+  .pg-city:hover { border-color: #c5cad3; }
+  .pg-city.is-active { background: var(--ink); border-color: var(--ink); color: #fff; font-weight: 600; }
+  .pg-city i { display: none; }
 
-  /* ── Chiffres clés : une seule bande ── */
-  .parc-figures {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    margin: 1.25rem 0;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    background: var(--card);
-  }
-  .parc-fig { padding: 1.05rem 1.25rem; border-left: 1px solid var(--line); }
-  .parc-fig:first-child { border-left: 0; border-radius: 14px 0 0 14px; }
-  .parc-fig:last-child { border-radius: 0 14px 14px 0; }
-  .parc-fig strong { display: block; font-size: clamp(1.5rem, 3vw, 2rem); font-weight: 750; line-height: 1; font-variant-numeric: tabular-nums; }
-  .parc-fig span { display: block; margin-top: .4rem; color: var(--muted); font-size: .8rem; }
-  .parc-fig.is-alert strong { color: var(--ko); }
-  .parc-inventory-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: .9rem;
-    margin: 1.25rem 0;
-  }
-  .parc-inventory-card {
-    --inventory-accent: var(--brique);
-    min-width: 0;
-    padding: 1rem;
-    border: 1px solid var(--line);
-    border-top: 3px solid var(--inventory-accent);
-    border-radius: 8px;
-    background: linear-gradient(145deg, #fff 55%, color-mix(in srgb, var(--inventory-accent) 5%, #fff));
-    box-shadow: 0 4px 14px rgba(31, 29, 26, .035);
-  }
-  .parc-inventory-card.is-panels { --inventory-accent: #932e2b; }
-  .parc-inventory-card.is-screens { --inventory-accent: #087da5; }
-  .parc-inventory-card.is-markets { --inventory-accent: #c36b16; }
-  .parc-inventory-card-head {
+  /* ── Indicateurs ── */
+  .pg-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .75rem; margin-bottom: 1rem; }
+  .pg-kpi { padding: .9rem 1.05rem; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
+  .pg-kpi strong { display: block; font-size: 1.55rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+  .pg-kpi span { display: block; margin-top: .35rem; color: var(--muted); font-size: .8rem; }
+  .pg-kpi.is-alert strong { color: var(--ko); }
+
+  /* ── Mise en page ── */
+  .pg-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); gap: 1rem; align-items: start; }
+  .pg-main, .pg-side { display: grid; gap: 1rem; min-width: 0; }
+  .pg-card { min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--card); overflow: hidden; }
+  .pg-card.is-plain { background: transparent; border: 0; overflow: visible; }
+  .pg-card-head {
     display: flex;
     align-items: center;
-    gap: .7rem;
-    margin-bottom: .9rem;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: .6rem 1rem;
+    padding: .85rem 1.05rem;
+    border-bottom: 1px solid var(--line);
   }
-  .parc-inventory-icon {
-    display: grid;
-    width: 2.45rem;
-    height: 2.45rem;
-    flex: 0 0 auto;
-    place-items: center;
-    border-radius: .75rem;
-    background: color-mix(in srgb, var(--inventory-accent) 11%, white);
-    color: var(--inventory-accent);
-    font-size: 1.1rem;
-  }
-  .parc-inventory-title { margin: 0; color: var(--ink); font-size: .95rem; font-weight: 750; }
-  .parc-inventory-caption { margin: .12rem 0 0; color: var(--muted); font-size: .72rem; }
-  .parc-inventory-metrics {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .pg-card-head h2 { margin: 0; font-size: .97rem; font-weight: 700; }
+  .pg-card-head p { margin: .15rem 0 0; color: var(--muted); font-size: .8rem; }
+  .pg-card-body { padding: .9rem 1.05rem; }
+  .pg-muted { color: var(--muted); font-size: .82rem; }
+
+  /* ── Blocs par catégorie ── */
+  .pg-blocks { display: grid; gap: .75rem; padding: 0; }
+  .pg-block {
+    min-width: 0;
+    padding: .9rem 1rem 1rem;
     border: 1px solid var(--line);
-    border-radius: 10px;
-    background: rgba(255,255,255,.82);
+    border-radius: 8px;
+    background: #ffffff;
   }
-  .parc-inventory-metric { min-width: 0; padding: .7rem .8rem; }
-  .parc-inventory-metric + .parc-inventory-metric { border-left: 1px solid var(--line); }
-  .parc-inventory-value {
+  .pg-block-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: .75rem;
+    margin-bottom: .7rem;
+  }
+  .pg-block-head h3 { margin: 0; font-size: .98rem; font-weight: 700; }
+  .pg-block-tag { color: var(--muted); font-size: .76rem; }
+  .pg-block-link {
+    display: inline-flex;
+    align-items: center;
+    gap: .35rem;
+    margin-left: auto;
+    padding: .3rem .6rem;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: #ffffff;
+    color: var(--ink-2);
+    font-size: .76rem;
+    font-weight: 600;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .pg-block-link:hover { border-color: var(--ink); color: var(--ink); }
+  .pg-block-link i { font-size: .8rem; }
+
+  /* Tuiles : libellé en haut, chiffre dessous */
+  .pg-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .5rem; }
+  .pg-tiles.is-two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .pg-tiles.is-three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .pg-tile {
+    min-width: 0;
+    padding: .6rem .7rem .65rem;
+    border-radius: 6px;
+    background: var(--tile);
+  }
+  .pg-tile span {
     display: block;
-    color: var(--ink);
-    font-size: clamp(1.25rem, 2vw, 1.65rem);
-    font-weight: 800;
-    line-height: 1.1;
+    color: var(--muted);
+    font-size: .66rem;
+    font-weight: 700;
+    letter-spacing: .05em;
+    text-transform: uppercase;
+    line-height: 1.2;
+  }
+  .pg-tile strong {
+    display: block;
+    margin-top: .3rem;
+    font-size: 1.3rem;
+    font-weight: 700;
+    line-height: 1;
     font-variant-numeric: tabular-nums;
   }
-  .parc-inventory-metric.is-good .parc-inventory-value { color: var(--ok); }
-  .parc-inventory-metric.is-current .parc-inventory-value { color: var(--inventory-accent); }
-  .parc-inventory-metric.is-upcoming .parc-inventory-value { color: #596b83; }
-  .parc-inventory-label { display: block; margin-top: .25rem; color: var(--muted); font-size: .68rem; line-height: 1.25; }
+  .pg-tile.is-current strong { color: var(--accent); }
+  .pg-tile.is-good strong { color: var(--ok); }
+  .pg-tile.is-upcoming strong { color: var(--ink-2); }
 
-  /* ── Panneaux ── */
-  .parc-grid { display: grid; grid-template-columns: minmax(0, 1fr); gap: 1.25rem; align-items: start; }
-  .parc-panel { padding: 1.2rem; border: 1px solid var(--line); border-radius: 8px; background: var(--card); min-width: 0; }
-  .parc-panel + .parc-panel { margin-top: 1.25rem; }
-  .parc-panel-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
-  .parc-panel-head h2 { margin: 0; font-size: 1rem; font-weight: 700; display: flex; align-items: center; gap: .5rem; }
-  .parc-panel-head h2 i { color: var(--brique); }
-  .parc-panel-head p { margin: .25rem 0 0; color: var(--muted); font-size: .8rem; }
-  .parc-sub-label { margin: 1.25rem 0 .6rem; color: var(--muted); font-size: .7rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
-  .parc-sub-label:first-of-type { margin-top: 0; }
-  .parc-muted { color: var(--muted); font-size: .8rem; }
-
-  /* ── Carte ── */
-  #parc-home-map {
-    height: clamp(320px, 38vw, 480px);
+  /* Sous-blocs : formats, marchés, résolutions */
+  .pg-subs { display: grid; gap: .5rem; margin-top: .75rem; }
+  .pg-sub {
+    padding: .6rem .75rem;
     border: 1px solid var(--line);
-    border-radius: 10px;
-    background: #eceae5;
+    border-radius: 6px;
+    background: #ffffff;
   }
-  #parc-map-error { margin-top: .75rem; }
+  .pg-sub-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: .4rem 1rem;
+  }
+  .pg-sub-title { font-size: .9rem; font-weight: 600; }
+  .pg-sub-title small { margin-left: .4rem; color: var(--muted); font-size: .74rem; font-weight: 400; }
+  .pg-sub .pg-tile { background: var(--tile); }
+
+  /* Valeurs affichées à côté du nom : Panneaux · Faces · Occupés · Libres */
+  .pg-stats-inline { display: flex; flex-wrap: wrap; gap: .5rem 1.1rem; }
+  .pg-stats-inline { gap: .45rem; }
+  .pg-stats-inline > span {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    min-width: 4.4rem;
+    padding: .45rem .65rem .5rem;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: var(--tile);
+    text-align: center;
+  }
+  .pg-stats-inline small { color: var(--muted); font-size: .64rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; line-height: 1.2; }
+  .pg-stats-inline b { margin-top: .25rem; color: var(--ink); font-size: 1.1rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+  .pg-stats-inline .is-current b { color: var(--accent); }
+  .pg-stats-inline .is-good b { color: var(--ok); }
+
+  /* Écrans : liste à plat, un écran par ligne */
+  .pg-ecrans { display: grid; gap: .45rem; margin-top: .75rem; }
+  .pg-ecran {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    padding: .6rem .75rem;
+    border-radius: 6px;
+    background: var(--tile);
+  }
+  .pg-ecran-main { min-width: 0; }
+  .pg-ecran-main strong { display: block; font-size: .9rem; font-weight: 600; }
+  .pg-ecran-main small { display: block; overflow: hidden; color: var(--muted); font-size: .74rem; text-overflow: ellipsis; white-space: nowrap; }
+  .pg-ecran-state { flex: 0 0 auto; padding: .25rem .65rem; border-radius: 999px; font-size: .72rem; font-weight: 700; }
+  .pg-ecran-state.is-occupe { background: #f8dedb; color: var(--accent); }
+  .pg-ecran-state.is-libre { background: #d6eee1; color: var(--ok); }
 
   /* ── Alertes ── */
-  .parc-alerts { display: grid; gap: .5rem; max-height: 440px; overflow-y: auto; padding-right: .15rem; }
-  .parc-alert {
+  .pg-alerts { display: grid; gap: .5rem; }
+  .pg-alert {
     display: flex;
     align-items: flex-start;
     gap: .6rem;
-    padding: .75rem .85rem;
+    padding: .6rem .7rem;
     border: 1px solid var(--line);
-    border-left: 3px solid var(--muted);
-    border-radius: 10px;
-    background: #fff;
-    font-size: .86rem;
+    border-radius: 6px;
+    font-size: .85rem;
     line-height: 1.35;
     text-decoration: none;
-    transition: background-color .15s ease;
   }
-  .parc-alert:hover { background: var(--paper); }
-  .parc-alert i { margin-top: .1rem; }
-  .parc-alert.is-danger { border-left-color: var(--ko); background: #fdf5f4; }
-  .parc-alert.is-danger i { color: var(--ko); }
-  .parc-alert.is-warning { border-left-color: var(--warn); background: #fdf9f0; }
-  .parc-alert.is-warning i { color: var(--warn); }
-  .parc-alert-arrow { margin-left: auto; color: var(--muted); }
-  .parc-ok { display: flex; align-items: center; gap: .5rem; padding: .75rem .85rem; border-radius: 10px; background: #f1f8f4; color: var(--ok); font-size: .86rem; }
-
-  /* ── Catégories (supports et campagnes) ── */
-  .parc-cats {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(330px, 1fr));
-    align-items: start;
-    gap: .75rem;
-  }
-  .parc-cat {
-    --cat: var(--brique);
-    position: relative;
-    overflow: hidden;
-    border: 1px solid var(--line);
-    border-radius: 12px;
-    background: #fff;
-  }
-  .parc-cat > summary {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr) auto;
+  .pg-alert:hover { background: #fafbfc; }
+  .pg-alert i { margin-top: .12rem; color: var(--muted); }
+  .pg-alert.is-danger { border-color: #f3c9c5; background: #fff8f7; }
+  .pg-alert.is-danger i { color: var(--ko); }
+  .pg-alert.is-warning { border-color: #f1dcb5; background: #fffbf3; }
+  .pg-alert.is-warning i { color: var(--warn); }
+  .pg-alert-arrow { margin-left: auto; color: var(--muted); }
+  .pg-ok {
+    display: flex;
     align-items: center;
-    gap: .9rem;
-    padding: .95rem 1rem .95rem 1.15rem;
+    gap: .5rem;
+    padding: .6rem .7rem;
+    border: 1px solid #cfe7da;
+    border-radius: 6px;
+    background: #f3faf6;
+    color: var(--ok);
+    font-size: .85rem;
+  }
+
+  /* ── Campagnes : détail par catégorie ── */
+  .pg-cat { border-top: 1px solid var(--line); }
+  .pg-cat:first-child { border-top: 0; }
+  .pg-cat > summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .75rem;
+    padding: .75rem 1.05rem;
     list-style: none;
     cursor: pointer;
+    font-weight: 600;
   }
-  .parc-cat > summary::-webkit-details-marker { display: none; }
-  .parc-cat > summary::before { content: ""; position: absolute; top: 0; bottom: 0; left: 0; width: 4px; background: var(--cat); }
-  .parc-cat > summary:hover { background: var(--paper); }
-  .parc-cat-icon {
-    display: grid;
-    width: 2.35rem;
-    height: 2.35rem;
-    place-items: center;
-    border-radius: 10px;
-    color: var(--cat);
-    background: color-mix(in srgb, var(--cat) 12%, #fff);
+  .pg-cat > summary::-webkit-details-marker { display: none; }
+  .pg-cat > summary:hover { background: #fafbfc; }
+  .pg-cat-count {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
   }
-  .parc-cat-name { font-size: .93rem; font-weight: 700; line-height: 1.2; }
-  .parc-cat-sub { margin-top: .15rem; color: var(--muted); font-size: .76rem; }
-  .parc-cat-count { display: flex; align-items: center; gap: .5rem; color: var(--cat); font-size: 1.45rem; font-weight: 750; font-variant-numeric: tabular-nums; line-height: 1; }
-  .parc-cat-count i { color: #a9a39b; font-size: .72rem; transition: transform .15s ease; }
-  .parc-cat[open] .parc-cat-count i { transform: rotate(180deg); }
-  .parc-cat-body { display: grid; gap: .85rem; padding: .95rem 1.15rem 1.1rem; border-top: 1px solid var(--line); background: var(--paper); }
+  .pg-cat-count i, .pg-recent > summary i { color: var(--muted); font-size: .7rem; transition: transform .15s ease; }
+  .pg-cat[open] .pg-cat-count i, .pg-recent[open] > summary i { transform: rotate(180deg); }
+  .pg-cat-body { padding: 0 1.05rem .75rem; }
+  .pg-list { max-height: 320px; overflow-y: auto; }
+  .pg-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: .6rem;
+    padding: .55rem 0;
+    border-top: 1px solid var(--line);
+  }
+  .pg-row:first-child { border-top: 0; }
+  .pg-row-main { min-width: 0; }
+  .pg-row-name {
+    display: block;
+    overflow: hidden;
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    text-decoration: none;
+  }
+  .pg-row-name:hover { color: var(--accent); }
+  .pg-row-meta { color: var(--muted); font-size: .76rem; }
 
-  /* Barre d'état : bon / maintenance / panne */
-  .parc-bar { display: flex; height: 6px; margin-top: .6rem; overflow: hidden; border-radius: 99px; background: #ebe6dd; }
-  .parc-bar > span { display: block; height: 100%; }
-  .parc-legend { display: flex; flex-wrap: wrap; gap: .25rem .85rem; margin-top: .45rem; color: var(--muted); font-size: .72rem; }
-  .parc-legend i { display: inline-block; width: .5rem; height: .5rem; margin-right: .3rem; border-radius: 50%; }
+  .pg-recent > summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: .8rem 1.05rem;
+    list-style: none;
+    cursor: pointer;
+    font-weight: 600;
+  }
+  .pg-recent > summary::-webkit-details-marker { display: none; }
+  .pg-recent > summary:hover { background: #fafbfc; }
+  .pg-recent .pg-list { padding: 0 1.05rem .6rem; }
 
-  .parc-facts { display: grid; grid-template-columns: repeat(auto-fit, minmax(105px, 1fr)); gap: .5rem; }
-  .parc-fact { padding: .6rem .7rem; border: 1px solid var(--line); border-radius: 10px; background: #fff; }
-  .parc-fact strong { display: block; font-size: 1.1rem; font-variant-numeric: tabular-nums; }
-  .parc-fact span { color: var(--muted); font-size: .72rem; }
+  /* ── Carte ── */
+  #parc-home-map { height: clamp(320px, 38vw, 440px); background: #e9ecef; }
+  #parc-map-error { margin: .75rem; }
 
-  /* Lignes de campagnes */
-  .parc-row { display: flex; align-items: center; justify-content: space-between; gap: .6rem; padding: .55rem 0; border-top: 1px solid var(--line); }
-  .parc-row:first-child { border-top: 0; padding-top: 0; }
-  .parc-row-main { min-width: 0; }
-  .parc-row-name { display: block; overflow: hidden; color: var(--ink); font-size: .84rem; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; text-decoration: none; }
-  .parc-row-name:hover { color: var(--brique); }
-  .parc-row-meta { color: var(--muted); font-size: .74rem; }
-  .parc-list-scroll { max-height: 340px; overflow-y: auto; }
-
-  .parc-recent > summary { display: flex; align-items: center; justify-content: space-between; padding: .8rem 0; cursor: pointer; list-style: none; font-weight: 700; font-size: .92rem; }
-  .parc-recent > summary::-webkit-details-marker { display: none; }
-  .parc-recent > summary i { color: #a9a39b; transition: transform .15s ease; }
-  .parc-recent[open] > summary i { transform: rotate(180deg); }
+  /* Filtres et légende des catégories sur la carte */
+  .pg-filters { display: flex; flex-wrap: wrap; gap: .4rem; padding: .75rem 1rem 0; }
+  .pg-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: .45rem;
+    padding: .32rem .65rem;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: #ffffff;
+    color: var(--ink-2);
+    font: inherit;
+    font-size: .8rem;
+    cursor: pointer;
+  }
+  .pg-chip:hover { border-color: #c5cad3; }
+  .pg-chip[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: #ffffff; }
+  .pg-chip-dot { width: .55rem; height: .55rem; border-radius: 50%; }
+  .pg-chip[aria-pressed="false"] .pg-chip-dot { opacity: .35; }
+  .pg-chip-count { opacity: .7; font-variant-numeric: tabular-nums; }
+  .pg-chip.is-back { border-style: dashed; }
+  .pg-block-head { flex-wrap: wrap; }
 
   /* ── Responsive ── */
-  @media (max-width: 1199.98px) {
-    .parc-figures { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .parc-fig:nth-child(odd) { border-left: 0; }
-    .parc-fig:nth-child(n+3) { border-top: 1px solid var(--line); }
-    .parc-fig:nth-child(1) { border-radius: 14px 0 0 0; }
-    .parc-fig:nth-child(2) { border-radius: 0 14px 0 0; }
-    .parc-fig:nth-child(3) { border-radius: 0 0 0 14px; }
-    .parc-fig:nth-child(4) { border-radius: 0 0 14px 0; }
-    .parc-inventory-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  @media (max-width: 1100px) {
+    .pg-layout { grid-template-columns: minmax(0, 1fr); }
   }
-  @media (max-width: 991.98px) {
-    .parc-grid { grid-template-columns: minmax(0, 1fr); }
-    .parc-alerts { max-height: none; }
-  }
-  @media (max-width: 575.98px) {
-    .parc-head { align-items: stretch; }
-    .parc-tabs { width: 100%; }
-    .parc-panel { padding: 1rem; }
-    .parc-cats { grid-template-columns: minmax(0, 1fr); }
-    .parc-fig { padding: .9rem 1rem; }
-    .parc-fig strong { font-size: 1.4rem; }
-    .parc-inventory-grid { grid-template-columns: minmax(0, 1fr); gap: .65rem; }
-    .parc-inventory-card { padding: .85rem; }
+  @media (max-width: 700px) {
+    .pg-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .pg-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .pg-tile strong { font-size: 1.15rem; }
+    .pg-card-body { padding: .75rem; }
+    .pg-blocks { padding: .7rem; }
   }
   @media (prefers-reduced-motion: reduce) {
-    .parc *, .parc *::before, .parc *::after { transition: none !important; }
+    .pg *, .pg *::before, .pg *::after { transition: none !important; }
   }
 </style>
 
-<main class="parc">
+<main class="pg">
 
-  {# ── En-tête et filtre par ville ── #}
-  <header class="parc-head">
+  {# ── En-tête ── #}
+  <header class="pg-head">
     <div>
-      <div class="parc-kicker">Tableau de bord</div>
-      <h1 class="parc-title">Parc publicitaire</h1>
-      <p class="parc-scope">
-        {% if ville_active %}Supports et campagnes à {{ ville_active }}.{% else %}Ensemble du parc, toutes villes confondues.{% endif %}
-      </p>
+      <p class="pg-kicker">Tableau de bord</p>
+      <h1>{% if ville_active %}{{ ville_active }}{% else %}Parc publicitaire{% endif %}</h1>
     </div>
-    <nav class="parc-tabs" aria-label="Filtrer par ville">
-      <a class="parc-tab {% if not ville_active %}is-active{% endif %}" href="{% url 'dashboard' %}">
-        <i class="bi bi-globe2"></i>Toutes
-      </a>
+    <nav class="pg-cities" aria-label="Filtrer par ville">
       {% for ville in villes %}
-        <a class="parc-tab {% if ville_active == ville %}is-active{% endif %}" href="{% url 'dashboard' %}?ville={{ ville|urlencode }}">
-          <i class="bi bi-geo-alt"></i>{{ ville }}
-        </a>
+        <a class="pg-city {% if ville_active == ville %}is-active{% endif %}" href="{% url 'dashboard' %}?ville={{ ville|urlencode }}">{{ ville }}</a>
       {% empty %}
-        <span class="parc-muted px-3 py-2">Aucune ville renseignée dans l’inventaire.</span>
+        <span class="pg-muted">Aucune ville renseignée dans l’inventaire.</span>
       {% endfor %}
     </nav>
   </header>
 
-    {# ── Carte et alertes ── #}
-  <div class="parc-grid">
-    <aside class="parc-panel" aria-labelledby="parc-alertes-title">
-      <div class="parc-panel-head">
-        <div>
-          <h2 id="parc-alertes-title"><i class="bi bi-bell-fill"></i>Alertes</h2>
-          <p>Campagnes sans document commercial ou bon de commande en attente.</p>
-        </div>
-        <div class="d-flex align-items-center gap-2">
-          <span class="badge {% if alertes %}text-bg-warning{% else %}text-bg-success{% endif %}">
-            {{ alertes|length }}
-          </span>
-          <button type="button" class="btn btn-sm btn-outline-secondary"
-            data-alert-fold="parcAlertsContent" aria-expanded="false"
-            aria-controls="parcAlertsContent" aria-label="Déplier les alertes">
-            <i class="bi bi-chevron-down me-1" aria-hidden="true"></i>
-            <span data-alert-fold-label>Déplier</span>
-          </button>
-        </div>
-      </div>
-      <div id="parcAlertsContent" class="d-none">
-        {% if alertes %}
-          <div class="parc-alerts">
-            {% for alerte in alertes %}
-              <a href="{{ alerte.url }}" class="parc-alert is-{{ alerte.type }}">
-                <i class="bi {% if alerte.type == 'danger' %}bi-exclamation-octagon-fill{% else %}bi-exclamation-triangle-fill{% endif %}"></i>
-                <span>{{ alerte.msg }}</span>
-                <i class="bi bi-arrow-up-right parc-alert-arrow"></i>
-              </a>
-            {% endfor %}
-          </div>
-        {% else %}
-          <div class="parc-ok">
-            <i class="bi bi-check-circle-fill"></i>
-            <span>Aucune alerte : les campagnes actives ou à venir ont leurs documents.</span>
-          </div>
-        {% endif %}
-      </div>
-    </aside>
-  </div>
 
+  <div class="pg-layout">
 
-  {# ── Chiffres clés ── #}
-  <div class="parc-inventory-grid" aria-label="État du parc par type de support">
-    <section class="parc-inventory-card is-panels" aria-labelledby="inventory-panels-title">
-      <header class="parc-inventory-card-head">
-        <span class="parc-inventory-icon"><i class="bi bi-signpost-2-fill" aria-hidden="true"></i></span>
-        <div>
-          <h2 class="parc-inventory-title" id="inventory-panels-title">Panneaux</h2>
-          <p class="parc-inventory-caption">Supports statiques</p>
-        </div>
-      </header>
-      <div class="parc-inventory-metrics">
-        <div class="parc-inventory-metric">
-          <strong class="parc-inventory-value">{{ panneaux_total }}</strong>
-          <span class="parc-inventory-label">Au total</span>
-        </div>
-        <div class="parc-inventory-metric is-good">
-          <strong class="parc-inventory-value">{{ panneaux_bon_etat }}</strong>
-          <span class="parc-inventory-label">En bon état</span>
-        </div>
-      </div>
-    </section>
-    <section class="parc-inventory-card is-screens" aria-labelledby="inventory-screens-title">
-      <header class="parc-inventory-card-head">
-        <span class="parc-inventory-icon"><i class="bi bi-display" aria-hidden="true"></i></span>
-        <div>
-          <h2 class="parc-inventory-title" id="inventory-screens-title">Écrans</h2>
-          <p class="parc-inventory-caption">Affichage numérique</p>
-        </div>
-      </header>
-      <div class="parc-inventory-metrics">
-        <div class="parc-inventory-metric">
-          <strong class="parc-inventory-value">{{ ecrans_total }}</strong>
-          <span class="parc-inventory-label">Au total</span>
-        </div>
-        <div class="parc-inventory-metric is-good">
-          <strong class="parc-inventory-value">{{ ecrans_bon_etat }}</strong>
-          <span class="parc-inventory-label">En bon état</span>
-        </div>
-      </div>
-    </section>
-    <section class="parc-inventory-card is-markets" aria-labelledby="inventory-markets-title">
-      <header class="parc-inventory-card-head">
-        <span class="parc-inventory-icon"><i class="bi bi-shop" aria-hidden="true"></i></span>
-        <div>
-          <h2 class="parc-inventory-title" id="inventory-markets-title">Marchés</h2>
-          <p class="parc-inventory-caption">Emplacements publicitaires</p>
-        </div>
-      </header>
-      <div class="parc-inventory-metrics">
-        <div class="parc-inventory-metric">
-          <strong class="parc-inventory-value">{{ marches_total }}</strong>
-          <span class="parc-inventory-label">Au total</span>
-        </div>
-        <div class="parc-inventory-metric is-good">
-          <strong class="parc-inventory-value">{{ marches_bon_etat }}</strong>
-          <span class="parc-inventory-label">En bon état</span>
-        </div>
-      </div>
-    </section>
-  </div>
+    {# ── Colonne principale : supports et carte ── #}
+    <div class="pg-main">
 
-  {# ── Supports par catégorie ── #}
-  <section class="parc-panel mt-4" aria-labelledby="parc-supports-title">
-    <div class="parc-panel-head">
-      <div>
-        <h2 id="parc-supports-title"><i class="bi bi-signpost-2-fill"></i>Supports par catégorie</h2>
-        <p>Répartition et état du parc {% if ville_active %}à {{ ville_active }}{% else %}— toutes villes{% endif %}.</p>
-      </div>
-      <a href="{% url 'format_list' %}" class="btn btn-sm btn-outline-secondary">Gérer les formats</a>
-    </div>
+      <section class="pg-card is-plain" aria-label="Supports par format">
+        <div class="pg-blocks">
 
-    {% if has_static_support_groups %}
-      <h3 class="parc-sub-label">Statique</h3>
-      <div class="parc-cats">
-        {% for groupe in support_groups_present %}
-          {% if groupe.kind == 'statique' %}
-          <details class="parc-cat" style="--cat: {{ groupe.color }}">
-            <summary>
-              <span class="parc-cat-icon"><i class="bi bi-signpost-2"></i></span>
-              <span class="min-w-0">
-                <span class="parc-cat-name d-block">{{ groupe.label }}</span>
-                <span class="parc-cat-sub d-block">{{ groupe.nb_actifs }} actif{{ groupe.nb_actifs|pluralize }} · {{ groupe.nb_inactifs }} inactif{{ groupe.nb_inactifs|pluralize }}</span>
-                <span class="parc-bar" aria-hidden="true">
-                  <span style="width: {% widthratio groupe.nb_bon groupe.nb_supports 100 %}%; background: var(--ok)"></span>
-                  <span style="width: {% widthratio groupe.nb_maintenance groupe.nb_supports 100 %}%; background: var(--warn)"></span>
-                  <span style="width: {% widthratio groupe.nb_panne groupe.nb_supports 100 %}%; background: var(--ko)"></span>
-                </span>
-              </span>
-              <span class="parc-cat-count">{{ groupe.nb_supports }}<i class="bi bi-chevron-down" aria-hidden="true"></i></span>
-            </summary>
-            <div class="parc-cat-body">
-              <div class="parc-facts">
-                <div class="parc-fact"><strong>{{ groupe.nb_bon }}</strong><span>Bon état</span></div>
-                <div class="parc-fact"><strong>{{ groupe.nb_maintenance }}</strong><span>En maintenance</span></div>
-                <div class="parc-fact"><strong>{{ groupe.nb_panne }}</strong><span>En panne</span></div>
-                <div class="parc-fact"><strong>{{ groupe.nb_faces }}</strong><span>Faces au total</span></div>
+          {# 12m² : totaux seulement #}
+          {% for cat in format_categories %}{% if cat.categorie == '12m²' %}
+            <article class="pg-block">
+              <div class="pg-block-head"><h3>12m²</h3><a href="#parc-map" class="pg-block-link" data-map-filter="12m²"><i class="bi bi-map"></i>Voir sur la carte</a></div>
+              <div class="pg-tiles">
+                <div class="pg-tile"><span>Panneaux</span><strong>{{ cat.nb_supports }}</strong></div>
+                <div class="pg-tile"><span>Faces</span><strong>{{ cat.nb_faces }}</strong></div>
+                <div class="pg-tile is-current"><span>Occupés</span><strong>{{ cat.nb_occupe }}</strong></div>
+                <div class="pg-tile is-good"><span>Libres</span><strong>{{ cat.nb_libre }}</strong></div>
               </div>
-              <div class="parc-muted">
-                Faces : {{ groupe.nb_faces_bon }} en bon état · {{ groupe.nb_faces_maintenance }} en maintenance · {{ groupe.nb_faces_panne }} en panne
+            </article>
+          {% endif %}{% endfor %}
+
+          {# Sucette : totaux seulement #}
+          {% for cat in format_categories %}{% if cat.categorie == 'Sucette' %}
+            <article class="pg-block">
+              <div class="pg-block-head"><h3>Sucette</h3><a href="#parc-map" class="pg-block-link" data-map-filter="Sucette"><i class="bi bi-map"></i>Voir sur la carte</a></div>
+              <div class="pg-tiles">
+                <div class="pg-tile"><span>Panneaux</span><strong>{{ cat.nb_supports }}</strong></div>
+                <div class="pg-tile"><span>Faces</span><strong>{{ cat.nb_faces }}</strong></div>
+                <div class="pg-tile is-current"><span>Occupés</span><strong>{{ cat.nb_occupe }}</strong></div>
+                <div class="pg-tile is-good"><span>Libres</span><strong>{{ cat.nb_libre }}</strong></div>
               </div>
-            </div>
-          </details>
-          {% endif %}
-        {% endfor %}
-      </div>
-    {% endif %}
+            </article>
+          {% endif %}{% endfor %}
 
-    {% if has_other_support_groups %}
-      <h3 class="parc-sub-label mt-4">Écrans et marchés</h3>
-      <div class="parc-cats">
-        {% for groupe in support_groups_present %}
-          {% if groupe.kind != 'statique' %}
-          <details class="parc-cat" style="--cat: {{ groupe.color }}">
-            <summary>
-              <span class="parc-cat-icon"><i class="bi {% if groupe.kind == 'ecrans' %}bi-display{% elif groupe.kind == 'marches' %}bi-shop{% else %}bi-signpost-2{% endif %}"></i></span>
-              <span class="min-w-0">
-                <span class="parc-cat-name d-block">{{ groupe.label }}</span>
-                <span class="parc-cat-sub d-block">{{ groupe.nb_actifs }} actif{{ groupe.nb_actifs|pluralize }} · {{ groupe.nb_inactifs }} inactif{{ groupe.nb_inactifs|pluralize }}</span>
-                <span class="parc-bar" aria-hidden="true">
-                  <span style="width: {% widthratio groupe.nb_bon groupe.nb_supports 100 %}%; background: var(--ok)"></span>
-                  <span style="width: {% widthratio groupe.nb_maintenance groupe.nb_supports 100 %}%; background: var(--warn)"></span>
-                  <span style="width: {% widthratio groupe.nb_panne groupe.nb_supports 100 %}%; background: var(--ko)"></span>
-                </span>
-              </span>
-              <span class="parc-cat-count">{{ groupe.nb_supports }}<i class="bi bi-chevron-down" aria-hidden="true"></i></span>
-            </summary>
-            <div class="parc-cat-body">
-              <div class="parc-facts">
-                <div class="parc-fact"><strong>{{ groupe.nb_bon }}</strong><span>Bon état</span></div>
-                <div class="parc-fact"><strong>{{ groupe.nb_maintenance }}</strong><span>En maintenance</span></div>
-                <div class="parc-fact"><strong>{{ groupe.nb_panne }}</strong><span>En panne</span></div>
+          {# Géant : totaux puis détail par format #}
+          {% for cat in format_categories %}{% if cat.categorie == 'Géant' %}
+            <article class="pg-block">
+              <div class="pg-block-head"><h3>Géant</h3><a href="#parc-map" class="pg-block-link" data-map-filter="Géant"><i class="bi bi-map"></i>Voir sur la carte</a></div>
+              <div class="pg-tiles">
+                <div class="pg-tile"><span>Panneaux</span><strong>{{ cat.nb_supports }}</strong></div>
+                <div class="pg-tile"><span>Faces</span><strong>{{ cat.nb_faces }}</strong></div>
+                <div class="pg-tile is-current"><span>Occupés</span><strong>{{ cat.nb_occupe }}</strong></div>
+                <div class="pg-tile is-good"><span>Libres</span><strong>{{ cat.nb_libre }}</strong></div>
               </div>
-            </div>
-          </details>
-          {% endif %}
-        {% endfor %}
-      </div>
-    {% endif %}
-    {% if not support_groups_present %}
-      <p class="parc-muted mb-0">Aucun support avec format ou catégorie renseigné pour cette sélection.</p>
-    {% endif %}
-  </section>
-
-  {# ── Campagnes clés après les catégories de supports ── #}
-  <div class="parc-figures" aria-label="Indicateurs des campagnes">
-    <div class="parc-fig">
-      <strong>{{ campagnes_actives }}</strong>
-      <span>Campagnes en cours</span>
-    </div>
-    <div class="parc-fig">
-      <strong>{{ campagnes_a_venir }}</strong>
-      <span>Campagnes à venir</span>
-    </div>
-  </div>
-
-  <section class="parc-panel mt-4" aria-labelledby="parc-campaign-summary-title">
-    <div class="parc-panel-head">
-      <div>
-        <h2 id="parc-campaign-summary-title"><i class="bi bi-megaphone-fill"></i>Campagnes par type de support</h2>
-        <p>Campagnes en cours et à venir{% if ville_active %} à {{ ville_active }}{% else %}, toutes villes confondues{% endif %}.</p>
-      </div>
-      <a href="{% url 'campagne_list' %}" class="btn btn-sm btn-outline-secondary">Toutes les campagnes</a>
-    </div>
-    <div class="parc-inventory-grid mb-0" aria-label="Campagnes en cours et à venir par type de support">
-      <section class="parc-inventory-card is-panels" aria-labelledby="campaign-panels-title">
-        <header class="parc-inventory-card-head">
-          <span class="parc-inventory-icon"><i class="bi bi-signpost-2-fill" aria-hidden="true"></i></span>
-          <div>
-            <h3 class="parc-inventory-title" id="campaign-panels-title">Panneaux</h3>
-            <p class="parc-inventory-caption">Campagnes statiques</p>
-          </div>
-        </header>
-        <div class="parc-inventory-metrics">
-          <div class="parc-inventory-metric is-current">
-            <strong class="parc-inventory-value">{{ panneaux_campagnes_en_cours }}</strong>
-            <span class="parc-inventory-label">En cours</span>
-          </div>
-          <div class="parc-inventory-metric is-upcoming">
-            <strong class="parc-inventory-value">{{ panneaux_campagnes_a_venir }}</strong>
-            <span class="parc-inventory-label">À venir</span>
-          </div>
-        </div>
-      </section>
-      <section class="parc-inventory-card is-screens" aria-labelledby="campaign-screens-title">
-        <header class="parc-inventory-card-head">
-          <span class="parc-inventory-icon"><i class="bi bi-display" aria-hidden="true"></i></span>
-          <div>
-            <h3 class="parc-inventory-title" id="campaign-screens-title">Écrans</h3>
-            <p class="parc-inventory-caption">Campagnes numériques</p>
-          </div>
-        </header>
-        <div class="parc-inventory-metrics">
-          <div class="parc-inventory-metric is-current">
-            <strong class="parc-inventory-value">{{ ecrans_campagnes_en_cours }}</strong>
-            <span class="parc-inventory-label">En cours</span>
-          </div>
-          <div class="parc-inventory-metric is-upcoming">
-            <strong class="parc-inventory-value">{{ ecrans_campagnes_a_venir }}</strong>
-            <span class="parc-inventory-label">À venir</span>
-          </div>
-        </div>
-      </section>
-      <section class="parc-inventory-card is-markets" aria-labelledby="campaign-markets-title">
-        <header class="parc-inventory-card-head">
-          <span class="parc-inventory-icon"><i class="bi bi-shop" aria-hidden="true"></i></span>
-          <div>
-            <h3 class="parc-inventory-title" id="campaign-markets-title">Marchés</h3>
-            <p class="parc-inventory-caption">Campagnes en marché</p>
-          </div>
-        </header>
-        <div class="parc-inventory-metrics">
-          <div class="parc-inventory-metric is-current">
-            <strong class="parc-inventory-value">{{ marches_campagnes_en_cours }}</strong>
-            <span class="parc-inventory-label">En cours</span>
-          </div>
-          <div class="parc-inventory-metric is-upcoming">
-            <strong class="parc-inventory-value">{{ marches_campagnes_a_venir }}</strong>
-            <span class="parc-inventory-label">À venir</span>
-          </div>
-        </div>
-      </section>
-    </div>
-  </section>
-
-  {# ── Campagnes ── #}
-  <section class="parc-panel mt-4" aria-labelledby="parc-campagnes-title">
-    <div class="parc-panel-head">
-      <div>
-        <h2 id="parc-campagnes-title"><i class="bi bi-megaphone-fill"></i>Campagnes par catégorie</h2>
-        <p>Campagnes en cours ou à venir, regroupées selon les supports réservés.</p>
-      </div>
-      <div class="d-flex gap-2 flex-wrap justify-content-end">
-        <a href="{% url 'campagne_list' %}" class="btn btn-sm btn-outline-secondary">Toutes les campagnes</a>
-      </div>
-    </div>
-
-    <div class="parc-cats">
-      {% for groupe in campaign_category_groups_present %}
-        <details class="parc-cat" style="--cat: {{ groupe.color }}">
-          <summary>
-            <span class="parc-cat-icon"><i class="bi {% if groupe.kind == 'ecrans' %}bi-display{% elif groupe.kind == 'marches' %}bi-shop{% else %}bi-megaphone{% endif %}"></i></span>
-            <span class="min-w-0">
-              <span class="parc-cat-name d-block">{{ groupe.label }}</span>
-              <span class="parc-cat-sub d-block">campagne{{ groupe.nb_campagnes|pluralize }} en cours ou à venir</span>
-            </span>
-            <span class="parc-cat-count">{{ groupe.nb_campagnes }}<i class="bi bi-chevron-down" aria-hidden="true"></i></span>
-          </summary>
-          <div class="parc-cat-body">
-            {% if groupe.campagnes %}
-              <div class="parc-list-scroll">
-                {% for campagne in groupe.campagnes %}
-                  <div class="parc-row">
-                    <div class="parc-row-main">
-                      <a href="{% url 'campagne_detail' campagne.pk %}" class="parc-row-name">{{ campagne.nom }}</a>
-                      <div class="parc-row-meta">{{ campagne.date_debut|date:"d/m/Y" }} – {{ campagne.date_fin|date:"d/m/Y" }}</div>
+              <div class="pg-subs">
+                {% for format in formats_stats %}{% if format.categorie == 'Géant' %}
+                  <div class="pg-sub">
+                    <div class="pg-sub-row">
+                      <div class="pg-sub-title">{{ format.code }}{% if format.dimensions %}<small>{{ format.dimensions }}</small>{% endif %}</div>
+                      <div class="pg-stats-inline">
+                        <span><small>Panneaux</small><b>{{ format.nb_supports }}</b></span>
+                        <span><small>Faces</small><b>{{ format.nb_faces }}</b></span>
+                        <span class="is-current"><small>Occupés</small><b>{{ format.nb_faces_occupees }}</b></span>
+                        <span class="is-good"><small>Libres</small><b>{{ format.nb_faces_libres }}</b></span>
+                      </div>
                     </div>
-                    <span class="badge bg-{{ campagne.get_statut_badge }}">{{ campagne.get_statut_display }}</span>
                   </div>
+                {% endif %}{% endfor %}
+              </div>
+            </article>
+          {% endif %}{% endfor %}
+
+          {# Marché : totaux puis détail par marché #}
+          {% for cat in format_categories %}{% if cat.categorie == 'Marché' %}
+            <article class="pg-block">
+              <div class="pg-block-head"><h3>Marché</h3><span class="pg-block-tag">{{ marches_total }} marché{{ marches_total|pluralize }}</span><a href="#parc-map" class="pg-block-link" data-map-filter="Marché"><i class="bi bi-map"></i>Voir sur la carte</a></div>
+              <div class="pg-tiles">
+                <div class="pg-tile"><span>Panneaux</span><strong>{{ cat.nb_supports }}</strong></div>
+                <div class="pg-tile"><span>Faces</span><strong>{{ cat.nb_faces }}</strong></div>
+                <div class="pg-tile is-current"><span>Occupés</span><strong>{{ cat.nb_occupe }}</strong></div>
+                <div class="pg-tile is-good"><span>Libres</span><strong>{{ cat.nb_libre }}</strong></div>
+              </div>
+              <div class="pg-subs">
+                {% for marche in marches_stats %}
+                  <div class="pg-sub">
+                    <div class="pg-sub-row">
+                      <div class="pg-sub-title">{{ marche.nom }}</div>
+                      <div class="pg-stats-inline">
+                        <span><small>Panneaux</small><b>{{ marche.nb_panneaux }}</b></span>
+                        <span><small>Faces</small><b>{{ marche.nb_faces }}</b></span>
+                        <span class="is-current"><small>Occupés</small><b>{{ marche.nb_faces_occupees }}</b></span>
+                        <span class="is-good"><small>Libres</small><b>{{ marche.nb_faces_libres }}</b></span>
+                      </div>
+                    </div>
+                  </div>
+                {% empty %}
+                  <p class="pg-muted mb-0">Aucun marché enregistré dans cette ville.</p>
                 {% endfor %}
               </div>
-            {% else %}
-              <p class="parc-muted mb-0">Aucune campagne en cours ou à venir pour cette catégorie.</p>
-            {% endif %}
+            </article>
+          {% endif %}{% endfor %}
+
+          {# Écrans : affiché seulement si la ville possède des écrans #}
+          {% if ecrans_total %}
+          <article class="pg-block">
+            <div class="pg-block-head"><h3>Écrans</h3><a href="#parc-map" class="pg-block-link" data-map-filter="Écrans"><i class="bi bi-map"></i>Voir sur la carte</a></div>
+            <div class="pg-tiles is-three">
+              <div class="pg-tile"><span>Écrans</span><strong>{{ ecrans_total }}</strong></div>
+              <div class="pg-tile is-current"><span>Occupés</span><strong>{{ ecrans_occupees }}</strong></div>
+              <div class="pg-tile is-good"><span>Libres</span><strong>{{ ecrans_libres }}</strong></div>
+            </div>
+            <div class="pg-ecrans">
+              {% for ecran in ecrans_liste %}
+                <div class="pg-ecran">
+                  <div class="pg-ecran-main">
+                    <strong>{{ ecran.nom }}</strong>
+                    <small>{{ ecran.code }}{% if ecran.quartier %} · {{ ecran.quartier }}{% endif %}{% if ecran.ville %} · {{ ecran.ville }}{% endif %}</small>
+                  </div>
+                  {% if ecran.occupe %}
+                    <span class="pg-ecran-state is-occupe">Occupé</span>
+                  {% else %}
+                    <span class="pg-ecran-state is-libre">Libre</span>
+                  {% endif %}
+                </div>
+              {% empty %}
+                <p class="pg-muted mb-0">Aucun écran enregistré dans cette ville.</p>
+              {% endfor %}
+            </div>
+          </article>
+          {% endif %}
+
+        </div>
+      </section>
+
+      <section class="pg-card" id="parc-map" aria-labelledby="pg-map-title">
+        <header class="pg-card-head">
+          <div>
+            <h2 id="pg-map-title">Carte du parc</h2>
+            <p>{% if ville_active %}Supports géolocalisés à {{ ville_active }}.{% else %}Supports géolocalisés sur l’ensemble du Burkina Faso.{% endif %}</p>
+          </div>
+          <span class="badge text-bg-light border" id="parc-map-count" aria-live="polite">Chargement…</span>
+        </header>
+        <div class="pg-filters d-none" id="parc-filters" role="group" aria-label="Filtrer les catégories sur la carte"></div>
+        <div id="parc-home-map" role="application" aria-label="Carte des supports publicitaires"></div>
+        <div id="parc-map-error" class="alert alert-danger d-none" role="alert">
+          Impossible de charger la carte du parc. Réessayez plus tard.
+        </div>
+      </section>
+
+    </div>
+
+    {# ── Colonne latérale : alertes et campagnes ── #}
+    <aside class="pg-side">
+
+      <section class="pg-card" aria-labelledby="pg-alerts-title">
+        <header class="pg-card-head">
+          <div>
+            <h2 id="pg-alerts-title">Alertes</h2>
+            <p>Campagnes sans document commercial ou bon de commande en attente.</p>
+          </div>
+          <span class="badge {% if alertes %}text-bg-warning{% else %}text-bg-success{% endif %}">{{ alertes|length }}</span>
+        </header>
+        <div class="pg-card-body">
+          {% if alertes %}
+            <div class="pg-alerts">
+              {% for alerte in alertes %}
+                <a href="{{ alerte.url }}" class="pg-alert is-{{ alerte.type }}">
+                  <i class="bi {% if alerte.type == 'danger' %}bi-exclamation-octagon-fill{% else %}bi-exclamation-triangle-fill{% endif %}"></i>
+                  <span>{{ alerte.msg }}</span>
+                  <i class="bi bi-arrow-up-right pg-alert-arrow"></i>
+                </a>
+              {% endfor %}
+            </div>
+          {% else %}
+            <div class="pg-ok">
+              <i class="bi bi-check-circle-fill"></i>
+              <span>Aucune alerte : les campagnes actives ou à venir ont leurs documents.</span>
+            </div>
+          {% endif %}
+        </div>
+      </section>
+
+      <section class="pg-card" aria-labelledby="pg-campaign-types-title">
+        <header class="pg-card-head">
+          <div>
+            <h2 id="pg-campaign-types-title">Campagnes par type</h2>
+            <p>En cours et à venir.</p>
+          </div>
+          <a href="{% url 'campagne_list' %}" class="btn btn-sm btn-outline-secondary">Toutes</a>
+        </header>
+        <div class="pg-blocks">
+          {% if panneaux_campagnes_en_cours or panneaux_campagnes_a_venir %}
+          <article class="pg-block">
+            <div class="pg-block-head"><h3>Panneaux</h3><span class="pg-block-tag">Campagnes statiques</span></div>
+            <div class="pg-tiles is-two">
+              <div class="pg-tile is-current"><span>En cours</span><strong>{{ panneaux_campagnes_en_cours }}</strong></div>
+              <div class="pg-tile is-upcoming"><span>À venir</span><strong>{{ panneaux_campagnes_a_venir }}</strong></div>
+            </div>
+          </article>
+          {% endif %}
+          {% if ecrans_campagnes_en_cours or ecrans_campagnes_a_venir %}
+          <article class="pg-block">
+            <div class="pg-block-head"><h3>Écrans</h3><span class="pg-block-tag">Campagnes numériques</span></div>
+            <div class="pg-tiles is-two">
+              <div class="pg-tile is-current"><span>En cours</span><strong>{{ ecrans_campagnes_en_cours }}</strong></div>
+              <div class="pg-tile is-upcoming"><span>À venir</span><strong>{{ ecrans_campagnes_a_venir }}</strong></div>
+            </div>
+          </article>
+          {% endif %}
+          {% if marches_campagnes_en_cours or marches_campagnes_a_venir %}
+          <article class="pg-block">
+            <div class="pg-block-head"><h3>Marchés</h3><span class="pg-block-tag">Campagnes en marché</span></div>
+            <div class="pg-tiles is-two">
+              <div class="pg-tile is-current"><span>En cours</span><strong>{{ marches_campagnes_en_cours }}</strong></div>
+              <div class="pg-tile is-upcoming"><span>À venir</span><strong>{{ marches_campagnes_a_venir }}</strong></div>
+            </div>
+          </article>
+          {% endif %}
+        </div>
+      </section>
+
+      <section class="pg-card" aria-labelledby="pg-campaign-groups-title">
+        <header class="pg-card-head">
+          <div>
+            <h2 id="pg-campaign-groups-title">Campagnes par catégorie</h2>
+            <p>Regroupées selon les supports réservés.</p>
+          </div>
+        </header>
+        {% for groupe in campaign_category_groups_present %}
+          <details class="pg-cat">
+            <summary>
+              <span>{{ groupe.label }}</span>
+              <span class="pg-cat-count">{{ groupe.nb_campagnes }}<i class="bi bi-chevron-down" aria-hidden="true"></i></span>
+            </summary>
+            <div class="pg-cat-body">
+              {% if groupe.campagnes %}
+                <div class="pg-list">
+                  {% for campagne in groupe.campagnes %}
+                    <div class="pg-row">
+                      <div class="pg-row-main">
+                        <a href="{% url 'campagne_detail' campagne.pk %}" class="pg-row-name">{{ campagne.nom }}</a>
+                        <div class="pg-row-meta">{{ campagne.date_debut|date:"d/m/Y" }} – {{ campagne.date_fin|date:"d/m/Y" }}</div>
+                      </div>
+                      <span class="badge bg-{{ campagne.get_statut_badge }}">{{ campagne.get_statut_display }}</span>
+                    </div>
+                  {% endfor %}
+                </div>
+              {% else %}
+                <p class="pg-muted mb-0">Aucune campagne en cours ou à venir pour cette catégorie.</p>
+              {% endif %}
+            </div>
+          </details>
+        {% empty %}
+          <p class="pg-muted p-3 mb-0">Aucune campagne en cours ou à venir.</p>
+        {% endfor %}
+      </section>
+
+      <section class="pg-card">
+        <details class="pg-recent">
+          <summary>
+            <span>Campagnes récentes <span class="pg-muted fw-normal">({{ campagnes_recentes|length }})</span></span>
+            <i class="bi bi-chevron-down" aria-hidden="true"></i>
+          </summary>
+          <div class="pg-list">
+            {% for campagne in campagnes_recentes %}
+              <div class="pg-row">
+                <div class="pg-row-main">
+                  <a href="{% url 'campagne_detail' campagne.pk %}" class="pg-row-name">{{ campagne.nom }}</a>
+                  <div class="pg-row-meta">{{ campagne.client.nom }} · {{ campagne.date_debut|date:"d/m/Y" }} – {{ campagne.date_fin|date:"d/m/Y" }}</div>
+                </div>
+                <span class="badge bg-{{ campagne.get_statut_badge }}">{{ campagne.get_statut_display }}</span>
+              </div>
+            {% empty %}
+              <p class="pg-muted mb-0">Aucune campagne à afficher pour cette sélection.</p>
+            {% endfor %}
           </div>
         </details>
-      {% endfor %}
-    </div>
+      </section>
 
-    <details class="parc-recent mt-3">
-      <summary>
-        <span>Campagnes récentes <span class="parc-muted fw-normal">({{ campagnes_recentes|length }})</span></span>
-        <i class="bi bi-chevron-down" aria-hidden="true"></i>
-      </summary>
-      <div class="parc-list-scroll pb-2">
-        {% for campagne in campagnes_recentes %}
-          <div class="parc-row">
-            <div class="parc-row-main">
-              <a href="{% url 'campagne_detail' campagne.pk %}" class="parc-row-name">{{ campagne.nom }}</a>
-              <div class="parc-row-meta">{{ campagne.client.nom }} · {{ campagne.date_debut|date:"d/m/Y" }} – {{ campagne.date_fin|date:"d/m/Y" }}</div>
-            </div>
-            <span class="badge bg-{{ campagne.get_statut_badge }}">{{ campagne.get_statut_display }}</span>
-          </div>
-        {% empty %}
-          <p class="parc-muted mb-0">Aucune campagne à afficher pour cette sélection.</p>
-        {% endfor %}
-      </div>
-    </details>
-  </section>
-
-  {# ── Carte en bas de page ── #}
-  <section class="parc-panel mt-4" aria-labelledby="parc-map-title">
-    <div class="parc-panel-head">
-      <div>
-        <h2 id="parc-map-title"><i class="bi bi-map-fill"></i>Carte du parc</h2>
-        <p>{% if ville_active %}Supports géolocalisés à {{ ville_active }}.{% else %}Supports géolocalisés sur l’ensemble du Burkina Faso.{% endif %}</p>
-      </div>
-      <span class="badge text-bg-light border" id="parc-map-count" aria-live="polite">Chargement…</span>
-    </div>
-    <div id="parc-home-map" role="application" aria-label="Carte des supports publicitaires"></div>
-    <div id="parc-map-error" class="alert alert-danger d-none" role="alert">
-      Impossible de charger la carte du parc. Réessayez plus tard.
-    </div>
-  </section>
+    </aside>
+  </div>
 
 </main>
 {% endblock %}
@@ -682,6 +664,11 @@
     const mapElement = document.getElementById('parc-home-map');
     const countElement = document.getElementById('parc-map-count');
     const errorElement = document.getElementById('parc-map-error');
+    const filtersElement = document.getElementById('parc-filters');
+
+    const CATEGORY_ORDER = ['12m²', 'Sucette', 'Géant', 'Marché', 'Écrans'];
+    const PALETTE = ['#932e2b', '#7c3aed', '#d97706', '#0f766e', '#0b7893', '#64748b'];
+    const NO_CITY = 'Ville non renseignée';
 
     function showMapError(message) {
       countElement.textContent = 'Carte indisponible';
@@ -689,10 +676,56 @@
       errorElement.classList.remove('d-none');
     }
 
+    // Ramène les libellés venant de la base (« Ecran », « ecrans », « Écran »…)
+    // à la même clé que les boutons « Voir sur la carte ».
+    function canonicalKey(raw) {
+      const value = String(raw || '').trim().toLowerCase();
+      if (!value) return 'Autre';
+      if (/^[ée]cran/.test(value)) return 'Écrans';
+      if (/^march[ée]/.test(value)) return 'Marché';
+      if (/^g[ée]ant/.test(value)) return 'Géant';
+      if (/^sucette/.test(value)) return 'Sucette';
+      if (/^12\s?m[²2]/.test(value)) return '12m²';
+      return String(raw).trim();
+    }
+
+    function categoryOf(feature) {
+      const p = feature.properties || {};
+      const key = canonicalKey(p.categorie);
+      return { key: key, label: key, color: p.categorie_color || null };
+    }
+
+    function cityOf(feature) {
+      return (feature.properties && feature.properties.ville) || NO_CITY;
+    }
+
+    function getLatLng(feature) {
+      return [
+        Number(feature.geometry.coordinates[1]),
+        Number(feature.geometry.coordinates[0])
+      ];
+    }
+
+    function isValidFeature(feature) {
+      return feature.geometry &&
+        Array.isArray(feature.geometry.coordinates) &&
+        Number.isFinite(Number(feature.geometry.coordinates[0])) &&
+        Number.isFinite(Number(feature.geometry.coordinates[1]));
+    }
+
+    function sortKeys(keys) {
+      return keys.slice().sort(function(a, b) {
+        const ia = CATEGORY_ORDER.indexOf(a);
+        const ib = CATEGORY_ORDER.indexOf(b);
+        if (ia !== -1 || ib !== -1) {
+          return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
+        }
+        return a.localeCompare(b, 'fr');
+      });
+    }
+
     function citiesCountLabel(features) {
-      const cities = new Set(features.map(function(feature) {
-        return (feature.properties && feature.properties.ville) || 'Ville non renseignée';
-      }));
+      const cities = new Set(features.map(cityOf));
       return cities.size + ' ville' + (cities.size === 1 ? '' : 's');
     }
 
@@ -730,102 +763,228 @@
       const endpoint = new URL('{% url "api_geojson" %}', window.location.origin);
       if (selectedCity) endpoint.searchParams.set('ville', selectedCity);
 
+      let features = [];
+      let allKeys = [];
+      let activeKeys = new Set();
+      let colorByKey = {};
+      let focusCity = null;
+
+      function colorOf(key) {
+        return colorByKey[key] || PALETTE[0];
+      }
+
+      function visibleFeatures() {
+        return features.filter(function(feature) {
+          return activeKeys.has(categoryOf(feature).key);
+        });
+      }
+
+      function toggleKey(key) {
+        if (activeKeys.has(key)) {
+          activeKeys.delete(key);
+        } else {
+          activeKeys.add(key);
+        }
+        if (!activeKeys.size) activeKeys = new Set(allKeys);
+        render();
+      }
+
+      function showAll() {
+        activeKeys = new Set(allKeys);
+        render();
+      }
+
+      function makeChip(label, color, pressed, count, onClick, extraClass) {
+        const button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'pg-chip' + (extraClass ? ' ' + extraClass : '');
+        button.setAttribute('aria-pressed', pressed ? 'true' : 'false');
+        if (color) {
+          const dot = document.createElement('span');
+          dot.className = 'pg-chip-dot';
+          dot.style.background = color;
+          button.appendChild(dot);
+        }
+        const text = document.createElement('span');
+        text.textContent = label;
+        button.appendChild(text);
+        if (count !== null && count !== undefined) {
+          const counter = document.createElement('span');
+          counter.className = 'pg-chip-count';
+          counter.textContent = count;
+          button.appendChild(counter);
+        }
+        button.addEventListener('click', onClick);
+        return button;
+      }
+
+      function renderFilters() {
+        filtersElement.textContent = '';
+        if (!allKeys.length) {
+          filtersElement.classList.add('d-none');
+          return;
+        }
+        filtersElement.classList.remove('d-none');
+
+        const countByKey = {};
+        features.forEach(function(feature) {
+          const key = categoryOf(feature).key;
+          countByKey[key] = (countByKey[key] || 0) + 1;
+        });
+
+        const allPressed = activeKeys.size === allKeys.length;
+        filtersElement.appendChild(makeChip('Toutes', null, allPressed, features.length, showAll));
+        allKeys.forEach(function(key) {
+          filtersElement.appendChild(makeChip(
+            key,
+            colorOf(key),
+            activeKeys.has(key),
+            countByKey[key] || 0,
+            function() { toggleKey(key); }
+          ));
+        });
+
+        if (focusCity && !selectedCity) {
+          filtersElement.appendChild(makeChip('Toutes les villes', null, false, null, function() {
+            focusCity = null;
+            render();
+          }, 'is-back'));
+        }
+      }
+
+      function popupFor(feature) {
+        const properties = feature.properties || {};
+        const popup = document.createElement('div');
+        const name = document.createElement('strong');
+        name.textContent = properties.nom || properties.code || 'Support';
+        popup.appendChild(name);
+        const details = document.createElement('div');
+        details.textContent = [properties.code, categoryOf(feature).label, properties.ville, properties.quartier]
+          .filter(Boolean)
+          .join(' · ');
+        popup.appendChild(details);
+        return popup;
+      }
+
+      function drawSupports(list) {
+        const markers = [];
+        list.forEach(function(feature) {
+          const marker = L.circleMarker(getLatLng(feature), {
+            radius: 8,
+            color: '#ffffff',
+            weight: 2,
+            fillColor: colorOf(categoryOf(feature).key),
+            fillOpacity: 0.95
+          });
+          marker.bindPopup(popupFor(feature));
+          marker.addTo(markersLayer);
+          markers.push(marker);
+        });
+        if (markers.length) {
+          const bounds = L.featureGroup(markers).getBounds();
+          if (bounds.isValid()) map.fitBounds(bounds, { padding: [28, 28], maxZoom: 14 });
+        }
+      }
+
+      function drawCities(list) {
+        const cities = new Map();
+        list.forEach(function(feature) {
+          const city = cityOf(feature);
+          if (!cities.has(city)) cities.set(city, []);
+          cities.get(city).push(feature);
+        });
+
+        cities.forEach(function(cityFeatures, city) {
+          const center = cityFeatures.reduce(function(total, feature) {
+            const point = getLatLng(feature);
+            total.lat += point[0];
+            total.lng += point[1];
+            return total;
+          }, { lat: 0, lng: 0 });
+          center.lat /= cityFeatures.length;
+          center.lng /= cityFeatures.length;
+
+          const marker = L.circleMarker([center.lat, center.lng], {
+            radius: Math.min(24, 10 + Math.sqrt(cityFeatures.length) * 1.5),
+            color: '#ffffff',
+            weight: 2,
+            fillColor: PALETTE[0],
+            fillOpacity: 0.9
+          });
+          marker.bindTooltip(city + ' · ' + cityFeatures.length + ' support(s)');
+          marker.on('click', function() {
+            focusCity = city;
+            render();
+          });
+          marker.addTo(markersLayer);
+        });
+        return cities;
+      }
+
+      function render() {
+        markersLayer.clearLayers();
+        const visible = visibleFeatures();
+
+        if (selectedCity) {
+          drawSupports(visible);
+          countElement.textContent = visible.length + ' support' + (visible.length === 1 ? '' : 's');
+        } else if (focusCity) {
+          const inCity = visible.filter(function(feature) { return cityOf(feature) === focusCity; });
+          drawSupports(inCity);
+          countElement.textContent = inCity.length + ' support' + (inCity.length === 1 ? '' : 's') + ' · ' + focusCity;
+        } else {
+          drawCities(visible);
+          countElement.textContent = citiesCountLabel(visible);
+        }
+
+        renderFilters();
+      }
+
+      // Boutons « Voir sur la carte » : n'affiche que la catégorie choisie
+      let pendingKey = null;
+      function applyCategoryFilter(key) {
+        if (!allKeys.length) {
+          pendingKey = key;
+          return;
+        }
+        focusCity = null;
+        activeKeys = allKeys.indexOf(key) === -1 ? new Set(allKeys) : new Set([key]);
+        render();
+      }
+      document.querySelectorAll('[data-map-filter]').forEach(function(link) {
+        link.addEventListener('click', function() {
+          applyCategoryFilter(link.getAttribute('data-map-filter'));
+        });
+      });
+
       fetch(endpoint, { headers: { 'Accept': 'application/json' } })
         .then(function(response) {
           if (!response.ok) throw new Error('La requête cartographique a échoué.');
           return response.json();
         })
         .then(function(data) {
-          const features = (data.features || []).filter(function(feature) {
-            return feature.geometry &&
-              Array.isArray(feature.geometry.coordinates) &&
-              Number.isFinite(Number(feature.geometry.coordinates[0])) &&
-              Number.isFinite(Number(feature.geometry.coordinates[1]));
+          features = (data.features || []).filter(isValidFeature);
+
+          allKeys = sortKeys(Array.from(new Set(features.map(function(feature) {
+            return categoryOf(feature).key;
+          }))));
+          colorByKey = {};
+          allKeys.forEach(function(key, index) {
+            const sample = features.find(function(feature) { return categoryOf(feature).key === key; });
+            colorByKey[key] = (sample && categoryOf(sample).color) || PALETTE[index % PALETTE.length];
           });
-
-          function getLatLng(feature) {
-            return [
-              Number(feature.geometry.coordinates[1]),
-              Number(feature.geometry.coordinates[0])
-            ];
+          activeKeys = new Set(allKeys);
+          if (pendingKey) {
+            const key = pendingKey;
+            pendingKey = null;
+            applyCategoryFilter(key);
           }
 
-          function showCitySupports(cityFeatures) {
-            markersLayer.clearLayers();
-            const markers = [];
-            cityFeatures.forEach(function(feature) {
-              const properties = feature.properties || {};
-              const marker = L.circleMarker(getLatLng(feature), {
-                radius: 8,
-                color: '#ffffff',
-                weight: 2,
-                fillColor: properties.color || '#932e2b',
-                fillOpacity: 0.95
-              });
-              const popup = document.createElement('div');
-              const name = document.createElement('strong');
-              name.textContent = properties.nom || properties.code || 'Support';
-              popup.appendChild(name);
-              const details = document.createElement('div');
-              details.textContent = [properties.code, properties.ville, properties.quartier]
-                .filter(Boolean)
-                .join(' · ');
-              popup.appendChild(details);
-              marker.bindPopup(popup);
-              marker.addTo(markersLayer);
-              markers.push(marker);
-            });
-
-            const bounds = L.featureGroup(markers).getBounds();
-            if (bounds.isValid()) map.fitBounds(bounds, { padding: [28, 28], maxZoom: 14 });
+          if (!features.length) {
+            showMapError('Aucun support géolocalisé n’a été renvoyé pour la carte.');
+            return;
           }
-
-          if (selectedCity) {
-            showCitySupports(features);
-          } else {
-            const cities = new Map();
-            features.forEach(function(feature) {
-              const properties = feature.properties || {};
-              const city = properties.ville || 'Ville non renseignée';
-              if (!cities.has(city)) cities.set(city, []);
-              cities.get(city).push(feature);
-            });
-
-            cities.forEach(function(cityFeatures, city) {
-              const center = cityFeatures.reduce(function(total, feature) {
-                const point = getLatLng(feature);
-                total.lat += point[0];
-                total.lng += point[1];
-                return total;
-              }, { lat: 0, lng: 0 });
-              center.lat /= cityFeatures.length;
-              center.lng /= cityFeatures.length;
-
-              const marker = L.circleMarker([center.lat, center.lng], {
-                radius: Math.min(24, 10 + Math.sqrt(cityFeatures.length) * 1.5),
-                color: '#ffffff',
-                weight: 2,
-                fillColor: '#932e2b',
-                fillOpacity: 0.9
-              });
-              marker.bindTooltip(city + ' · ' + cityFeatures.length + ' support(s)');
-              marker.on('click', function() {
-                showCitySupports(cityFeatures);
-              });
-              marker.addTo(markersLayer);
-            });
-
-            if (!cities.size) {
-              showMapError('Aucun support géolocalisé n’a été renvoyé pour la carte.');
-            }
-          }
-
-          countElement.textContent = selectedCity
-            ? features.length + ' support' + (features.length === 1 ? '' : 's')
-            : citiesCountLabel(features);
-          if (selectedCity && !features.length) {
-            showMapError('Aucun support géolocalisé n’a été trouvé pour cette ville.');
-          }
+          render();
           window.setTimeout(function() { map.invalidateSize(); }, 0);
         })
         .catch(function(error) {

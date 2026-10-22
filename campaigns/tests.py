@@ -129,6 +129,203 @@ class DashboardParcGroupingTests(TestCase):
         self.assertEqual(campaigns_by_key['marches']['campagnes'], [campaign])
         self.assertEqual(campaigns_by_key['statique_sucettes']['campagnes'], [])
 
+    def test_static_support_groups_report_panel_face_occupancy_individually(self):
+        support = self.create_support('DASH-OCCUPANCY', 'DASH-12')
+        occupied = FacePanneau.objects.create(
+            support=support, label='A', etat=Support.ETAT_BON,
+        )
+        reserved = FacePanneau.objects.create(
+            support=support, label='B', etat=Support.ETAT_BON,
+        )
+        free_support = self.create_support('DASH-FREE', 'DASH-12')
+        free = FacePanneau.objects.create(
+            support=free_support, label='A', etat=Support.ETAT_BON,
+        )
+        broken_support = self.create_support('DASH-BROKEN', 'DASH-12')
+        FacePanneau.objects.create(
+            support=broken_support, label='A', etat=Support.ETAT_PANNE,
+        )
+
+        support_groups, _ = DashboardView()._build_support_and_campaign_groups(
+            'Ouagadougou', [], [],
+            faces_occupees_ids={occupied.pk},
+            faces_reservees_ids={reserved.pk},
+        )
+        panels = next(
+            group for group in support_groups if group['key'] == 'statique_12m2'
+        )
+
+        self.assertEqual(panels['nb_supports'], 3)
+        self.assertEqual(panels['nb_faces'], 4)
+        self.assertEqual(panels['nb_faces_occupees'], 1)
+        self.assertEqual(panels['nb_faces_reservees'], 1)
+        self.assertEqual(panels['nb_faces_libres'], 1)
+
+    def test_inventory_cards_show_simple_categories_and_market_specific_face_counts(self):
+        today = timezone.now().date()
+        static_support = self.create_support('DASH-CARD-12', 'DASH-12')
+        occupied_face = FacePanneau.objects.create(
+            support=static_support, label='A', etat=Support.ETAT_BON,
+        )
+        FacePanneau.objects.create(
+            support=static_support, label='B', etat=Support.ETAT_BON,
+        )
+        giant_support = self.create_support('DASH-CARD-GIANT', 'DASH-GEA')
+        FacePanneau.objects.create(support=giant_support, label='A')
+
+        market = Marche.objects.create(nom='Marché carte', ville='Ouagadougou')
+        emplacement = Emplacement.objects.create(marche=market, code='C-01')
+        market_support = self.create_support('DASH-CARD-MARKET', 'DASH-MAR')
+        market_support.emplacement = emplacement
+        market_support.save()
+        market_face = FacePanneau.objects.create(
+            support=market_support, label='A', etat=Support.ETAT_BON,
+        )
+        FacePanneau.objects.create(
+            support=market_support, label='B', etat=Support.ETAT_BON,
+        )
+        Marche.objects.create(nom='Marché sans panneau', ville='Ouagadougou')
+
+        screen = Support.objects.create(
+            code='DASH-CARD-SCREEN',
+            nom='Écran carte',
+            type_support=Support.TYPE_ECRAN,
+            etat=Support.ETAT_PANNE,
+            latitude=12.34,
+            longitude=-1.52,
+            ville='Ouagadougou',
+        )
+        EcranNumerique.objects.create(support=screen)
+        campaign = self.create_campaign(
+            'Campagne carte',
+            today,
+            today + datetime.timedelta(days=2),
+            Campagne.STATUT_EN_COURS,
+        )
+        LigneCampagne.objects.create(campagne=campaign, face=occupied_face)
+        LigneCampagne.objects.create(campagne=campaign, face=market_face)
+        cache.clear()
+        request = RequestFactory().get('/', {'ville': 'Ouagadougou'})
+        view = DashboardView()
+        view.setup(request)
+        context = view.get_context_data()
+        rendered = render_to_string(view.template_name, context, request=request)
+
+        self.assertEqual(context['ecrans_total'], 1)
+        self.assertEqual(context['ecrans_panne'], 1)
+        self.assertEqual(context['marches_total'], 2)
+        self.assertEqual(
+            context['marches_stats'],
+            [
+                {
+                    'nom': 'Marché carte',
+                    'nb_panneaux': 1,
+                    'nb_faces': 2,
+                    'nb_faces_occupees': 1,
+                    'nb_faces_reservees': 0,
+                    'nb_faces_libres': 1,
+                },
+                {
+                    'nom': 'Marché sans panneau',
+                    'nb_panneaux': 0,
+                    'nb_faces': 0,
+                    'nb_faces_occupees': 0,
+                    'nb_faces_reservees': 0,
+                    'nb_faces_libres': 0,
+                },
+            ],
+        )
+        market_face_stats = DashboardView._build_market_stats(
+            'Ouagadougou', {market_face.pk}, set()
+        )[0]
+        self.assertEqual(market_face_stats['nb_faces_occupees'], 1)
+        self.assertEqual(market_face_stats['nb_faces_libres'], 1)
+        self.assertIn('grid-template-columns: minmax(0, 1fr);', rendered)
+        self.assertIn('aria-label="Statistiques par format de panneau"', rendered)
+        self.assertIn('12m² · DASH-12', rendered)
+        self.assertIn('Géant · DASH-GEA', rendered)
+        self.assertIn('DASH-GEA', rendered)
+        self.assertNotIn('Panneaux ·', rendered)
+
+        static_section = rendered.split(
+            'aria-label="Statistiques par format de panneau"', 1
+        )[1].split('class="parc-cats"', 1)[0]
+        self.assertNotIn('DASH-MAR', static_section)
+        panels_card = static_section.split(
+            'aria-label="Format DASH-12"', 1
+        )[1].split('</section>', 1)[0]
+        self.assertLess(
+            panels_card.index('Panneaux</span>'),
+            panels_card.index('<strong class="parc-inventory-value">1</strong>'),
+        )
+        self.assertEqual(panels_card.count('class="parc-inventory-label"'), 4)
+        for label in ('Faces', 'Occupées', 'Libres'):
+            self.assertIn(f'{label}</span>', panels_card)
+        self.assertIn('Écrans</span>', rendered)
+        self.assertIn('Écrans au total</span>', rendered)
+        self.assertIn('Occupation selon les campagnes en cours.', rendered)
+        self.assertIn('Marché carte', rendered)
+        self.assertIn('Marché sans panneau', rendered)
+
+    def test_screen_inventory_counts_occupancy_per_resolution(self):
+        today = timezone.now().date()
+        occupied_screen = Support.objects.create(
+            code='DASH-SCREEN-OCCUPIED',
+            nom='Écran HD occupé',
+            type_support=Support.TYPE_ECRAN,
+            latitude=12.34,
+            longitude=-1.52,
+            ville='Ouagadougou',
+        )
+        EcranNumerique.objects.create(support=occupied_screen, resolution='hd')
+        free_screen = Support.objects.create(
+            code='DASH-SCREEN-FREE',
+            nom='Écran HD libre',
+            type_support=Support.TYPE_ECRAN,
+            latitude=12.34,
+            longitude=-1.52,
+            ville='Ouagadougou',
+        )
+        EcranNumerique.objects.create(support=free_screen, resolution='hd')
+        fullhd_screen = Support.objects.create(
+            code='DASH-SCREEN-FULLHD',
+            nom='Écran Full HD libre',
+            type_support=Support.TYPE_ECRAN,
+            latitude=12.34,
+            longitude=-1.52,
+            ville='Ouagadougou',
+        )
+        EcranNumerique.objects.create(support=fullhd_screen, resolution='fullhd')
+        campaign = self.create_campaign(
+            'Campagne écran en cours',
+            today,
+            today + datetime.timedelta(days=1),
+            Campagne.STATUT_EN_COURS,
+        )
+        LigneCampagne.objects.create(campagne=campaign, support=occupied_screen)
+
+        stats = DashboardView._build_screen_resolution_stats(
+            'Ouagadougou', today
+        )
+
+        self.assertEqual(
+            stats,
+            [
+                {
+                    'resolution': 'HD 1280×720',
+                    'nb_ecrans': 2,
+                    'nb_occupees': 1,
+                    'nb_libres': 1,
+                },
+                {
+                    'resolution': 'Full HD 1920×1080',
+                    'nb_ecrans': 1,
+                    'nb_occupees': 0,
+                    'nb_libres': 1,
+                },
+            ],
+        )
+
     def test_dashboard_counts_campaigns_separately_and_filters_by_city(self):
         today = timezone.now().date()
         ouaga_support = self.create_support('DASH-OUA', 'DASH-12')
@@ -209,7 +406,7 @@ class DashboardParcGroupingTests(TestCase):
         self.assertIn('Ouagadougou', context['villes'])
         self.assertIn('Ville avec écran', context['villes'])
         self.assertNotIn('Ville sans catégorie', context['villes'])
-        self.assertEqual(context['ville_active'], '')
+        self.assertEqual(context['ville_active'], context['villes'][0])
         self.assertNotIn(
             'statique_sucettes',
             [group['key'] for group in context['support_groups_present']],
@@ -217,6 +414,28 @@ class DashboardParcGroupingTests(TestCase):
         self.assertLess(
             rendered.index('id="parc-campagnes-title"'),
             rendered.index('id="parc-map-title"'),
+        )
+
+    def test_dashboard_defaults_to_city_with_most_supports_and_orders_cities_by_count(self):
+        self.create_support('DASH-OUA-1', 'DASH-12', ville='Ouagadougou')
+        self.create_support('DASH-OUA-2', 'DASH-12', ville='Ouagadougou')
+        self.create_support('DASH-BOB-1', 'DASH-12', ville='Bobo-Dioulasso')
+
+        cache.clear()
+        request = RequestFactory().get('/')
+        view = DashboardView()
+        view.setup(request)
+        context = view.get_context_data()
+        rendered = render_to_string(view.template_name, context, request=request)
+        city_tabs = rendered.split('<nav class="parc-tabs"', 1)[1].split('</nav>', 1)[0]
+
+        self.assertEqual(context['villes'], ['Ouagadougou', 'Bobo-Dioulasso'])
+        self.assertEqual(context['ville_active'], 'Ouagadougou')
+        self.assertEqual(context['total_supports'], 2)
+        self.assertNotIn('>Toutes</a>', city_tabs)
+        self.assertLess(
+            city_tabs.index('Ouagadougou'),
+            city_tabs.index('Bobo-Dioulasso'),
         )
 
     def test_campaign_categories_follow_city_supports_even_without_campaigns(self):
@@ -252,15 +471,18 @@ class DashboardParcGroupingTests(TestCase):
         self.assertIn('Statique — Sucettes', campaign_section)
         self.assertNotIn('Écrans numériques', campaign_section)
 
-        global_request = RequestFactory().get('/')
-        global_view = DashboardView()
-        global_view.setup(global_request)
-        global_context = global_view.get_context_data()
-        global_keys = {
-            group['key'] for group in global_context['campaign_category_groups_present']
+        default_request = RequestFactory().get('/')
+        default_view = DashboardView()
+        default_view.setup(default_request)
+        default_context = default_view.get_context_data()
+        default_keys = {
+            group['key'] for group in default_context['campaign_category_groups_present']
         }
         self.assertEqual(
-            global_keys, {'statique_12m2', 'statique_sucettes', 'ecrans'}
+            default_context['ville_active'], 'Ouagadougou'
+        )
+        self.assertEqual(
+            default_keys, {'statique_12m2', 'statique_sucettes'}
         )
 
 

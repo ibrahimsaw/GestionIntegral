@@ -208,7 +208,7 @@ from django.template.defaultfilters import slugify
 from django.utils import timezone
 from django.views.generic import TemplateView
 
-from inventory.models import Support, FacePanneau, FormatSupport
+from inventory.models import Support, FacePanneau, FormatSupport, Marche
 from .models import (
     Campagne, Client, LigneCampagne, ReservationLigne,
     STATUT_EN_ATTENTE, STATUT_CONFIRMEE,
@@ -236,6 +236,12 @@ class DashboardView(LoginRequiredMixin, TemplateView):
     DEFAULT_CATEGORY_COLOR = '#64748b'
     COLOR_ECRANS = '#06b6d4'
     COLOR_PANNE = '#94a3b8'
+    INVENTORY_LABELS = {
+        'statique_12m2': '12m2',
+        'statique_sucettes': 'Sucette',
+        'statique_geants': 'Géant',
+        'autres_statiques': 'Autres',
+    }
 
     @staticmethod
     def _support_category_key(support, format_categories):
@@ -255,8 +261,11 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         return 'autres_statiques'
 
     def _build_support_and_campaign_groups(
-        self, ville_active, campagnes_actives_list, campagnes_a_venir_list
+        self, ville_active, campagnes_actives_list, campagnes_a_venir_list,
+        faces_occupees_ids=None, faces_reservees_ids=None,
     ):
+        faces_occupees_ids = faces_occupees_ids or set()
+        faces_reservees_ids = faces_reservees_ids or set()
         format_categories = dict(
             FormatSupport.objects.values_list('code', 'categorie')
         )
@@ -264,6 +273,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             key: {
                 'key': key,
                 'label': label,
+                'inventory_label': self.INVENTORY_LABELS.get(key, label),
                 'kind': 'statique' if key.startswith('statique_') or key == 'autres_statiques' else key,
                 'color': {
                     'statique_12m2': 'var(--color-primary)',
@@ -284,6 +294,9 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 'nb_faces_bon': 0,
                 'nb_faces_maintenance': 0,
                 'nb_faces_panne': 0,
+                'nb_faces_occupees': 0,
+                'nb_faces_reservees': 0,
+                'nb_faces_libres': 0,
                 'nb_campagnes': 0,
             }
             for key, label, _ in self.SUPPORT_GROUP_DEFINITIONS
@@ -314,6 +327,13 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                     }.get(face.etat)
                     if face_state_key:
                         group[face_state_key] += 1
+                    if face.etat == Support.ETAT_BON:
+                        if face.pk in faces_occupees_ids:
+                            group['nb_faces_occupees'] += 1
+                        elif face.pk in faces_reservees_ids:
+                            group['nb_faces_reservees'] += 1
+                        else:
+                            group['nb_faces_libres'] += 1
 
         for campaign in campagnes_actives_list + campagnes_a_venir_list:
             campaign_keys = set()
@@ -338,6 +358,77 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             campaign_groups.append(group)
         return support_groups, campaign_groups
 
+    @staticmethod
+    def _build_market_stats(ville_active, faces_occupees_ids, faces_reservees_ids):
+        """Compte les panneaux et faces installés par marché, sans confondre emplacements et panneaux."""
+        marches = Marche.objects.filter(ville__iexact=ville_active).order_by('nom')
+        marches = marches.prefetch_related('emplacements__support_installe__faces')
+        stats = []
+        for marche in marches:
+            supports = [
+                emplacement.support_installe
+                for emplacement in marche.emplacements.all()
+                if hasattr(emplacement, 'support_installe')
+                and emplacement.support_installe.type_support == Support.TYPE_PANNEAU
+            ]
+            faces = [face for support in supports for face in support.faces.all()]
+            occupees = sum(
+                1 for face in faces
+                if face.etat == Support.ETAT_BON and face.pk in faces_occupees_ids
+            )
+            reservees = sum(
+                1 for face in faces
+                if face.etat == Support.ETAT_BON
+                and face.pk in faces_reservees_ids
+                and face.pk not in faces_occupees_ids
+            )
+            faces_bonnes = sum(1 for face in faces if face.etat == Support.ETAT_BON)
+            stats.append({
+                'nom': marche.nom,
+                'nb_panneaux': len(supports),
+                'nb_faces': len(faces),
+                'nb_faces_occupees': occupees,
+                'nb_faces_reservees': reservees,
+                'nb_faces_libres': faces_bonnes - occupees - reservees,
+            })
+        return stats
+
+    @staticmethod
+    def _build_screen_resolution_stats(ville_active, today):
+        """Compte les écrans occupés par une campagne en cours, regroupés par résolution."""
+        screens = EcranNumerique.objects.all()
+        if ville_active:
+            screens = screens.filter(support__ville__iexact=ville_active)
+
+        counts_by_resolution = {
+            row['resolution']: row
+            for row in screens.values('resolution').annotate(
+                nb_ecrans=Count('support_id', distinct=True),
+                nb_occupees=Count(
+                    'support_id',
+                    filter=Q(
+                        support__lignes_campagne__campagne__statut=Campagne.STATUT_EN_COURS,
+                        support__lignes_campagne__campagne__date_debut__lte=today,
+                        support__lignes_campagne__campagne__date_fin__gte=today,
+                    ),
+                    distinct=True,
+                ),
+            )
+        }
+        return [
+            {
+                'resolution': label,
+                'nb_ecrans': counts_by_resolution[code]['nb_ecrans'],
+                'nb_occupees': counts_by_resolution[code]['nb_occupees'],
+                'nb_libres': (
+                    counts_by_resolution[code]['nb_ecrans']
+                    - counts_by_resolution[code]['nb_occupees']
+                ),
+            }
+            for code, label in EcranNumerique.RESOLUTION_CHOICES
+            if code in counts_by_resolution
+        ]
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         today = timezone.now().date()
@@ -347,15 +438,19 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             | Q(emplacement__isnull=False)
             | Q(format__in=FormatSupport.objects.exclude(categorie='').values('code'))
         )
-        villes = list(
-            supports_classes.exclude(ville='')
-            .values_list('ville', flat=True)
-            .distinct()
-            .order_by('ville')
-        )
+        villes = [
+            row['ville']
+            for row in supports_classes.exclude(ville='')
+            .values('ville')
+            .annotate(nb_supports=Count('pk', distinct=True))
+            .order_by('-nb_supports', 'ville')
+        ]
         ville_active = next(
-            (ville for ville in villes if ville.casefold() == ville_active.casefold()),
-            '',
+            (
+                ville for ville in villes
+                if ville.casefold() == ville_active.casefold()
+            ),
+            villes[0] if villes else '',
         )
 
         # ── Mise à jour des statuts en masse : 2 requêtes au lieu d'une
@@ -505,7 +600,20 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             ville_active, faces_occupees_ids, faces_reservees_ids
         )
         support_groups, campaign_category_groups = self._build_support_and_campaign_groups(
-            ville_active, campagnes_actives_list, campagnes_a_venir_list
+            ville_active, campagnes_actives_list, campagnes_a_venir_list,
+            faces_occupees_ids, faces_reservees_ids,
+        )
+        marches_stats = self._build_market_stats(
+            ville_active, faces_occupees_ids, faces_reservees_ids
+        )
+        ecrans_stats_par_resolution = self._build_screen_resolution_stats(
+            ville_active, today
+        )
+        ecrans_occupees = sum(
+            item['nb_occupees'] for item in ecrans_stats_par_resolution
+        )
+        ecrans_libres = sum(
+            item['nb_libres'] for item in ecrans_stats_par_resolution
         )
         campaign_category_groups_present = [
             group for group in campaign_category_groups if group['nb_supports'] > 0
@@ -521,6 +629,14 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 ),
                 'bon': sum(
                     group['nb_bon'] for group in support_groups
+                    if group['kind'] == kind
+                ),
+                'maintenance': sum(
+                    group['nb_maintenance'] for group in support_groups
+                    if group['kind'] == kind
+                ),
+                'panne': sum(
+                    group['nb_panne'] for group in support_groups
                     if group['kind'] == kind
                 ),
             }
@@ -592,9 +708,38 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             types_stats.append({'label': 'En panne', 'count': parc['nb_supports_panne'], 'color': self.COLOR_PANNE})
         types_stats_json = json.dumps(types_stats)
 
+        # ── Liste des écrans, un par ligne (occupé / libre aujourd'hui) ──
+        screens_qs = EcranNumerique.objects.select_related('support')
+        if ville_active:
+            screens_qs = screens_qs.filter(support__ville__iexact=ville_active)
+        screens_qs = screens_qs.order_by('support__ville', 'support__quartier', 'support__code')
+
+        # Même règle que _build_screen_resolution_stats : campagne en cours à la date du jour
+        ecrans_occupes_ids = set(
+            LigneCampagne.objects.filter(
+                campagne__statut=Campagne.STATUT_EN_COURS,
+                campagne__date_debut__lte=today,
+                campagne__date_fin__gte=today,
+                support_id__isnull=False,
+            ).values_list('support_id', flat=True)
+        )
+
+        ecrans_liste = [
+            {
+                'nom': e.support.nom,
+                'code': e.support.code,
+                'ville': e.support.ville,
+                'quartier': e.support.quartier,
+                'resolution': e.get_resolution_display(),
+                'occupe': e.support_id in ecrans_occupes_ids,
+            }
+            for e in screens_qs
+        ]
+
         context.update({
             'ville_active': ville_active,
             'villes': villes,
+            'ecrans_liste': ecrans_liste,
 
             'total_supports': parc['total'],
             'total_campagnes': campagnes_qs.count(),
@@ -606,8 +751,14 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             'panneaux_bon_etat': support_totals_by_kind['statique']['bon'],
             'ecrans_total': support_totals_by_kind['ecrans']['total'],
             'ecrans_bon_etat': support_totals_by_kind['ecrans']['bon'],
-            'marches_total': support_totals_by_kind['marches']['total'],
+            'ecrans_maintenance': support_totals_by_kind['ecrans']['maintenance'],
+            'ecrans_panne': support_totals_by_kind['ecrans']['panne'],
+            'ecrans_occupees': ecrans_occupees,
+            'ecrans_libres': ecrans_libres,
+            'ecrans_stats_par_resolution': ecrans_stats_par_resolution,
+            'marches_total': len(marches_stats),
             'marches_bon_etat': support_totals_by_kind['marches']['bon'],
+            'marches_stats': marches_stats,
             'panneaux_campagnes_en_cours': campaign_totals_by_kind['statique']['en_cours'],
             'panneaux_campagnes_a_venir': campaign_totals_by_kind['statique']['a_venir'],
             'ecrans_campagnes_en_cours': campaign_totals_by_kind['ecrans']['en_cours'],
@@ -731,6 +882,8 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 'nb_faces_reservees': face_counts.get('reserve', 0),
                 'nb_faces_panne': face_counts.get('panne', 0),
             })
+        # Dans chaque catégorie : du plus petit au plus grand (superficie), sans superficie en fin de liste
+        stats.sort(key=lambda s: (s['categorie'], s['superficie'] is None, s['superficie'] or 0, s['code']))
         return stats
 
     def _build_format_category_stats(self, format_categories_codes, ville_active, faces_occupees_ids, faces_reservees_ids):

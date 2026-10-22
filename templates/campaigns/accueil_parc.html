@@ -143,7 +143,8 @@
   .pg-block-link i { font-size: .8rem; }
 
   /* Tuiles : libellé en haut, chiffre dessous */
-  .pg-tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .5rem; }
+  .pg-tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .5rem; }
+  .pg-tiles.is-four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .pg-tiles.is-two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .pg-tiles.is-three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .pg-tile {
@@ -188,7 +189,7 @@
     justify-content: space-between;
     gap: .4rem 1rem;
   }
-  .pg-sub-title { font-size: .9rem; font-weight: 600; }
+  .pg-sub-title { font-size: 1rem; font-weight: 600; color: var(--ink);}
   .pg-sub-title small { margin-left: .4rem; color: var(--muted); font-size: .74rem; font-weight: 400; }
   .pg-sub .pg-tile { background: var(--tile); }
 
@@ -287,7 +288,18 @@
   .pg-cat-count i, .pg-recent > summary i { color: var(--muted); font-size: .7rem; transition: transform .15s ease; }
   .pg-cat[open] .pg-cat-count i, .pg-recent[open] > summary i { transform: rotate(180deg); }
   .pg-cat-body { padding: 0 1.05rem .75rem; }
-  .pg-list { max-height: 320px; overflow-y: auto; }
+  /* Listes : six lignes visibles, ensuite défilement */
+  .pg-list { max-height: 19.5rem; overflow-y: auto; }
+  .pg-alerts { max-height: 19.5rem; overflow-y: auto; padding-right: .25rem; }
+
+  /* Bloc repliable (Alertes) */
+  .pg-fold > summary { list-style: none; cursor: pointer; }
+  .pg-fold > summary::-webkit-details-marker { display: none; }
+  .pg-fold > summary:hover { background: #fafbfc; }
+  .pg-fold:not([open]) > summary { border-bottom: 0; }
+  .pg-fold-right { display: inline-flex; align-items: center; gap: .6rem; }
+  .pg-fold-icon { color: var(--muted); font-size: .72rem; transition: transform .15s ease; }
+  .pg-fold[open] .pg-fold-icon { transform: rotate(180deg); }
   .pg-row {
     display: flex;
     align-items: center;
@@ -400,6 +412,7 @@
                 <div class="pg-tile"><span>Faces</span><strong>{{ cat.nb_faces }}</strong></div>
                 <div class="pg-tile is-current"><span>Occupés</span><strong>{{ cat.nb_occupe }}</strong></div>
                 <div class="pg-tile is-good"><span>Libres</span><strong>{{ cat.nb_libre }}</strong></div>
+                <div class="pg-tile"><span>Taux occupation</span><strong>{% widthratio cat.nb_occupe cat.nb_faces 100 %}%</strong></div>
               </div>
             </article>
           {% endif %}{% endfor %}
@@ -413,6 +426,7 @@
                 <div class="pg-tile"><span>Faces</span><strong>{{ cat.nb_faces }}</strong></div>
                 <div class="pg-tile is-current"><span>Occupés</span><strong>{{ cat.nb_occupe }}</strong></div>
                 <div class="pg-tile is-good"><span>Libres</span><strong>{{ cat.nb_libre }}</strong></div>
+                <div class="pg-tile"><span>Taux occupation</span><strong>{% widthratio cat.nb_occupe cat.nb_faces 100 %}%</strong></div>
               </div>
             </article>
           {% endif %}{% endfor %}
@@ -426,17 +440,19 @@
                 <div class="pg-tile"><span>Faces</span><strong>{{ cat.nb_faces }}</strong></div>
                 <div class="pg-tile is-current"><span>Occupés</span><strong>{{ cat.nb_occupe }}</strong></div>
                 <div class="pg-tile is-good"><span>Libres</span><strong>{{ cat.nb_libre }}</strong></div>
+                <div class="pg-tile"><span>Taux occupation</span><strong>{% widthratio cat.nb_occupe cat.nb_faces 100 %}%</strong></div>
               </div>
               <div class="pg-subs">
                 {% for format in formats_stats %}{% if format.categorie == 'Géant' %}
                   <div class="pg-sub">
                     <div class="pg-sub-row">
-                      <div class="pg-sub-title">{{ format.code }}{% if format.dimensions %}<small>{{ format.dimensions }}</small>{% endif %}</div>
+                      <div class="pg-sub-title"><b>{{ format.superficie }} m²</b>{% if format.dimensions %} <b>{{ format.dimensions }}</b>{% endif %}</div>
                       <div class="pg-stats-inline">
                         <span><small>Panneaux</small><b>{{ format.nb_supports }}</b></span>
                         <span><small>Faces</small><b>{{ format.nb_faces }}</b></span>
                         <span class="is-current"><small>Occupés</small><b>{{ format.nb_faces_occupees }}</b></span>
                         <span class="is-good"><small>Libres</small><b>{{ format.nb_faces_libres }}</b></span>
+                        <span><small>Taux occ.</small><b>{% widthratio format.nb_faces_occupees format.nb_faces 100 %}%</b></span>
                       </div>
                     </div>
                   </div>
@@ -454,6 +470,7 @@
                 <div class="pg-tile"><span>Faces</span><strong>{{ cat.nb_faces }}</strong></div>
                 <div class="pg-tile is-current"><span>Occupés</span><strong>{{ cat.nb_occupe }}</strong></div>
                 <div class="pg-tile is-good"><span>Libres</span><strong>{{ cat.nb_libre }}</strong></div>
+                <div class="pg-tile"><span>Taux occupation</span><strong>{% widthratio cat.nb_occupe cat.nb_faces 100 %}%</strong></div>
               </div>
               <div class="pg-subs">
                 {% for marche in marches_stats %}
@@ -465,6 +482,7 @@
                         <span><small>Faces</small><b>{{ marche.nb_faces }}</b></span>
                         <span class="is-current"><small>Occupés</small><b>{{ marche.nb_faces_occupees }}</b></span>
                         <span class="is-good"><small>Libres</small><b>{{ marche.nb_faces_libres }}</b></span>
+                        <span><small>Taux occ.</small><b>{% widthratio marche.nb_faces_occupees marche.nb_faces 100 %}%</b></span>
                       </div>
                     </div>
                   </div>
@@ -479,10 +497,11 @@
           {% if ecrans_total %}
           <article class="pg-block">
             <div class="pg-block-head"><h3>Écrans</h3><a href="#parc-map" class="pg-block-link" data-map-filter="Écrans"><i class="bi bi-map"></i>Voir sur la carte</a></div>
-            <div class="pg-tiles is-three">
+            <div class="pg-tiles is-four">
               <div class="pg-tile"><span>Écrans</span><strong>{{ ecrans_total }}</strong></div>
               <div class="pg-tile is-current"><span>Occupés</span><strong>{{ ecrans_occupees }}</strong></div>
               <div class="pg-tile is-good"><span>Libres</span><strong>{{ ecrans_libres }}</strong></div>
+              <div class="pg-tile"><span>Taux occupation</span><strong>{% widthratio ecrans_occupees ecrans_total 100 %}%</strong></div>
             </div>
             <div class="pg-ecrans">
               {% for ecran in ecrans_liste %}
@@ -528,31 +547,36 @@
     <aside class="pg-side">
 
       <section class="pg-card" aria-labelledby="pg-alerts-title">
-        <header class="pg-card-head">
-          <div>
-            <h2 id="pg-alerts-title">Alertes</h2>
-            <p>Campagnes sans document commercial ou bon de commande en attente.</p>
+        <details class="pg-fold">
+          <summary class="pg-card-head">
+            <div>
+              <h2 id="pg-alerts-title">Alertes</h2>
+              <p>Campagnes sans document commercial ou bon de commande en attente.</p>
+            </div>
+            <span class="pg-fold-right">
+              <span class="badge {% if alertes %}text-bg-warning{% else %}text-bg-success{% endif %}">{{ alertes|length }}</span>
+              <i class="bi bi-chevron-down pg-fold-icon" aria-hidden="true"></i>
+            </span>
+          </summary>
+          <div class="pg-card-body">
+            {% if alertes %}
+              <div class="pg-alerts">
+                {% for alerte in alertes %}
+                  <a href="{{ alerte.url }}" class="pg-alert is-{{ alerte.type }}">
+                    <i class="bi {% if alerte.type == 'danger' %}bi-exclamation-octagon-fill{% else %}bi-exclamation-triangle-fill{% endif %}"></i>
+                    <span>{{ alerte.msg }}</span>
+                    <i class="bi bi-arrow-up-right pg-alert-arrow"></i>
+                  </a>
+                {% endfor %}
+              </div>
+            {% else %}
+              <div class="pg-ok">
+                <i class="bi bi-check-circle-fill"></i>
+                <span>Aucune alerte : les campagnes actives ou à venir ont leurs documents.</span>
+              </div>
+            {% endif %}
           </div>
-          <span class="badge {% if alertes %}text-bg-warning{% else %}text-bg-success{% endif %}">{{ alertes|length }}</span>
-        </header>
-        <div class="pg-card-body">
-          {% if alertes %}
-            <div class="pg-alerts">
-              {% for alerte in alertes %}
-                <a href="{{ alerte.url }}" class="pg-alert is-{{ alerte.type }}">
-                  <i class="bi {% if alerte.type == 'danger' %}bi-exclamation-octagon-fill{% else %}bi-exclamation-triangle-fill{% endif %}"></i>
-                  <span>{{ alerte.msg }}</span>
-                  <i class="bi bi-arrow-up-right pg-alert-arrow"></i>
-                </a>
-              {% endfor %}
-            </div>
-          {% else %}
-            <div class="pg-ok">
-              <i class="bi bi-check-circle-fill"></i>
-              <span>Aucune alerte : les campagnes actives ou à venir ont leurs documents.</span>
-            </div>
-          {% endif %}
-        </div>
+        </details>
       </section>
 
       <section class="pg-card" aria-labelledby="pg-campaign-types-title">
@@ -601,10 +625,10 @@
             <p>Regroupées selon les supports réservés.</p>
           </div>
         </header>
-        {% for groupe in campaign_category_groups_present %}
+        {% for groupe in campaign_category_groups_present %}{% if groupe.nb_campagnes %}
           <details class="pg-cat">
             <summary>
-              <span>{{ groupe.label }}</span>
+              <span>{% if groupe.key == 'statique_12m2' %}12m²{% else %}{{ groupe.label|cut:"Statique — " }}{% endif %}</span>
               <span class="pg-cat-count">{{ groupe.nb_campagnes }}<i class="bi bi-chevron-down" aria-hidden="true"></i></span>
             </summary>
             <div class="pg-cat-body">
@@ -625,7 +649,7 @@
               {% endif %}
             </div>
           </details>
-        {% empty %}
+        {% endif %}{% empty %}
           <p class="pg-muted p-3 mb-0">Aucune campagne en cours ou à venir.</p>
         {% endfor %}
       </section>

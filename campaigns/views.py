@@ -34,6 +34,7 @@ from piges.models import PigeFichier
 from datetime import datetime, date, timedelta
 today = timezone.now().date()
 from core.mixins import SortableListMixin
+from django.core.files.storage import default_storage
 
 class GetClientContratsView(StaffRequiredMixin, View):
     def get(self, request, client_id):
@@ -337,14 +338,26 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
         for campaign in campagnes_actives_list + campagnes_a_venir_list:
             campaign_keys = set()
+            faces_reservees = set()
+            ecrans_reserves = set()
+            emplacements_reserves = set()
             for ligne in campaign.lignes.all():
                 support = ligne.support
                 if support is None and ligne.face_id:
                     support = ligne.face.support
+                if ligne.face_id:
+                    faces_reservees.add(ligne.face_id)
                 if support is not None:
+                    if support.type_support == Support.TYPE_ECRAN:
+                        ecrans_reserves.add(support.pk)
                     campaign_keys.add(self._support_category_key(support, format_categories))
                 elif ligne.emplacement_id:
                     campaign_keys.add('marches')
+                if ligne.emplacement_id:
+                    emplacements_reserves.add(ligne.emplacement_id)
+            campaign.nb_faces_reservees = len(faces_reservees)
+            campaign.nb_ecrans_reserves = len(ecrans_reserves)
+            campaign.nb_emplacements_reserves = len(emplacements_reserves)
             for key in campaign_keys:
                 groups[key]['campagnes'].append(campaign)
 
@@ -728,6 +741,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             {
                 'nom': e.support.nom,
                 'code': e.support.code,
+                'uuid': e.support.uuid,
                 'ville': e.support.ville,
                 'quartier': e.support.quartier,
                 'resolution': e.get_resolution_display(),
@@ -842,6 +856,18 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             )
         }
 
+        # Une photo représentative par format (1 requête)
+        photo_by_format = {}
+        photo_rows = (
+            supports_qs
+            .exclude(Q(photo_principale='') | Q(photo_principale__isnull=True))
+            .order_by('code')
+            .values_list('format', 'photo_principale')
+        )
+        for fmt, photo_name in photo_rows:
+            if fmt not in photo_by_format and photo_name:
+                photo_by_format[fmt] = default_storage.url(photo_name)
+
         faces_by_format = {}
         for face_id, format_code, etat in faces_qs.values_list('id', 'support__format', 'etat'):
             counts = faces_by_format.setdefault(format_code, {
@@ -863,24 +889,28 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             if not support_counts.get('total'):
                 continue
             face_counts = faces_by_format.get(format_support.code, {})
+            nb_faces = face_counts.get('total', 0)
             nb_faces_bon = face_counts.get('bon', 0)
+            nb_occupe = face_counts.get('occupe', 0)
             stats.append({
                 'code': format_support.code,
                 'categorie': format_support.categorie or 'Sans catégorie',
                 'dimensions': format_support.dimensions,
                 'superficie': format_support.superficie,
+                'photo': photo_by_format.get(format_support.code, ''),
                 'nb_supports': support_counts.get('total', 0),
                 'nb_supports_bon': support_counts.get('bon', 0),
                 'nb_supports_maintenance': support_counts.get('maintenance', 0),
                 'nb_supports_panne': support_counts.get('panne', 0),
-                'nb_faces': face_counts.get('total', 0),
+                'nb_faces': nb_faces,
                 'nb_faces_libres': max(
                     0,
-                    nb_faces_bon - face_counts.get('occupe', 0) - face_counts.get('reserve', 0),
+                    nb_faces_bon - nb_occupe - face_counts.get('reserve', 0),
                 ),
-                'nb_faces_occupees': face_counts.get('occupe', 0),
+                'nb_faces_occupees': nb_occupe,
                 'nb_faces_reservees': face_counts.get('reserve', 0),
                 'nb_faces_panne': face_counts.get('panne', 0),
+                'taux': round(nb_occupe / nb_faces * 100) if nb_faces else 0,
             })
         # Dans chaque catégorie : du plus petit au plus grand (superficie), sans superficie en fin de liste
         stats.sort(key=lambda s: (s['categorie'], s['superficie'] is None, s['superficie'] or 0, s['code']))
@@ -933,6 +963,13 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             stats.append({
                 'categorie': categorie,
                 'label': categorie,
+                'detail_code': next(
+                    (
+                        code for code in codes
+                        if stats_par_format.get(code, {}).get('total', 0)
+                    ),
+                    '',
+                ),
                 'slug': slugify(categorie),
                 'nb_supports': nb_supports,
                 'nb_faces': total_faces,
@@ -944,6 +981,211 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 'color': self.CATEGORY_COLORS.get(categorie, self.DEFAULT_CATEGORY_COLOR),
             })
         return stats
+
+def _faces_occupees_et_reservees(today):
+    """Mêmes règles que DashboardView.get_context_data."""
+    occupees = set(
+        LigneCampagne.objects.filter(
+            campagne__date_debut__lte=today,
+            campagne__date_fin__gte=today,
+            campagne__statut__in=['en_cours', 'a_venir'],
+        ).values_list('face_id', flat=True)
+    )
+    reservees = set(
+        ReservationLigne.objects.filter(
+            reservation__date_fin__gte=today,
+            reservation__statut__in=[STATUT_EN_ATTENTE, STATUT_CONFIRMEE],
+        ).values_list('face_id', flat=True)
+    )
+    return occupees, reservees
+
+
+class FormatDetailView(LoginRequiredMixin, TemplateView):
+    """Détail d'un format : carte, liste des panneaux et statistiques."""
+    template_name = 'campaigns/format_detail.html'
+
+    STATUT_LABELS = {
+        'libre': 'Libre',
+        'partiel': 'Partiel',
+        'occupe': 'Occupé',
+        'panne': 'Hors service',
+    }
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        today = timezone.now().date()
+        code = self.kwargs['code']
+        ville_active = self.request.GET.get('ville', '').strip()
+        if code == 'ecrans':
+            return self._get_screen_context(context, ville_active, today)
+
+        tous_geants = code == 'geant'
+        if tous_geants:
+            formats = list(FormatSupport.objects.filter(categorie='Géant'))
+            format_support = {'categorie': 'Géant', 'dimensions': '', 'code': 'geant'}
+            supports_qs = Support.objects.filter(
+                type_support=Support.TYPE_PANNEAU,
+                format__in=[format_obj.code for format_obj in formats],
+            )
+            format_by_code = {format_obj.code: format_obj for format_obj in formats}
+        else:
+            format_support = get_object_or_404(FormatSupport, code=code)
+            supports_qs = Support.objects.filter(
+                type_support=Support.TYPE_PANNEAU, format=code,
+            )
+            format_by_code = {format_support.code: format_support}
+        if ville_active:
+            supports_qs = supports_qs.filter(ville__iexact=ville_active)
+        supports_list = list(supports_qs.order_by('code'))
+
+        faces_by_support = {}
+        for face in FacePanneau.objects.filter(support__in=supports_list):
+            faces_by_support.setdefault(face.support_id, []).append(face)
+
+        occupees, reservees = _faces_occupees_et_reservees(today)
+
+        panneaux = []
+        quartiers = {}
+        tot_faces = tot_occ = tot_libre = 0
+
+        for numero, support in enumerate(supports_list, start=1):
+            faces = faces_by_support.get(support.pk, [])
+            bonnes = [f for f in faces if f.etat == Support.ETAT_BON]
+            nb_occ = sum(1 for f in bonnes if f.pk in occupees)
+            nb_res = sum(1 for f in bonnes if f.pk in reservees and f.pk not in occupees)
+            nb_libre = len(bonnes) - nb_occ - nb_res
+
+            if support.etat == Support.ETAT_PANNE or (faces and not bonnes):
+                statut = 'panne'
+            elif bonnes and nb_libre == 0:
+                statut = 'occupe'
+            elif nb_occ + nb_res > 0:
+                statut = 'partiel'
+            else:
+                statut = 'libre'
+
+            photo = ''
+            if support.photo_principale:
+                photo = support.photo_principale.url
+            else:
+                for f in faces:
+                    if f.photo:
+                        photo = f.photo.url
+                        break
+
+            lat = float(support.latitude) if support.latitude else None
+            lng = float(support.longitude) if support.longitude else None
+            support_format = format_by_code.get(support.format)
+
+            panneaux.append({
+                'numero': numero,
+                'code': support.code,
+                'nom': support.nom,
+                'format': support_format.dimensions if support_format else support.format,
+                'ville': support.ville or '',
+                'quartier': support.quartier or '',
+                'adresse': support.adresse or support.quartier or support.ville or '',
+                'photo': photo,
+                'nb_faces': len(faces),
+                'nb_occupees': nb_occ,
+                'nb_libres': nb_libre,
+                'statut': statut,
+                'statut_label': self.STATUT_LABELS[statut],
+                'lat': lat,
+                'lng': lng,
+                'url': reverse('support_detail', args=[support.uuid]),
+            })
+
+            tot_faces += len(faces)
+            tot_occ += nb_occ
+            tot_libre += nb_libre
+
+            q = quartiers.setdefault(support.quartier or 'Non renseigné', {
+                'nom': support.quartier or 'Non renseigné',
+                'nb_panneaux': 0, 'nb_faces': 0, 'nb_occupees': 0, 'nb_libres': 0,
+            })
+            q['nb_panneaux'] += 1
+            q['nb_faces'] += len(faces)
+            q['nb_occupees'] += nb_occ
+            q['nb_libres'] += nb_libre
+
+        stats_quartiers = sorted(
+            quartiers.values(), key=lambda q: (-q['nb_panneaux'], q['nom'])
+        )
+        for q in stats_quartiers:
+            q['taux'] = round(q['nb_occupees'] / q['nb_faces'] * 100) if q['nb_faces'] else 0
+
+        context.update({
+            'format': format_support,
+            'tous_geants': tous_geants,
+            'ville_active': ville_active,
+            'panneaux': panneaux,
+            'nb_panneaux': len(panneaux),
+            'nb_faces': tot_faces,
+            'nb_occupees': tot_occ,
+            'nb_libres': tot_libre,
+            'taux': round(tot_occ / tot_faces * 100) if tot_faces else 0,
+            'stats_quartiers': stats_quartiers,
+            'nb_libre_panneaux': sum(1 for p in panneaux if p['statut'] == 'libre'),
+            'nb_partiel_panneaux': sum(1 for p in panneaux if p['statut'] == 'partiel'),
+            'nb_occupe_panneaux': sum(1 for p in panneaux if p['statut'] == 'occupe'),
+            'nb_panne_panneaux': sum(1 for p in panneaux if p['statut'] == 'panne'),
+        })
+        return context
+
+    def _get_screen_context(self, context, ville_active, today):
+        screens_qs = Support.objects.filter(
+            type_support=Support.TYPE_ECRAN
+        ).select_related('ecran_info').order_by('ville', 'quartier', 'code')
+        if ville_active:
+            screens_qs = screens_qs.filter(ville__iexact=ville_active)
+
+        screen_supports = list(screens_qs)
+        occupied_ids = set(
+            LigneCampagne.objects.filter(
+                support_id__in=[support.pk for support in screen_supports],
+                campagne__statut=Campagne.STATUT_EN_COURS,
+                campagne__date_debut__lte=today,
+                campagne__date_fin__gte=today,
+            ).values_list('support_id', flat=True)
+        )
+        screens = []
+        resolutions = {}
+        for number, support in enumerate(screen_supports, start=1):
+            try:
+                resolution = support.ecran_info.get_resolution_display()
+            except EcranNumerique.DoesNotExist:
+                resolution = 'Non renseignée'
+            occupied = support.pk in occupied_ids
+            resolutions[resolution] = resolutions.get(resolution, 0) + 1
+            screens.append({
+                'numero': number,
+                'nom': support.nom,
+                'code': support.code,
+                'ville': support.ville or '',
+                'quartier': support.quartier or '',
+                'resolution': resolution,
+                'etat': support.get_etat_display(),
+                'occupe': occupied,
+                'lat': float(support.latitude) if support.latitude is not None else None,
+                'lng': float(support.longitude) if support.longitude is not None else None,
+                'url': reverse('support_detail', args=[support.uuid]),
+            })
+
+        context.update({
+            'ecrans_mode': True,
+            'ville_active': ville_active,
+            'ecrans': screens,
+            'nb_ecrans': len(screens),
+            'nb_ecrans_occupees': len(occupied_ids),
+            'nb_ecrans_libres': len(screens) - len(occupied_ids),
+            'resolutions': [
+                {'nom': name, 'nombre': count}
+                for name, count in sorted(resolutions.items())
+            ],
+        })
+        return context
+
 
 def _build_alertes():
     alertes = []

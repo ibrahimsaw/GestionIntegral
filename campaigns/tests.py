@@ -5,11 +5,12 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.cache import cache
 from django.template.loader import render_to_string
 from django.test import RequestFactory, SimpleTestCase, TestCase
+from django.urls import reverse
 from django.utils import timezone
 
 from campaigns.forms import PreuveDiffusionForm
 from campaigns.models import Campagne, Client, Contrat, LigneCampagne, PreuveDiffusion
-from campaigns.views import CampagneDetailView, DashboardView
+from campaigns.views import CampagneDetailView, DashboardView, FormatDetailView
 from piges.models import PigeFichier
 from campaigns.simulation_view import (
     _enrich_resultat_metriques,
@@ -128,6 +129,65 @@ class DashboardParcGroupingTests(TestCase):
         self.assertEqual(campaigns_by_key['ecrans']['campagnes'], [campaign])
         self.assertEqual(campaigns_by_key['marches']['campagnes'], [campaign])
         self.assertEqual(campaigns_by_key['statique_sucettes']['campagnes'], [])
+
+    def test_campaign_category_shows_distinct_faces_screens_and_detail_button(self):
+        today = timezone.now().date()
+        panel = self.create_support('DASH-CAMPAIGN-COUNT', 'DASH-12')
+        face_a = FacePanneau.objects.create(support=panel, label='A')
+        face_b = FacePanneau.objects.create(support=panel, label='B')
+        screen = Support.objects.create(
+            code='DASH-CAMPAIGN-SCREEN',
+            nom='Écran pour comptage',
+            type_support=Support.TYPE_ECRAN,
+            latitude=12.34,
+            longitude=-1.52,
+            ville='Ouagadougou',
+        )
+        EcranNumerique.objects.create(support=screen)
+        campaign = self.create_campaign(
+            'Campagne du comptage',
+            today,
+            today + datetime.timedelta(days=7),
+            Campagne.STATUT_EN_COURS,
+        )
+        LigneCampagne.objects.create(campagne=campaign, face=face_a)
+        LigneCampagne.objects.create(campagne=campaign, face=face_a)
+        LigneCampagne.objects.create(campagne=campaign, face=face_b)
+        LigneCampagne.objects.create(campagne=campaign, support=screen)
+        future_campaign = self.create_campaign(
+            'Campagne à venir du comptage',
+            today + datetime.timedelta(days=8),
+            today + datetime.timedelta(days=15),
+            Campagne.STATUT_A_VENIR,
+        )
+        LigneCampagne.objects.create(campagne=future_campaign, face=face_a)
+        cache.clear()
+
+        request = RequestFactory().get('/', {'ville': 'Ouagadougou'})
+        view = DashboardView()
+        view.setup(request)
+        context = view.get_context_data()
+        rendered = render_to_string(view.template_name, context, request=request)
+        campaign_section = rendered.split(
+            'id="pg-campaign-groups-title"', 1
+        )[1].split('Campagnes récentes', 1)[0]
+        campaign_from_context = next(
+            item
+            for group in context['campaign_category_groups']
+            for item in group['campagnes']
+            if item.pk == campaign.pk
+        )
+
+        self.assertEqual(campaign_from_context.nb_faces_reservees, 2)
+        self.assertEqual(campaign_from_context.nb_ecrans_reserves, 1)
+        self.assertIn('2 faces occupées', campaign_section)
+        self.assertIn('1 écran occupé', campaign_section)
+        self.assertIn('1 face réservée', campaign_section)
+        self.assertIn(
+            f'href="{reverse("campagne_detail", args=[campaign.pk])}" '
+            'class="btn btn-sm btn-outline-primary">Voir la campagne</a>',
+            campaign_section,
+        )
 
     def test_static_support_groups_report_panel_face_occupancy_individually(self):
         support = self.create_support('DASH-OCCUPANCY', 'DASH-12')
@@ -325,6 +385,111 @@ class DashboardParcGroupingTests(TestCase):
                 },
             ],
         )
+
+    def test_format_card_map_link_opens_format_detail_and_dashboard_has_no_map_card(self):
+        support = self.create_support('DASH-FORMAT-DETAIL', 'DASH-12')
+        FacePanneau.objects.create(support=support, label='A')
+        cache.clear()
+
+        request = RequestFactory().get('/', {'ville': 'Ouagadougou'})
+        view = DashboardView()
+        view.setup(request)
+        context = view.get_context_data()
+        rendered = render_to_string(view.template_name, context, request=request)
+        detail_url = reverse('format_detail', args=['DASH-12'])
+
+        self.assertIn(
+            f'href="{detail_url}?ville=Ouagadougou"', rendered
+        )
+        self.assertNotIn('href="#parc-map"', rendered)
+        self.assertNotIn('id="parc-map"', rendered)
+
+    def test_giant_category_detail_includes_all_giant_formats(self):
+        other_giant = FormatSupport.objects.create(
+            code='DASH-GEA-OTHER',
+            categorie='Géant',
+            dimensions='10m × 4m',
+        )
+        first = self.create_support('DASH-GEA-FIRST', 'DASH-GEA')
+        second = self.create_support('DASH-GEA-SECOND', other_giant.code)
+
+        request = RequestFactory().get('/parc/format/geant/', {'ville': 'Ouagadougou'})
+        view = FormatDetailView()
+        view.setup(request, code='geant')
+        context = view.get_context_data()
+        rendered = render_to_string(view.template_name, context, request=request)
+
+        self.assertTrue(context['tous_geants'])
+        self.assertEqual(context['nb_panneaux'], 2)
+        self.assertEqual(
+            {panel['code'] for panel in context['panneaux']},
+            {first.code, second.code},
+        )
+        self.assertIn('Tous les panneaux géants', rendered)
+        self.assertIn('10m × 4m', rendered)
+        self.assertIn('if (p.photo)', rendered)
+        self.assertIn("image.className = 'fd-popup-image'", rendered)
+
+    def test_screen_entry_links_to_format_detail_and_support_detail(self):
+        screen = Support.objects.create(
+            code='DASH-SCREEN-LINK',
+            nom='Écran à ouvrir',
+            type_support=Support.TYPE_ECRAN,
+            latitude=12.34,
+            longitude=-1.52,
+            ville='Ouagadougou',
+        )
+        EcranNumerique.objects.create(support=screen, resolution='hd')
+        cache.clear()
+
+        request = RequestFactory().get('/', {'ville': 'Ouagadougou'})
+        view = DashboardView()
+        view.setup(request)
+        context = view.get_context_data()
+        rendered = render_to_string(view.template_name, context, request=request)
+
+        self.assertEqual(context['ecrans_liste'][0]['uuid'], screen.uuid)
+        self.assertIn(
+            f'href="{reverse("format_detail", args=["ecrans"])}?ville=Ouagadougou"',
+            rendered,
+        )
+        self.assertIn(
+            f'href="{reverse("support_detail", args=[screen.uuid])}"', rendered
+        )
+        self.assertIn('>Écran à ouvrir</a>', rendered)
+
+    def test_format_detail_displays_city_screens_and_resolution(self):
+        screen = Support.objects.create(
+            code='DASH-SCREEN-FORMAT',
+            nom='Écran dans le détail',
+            type_support=Support.TYPE_ECRAN,
+            latitude=12.34,
+            longitude=-1.52,
+            ville='Ouagadougou',
+            quartier='Centre',
+        )
+        EcranNumerique.objects.create(support=screen, resolution='fullhd')
+        other_city_screen = Support.objects.create(
+            code='DASH-SCREEN-OTHER-CITY',
+            nom='Écran autre ville',
+            type_support=Support.TYPE_ECRAN,
+            latitude=11.18,
+            longitude=-4.29,
+            ville='Bobo-Dioulasso',
+        )
+        EcranNumerique.objects.create(support=other_city_screen, resolution='hd')
+
+        request = RequestFactory().get('/parc/format/ecrans/', {'ville': 'Ouagadougou'})
+        view = FormatDetailView()
+        view.setup(request, code='ecrans')
+        context = view.get_context_data()
+        rendered = render_to_string(view.template_name, context, request=request)
+
+        self.assertEqual(context['nb_ecrans'], 1)
+        self.assertEqual(context['ecrans'][0]['resolution'], 'Full HD 1920×1080')
+        self.assertIn('Écran dans le détail', rendered)
+        self.assertIn('fd-screen-map', rendered)
+        self.assertNotIn('Écran autre ville', rendered)
 
     def test_dashboard_counts_campaigns_separately_and_filters_by_city(self):
         today = timezone.now().date()

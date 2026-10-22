@@ -1,0 +1,354 @@
+{% extends 'base.html' %}
+{% load sort_tags %}
+
+{% block title %}{{ format.code }} — Détail du format{% endblock %}
+
+{% block topbar_title %}
+  <div class="d-flex align-items-center gap-2">
+    <i class="bi bi-aspect-ratio" style="color:var(--color-primary)"></i>
+    <span class="fw-bold">Détail du format</span>
+    <span class="badge bg-light text-dark border font-monospace ms-1">{{ format.code }}</span>
+  </div>
+{% endblock %}
+
+{% block topbar_actions %}
+  {% if user.is_staff_regie_role or user.is_admin %}
+  <a href="{% url 'format_update' format.pk %}" class="btn btn-primary btn-sm px-3 shadow-sm d-flex align-items-center gap-1">
+    <i class="bi bi-pencil"></i>
+    <span class="d-none d-md-inline">Modifier</span>
+  </a>
+  {% endif %}
+{% endblock %}
+
+{% block page_toolbar %}{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+
+  {# ── FIL D'ARIANE ── #}
+  <div class="d-flex align-items-center gap-2 mb-3 flex-wrap" style="font-size:0.83rem;">
+    <a href="{% url 'format_list' %}" class="d-inline-flex align-items-center gap-1 text-muted text-decoration-none">
+      <i class="bi bi-arrow-left"></i> Formats
+    </a>
+    <span class="text-muted">/</span>
+    <span class="fw-bold text-dark font-monospace">{{ format.code }}</span>
+  </div>
+
+  {# ── BANNIÈRE HÉRO : identité + aperçu proportionnel ── #}
+  <section class="mb-4 p-4"
+           style="background:linear-gradient(135deg,var(--color-primary) 0%,#1e40af 100%);border-radius:8px;color:#fff;box-shadow:0 8px 24px rgba(15,23,42,0.12);position:relative;overflow:hidden;">
+    <div style="position:absolute;right:-30px;top:-30px;width:170px;height:170px;border-radius:50%;background:rgba(255,255,255,0.06);pointer-events:none;"></div>
+
+    <div class="row g-4 align-items-center position-relative">
+      <div class="col-lg-8">
+        <div style="font-size:0.7rem;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:rgba(255,255,255,0.6);">
+          Inventaire &amp; gabarits publicitaires
+        </div>
+        <h1 class="fw-bold mb-2 mt-1" style="font-size:1.9rem;letter-spacing:-0.03em;color:#fff;">
+          {{ format.dimensions|default:"Dimensions non renseignées" }}
+        </h1>
+
+        <div class="d-flex flex-wrap align-items-center gap-2 mb-3">
+          <span class="badge" style="background:rgba(255,255,255,0.14);border:1px solid rgba(255,255,255,0.25);color:#fff;font-size:0.75rem;padding:6px 10px;">
+            <i class="bi bi-tag-fill me-1"></i>{{ format.categorie|default:"Sans catégorie" }}
+          </span>
+          <span class="badge font-monospace" style="background:rgba(255,255,255,0.14);border:1px solid rgba(255,255,255,0.25);color:#fff;font-size:0.75rem;padding:6px 10px;">
+            <i class="bi bi-upc me-1"></i>{{ format.code }}
+          </span>
+          {% if ratio %}
+            <span class="badge" style="background:rgba(255,255,255,0.14);border:1px solid rgba(255,255,255,0.25);color:#fff;font-size:0.75rem;padding:6px 10px;">
+              <i class="bi bi-aspect-ratio me-1"></i>Ratio {{ ratio }} : 1
+            </span>
+          {% endif %}
+        </div>
+
+        {% if user.is_staff_regie_role or user.is_admin %}
+        <div class="d-flex flex-wrap gap-2">
+          <a href="{% url 'format_update' format.pk %}" class="btn btn-light btn-sm shadow-sm d-flex align-items-center gap-1" style="font-weight:700;color:#932e2b;">
+            <i class="bi bi-pencil"></i>Modifier ce format
+          </a>
+          <a href="{% url 'format_delete' format.pk %}" class="btn btn-sm d-flex align-items-center gap-1" style="font-weight:600;color:#fff;border:1px solid rgba(255,255,255,0.35);background:rgba(255,255,255,0.08);">
+            <i class="bi bi-trash"></i>Supprimer
+          </a>
+        </div>
+        {% endif %}
+      </div>
+
+      {# Aperçu à l'échelle du gabarit #}
+      <div class="col-lg-4">
+        <div class="d-flex flex-column align-items-center justify-content-center mx-auto"
+             style="height:150px;max-width:260px;background:rgba(255,255,255,0.08);border:2px dashed rgba(255,255,255,0.3);border-radius:8px;">
+          <div style="width:{{ preview_w }}px;height:{{ preview_h }}px;background:#fff;border-radius:4px;box-shadow:0 4px 14px rgba(0,0,0,0.25);display:flex;align-items:center;justify-content:center;color:var(--color-primary);font-weight:800;font-size:0.85rem;">
+            <span class="font-monospace">{{ format.code }}</span>
+          </div>
+        </div>
+        <div class="text-center mt-2" style="font-size:0.7rem;color:rgba(255,255,255,0.6);">
+          Aperçu à l'échelle du gabarit
+        </div>
+      </div>
+    </div>
+  </section>
+
+  {# ── INDICATEURS CLÉS ── #}
+  <div class="row g-3 mb-4">
+    <div class="col-6 col-lg">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body p-3">
+          <div class="text-muted text-uppercase fw-bold" style="font-size:0.68rem;letter-spacing:0.4px;">
+            <i class="bi bi-bounding-box me-1"></i>{% if est_ecran %}Cellules{% else %}Superficie{% endif %}
+          </div>
+          <div class="fs-3 fw-bold text-dark mt-1">
+            {% if format.superficie %}{{ format.superficie|floatformat:"-2" }} <span class="fs-6 text-muted">{{ unite_surface }}</span>{% else %}—{% endif %}
+          </div>
+          <div class="text-muted" style="font-size:0.72rem;">par {% if est_ecran %}écran{% else %}face{% endif %}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-6 col-lg">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body p-3">
+          <div class="text-muted text-uppercase fw-bold" style="font-size:0.68rem;letter-spacing:0.4px;">
+            <i class="bi bi-signpost-split me-1"></i>Supports
+          </div>
+          <div class="fs-3 fw-bold text-dark mt-1">{{ support_count }}</div>
+          <div class="text-muted" style="font-size:0.72rem;">dans {{ nb_villes }} ville{{ nb_villes|pluralize }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-6 col-lg">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body p-3">
+          <div class="text-muted text-uppercase fw-bold" style="font-size:0.68rem;letter-spacing:0.4px;">
+            <i class="bi bi-check-circle me-1 text-success"></i>Bon état
+          </div>
+          <div class="fs-3 fw-bold text-success mt-1">{{ nb_bon }}</div>
+          <div class="text-muted" style="font-size:0.72rem;">opérationnel{{ nb_bon|pluralize }}</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-6 col-lg">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body p-3">
+          <div class="text-muted text-uppercase fw-bold" style="font-size:0.68rem;letter-spacing:0.4px;">
+            <i class="bi bi-exclamation-triangle me-1 text-danger"></i>À surveiller
+          </div>
+          <div class="fs-3 fw-bold mt-1 {% if nb_panne or nb_maintenance %}text-danger{% else %}text-dark{% endif %}">{{ nb_panne|add:nb_maintenance }}</div>
+          <div class="text-muted" style="font-size:0.72rem;">{{ nb_panne }} en panne · {{ nb_maintenance }} en maintenance</div>
+        </div>
+      </div>
+    </div>
+
+    {% if surface_totale %}
+    <div class="col-12 col-lg">
+      <div class="card border-0 shadow-sm h-100">
+        <div class="card-body p-3">
+          <div class="text-muted text-uppercase fw-bold" style="font-size:0.68rem;letter-spacing:0.4px;">
+            <i class="bi bi-layers me-1"></i>Surface cumulée
+          </div>
+          <div class="fs-3 fw-bold text-dark mt-1">{{ surface_totale|floatformat:"-2" }} <span class="fs-6 text-muted">m²</span></div>
+          <div class="text-muted" style="font-size:0.72rem;">par face, tous supports</div>
+        </div>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="row g-4">
+
+    {# ── TABLEAU DES SUPPORTS ── #}
+    <div class="col-xl-8">
+      <section class="card table-custom-card border-0 shadow-sm">
+        <div class="card-header bg-white py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-2 border-bottom">
+          <div class="d-flex align-items-center gap-2">
+            <h2 class="h6 fw-bold mb-0 text-dark">Supports utilisant ce format</h2>
+            <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1 font-monospace" style="font-size:0.75rem;">
+              {{ paginator.count }} support{{ paginator.count|pluralize }}
+            </span>
+          </div>
+
+          {% if support_count %}
+          <div class="d-flex align-items-center gap-2 flex-wrap">
+            <div class="btn-group btn-group-sm" role="group" aria-label="Filtrer par état" id="etat-filters">
+              <button type="button" class="btn btn-outline-secondary active" data-etat="">Tous</button>
+              <button type="button" class="btn btn-outline-secondary" data-etat="bon">Bon</button>
+              <button type="button" class="btn btn-outline-secondary" data-etat="maintenance">Maintenance</button>
+              <button type="button" class="btn btn-outline-secondary" data-etat="panne">Panne</button>
+            </div>
+            <div class="input-group input-group-sm" style="width:200px;">
+              <span class="input-group-text bg-light border-end-0"><i class="bi bi-search text-muted"></i></span>
+              <input type="search" id="support-search" class="form-control border-start-0" placeholder="Rechercher…" autocomplete="off">
+            </div>
+          </div>
+          {% endif %}
+        </div>
+
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0 table-supports" id="supports-table">
+            <thead>
+              <tr>
+                <th class="ps-4">Code</th>
+                <th>Nom</th>
+                <th>Localisation</th>
+                <th>État</th>
+                <th class="text-end pe-4">Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for support in supports %}
+                <tr class="support-row" data-etat="{{ support.etat }}"
+                    data-search="{{ support.code }} {{ support.nom }} {{ support.ville }} {{ support.quartier }}">
+                  <td class="ps-4">
+                    <span class="code-primary">{{ support.code }}</span>
+                  </td>
+                  <td class="fw-semibold">{{ support.nom|default:"—" }}</td>
+                  <td>
+                    <div>{{ support.ville|default:"—" }}</div>
+                    {% if support.quartier %}
+                      <div class="text-muted small"><i class="bi bi-geo-alt me-1"></i>{{ support.quartier }}</div>
+                    {% endif %}
+                  </td>
+                  <td>
+                    <span class="badge badge-status {% if support.etat == 'bon' %}bs-disponible{% elif support.etat == 'maintenance' %}bs-maintenance{% else %}bs-occupe{% endif %}">
+                      {{ support.get_etat_display }}
+                    </span>
+                  </td>
+                  <td class="text-end pe-4">
+                    <a href="{% url 'support_detail' support.uuid %}" class="btn btn-sm btn-outline-primary btn-action-icon" title="Voir le support">
+                      <i class="bi bi-eye"></i>
+                    </a>
+                  </td>
+                </tr>
+              {% empty %}
+                <tr>
+                  <td colspan="5" class="text-center py-5 text-muted">
+                    <div class="py-3">
+                      <i class="bi bi-signpost-split d-block mb-3" style="font-size:2.5rem;opacity:0.4;"></i>
+                      <h6 class="fw-bold text-dark mb-1">Aucun support pour ce format</h6>
+                      <p class="text-muted small mb-3">
+                        {% if est_ecran %}Aucun écran numérique n'utilise actuellement cette cellule.{% else %}Aucun panneau n'utilise actuellement ce format.{% endif %}
+                      </p>
+                      {% if user.is_staff_regie_role or user.is_admin %}
+                      <a href="{% url 'support_create' %}" class="btn btn-primary btn-sm px-3">
+                        <i class="bi bi-plus-lg me-1"></i>Ajouter un support
+                      </a>
+                      {% endif %}
+                    </div>
+                  </td>
+                </tr>
+              {% endfor %}
+              <tr id="no-match-row" style="display:none;">
+                <td colspan="5" class="text-center py-4 text-muted small">
+                  <i class="bi bi-search me-1"></i>Aucun support ne correspond à votre recherche.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+      <div class="mt-3">
+        {% pagination_nav %}
+      </div>
+    </div>
+
+    {# ── COLONNE LATÉRALE ── #}
+    <div class="col-xl-4">
+
+      {# Fiche technique #}
+      <section class="card border-0 shadow-sm mb-4">
+        <div class="card-header bg-white py-3 px-4 border-bottom">
+          <h2 class="h6 fw-bold mb-0 text-dark"><i class="bi bi-card-list me-2 text-primary"></i>Fiche technique</h2>
+        </div>
+        <div class="card-body p-0">
+          <dl class="row g-0 mb-0" style="font-size:0.85rem;">
+            <dt class="col-5 px-4 py-2 text-muted fw-semibold border-bottom">Code</dt>
+            <dd class="col-7 px-3 py-2 mb-0 border-bottom font-monospace fw-semibold">{{ format.code }}</dd>
+
+            <dt class="col-5 px-4 py-2 text-muted fw-semibold border-bottom">Catégorie</dt>
+            <dd class="col-7 px-3 py-2 mb-0 border-bottom">{{ format.categorie|default:"—" }}</dd>
+
+            <dt class="col-5 px-4 py-2 text-muted fw-semibold border-bottom">Dimensions</dt>
+            <dd class="col-7 px-3 py-2 mb-0 border-bottom">{{ format.dimensions|default:"—" }}</dd>
+
+            <dt class="col-5 px-4 py-2 text-muted fw-semibold {% if ratio %}border-bottom{% endif %}">{% if est_ecran %}Cellules{% else %}Superficie{% endif %}</dt>
+            <dd class="col-7 px-3 py-2 mb-0 {% if ratio %}border-bottom{% endif %}">
+              {% if format.superficie %}{{ format.superficie|floatformat:"-2" }} {{ unite_surface }}{% else %}—{% endif %}
+            </dd>
+
+            {% if ratio %}
+            <dt class="col-5 px-4 py-2 text-muted fw-semibold">Orientation</dt>
+            <dd class="col-7 px-3 py-2 mb-0">
+              {% if ratio > 1 %}Paysage{% elif ratio < 1 %}Portrait{% else %}Carré{% endif %}
+            </dd>
+            {% endif %}
+          </dl>
+        </div>
+      </section>
+
+      {# Répartition par ville #}
+      <section class="card border-0 shadow-sm">
+        <div class="card-header bg-white py-3 px-4 border-bottom">
+          <h2 class="h6 fw-bold mb-0 text-dark"><i class="bi bi-geo-alt me-2 text-primary"></i>Répartition par ville</h2>
+        </div>
+        <div class="card-body p-4">
+          {% for v in villes %}
+            <div class="{% if not forloop.last %}mb-3{% endif %}">
+              <div class="d-flex justify-content-between align-items-center mb-1" style="font-size:0.82rem;">
+                <span class="fw-semibold text-dark">{{ v.ville }}</span>
+                <span class="text-muted font-monospace">{{ v.n }}</span>
+              </div>
+              <div class="progress" style="height:6px;">
+                <div class="progress-bar" role="progressbar"
+                     style="width:{% widthratio v.n support_count 100 %}%;background:var(--color-primary);"
+                     aria-valuenow="{{ v.n }}" aria-valuemin="0" aria-valuemax="{{ support_count }}"></div>
+              </div>
+            </div>
+          {% empty %}
+            <p class="text-muted small mb-0">Aucune donnée de localisation disponible.</p>
+          {% endfor %}
+        </div>
+      </section>
+
+    </div>
+  </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+  const rows = Array.from(document.querySelectorAll('#supports-table tr.support-row'));
+  if (!rows.length) return;
+
+  const search = document.getElementById('support-search');
+  const filters = document.querySelectorAll('#etat-filters button');
+  const noMatch = document.getElementById('no-match-row');
+  let etatActif = '';
+
+  function appliquer() {
+    const q = (search ? search.value : '').trim().toLowerCase();
+    let visibles = 0;
+    rows.forEach(function (row) {
+      const okEtat = !etatActif || row.dataset.etat === etatActif;
+      const okTexte = !q || row.dataset.search.toLowerCase().indexOf(q) !== -1;
+      const visible = okEtat && okTexte;
+      row.style.display = visible ? '' : 'none';
+      if (visible) visibles++;
+    });
+    if (noMatch) noMatch.style.display = visibles ? 'none' : '';
+  }
+
+  if (search) search.addEventListener('input', appliquer);
+  filters.forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      filters.forEach(function (b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      etatActif = btn.dataset.etat;
+      appliquer();
+    });
+  });
+});
+</script>
+{% endblock %}

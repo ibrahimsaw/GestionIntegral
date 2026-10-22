@@ -1,0 +1,507 @@
+{% extends 'base.html' %}
+
+{% block title %}{% if ecrans_mode %}Écrans{% elif tous_geants %}Géants{% else %}{{ format.dimensions|default:format.code }}{% endif %} — Parc Integral{% endblock %}
+
+{% block topbar_title %}
+  <div class="d-flex align-items-center gap-2">
+    <a href="{% url 'dashboard' %}{% if ville_active %}?ville={{ ville_active|urlencode }}{% endif %}" class="btn btn-sm btn-outline-secondary" aria-label="Retour au parc">
+      <i class="bi bi-arrow-left"></i>
+    </a>
+    <span class="fw-bold">{% if ecrans_mode %}Écrans{% elif tous_geants %}Géants{% else %}{{ format.categorie|default:"Format" }}{% endif %}</span>
+  </div>
+{% endblock %}
+
+{% block topbar_actions %}{% endblock %}
+{% block page_toolbar %}{% endblock %}
+
+{% block content %}
+<style>
+  .fd {
+    --bg: #f4f5f7; --card: #fff; --tile: #eceef2; --ink: #16181d; --ink-2: #434956;
+    --muted: #6f7681; --line: #e2e5ea; --accent: #932e2b; --ok: #1d7a4b; --ko: #b42318; --warn: #a35f0a;
+    background: var(--bg); color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    font-size: .9rem; max-width: 1600px; margin: 0 auto; padding: clamp(1rem, 2.2vw, 1.5rem);
+  }
+  .fd *, .fd *::before, .fd *::after { box-sizing: border-box; }
+  .fd a { color: inherit; text-decoration: none; }
+
+  .fd-head { display: flex; flex-wrap: wrap; align-items: flex-end; justify-content: space-between; gap: 1rem; margin-bottom: 1rem; }
+  .fd-head h1 { margin: 0; font-size: 1.7rem; font-weight: 700; letter-spacing: -.02em; }
+  .fd-head p { margin: .25rem 0 0; color: var(--muted); }
+  .fd-kpis { display: flex; flex-wrap: wrap; gap: .6rem; }
+  .fd-kpi { min-width: 7.5rem; padding: .6rem .9rem; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
+  .fd-kpi small { display: block; color: var(--muted); font-size: .66rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; }
+  .fd-kpi strong { display: block; margin-top: .3rem; font-size: 1.4rem; line-height: 1; font-variant-numeric: tabular-nums; }
+  .fd-kpi.is-occ strong { color: var(--ko); }
+  .fd-kpi.is-free strong { color: var(--ok); }
+  .fd-bar { height: 6px; margin-top: .45rem; overflow: hidden; border-radius: 999px; background: var(--tile); }
+  .fd-bar > i { display: block; height: 100%; background: var(--accent); }
+
+  .fd-tabs { display: flex; gap: .25rem; margin-bottom: 1rem; border-bottom: 1px solid var(--line); }
+  .fd-tab { display: inline-flex; align-items: center; gap: .45rem; padding: .6rem 1rem; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--muted); font: inherit; font-weight: 600; cursor: pointer; }
+  .fd-tab:hover { color: var(--ink); }
+  .fd-tab[aria-selected="true"] { border-bottom-color: var(--accent); color: var(--ink); }
+  .fd-panel[hidden] { display: none; }
+
+  .fd-card { border: 1px solid var(--line); border-radius: 8px; background: var(--card); overflow: hidden; }
+  #fd-map { height: clamp(300px, 36vw, 420px); background: #e9ecef; }
+  .fd-map-error { margin: .75rem; }
+
+  .fd-bar-tools { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .6rem 1rem; margin: 1.1rem 0 .75rem; }
+  .fd-bar-tools h2 { margin: 0; font-size: 1rem; font-weight: 700; }
+  .fd-tools-right { display: flex; flex-wrap: wrap; gap: .5rem; }
+  .fd-input, .fd-select { padding: .4rem .7rem; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink); font: inherit; }
+  .fd-input { min-width: 14rem; }
+
+  .fd-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: .8rem; }
+  .fd-pan { position: relative; display: block; overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background: var(--card); transition: box-shadow .15s ease, border-color .15s ease; }
+  .fd-pan:hover, .fd-pan.is-hl { border-color: var(--accent); box-shadow: 0 4px 14px rgba(22, 24, 29, .1); }
+  .fd-pan-img { position: relative; aspect-ratio: 16 / 10; background: var(--tile); display: grid; place-items: center; color: var(--muted); font-size: 1.6rem; }
+  .fd-pan-img img { width: 100%; height: 100%; object-fit: cover; }
+  .fd-num { position: absolute; top: .5rem; left: .5rem; min-width: 1.6rem; padding: .12rem .45rem; border-radius: 5px; background: var(--color-primary); color: #fff; font-size: .78rem; font-weight: 700; text-align: center; }
+  .fd-pan-body { display: grid; gap: .3rem; padding: .6rem .75rem .7rem; }
+  .fd-pan-body .addr { display: flex; align-items: center; gap: .4rem; font-weight: 600; }
+  .fd-pan-body .addr span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .fd-pan-body .meta { color: var(--muted); font-size: .8rem; }
+  .fd-pan-foot { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+
+  .fd-pill { display: inline-block; padding: .15rem .6rem; border-radius: 4px; font-size: .74rem; font-weight: 700; }
+  .fd-pill.is-libre { background: #d6eee1; color: var(--ok); }
+  .fd-pill.is-partiel { background: #fbecd0; color: var(--warn); }
+  .fd-pill.is-occupe { background: #f8dedb; color: var(--accent); }
+  .fd-pill.is-panne { background: var(--tile); color: var(--muted); }
+
+  .fd-marker { display: grid; place-items: center; width: 28px; height: 28px; border: 2px solid #fff; border-radius: 50% 50% 50% 0; background: #2563eb; color: #fff; font-size: .75rem; font-weight: 700; transform: rotate(-45deg); box-shadow: 0 2px 6px rgba(0, 0, 0, .3); }
+  .fd-marker > span { transform: rotate(45deg); }
+  .fd-marker.is-occupe { background: var(--accent); }
+  .fd-marker.is-partiel { background: #d97706; }
+  .fd-marker.is-panne { background: #64748b; }
+  .fd-marker.is-libre { background: #2563eb; }
+
+  .fd-table { width: 100%; min-width: 640px; border-collapse: collapse; }
+  .fd-table th { padding: .65rem .8rem; background: var(--tile); color: var(--muted); font-size: .66rem; font-weight: 700; letter-spacing: .05em; text-align: left; text-transform: uppercase; }
+  .fd-table td { padding: .65rem .8rem; border-top: 1px solid var(--line); font-variant-numeric: tabular-nums; }
+  .fd-table .num { text-align: center; }
+  .fd-table tbody tr:hover { background: #fafbfc; }
+  .fd-scroll { overflow-x: auto; }
+
+  .fd-empty { padding: 1.5rem; color: var(--muted); text-align: center; }
+  .fd-legend { display: flex; flex-wrap: wrap; gap: .4rem 1rem; padding: .7rem 1rem; border-top: 1px solid var(--line); color: var(--muted); font-size: .8rem; }
+  .fd-legend i { display: inline-block; width: .6rem; height: .6rem; margin-right: .35rem; border-radius: 50%; }
+  .fd-popup-image { display: block; width: 100%; max-height: 150px; margin-bottom: .5rem; border-radius: 6px; object-fit: cover; }
+  .fd-popup-title { display: block; margin-bottom: .25rem; }
+  .fd-screen-layout { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(280px, 1fr); gap: 1rem; }
+  .fd-screen-list { display: grid; gap: .6rem; align-content: start; }
+  .fd-screen-item { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem 1rem; padding: .8rem 1rem; }
+  .fd-screen-item h2 { margin: 0; font-size: .98rem; }
+  .fd-screen-meta { color: var(--muted); font-size: .82rem; }
+  .fd-screen-map { min-height: 360px; }
+
+  @media (max-width: 700px) {
+    .fd-kpi { min-width: 6.5rem; flex: 1 1 6.5rem; }
+    .fd-input { min-width: 0; width: 100%; }
+    .fd-screen-layout { grid-template-columns: 1fr; }
+  }
+</style>
+
+<main class="fd">
+
+{% if ecrans_mode %}
+  <header class="fd-head">
+    <div>
+      <h1>Écrans numériques</h1>
+      <p>{{ nb_ecrans }} écran{{ nb_ecrans|pluralize }}{% if ville_active %} • {{ ville_active }}{% endif %}</p>
+    </div>
+    <div class="fd-kpis">
+      <div class="fd-kpi"><small>Écrans</small><strong>{{ nb_ecrans }}</strong></div>
+      <div class="fd-kpi is-occ"><small>Occupés</small><strong>{{ nb_ecrans_occupees }}</strong></div>
+      <div class="fd-kpi is-free"><small>Libres</small><strong>{{ nb_ecrans_libres }}</strong></div>
+    </div>
+  </header>
+
+  <div class="fd-screen-layout">
+    <div class="fd-card fd-screen-map" id="fd-screen-map" role="region" aria-label="Carte des écrans"></div>
+    <section>
+      <div class="fd-bar-tools">
+        <h2>Liste des écrans</h2>
+        <input class="fd-input" id="fd-screen-search" type="search" placeholder="Rechercher un écran..." aria-label="Rechercher un écran">
+      </div>
+      <div class="fd-screen-list" id="fd-screen-list">
+        {% for ecran in ecrans %}
+          <article class="fd-card fd-screen-item" data-search="{{ ecran.code|lower }} {{ ecran.nom|lower }} {{ ecran.ville|lower }} {{ ecran.quartier|lower }} {{ ecran.resolution|lower }}">
+            <div>
+              <h2><a href="{{ ecran.url }}">{{ ecran.nom }}</a></h2>
+              <div class="fd-screen-meta">{{ ecran.code }}{% if ecran.quartier %} · {{ ecran.quartier }}{% endif %}{% if ecran.ville %} · {{ ecran.ville }}{% endif %}</div>
+              <div class="fd-screen-meta">Résolution : {{ ecran.resolution }} · {{ ecran.etat }}</div>
+            </div>
+            {% if ecran.occupe %}
+              <span class="fd-pill is-occupe">Occupé</span>
+            {% else %}
+              <span class="fd-pill is-libre">Libre</span>
+            {% endif %}
+          </article>
+        {% empty %}
+          <div class="fd-card fd-empty">Aucun écran{% if ville_active %} à {{ ville_active }}{% endif %}.</div>
+        {% endfor %}
+      </div>
+      {% if resolutions %}
+        <div class="fd-card fd-scroll" style="margin-top: 1rem;">
+          <table class="fd-table">
+            <thead><tr><th>Résolution</th><th class="num">Écrans</th></tr></thead>
+            <tbody>
+              {% for resolution in resolutions %}
+                <tr><td>{{ resolution.nom }}</td><td class="num">{{ resolution.nombre }}</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% endif %}
+    </section>
+  </div>
+{% else %}
+  <header class="fd-head">
+    <div>
+      <h1>{% if tous_geants %}Tous les panneaux géants{% else %}{% if format.categorie %}{{ format.categorie }} — {% endif %}{{ format.dimensions|default:format.code }}{% endif %}</h1>
+      <p>
+        {{ nb_panneaux }} panneau{{ nb_panneaux|pluralize:"x" }} • {{ nb_faces }} face{{ nb_faces|pluralize }}
+        {% if not tous_geants and format.superficie %}• {{ format.superficie }} m² par panneau{% endif %}
+        {% if ville_active %}• {{ ville_active }}{% endif %}
+      </p>
+    </div>
+    <div class="fd-kpis">
+      <div class="fd-kpi is-occ"><small>Occupés</small><strong>{{ nb_occupees }}</strong></div>
+      <div class="fd-kpi is-free"><small>Libres</small><strong>{{ nb_libres }}</strong></div>
+      <div class="fd-kpi">
+        <small>Taux de remplissage</small>
+        <strong>{{ taux }} %</strong>
+        <div class="fd-bar"><i style="width: {{ taux }}%"></i></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="fd-tabs" role="tablist" aria-label="Vues du format">
+    <button class="fd-tab" role="tab" id="tab-carte" aria-controls="panel-carte" aria-selected="true" data-tab="carte"><i class="bi bi-map"></i>Carte</button>
+    <button class="fd-tab" role="tab" id="tab-liste" aria-controls="panel-liste" aria-selected="false" data-tab="liste"><i class="bi bi-list-ul"></i>Liste</button>
+    <button class="fd-tab" role="tab" id="tab-stats" aria-controls="panel-stats" aria-selected="false" data-tab="stats"><i class="bi bi-bar-chart"></i>Statistiques</button>
+  </div>
+
+  {# ── Carte + cartes de panneaux ── #}
+  <section class="fd-panel" id="panel-carte" role="tabpanel" aria-labelledby="tab-carte">
+    <div class="fd-card">
+      <div id="fd-map" role="application" aria-label="Carte des panneaux"></div>
+      <div id="fd-map-error" class="alert alert-warning fd-map-error d-none" role="alert"></div>
+      <div class="fd-legend">
+        <span><i style="background:#2563eb"></i>Libre</span>
+        <span><i style="background:#d97706"></i>Partiel</span>
+        <span><i style="background:#932e2b"></i>Occupé</span>
+        <span><i style="background:#64748b"></i>Hors service</span>
+      </div>
+    </div>
+
+    <div class="fd-bar-tools">
+      <h2>Liste des {{ nb_panneaux }} panneaux{% if format.dimensions %} ({{ format.dimensions }}){% endif %}</h2>
+      <div class="fd-tools-right">
+        <input type="search" id="fd-search" class="fd-input" placeholder="Rechercher un panneau…" aria-label="Rechercher un panneau">
+        <select id="fd-sort" class="fd-select" aria-label="Trier">
+          <option value="numero">Trier par numéro</option>
+          <option value="quartier">Trier par quartier</option>
+          <option value="statut">Trier par statut</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="fd-grid" id="fd-grid">
+      {% for p in panneaux %}
+        <a class="fd-pan" href="{{ p.url }}"
+           data-numero="{{ p.numero }}" data-quartier="{{ p.quartier|lower }}" data-statut="{{ p.statut }}"
+           data-search="{{ p.code|lower }} {{ p.nom|lower }} {{ p.adresse|lower }} {{ p.quartier|lower }}">
+          <div class="fd-pan-img">
+            {% if p.photo %}<img src="{{ p.photo }}" alt="" loading="lazy">{% else %}<i class="bi bi-image" aria-hidden="true"></i>{% endif %}
+            <span class="fd-num">{{ p.numero }}</span>
+          </div>
+          <div class="fd-pan-body">
+            <div class="addr"><i class="bi bi-geo-alt-fill" aria-hidden="true"></i><span>{{ p.adresse|default:p.nom }}</span></div>
+            <div class="meta">{{ p.code }}{% if tous_geants %} · {{ p.format }}{% endif %} · {{ p.nb_faces }} face{{ p.nb_faces|pluralize }}</div>
+            <div class="fd-pan-foot">
+              <span class="fd-pill is-{{ p.statut }}">{{ p.statut_label }}</span>
+              <i class="bi bi-chevron-right" aria-hidden="true"></i>
+            </div>
+          </div>
+        </a>
+      {% empty %}
+        <div class="fd-card fd-empty" style="grid-column: 1 / -1;">Aucun panneau pour ce format{% if ville_active %} à {{ ville_active }}{% endif %}.</div>
+      {% endfor %}
+    </div>
+    <div class="fd-card fd-empty d-none" id="fd-no-result">Aucun panneau ne correspond à la recherche.</div>
+  </section>
+
+  {# ── Liste (tableau) ── #}
+  <section class="fd-panel" id="panel-liste" role="tabpanel" aria-labelledby="tab-liste" hidden>
+    <div class="fd-card fd-scroll">
+      <table class="fd-table">
+        <thead>
+          <tr>
+            <th>N°</th><th>Code</th>{% if tous_geants %}<th>Dimension</th>{% endif %}<th>Adresse</th><th>Quartier</th>
+            <th class="num">Faces</th><th class="num">Occupées</th><th class="num">Libres</th><th>Statut</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for p in panneaux %}
+            <tr>
+              <td><b>{{ p.numero }}</b></td>
+              <td><a href="{{ p.url }}"><b>{{ p.code }}</b></a></td>
+              {% if tous_geants %}<td>{{ p.format }}</td>{% endif %}
+              <td>{{ p.adresse|default:"—" }}</td>
+              <td>{{ p.quartier|default:"—" }}</td>
+              <td class="num">{{ p.nb_faces }}</td>
+              <td class="num" style="color: var(--ko); font-weight: 700;">{{ p.nb_occupees }}</td>
+              <td class="num" style="color: var(--ok); font-weight: 700;">{{ p.nb_libres }}</td>
+              <td><span class="fd-pill is-{{ p.statut }}">{{ p.statut_label }}</span></td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="{% if tous_geants %}9{% else %}8{% endif %}" class="fd-empty">Aucun panneau.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  {# ── Statistiques ── #}
+  <section class="fd-panel" id="panel-stats" role="tabpanel" aria-labelledby="tab-stats" hidden>
+    <div class="fd-kpis" style="margin-bottom: 1rem;">
+      <div class="fd-kpi is-free"><small>Panneaux libres</small><strong>{{ nb_libre_panneaux }}</strong></div>
+      <div class="fd-kpi"><small>Partiels</small><strong>{{ nb_partiel_panneaux }}</strong></div>
+      <div class="fd-kpi is-occ"><small>Occupés</small><strong>{{ nb_occupe_panneaux }}</strong></div>
+      <div class="fd-kpi"><small>Hors service</small><strong>{{ nb_panne_panneaux }}</strong></div>
+    </div>
+    <div class="fd-card fd-scroll">
+      <table class="fd-table">
+        <thead>
+          <tr>
+            <th>Quartier</th><th class="num">Panneaux</th><th class="num">Faces</th>
+            <th class="num">Occupées</th><th class="num">Libres</th><th>Taux de remplissage</th>
+          </tr>
+        </thead>
+        <tbody>
+          {% for q in stats_quartiers %}
+            <tr>
+              <td><b>{{ q.nom }}</b></td>
+              <td class="num">{{ q.nb_panneaux }}</td>
+              <td class="num">{{ q.nb_faces }}</td>
+              <td class="num" style="color: var(--ko); font-weight: 700;">{{ q.nb_occupees }}</td>
+              <td class="num" style="color: var(--ok); font-weight: 700;">{{ q.nb_libres }}</td>
+              <td style="min-width: 140px;">
+                <b>{{ q.taux }} %</b>
+                <div class="fd-bar"><i style="width: {{ q.taux }}%"></i></div>
+              </td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="6" class="fd-empty">Aucune donnée.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+{% endif %}
+
+</main>
+
+{% if ecrans_mode %}
+  {{ ecrans|json_script:"fd-screen-data" }}
+{% else %}
+{{ panneaux|json_script:"fd-data" }}
+{% endif %}
+{% endblock %}
+
+{% block extra_js %}
+{% if ecrans_mode %}
+<script>
+  (function() {
+    const screens = JSON.parse(document.getElementById('fd-screen-data').textContent || '[]');
+    const search = document.getElementById('fd-screen-search');
+    const list = document.getElementById('fd-screen-list');
+    if (search) {
+      search.addEventListener('input', function() {
+        const query = search.value.trim().toLowerCase();
+        list.querySelectorAll('.fd-screen-item').forEach(function(item) {
+          item.hidden = item.dataset.search.indexOf(query) === -1;
+        });
+      });
+    }
+
+    const located = screens.filter(function(screen) {
+      return Number.isFinite(screen.lat) && Number.isFinite(screen.lng);
+    });
+    const mapElement = document.getElementById('fd-screen-map');
+    if (!located.length) {
+      mapElement.textContent = 'Aucun écran géolocalisé.';
+      return;
+    }
+    if (typeof L === 'undefined') {
+      mapElement.textContent = 'La bibliothèque cartographique ne s’est pas chargée. Rechargez la page.';
+      return;
+    }
+    const map = L.map(mapElement, { scrollWheelZoom: false });
+    if (typeof window.buildSafeLeafletTiles === 'function') {
+      window.buildSafeLeafletTiles(map, { attribution: '&copy; OpenStreetMap contributors', maxZoom: 19 });
+    } else {
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors',
+        maxZoom: 19
+      }).addTo(map);
+    }
+    const bounds = [];
+    located.forEach(function(screen) {
+      const marker = L.marker([screen.lat, screen.lng]).addTo(map);
+      const popup = document.createElement('div');
+      const link = document.createElement('a');
+      link.href = screen.url;
+      link.textContent = screen.nom;
+      popup.appendChild(link);
+      const details = document.createElement('div');
+      details.textContent = [screen.code, screen.quartier, screen.ville, screen.resolution].filter(Boolean).join(' · ');
+      popup.appendChild(details);
+      marker.bindPopup(popup);
+      bounds.push([screen.lat, screen.lng]);
+    });
+    map.fitBounds(bounds, { padding: [24, 24], maxZoom: 15 });
+  })();
+</script>
+{% else %}
+<script>
+  (function() {
+    const panneaux = JSON.parse(document.getElementById('fd-data').textContent || '[]');
+
+    /* ── Onglets ── */
+    const tabs = document.querySelectorAll('.fd-tab');
+    let map = null;
+    function selectTab(name) {
+      tabs.forEach(function(tab) {
+        const active = tab.dataset.tab === name;
+        tab.setAttribute('aria-selected', active ? 'true' : 'false');
+        document.getElementById('panel-' + tab.dataset.tab).hidden = !active;
+      });
+      if (name === 'carte' && map) window.setTimeout(function() { map.invalidateSize(); }, 0);
+      if (history.replaceState) history.replaceState(null, '', '#' + name);
+    }
+    tabs.forEach(function(tab) {
+      tab.addEventListener('click', function() { selectTab(tab.dataset.tab); });
+    });
+    const initial = (location.hash || '').replace('#', '');
+    if (['carte', 'liste', 'stats'].indexOf(initial) !== -1) selectTab(initial);
+
+    /* ── Recherche + tri des cartes ── */
+    const grid = document.getElementById('fd-grid');
+    const search = document.getElementById('fd-search');
+    const sortSelect = document.getElementById('fd-sort');
+    const noResult = document.getElementById('fd-no-result');
+    const STATUT_ORDER = { libre: 0, partiel: 1, occupe: 2, panne: 3 };
+
+    function applyListState() {
+      const query = (search.value || '').trim().toLowerCase();
+      const cards = Array.prototype.slice.call(grid.querySelectorAll('.fd-pan'));
+      const mode = sortSelect.value;
+
+      cards.sort(function(a, b) {
+        if (mode === 'quartier') {
+          return a.dataset.quartier.localeCompare(b.dataset.quartier, 'fr') || (a.dataset.numero - b.dataset.numero);
+        }
+        if (mode === 'statut') {
+          return (STATUT_ORDER[a.dataset.statut] - STATUT_ORDER[b.dataset.statut]) || (a.dataset.numero - b.dataset.numero);
+        }
+        return a.dataset.numero - b.dataset.numero;
+      });
+
+      let visible = 0;
+      cards.forEach(function(card) {
+        const match = !query || card.dataset.search.indexOf(query) !== -1;
+        card.style.display = match ? '' : 'none';
+        if (match) visible += 1;
+        grid.appendChild(card);
+      });
+      noResult.classList.toggle('d-none', visible !== 0 || !cards.length);
+    }
+    if (search) {
+      search.addEventListener('input', applyListState);
+      sortSelect.addEventListener('change', applyListState);
+    }
+
+    /* ── Carte ── */
+    const mapElement = document.getElementById('fd-map');
+    const errorElement = document.getElementById('fd-map-error');
+    function showError(message) {
+      errorElement.textContent = message;
+      errorElement.classList.remove('d-none');
+    }
+    if (!mapElement) return;
+    if (typeof L === 'undefined') {
+      showError('La bibliothèque cartographique ne s’est pas chargée. Rechargez la page.');
+      return;
+    }
+
+    const located = panneaux.filter(function(p) {
+      return Number.isFinite(p.lat) && Number.isFinite(p.lng);
+    });
+    if (!located.length) {
+      showError('Aucun panneau géolocalisé pour ce format.');
+      return;
+    }
+
+    map = L.map(mapElement, { scrollWheelZoom: false });
+    if (typeof window.buildSafeLeafletTiles === 'function') {
+      window.buildSafeLeafletTiles(map, { attribution: '&copy; OpenStreetMap contributors', maxZoom: 19 });
+    } else {
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '&copy; OpenStreetMap contributors', maxZoom: 19
+      }).addTo(map);
+    }
+
+    const markers = located.map(function(p) {
+      const icon = L.divIcon({
+        className: '',
+        html: '<div class="fd-marker is-' + p.statut + '"><span>' + p.numero + '</span></div>',
+        iconSize: [28, 28],
+        iconAnchor: [14, 28]
+      });
+      const marker = L.marker([p.lat, p.lng], { icon: icon }).addTo(map);
+
+      const popup = document.createElement('div');
+      if (p.photo) {
+        const image = document.createElement('img');
+        image.className = 'fd-popup-image';
+        image.src = p.photo;
+        image.alt = p.nom || p.code;
+        popup.appendChild(image);
+      }
+      const title = document.createElement('strong');
+      title.className = 'fd-popup-title';
+      title.textContent = (p.nom || p.code) + ' · #' + p.numero;
+      popup.appendChild(title);
+      const details = document.createElement('div');
+      details.textContent = [p.adresse, p.nb_faces + ' face(s)', p.statut_label].filter(Boolean).join(' · ');
+      popup.appendChild(details);
+      const link = document.createElement('a');
+      link.href = p.url;
+      link.textContent = 'Ouvrir la fiche';
+      popup.appendChild(link);
+      marker.bindPopup(popup);
+
+      marker.on('click', function() {
+        const card = grid.querySelector('.fd-pan[data-numero="' + p.numero + '"]');
+        document.querySelectorAll('.fd-pan.is-hl').forEach(function(el) { el.classList.remove('is-hl'); });
+        if (card) {
+          card.classList.add('is-hl');
+          card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      });
+      return marker;
+    });
+
+    const bounds = L.featureGroup(markers).getBounds();
+    if (bounds.isValid()) map.fitBounds(bounds, { padding: [30, 30], maxZoom: 15 });
+    window.setTimeout(function() { map.invalidateSize(); }, 0);
+  })();
+</script>
+{% endif %}
+{% endblock %}

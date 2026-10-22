@@ -223,6 +223,11 @@
     border-radius: 6px;
     background: var(--tile);
   }
+  .pg-ecran-actions {
+    display: flex;
+    align-items: center;
+    gap: .6rem;
+  }
   .pg-ecran-main { min-width: 0; }
   .pg-ecran-main strong { display: block; font-size: .9rem; font-weight: 600; }
   .pg-ecran-main small { display: block; overflow: hidden; color: var(--muted); font-size: .74rem; text-overflow: ellipsis; white-space: nowrap; }
@@ -361,6 +366,26 @@
   .pg-chip.is-back { border-style: dashed; }
   .pg-block-head { flex-wrap: wrap; }
 
+  /* ── Tableau des formats (Géant) ── */
+  .pg-table-wrap { margin-top: .75rem; overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
+  .pg-table { width: 100%; min-width: 780px; border-collapse: collapse; }
+  .pg-table th { padding: .65rem .8rem; background: var(--tile); color: var(--muted); font-size: .66rem; font-weight: 700; letter-spacing: .05em; text-align: left; text-transform: uppercase; white-space: nowrap; }
+  .pg-table td { padding: .7rem .8rem; border-top: 1px solid var(--line); vertical-align: middle; font-variant-numeric: tabular-nums; }
+  .pg-table .num { text-align: center; }
+  .pg-table tbody tr:hover { background: #fafbfc; }
+  .pg-dim { display: flex; align-items: center; gap: .7rem; }
+  .pg-dim b { display: block; font-size: 1rem; }
+  .pg-dim small { color: var(--muted); font-size: .74rem; }
+  .pg-thumb { display: grid; flex: 0 0 auto; place-items: center; width: 56px; height: 42px; overflow: hidden; border-radius: 6px; background: var(--tile); color: var(--muted); }
+  .pg-thumb img { width: 100%; height: 100%; object-fit: cover; }
+  .pg-table .pg-num-occ { color: var(--ko); font-weight: 700; }
+  .pg-table .pg-num-free { color: var(--ok); font-weight: 700; }
+  .pg-taux { display: grid; gap: .3rem; min-width: 110px; }
+  .pg-bar { height: 6px; overflow: hidden; border-radius: 999px; background: var(--tile); }
+  .pg-bar > i { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
+  .pg .pg-voir { display: inline-block; padding: .35rem .95rem; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink-2); font-size: .82rem; font-weight: 600; text-decoration: none; }
+  .pg .pg-voir:hover { border-color: var(--accent); background: var(--accent); color: #fff; }
+
   /* ── Responsive ── */
   @media (max-width: 1100px) {
     .pg-layout { grid-template-columns: minmax(0, 1fr); }
@@ -406,7 +431,7 @@
           {# 12m² : totaux seulement #}
           {% for cat in format_categories %}{% if cat.categorie == '12m²' %}
             <article class="pg-block">
-              <div class="pg-block-head"><h3>12m²</h3><a href="#parc-map" class="pg-block-link" data-map-filter="12m²"><i class="bi bi-map"></i>Voir sur la carte</a></div>
+              <div class="pg-block-head"><h3>12m²</h3><a class="pg-block-link" href="{% url 'format_detail' cat.detail_code %}{% if ville_active %}?ville={{ ville_active|urlencode }}{% endif %}"><i class="bi bi-map"></i>Voir sur la carte</a></div>
               <div class="pg-tiles">
                 <div class="pg-tile"><span>Panneaux</span><strong>{{ cat.nb_supports }}</strong></div>
                 <div class="pg-tile"><span>Faces</span><strong>{{ cat.nb_faces }}</strong></div>
@@ -420,7 +445,7 @@
           {# Sucette : totaux seulement #}
           {% for cat in format_categories %}{% if cat.categorie == 'Sucette' %}
             <article class="pg-block">
-              <div class="pg-block-head"><h3>Sucette</h3><a href="#parc-map" class="pg-block-link" data-map-filter="Sucette"><i class="bi bi-map"></i>Voir sur la carte</a></div>
+              <div class="pg-block-head"><h3>Sucette</h3><a class="pg-block-link" href="{% url 'format_detail' cat.detail_code %}{% if ville_active %}?ville={{ ville_active|urlencode }}{% endif %}"><i class="bi bi-map"></i>Voir sur la carte</a></div>
               <div class="pg-tiles">
                 <div class="pg-tile"><span>Panneaux</span><strong>{{ cat.nb_supports }}</strong></div>
                 <div class="pg-tile"><span>Faces</span><strong>{{ cat.nb_faces }}</strong></div>
@@ -434,7 +459,7 @@
           {# Géant : totaux puis détail par format #}
           {% for cat in format_categories %}{% if cat.categorie == 'Géant' %}
             <article class="pg-block">
-              <div class="pg-block-head"><h3>Géant</h3><a href="#parc-map" class="pg-block-link" data-map-filter="Géant"><i class="bi bi-map"></i>Voir sur la carte</a></div>
+              <div class="pg-block-head"><h3>Géant</h3><a class="pg-block-link" href="{% url 'format_detail' 'geant' %}{% if ville_active %}?ville={{ ville_active|urlencode }}{% endif %}"><i class="bi bi-map"></i>Voir sur la carte</a></div>
               <div class="pg-tiles">
                 <div class="pg-tile"><span>Panneaux</span><strong>{{ cat.nb_supports }}</strong></div>
                 <div class="pg-tile"><span>Faces</span><strong>{{ cat.nb_faces }}</strong></div>
@@ -442,21 +467,47 @@
                 <div class="pg-tile is-good"><span>Libres</span><strong>{{ cat.nb_libre }}</strong></div>
                 <div class="pg-tile"><span>Taux occupation</span><strong>{% widthratio cat.nb_occupe cat.nb_faces 100 %}%</strong></div>
               </div>
-              <div class="pg-subs">
-                {% for format in formats_stats %}{% if format.categorie == 'Géant' %}
-                  <div class="pg-sub">
-                    <div class="pg-sub-row">
-                      <div class="pg-sub-title"><b>{{ format.superficie }} m²</b>{% if format.dimensions %} <b>{{ format.dimensions }}</b>{% endif %}</div>
-                      <div class="pg-stats-inline">
-                        <span><small>Panneaux</small><b>{{ format.nb_supports }}</b></span>
-                        <span><small>Faces</small><b>{{ format.nb_faces }}</b></span>
-                        <span class="is-current"><small>Occupés</small><b>{{ format.nb_faces_occupees }}</b></span>
-                        <span class="is-good"><small>Libres</small><b>{{ format.nb_faces_libres }}</b></span>
-                        <span><small>Taux occ.</small><b>{% widthratio format.nb_faces_occupees format.nb_faces 100 %}%</b></span>
-                      </div>
-                    </div>
-                  </div>
-                {% endif %}{% endfor %}
+              <div class="pg-table-wrap">
+                <table class="pg-table">
+                  <thead>
+                    <tr>
+                      <th>Dimension</th>
+                      <th>Surface</th>
+                      <th class="num">Panneaux</th>
+                      <th class="num">Faces</th>
+                      <th class="num">Occupés</th>
+                      <th class="num">Libres</th>
+                      <th>Taux de remplissage</th>
+                      <th class="num">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for format in formats_stats %}{% if format.categorie == 'Géant' %}
+                    <tr>
+                      <td>
+                        <div class="pg-dim">
+                          <span class="pg-thumb">{% if format.photo %}<img src="{{ format.photo }}" alt="" loading="lazy">{% else %}<i class="bi bi-signpost-2" aria-hidden="true"></i>{% endif %}</span>
+                          <div><b>{{ format.dimensions|default:format.code }}</b><small>{{ format.code }}</small></div>
+                        </div>
+                      </td>
+                      <td>{% if format.superficie %}{{ format.superficie }} m²{% else %}—{% endif %}</td>
+                      <td class="num"><b>{{ format.nb_supports }}</b></td>
+                      <td class="num"><b>{{ format.nb_faces }}</b></td>
+                      <td class="num pg-num-occ">{{ format.nb_faces_occupees }}</td>
+                      <td class="num pg-num-free">{{ format.nb_faces_libres }}</td>
+                      <td>
+                        <div class="pg-taux">
+                          <b>{{ format.taux }} %</b>
+                          <div class="pg-bar" role="progressbar" aria-valuenow="{{ format.taux }}" aria-valuemin="0" aria-valuemax="100"><i style="width: {{ format.taux }}%"></i></div>
+                        </div>
+                      </td>
+                      <td class="num">
+                        <a class="pg-voir" href="{% url 'format_detail' format.code %}{% if ville_active %}?ville={{ ville_active|urlencode }}{% endif %}">Voir</a>
+                      </td>
+                    </tr>
+                    {% endif %}{% endfor %}
+                  </tbody>
+                </table>
               </div>
             </article>
           {% endif %}{% endfor %}
@@ -464,7 +515,7 @@
           {# Marché : totaux puis détail par marché #}
           {% for cat in format_categories %}{% if cat.categorie == 'Marché' %}
             <article class="pg-block">
-              <div class="pg-block-head"><h3>Marché</h3><span class="pg-block-tag">{{ marches_total }} marché{{ marches_total|pluralize }}</span><a href="#parc-map" class="pg-block-link" data-map-filter="Marché"><i class="bi bi-map"></i>Voir sur la carte</a></div>
+              <div class="pg-block-head"><h3>Marché</h3><span class="pg-block-tag">{{ marches_total }} marché{{ marches_total|pluralize }}</span><a class="pg-block-link" href="{% url 'format_detail' cat.detail_code %}{% if ville_active %}?ville={{ ville_active|urlencode }}{% endif %}"><i class="bi bi-map"></i>Voir sur la carte</a></div>
               <div class="pg-tiles">
                 <div class="pg-tile"><span>Panneaux</span><strong>{{ cat.nb_supports }}</strong></div>
                 <div class="pg-tile"><span>Faces</span><strong>{{ cat.nb_faces }}</strong></div>
@@ -496,7 +547,7 @@
           {# Écrans : affiché seulement si la ville possède des écrans #}
           {% if ecrans_total %}
           <article class="pg-block">
-            <div class="pg-block-head"><h3>Écrans</h3><a href="#parc-map" class="pg-block-link" data-map-filter="Écrans"><i class="bi bi-map"></i>Voir sur la carte</a></div>
+            <div class="pg-block-head"><h3>Écrans</h3><a class="pg-block-link" href="{% url 'format_detail' 'ecrans' %}{% if ville_active %}?ville={{ ville_active|urlencode }}{% endif %}"><i class="bi bi-map"></i>Voir sur la carte</a></div>
             <div class="pg-tiles is-four">
               <div class="pg-tile"><span>Écrans</span><strong>{{ ecrans_total }}</strong></div>
               <div class="pg-tile is-current"><span>Occupés</span><strong>{{ ecrans_occupees }}</strong></div>
@@ -507,14 +558,17 @@
               {% for ecran in ecrans_liste %}
                 <div class="pg-ecran">
                   <div class="pg-ecran-main">
-                    <strong>{{ ecran.nom }}</strong>
+                    <strong><a href="{% url 'support_detail' ecran.uuid %}">{{ ecran.nom }}</a></strong>
                     <small>{{ ecran.code }}{% if ecran.quartier %} · {{ ecran.quartier }}{% endif %}{% if ecran.ville %} · {{ ecran.ville }}{% endif %}</small>
                   </div>
-                  {% if ecran.occupe %}
-                    <span class="pg-ecran-state is-occupe">Occupé</span>
-                  {% else %}
-                    <span class="pg-ecran-state is-libre">Libre</span>
-                  {% endif %}
+                  <div class="pg-ecran-actions">
+                    {% if ecran.occupe %}
+                      <span class="pg-ecran-state is-occupe">Occupé</span>
+                    {% else %}
+                      <span class="pg-ecran-state is-libre">Libre</span>
+                    {% endif %}
+                    <a class="pg-voir" href="{% url 'support_detail' ecran.uuid %}">Voir</a>
+                  </div>
                 </div>
               {% empty %}
                 <p class="pg-muted mb-0">Aucun écran enregistré dans cette ville.</p>
@@ -523,21 +577,6 @@
           </article>
           {% endif %}
 
-        </div>
-      </section>
-
-      <section class="pg-card" id="parc-map" aria-labelledby="pg-map-title">
-        <header class="pg-card-head">
-          <div>
-            <h2 id="pg-map-title">Carte du parc</h2>
-            <p>{% if ville_active %}Supports géolocalisés à {{ ville_active }}.{% else %}Supports géolocalisés sur l’ensemble du Burkina Faso.{% endif %}</p>
-          </div>
-          <span class="badge text-bg-light border" id="parc-map-count" aria-live="polite">Chargement…</span>
-        </header>
-        <div class="pg-filters d-none" id="parc-filters" role="group" aria-label="Filtrer les catégories sur la carte"></div>
-        <div id="parc-home-map" role="application" aria-label="Carte des supports publicitaires"></div>
-        <div id="parc-map-error" class="alert alert-danger d-none" role="alert">
-          Impossible de charger la carte du parc. Réessayez plus tard.
         </div>
       </section>
 
@@ -638,9 +677,18 @@
                     <div class="pg-row">
                       <div class="pg-row-main">
                         <a href="{% url 'campagne_detail' campagne.pk %}" class="pg-row-name">{{ campagne.nom }}</a>
-                        <div class="pg-row-meta">{{ campagne.date_debut|date:"d/m/Y" }} – {{ campagne.date_fin|date:"d/m/Y" }}</div>
+                        <span class="badge bg-panne" style="background-color: #dbdddd !important; color: #6c757d !important; border-color: rgba(100, 116, 139, 0.2) !important;">
+                          {% if campagne.nb_faces_reservees %}<span class="ms-2">{{ campagne.nb_faces_reservees }} face{% if campagne.nb_faces_reservees != 1 %}s{% endif %} {% if campagne.statut == 'en_cours' %}occupée{% else %}réservée{% endif %}{% if campagne.nb_faces_reservees != 1 %}s{% endif %}</span>{% endif %}
+                          {% if campagne.nb_ecrans_reserves %}<span class="ms-2">{{ campagne.nb_ecrans_reserves }} écran{% if campagne.nb_ecrans_reserves != 1 %}s{% endif %} {% if campagne.statut == 'en_cours' %}occupé{% else %}réservé{% endif %}{% if campagne.nb_ecrans_reserves != 1 %}s{% endif %}</span>{% endif %}
+                          {% if campagne.nb_emplacements_reserves %}<span class="ms-2">{{ campagne.nb_emplacements_reserves }} emplacement{% if campagne.nb_emplacements_reserves != 1 %}s{% endif %} {% if campagne.statut == 'en_cours' %}occupé{% else %}réservé{% endif %}{% if campagne.nb_emplacements_reserves != 1 %}s{% endif %}</span>{% endif %}
+                        </span>
+                        <div class="pg-row-meta">
+                          {{ campagne.date_debut|date:"d/m/Y" }} – {{ campagne.date_fin|date:"d/m/Y" }}
+                        </div>
                       </div>
-                      <span class="badge bg-{{ campagne.get_statut_badge }}">{{ campagne.get_statut_display }}</span>
+                      <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-{{ campagne.get_statut_badge }}" style="color: #ffffff;">{{ campagne.get_statut_display }}</span>
+                      </div>
                     </div>
                   {% endfor %}
                 </div>
@@ -667,7 +715,7 @@
                   <a href="{% url 'campagne_detail' campagne.pk %}" class="pg-row-name">{{ campagne.nom }}</a>
                   <div class="pg-row-meta">{{ campagne.client.nom }} · {{ campagne.date_debut|date:"d/m/Y" }} – {{ campagne.date_fin|date:"d/m/Y" }}</div>
                 </div>
-                <span class="badge bg-{{ campagne.get_statut_badge }}">{{ campagne.get_statut_display }}</span>
+                <span class="badge bg-{{ campagne.get_statut_badge }}" style="color: #ffffff;">{{ campagne.get_statut_display }}</span>
               </div>
             {% empty %}
               <p class="pg-muted mb-0">Aucune campagne à afficher pour cette sélection.</p>

@@ -97,5 +97,5 @@ urlpatterns = [
     path('demandes/<uuid:uuid>/valider/', views.DemandeValiderView.as_view(), name='demande_valider'),
     path('demandes/<uuid:uuid>/refuser/', views.DemandeRefuserView.as_view(), name='demande_refuser'),
     
-    
+    path('parc/format/<str:code>/', views.FormatDetailView.as_view(), name='format_detail'),
 ]

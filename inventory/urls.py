@@ -27,6 +27,7 @@ urlpatterns = [
 
     path('formats/', FormatSupportListView.as_view(), name='format_list'),
     path('formats/ajouter/', FormatSupportCreateView.as_view(), name='format_create'),
+    path('formats/<int:pk>/', FormatSupportDetailView.as_view(), name='format_support_detail'),
     path('formats/<int:pk>/modifier/', FormatSupportUpdateView.as_view(), name='format_update'),
     path('formats/<int:pk>/supprimer/', FormatSupportDeleteView.as_view(), name='format_delete'),
 

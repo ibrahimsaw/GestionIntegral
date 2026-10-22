@@ -56,6 +56,114 @@ class FormatSupportListView(LoginRequiredMixin, SortableListMixin, ListView):
         qs = super().get_queryset()
         return self.apply_sort(qs)
 
+
+def _extraire_dimensions(texte):
+    """
+    Extrait (largeur, hauteur) en mètres depuis un texte du type
+    '4m × 3m', '10m × 4.14m', '1,20m × 1,80m' ou '12 x 4'.
+    Retourne None si le texte n'est pas exploitable.
+    """
+    import re
+    if not texte:
+        return None
+    m = re.search(
+        r'(\d+(?:[.,]\d+)?)\s*m?\s*[x×*]\s*(\d+(?:[.,]\d+)?)',
+        texte, re.IGNORECASE,
+    )
+    if not m:
+        return None
+    try:
+        largeur = float(m.group(1).replace(',', '.'))
+        hauteur = float(m.group(2).replace(',', '.'))
+    except ValueError:
+        return None
+    if largeur <= 0 or hauteur <= 0:
+        return None
+    return largeur, hauteur
+
+
+class FormatSupportDetailView(LoginRequiredMixin, DetailView):
+    model = FormatSupport
+    template_name = 'inventory/format_detail.html'
+    context_object_name = 'format'
+    paginate_by = 20
+
+    def get_context_data(self, **kwargs):
+        from django.db.models import Count
+        from django.core.paginator import Paginator
+
+        context = super().get_context_data(**kwargs)
+        fmt = self.object
+        est_ecran = fmt.categorie == 'Ecran'
+
+        # Les écrans portent leur format dans ecran_info.cellule,
+        # les panneaux dans Support.format.
+        if est_ecran:
+            supports = Support.objects.filter(
+                type_support=Support.TYPE_ECRAN,
+                ecran_info__cellule=fmt.code,
+            )
+        else:
+            supports = Support.objects.filter(
+                type_support=Support.TYPE_PANNEAU,
+                format=fmt.code,
+            )
+        supports = supports.order_by('ville', 'quartier', 'code')
+
+        support_count = supports.count()
+
+        # ── Répartition par état ──────────────────────────────────────
+        etats = {row['etat']: row['n'] for row in supports.values('etat').annotate(n=Count('pk'))}
+        nb_bon = etats.get(Support.ETAT_BON, 0)
+        nb_maintenance = etats.get(Support.ETAT_MAINTENANCE, 0)
+        nb_panne = etats.get(Support.ETAT_PANNE, 0)
+
+        # ── Répartition par ville ─────────────────────────────────────
+        villes = [
+            {'ville': row['ville'] or 'Non renseignée', 'n': row['n']}
+            for row in supports.order_by().values('ville').annotate(n=Count('pk')).order_by('-n', 'ville')
+        ]
+
+        # ── Aperçu proportionnel du gabarit (boîte max 220 × 120 px) ──
+        dims = _extraire_dimensions(fmt.dimensions)
+        preview_w, preview_h = 140, 100
+        ratio = None
+        if dims:
+            largeur, hauteur = dims
+            ratio = round(largeur / hauteur, 2)
+            max_w, max_h = 220, 120
+            echelle = min(max_w / largeur, max_h / hauteur)
+            preview_w = max(int(largeur * echelle), 40)
+            preview_h = max(int(hauteur * echelle), 24)
+
+        surface_totale = None
+        if not est_ecran and fmt.superficie and support_count:
+            surface_totale = round(fmt.superficie * support_count, 2)
+
+        paginator = Paginator(supports, self.paginate_by)
+        page_obj = paginator.get_page(self.request.GET.get('page'))
+
+        context.update({
+            'supports': page_obj,
+            'page_obj': page_obj,
+            'paginator': paginator,
+            'is_paginated': page_obj.has_other_pages(),
+            'support_count': support_count,
+            'est_ecran': est_ecran,
+            'unite_surface': 'cellules' if est_ecran else 'm²',
+            'nb_bon': nb_bon,
+            'nb_maintenance': nb_maintenance,
+            'nb_panne': nb_panne,
+            'villes': villes,
+            'nb_villes': len(villes),
+            'surface_totale': surface_totale,
+            'ratio': ratio,
+            'preview_w': preview_w,
+            'preview_h': preview_h,
+        })
+        return context
+
+
 # 2. AJOUTER UN FORMAT
 class FormatSupportCreateView(LoginRequiredMixin, CreateView):
     model = FormatSupport

@@ -1131,7 +1131,7 @@ def _supports_ecran_disponibles(date_debut, date_fin) -> list[Support]:
     supports = Support.objects.filter(
         type_support="ecran",
         actif=True,
-        etat=Support.ETAT_BON,
+        etat__in=Support.ETATS_OPERATIONNELS,
     ).order_by("code")
     if date_debut and date_fin:
         supports_engages = LigneCampagne.objects.filter(

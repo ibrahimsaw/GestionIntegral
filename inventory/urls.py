@@ -12,6 +12,7 @@ urlpatterns = [
     # CRUD
     path('', SupportListView.as_view(), name='support_list'),
     path('ajouter/', SupportCreateView.as_view(), name='support_create'),
+    path('suppressions/en-attente/', SupportDeletionRequestsView.as_view(), name='support_deletion_requests'),
     path('<uuid:uuid>/', SupportDetailView.as_view(), name='support_detail'),
     path('<uuid:uuid>/modifier/', SupportUpdateView.as_view(), name='support_edit'),
     path('<uuid:uuid>/supprimer/', SupportDeleteView.as_view(), name='support_delete'),

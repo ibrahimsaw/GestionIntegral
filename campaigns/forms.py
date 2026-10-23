@@ -332,8 +332,10 @@ class LigneCampagneForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.campagne = campagne
 
-        # Filtrage initial des supports en bon état
-        supports_qs = Support.objects.filter(etat='bon').order_by('code')
+        # Les supports fonctionnels restent réservables même si une maintenance est à prévoir.
+        supports_qs = Support.objects.filter(
+            etat__in=Support.ETATS_OPERATIONNELS,
+        ).order_by('code')
 
         # Gestion du type sélectionné (via POST ou instance existante)
         selected_type = self.data.get('type_support')

@@ -21,7 +21,10 @@ class SupportForm(forms.ModelForm):
         required=False,
         label="Nombre de faces",
         widget=forms.NumberInput(attrs={**W, 'min': 1, 'max': 10}),
-        help_text="Nombre de faces du panneau (généralement 2).",
+        help_text=(
+            "Un panneau de marché est proposé avec 1 face par défaut ; "
+            "vous pouvez modifier ce nombre."
+        ),
     )
 
     class Meta:
@@ -315,9 +318,13 @@ class MaintenanceForm(forms.ModelForm):
         support_pk = kwargs.pop('support_pk', None)
         super().__init__(*args, **kwargs)
 
-        # ── État enregistré : uniquement Bon / Panne ──────────────────────
+        # ── État enregistré après intervention ────────────────────────────
         self.fields['etat_apres'].choices = [
             (Maintenance.ETAT_BON, 'Bon état'),
+            (
+                Maintenance.ETAT_A_MAINTENIR,
+                'Fonctionnel — maintenance à prévoir',
+            ),
             (Maintenance.ETAT_PANNE, 'En panne'),
         ]
         self.fields['etat_apres'].initial = Maintenance.ETAT_BON

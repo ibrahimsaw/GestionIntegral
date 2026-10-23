@@ -1,49 +1,70 @@
 {% extends 'base.html' %}
 
-{% block title %}Supprimer {{ obj }} — Integral{% endblock %}
+{% block title %}Suppression de {{ support.code }} — Integral{% endblock %}
+
+{% block topbar_title %}
+  <i class="bi bi-trash me-2 text-danger"></i>Suppression de support
+{% endblock %}
 
 {% block content %}
-<div class="row justify-content-center" style="margin-top: 5vh;">
-    <div class="col-md-6 col-lg-5">
-        <div class="card border-0 shadow-lg rounded-4 overflow-hidden">
-            <div class="card-header bg-danger text-white py-3 px-4 d-flex align-items-center gap-2">
-                <i class="bi bi-exclamation-triangle-fill fs-5"></i>
-                <h5 class="mb-0 fw-bold">Confirmation de suppression</h5>
-            </div>
-            <div class="card-body p-4 text-center">
-                <div class="mb-4">
-                    <div class="d-inline-flex align-items-center justify-content-center rounded-circle bg-danger bg-opacity-10 text-danger" style="width:80px;height:80px">
-                        <i class="bi bi-trash3" style="font-size: 2.5rem;"></i>
-                    </div>
-                </div>
-                
-                <p class="mb-1 text-muted text-uppercase fw-bold font-monospace" style="font-size: 0.7rem; letter-spacing: 1px;">Vous êtes sur le point de supprimer :</p>
-                <h4 class="fw-bold mb-3 text-dark">{{ obj }}</h4>
-                
-                <div class="alert alert-warning border-0 small mb-4 rounded-3 text-start" style="background: rgba(251, 191, 36, 0.12); color: #92400e;">
-                    <i class="bi bi-info-circle-fill me-2"></i>
-                    <strong>Attention :</strong> Cette opération est irréversible. Les faces, spécifications et historiques liés seront définitivement supprimés de la base de données.
-                </div>
+<div class="container py-5">
+  <div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+      <div class="card border-0 shadow-sm">
+        <div class="card-body p-4 p-md-5">
+          <div class="text-center mb-4">
+            <i class="bi bi-shield-exclamation text-danger" style="font-size:2.5rem;"></i>
+            <h1 class="h4 mt-3">{{ support.code }} — {{ support.nom }}</h1>
+            <p class="text-muted mb-0">
+              {% if support.type_support == 'ecran' %}Écran numérique{% else %}Panneau statique{% endif %}
+            </p>
+          </div>
 
-                <form method="post" class="d-flex gap-2 justify-content-center">
-                    {% csrf_token %}
-                    
-                    <a href="{% url cancel_url %}" class="btn btn-outline-secondary rounded-pill px-4">
-                        Annuler
-                    </a>
-                    
-                    <button type="submit" class="btn btn-danger rounded-pill px-4 shadow-sm d-flex align-items-center gap-2">
-                        <i class="bi bi-trash"></i>
-                        <span>Confirmer la suppression</span>
-                    </button>
-                </form>
+          {% if has_campaign_links %}
+            <div class="alert alert-danger">
+              Ce support est lié à une campagne ou à une réservation. Sa suppression est bloquée, y compris pour l’administrateur, afin de préserver l’historique.
             </div>
-            <div class="card-footer bg-light text-center py-2.5 border-top">
-                <small class="text-muted font-monospace" style="font-size: 0.7rem;">
-                    IDENTIFIANT : {{ obj.pk }} | SYSTÈME INTEGRAL
-                </small>
+          {% elif pending_request and is_requester %}
+            <div class="alert alert-info">
+              Votre demande est en attente d’approbation par un autre utilisateur. Vous ne pouvez pas approuver votre propre demande.
             </div>
+          {% elif pending_request %}
+            <div class="alert alert-warning">
+              <strong>{{ pending_request.requester_name }}</strong> demande la suppression de ce support.
+              En confirmant, vous approuvez la demande et le support sera supprimé définitivement.
+            </div>
+          {% elif can_delete_alone %}
+            <div class="alert alert-warning">
+              Cette suppression est définitive. En tant qu’administrateur, vous pouvez la confirmer directement.
+            </div>
+          {% else %}
+            <div class="alert alert-warning">
+              Votre demande doit être approuvée par un autre compte utilisateur avant la suppression. Vous ne pourrez pas l’approuver vous-même.
+            </div>
+          {% endif %}
+
+          <div class="d-flex flex-wrap justify-content-center gap-2">
+            <a href="{% url 'support_detail' support.uuid %}" class="btn btn-outline-secondary">
+              Retour au support
+            </a>
+            {% if not has_campaign_links and not is_requester %}
+              <form method="post">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-danger">
+                  {% if can_delete_alone %}
+                    <i class="bi bi-trash me-1"></i>Supprimer le support
+                  {% elif pending_request %}
+                    <i class="bi bi-check2-circle me-1"></i>Approuver et supprimer
+                  {% else %}
+                    <i class="bi bi-send me-1"></i>Demander la suppression
+                  {% endif %}
+                </button>
+              </form>
+            {% endif %}
+          </div>
         </div>
+      </div>
     </div>
+  </div>
 </div>
 {% endblock %}

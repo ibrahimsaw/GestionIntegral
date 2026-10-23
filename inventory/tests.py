@@ -1,20 +1,113 @@
+import datetime
 import io
 import zipfile
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.auth import get_user_model
+from django.contrib.messages import get_messages
+from django.core.cache import cache
 from django.template.loader import render_to_string
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
 from unittest.mock import patch
 
-from inventory.forms import SupportForm
-from inventory.models import Emplacement, EcranNumerique, FormatSupport, Marche, Support
+from campaigns.forms import LigneCampagneForm
+from campaigns.models import Campagne, Client, LigneCampagne
+from inventory.forms import MaintenanceForm, SupportForm
+from inventory.models import (
+    Emplacement,
+    EcranNumerique,
+    FacePanneau,
+    FormatSupport,
+    Marche,
+    Maintenance,
+    Support,
+    SupportDeletionRequest,
+)
 from inventory.views import (
     FormatSupportDetailView,
     FormatSupportListView,
     SupportListView,
 )
+from campaigns.context_processors import alerts_data
 from geoad.context_processors import inventory_villes
+
+
+class PreventiveMaintenanceStateTests(TestCase):
+    def test_maintenance_form_offers_preventive_state(self):
+        form = MaintenanceForm()
+        self.assertIn(
+            (
+                Support.ETAT_A_MAINTENIR,
+                'Fonctionnel — maintenance à prévoir',
+            ),
+            list(form.fields['etat_apres'].choices),
+        )
+
+    def test_maintenance_marks_screen_functional_but_due_for_maintenance(self):
+        screen = Support.objects.create(
+            code='MAINT-SCREEN',
+            nom='Écran à entretenir',
+            type_support=Support.TYPE_ECRAN,
+            latitude=12.34,
+            longitude=-1.52,
+        )
+
+        Maintenance.objects.create(
+            support=screen,
+            etat_apres=Support.ETAT_A_MAINTENIR,
+        )
+
+        screen.refresh_from_db()
+        self.assertEqual(screen.etat, Support.ETAT_A_MAINTENIR)
+
+    def test_panel_state_tracks_preventive_and_failed_faces(self):
+        panel = Support.objects.create(
+            code='MAINT-PANEL',
+            nom='Panneau à entretenir',
+            type_support=Support.TYPE_PANNEAU,
+            latitude=12.34,
+            longitude=-1.52,
+        )
+        face_a = FacePanneau.objects.create(support=panel, label='A')
+        face_b = FacePanneau.objects.create(support=panel, label='B')
+
+        Maintenance.objects.create(
+            support=panel,
+            face=face_a,
+            etat_apres=Support.ETAT_A_MAINTENIR,
+        )
+        panel.refresh_from_db()
+        self.assertEqual(panel.etat, Support.ETAT_A_MAINTENIR)
+
+        Maintenance.objects.create(
+            support=panel,
+            face=face_b,
+            etat_apres=Support.ETAT_PANNE,
+        )
+        panel.refresh_from_db()
+        self.assertEqual(panel.etat, Support.ETAT_A_MAINTENIR)
+
+        Maintenance.objects.create(
+            support=panel,
+            face=face_a,
+            etat_apres=Support.ETAT_PANNE,
+        )
+        panel.refresh_from_db()
+        self.assertEqual(panel.etat, Support.ETAT_PANNE)
+
+    def test_preventive_state_remains_selectable_for_campaigns(self):
+        screen = Support.objects.create(
+            code='MAINT-BOOKABLE',
+            nom='Écran réservable',
+            type_support=Support.TYPE_ECRAN,
+            etat=Support.ETAT_A_MAINTENIR,
+            latitude=12.34,
+            longitude=-1.52,
+        )
+
+        form = LigneCampagneForm(data={'type_support': Support.TYPE_ECRAN})
+
+        self.assertIn(screen, form.fields['support'].queryset)
 
 
 class SupportFormCategoryFilterTests(TestCase):
@@ -69,6 +162,61 @@ class SupportFormCategoryFilterTests(TestCase):
         self.assertIn('ne correspond pas à la catégorie', form.errors['format'][0])
 
 
+class SupportMarketPlacementDefaultsTests(TestCase):
+    def test_new_support_form_exposes_market_and_editable_market_face_default(self):
+        staff = get_user_model().objects.create_user(
+            username='market-default-staff',
+            password='test-password',
+            role='staff',
+        )
+        self.client.force_login(staff)
+
+        response = self.client.get(reverse('support_create'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="id_marche_select" name="marche"')
+        self.assertContains(response, "nbFacesInput.value = '1'")
+        self.assertContains(response, 'marketFaceDefaultApplied = true;')
+        self.assertContains(response, 'updateFaces();')
+        self.assertContains(response, 'premierEmplacementLibre')
+
+    def test_market_emplacements_include_availability_in_code_order(self):
+        market = Marche.objects.create(nom='Marché des emplacements')
+        occupied = Emplacement.objects.create(marche=market, code='A-01')
+        first_free = Emplacement.objects.create(marche=market, code='A-02')
+        Emplacement.objects.create(marche=market, code='A-03')
+        Support.objects.create(
+            code='MARKET-OCCUPIED',
+            nom='Support déjà installé',
+            type_support=Support.TYPE_PANNEAU,
+            emplacement=occupied,
+            latitude=12.34,
+            longitude=-1.52,
+        )
+        staff = get_user_model().objects.create_user(
+            username='market-placement-staff',
+            password='test-password',
+            role='staff',
+        )
+        self.client.force_login(staff)
+
+        response = self.client.get(
+            reverse('api_emplacements_marche', args=[market.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        emplacements = response.json()['emplacements']
+        self.assertEqual(
+            [emplacement['code'] for emplacement in emplacements],
+            ['A-01', 'A-02', 'A-03'],
+        )
+        self.assertFalse(emplacements[0]['libre'])
+        self.assertEqual(
+            next(emplacement['id'] for emplacement in emplacements if emplacement['libre']),
+            first_free.pk,
+        )
+
+
 class FormatSupportDetailViewTests(TestCase):
     def test_detail_shows_format_details_and_matching_supports(self):
         format_support = FormatSupport.objects.create(
@@ -101,6 +249,59 @@ class FormatSupportDetailViewTests(TestCase):
         self.assertEqual(list(context['supports']), [support])
         self.assertIn('4m × 3m', rendered)
         self.assertIn('Panneau du format', rendered)
+
+    def test_format_used_by_panel_cannot_be_deleted(self):
+        format_support = FormatSupport.objects.create(
+            code='DELETE-PROTECTED',
+            dimensions='4m × 3m',
+            superficie=12,
+            categorie='Standard',
+        )
+        Support.objects.create(
+            code='DELETE-PROTECTED-PANEL',
+            nom='Panneau utilisant le format',
+            type_support=Support.TYPE_PANNEAU,
+            format=format_support.code,
+            latitude=12.34,
+            longitude=-1.52,
+        )
+        user = get_user_model().objects.create_user(
+            username='format-delete-test',
+            password='test-password',
+            role='staff',
+        )
+        self.client.force_login(user)
+
+        response = self.client.post(reverse('format_delete', args=[format_support.pk]))
+
+        self.assertRedirects(
+            response,
+            reverse('format_support_detail', args=[format_support.pk]),
+        )
+        self.assertTrue(FormatSupport.objects.filter(pk=format_support.pk).exists())
+        self.assertIn(
+            'au moins un panneau l’utilise',
+            str(list(get_messages(response.wsgi_request))),
+        )
+
+    def test_unused_format_can_still_be_deleted(self):
+        format_support = FormatSupport.objects.create(
+            code='DELETE-UNUSED',
+            dimensions='4m × 3m',
+            superficie=12,
+            categorie='Standard',
+        )
+        user = get_user_model().objects.create_user(
+            username='format-delete-unused-test',
+            password='test-password',
+            role='staff',
+        )
+        self.client.force_login(user)
+
+        response = self.client.post(reverse('format_delete', args=[format_support.pk]))
+
+        self.assertRedirects(response, reverse('format_list'))
+        self.assertFalse(FormatSupport.objects.filter(pk=format_support.pk).exists())
 
     def test_detail_supports_are_paginated(self):
         format_support = FormatSupport.objects.create(
@@ -155,20 +356,20 @@ class FormatSupportDetailViewTests(TestCase):
         self.assertIn('21 format', rendered)
         self.assertIn('Page 2 / 2', rendered)
 
-    def test_format_list_is_sorted_by_measure_then_code(self):
+    def test_format_list_is_sorted_by_category_then_measure_and_code(self):
         formats = [
-            ('SORT-LARGE', '8m × 6m', 48),
-            ('SORT-SMALL', '1m × 2m', 2),
-            ('SORT-MIDDLE', '4m × 3m', 12),
-            ('SORT-DERIVED', '9m × 5m', None),
-            ('SORT-UNKNOWN', 'Personnalisé', None),
+            ('SORT-LARGE', '8m × 6m', 48, 'Géant'),
+            ('SORT-SMALL', '1m × 2m', 2, 'Sucette'),
+            ('SORT-MIDDLE', '4m × 3m', 12, 'Standard'),
+            ('SORT-DERIVED', '9m × 5m', None, 'Géant'),
+            ('SORT-UNKNOWN', 'Personnalisé', None, 'Marché'),
         ]
-        for code, dimensions, superficie in formats:
+        for code, dimensions, superficie, categorie in formats:
             FormatSupport.objects.create(
                 code=code,
                 dimensions=dimensions,
                 superficie=superficie,
-                categorie='Standard',
+                categorie=categorie,
             )
 
         view = FormatSupportListView()
@@ -180,13 +381,178 @@ class FormatSupportDetailViewTests(TestCase):
         self.assertEqual(
             [format_support.code for format_support in view.get_queryset()],
             [
-                'SORT-SMALL',
-                'SORT-MIDDLE',
                 'SORT-DERIVED',
                 'SORT-LARGE',
                 'SORT-UNKNOWN',
+                'SORT-MIDDLE',
+                'SORT-SMALL',
             ],
         )
+
+    def test_format_list_defaults_to_category_then_superficie_order(self):
+        expected = [
+            ('ORDER-GEANT-SMALL', 2, 'Géant'),
+            ('ORDER-GEANT-LARGE', 48, 'Géant'),
+            ('ORDER-STANDARD', 12, 'Standard'),
+            ('ORDER-SUCETTE', 1, 'Sucette'),
+        ]
+        for code, superficie, categorie in expected:
+            FormatSupport.objects.create(
+                code=code,
+                dimensions=f'{superficie}m²',
+                superficie=superficie,
+                categorie=categorie,
+            )
+
+        view = FormatSupportListView()
+        view.setup(RequestFactory().get(reverse('format_list')))
+
+        ordered_formats = [
+            item for item in view.get_queryset()
+            if item.code.startswith('ORDER-')
+        ]
+        self.assertEqual(
+            [(item.code, item.superficie) for item in ordered_formats],
+            [(code, superficie) for code, superficie, _ in expected],
+        )
+
+
+class SupportDeletionApprovalTests(TestCase):
+    def setUp(self):
+        self.support = Support.objects.create(
+            code='DELETE-APPROVAL',
+            nom='Support à supprimer',
+            type_support=Support.TYPE_ECRAN,
+            latitude=12.34,
+            longitude=-1.52,
+        )
+        self.requester = get_user_model().objects.create_user(
+            username='deletion-requester',
+            password='test-password',
+            role='staff',
+        )
+        self.reviewer = get_user_model().objects.create_user(
+            username='deletion-reviewer',
+            password='test-password',
+            role='staff',
+        )
+        self.admin = get_user_model().objects.create_user(
+            username='deletion-admin',
+            password='test-password',
+            role='admin',
+        )
+        self.url = reverse('support_delete', args=[self.support.uuid])
+
+    def test_second_staff_user_must_approve_and_cannot_be_requester(self):
+        self.client.force_login(self.requester)
+
+        confirmation_response = self.client.get(self.url)
+        self.assertContains(confirmation_response, 'un autre compte utilisateur')
+
+        first_response = self.client.post(self.url)
+
+        self.assertRedirects(
+            first_response,
+            reverse('support_detail', args=[self.support.uuid]),
+        )
+        deletion_request = SupportDeletionRequest.objects.get(support=self.support)
+        self.assertEqual(deletion_request.requested_by, self.requester)
+        cache.clear()
+        reviewer_request = RequestFactory().get('/')
+        reviewer_request.user = self.reviewer
+        reviewer_alerts = alerts_data(reviewer_request)['alertes']
+        self.assertTrue(any(self.support.code in alert['msg'] for alert in reviewer_alerts))
+        requester_request = RequestFactory().get('/')
+        requester_request.user = self.requester
+        requester_alerts = alerts_data(requester_request)['alertes']
+        self.assertFalse(any(self.support.code in alert['msg'] for alert in requester_alerts))
+
+        self.client.post(self.url)
+        self.assertTrue(Support.objects.filter(pk=self.support.pk).exists())
+        self.assertEqual(
+            SupportDeletionRequest.objects.get(pk=deletion_request.pk).status,
+            SupportDeletionRequest.STATUS_PENDING,
+        )
+
+        self.client.force_login(self.reviewer)
+        queue_response = self.client.get(reverse('support_deletion_requests'))
+        self.assertContains(queue_response, self.support.code)
+        support_list_response = self.client.get(reverse('support_list'))
+        self.assertContains(support_list_response, '1 demande à approuver')
+        self.assertContains(support_list_response, 'Suppression en attente')
+        approval_response = self.client.post(self.url)
+
+        self.assertRedirects(approval_response, reverse('support_list'))
+        self.assertFalse(Support.objects.filter(pk=self.support.pk).exists())
+        deletion_request.refresh_from_db()
+        self.assertIsNone(deletion_request.support)
+        self.assertEqual(deletion_request.status, SupportDeletionRequest.STATUS_APPROVED)
+        self.assertEqual(deletion_request.approved_by, self.reviewer)
+
+    def test_admin_can_delete_support_without_second_approval(self):
+        self.client.force_login(self.admin)
+
+        response = self.client.post(self.url)
+
+        self.assertRedirects(response, reverse('support_list'))
+        self.assertFalse(Support.objects.filter(pk=self.support.pk).exists())
+        self.assertFalse(SupportDeletionRequest.objects.filter(support_code=self.support.code).exists())
+
+    def test_panel_also_requires_two_distinct_staff_users(self):
+        panel = Support.objects.create(
+            code='DELETE-PANEL-APPROVAL',
+            nom='Panneau à supprimer',
+            type_support=Support.TYPE_PANNEAU,
+            format='4x3',
+            latitude=12.34,
+            longitude=-1.52,
+        )
+        panel_url = reverse('support_delete', args=[panel.uuid])
+        self.client.force_login(self.requester)
+        self.client.post(panel_url)
+        self.client.force_login(self.reviewer)
+
+        response = self.client.post(panel_url)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse('support_list'))
+        self.assertFalse(Support.objects.filter(pk=panel.pk).exists())
+
+    def test_support_linked_to_campaign_cannot_be_deleted_even_by_admin(self):
+        client = Client.objects.create(
+            nom='Client suppression',
+            telephone='00000000',
+            email='delete-campaign@example.com',
+        )
+        campaign = Campagne.objects.create(
+            client=client,
+            nom='Campagne liée',
+            date_debut=datetime.date.today(),
+            date_fin=datetime.date.today() + datetime.timedelta(days=1),
+        )
+        LigneCampagne.objects.create(campagne=campaign, support=self.support)
+        self.client.force_login(self.admin)
+
+        response = self.client.post(self.url)
+
+        self.assertRedirects(
+            response,
+            reverse('support_detail', args=[self.support.uuid]),
+        )
+        self.assertTrue(Support.objects.filter(pk=self.support.pk).exists())
+        self.assertFalse(SupportDeletionRequest.objects.filter(support=self.support).exists())
+
+    def test_admin_can_delete_directly_and_cancels_pending_request(self):
+        self.client.force_login(self.requester)
+        self.client.post(self.url)
+        self.client.force_login(self.admin)
+
+        response = self.client.post(self.url)
+
+        self.assertRedirects(response, reverse('support_list'))
+        self.assertFalse(Support.objects.filter(pk=self.support.pk).exists())
+        deletion_request = SupportDeletionRequest.objects.get(support_code=self.support.code)
+        self.assertEqual(deletion_request.status, SupportDeletionRequest.STATUS_CANCELLED)
 
 
 class SupportListCategoryFilterTests(TestCase):

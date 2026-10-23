@@ -88,7 +88,7 @@ def _get_compteurs():
     nb_libres = FacePanneau.objects.filter(
         support__actif=True,
         support__type_support='panneau',
-        etat='bon',
+        etat__in=Support.ETATS_OPERATIONNELS,
     ).exclude(
         pk__in=faces_occupees_ids | faces_reservees_ids
     ).count()
@@ -274,11 +274,19 @@ def _get_compteurs() -> dict:
         # ── Cas spécial : Écran ou Marché → liste individuelle des supports ──
         if support.type_support == Support.TYPE_ECRAN or support.is_dans_marche:
             if support.type_support == Support.TYPE_ECRAN:
-                entries = [(None, not support.is_occupe() and support.etat == Support.ETAT_BON)]
+                entries = [(
+                    None,
+                    not support.is_occupe()
+                    and support.etat in Support.ETATS_OPERATIONNELS,
+                )]
             else:
                 faces = list(support.faces.all())
                 entries = [
-                    (face, face.etat == Support.ETAT_BON and face.is_disponibles())
+                    (
+                        face,
+                        face.etat in Support.ETATS_OPERATIONNELS
+                        and face.is_disponibles(),
+                    )
                     for face in faces
                 ] or [(None, False)]
 
@@ -326,7 +334,7 @@ def _get_compteurs() -> dict:
             entry['code'] = code_format
 
             face_libre = (
-                face.etat == Support.ETAT_BON
+                face.etat in Support.ETATS_OPERATIONNELS
                 and face.is_disponibles()
             )
             if face_libre:
@@ -714,7 +722,10 @@ class CatalogueView(View):
             photos = []
             for s in supports_fmt:
                 for f in s.faces.all():
-                    if f.pk not in indisponibles and f.etat == 'bon':
+                    if (
+                        f.pk not in indisponibles
+                        and f.etat in Support.ETATS_OPERATIONNELS
+                    ):
                         nb_faces_libres += 1
                 if s.photo_principale and len(photos) < 4:
                     photos.append(s.photo_principale.url)

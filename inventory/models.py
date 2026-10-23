@@ -1,4 +1,5 @@
 from django.db import models
+from django.db.models import Q
 from django.utils import timezone
 from django.conf import settings
 from django.core.exceptions import ValidationError
@@ -64,12 +65,15 @@ TYPE_CHOICES = [
 ]
 ETAT_BON         = 'bon'
 ETAT_MAINTENANCE = 'maintenance'
+ETAT_A_MAINTENIR = 'a_maintenir'
 ETAT_PANNE       = 'panne'
 ETAT_CHOICES = [
     (ETAT_BON,         'Bon état'),
     (ETAT_MAINTENANCE, 'En maintenance'),
+    (ETAT_A_MAINTENIR, 'Fonctionnel — maintenance à prévoir'),
     (ETAT_PANNE,       'En panne'),
 ]
+ETATS_OPERATIONNELS = (ETAT_BON, ETAT_A_MAINTENIR)
 
 
 class FormatSupport(models.Model):
@@ -316,7 +320,9 @@ class Support(models.Model):
     TYPE_CHOICES = TYPE_CHOICES
     ETAT_BON = ETAT_BON
     ETAT_MAINTENANCE = ETAT_MAINTENANCE
+    ETAT_A_MAINTENIR = ETAT_A_MAINTENIR
     ETAT_PANNE = ETAT_PANNE
+    ETATS_OPERATIONNELS = ETATS_OPERATIONNELS
     ETAT_CHOICES = ETAT_CHOICES
     
         # Identité
@@ -427,8 +433,10 @@ class Support(models.Model):
             all_faces = self.faces.all()
             if all_faces.exists() and all_faces.filter(etat=self.ETAT_PANNE).count() == all_faces.count():
                 return cfg['COLOR_PANNE']
-        elif self.etat in [self.ETAT_PANNE, self.ETAT_MAINTENANCE]:
+        if self.etat in [self.ETAT_PANNE, self.ETAT_MAINTENANCE]:
             return cfg['COLOR_PANNE']
+        if self.etat == self.ETAT_A_MAINTENIR:
+            return cfg['COLOR_MAINTENANCE']
 
         # Vérifier si au moins une face/slot est occupé(e)
         if self.is_occupe():
@@ -646,7 +654,7 @@ class Support(models.Model):
                         # Début d'une période de panne
                         panne_debut = maint.date_intervention
 
-                    elif maint.etat_apres == ETAT_BON and panne_debut is not None:
+                    elif maint.etat_apres in ETATS_OPERATIONNELS and panne_debut is not None:
                         # Fin de la période de panne
                         periodes.append({
                             'debut'   : panne_debut,
@@ -680,7 +688,7 @@ class Support(models.Model):
                 if maint.etat_apres == ETAT_PANNE and panne_debut is None:
                     panne_debut = maint.date_intervention
 
-                elif maint.etat_apres == ETAT_BON and panne_debut is not None:
+                elif maint.etat_apres in ETATS_OPERATIONNELS and panne_debut is not None:
                     periodes.append({
                         'debut'   : panne_debut,
                         'fin'     : maint.date_intervention,
@@ -756,6 +764,62 @@ class Support(models.Model):
                 jours_panne += (overlap_fin - overlap_debut).days + 1
 
         return max(0, total_jours - jours_panne)
+
+
+class SupportDeletionRequest(models.Model):
+    STATUS_PENDING = 'pending'
+    STATUS_APPROVED = 'approved'
+    STATUS_CANCELLED = 'cancelled'
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'En attente'),
+        (STATUS_APPROVED, 'Approuvée'),
+        (STATUS_CANCELLED, 'Annulée'),
+    ]
+
+    support = models.ForeignKey(
+        Support,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='deletion_requests',
+    )
+    support_code = models.CharField(max_length=30)
+    requested_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        related_name='support_deletion_requests',
+    )
+    requester_name = models.CharField(max_length=150)
+    approved_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='approved_support_deletions',
+    )
+    approver_name = models.CharField(max_length=150, blank=True)
+    status = models.CharField(
+        max_length=20,
+        choices=STATUS_CHOICES,
+        default=STATUS_PENDING,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    decided_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['created_at']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['support'],
+                condition=Q(status='pending'),
+                name='uniq_pending_support_deletion',
+            ),
+        ]
+
+    def __str__(self):
+        return f"Demande de suppression {self.support_code} ({self.get_status_display()})"
+
 
 class FacePanneau(models.Model):
     """Face A ou B d'un panneau statique."""
@@ -914,7 +978,7 @@ class FacePanneau(models.Model):
                 # Début d'une période de panne
                 panne_debut = maint.date_intervention
 
-            elif maint.etat_apres == ETAT_BON and panne_debut is not None:
+            elif maint.etat_apres in ETATS_OPERATIONNELS and panne_debut is not None:
                 # Fin de la période de panne
                 p_debut = panne_debut.date() if hasattr(panne_debut, 'date') else panne_debut
                 p_fin = maint.date_intervention.date() if hasattr(maint.date_intervention, 'date') else maint.date_intervention
@@ -1157,6 +1221,7 @@ class Maintenance(models.Model):
     """Intervention de maintenance effectuée par un technicien sur un support."""
     ETAT_CHOICES = ETAT_CHOICES
     ETAT_BON = ETAT_BON
+    ETAT_A_MAINTENIR = ETAT_A_MAINTENIR
     ETAT_PANNE = ETAT_PANNE
 
     support           = models.ForeignKey(
@@ -1222,7 +1287,11 @@ class Maintenance(models.Model):
             not self.face
             and self.support_id
             and self.support.type_support == Support.TYPE_ECRAN
-            and self.etat_apres not in (self.ETAT_BON, self.ETAT_PANNE)
+            and self.etat_apres not in (
+                self.ETAT_BON,
+                self.ETAT_A_MAINTENIR,
+                self.ETAT_PANNE,
+            )
         ):
             pass
 
@@ -1253,7 +1322,16 @@ class Maintenance(models.Model):
                         f.etat == Support.ETAT_PANNE
                         for f in toutes_les_faces
                     )
-                    nouvel_etat_support = Support.ETAT_PANNE if toutes_en_panne else Support.ETAT_BON
+                    faces_a_maintenir = any(
+                        f.etat == Support.ETAT_A_MAINTENIR
+                        for f in toutes_les_faces
+                    )
+                    if toutes_en_panne:
+                        nouvel_etat_support = Support.ETAT_PANNE
+                    elif faces_a_maintenir:
+                        nouvel_etat_support = Support.ETAT_A_MAINTENIR
+                    else:
+                        nouvel_etat_support = Support.ETAT_BON
                 else:
                     nouvel_etat_support = self.etat_apres  # fallback si pas de faces
 

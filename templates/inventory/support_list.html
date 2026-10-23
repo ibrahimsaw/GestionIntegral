@@ -5,6 +5,10 @@
 {% block topbar_actions %}
   {% if user.is_staff_regie_role %}
   <div class="d-flex gap-2">
+    <a href="{% url 'support_deletion_requests' %}" class="btn btn-outline-warning btn-sm shadow-sm px-3">
+      <i class="bi bi-shield-check me-1"></i>
+      <span class="d-none d-md-inline">Demandes à approuver</span>
+    </a>
     <a href="{% url 'supports_report' %}" class="btn btn-outline-secondary btn-sm shadow-sm px-3">
       <i class="bi bi-file-earmark-bar-graph me-1"></i>
       <span class="d-none d-md-inline">Report Panneaux</span>
@@ -33,6 +37,10 @@
     </div>
     {% if user.is_staff_regie_role %}
     <div class=" d-flex gap-2 flex-wrap d-inline d-md-none align-items-center">
+      <a href="{% url 'support_deletion_requests' %}" class="btn btn-outline-light shadow-sm d-flex align-items-center gap-1" style="font-weight: 600;">
+        <i class="bi bi-shield-check me-1"></i>
+        <span>Demandes à approuver</span>
+      </a>
       <a href="{% url 'supports_report' %}" class="btn btn-outline-light shadow-sm d-flex align-items-center gap-1" style="font-weight: 600;">
         <i class="bi bi-file-earmark-bar-graph me-1"></i>
         <span>Report Panneaux</span>
@@ -94,6 +102,8 @@
         <select name="etat" class="form-select form-select-sm">
           <option value="">Tous les états</option>
           <option value="bon"   {% if etat_f == 'bon'   %}selected{% endif %}>Bon état</option>
+          <option value="a_maintenir" {% if etat_f == 'a_maintenir' %}selected{% endif %}>Fonctionnel — maintenance à prévoir</option>
+          <option value="maintenance" {% if etat_f == 'maintenance' %}selected{% endif %}>En maintenance</option>
           <option value="panne" {% if etat_f == 'panne' %}selected{% endif %}>En panne</option>
         </select>
       </div>
@@ -181,6 +191,12 @@
       <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2.5 py-1 font-monospace" style="font-size: 0.75rem;">
         {{ supports|length }} support{{ supports|length|pluralize }}
       </span>
+      {% if pending_deletion_count %}
+      <a href="{% url 'support_deletion_requests' %}" class="btn btn-sm btn-outline-warning d-flex align-items-center gap-1">
+        <i class="bi bi-shield-exclamation"></i>
+        <span>{{ pending_deletion_count }} demande{{ pending_deletion_count|pluralize }} à approuver</span>
+      </a>
+      {% endif %}
     </div>
     <a href="{% url 'carte' %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}" class="btn btn-sm btn-outline-primary px-3 shadow-sm d-flex align-items-center gap-1">
       <i class="bi bi-map-fill"></i>
@@ -237,6 +253,11 @@
               <a href="{% url 'support_detail' s.uuid %}" class="support-name-link">
                 {{ s.nom }}
               </a>
+              {% if s.pk in pending_deletion_support_ids %}
+                <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle ms-1">
+                  <i class="bi bi-hourglass-split me-1"></i>Suppression en attente
+                </span>
+              {% endif %}
               {% if s.adresse %}
                 <small class="text-muted d-block text-truncate support-address-text">
                   <i class="bi bi-geo-alt me-1"></i>{{ s.adresse }}
@@ -260,7 +281,7 @@
             {% endif %}
 
             <td>
-              <span class="badge {% if s.etat == 'bon' %}bs-disponible{% elif s.etat == 'maintenance' %}bs-occupe{% else %}bs-panne{% endif %}">
+              <span class="badge {% if s.etat == 'bon' %}bs-disponible{% elif s.etat == 'a_maintenir' %}bs-maintenance{% elif s.etat == 'maintenance' %}bs-occupe{% else %}bs-panne{% endif %}">
                 {{ s.get_etat_display }}
               </span>
             </td>

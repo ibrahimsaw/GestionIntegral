@@ -40,10 +40,14 @@
     <span>Modifier</span>
   </a>
   {% endif %}
-  {% if user.is_admin %}
+  {% if user.is_staff_regie_role %}
   <a href="{% url 'support_delete' support.uuid %}" class="btn btn-outline-danger btn-sm shadow-sm d-inline-flex align-items-center gap-1" style="border-radius:8px !important; font-weight:600;" title="Supprimer">
     <i class="bi bi-trash"></i>
-    <span class="d-none d-sm-inline">Supprimer</span>
+    <span class="d-none d-sm-inline">{% if pending_deletion_request %}Demande en attente{% else %}Supprimer{% endif %}</span>
+  </a>
+  <a href="{% url 'support_deletion_requests' %}" class="btn btn-outline-warning btn-sm shadow-sm d-inline-flex align-items-center gap-1" style="border-radius:8px !important; font-weight:600;" title="Demandes de suppression en attente">
+    <i class="bi bi-shield-check"></i>
+    <span class="d-none d-sm-inline">Approbations{% if pending_deletion_request %} · 1{% endif %}</span>
   </a>
   {% endif %}
 {% endblock %}
@@ -79,7 +83,7 @@
             <span style="font-size:0.76rem; font-weight:700; color:rgba(255,255,255,0.85); text-transform:uppercase; letter-spacing:0.06em;">
               {{ support.get_type_support_display }}{% if support.format %} · {{ support.get_format_display }}{% endif %}
             </span>
-            <span class="sdp-pulse {% if support.etat == 'bon' %}pulse-green{% elif support.etat == 'maintenance' %}pulse-amber{% else %}pulse-red{% endif %}" style="border-radius:8px !important;">
+            <span class="sdp-pulse {% if support.etat == 'bon' %}pulse-green{% elif support.etat == 'a_maintenir' or support.etat == 'maintenance' %}pulse-amber{% else %}pulse-red{% endif %}" style="border-radius:8px !important;">
               <span class="sdp-pulse-dot"></span>
               {{ support.get_etat_display }}
             </span>
@@ -532,7 +536,7 @@
         <div class="sdp-spec">
           <div class="sdp-spec-label">État Opérationnel</div>
           <div class="sdp-spec-value">
-            <span class="badge badge-status {% if support.etat == 'bon' %}bs-disponible{% elif support.etat == 'maintenance' %}bs-occupe{% else %}bs-panne{% endif %}" style="border-radius:4px !important;">
+            <span class="badge badge-status {% if support.etat == 'bon' %}bs-disponible{% elif support.etat == 'a_maintenir' %}bs-maintenance{% elif support.etat == 'maintenance' %}bs-occupe{% else %}bs-panne{% endif %}" style="border-radius:4px !important;">
               {{ support.get_etat_display }}
             </span>
           </div>
@@ -700,14 +704,14 @@
           <div class="sdp-timeline">
             {% for m in maintenances %}
             <div class="sdp-tl-item">
-              <div class="sdp-tl-dot {% if m.etat_apres == 'bon' %}bs-disponible{% elif m.etat_apres == 'maintenance' %}bs-occupe{% else %}bs-panne{% endif %}"
-                   style="border-radius:8px !important; background:{% if m.etat_apres == 'bon' %}rgba(16,185,129,0.12){% elif m.etat_apres == 'maintenance' %}rgba(245,158,11,0.12){% else %}rgba(239,68,68,0.12){% endif %};
-                          color:{% if m.etat_apres == 'bon' %}#10b981{% elif m.etat_apres == 'maintenance' %}#f59e0b{% else %}#ef4444{% endif %};">
-                <i class="bi {% if m.etat_apres == 'bon' %}bi-check-circle-fill{% elif m.etat_apres == 'maintenance' %}bi-exclamation-circle-fill{% else %}bi-x-circle-fill{% endif %}"></i>
+              <div class="sdp-tl-dot {% if m.etat_apres == 'bon' %}bs-disponible{% elif m.etat_apres == 'a_maintenir' %}bs-maintenance{% elif m.etat_apres == 'maintenance' %}bs-occupe{% else %}bs-panne{% endif %}"
+                   style="border-radius:8px !important; background:{% if m.etat_apres == 'bon' %}rgba(16,185,129,0.12){% elif m.etat_apres == 'a_maintenir' or m.etat_apres == 'maintenance' %}rgba(245,158,11,0.12){% else %}rgba(239,68,68,0.12){% endif %};
+                          color:{% if m.etat_apres == 'bon' %}#10b981{% elif m.etat_apres == 'a_maintenir' or m.etat_apres == 'maintenance' %}#f59e0b{% else %}#ef4444{% endif %};">
+                <i class="bi {% if m.etat_apres == 'bon' %}bi-check-circle-fill{% elif m.etat_apres == 'a_maintenir' or m.etat_apres == 'maintenance' %}bi-exclamation-circle-fill{% else %}bi-x-circle-fill{% endif %}"></i>
               </div>
               <div class="sdp-tl-body" style="border-radius:8px !important;">
                 <div class="d-flex justify-content-between align-items-start mb-1">
-                  <span class="badge badge-status {% if m.etat_apres == 'bon' %}bs-disponible{% elif m.etat_apres == 'maintenance' %}bs-occupe{% else %}bs-panne{% endif %}" style="border-radius:8px !important;">
+                  <span class="badge badge-status {% if m.etat_apres == 'bon' %}bs-disponible{% elif m.etat_apres == 'a_maintenir' %}bs-maintenance{% elif m.etat_apres == 'maintenance' %}bs-occupe{% else %}bs-panne{% endif %}" style="border-radius:8px !important;">
                     {{ m.get_etat_apres_display }}
                   </span>
                   <span class="sdp-tl-date">{{ m.date_intervention|date:"d/m/Y H:i" }}</span>
@@ -895,7 +899,7 @@ function initFullMap() {
           {% if support.get_format_display %}<div class="lp-row"><i class="bi bi-aspect-ratio"></i><span>{{ support.get_format_display }}{% if support.surface_m2 %} · {{ support.surface_m2 }} m²{% endif %}</span></div>{% endif %}
         </div>
         <div class="lp-footer">
-          <span class="lp-badge {% if support.etat == 'bon' %}lp-badge-green{% elif support.etat == 'maintenance' %}lp-badge-amber{% else %}lp-badge-red{% endif %}" style="border-radius:8px !important;">
+          <span class="lp-badge {% if support.etat == 'bon' %}lp-badge-green{% elif support.etat == 'a_maintenir' or support.etat == 'maintenance' %}lp-badge-amber{% else %}lp-badge-red{% endif %}" style="border-radius:8px !important;">
             {{ support.get_etat_display }}
           </span>
           <a href="/gestion/inventory/{{ support.uuid }}/" class="lp-btn" style="border-radius:8px !important;">Voir →</a>

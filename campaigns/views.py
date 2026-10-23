@@ -22,7 +22,7 @@ from accounts.audit import log_action
 from .models import *
 from inventory.models import (
     Support, FacePanneau, EcranNumerique, FormatSupport, Emplacement, Marche,
-    format_sort_key, formats_croissants,
+    SupportDeletionRequest, format_sort_key, formats_croissants,
 )
 from .forms import (
     ClientForm,
@@ -317,6 +317,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             state_key = {
                 Support.ETAT_BON: 'nb_bon',
                 Support.ETAT_MAINTENANCE: 'nb_maintenance',
+                Support.ETAT_A_MAINTENIR: 'nb_maintenance',
                 Support.ETAT_PANNE: 'nb_panne',
             }.get(support.etat)
             if state_key:
@@ -328,11 +329,12 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                     face_state_key = {
                         Support.ETAT_BON: 'nb_faces_bon',
                         Support.ETAT_MAINTENANCE: 'nb_faces_maintenance',
+                        Support.ETAT_A_MAINTENIR: 'nb_faces_maintenance',
                         Support.ETAT_PANNE: 'nb_faces_panne',
                     }.get(face.etat)
                     if face_state_key:
                         group[face_state_key] += 1
-                    if face.etat == Support.ETAT_BON:
+                    if face.etat in Support.ETATS_OPERATIONNELS:
                         if face.pk in faces_occupees_ids:
                             group['nb_faces_occupees'] += 1
                         elif face.pk in faces_reservees_ids:
@@ -391,15 +393,17 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             faces = [face for support in supports for face in support.faces.all()]
             occupees = sum(
                 1 for face in faces
-                if face.etat == Support.ETAT_BON and face.pk in faces_occupees_ids
+                if face.etat in Support.ETATS_OPERATIONNELS and face.pk in faces_occupees_ids
             )
             reservees = sum(
                 1 for face in faces
-                if face.etat == Support.ETAT_BON
+                if face.etat in Support.ETATS_OPERATIONNELS
                 and face.pk in faces_reservees_ids
                 and face.pk not in faces_occupees_ids
             )
-            faces_bonnes = sum(1 for face in faces if face.etat == Support.ETAT_BON)
+            faces_bonnes = sum(
+                1 for face in faces if face.etat in Support.ETATS_OPERATIONNELS
+            )
             stats.append({
                 'nom': marche.nom,
                 'nb_panneaux': len(supports),
@@ -592,12 +596,24 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         parc = supports.aggregate(
             total=Count('id'),
             nb_panneaux=Count('id', filter=Q(type_support=Support.TYPE_PANNEAU)),
-            nb_panneaux_bon=Count('id', filter=Q(type_support=Support.TYPE_PANNEAU, etat=Support.ETAT_BON)),
+            nb_panneaux_bon=Count(
+                'id',
+                filter=Q(
+                    type_support=Support.TYPE_PANNEAU,
+                    etat__in=Support.ETATS_OPERATIONNELS,
+                ),
+            ),
             nb_ecrans=Count('id', filter=Q(type_support=Support.TYPE_ECRAN)),
-            nb_ecrans_bon=Count('id', filter=Q(type_support=Support.TYPE_ECRAN, etat=Support.ETAT_BON)),
+            nb_ecrans_bon=Count(
+                'id',
+                filter=Q(
+                    type_support=Support.TYPE_ECRAN,
+                    etat__in=Support.ETATS_OPERATIONNELS,
+                ),
+            ),
             nb_ecrans_panne=Count('id', filter=Q(type_support=Support.TYPE_ECRAN, etat=Support.ETAT_PANNE)),
             nb_supports_panne=Count('id', filter=Q(etat=Support.ETAT_PANNE)),
-            nb_supports_bon=Count('id', filter=Q(etat=Support.ETAT_BON)),
+            nb_supports_bon=Count('id', filter=Q(etat__in=Support.ETATS_OPERATIONNELS)),
         )
 
         # ── Faces occupées / réservées (déjà optimal) ──
@@ -861,7 +877,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             row['format']: row
             for row in supports_qs.values('format').annotate(
                 total=Count('id'),
-                bon=Count('id', filter=Q(etat=Support.ETAT_BON)),
+                bon=Count('id', filter=Q(etat__in=Support.ETATS_OPERATIONNELS)),
                 maintenance=Count('id', filter=Q(etat=Support.ETAT_MAINTENANCE)),
                 panne=Count('id', filter=Q(etat=Support.ETAT_PANNE)),
             )
@@ -887,7 +903,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             counts['total'] += 1
             if etat == Support.ETAT_PANNE:
                 counts['panne'] += 1
-            elif etat == Support.ETAT_BON:
+            elif etat in Support.ETATS_OPERATIONNELS:
                 counts['bon'] += 1
                 if face_id in faces_occupees_ids:
                     counts['occupe'] += 1
@@ -949,13 +965,19 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         stats_par_format = {row['support__format']: row for row in par_format}
 
         # 2) faces en bon état + leur format (pour dériver occupé/réservé/libre en mémoire)
-        faces_bon = faces_qs.filter(etat=Support.ETAT_BON).values_list('id', 'support__format')
+        faces_bon = faces_qs.filter(
+            etat__in=Support.ETATS_OPERATIONNELS,
+        ).values_list('id', 'support__format')
         bon_par_format = {}
         for face_id, fmt in faces_bon:
             bon_par_format.setdefault(fmt, []).append(face_id)
 
         # 3) nb de supports en bon état par format
-        supports_qs = Support.objects.filter(type_support=Support.TYPE_PANNEAU, format__in=all_codes, etat=Support.ETAT_BON)
+        supports_qs = Support.objects.filter(
+            type_support=Support.TYPE_PANNEAU,
+            format__in=all_codes,
+            etat__in=Support.ETATS_OPERATIONNELS,
+        )
         if ville_active:
             supports_qs = supports_qs.filter(ville__iexact=ville_active)
         supports_par_format = dict(supports_qs.values('format').annotate(n=Count('id')).values_list('format', 'n'))
@@ -1066,7 +1088,7 @@ class FormatDetailView(LoginRequiredMixin, TemplateView):
 
         for numero, support in enumerate(supports_list, start=1):
             faces = faces_by_support.get(support.pk, [])
-            bonnes = [f for f in faces if f.etat == Support.ETAT_BON]
+            bonnes = [f for f in faces if f.etat in Support.ETATS_OPERATIONNELS]
             nb_occ = sum(1 for f in bonnes if f.pk in occupees)
             nb_res = sum(1 for f in bonnes if f.pk in reservees and f.pk not in occupees)
             nb_libre = len(bonnes) - nb_occ - nb_res
@@ -1215,6 +1237,25 @@ def _build_alertes():
             'type': 'danger',
             'msg': f'Support {s.code} en panne',
             'url': reverse('support_detail', args=[s.uuid])
+        })
+
+    deletion_requests = SupportDeletionRequest.objects.filter(
+        status=SupportDeletionRequest.STATUS_PENDING,
+        support__isnull=False,
+    ).select_related('support')
+    for deletion_request in deletion_requests:
+        if not deletion_request.support:
+            continue
+        alertes.append({
+            'id': f'support-deletion-{deletion_request.pk}',
+            'type': 'warning',
+            'msg': (
+                f'Demande de suppression du support {deletion_request.support_code} '
+                f'par {deletion_request.requester_name} — approbation requise'
+            ),
+            'url': reverse('support_deletion_requests'),
+            'staff_only': True,
+            'exclude_user_id': deletion_request.requested_by_id,
         })
 
     bientot = Campagne.objects.filter(
@@ -2665,7 +2706,7 @@ class SupportBulkActionView(StaffRequiredMixin, View):
             # Écrans : on filtre sur le type d'écran, éventuellement la ville.
             supports_qs = Support.objects.filter(
                 type_support='ecran',
-                etat='bon'
+                etat__in=Support.ETATS_OPERATIONNELS
             )
             if ville:
                 supports_qs = supports_qs.filter(ville=ville)
@@ -2723,12 +2764,12 @@ class SupportBulkActionView(StaffRequiredMixin, View):
             supports_qs = Support.objects.filter(
                 type_support='panneau',
                 format=type_support,
-                etat='bon'
+                etat__in=Support.ETATS_OPERATIONNELS
             )
             if type_support == Support.TYPE_PANNEAU:
                 supports_qs = Support.objects.filter(
                     type_support=Support.TYPE_PANNEAU,
-                    etat='bon',
+                    etat__in=Support.ETATS_OPERATIONNELS,
                 )
             elif type_support == 'Autre':
                 formats_categorie = FormatSupport.hors_ecran().filter(
@@ -2738,7 +2779,7 @@ class SupportBulkActionView(StaffRequiredMixin, View):
                     supports_qs = Support.objects.filter(
                         type_support=Support.TYPE_PANNEAU,
                         format__in=formats_categorie,
-                        etat='bon',
+                        etat__in=Support.ETATS_OPERATIONNELS,
                     )
             elif FormatSupport.hors_ecran().filter(categorie__iexact=type_support).exists():
                 formats_categorie = FormatSupport.hors_ecran().filter(
@@ -2747,7 +2788,7 @@ class SupportBulkActionView(StaffRequiredMixin, View):
                 supports_qs = Support.objects.filter(
                     type_support=Support.TYPE_PANNEAU,
                     format__in=formats_categorie,
-                    etat='bon',
+                    etat__in=Support.ETATS_OPERATIONNELS,
                 )
             elif not FormatSupport.objects.filter(code=type_support).exists():
                 formats_categorie = FormatSupport.objects.filter(
@@ -2757,7 +2798,7 @@ class SupportBulkActionView(StaffRequiredMixin, View):
                     supports_qs = Support.objects.filter(
                         type_support=Support.TYPE_PANNEAU,
                         format__in=formats_categorie,
-                        etat='bon',
+                        etat__in=Support.ETATS_OPERATIONNELS,
                     )
             villes_disponibles = (
                 supports_qs.exclude(ville__exact='')
@@ -3052,7 +3093,7 @@ def _get_supports():
     """Retourne les panneaux en bon état avec leurs faces."""
     return (
         Support.objects
-        .filter(type_support='panneau', etat='bon')
+        .filter(type_support='panneau', etat__in=Support.ETATS_OPERATIONNELS)
         .prefetch_related('faces')
         .order_by('code')
     )

@@ -215,10 +215,10 @@
               <div class="row g-3">
                 <div class="col-md-6">
                   <label class="form-label" style="font-size:0.74rem;font-weight:700;text-transform:uppercase;color:#475569;">Marché</label>
-                  <select id="id_marche_select" class="form-select" style="border-radius:8px;font-size:0.85rem;">
+                  <select id="id_marche_select" name="marche" class="form-select" style="border-radius:8px;font-size:0.85rem;">
                     <option value="">— Support autonome (hors marché) —</option>
                     {% for m in marches %}
-                    <option value="{{ m.pk }}" {% if object.marche.pk == m.pk %}selected{% endif %}>{{ m.nom }}</option>
+                    <option value="{{ m.pk }}" {% if object.marche.pk == m.pk or selected_marche_id == m.pk|stringformat:"s" %}selected{% endif %}>{{ m.nom }}</option>
                     {% endfor %}
                   </select>
                 </div>
@@ -370,6 +370,7 @@
               <div class="row g-3 align-items-end mb-4 p-3" style="background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px !important;">
                 <div class="col-md-4">
                   <label class="form-label" style="font-size:0.74rem;font-weight:700;text-transform:uppercase;color:#475569;">Nombre de faces</label>
+                  <div class="form-text">{{ form.nb_faces.help_text }}</div>
                   {{ form.nb_faces }}
                 </div>
                 <div class="col-md-4">
@@ -908,6 +909,7 @@
   const CURRENT_SUPPORT_ID = "{{ object.pk|default:'' }}";
   const CURRENT_EMPLACEMENT_ID = "{{ object.emplacement_id|default:'' }}";
   const API_EMPLACEMENTS_TEMPLATE = "{% url 'api_emplacements_marche' pk=999999 %}";
+  let marketFaceDefaultApplied = false;
 
   function chargerEmplacements(marcheId, preselect = null) {
     if (!emplacementSelect) return Promise.resolve();
@@ -925,6 +927,7 @@
       .then(r => r.json())
       .then(data => {
         const emplacements = data.emplacements || [];
+        let emplacementSelectionne = false;
         emplacements.forEach(e => {
           const opt = document.createElement('option');
           opt.value = e.id;
@@ -934,9 +937,18 @@
             opt.textContent = `${e.code} (occupé — ${e.support_code})`;
             opt.disabled = true;
           }
-          if (preselect && String(e.id) === String(preselect)) opt.selected = true;
+          const emplacementCourant = preselect && String(e.id) === String(preselect);
+          const premierEmplacementLibre = !preselect && !emplacementSelectionne && e.libre;
+          if (emplacementCourant || premierEmplacementLibre) {
+            opt.selected = true;
+            emplacementSelectionne = true;
+          }
           emplacementSelect.appendChild(opt);
         });
+        if (!emplacementSelectionne) {
+          const premierLibre = emplacementSelect.querySelector('option:not(:disabled)[value]:not([value=""])');
+          if (premierLibre) premierLibre.selected = true;
+        }
         const nbLibres = emplacements.filter(e => e.libre).length;
         if (emplacementHelp) emplacementHelp.textContent = `${nbLibres} emplacement(s) libre(s) sur ${emplacements.length}`;
 
@@ -952,6 +964,16 @@
   if (marcheSelect) {
     const categoryFormatSelect = document.getElementById('id_categorie_format');
     marcheSelect.addEventListener('change', () => {
+      if (
+        marcheSelect.value
+        && !CURRENT_SUPPORT_ID
+        && !marketFaceDefaultApplied
+        && nbFacesInput
+      ) {
+        nbFacesInput.value = '1';
+        marketFaceDefaultApplied = true;
+        updateFaces();
+      }
       if (marcheSelect.value && categoryFormatSelect) {
         const marketCategory = Array.from(categoryFormatSelect.options)
           .find(option => option.value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase() === 'marche');

@@ -5,6 +5,7 @@ from typing import cast
 
 from django.conf import settings
 from django.contrib import messages
+from django.core.cache import cache
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
@@ -24,6 +25,7 @@ from accounts.models import User
 from django.db.models import Q
 from django.utils.safestring import mark_safe
 from django.core.exceptions import PermissionDenied
+from django.db.models.deletion import ProtectedError
 from django.db import IntegrityError, transaction
 from django.shortcuts import redirect, get_object_or_404
 from django.contrib import messages
@@ -55,7 +57,22 @@ class FormatSupportListView(LoginRequiredMixin, SortableListMixin, ListView):
     DEFAULT_DIR = 'asc'
 
     def get_queryset(self):
-        return formats_croissants(super().get_queryset())
+        return sorted(
+            super().get_queryset(),
+            key=lambda format_support: (
+                format_support.categorie.casefold(),
+                *format_sort_key(format_support),
+            ),
+        )
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['codes_formats_panneaux'] = set(
+            Support.objects.filter(
+                type_support=Support.TYPE_PANNEAU,
+            ).values_list('format', flat=True)
+        )
+        return context
 
 
 def _extraire_dimensions(texte):
@@ -117,6 +134,7 @@ class FormatSupportDetailView(LoginRequiredMixin, DetailView):
         etats = {row['etat']: row['n'] for row in supports.values('etat').annotate(n=Count('pk'))}
         nb_bon = etats.get(Support.ETAT_BON, 0)
         nb_maintenance = etats.get(Support.ETAT_MAINTENANCE, 0)
+        nb_maintenance_preventive = etats.get(Support.ETAT_A_MAINTENIR, 0)
         nb_panne = etats.get(Support.ETAT_PANNE, 0)
 
         # ── Répartition par ville ─────────────────────────────────────
@@ -150,10 +168,15 @@ class FormatSupportDetailView(LoginRequiredMixin, DetailView):
             'paginator': paginator,
             'is_paginated': page_obj.has_other_pages(),
             'support_count': support_count,
+            'format_utilise_panneau': Support.objects.filter(
+                type_support=Support.TYPE_PANNEAU,
+                format=fmt.code,
+            ).exists(),
             'est_ecran': est_ecran,
             'unite_surface': 'cellules' if est_ecran else 'm²',
             'nb_bon': nb_bon,
             'nb_maintenance': nb_maintenance,
+            'nb_maintenance_preventive': nb_maintenance_preventive,
             'nb_panne': nb_panne,
             'villes': villes,
             'nb_villes': len(villes),
@@ -184,6 +207,34 @@ class FormatSupportDeleteView(LoginRequiredMixin, DeleteView):
     model = FormatSupport
     template_name = 'partials/confirm_delete.html'
     success_url = reverse_lazy('format_list')
+
+    def get(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        if self._has_linked_panels():
+            messages.error(
+                request,
+                f'Impossible de supprimer le format « {self.object.code} » : '
+                'au moins un panneau l’utilise.',
+            )
+            return redirect('format_support_detail', pk=self.object.pk)
+        return super().get(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        if self._has_linked_panels():
+            messages.error(
+                request,
+                f'Impossible de supprimer le format « {self.object.code} » : '
+                'au moins un panneau l’utilise.',
+            )
+            return redirect('format_support_detail', pk=self.object.pk)
+        return super().post(request, *args, **kwargs)
+
+    def _has_linked_panels(self):
+        return Support.objects.filter(
+            type_support=Support.TYPE_PANNEAU,
+            format=self.object.code,
+        ).exists()
 
 
 
@@ -683,7 +734,10 @@ class ApiGeojsonView(View):
             if type_filtre == Support.TYPE_PANNEAU and type_panneau_filtre != '1x2':
                 qs = qs.exclude(format='1x2')
         if etat_filtre:
-            qs = qs.filter(etat=etat_filtre)
+            if etat_filtre == Support.ETAT_BON:
+                qs = qs.filter(etat__in=Support.ETATS_OPERATIONNELS)
+            else:
+                qs = qs.filter(etat=etat_filtre)
         if type_panneau_filtre:
             codes_valides = list(
                 FormatSupport.objects.filter(categorie=type_panneau_filtre)
@@ -985,8 +1039,12 @@ class CarteView(LoginRequiredMixin, TemplateView):
         context = super().get_context_data(**kwargs)
         context['stats'] = {
             'total': Support.objects.count(),
-            'bon': Support.objects.filter(etat='bon').count(),
-            'maintenance': Support.objects.filter(etat='maintenance').count(),
+            'bon': Support.objects.filter(
+                etat=Support.ETAT_BON,
+            ).count(),
+            'maintenance': Support.objects.filter(
+                etat__in=(Support.ETAT_MAINTENANCE, Support.ETAT_A_MAINTENIR),
+            ).count(),
             'panne': Support.objects.filter(etat='panne').count(),
             'panneaux': Support.objects.filter(type_support='panneau').count(),
             'ecrans': Support.objects.filter(type_support='ecran').count(),
@@ -1123,7 +1181,10 @@ class SupportListView(TechnicienStaffRequiredMixin,SortableListMixin, ListView):
                 )
 
         if etat_f:
-            queryset = queryset.filter(etat=etat_f)
+            if etat_f == Support.ETAT_BON:
+                queryset = queryset.filter(etat__in=Support.ETATS_OPERATIONNELS)
+            else:
+                queryset = queryset.filter(etat=etat_f)
 
         if ville_f:
             queryset = queryset.filter(ville__iexact=ville_f)
@@ -1164,6 +1225,7 @@ class SupportListView(TechnicienStaffRequiredMixin,SortableListMixin, ListView):
         )
         screen_format_codes = set(
             support_scope.filter(type_support=Support.TYPE_ECRAN)
+            .exclude(ecran_info__cellule__isnull=True)
             .exclude(ecran_info__cellule='')
             .values_list('ecran_info__cellule', flat=True)
         )
@@ -1242,6 +1304,14 @@ class SupportListView(TechnicienStaffRequiredMixin,SortableListMixin, ListView):
             'villes': villes,
             'desactif': self.request.GET.get('desactif', '')
         })
+        pending_requests = SupportDeletionRequest.objects.filter(
+            status=SupportDeletionRequest.STATUS_PENDING,
+            support__isnull=False,
+        )
+        context['pending_deletion_support_ids'] = set(
+            pending_requests.values_list('support_id', flat=True)
+        )
+        context['pending_deletion_count'] = pending_requests.count()
         return context
 
 class SupportDetailView(ClientStaffRequiredMixin, DetailView):
@@ -1410,6 +1480,10 @@ class SupportDetailView(ClientStaffRequiredMixin, DetailView):
             'info_rows':      info_rows,
             'spots_data':     spots_data,
             'reservations':   reservations,
+            'pending_deletion_request': SupportDeletionRequest.objects.filter(
+                support=support,
+                status=SupportDeletionRequest.STATUS_PENDING,
+            ).select_related('requested_by').first(),
         })
         return context
     
@@ -1443,6 +1517,9 @@ class SupportCreateView(StaffRequiredMixin, CreateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        context['selected_marche_id'] = (
+            self.request.POST.get('marche', '') if self.request.method == 'POST' else ''
+        )
         if self.request.POST:
             context['ecran_form'] = EcranNumeriqueForm(self.request.POST, prefix='ecran')
             if 'marche_form' not in context:
@@ -1637,9 +1714,8 @@ class SupportUpdateView(StaffRequiredMixin, UpdateView):
 # --- VUE DE SUPPRESSION ---
 class SupportDeleteView(StaffRequiredMixin, DeleteView):
     model = Support
-    template_name = 'partials/confirm_delete.html'
+    template_name = 'inventory/support_confirm_delete.html'
     context_object_name = 'obj'
-    success_url = reverse_lazy('support_list')
     pk_url_kwarg = 'uuid'
     
     def get_object(self, queryset=None):
@@ -1650,40 +1726,148 @@ class SupportDeleteView(StaffRequiredMixin, DeleteView):
         uuid_val = self.kwargs.get(self.pk_url_kwarg)
         return get_object_or_404(Support, uuid=uuid_val)
 
-    def delete(self, request, *args, **kwargs):
-        # 1. On récupère proprement l'objet par get_object()
-        support = cast(Support, self.get_object())
+    def get(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        return self.render_to_response(self.get_context_data())
+
+    def post(self, request, *args, **kwargs):
+        try:
+            with transaction.atomic():
+                support = Support.objects.select_for_update().get(
+                    uuid=self.kwargs[self.pk_url_kwarg],
+                )
+                self.object = support
+                if self._has_campaign_links(support):
+                    messages.error(
+                        request,
+                        f'Impossible de supprimer {support.code} : ce support est lié '
+                        'à une campagne ou à une réservation.',
+                    )
+                    return redirect('support_detail', uuid=support.uuid)
+
+                if request.user.is_admin:
+                    SupportDeletionRequest.objects.filter(
+                        support=support,
+                        status=SupportDeletionRequest.STATUS_PENDING,
+                    ).update(
+                        status=SupportDeletionRequest.STATUS_CANCELLED,
+                        decided_at=timezone.now(),
+                    )
+                    transaction.on_commit(lambda: cache.delete('dashboard_alertes'))
+                    return self._delete_support(request, support)
+
+                pending = SupportDeletionRequest.objects.select_for_update().filter(
+                    support=support,
+                    status=SupportDeletionRequest.STATUS_PENDING,
+                ).first()
+                if pending is None:
+                    pending = SupportDeletionRequest.objects.create(
+                        support=support,
+                        support_code=support.code,
+                        requested_by=request.user,
+                        requester_name=request.user.get_full_name() or request.user.username,
+                    )
+                    transaction.on_commit(lambda: cache.delete('dashboard_alertes'))
+                    log_action(
+                        request,
+                        AuditLog.ACTION_CREATE,
+                        'inventory',
+                        obj=pending,
+                        detail=f"Demande de suppression du support {support.code}",
+                    )
+                    messages.success(
+                        request,
+                        'Demande enregistrée. Un autre utilisateur doit l’approuver '
+                        'depuis la liste des demandes de suppression.',
+                    )
+                    return redirect('support_detail', uuid=support.uuid)
+
+                if pending.requested_by_id == request.user.pk:
+                    messages.error(
+                        request,
+                        'Vous ne pouvez pas approuver votre propre demande. '
+                        'Un autre utilisateur doit la confirmer.',
+                    )
+                    return redirect('support_deletion_requests')
+
+                pending.status = SupportDeletionRequest.STATUS_APPROVED
+                pending.approved_by = request.user
+                pending.approver_name = request.user.get_full_name() or request.user.username
+                pending.decided_at = timezone.now()
+                pending.save(update_fields=[
+                    'status', 'approved_by', 'approver_name', 'decided_at',
+                ])
+                transaction.on_commit(lambda: cache.delete('dashboard_alertes'))
+                log_action(
+                    request,
+                    AuditLog.ACTION_UPDATE,
+                    'inventory',
+                    obj=pending,
+                    detail=f"Approbation de suppression du support {support.code}",
+                )
+                return self._delete_support(request, support)
+        except Support.DoesNotExist:
+            messages.error(request, 'Ce support a déjà été supprimé ou n’existe plus.')
+            return redirect('support_list')
+        except ProtectedError:
+            messages.error(
+                request,
+                'La suppression est bloquée car ce support possède encore des données liées.',
+            )
+            return redirect('support_detail', uuid=self.object.uuid)
+
+    @staticmethod
+    def _has_campaign_links(support):
+        return (
+            support.lignes_campagne.exists()
+            or support.lignes_reservation.exists()
+        )
+
+    def _delete_support(self, request, support):
         code = support.code
-        
-        # 2. Exécution de la suppression réelle
-        response = super().delete(request, *args, **kwargs)
-        
-        # 3. Log de l'action et message de succès
+        support.delete()
         log_action(
-            request, 
-            AuditLog.ACTION_DELETE, 
-            'inventory', 
-            detail=f"Suppression support: {code}"
+            request,
+            AuditLog.ACTION_DELETE,
+            'inventory',
+            detail=f"Suppression support: {code}",
         )
         messages.success(request, f'Le support {code} a été supprimé avec succès.')
-        
-        return response
+        return redirect('support_list')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        support = self.get_object()  # Utilisation sécurisée de get_object()
-        
+        support = self.object
+        pending = SupportDeletionRequest.objects.filter(
+            support=support,
+            status=SupportDeletionRequest.STATUS_PENDING,
+        ).select_related('requested_by').first()
+        has_campaign_links = self._has_campaign_links(support)
         context.update({
             'title': 'Supprimer le support',
             'header': 'Suppression de support',
             'message_title': 'Supprimer ce support ?',
-            'message_body': f"Vous êtes sur le point de supprimer le support {support.code}",
-            'hint': 'Cette opération supprimera définitivement le support et ses données associées.',
-            'confirm_label': 'Supprimer le support',
-            # CORRECTION DU CANCEL_URL : Utilisation d'une URL absolue ou dynamique basée sur l'UUID actuel
-            'cancel_url': reverse('support_detail', kwargs={'uuid': support.uuid}),
+            'message_body': f"Vous êtes sur le point de supprimer le support {support.code}.",
+            'hint': 'Les panneaux et écrans liés à une campagne ne peuvent pas être supprimés.',
+            'support': support,
+            'pending_request': pending,
+            'has_campaign_links': has_campaign_links,
+            'is_requester': bool(pending and pending.requested_by_id == self.request.user.pk),
+            'can_delete_alone': self.request.user.is_admin,
         })
         return context
+
+
+class SupportDeletionRequestsView(StaffRequiredMixin, ListView):
+    model = SupportDeletionRequest
+    template_name = 'inventory/support_deletion_requests.html'
+    context_object_name = 'deletion_requests'
+
+    def get_queryset(self):
+        return SupportDeletionRequest.objects.filter(
+            status=SupportDeletionRequest.STATUS_PENDING,
+            support__isnull=False,
+        ).select_related('support', 'requested_by').order_by('created_at')
 
 
 from core.mixins import SortableListMixin
@@ -1733,7 +1917,9 @@ class MaintenanceListView(LoginRequiredMixin, SortableListMixin, ListView):
             base_qs = base_qs.filter(effectue_par=self.request.user)
 
         context['kpi_total'] = base_qs.count()
-        context['kpi_operationnels'] = base_qs.filter(etat_apres='bon').count()
+        context['kpi_operationnels'] = base_qs.filter(
+            etat_apres__in=Support.ETATS_OPERATIONNELS,
+        ).count()
         context['kpi_en_maintenance'] = base_qs.filter(etat_apres='maintenance').count()
         context['kpi_en_panne'] = base_qs.filter(etat_apres='panne').count()
         context['kpi_pannes_actives'] = Support.objects.filter(actif=True, etat='panne').count()

@@ -1,0 +1,46 @@
+{% extends 'base.html' %}
+
+{% block title %}Demandes de suppression — Integral{% endblock %}
+
+{% block topbar_title %}
+  <i class="bi bi-shield-check me-2 text-warning"></i>Demandes de suppression
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-4">
+  <div class="card border-0 shadow-sm">
+    <div class="card-header bg-white py-3">
+      <h1 class="h5 mb-0">Approbation à deux utilisateurs</h1>
+      <p class="text-muted small mb-0 mt-1">
+        Un utilisateur différent du demandeur doit approuver chaque suppression.
+      </p>
+    </div>
+    <div class="card-body">
+      {% for deletion_request in deletion_requests %}
+        <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 border rounded p-3 mb-3">
+          <div>
+            <div class="fw-semibold">
+              {{ deletion_request.support_code }}
+              {% if deletion_request.support %}— {{ deletion_request.support.nom }}{% endif %}
+            </div>
+            <div class="text-muted small">
+              Demandée par {{ deletion_request.requester_name }}
+              le {{ deletion_request.created_at|date:"d/m/Y H:i" }}
+            </div>
+          </div>
+          {% if deletion_request.support %}
+            <a href="{% url 'support_delete' deletion_request.support.uuid %}" class="btn btn-sm btn-outline-warning">
+              Examiner la demande
+            </a>
+          {% endif %}
+        </div>
+      {% empty %}
+        <div class="text-center text-muted py-5">
+          <i class="bi bi-check-circle fs-2 d-block mb-2"></i>
+          Aucune demande de suppression en attente.
+        </div>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endblock %}

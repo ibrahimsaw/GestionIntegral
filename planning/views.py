@@ -310,7 +310,9 @@ class ApiTauxOccupationView(LoginRequiredMixin, View):
         d2 = parse_iso_date(request.GET.get('date_fin'),   timezone.localdate())
 
         result = []
-        for s in Support.objects.filter(etat='bon').prefetch_related('faces'):
+        for s in Support.objects.filter(
+            etat__in=Support.ETATS_OPERATIONNELS,
+        ).prefetch_related('faces'):
             taux = 0.0
 
             if s.type_support == s.TYPE_ECRAN:

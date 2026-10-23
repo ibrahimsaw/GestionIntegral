@@ -8,7 +8,11 @@ from django.db import models
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
-from inventory.models import get_dynamic_format_choices
+from inventory.models import (
+    FormatSupport,
+    get_dynamic_format_choices,
+    normaliser_categorie_format,
+)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # Fonctions utilitaires
@@ -80,7 +84,22 @@ TYPE_DOCUMENT_CONTRAT_CHOICES = [
 ]
 
 def get_type_support_choices():
-    return [('ecran', 'Écran')] + get_dynamic_format_choices()
+    choix = [('ecran', 'Écran')]
+    valeurs = {'ecran'}
+    categories = sorted({
+        normaliser_categorie_format(categorie)
+        for categorie in FormatSupport.hors_ecran().values_list('categorie', flat=True)
+        if normaliser_categorie_format(categorie)
+    }, key=str.casefold)
+    for categorie in categories:
+        if categorie not in valeurs:
+            choix.append((categorie, categorie))
+            valeurs.add(categorie)
+    for valeur, label in get_dynamic_format_choices():
+        if valeur not in valeurs:
+            choix.append((valeur, label))
+            valeurs.add(valeur)
+    return choix
 
 STATUT_EN_ATTENTE = 'en_attente'
 STATUT_CONFIRMEE  = 'confirmee'
@@ -1009,7 +1028,7 @@ class Campagne(models.Model):
     
     @staticmethod
     def get_type_support_choices():
-        return [('ecran', 'Écran')] + get_dynamic_format_choices()
+        return get_type_support_choices()
     
     def montant_total_impression(self):
         prix = self.prix_impression or Decimal('0.00') 

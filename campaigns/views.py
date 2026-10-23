@@ -31,6 +31,7 @@ from .forms import (
     LigneCampagneForm,
     PreuveDiffusionForm,
     DemandeCampagneForm,
+    normaliser_categorie_format,
 )
 from piges.models import PigeFichier
 # from .mixins import *
@@ -2403,7 +2404,7 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
         # pour le sélecteur en cascade Catégorie → Format dans campagne_form.html.
         formats_par_categorie = {}
         for f in formats_croissants(FormatSupport.hors_ecran()):
-            cat = f.categorie or 'Autre'
+            cat = normaliser_categorie_format(f.categorie) or 'Autre'
             formats_par_categorie.setdefault(cat, []).append({
                 'code': f.code,
                 'label': f"{f.dimensions} ({f.superficie:g}m²)" if f.superficie else f.dimensions,

@@ -63,6 +63,25 @@ class DashboardParcGroupingTests(TestCase):
         self.assertEqual(form.fields['type_support'].clean('Marché'), 'Marché')
         self.assertEqual(form.fields['type_support'].clean('ecran'), 'ecran')
 
+    def test_campaign_form_normalizes_format_category_before_choice_validation(self):
+        FormatSupport.objects.create(
+            code='DASH-GEA-NORMALIZE',
+            categorie='  Ge\u0301ant  ',
+            dimensions='9m × 5m',
+        )
+
+        form = CampagneForm(data={'type_support': 'Ge\u0301ant '})
+
+        self.assertEqual(form.data.get('type_support'), 'Géant')
+        self.assertIn(('Géant', 'Géant'), form.fields['type_support'].choices)
+        self.assertIn(('Géant', 'Géant'), Campagne.get_type_support_choices())
+        self.assertEqual(
+            Campagne._meta.get_field('type_support').clean('Géant', None),
+            'Géant',
+        )
+        self.assertNotIn('type_support', form.errors)
+        self.assertEqual(form.cleaned_data['type_support'], 'Géant')
+
     def create_support(self, code, format_code, ville='Ouagadougou'):
         return Support.objects.create(
             code=code,

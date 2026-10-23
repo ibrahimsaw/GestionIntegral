@@ -10,7 +10,12 @@ from .models import (
     CampagneVisuel,
     PreuveDiffusion,
 )
-from inventory.models import Support, FacePanneau, FormatSupport
+from inventory.models import (
+    Support,
+    FacePanneau,
+    FormatSupport,
+    normaliser_categorie_format,
+)
 
 W = {'class': 'form-control'}
 S = {'class': 'form-select'}
@@ -157,6 +162,18 @@ class CampagneForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        submitted_data = kwargs.get('data')
+        data_in_args = bool(args) and args[0] is not None
+        if submitted_data is not None or data_in_args:
+            data = (submitted_data if submitted_data is not None else args[0]).copy()
+            value = data.get('type_support')
+            if value:
+                data['type_support'] = normaliser_categorie_format(value)
+            if submitted_data is not None:
+                kwargs['data'] = data
+            else:
+                args = (data, *args[1:])
+
         super().__init__(*args, **kwargs)
         self.fields['client'].required = False
         self.fields['client'].help_text = "Laissez vide pour une campagne propre à INTEGRAL."
@@ -188,7 +205,7 @@ class CampagneForm(forms.ModelForm):
             self.fields['campagne_parente'].queryset = Campagne.objects.none()
 
         categories = {
-            format_support.categorie or 'Autre'
+            normaliser_categorie_format(format_support.categorie) or 'Autre'
             for format_support in FormatSupport.hors_ecran().only('categorie')
         }
         support_choices = [('', '--- Sélectionner une catégorie ---')]

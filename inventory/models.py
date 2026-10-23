@@ -3,6 +3,7 @@ from django.utils import timezone
 from django.conf import settings
 from django.core.exceptions import ValidationError
 import re
+import unicodedata
 from datetime import datetime, timedelta
 from datetime import datetime
 from typing import Optional
@@ -131,6 +132,10 @@ def format_sort_key(format_support):
 
 def formats_croissants(formats):
     return sorted(formats, key=format_sort_key)
+
+
+def normaliser_categorie_format(categorie):
+    return unicodedata.normalize('NFC', str(categorie or '')).strip()
 
 
 def get_dynamic_format_choices():

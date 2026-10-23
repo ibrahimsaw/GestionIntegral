@@ -163,14 +163,22 @@ class SupportFormCategoryFilterTests(TestCase):
 
 
 class SupportMarketPlacementDefaultsTests(TestCase):
-    def test_new_support_form_exposes_market_and_editable_market_face_default(self):
+    def setUp(self):
+        self.market = Marche.objects.create(nom='Marché sans emplacement')
+        self.market_format = FormatSupport.objects.create(
+            code='MARKET-PANEL-FORMAT',
+            dimensions='Emplacement marché',
+            superficie=1,
+            categorie='Marché',
+        )
         staff = get_user_model().objects.create_user(
-            username='market-default-staff',
+            username='market-panel-create-staff',
             password='test-password',
             role='staff',
         )
         self.client.force_login(staff)
 
+    def test_new_support_form_exposes_market_and_editable_market_face_default(self):
         response = self.client.get(reverse('support_create'))
 
         self.assertEqual(response.status_code, 200)
@@ -179,6 +187,34 @@ class SupportMarketPlacementDefaultsTests(TestCase):
         self.assertContains(response, 'marketFaceDefaultApplied = true;')
         self.assertContains(response, 'updateFaces();')
         self.assertContains(response, 'premierEmplacementLibre')
+        self.assertContains(response, 'supportSubmitButton.disabled = blocked;')
+        self.assertContains(response, 'Ce marché n’a aucun emplacement libre.')
+
+    def test_cannot_create_panel_in_market_without_free_location(self):
+        response = self.client.post(reverse('support_create'), {
+            'type_choice': Support.TYPE_PANNEAU,
+            'type_support': Support.TYPE_PANNEAU,
+            'code': 'MARKET-PANEL-NO-SLOT',
+            'nom': 'Panneau marché sans emplacement',
+            'format': self.market_format.code,
+            'categorie_format': 'Marché',
+            'nb_faces': 1,
+            'latitude': '12.3400000',
+            'longitude': '-1.5200000',
+            'ville': 'Ouagadougou',
+            'etat': Support.ETAT_BON,
+            'marche': str(self.market.pk),
+            'emplacement': '',
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn(
+            "Ce marché n'a plus d'emplacement libre",
+            response.context['form'].non_field_errors()[0],
+        )
+        self.assertFalse(
+            Support.objects.filter(code='MARKET-PANEL-NO-SLOT').exists()
+        )
 
     def test_market_emplacements_include_availability_in_code_order(self):
         market = Marche.objects.create(nom='Marché des emplacements')
@@ -193,13 +229,6 @@ class SupportMarketPlacementDefaultsTests(TestCase):
             latitude=12.34,
             longitude=-1.52,
         )
-        staff = get_user_model().objects.create_user(
-            username='market-placement-staff',
-            password='test-password',
-            role='staff',
-        )
-        self.client.force_login(staff)
-
         response = self.client.get(
             reverse('api_emplacements_marche', args=[market.pk])
         )

@@ -228,6 +228,7 @@
                     <option value="">---------</option>
                   </select>
                   <div class="text-muted mt-1" style="font-size:0.72rem;" id="emplacement-help"></div>
+                  <div class="text-danger mt-1 d-none" style="font-size:0.78rem;" id="emplacement-error" role="alert"></div>
                 </div>
               </div>
             </div>
@@ -536,7 +537,7 @@
       <a href="{% url 'support_list' %}" class="btn btn-outline-secondary px-4" style="border-radius:8px;font-size:0.85rem;font-weight:600;">
         Annuler
       </a>
-      <button type="submit" class="btn btn-primary px-5 shadow-sm d-flex align-items-center gap-2" style="border-radius:8px;font-size:0.85rem;font-weight:700;">
+      <button type="submit" id="support-submit-button" class="btn btn-primary px-5 shadow-sm d-flex align-items-center gap-2" style="border-radius:8px;font-size:0.85rem;font-weight:700;">
         <i class="bi bi-cloud-arrow-up-fill"></i>
         <span id="btn-submit-label">{% if object %}Mettre à jour{% else %}Enregistrer{% endif %}</span>
       </button>
@@ -906,25 +907,53 @@
   const marcheSelect = document.getElementById('id_marche_select');
   const emplacementSelect = document.getElementById('id_emplacement');
   const emplacementHelp = document.getElementById('emplacement-help');
+  const emplacementError = document.getElementById('emplacement-error');
+  const supportSubmitButton = document.getElementById('support-submit-button');
   const CURRENT_SUPPORT_ID = "{{ object.pk|default:'' }}";
   const CURRENT_EMPLACEMENT_ID = "{{ object.emplacement_id|default:'' }}";
   const API_EMPLACEMENTS_TEMPLATE = "{% url 'api_emplacements_marche' pk=999999 %}";
   let marketFaceDefaultApplied = false;
+  let marketEmplacementsLoaded = false;
+
+  function updateMarketPlacementGuard() {
+    if (!supportSubmitButton || CURRENT_SUPPORT_ID || typeField.value !== 'panneau') return;
+    const hasSelectedMarket = !!(marcheSelect && marcheSelect.value);
+    const hasSelectedPlacement = !!(emplacementSelect && emplacementSelect.value);
+    const blocked = hasSelectedMarket && (!marketEmplacementsLoaded || !hasSelectedPlacement);
+    supportSubmitButton.disabled = blocked;
+    if (!emplacementError) return;
+    if (hasSelectedMarket && marketEmplacementsLoaded && !emplacementSelect.value) {
+      emplacementError.textContent = 'Ce marché n’a aucun emplacement libre. Choisissez un autre marché ou sélectionnez « Support autonome ».';
+      emplacementError.classList.remove('d-none');
+    } else if (hasSelectedMarket && !marketEmplacementsLoaded) {
+      emplacementError.textContent = 'Vérification des emplacements du marché…';
+      emplacementError.classList.remove('d-none');
+    } else {
+      emplacementError.textContent = '';
+      emplacementError.classList.add('d-none');
+    }
+  }
 
   function chargerEmplacements(marcheId, preselect = null) {
     if (!emplacementSelect) return Promise.resolve();
+    marketEmplacementsLoaded = !marcheId;
     emplacementSelect.innerHTML = '<option value="">---------</option>';
     if (!marcheId) {
       emplacementSelect.disabled = true;
       if (emplacementHelp) emplacementHelp.textContent = '';
+      updateMarketPlacementGuard();
       return Promise.resolve();
     }
     emplacementSelect.disabled = false;
     if (emplacementHelp) emplacementHelp.textContent = 'Chargement des emplacements...';
+    updateMarketPlacementGuard();
 
     const url = API_EMPLACEMENTS_TEMPLATE.replace('999999', marcheId) + `?current_support=${CURRENT_SUPPORT_ID}`;
     return fetch(url)
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error(`Chargement des emplacements impossible (${r.status}).`);
+        return r.json();
+      })
       .then(data => {
         const emplacements = data.emplacements || [];
         let emplacementSelectionne = false;
@@ -949,8 +978,10 @@
           const premierLibre = emplacementSelect.querySelector('option:not(:disabled)[value]:not([value=""])');
           if (premierLibre) premierLibre.selected = true;
         }
+        marketEmplacementsLoaded = true;
         const nbLibres = emplacements.filter(e => e.libre).length;
         if (emplacementHelp) emplacementHelp.textContent = `${nbLibres} emplacement(s) libre(s) sur ${emplacements.length}`;
+        updateMarketPlacementGuard();
 
         if (data.marche_latitude && data.marche_longitude) {
           const lat = parseFloat(String(data.marche_latitude).replace(',', '.'));
@@ -958,11 +989,17 @@
           placeMarker(lat, lng);
           gmap.setView([lat, lng], 16);
         }
+      })
+      .catch(error => {
+        marketEmplacementsLoaded = false;
+        if (emplacementHelp) emplacementHelp.textContent = error.message;
+        updateMarketPlacementGuard();
       });
   }
 
   if (marcheSelect) {
     const categoryFormatSelect = document.getElementById('id_categorie_format');
+    emplacementSelect.addEventListener('change', updateMarketPlacementGuard);
     marcheSelect.addEventListener('change', () => {
       if (
         marcheSelect.value
@@ -1043,6 +1080,7 @@
     if (nbFacesInput) {
       nbFacesInput.addEventListener('input', updateFaces);
     }
+    updateMarketPlacementGuard();
   });
 </script>
 {% endblock %}

@@ -1555,20 +1555,45 @@ class SupportCreateView(StaffRequiredMixin, CreateView):
     def form_valid(self, form):
         context = self.get_context_data()
         ecran_form = context['ecran_form']
-        
+        market_id = self.request.POST.get('marche', '').strip()
+        emplacement_id = self.request.POST.get('emplacement', '').strip()
+        emplacement = None
+
         with transaction.atomic():
+            if form.cleaned_data.get('type_support') == Support.TYPE_PANNEAU and market_id:
+                marche = Marche.objects.filter(pk=market_id, actif=True).first()
+                if marche is None:
+                    form.add_error(None, "Le marché sélectionné est invalide ou inactif.")
+                    return self.form_invalid(form)
+
+                emplacement = (
+                    Emplacement.objects.select_for_update()
+                    .filter(pk=emplacement_id, marche=marche)
+                    .first()
+                    if emplacement_id
+                    else None
+                )
+                if emplacement is None or not emplacement.is_libre():
+                    if not marche.emplacements.filter(support_installe__isnull=True).exists():
+                        form.add_error(
+                            None,
+                            "Ce marché n'a plus d'emplacement libre. Choisissez un autre "
+                            "marché ou créez le panneau hors marché.",
+                        )
+                    else:
+                        form.add_error(
+                            None,
+                            "Sélectionnez un emplacement libre de ce marché avant de créer "
+                            "le panneau.",
+                        )
+                    return self.form_invalid(form)
+
             # 1. Sauvegarde du support
             self.object = form.save(commit=False)
             self.object.created_by = self.request.user
+            if emplacement is not None:
+                self.object.emplacement = emplacement
             self.object.save()
-
-            # 1bis. Rattachement à un emplacement de marché (optionnel)
-            emplacement_id = self.request.POST.get('emplacement')
-            if emplacement_id:
-                emplacement = Emplacement.objects.filter(pk=emplacement_id).first()
-                if emplacement and emplacement.is_libre():
-                    self.object.emplacement = emplacement
-                    self.object.save()
 
             # 2. Logique selon le type
             type_support = self.object.type_support

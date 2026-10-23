@@ -9,6 +9,13 @@ CODE_STYLE = {
 
 
 class SupportForm(forms.ModelForm):
+    categorie_format = forms.ChoiceField(
+        required=False,
+        choices=[],
+        label="Catégorie",
+        widget=forms.Select(attrs={**S, 'id': 'id_categorie_format'}),
+    )
+
     nb_faces = forms.IntegerField(
         min_value=1, max_value=10, initial=2,
         required=False,
@@ -60,6 +67,47 @@ class SupportForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+        formats = formats_croissants(FormatSupport.objects.all())
+        formats_par_categorie = {}
+        for format_support in formats:
+            categorie = format_support.categorie.strip() or 'Autre'
+            if categorie.casefold() == 'ecran':
+                continue
+            formats_par_categorie.setdefault(categorie, []).append((
+                format_support.code,
+                f"{format_support.dimensions} ({format_support.superficie:g}m²)"
+                if format_support.superficie
+                else format_support.dimensions or format_support.code,
+            ))
+
+        self.fields['categorie_format'].choices = [
+            ('', 'Toutes les catégories'),
+            *[(categorie, categorie) for categorie in sorted(
+                formats_par_categorie,
+                key=str.casefold,
+            )],
+        ]
+        self.fields['format'].choices = [('', '---------')] + [
+            (categorie, choix)
+            for categorie, choix in sorted(
+                formats_par_categorie.items(),
+                key=lambda item: item[0].casefold(),
+            )
+        ]
+
+        selected_format = (
+            self.data.get(self.add_prefix('format'))
+            if self.is_bound
+            else self.initial.get('format') or getattr(self.instance, 'format', '')
+        )
+        if selected_format:
+            format_support = next(
+                (item for item in formats if item.code == selected_format),
+                None,
+            )
+            if format_support:
+                self.initial['categorie_format'] = format_support.categorie.strip() or 'Autre'
+
         # ── Cas ÉDITION ──────────────────────────────────────────────────
         if self.instance and self.instance.pk:
             # Le type ne peut plus changer
@@ -72,6 +120,7 @@ class SupportForm(forms.ModelForm):
                 # Écran : on retire format et nb_faces, inutiles
                 del self.fields['nb_faces']
                 del self.fields['format']
+                del self.fields['categorie_format']
             else:
                 # Panneau : nb_faces initialisé au nombre de faces existantes
                 self.fields['nb_faces'].initial = self.instance.faces.count()
@@ -88,11 +137,24 @@ class SupportForm(forms.ModelForm):
         cleaned = super().clean()
         type_support = cleaned.get('type_support')
         fmt          = cleaned.get('format')
+        categorie    = cleaned.get('categorie_format')
         nb_faces     = cleaned.get('nb_faces')
 
         if type_support == Support.TYPE_PANNEAU:
             if not fmt:
                 self.add_error('format', "Le format est obligatoire pour un panneau.")
+            elif categorie:
+                format_support = FormatSupport.objects.filter(code=fmt).first()
+                categorie_format = (
+                    format_support.categorie.strip() or 'Autre'
+                    if format_support
+                    else None
+                )
+                if categorie_format != categorie:
+                    self.add_error(
+                        'format',
+                        "Le format sélectionné ne correspond pas à la catégorie choisie.",
+                    )
             if not nb_faces:
                 self.add_error('nb_faces', "Le nombre de faces est obligatoire pour un panneau.")
 

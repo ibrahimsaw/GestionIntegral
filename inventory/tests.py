@@ -7,6 +7,7 @@ from django.test import RequestFactory, TestCase
 from django.urls import reverse
 from unittest.mock import patch
 
+from inventory.forms import SupportForm
 from inventory.models import Emplacement, EcranNumerique, FormatSupport, Marche, Support
 from inventory.views import (
     FormatSupportDetailView,
@@ -14,6 +15,58 @@ from inventory.views import (
     SupportListView,
 )
 from geoad.context_processors import inventory_villes
+
+
+class SupportFormCategoryFilterTests(TestCase):
+    def setUp(self):
+        self.geant_format = FormatSupport.objects.create(
+            code='FORM-GEANT',
+            dimensions='8m × 6m',
+            superficie=48,
+            categorie='Géant',
+        )
+        self.sucette_format = FormatSupport.objects.create(
+            code='FORM-SUCETTE',
+            dimensions='1m × 2m',
+            superficie=2,
+            categorie='Sucette',
+        )
+        self.screen_format = FormatSupport.objects.create(
+            code='FORM-ECRAN',
+            dimensions='6 × 4',
+            categorie='Ecran',
+        )
+        self.market_format = FormatSupport.objects.create(
+            code='FORM-MARCHE',
+            dimensions='Marché',
+            categorie='Marché',
+        )
+
+    def test_form_lists_categories_and_groups_formats_by_category(self):
+        form = SupportForm()
+        choices = form.fields['format'].choices
+
+        self.assertIn(('Géant', [('FORM-GEANT', '8m × 6m (48m²)')]), choices)
+        self.assertIn(('Sucette', [('FORM-SUCETTE', '1m × 2m (2m²)')]), choices)
+        self.assertIn(('Géant', 'Géant'), form.fields['categorie_format'].choices)
+        self.assertIn(('Sucette', 'Sucette'), form.fields['categorie_format'].choices)
+        self.assertIn(('Marché', 'Marché'), form.fields['categorie_format'].choices)
+        self.assertNotIn(('Ecran', 'Ecran'), form.fields['categorie_format'].choices)
+        self.assertNotIn(
+            ('Ecran', [('FORM-ECRAN', '6 × 4')]),
+            choices,
+        )
+
+    def test_selected_category_must_match_selected_format(self):
+        form = SupportForm(data={
+            'categorie_format': 'Géant',
+            'format': self.sucette_format.code,
+            'type_support': Support.TYPE_PANNEAU,
+            'nb_faces': 2,
+        })
+
+        self.assertIn('format', form.errors)
+        self.assertIn('ne correspond pas à la catégorie', form.errors['format'][0])
 
 
 class FormatSupportDetailViewTests(TestCase):

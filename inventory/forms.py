@@ -136,6 +136,27 @@ class MarcheForm(forms.ModelForm):
         }
 
 
+class EmplacementCreateForm(forms.Form):
+    nombre = forms.IntegerField(
+        required=True,
+        min_value=1,
+        max_value=500,
+        label="Nombre d'emplacements à créer",
+        widget=forms.NumberInput(attrs={
+            **W,
+            'min': 1,
+            'max': 500,
+            'step': 1,
+        }),
+        help_text="Saisissez un nombre de 1 à 500.",
+    )
+    notes = forms.CharField(
+        required=False,
+        label="Notes et repères physiques",
+        widget=forms.Textarea(attrs={**W, 'rows': 3}),
+    )
+
+
 class FacePanneauForm(forms.ModelForm):
     """
     Formulaire d'une face de panneau.

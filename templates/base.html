@@ -21,7 +21,7 @@
 
     
     <!-- Feuille de Style Centralisée Integral GeoAD ERP -->
-    <link rel="stylesheet" href="{% static 'css/style.css' %}" />
+    <link rel="stylesheet" href="{% static 'css/style.css' %}?v=20261022-submenu-arrows" />
 
     <style>
       /* Surcharges dynamiques issues du context processor DESIGN */
@@ -79,7 +79,7 @@
             </a>
             
             <div class="nav-label">Inventaire</div>
-            <a href="{% url 'support_list' %}" class="nav-link {% if request.resolver_match.url_name == 'support_list' and not request.GET.type and not request.GET.type_panneau and not request.GET.ville %}active{% endif %}">
+            <a href="{% url 'support_list' %}" class="nav-link {% if request.resolver_match.url_name == 'support_list' and not request.GET.type and not request.GET.categorie and not request.GET.type_panneau and not request.GET.ville %}active{% endif %}">
               <i class="bi bi-collection"></i>Tous les Supports
             </a>
             <a href="{% url 'marche_list' %}" class="nav-link {% if request.resolver_match.url_name == 'marche_list' %}active{% endif %}">
@@ -88,29 +88,67 @@
             <a href="{% url 'format_list' %}" class="nav-link {% if request.resolver_match.url_name == 'format_list' %}active{% endif %}">
               <i class="bi bi-grid-1x2 me-1"></i>Formats
             </a>
-            {% for category in inventory_categories %}
-              <details class="nav-submenu"
-                {% if category.key == 'panneau' and request.GET.type == 'panneau' and request.GET.type_panneau != '1x2' %}open{% endif %}
-                {% if category.key == 'sucette' and request.GET.type == 'panneau' and request.GET.type_panneau == '1x2' %}open{% endif %}
-                {% if category.key == 'ecran' and request.GET.type == 'ecran' %}open{% endif %}>
-                <summary class="nav-link nav-submenu-header
-                  {% if category.key == 'panneau' and request.GET.type == 'panneau' and request.GET.type_panneau != '1x2' %}parent-active{% endif %}
-                  {% if category.key == 'ecran' and request.GET.type == 'ecran' %}parent-active{% endif %}
-                  {% if category.key == 'sucette' and request.GET.type == 'panneau' and request.GET.type_panneau == '1x2' %}parent-active{% endif %}">
-                  <i class="bi {{ category.icon }}"></i>{{ category.label }}
+            {% for ville_data in inventory_categories %}
+              <details class="nav-submenu" {% if request.GET.ville == ville_data.ville %}open{% endif %}>
+                <summary class="nav-link nav-submenu-header {% if request.GET.ville == ville_data.ville %}parent-active{% endif %}">
+                  <i class="bi bi-pin-map"></i><span class="nav-submenu-label">{{ ville_data.ville }}</span>
                   <i class="bi bi-chevron-down submenu-chevron"></i>
                 </summary>
                 <div class="nav-submenu-items">
-                  <a href="{% url 'support_list' %}?type={{ category.type }}{% if category.format %}&type_panneau={{ category.format }}{% endif %}" class="nav-link {% if request.GET.type == category.type and not request.GET.ville %}{% if not category.format and request.GET.type_panneau != '1x2' or category.format and request.GET.type_panneau == category.format %}active{% endif %}{% endif %}">
-                    <i class="bi bi-grid"></i>Tous
-                  </a>
-                  {% for ville in category.villes %}
-                    <a href="{% url 'support_list' %}?type={{ category.type }}{% if category.format %}&type_panneau={{ category.format }}{% endif %}&ville={{ ville|urlencode }}&desactif=ville" class="nav-link {% if request.GET.type == category.type and request.GET.ville == ville %}{% if not category.format and request.GET.type_panneau != '1x2' or category.format and request.GET.type_panneau == category.format %}active{% endif %}{% endif %}">
-                      <i class="bi bi-pin-map"></i>{{ ville }}
-                    </a>
+                  {% for category in ville_data.categories %}
+                    {% if category.formats|length == 1 %}
+                      {% with format=category.formats.0 %}
+                        <a href="{% url 'support_list' %}?ville={{ ville_data.ville|urlencode }}&categorie={{ category.label|urlencode }}&type_panneau={{ format.code|urlencode }}&desactif=ville" class="nav-link {% if request.GET.ville == ville_data.ville and request.GET.categorie == category.label and request.GET.type_panneau == format.code %}active{% endif %}">
+                          <i class="bi bi-grid"></i><span>{{ category.label }} · {{ format.label }}</span>
+                        </a>
+                      {% endwith %}
+                    {% else %}
+                      <details class="nav-submenu" {% if request.GET.ville == ville_data.ville and request.GET.categorie == category.label %}open{% endif %}>
+                        <summary class="nav-link nav-submenu-header {% if request.GET.ville == ville_data.ville and request.GET.categorie == category.label %}parent-active{% endif %}">
+                          <i class="bi bi-grid"></i><span class="nav-submenu-label">{{ category.label }}</span>
+                          <i class="bi bi-chevron-down submenu-chevron"></i>
+                        </summary>
+                        <div class="nav-submenu-items">
+                          <a href="{% url 'support_list' %}?ville={{ ville_data.ville|urlencode }}&categorie={{ category.label|urlencode }}&desactif=ville" class="nav-link {% if request.GET.ville == ville_data.ville and request.GET.categorie == category.label and not request.GET.type_panneau %}active{% endif %}">
+                            <i class="bi bi-collection"></i>Tous les formats
+                          </a>
+                          {% for format in category.formats %}
+                            <a href="{% url 'support_list' %}?ville={{ ville_data.ville|urlencode }}&categorie={{ category.label|urlencode }}&type_panneau={{ format.code|urlencode }}&desactif=ville" class="nav-link {% if request.GET.ville == ville_data.ville and request.GET.categorie == category.label and request.GET.type_panneau == format.code %}active{% endif %}">
+                              <i class="bi bi-aspect-ratio"></i>{{ format.label }}
+                            </a>
+                          {% endfor %}
+                        </div>
+                      </details>
+                    {% endif %}
                   {% endfor %}
                 </div>
               </details>
+            {% endfor %}
+            {% for category in inventory_global_categories %}
+              {% if category.formats|length == 1 %}
+                {% with format=category.formats.0 %}
+                  <a href="{% url 'support_list' %}?categorie={{ category.label|urlencode }}&type_panneau={{ format.code|urlencode }}" class="nav-link {% if not request.GET.ville and request.GET.categorie == category.label and request.GET.type_panneau == format.code %}active{% endif %}">
+                    <i class="bi {% if category.label == 'Ecran' %}bi-display{% else %}bi-aspect-ratio{% endif %}"></i><span>{{ category.label }} · {{ format.label }}</span>
+                  </a>
+                {% endwith %}
+              {% else %}
+                <details class="nav-submenu" {% if not request.GET.ville and request.GET.categorie == category.label %}open{% endif %}>
+                  <summary class="nav-link nav-submenu-header {% if not request.GET.ville and request.GET.categorie == category.label %}parent-active{% endif %}">
+                    <i class="bi {% if category.label == 'Ecran' %}bi-display{% else %}bi-aspect-ratio{% endif %}"></i><span class="nav-submenu-label">{{ category.label }}</span>
+                    <i class="bi bi-chevron-down submenu-chevron"></i>
+                  </summary>
+                  <div class="nav-submenu-items">
+                    <a href="{% url 'support_list' %}?categorie={{ category.label|urlencode }}" class="nav-link {% if not request.GET.ville and request.GET.categorie == category.label and not request.GET.type_panneau %}active{% endif %}">
+                      <i class="bi bi-collection"></i>Tous les formats
+                    </a>
+                    {% for format in category.formats %}
+                      <a href="{% url 'support_list' %}?categorie={{ category.label|urlencode }}&type_panneau={{ format.code|urlencode }}" class="nav-link {% if not request.GET.ville and request.GET.categorie == category.label and request.GET.type_panneau == format.code %}active{% endif %}">
+                        <i class="bi bi-aspect-ratio"></i>{{ format.label }}
+                      </a>
+                    {% endfor %}
+                  </div>
+                </details>
+              {% endif %}
             {% endfor %}
             <a href="{% url 'supports_report' %}" class="nav-link {% if request.resolver_match.url_name == 'supports_report' %}active{% endif %}">
               <i class="bi bi-file-earmark-bar-graph-fill"></i>Rapport Supports

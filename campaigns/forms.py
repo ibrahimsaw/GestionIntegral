@@ -187,7 +187,17 @@ class CampagneForm(forms.ModelForm):
             self.fields['contrat'].queryset = Contrat.objects.none()
             self.fields['campagne_parente'].queryset = Campagne.objects.none()
 
-        support_choices = [('', '--- Sélectionner un type / format ---')] + list(Campagne.get_type_support_choices())
+        categories = {
+            format_support.categorie or 'Autre'
+            for format_support in FormatSupport.hors_ecran().only('categorie')
+        }
+        support_choices = [('', '--- Sélectionner une catégorie ---')]
+        support_choices += [('ecran', 'Écran Numérique LED')]
+        support_choices += [(category, category) for category in sorted(categories)]
+        support_choices += [
+            choice for choice in Campagne.get_type_support_choices()
+            if choice[0] not in categories and choice[0] != 'ecran'
+        ]
         self.fields['type_support'].choices = support_choices
 
         # 2. Choix dynamique du lieu (villes distinctes présentes dans les supports)

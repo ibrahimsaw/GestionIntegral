@@ -1,4 +1,6 @@
 import json
+import re
+import unicodedata
 from typing import cast
 
 from django.conf import settings
@@ -22,7 +24,7 @@ from accounts.models import User
 from django.db.models import Q
 from django.utils.safestring import mark_safe
 from django.core.exceptions import PermissionDenied
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.shortcuts import redirect, get_object_or_404
 from django.contrib import messages
 from django.views.generic import UpdateView
@@ -35,7 +37,7 @@ from typing import cast
 from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView
 from django.contrib.auth.mixins import LoginRequiredMixin # Optionnel: pour sécuriser l'accès
-from .models import FormatSupport
+from .models import FormatSupport, format_sort_key, formats_croissants
 
 # 1. LISTER LES FORMATS
 class FormatSupportListView(LoginRequiredMixin, SortableListMixin, ListView):
@@ -53,8 +55,7 @@ class FormatSupportListView(LoginRequiredMixin, SortableListMixin, ListView):
     DEFAULT_DIR = 'asc'
 
     def get_queryset(self):
-        qs = super().get_queryset()
-        return self.apply_sort(qs)
+        return formats_croissants(super().get_queryset())
 
 
 def _extraire_dimensions(texte):
@@ -302,30 +303,77 @@ class EmplacementDetailView(LoginRequiredMixin, DetailView):
         return context
 
 
-class EmplacementCreateView(StaffRequiredMixin, CreateView):
-    model = Emplacement
-    fields = ['code', 'notes']
+class EmplacementCreateView(StaffRequiredMixin, FormView):
+    form_class = EmplacementCreateForm
     template_name = 'inventory/emplacement_form.html'
 
     def dispatch(self, request, *args, **kwargs):
         self.marche = get_object_or_404(Marche, pk=kwargs['marche_pk'])
         return super().dispatch(request, *args, **kwargs)
 
-    def get_initial(self):
-        initial = super().get_initial()
-        initial['code'] = generer_prochain_code_emplacement(self.marche)
-        return initial
-
     def form_valid(self, form):
-        form.instance.marche = self.marche
-        response = super().form_valid(form)
-        messages.success(self.request, f'Emplacement "{self.object.code}" ajouté au marché {self.marche.nom}.')
-        return response
+        try:
+            with transaction.atomic():
+                # Sérialise les créations concurrentes sur le même marché
+                # lorsque le moteur de base de données prend en charge ce verrou.
+                Marche.objects.select_for_update().get(pk=self.marche.pk)
+                nombre = form.cleaned_data['nombre']
+                existing_codes = list(
+                    self.marche.emplacements.values_list('code', flat=True)
+                )
+                codes = [
+                    generer_prochain_code_emplacement(
+                        self.marche, offset=i, existing_codes=existing_codes
+                    )
+                    for i in range(nombre)
+                ]
+                deja_utilises = list(
+                    self.marche.emplacements.filter(code__in=codes)
+                    .values_list('code', flat=True)
+                )
+                if deja_utilises:
+                    form.add_error(
+                        None,
+                        "Création impossible : les codes suivants existent déjà sur ce "
+                        f"marché : {', '.join(deja_utilises)}. Réessayez.",
+                    )
+                    return self.form_invalid(form)
+
+                Emplacement.objects.bulk_create([
+                    Emplacement(
+                        marche=self.marche,
+                        code=code,
+                        notes=form.cleaned_data.get('notes', ''),
+                    )
+                    for code in codes
+                ])
+        except IntegrityError:
+            form.add_error(
+                None,
+                "Création impossible : un code généré vient d'être utilisé sur ce "
+                "marché. Aucun emplacement n'a été ajouté ; veuillez réessayer.",
+            )
+            return self.form_invalid(form)
+
+        messages.success(
+            self.request,
+            f'{len(codes)} emplacement(s) ajouté(s) au marché {self.marche.nom} '
+            f'({codes[0]} à {codes[-1]}).',
+        )
+        return redirect(self.get_success_url())
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['marche'] = self.marche
         context['title'] = f'Nouvel emplacement — {self.marche.nom}'
+        existing_codes = list(
+            self.marche.emplacements.values_list('code', flat=True)
+        )
+        context['code_prefix'] = generer_prefixe_code_emplacement(self.marche)
+        context['code_start'] = prochain_numero_emplacement(
+            context['code_prefix'],
+            existing_codes,
+        )
         return context
 
     def get_success_url(self):
@@ -373,6 +421,148 @@ class EmplacementDeleteView(StaffRequiredMixin, DeleteView):
 
     def get_success_url(self):
         return reverse('marche_detail', kwargs={'pk': self.object.marche.pk})
+
+
+class EmplacementBulkActionView(StaffRequiredMixin, View):
+    """Applique une action aux emplacements sélectionnés d'un seul marché."""
+
+    def post(self, request, marche_pk, *args, **kwargs):
+        marche = get_object_or_404(Marche, pk=marche_pk)
+        raw_ids = request.POST.getlist('selected_ids')
+        try:
+            selected_ids = {int(value) for value in raw_ids}
+        except (TypeError, ValueError):
+            messages.error(request, "La sélection d'emplacements est invalide.")
+            return redirect('marche_detail', pk=marche.pk)
+
+        if not selected_ids:
+            messages.warning(request, "Cochez au moins un emplacement.")
+            return redirect('marche_detail', pk=marche.pk)
+
+        emplacements = list(
+            Emplacement.objects.filter(
+                marche=marche,
+                pk__in=selected_ids,
+            ).select_related('support_installe').order_by('code')
+        )
+        if len(emplacements) != len(selected_ids):
+            messages.error(
+                request,
+                "La sélection contient un emplacement invalide ou appartenant à un autre marché.",
+            )
+            return redirect('marche_detail', pk=marche.pk)
+
+        action = request.POST.get('action')
+        if action == 'edit_notes':
+            notes = request.POST.get('notes')
+            if notes is None:
+                messages.error(request, "Saisissez les notes à appliquer.")
+            else:
+                Emplacement.objects.filter(
+                    marche=marche,
+                    pk__in=selected_ids,
+                ).update(notes=notes.strip())
+                messages.success(
+                    request,
+                    f"Notes mises à jour pour {len(emplacements)} emplacement(s).",
+                )
+        elif action == 'delete':
+            if not request.user.is_admin:
+                raise PermissionDenied
+            eligible = []
+            blocked = []
+            linked_campaign_ids = set(
+                LigneCampagne.objects.filter(
+                    emplacement_id__in=selected_ids,
+                ).values_list('emplacement_id', flat=True)
+            )
+            for emplacement in emplacements:
+                if getattr(emplacement, 'support_installe', None):
+                    blocked.append(f"{emplacement.code} (panneau installé)")
+                elif emplacement.pk in linked_campaign_ids:
+                    blocked.append(f"{emplacement.code} (lié à une campagne)")
+                else:
+                    eligible.append(emplacement)
+
+            if eligible:
+                from django.db.models.deletion import ProtectedError
+                try:
+                    with transaction.atomic():
+                        Emplacement.objects.filter(
+                            marche=marche,
+                            pk__in=[emplacement.pk for emplacement in eligible],
+                        ).delete()
+                except ProtectedError:
+                    messages.error(
+                        request,
+                        "Suppression annulée : au moins un emplacement est encore "
+                        "utilisé par une campagne ou un support.",
+                    )
+                else:
+                    messages.success(
+                        request,
+                        f"{len(eligible)} emplacement(s) supprimé(s).",
+                    )
+            if blocked:
+                messages.warning(
+                    request,
+                    "Non supprimé(s) pour éviter de détacher un panneau ou de casser "
+                    "l'historique d'une campagne : " + ", ".join(blocked),
+                )
+            if not eligible and not blocked:
+                messages.warning(request, "Aucun emplacement n'a pu être supprimé.")
+        elif action == 'download':
+            if len(emplacements) > 50:
+                messages.error(
+                    request,
+                    "Téléchargez au maximum 50 rapports à la fois.",
+                )
+                return redirect('marche_detail', pk=marche.pk)
+
+            import io
+            import zipfile
+            from django.http import HttpResponse
+            from django.template.loader import render_to_string
+            from django.utils.text import slugify
+            from reports.views import HTML, _build_context_emplacement_detail
+
+            archive_buffer = io.BytesIO()
+            with zipfile.ZipFile(
+                archive_buffer,
+                mode='w',
+                compression=zipfile.ZIP_DEFLATED,
+            ) as archive:
+                for emplacement in emplacements:
+                    context = _build_context_emplacement_detail(
+                        emplacement,
+                        request=request,
+                    )
+                    html = render_to_string(
+                        'reports/emplacement_detail_pdf.html',
+                        context,
+                        request=request,
+                    )
+                    pdf = HTML(
+                        string=html,
+                        base_url=request.build_absolute_uri(),
+                    ).write_pdf()
+                    archive.writestr(
+                        f"rapport_emplacement_{slugify(emplacement.code) or 'emplacement'}_{emplacement.pk}.pdf",
+                        pdf,
+                    )
+
+            response = HttpResponse(
+                archive_buffer.getvalue(),
+                content_type='application/zip',
+            )
+            response['Content-Disposition'] = (
+                f'attachment; filename="rapports_{slugify(marche.nom) or marche.pk}.zip"'
+            )
+            return response
+        else:
+            messages.error(request, "Choisissez une action globale valide.")
+
+        return redirect('marche_detail', pk=marche.pk)
 
 
 class ApiMarchesGeojsonView(LoginRequiredMixin, View):
@@ -717,23 +907,46 @@ api_faces_support = ApiFacesSupportView.as_view()
 # views.py
 from django.http import JsonResponse
 from .models import Support
-import re
 
-def generer_prochain_code_emplacement(marche):
+
+def generer_prefixe_code_emplacement(marche):
+    """Construit un préfixe lisible à partir du nom du marché."""
+    nom_normalise = unicodedata.normalize('NFKD', marche.nom)
+    nom_ascii = ''.join(
+        caractere for caractere in nom_normalise
+        if not unicodedata.combining(caractere)
+    )
+    mots = re.findall(r'[A-Za-z0-9]+', nom_ascii.upper())
+    mots_ignores = {'DE', 'DU', 'DES', 'LA', 'LE', 'LES', 'D', 'L'}
+    prefixe = ''.join(
+        mot if any(caractere.isdigit() for caractere in mot) else mot[0]
+        for mot in mots
+        if mot not in mots_ignores
+    )
+    return prefixe[:10] or 'M'
+
+
+def prochain_numero_emplacement(prefixe, existing_codes):
+    pattern = re.compile(rf'^{re.escape(prefixe)}-(\d+)$', re.IGNORECASE)
+    numeros = [
+        int(match.group(1))
+        for code in existing_codes
+        if (match := pattern.match(code or ''))
+    ]
+    return max(numeros, default=0) + 1
+
+def generer_prochain_code_emplacement(marche, offset=0, existing_codes=None):
     """
-    Prochain code disponible pour un emplacement de ce marché, au format 'A-01'.
-    Cherche le plus grand numéro utilisé (peu importe la lettre de série) et incrémente.
-    Reste éditable par l'utilisateur : c'est juste une suggestion de départ.
+    Génère un code préfixé par les initiales du marché, par exemple 'GM-01'.
     """
-    existing = marche.emplacements.values_list('code', flat=True)
-    nums = []
-    pattern = re.compile(r'-(\d+)$')
-    for code in existing:
-        m = pattern.search(code or '')
-        if m:
-            nums.append(int(m.group(1)))
-    next_num = (max(nums) + 1) if nums else 1
-    return f"A-{str(next_num).zfill(2)}"
+    existing = (
+        list(existing_codes)
+        if existing_codes is not None
+        else list(marche.emplacements.values_list('code', flat=True))
+    )
+    prefixe = generer_prefixe_code_emplacement(marche)
+    numero = prochain_numero_emplacement(prefixe, existing) + offset
+    return f"{prefixe}-{numero:02d}"
 
 
 def emplacement_next_code(request, marche_pk):
@@ -856,6 +1069,7 @@ class SupportListView(TechnicienStaffRequiredMixin,SortableListMixin, ListView):
         queryset = Support.objects.prefetch_related('faces').select_related('ecran_info').all()
         q = self.request.GET.get('q', '')
         type_f = self.request.GET.get('type', '')
+        category_f = self.request.GET.get('categorie', '')
         etat_f = self.request.GET.get('etat', '')
         ville_f = self.request.GET.get('ville', '')
         occupation_f = self.request.GET.get('occupation', '')
@@ -865,7 +1079,10 @@ class SupportListView(TechnicienStaffRequiredMixin,SortableListMixin, ListView):
         # Filtre par format (code) — la valeur envoyée par le <select> est bien le code
         if type_panneau_f:
             fmt = FormatSupport.objects.filter(code=type_panneau_f).first()
-            if fmt and fmt.categorie == 'Ecran':
+            if (
+                category_f.casefold() == 'ecran'
+                or (fmt and fmt.categorie == 'Ecran')
+            ):
                 queryset = queryset.filter(ecran_info__cellule=type_panneau_f)
             else:
                 queryset = queryset.filter(format=type_panneau_f)
@@ -880,6 +1097,30 @@ class SupportListView(TechnicienStaffRequiredMixin,SortableListMixin, ListView):
             queryset = queryset.filter(type_support=type_f)
             if type_f == Support.TYPE_PANNEAU and type_panneau_f != '1x2':
                 queryset = queryset.exclude(format='1x2')
+
+        if category_f:
+            if category_f == 'Autre':
+                formats_categorie = FormatSupport.hors_ecran().filter(
+                    Q(categorie__isnull=True) | Q(categorie=''),
+                ).values('code')
+            elif category_f.casefold() == '12m2':
+                formats_categorie = FormatSupport.objects.filter(
+                    Q(categorie__iexact='Standard')
+                    | Q(categorie__iexact='12m2')
+                    | Q(categorie__iexact='12m²')
+                ).values('code')
+            else:
+                formats_categorie = FormatSupport.objects.filter(
+                    categorie__iexact=category_f,
+                ).values('code')
+
+            if category_f.casefold() == 'ecran':
+                queryset = queryset.filter(type_support=Support.TYPE_ECRAN)
+            else:
+                queryset = queryset.filter(
+                    type_support=Support.TYPE_PANNEAU,
+                    format__in=formats_categorie,
+                )
 
         if etat_f:
             queryset = queryset.filter(etat=etat_f)
@@ -908,39 +1149,92 @@ class SupportListView(TechnicienStaffRequiredMixin,SortableListMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         type_f = self.request.GET.get('type', '')
+        ville_f = self.request.GET.get('ville', '').strip()
+        category_f = self.request.GET.get('categorie', '')
+        support_scope = Support.objects.all()
+        if ville_f:
+            support_scope = support_scope.filter(ville__iexact=ville_f)
+        if type_f:
+            support_scope = support_scope.filter(type_support=type_f)
 
-        if type_f == Support.TYPE_ECRAN:
-            # Type = Écran → uniquement les formats catégorie "Ecran", affichés en Cellules
-            type_panneau_choices = [
-                (f.code, f"{f.dimensions} ({f.superficie} Cellules)" if f.superficie else f.dimensions)
-                for f in FormatSupport.filtre_par_categorie(['Ecran'])
-            ]
-        elif type_f == Support.TYPE_PANNEAU:
-            # Type = Panneau → tous les formats sauf "Ecran", affichés en m²
-            type_panneau_choices = [
-                (f.code, f"{f.dimensions} ({f.superficie}m²)" if f.superficie else f.dimensions)
-                for f in FormatSupport.hors_ecran()
-                if f.code != '1x2'
-            ]
-        else:
-            # Type vide → on affiche TOUT (panneaux + écrans confondus)
-            type_panneau_choices = [
-                (f.code, f"{f.dimensions} ({f.superficie} Cellules)" if f.categorie == 'Ecran' and f.superficie
-                else f"{f.dimensions} ({f.superficie}m²)" if f.superficie
-                else f.dimensions)
-                for f in FormatSupport.objects.exclude(categorie='')
-            ]
+        panel_format_codes = set(
+            support_scope.filter(type_support=Support.TYPE_PANNEAU)
+            .exclude(format='')
+            .values_list('format', flat=True)
+        )
+        screen_format_codes = set(
+            support_scope.filter(type_support=Support.TYPE_ECRAN)
+            .exclude(ecran_info__cellule='')
+            .values_list('ecran_info__cellule', flat=True)
+        )
+        available_format_codes = panel_format_codes | screen_format_codes
+        formats_by_code = {
+            format_support.code: format_support
+            for format_support in FormatSupport.objects.filter(code__in=available_format_codes)
+        }
 
-        type_panneau_choices = sorted(type_panneau_choices)
+        categories = {
+            format_support.categorie
+            for format_support in formats_by_code.values()
+            if format_support.categorie
+        }
+        if support_scope.filter(type_support=Support.TYPE_ECRAN).exists():
+            categories.add('Ecran')
+        if any(
+            not formats_by_code[code].categorie
+            for code in panel_format_codes
+            if code in formats_by_code
+        ):
+            categories.add('Autre')
+        category_choices = sorted(categories, key=str.casefold)
 
-        
-        villes = sorted({v.strip() for v in Support.objects.values_list('ville', flat=True) if v and v.strip()})
+        category_codes = available_format_codes
+        if category_f:
+            if category_f.casefold() == 'ecran':
+                category_codes = screen_format_codes
+            elif category_f == 'Autre':
+                category_codes = {
+                    code for code in panel_format_codes
+                    if code in formats_by_code and not formats_by_code[code].categorie
+                }
+            else:
+                category_codes = {
+                    code for code in available_format_codes
+                    if code in formats_by_code
+                    and (formats_by_code[code].categorie or '').casefold() == category_f.casefold()
+                }
+
+        type_panneau_choices = []
+        for code in sorted(
+            category_codes,
+            key=lambda value: format_sort_key(formats_by_code.get(value) or value),
+        ):
+            format_support = formats_by_code.get(code)
+            if not format_support:
+                if code in screen_format_codes:
+                    type_panneau_choices.append((code, code))
+                continue
+            is_screen_format = code in screen_format_codes and code not in panel_format_codes
+            unit = 'Cellules' if is_screen_format else 'm²'
+            label = (
+                f"{format_support.dimensions} ({format_support.superficie:g} {unit})"
+                if format_support.superficie
+                else format_support.dimensions
+            )
+            type_panneau_choices.append((code, label))
+
+        villes = sorted({
+            v.strip() for v in Support.objects.values_list('ville', flat=True)
+            if v and v.strip()
+        })
 
         context.update({
             'q': self.request.GET.get('q', ''),
             'type_f': type_f,
+            'ville_f': ville_f,
+            'category_f': category_f,
+            'category_choices': category_choices,
             'etat_f': self.request.GET.get('etat', ''),
-            'ville_f': self.request.GET.get('ville', ''),
             'occupation_f': self.request.GET.get('occupation', ''),
             'type_panneau_f': self.request.GET.get('type_panneau', ''),
             'type_panneau_choices': type_panneau_choices,

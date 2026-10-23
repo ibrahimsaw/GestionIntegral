@@ -1107,6 +1107,30 @@
       return true;
     }
 
+    function formatMeasure(label) {
+      const text = String(label || '');
+      const displayedMeasure = text.match(/\(([\d.,]+)\s*(?:m²|cellules?)/i);
+      if (displayedMeasure) return Number(displayedMeasure[1].replace(',', '.'));
+
+      const dimensions = text.match(/(\d+(?:[.,]\d+)?)\s*m?\s*[x×*]\s*(\d+(?:[.,]\d+)?)/i);
+      if (!dimensions) return null;
+      return Number(dimensions[1].replace(',', '.')) * Number(dimensions[2].replace(',', '.'));
+    }
+
+    function compareFormatLabels(first, second) {
+      const firstMeasure = formatMeasure(first);
+      const secondMeasure = formatMeasure(second);
+      if (firstMeasure === null && secondMeasure !== null) return 1;
+      if (firstMeasure !== null && secondMeasure === null) return -1;
+      if (firstMeasure !== null && secondMeasure !== null && firstMeasure !== secondMeasure) {
+        return firstMeasure - secondMeasure;
+      }
+      return String(first).localeCompare(String(second), undefined, {
+        numeric: true,
+        sensitivity: 'base',
+      });
+    }
+
     function refreshFacetSelects(prefix) {
       const elVille     = document.getElementById(prefix + 'ville');
       const elCategorie = document.getElementById(prefix + 'categorie');
@@ -1139,7 +1163,9 @@
         el.appendChild(placeholder);
 
         Array.from(values.entries())
-          .sort((a, b) => String(a[1]).localeCompare(String(b[1])))
+          .sort((a, b) => field === 'format'
+            ? compareFormatLabels(a[1], b[1])
+            : String(a[1]).localeCompare(String(b[1])))
           .forEach(([val, lbl]) => {
             const opt = document.createElement('option');
             opt.value = val; opt.textContent = lbl;
@@ -1226,7 +1252,7 @@
           <span class="count-badge">${totalVille} panneau${totalVille > 1 ? 'x' : ''}</span>
         </div>`;
 
-        Array.from(formats.keys()).sort().forEach(format => {
+        Array.from(formats.keys()).sort(compareFormatLabels).forEach(format => {
           const quartiers = formats.get(format);
           const totalFormat = Array.from(quartiers.values()).reduce((acc, arr) => acc + arr.length, 0);
 

@@ -8,7 +8,7 @@ from django.test import RequestFactory, SimpleTestCase, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
-from campaigns.forms import PreuveDiffusionForm
+from campaigns.forms import CampagneForm, PreuveDiffusionForm
 from campaigns.models import Campagne, Client, Contrat, LigneCampagne, PreuveDiffusion
 from campaigns.views import CampagneDetailView, DashboardView, FormatDetailView
 from piges.models import PigeFichier
@@ -55,6 +55,13 @@ class DashboardParcGroupingTests(TestCase):
                 code='DASH-MAR', categorie='Marché', dimensions='Marché',
             ),
         }
+
+    def test_campaign_form_accepts_support_category_without_specific_format(self):
+        form = CampagneForm()
+
+        self.assertEqual(form.fields['type_support'].clean('Géant'), 'Géant')
+        self.assertEqual(form.fields['type_support'].clean('Marché'), 'Marché')
+        self.assertEqual(form.fields['type_support'].clean('ecran'), 'ecran')
 
     def create_support(self, code, format_code, ville='Ouagadougou'):
         return Support.objects.create(

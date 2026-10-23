@@ -26,7 +26,7 @@ from campaigns.models import (
     STATUT_EN_ATTENTE,
     STATUT_CONFIRMEE,
 )
-from inventory.models import FacePanneau, Support
+from inventory.models import FacePanneau, FormatSupport, Support, format_sort_key
 
 from .forms import *
 
@@ -437,7 +437,10 @@ def _get_compteurs() -> dict:
         'total_faces_occupees_reseau': total_faces_reseau - total_faces_libres_reseau,
         'nb_villes': len(villes_stats),
         'nb_formats': len(formats_utilises),
-        'formats_utilises': sorted(formats_utilises),
+        'formats_utilises': sorted(
+            formats_utilises,
+            key=lambda code: format_sort_key(formats_map.get(code) or code),
+        ),
     }
 
 
@@ -688,7 +691,16 @@ class CatalogueView(View):
             .exclude(format='')
             .values('format')
             .annotate(nb_supports=Count('id', distinct=True))
-            .order_by('format')
+        )
+        format_sort_map = {
+            format_support.code: format_support
+            for format_support in FormatSupport.objects.all()
+        }
+        formats_raw = sorted(
+            formats_raw,
+            key=lambda row: format_sort_key(
+                format_sort_map.get(row['format']) or row['format']
+            ),
         )
 
         formats_data = []
@@ -814,8 +826,20 @@ class SupportsListeView(View):
         quartiers = sorted({v for v in Support.objects.filter(
             **({**filter_kwargs, **({'ville': ville} if ville else {})})
         ).values_list('quartier', flat=True) if v})
-        formats = sorted({v for v in Support.objects.filter(
-            **filter_kwargs).exclude(format='').values_list('format', flat=True) if v})
+        format_codes = {
+            value for value in Support.objects.filter(
+                **filter_kwargs,
+            ).exclude(format='').values_list('format', flat=True)
+            if value
+        }
+        format_sort_map = {
+            format_support.code: format_support
+            for format_support in FormatSupport.objects.filter(code__in=format_codes)
+        }
+        formats = sorted(
+            format_codes,
+            key=lambda code: format_sort_key(format_sort_map.get(code) or code),
+        )
 
         return render(request, self.template_name, {
             'page_obj':  page_obj,
@@ -1111,7 +1135,6 @@ from django.core.mail import send_mail
 from django.shortcuts import render, redirect, get_object_or_404
 from django.views import View
 
-from inventory.models import FacePanneau, Support, FormatSupport
 from campaigns.models import DemandeReservation
 from .forms import Etape1Form, Etape2Form, Etape3Form
 

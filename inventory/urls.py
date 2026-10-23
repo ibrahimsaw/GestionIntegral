@@ -40,6 +40,7 @@ urlpatterns = [
 
     # Emplacements (rattachés à un marché)
     path('marches/<int:marche_pk>/emplacements/ajouter/', EmplacementCreateView.as_view(), name='emplacement_create'),
+    path('marches/<int:marche_pk>/emplacements/actions/', EmplacementBulkActionView.as_view(), name='emplacement_bulk_action'),
     path('marches/<int:marche_pk>/emplacements/next-code/', emplacement_next_code, name='emplacement_next_code'),
     path('emplacements/<int:pk>/', EmplacementDetailView.as_view(), name='emplacement_detail'),
     path('emplacements/<int:pk>/modifier/', EmplacementUpdateView.as_view(), name='emplacement_update'),

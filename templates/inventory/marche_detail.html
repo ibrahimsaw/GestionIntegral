@@ -211,10 +211,40 @@
     </a>
     {% endif %}
   </div>
-  <div class="table-responsive">
+  <form method="post" action="{% url 'emplacement_bulk_action' marche.pk %}" id="emplacement-bulk-form">
+    {% csrf_token %}
+    {% if user.is_staff_regie_role and emplacements %}
+    <div class="d-flex flex-wrap align-items-center gap-2 px-3 py-3 border-bottom bg-light">
+      <label class="d-inline-flex align-items-center gap-2 small fw-semibold me-auto" for="select-all-emplacements">
+        <input type="checkbox" class="form-check-input m-0" id="select-all-emplacements">
+        Tout sélectionner
+      </label>
+      <span class="small text-muted" id="emplacement-selection-count" aria-live="polite">0 sélectionné</span>
+      <button type="button" class="btn btn-sm btn-outline-secondary bulk-action" data-action="edit_notes" disabled>
+        <i class="bi bi-pencil-square me-1"></i>Modifier les notes
+      </button>
+      <button type="submit" name="action" value="download" class="btn btn-sm btn-outline-primary bulk-action" disabled>
+        <i class="bi bi-file-earmark-zip me-1"></i>Télécharger les rapports
+      </button>
+      {% if user.is_admin %}
+      <button type="submit" name="action" value="delete" class="btn btn-sm btn-outline-danger bulk-action" data-confirm-delete disabled>
+        <i class="bi bi-trash me-1"></i>Supprimer
+      </button>
+      {% endif %}
+    </div>
+    <div id="bulk-notes-panel" class="px-3 py-3 border-bottom" hidden>
+      <label for="bulk-emplacement-notes" class="form-label fw-semibold small">Notes à appliquer aux emplacements sélectionnés</label>
+      <textarea id="bulk-emplacement-notes" name="notes" class="form-control mb-2" rows="3" placeholder="Laissez vide pour effacer les notes existantes."></textarea>
+      <button type="submit" name="action" value="edit_notes" class="btn btn-sm btn-primary">
+        <i class="bi bi-check2 me-1"></i>Appliquer aux emplacements cochés
+      </button>
+    </div>
+    {% endif %}
+    <div class="table-responsive">
     <table class="table marche-table table-hover mb-0 align-middle">
       <thead class="bg-light">
         <tr>
+          {% if user.is_staff_regie_role %}<th class="ps-3" style="width:44px;"></th>{% endif %}
           <th class="ps-4">Code</th>
           <th>Statut</th>
           <th>Support installé</th>
@@ -225,6 +255,11 @@
       <tbody>
         {% for e in emplacements %}
         <tr>
+          {% if user.is_staff_regie_role %}
+          <td class="ps-3">
+            <input type="checkbox" class="form-check-input emplacement-checkbox" name="selected_ids" value="{{ e.pk }}" aria-label="Sélectionner {{ e.code }}">
+          </td>
+          {% endif %}
           <td class="ps-4">
             <a href="{% url 'emplacement_detail' e.pk %}" class="text-decoration-none">
               <span class="font-monospace fw-bold text-primary">{{ e.code }}</span>
@@ -274,7 +309,7 @@
         </tr>
         {% empty %}
         <tr>
-          <td colspan="5" class="text-center py-5 text-muted">
+          <td colspan="{% if user.is_staff_regie_role %}6{% else %}5{% endif %}" class="text-center py-5 text-muted">
             <i class="bi bi-grid-3x3-gap d-block mb-2 fs-3 opacity-30"></i>
             Aucun emplacement enregistré pour ce marché.
             {% if user.is_staff_regie_role %}
@@ -290,6 +325,7 @@
       </tbody>
     </table>
   </div>
+  </form>
 </div>
 {# ═══════════════════════════════════════════ #}
 {# ── SECTION 3: EXPORTS & RAPPORTS DU MARCHÉ ── #}
@@ -321,6 +357,52 @@
 {% block extra_js %}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
+    const bulkForm = document.getElementById('emplacement-bulk-form');
+    if (bulkForm) {
+      const checkboxes = Array.from(bulkForm.querySelectorAll('.emplacement-checkbox'));
+      const selectAll = document.getElementById('select-all-emplacements');
+      const selectionCount = document.getElementById('emplacement-selection-count');
+      const notesPanel = document.getElementById('bulk-notes-panel');
+      const editNotesToggle = bulkForm.querySelector('[data-action="edit_notes"]');
+      const actionButtons = Array.from(bulkForm.querySelectorAll('.bulk-action'));
+
+      function updateBulkSelection() {
+        const selectedCount = checkboxes.filter((checkbox) => checkbox.checked).length;
+        selectionCount.textContent = `${selectedCount} sélectionné${selectedCount > 1 ? 's' : ''}`;
+        actionButtons.forEach((button) => {
+          button.disabled = selectedCount === 0;
+        });
+        selectAll.checked = selectedCount === checkboxes.length && selectedCount > 0;
+        selectAll.indeterminate = selectedCount > 0 && selectedCount < checkboxes.length;
+        if (selectedCount === 0 && notesPanel) notesPanel.hidden = true;
+      }
+
+      selectAll.addEventListener('change', function () {
+        checkboxes.forEach((checkbox) => {
+          checkbox.checked = selectAll.checked;
+        });
+        updateBulkSelection();
+      });
+      checkboxes.forEach((checkbox) => checkbox.addEventListener('change', updateBulkSelection));
+
+      if (editNotesToggle && notesPanel) {
+        editNotesToggle.addEventListener('click', function () {
+          notesPanel.hidden = !notesPanel.hidden;
+        });
+      }
+
+      bulkForm.addEventListener('submit', function (event) {
+        const submitter = event.submitter;
+        if (submitter && submitter.hasAttribute('data-confirm-delete')) {
+          const selectedCount = checkboxes.filter((checkbox) => checkbox.checked).length;
+          if (!window.confirm(`Supprimer les ${selectedCount} emplacements sélectionnés qui peuvent l'être ?`)) {
+            event.preventDefault();
+          }
+        }
+      });
+      updateBulkSelection();
+    }
+
     const refLat = {{ marche.latitude|unlocalize|default:"12.3714" }};
     const refLng = {{ marche.longitude|unlocalize|default:"-1.5197" }};
     const rayon  = {{ marche.rayon_metres|unlocalize|default:"100" }};
@@ -351,4 +433,3 @@ document.addEventListener('DOMContentLoaded', function () {
 });
 </script>
 {% endblock %}
-

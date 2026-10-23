@@ -102,7 +102,8 @@
           <div class="card-body p-4">
             <div class="row g-4">
 
-              {# Champ Code #}
+              {% if object %}
+              {# Champ Code pour la modification d'un emplacement existant #}
               <div class="col-12">
                 <div class="d-flex justify-content-between align-items-center mb-1">
                   <label class="form-label mb-0" for="{{ form.code.id_for_label }}" style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#475569;">
@@ -153,6 +154,33 @@
                   </span>
                 </div>
               </div>
+              {% else %}
+              <div class="col-12">
+                <label class="form-label" for="{{ form.nombre.id_for_label }}" style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#475569;">
+                  {{ form.nombre.label }} <span class="text-danger">*</span>
+                </label>
+                {{ form.nombre }}
+                {% if form.nombre.help_text %}
+                  <div class="form-text">{{ form.nombre.help_text }}</div>
+                {% endif %}
+                {% for error in form.nombre.errors %}
+                  <div class="text-danger fw-semibold mt-1" style="font-size:0.75rem;">{{ error }}</div>
+                {% endfor %}
+                <div class="form-text text-muted mt-1" style="font-size:0.75rem;">
+                  Les codes reprennent les initiales du marché (ex. GM-01) et continuent après le dernier numéro utilisé.
+                </div>
+                <div id="codes-preview" class="mt-3 p-3 rounded border bg-light"
+                     data-prefix="{{ code_prefix }}"
+                     data-start="{{ code_start }}"
+                     aria-live="polite"
+                     hidden>
+                  <div class="fw-semibold mb-2" style="font-size:0.82rem;">
+                    <i class="bi bi-eye me-1"></i>Emplacements qui seront créés
+                  </div>
+                  <div id="codes-preview-list" class="d-flex flex-wrap gap-2"></div>
+                </div>
+              </div>
+              {% endif %}
 
               {# Champ Notes & Repérage #}
               <div class="col-12">
@@ -188,7 +216,7 @@
             
             <button type="submit" class="btn btn-primary px-4 shadow-sm d-flex align-items-center gap-2" style="border-radius:8px;font-size:0.83rem;font-weight:700;">
               <i class="bi bi-cloud-arrow-up-fill"></i>
-              <span>{% if object %}Enregistrer les modifications{% else %}Créer l'emplacement{% endif %}</span>
+              <span>{% if object %}Enregistrer les modifications{% else %}Créer les emplacements{% endif %}</span>
             </button>
           </div>
         </div>
@@ -305,6 +333,9 @@ document.addEventListener('DOMContentLoaded', function () {
   const livePreview = document.getElementById('live-code-preview');
   const btnRefresh = document.getElementById('btn-refresh-code');
   const marcheNom = "{{ marche.nom|escapejs }}";
+  const countInput = document.getElementById('id_nombre');
+  const codesPreview = document.getElementById('codes-preview');
+  const codesPreviewList = document.getElementById('codes-preview-list');
 
   // Configuration Bootstrap des champs
   if (codeInput) {
@@ -323,6 +354,33 @@ document.addEventListener('DOMContentLoaded', function () {
     notesInput.placeholder = 'Ex: Angle nord, face à l\'entrée principale des piétons, stand n° 12...';
   }
 
+  if (countInput && codesPreview && codesPreviewList) {
+    const prefix = codesPreview.dataset.prefix;
+    const firstNumber = Number(codesPreview.dataset.start);
+
+    function updateCodesPreview() {
+      const count = Number(countInput.value);
+      codesPreviewList.replaceChildren();
+      if (!Number.isInteger(count) || count < 1 || count > 500) {
+        codesPreview.hidden = true;
+        return;
+      }
+
+      const fragment = document.createDocumentFragment();
+      for (let offset = 0; offset < count; offset += 1) {
+        const code = document.createElement('span');
+        code.className = 'badge bg-white text-dark border font-monospace';
+        code.textContent = `${prefix}-${String(firstNumber + offset).padStart(2, '0')}`;
+        fragment.appendChild(code);
+      }
+      codesPreviewList.appendChild(fragment);
+      codesPreview.hidden = false;
+    }
+
+    countInput.addEventListener('input', updateCodesPreview);
+    updateCodesPreview();
+  }
+
   // Live preview update
   function updateLivePreview() {
     if (codeInput && livePreview) {
@@ -336,35 +394,6 @@ document.addEventListener('DOMContentLoaded', function () {
     updateLivePreview();
   }
 
-  // Générateur de prochain code
-  function fetchNextCode() {
-    fetch("{% url 'emplacement_next_code' marche.pk %}")
-      .then(r => r.json())
-      .then(data => {
-        if (data && data.code && codeInput) {
-          codeInput.value = data.code;
-          updateLivePreview();
-          // Feedback visuel doux
-          codeInput.style.borderColor = 'var(--color-primary)';
-          setTimeout(() => { codeInput.style.borderColor = ''; }, 1000);
-        }
-      })
-      .catch(() => {});
-  }
-
-  {% if not object %}
-  // Auto-fetch si vide au chargement
-  if (codeInput && !codeInput.value) {
-    fetchNextCode();
-  }
-  {% endif %}
-
-  if (btnRefresh) {
-    btnRefresh.addEventListener('click', function(e) {
-      e.preventDefault();
-      fetchNextCode();
-    });
-  }
 });
 </script>
 {% endblock %}

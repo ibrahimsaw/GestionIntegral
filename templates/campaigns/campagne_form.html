@@ -411,7 +411,7 @@
               <div class="row g-3">
                 
                 <!-- Catégorie -->
-                <div class="col-md-6" id="col-categorie">
+                <div class="col-md-12" id="col-categorie">
                   <label class="form-label" for="id_categorie_support">
                     Catégorie de Support
                   </label>
@@ -427,22 +427,7 @@
                       {% endfor %}
                     </select>
                   </div>
-                </div>
-
-                <!-- Format -->
-                <div class="col-md-6" id="col-format">
-                  <label class="form-label" for="id_format_support">
-                    Format spécifique
-                  </label>
-                  <div class="input-group">
-                    <span class="input-group-text">
-                      <i class="bi bi-aspect-ratio"></i>
-                    </span>
-                    <select id="id_format_support" class="form-select" disabled>
-                      <option value="">---------</option>
-                    </select>
-                  </div>
-                  <div class="form-text small text-muted" id="format-help">Choisissez d'abord une catégorie.</div>
+                  <div class="form-text small text-muted">La catégorie choisie définira les supports proposés à la réservation.</div>
                   <div style="display:none">{{ form.type_support }}</div>
                   {% if form.type_support.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.type_support.errors }}</div>{% endif %}
                 </div>
@@ -791,65 +776,23 @@ document.addEventListener('DOMContentLoaded', function () {
 
     const typeSupport = document.getElementById('id_type_support');
     const categorieSelect = document.getElementById('id_categorie_support');
-    const formatSelect = document.getElementById('id_format_support');
-    const formatHelp = document.getElementById('format-help');
     const FORMATS_PAR_CATEGORIE = JSON.parse(document.getElementById('formats-par-categorie').textContent);
-
-    /* =========================
-       CASCADE CATÉGORIE → FORMAT
-    ========================= */
-    function remplirFormats(categorie, preselect) {
-        formatSelect.innerHTML = '';
-        const colFormat = document.getElementById('col-format');
-
-        if (!categorie || categorie === 'ecran') {
-            colFormat.style.display = '';
-            formatSelect.disabled = true;
-            formatSelect.innerHTML = '<option value="">---------</option>';
-            formatHelp.textContent = categorie === 'ecran' ? 'Écran : aucun format à choisir.' : "Choisissez d'abord une catégorie.";
-            return;
-        }
-
-        const formats = FORMATS_PAR_CATEGORIE[categorie] || [];
-
-        if (formats.length === 1) {
-            typeSupport.value = formats[0].code;
-            colFormat.style.display = 'none';
-            formatSelect.disabled = true;
-            formatSelect.innerHTML = `<option value="${formats[0].code}" selected>${formats[0].label}</option>`;
-            return;
-        }
-
-        colFormat.style.display = '';
-        formatSelect.disabled = false;
-        formatSelect.appendChild(new Option('---------', ''));
-        formats.forEach(f => {
-            const opt = new Option(f.label, f.code);
-            if (preselect && f.code === preselect) opt.selected = true;
-            formatSelect.appendChild(opt);
-        });
-        formatHelp.textContent = `${formats.length} format(s) disponible(s) dans cette catégorie`;
-    }
 
     function onCategorieChange() {
         const cat = categorieSelect.value;
-        if (cat === 'ecran') {
-            typeSupport.value = 'ecran';
-            remplirFormats('ecran');
-        } else {
-            typeSupport.value = '';
-            remplirFormats(cat);
-        }
-        typeSupport.dispatchEvent(new Event('change'));
-    }
-
-    function onFormatChange() {
-        typeSupport.value = formatSelect.value;
+        const formats = FORMATS_PAR_CATEGORIE[cat] || [];
+        const marcheFormat = formats.find(format => format.code === 'marche');
+        typeSupport.value = cat === 'ecran'
+            ? 'ecran'
+            : marcheFormat
+                ? marcheFormat.code
+                : formats.length === 1
+                    ? formats[0].code
+                    : cat;
         typeSupport.dispatchEvent(new Event('change'));
     }
 
     if (categorieSelect) categorieSelect.addEventListener('change', onCategorieChange);
-    if (formatSelect) formatSelect.addEventListener('change', onFormatChange);
 
     // Pré-remplissage en modification
     (function initCascadeFromValue() {
@@ -858,13 +801,11 @@ document.addEventListener('DOMContentLoaded', function () {
         if (!valeurActuelle) return;
         if (valeurActuelle === 'ecran') {
             if (categorieSelect) categorieSelect.value = 'ecran';
-            remplirFormats('ecran');
             return;
         }
         for (const [cat, formats] of Object.entries(FORMATS_PAR_CATEGORIE)) {
-            if (formats.some(f => f.code === valeurActuelle)) {
+            if (cat === valeurActuelle || formats.some(f => f.code === valeurActuelle)) {
                 if (categorieSelect) categorieSelect.value = cat;
-                remplirFormats(cat, valeurActuelle);
                 return;
             }
         }
@@ -918,17 +859,13 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (typeSupport) {
             const colCat = document.getElementById('col-categorie');
-            const colFmt = document.getElementById('col-format');
             if (isMere) {
                 if (colCat) colCat.style.display = 'none';
-                if (colFmt) colFmt.style.display = 'none';
                 typeSupport.value = '';
                 typeSupport.disabled = true;
                 if (categorieSelect) categorieSelect.value = '';
-                if (formatSelect) { formatSelect.innerHTML = '<option value="">---------</option>'; formatSelect.disabled = true; }
             } else {
                 if (colCat) colCat.style.display = '';
-                if (colFmt) colFmt.style.display = '';
                 typeSupport.disabled = false;
             }
         }

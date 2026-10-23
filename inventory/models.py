@@ -2,6 +2,7 @@ from django.db import models
 from django.utils import timezone
 from django.conf import settings
 from django.core.exceptions import ValidationError
+import re
 from datetime import datetime, timedelta
 from datetime import datetime
 from typing import Optional
@@ -96,17 +97,53 @@ class FormatSupport(models.Model):
     def filtre_par_categorie(cls, categories):
         return cls.objects.filter(categorie__in=categories)
 
+
+def format_sort_key(format_support):
+    """Tri croissant par superficie/cellules, puis code, avec les formats sans mesure à la fin."""
+    if isinstance(format_support, str):
+        code = format_support
+        dimensions = ''
+        mesure = None
+    else:
+        code = format_support.code
+        dimensions = format_support.dimensions or ''
+        mesure = format_support.superficie
+
+    if mesure is None:
+        texte = dimensions or code
+        match = re.search(
+            r'(\d+(?:[.,]\d+)?)\s*m?\s*[x×*]\s*(\d+(?:[.,]\d+)?)',
+            texte,
+            re.IGNORECASE,
+        )
+        if match:
+            mesure = (
+                float(match.group(1).replace(',', '.'))
+                * float(match.group(2).replace(',', '.'))
+            )
+
+    return (
+        mesure is None,
+        mesure if mesure is not None else 0,
+        code.casefold(),
+    )
+
+
+def formats_croissants(formats):
+    return sorted(formats, key=format_sort_key)
+
+
 def get_dynamic_format_choices():
     return [
         (f.code, f"{f.dimensions} ({f.superficie:g}m²)" if f.superficie else f.dimensions)
-        for f in FormatSupport.hors_ecran()
+        for f in formats_croissants(FormatSupport.hors_ecran())
     ]
 
 def get_dynamic_format_choices_ecran():
     # categories different de Ecran
     return [
         (f.code, f"{f.dimensions} ({f.superficie} Cellules)" if f.superficie else f.dimensions)
-        for f in FormatSupport.filtre_par_categorie(['Ecran'])
+        for f in formats_croissants(FormatSupport.filtre_par_categorie(['Ecran']))
     ]
 
 
@@ -339,7 +376,10 @@ class Support(models.Model):
     )
 
     def get_dynamic_format_choices():
-        return [(f.code, f"{f.dimensions} ({f.superficie}m²)") for f in FormatSupport.objects.all()]
+        return [
+            (f.code, f"{f.dimensions} ({f.superficie}m²)")
+            for f in formats_croissants(FormatSupport.objects.all())
+        ]
     class Meta:
         verbose_name = "Support Publicitaire"
         verbose_name_plural = "Supports Publicitaires"

@@ -20,7 +20,10 @@ from accounts.models import AuditLog
 from accounts.decorators import *
 from accounts.audit import log_action
 from .models import *
-from inventory.models import Support, FacePanneau, EcranNumerique, FormatSupport, Emplacement, Marche
+from inventory.models import (
+    Support, FacePanneau, EcranNumerique, FormatSupport, Emplacement, Marche,
+    format_sort_key, formats_croissants,
+)
 from .forms import (
     ClientForm,
     ContratForm,
@@ -482,8 +485,13 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
         # ── Formats groupés par catégorie (1 requête) ──
         format_categories_codes = {}
-        for row in FormatSupport.objects.exclude(categorie='').values('categorie', 'code').order_by('categorie', 'code'):
-            format_categories_codes.setdefault(row['categorie'], []).append(row['code'])
+        for format_support in formats_croissants(
+            FormatSupport.objects.exclude(categorie='')
+        ):
+            format_categories_codes.setdefault(
+                format_support.categorie,
+                [],
+            ).append(format_support.code)
 
         # ── Querysets de base ──
         supports = Support.objects.all()
@@ -832,7 +840,9 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
     def _build_format_stats(self, ville_active, faces_occupees_ids, faces_reservees_ids):
         """Construit les indicateurs pour chaque format individuel du parc."""
-        formats = list(FormatSupport.objects.exclude(categorie__iexact='Ecran').order_by('categorie', 'code'))
+        formats = formats_croissants(
+            FormatSupport.objects.exclude(categorie__iexact='Ecran')
+        )
         if not formats:
             return []
 
@@ -912,8 +922,11 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 'nb_faces_panne': face_counts.get('panne', 0),
                 'taux': round(nb_occupe / nb_faces * 100) if nb_faces else 0,
             })
-        # Dans chaque catégorie : du plus petit au plus grand (superficie), sans superficie en fin de liste
-        stats.sort(key=lambda s: (s['categorie'], s['superficie'] is None, s['superficie'] or 0, s['code']))
+        formats_by_code = {format_support.code: format_support for format_support in formats}
+        stats.sort(key=lambda stat: (
+            stat['categorie'].casefold(),
+            format_sort_key(formats_by_code.get(stat['code']) or stat['code']),
+        ))
         return stats
 
     def _build_format_category_stats(self, format_categories_codes, ville_active, faces_occupees_ids, faces_reservees_ids):
@@ -1021,7 +1034,9 @@ class FormatDetailView(LoginRequiredMixin, TemplateView):
 
         tous_geants = code == 'geant'
         if tous_geants:
-            formats = list(FormatSupport.objects.filter(categorie='Géant'))
+            formats = formats_croissants(
+                FormatSupport.objects.filter(categorie='Géant')
+            )
             format_support = {'categorie': 'Géant', 'dimensions': '', 'code': 'geant'}
             supports_qs = Support.objects.filter(
                 type_support=Support.TYPE_PANNEAU,
@@ -2387,14 +2402,17 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
         # Regroupement des formats de panneaux par catégorie (Standard, Géant, Sucette, Marché...),
         # pour le sélecteur en cascade Catégorie → Format dans campagne_form.html.
         formats_par_categorie = {}
-        for f in FormatSupport.hors_ecran().order_by('categorie', 'code'):
+        for f in formats_croissants(FormatSupport.hors_ecran()):
             cat = f.categorie or 'Autre'
             formats_par_categorie.setdefault(cat, []).append({
                 'code': f.code,
                 'label': f"{f.dimensions} ({f.superficie:g}m²)" if f.superficie else f.dimensions,
             })
         context['formats_par_categorie'] = formats_par_categorie
-        context['categories_format'] = list(formats_par_categorie.keys())
+        context['categories_format'] = sorted(
+            formats_par_categorie,
+            key=str.casefold,
+        )
         return context
     # def get(self, request, *args, **kwargs):
     #     self.object = self.get_object()
@@ -2709,6 +2727,25 @@ class SupportBulkActionView(StaffRequiredMixin, View):
             if type_support == Support.TYPE_PANNEAU:
                 supports_qs = Support.objects.filter(
                     type_support=Support.TYPE_PANNEAU,
+                    etat='bon',
+                )
+            elif type_support == 'Autre':
+                formats_categorie = FormatSupport.hors_ecran().filter(
+                    Q(categorie__isnull=True) | Q(categorie=''),
+                ).values('code')
+                if formats_categorie.exists():
+                    supports_qs = Support.objects.filter(
+                        type_support=Support.TYPE_PANNEAU,
+                        format__in=formats_categorie,
+                        etat='bon',
+                    )
+            elif FormatSupport.hors_ecran().filter(categorie__iexact=type_support).exists():
+                formats_categorie = FormatSupport.hors_ecran().filter(
+                    categorie__iexact=type_support,
+                ).values('code')
+                supports_qs = Support.objects.filter(
+                    type_support=Support.TYPE_PANNEAU,
+                    format__in=formats_categorie,
                     etat='bon',
                 )
             elif not FormatSupport.objects.filter(code=type_support).exists():
@@ -3053,6 +3090,17 @@ class ReservationCreateView(StaffRequiredMixin, View):
             for code in codes_uniques
             if code in format_choices_map
         ))
+        format_sort_map = {
+            format_support.code: format_support
+            for format_support in FormatSupport.objects.filter(
+                code__in=[code for code, _ in type_panneau_choices]
+            )
+        }
+        type_panneau_choices.sort(
+            key=lambda choice: format_sort_key(
+                format_sort_map.get(choice[0]) or choice[0]
+            )
+        )
         print("type_panneau_choices:", type_panneau_choices)
 
         return render(request, self.template_name, {
@@ -3237,6 +3285,17 @@ class ReservationUpdateView(StaffRequiredMixin, View):
             for code in codes_uniques
             if code in format_choices_map
         ))
+        format_sort_map = {
+            format_support.code: format_support
+            for format_support in FormatSupport.objects.filter(
+                code__in=[code for code, _ in type_panneau_choices]
+            )
+        }
+        type_panneau_choices.sort(
+            key=lambda choice: format_sort_key(
+                format_sort_map.get(choice[0]) or choice[0]
+            )
+        )
         print("type_panneau_choices:", type_panneau_choices)
         # Faces déjà dans cette réservation
         selectionnes = list(

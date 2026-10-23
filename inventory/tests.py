@@ -1,9 +1,19 @@
+import io
+import zipfile
+from django.contrib.auth.models import AnonymousUser
+from django.contrib.auth import get_user_model
 from django.template.loader import render_to_string
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
+from unittest.mock import patch
 
-from inventory.models import FormatSupport, Support
-from inventory.views import FormatSupportDetailView, FormatSupportListView
+from inventory.models import Emplacement, EcranNumerique, FormatSupport, Marche, Support
+from inventory.views import (
+    FormatSupportDetailView,
+    FormatSupportListView,
+    SupportListView,
+)
+from geoad.context_processors import inventory_villes
 
 
 class FormatSupportDetailViewTests(TestCase):
@@ -91,3 +101,589 @@ class FormatSupportDetailViewTests(TestCase):
         self.assertEqual(context['page_obj'].number, 2)
         self.assertIn('21 format', rendered)
         self.assertIn('Page 2 / 2', rendered)
+
+    def test_format_list_is_sorted_by_measure_then_code(self):
+        formats = [
+            ('SORT-LARGE', '8m × 6m', 48),
+            ('SORT-SMALL', '1m × 2m', 2),
+            ('SORT-MIDDLE', '4m × 3m', 12),
+            ('SORT-DERIVED', '9m × 5m', None),
+            ('SORT-UNKNOWN', 'Personnalisé', None),
+        ]
+        for code, dimensions, superficie in formats:
+            FormatSupport.objects.create(
+                code=code,
+                dimensions=dimensions,
+                superficie=superficie,
+                categorie='Standard',
+            )
+
+        view = FormatSupportListView()
+        view.setup(RequestFactory().get(
+            reverse('format_list'),
+            {'sort': 'code', 'dir': 'desc'},
+        ))
+
+        self.assertEqual(
+            [format_support.code for format_support in view.get_queryset()],
+            [
+                'SORT-SMALL',
+                'SORT-MIDDLE',
+                'SORT-DERIVED',
+                'SORT-LARGE',
+                'SORT-UNKNOWN',
+            ],
+        )
+
+
+class SupportListCategoryFilterTests(TestCase):
+    def setUp(self):
+        self.geant_format = FormatSupport.objects.create(
+            code='FILTER-GEANT',
+            dimensions='8m × 6m',
+            categorie='Géant',
+        )
+        self.sucette_format = FormatSupport.objects.create(
+            code='FILTER-SUCETTE',
+            dimensions='1m × 2m',
+            categorie='Sucette',
+        )
+        self.screen_format = FormatSupport.objects.create(
+            code='FILTER-ECRAN',
+            dimensions='6 × 4',
+            categorie='Ecran',
+        )
+        self.geant = Support.objects.create(
+            code='FILTER-PANEL-GEANT',
+            nom='Panneau géant',
+            type_support=Support.TYPE_PANNEAU,
+            format=self.geant_format.code,
+            latitude=12.34,
+            longitude=-1.52,
+        )
+        self.sucette = Support.objects.create(
+            code='FILTER-PANEL-SUCETTE',
+            nom='Panneau sucette',
+            type_support=Support.TYPE_PANNEAU,
+            format=self.sucette_format.code,
+            latitude=12.34,
+            longitude=-1.52,
+            ville='Bobo-Dioulasso',
+        )
+        self.screen = Support.objects.create(
+            code='FILTER-SCREEN',
+            nom='Écran numérique',
+            type_support=Support.TYPE_ECRAN,
+            latitude=12.34,
+            longitude=-1.52,
+        )
+        EcranNumerique.objects.create(
+            support=self.screen,
+            cellule=self.screen_format.code,
+        )
+
+    def get_view(self, query):
+        request = RequestFactory().get(reverse('support_list'), query)
+        view = SupportListView()
+        view.setup(request)
+        return view
+
+    def test_category_filter_returns_supports_of_selected_category(self):
+        view = self.get_view({'categorie': 'Géant'})
+
+        self.assertEqual(list(view.get_queryset()), [self.geant])
+
+    def test_12m2_menu_category_matches_standard_formats(self):
+        standard_format = FormatSupport.objects.create(
+            code='FILTER-STANDARD',
+            dimensions='4m × 3m',
+            superficie=12,
+            categorie='Standard',
+        )
+        standard = Support.objects.create(
+            code='FILTER-PANEL-STANDARD',
+            nom='Panneau standard',
+            type_support=Support.TYPE_PANNEAU,
+            format=standard_format.code,
+            latitude=12.34,
+            longitude=-1.52,
+        )
+
+        view = self.get_view({'categorie': '12m2'})
+
+        self.assertEqual(list(view.get_queryset()), [standard])
+
+    def test_screen_category_filters_by_screen_cell_format(self):
+        legacy_screen = Support.objects.create(
+            code='FILTER-SCREEN-LEGACY',
+            nom='Écran sans fiche technique',
+            type_support=Support.TYPE_ECRAN,
+            latitude=12.34,
+            longitude=-1.52,
+        )
+        view = self.get_view({'categorie': 'Ecran'})
+
+        self.assertEqual(set(view.get_queryset()), {self.screen, legacy_screen})
+
+    def test_unknown_screen_cell_format_remains_filterable(self):
+        screen = Support.objects.create(
+            code='FILTER-SCREEN-UNKNOWN',
+            nom='Écran format non catalogué',
+            type_support=Support.TYPE_ECRAN,
+            latitude=12.34,
+            longitude=-1.52,
+        )
+        EcranNumerique.objects.create(support=screen, cellule='9x5')
+
+        view = self.get_view({
+            'categorie': 'Ecran',
+            'type_panneau': '9x5',
+        })
+        context = view.get_context_data(object_list=view.get_queryset())
+
+        self.assertEqual(list(view.get_queryset()), [screen])
+        self.assertIn(('9x5', '9x5'), context['type_panneau_choices'])
+
+    def test_categories_and_formats_are_limited_to_selected_city(self):
+        view = self.get_view({
+            'ville': 'Bobo-Dioulasso',
+            'categorie': 'Sucette',
+        })
+        context = view.get_context_data(object_list=view.get_queryset())
+
+        self.assertEqual(context['category_choices'], ['Sucette'])
+        self.assertEqual(
+            context['type_panneau_choices'],
+            [('FILTER-SUCETTE', '1m × 2m')],
+        )
+        self.assertEqual(list(view.get_queryset()), [self.sucette])
+
+    def test_category_choices_and_formats_are_exposed_to_filter(self):
+        view = self.get_view({'categorie': 'Géant'})
+        queryset = view.get_queryset()
+        context = view.get_context_data(object_list=queryset)
+        view.request.user = AnonymousUser()
+        rendered = render_to_string(
+            view.template_name,
+            context,
+            request=view.request,
+        )
+
+        self.assertIn('Géant', context['category_choices'])
+        self.assertEqual(context['category_f'], 'Géant')
+        self.assertEqual(
+            context['type_panneau_choices'],
+            [('FILTER-GEANT', '8m × 6m')],
+        )
+        self.assertIn('name="categorie"', rendered)
+        self.assertIn('<option value="Géant" selected>Géant</option>', rendered)
+        self.assertNotIn('Tous les types', rendered)
+
+
+class InventoryNavigationTests(TestCase):
+    def test_menu_keeps_standard_and_giant_by_city_and_globalizes_sucette_screen(self):
+        geant_format = FormatSupport.objects.create(
+            code='MENU-GEANT',
+            dimensions='8m × 6m',
+            superficie=48,
+            categorie='Géant',
+        )
+        standard_format = FormatSupport.objects.create(
+            code='MENU-STANDARD',
+            dimensions='4m × 3m',
+            superficie=12,
+            categorie='Standard',
+        )
+        sucette_format = FormatSupport.objects.create(
+            code='MENU-SUCETTE',
+            dimensions='1m × 2m',
+            superficie=2,
+            categorie='Sucette',
+        )
+        Support.objects.create(
+            code='MENU-PANEL-GEANT',
+            nom='Panneau géant',
+            type_support=Support.TYPE_PANNEAU,
+            format=geant_format.code,
+            latitude=12.34,
+            longitude=-1.52,
+            ville='Ouagadougou',
+        )
+        Support.objects.create(
+            code='MENU-PANEL-STANDARD',
+            nom='Panneau standard',
+            type_support=Support.TYPE_PANNEAU,
+            format=standard_format.code,
+            latitude=12.34,
+            longitude=-1.52,
+            ville='Ouagadougou',
+        )
+        Support.objects.create(
+            code='MENU-PANEL-SUCETTE',
+            nom='Panneau sucette',
+            type_support=Support.TYPE_PANNEAU,
+            format=sucette_format.code,
+            latitude=12.34,
+            longitude=-1.52,
+            ville='Bobo-Dioulasso',
+        )
+        for number in range(3):
+            Support.objects.create(
+                code=f'MENU-PANEL-BOBO-{number}',
+                nom=f'Panneau géant {number}',
+                type_support=Support.TYPE_PANNEAU,
+                format=geant_format.code,
+                latitude=12.34,
+                longitude=-1.52,
+                ville='Bobo-Dioulasso',
+            )
+        screen_format = FormatSupport.objects.create(
+            code='MENU-ECRAN',
+            dimensions='6 × 4',
+            categorie='Ecran',
+        )
+        smaller_screen_format = FormatSupport.objects.create(
+            code='MENU-ECRAN-2',
+            dimensions='2 × 1',
+            superficie=2,
+            categorie='Ecran',
+        )
+        screen = Support.objects.create(
+            code='MENU-SCREEN',
+            nom='Écran de Ouagadougou',
+            type_support=Support.TYPE_ECRAN,
+            latitude=12.34,
+            longitude=-1.52,
+            ville='Ouagadougou',
+        )
+        EcranNumerique.objects.create(support=screen, cellule=screen_format.code)
+        smaller_screen = Support.objects.create(
+            code='MENU-SCREEN-2',
+            nom='Petit écran de Ouagadougou',
+            type_support=Support.TYPE_ECRAN,
+            latitude=12.34,
+            longitude=-1.52,
+            ville='Ouagadougou',
+        )
+        EcranNumerique.objects.create(
+            support=smaller_screen,
+            cellule=smaller_screen_format.code,
+        )
+
+        navigation = inventory_villes(RequestFactory().get('/'))
+        self.assertEqual(
+            [city['ville'] for city in navigation['inventory_categories']],
+            ['Bobo-Dioulasso', 'Ouagadougou'],
+        )
+        self.assertEqual(
+            [city['support_count'] for city in navigation['inventory_categories']],
+            [3, 2],
+        )
+        ouagadougou = next(
+            city for city in navigation['inventory_categories']
+            if city['ville'] == 'Ouagadougou'
+        )
+        categories = {
+            category['label']: category['formats']
+            for category in ouagadougou['categories']
+        }
+
+        self.assertEqual(set(categories), {'12m2', 'Géant'})
+        self.assertEqual(
+            categories['12m2'],
+            [{'code': 'MENU-STANDARD', 'label': '4m × 3m (12 m²)'}],
+        )
+        self.assertEqual(
+            categories['Géant'],
+            [{'code': 'MENU-GEANT', 'label': '8m × 6m (48 m²)'}],
+        )
+        global_categories = {
+            category['label']: category['formats']
+            for category in navigation['inventory_global_categories']
+        }
+        self.assertEqual(
+            global_categories['Ecran'],
+            [
+                {'code': 'MENU-ECRAN-2', 'label': '2 × 1 (2 Cellules)'},
+                {'code': 'MENU-ECRAN', 'label': '6 × 4'},
+            ],
+        )
+        self.assertEqual(
+            global_categories['Sucette'],
+            [{'code': 'MENU-SUCETTE', 'label': '1m × 2m (2 m²)'}],
+        )
+
+        request = RequestFactory().get(
+            reverse('support_list'),
+            {'ville': 'Ouagadougou', 'categorie': 'Géant'},
+        )
+        request.user = get_user_model().objects.create_user(
+            username='inventory-menu-test',
+            password='test-password',
+        )
+        rendered_menu = render_to_string('base.html', {}, request=request)
+
+        self.assertNotIn('Tous les supports de la ville', rendered_menu)
+        self.assertIn(
+            '?ville=Ouagadougou&categorie=G%C3%A9ant&type_panneau=MENU-GEANT&desactif=ville',
+            rendered_menu,
+        )
+        self.assertIn(
+            '?ville=Ouagadougou&categorie=12m2&type_panneau=MENU-STANDARD&desactif=ville',
+            rendered_menu,
+        )
+        self.assertIn(
+            '12m2 · 4m × 3m (12 m²)',
+            rendered_menu,
+        )
+        self.assertNotIn(
+            '<span class="nav-submenu-label">12m2</span>',
+            rendered_menu,
+        )
+        self.assertIn(
+            '?categorie=Ecran&type_panneau=MENU-ECRAN',
+            rendered_menu,
+        )
+        self.assertNotIn(
+            '?ville=Bobo-Dioulasso&categorie=G%C3%A9ant&type_panneau=MENU-SUCETTE',
+            rendered_menu,
+        )
+        self.assertNotIn(
+            '?ville=Ouagadougou&categorie=Ecran',
+            rendered_menu,
+        )
+
+
+class EmplacementBulkCreateTests(TestCase):
+    def setUp(self):
+        self.marche = Marche.objects.create(nom='Grand Marché')
+        self.user = get_user_model().objects.create_user(
+            username='emplacement-bulk-staff',
+            password='test-password',
+            role='staff',
+        )
+        self.client.force_login(self.user)
+        self.url = reverse('emplacement_create', args=[self.marche.pk])
+
+    def test_creates_requested_count_using_market_sequence(self):
+        Emplacement.objects.create(marche=self.marche, code='GM-04')
+
+        response = self.client.post(self.url, {'nombre': 3, 'notes': 'Allée nord'})
+
+        self.assertRedirects(response, reverse('marche_detail', args=[self.marche.pk]))
+        created = list(self.marche.emplacements.order_by('code'))
+        self.assertEqual(
+            [emplacement.code for emplacement in created],
+            ['GM-04', 'GM-05', 'GM-06', 'GM-07'],
+        )
+        self.assertEqual(
+            {emplacement.notes for emplacement in created if emplacement.code != 'GM-04'},
+            {'Allée nord'},
+        )
+
+    def test_market_name_generates_expected_code_prefix_and_preview(self):
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.context['code_prefix'], 'GM')
+        self.assertEqual(response.context['code_start'], 1)
+        self.assertContains(response, 'data-prefix="GM"')
+        self.assertContains(response, 'data-start="1"')
+
+        other_market = Marche.objects.create(nom='Marché de 10')
+        other_response = self.client.get(
+            reverse('emplacement_create', args=[other_market.pk])
+        )
+        self.assertEqual(other_response.context['code_prefix'], 'M10')
+        creation_response = self.client.post(
+            reverse('emplacement_create', args=[other_market.pk]),
+            {'nombre': 2},
+        )
+        self.assertRedirects(
+            creation_response,
+            reverse('marche_detail', args=[other_market.pk]),
+        )
+        self.assertEqual(
+            list(other_market.emplacements.order_by('code').values_list('code', flat=True)),
+            ['M10-01', 'M10-02'],
+        )
+
+    def test_next_code_endpoint_uses_market_prefix_and_sequence(self):
+        Emplacement.objects.create(marche=self.marche, code='GM-08')
+
+        response = self.client.get(
+            reverse('emplacement_next_code', args=[self.marche.pk])
+        )
+
+        self.assertEqual(response.json(), {'code': 'GM-09'})
+
+    def test_count_is_required_and_must_stay_within_bounds(self):
+        for data in ({}, {'nombre': 0}, {'nombre': 501}, {'nombre': 'abc'}):
+            with self.subTest(data=data):
+                response = self.client.post(self.url, data)
+                self.assertEqual(response.status_code, 200)
+                self.assertContains(response, 'nombre')
+                self.assertEqual(self.marche.emplacements.count(), 0)
+
+    def test_code_collision_returns_explicit_error_without_partial_creation(self):
+        Emplacement.objects.create(marche=self.marche, code='GM-01')
+        with patch('inventory.views.generer_prochain_code_emplacement', return_value='GM-01'):
+            response = self.client.post(self.url, {'nombre': 2})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'codes suivants existent déjà')
+        self.assertEqual(self.marche.emplacements.count(), 1)
+
+    def test_non_staff_cannot_create_market_emplacements(self):
+        client_user = get_user_model().objects.create_user(
+            username='emplacement-bulk-technicien',
+            password='test-password',
+            role='technicien',
+        )
+        self.client.force_login(client_user)
+
+        response = self.client.post(self.url, {'nombre': 1})
+
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(response.url, reverse('login'))
+        self.assertEqual(self.marche.emplacements.count(), 0)
+
+
+class EmplacementBulkActionTests(TestCase):
+    def setUp(self):
+        self.marche = Marche.objects.create(nom='Marché actions')
+        self.other_marche = Marche.objects.create(nom='Autre marché')
+        self.user = get_user_model().objects.create_user(
+            username='emplacement-actions-staff',
+            password='test-password',
+            role='staff',
+        )
+        self.client.force_login(self.user)
+        self.url = reverse('emplacement_bulk_action', args=[self.marche.pk])
+        self.first = Emplacement.objects.create(
+            marche=self.marche,
+            code='MA-01',
+            notes='Ancienne note',
+        )
+        self.second = Emplacement.objects.create(
+            marche=self.marche,
+            code='MA-02',
+            notes='Autre note',
+        )
+
+    def test_bulk_edit_updates_notes_only_for_selected_market_emplacements(self):
+        foreign = Emplacement.objects.create(
+            marche=self.other_marche,
+            code='AM-01',
+            notes='Ne pas modifier',
+        )
+
+        response = self.client.post(self.url, {
+            'action': 'edit_notes',
+            'selected_ids': [self.first.pk, self.second.pk],
+            'notes': 'Note commune',
+        })
+
+        self.assertRedirects(response, reverse('marche_detail', args=[self.marche.pk]))
+        self.first.refresh_from_db()
+        self.second.refresh_from_db()
+        foreign.refresh_from_db()
+        self.assertEqual(self.first.notes, 'Note commune')
+        self.assertEqual(self.second.notes, 'Note commune')
+        self.assertEqual(foreign.notes, 'Ne pas modifier')
+
+    def test_market_detail_renders_select_all_and_per_row_checkboxes_inside_action_form(self):
+        response = self.client.get(reverse('marche_detail', args=[self.marche.pk]))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="select-all-emplacements"')
+        self.assertContains(response, f'value="{self.first.pk}"')
+        self.assertContains(response, f'value="{self.second.pk}"')
+        form_start = response.content.decode().index('id="emplacement-bulk-form"')
+        checkbox = response.content.decode().index(
+            f'value="{self.first.pk}"',
+            form_start,
+        )
+        form_end = response.content.decode().index('</form>', form_start)
+        self.assertLess(checkbox, form_end)
+
+    def test_bulk_delete_is_admin_only(self):
+        self.client.raise_request_exception = False
+        response = self.client.post(self.url, {
+            'action': 'delete',
+            'selected_ids': [self.first.pk],
+        })
+
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(Emplacement.objects.filter(pk=self.first.pk).exists())
+
+    def test_admin_can_bulk_delete_selected_emplacements(self):
+        admin = get_user_model().objects.create_user(
+            username='emplacement-actions-admin',
+            password='test-password',
+            role='admin',
+        )
+        self.client.force_login(admin)
+
+        response = self.client.post(self.url, {
+            'action': 'delete',
+            'selected_ids': [self.first.pk],
+        })
+
+        self.assertRedirects(response, reverse('marche_detail', args=[self.marche.pk]))
+        self.assertFalse(Emplacement.objects.filter(pk=self.first.pk).exists())
+        self.assertTrue(Emplacement.objects.filter(pk=self.second.pk).exists())
+
+    def test_bulk_delete_skips_emplacements_with_installed_support(self):
+        admin = get_user_model().objects.create_user(
+            username='emplacement-actions-admin-installed',
+            password='test-password',
+            role='admin',
+        )
+        self.client.force_login(admin)
+        support = Support.objects.create(
+            code='BULK-INSTALLED',
+            nom='Panneau installé',
+            type_support=Support.TYPE_PANNEAU,
+            latitude=12.34,
+            longitude=-1.52,
+            ville='Ouagadougou',
+            emplacement=self.first,
+        )
+
+        response = self.client.post(self.url, {
+            'action': 'delete',
+            'selected_ids': [self.first.pk, self.second.pk],
+        }, follow=True)
+
+        self.assertRedirects(response, reverse('marche_detail', args=[self.marche.pk]))
+        self.assertTrue(Emplacement.objects.filter(pk=self.first.pk).exists())
+        self.assertTrue(Support.objects.filter(pk=support.pk).exists())
+        self.assertFalse(Emplacement.objects.filter(pk=self.second.pk).exists())
+        self.assertContains(response, 'panneau installé')
+
+    @patch('reports.views._build_context_emplacement_detail', return_value={})
+    @patch('reports.views.HTML')
+    def test_bulk_download_returns_zip_with_one_report_per_selected_item(
+        self,
+        html_mock,
+        context_mock,
+    ):
+        html_mock.return_value.write_pdf.return_value = b'%PDF-test'
+
+        response = self.client.post(self.url, {
+            'action': 'download',
+            'selected_ids': [self.first.pk, self.second.pk],
+        })
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'application/zip')
+        with zipfile.ZipFile(io.BytesIO(response.content)) as archive:
+            self.assertEqual(
+                archive.namelist(),
+                [
+                    f'rapport_emplacement_ma-01_{self.first.pk}.pdf',
+                    f'rapport_emplacement_ma-02_{self.second.pk}.pdf',
+                ],
+            )
+            self.assertEqual(archive.read(archive.namelist()[0]), b'%PDF-test')
+        self.assertEqual(context_mock.call_count, 2)

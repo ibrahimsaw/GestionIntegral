@@ -147,7 +147,7 @@
   <a href="{% url 'support_detail' support.uuid %}" class="spp-back"><i class="bi bi-arrow-left"></i></a>
   <a href="{% url 'support_detail' support.uuid %}" style="color:var(--text-muted);text-decoration:none;">Support {{ support.code }}</a>
   <i class="bi bi-chevron-right" style="font-size:0.65rem;"></i>
-  <span style="color:var(--text);font-weight:600;">Périodes d'indisponibilité</span>
+  <span style="color:var(--text);font-weight:600;">Périodes de signalement et de panne</span>
 </div>
 
 <!-- ══ HERO ══ -->
@@ -164,7 +164,7 @@
   </div>
   <div>
     <span class="badge"
-          style="background:{% if support.etat == 'bon' %}#dcfce7;color:#166534;{% elif support.etat == 'a_maintenir' or support.etat == 'maintenance' %}#fef3c7;color:#92400e;{% else %}#fee2e2;color:#991b1b;{% endif %} font-size:0.82rem;font-weight:700;padding:6px 14px;border-radius: 8px;">
+          style="background:{% if support.etat == 'bon' %}#dcfce7;color:#166534;{% elif support.etat == 'a_maintenir' %}#fef3c7;color:#92400e;{% else %}#fee2e2;color:#991b1b;{% endif %} font-size:0.82rem;font-weight:700;padding:6px 14px;border-radius: 8px;">
       État actuel : {{ support.get_etat_display }}
     </span>
   </div>
@@ -176,7 +176,7 @@
     <div class="spp-kpi-icon" style="background:#f1f5f9;color:#475569;"><i class="bi bi-list-check"></i></div>
     <div>
       <div class="spp-kpi-val">{{ nb_total }}</div>
-      <div class="spp-kpi-lbl">Pannes Totales</div>
+      <div class="spp-kpi-lbl">Signaux et pannes</div>
     </div>
   </div>
 
@@ -216,7 +216,11 @@
           <i class="bi bi-signpost-split me-2"></i>Face {{ label }}
         </span>
         {% if stat.nb_en_cours %}
-          <span class="spp-badge spp-badge-encours"><i class="bi bi-exclamation-triangle-fill"></i>EN PANNE</span>
+          {% if stat.face.etat == 'a_maintenir' %}
+            <span class="spp-badge" style="background:#fef3c7;color:#92400e;"><i class="bi bi-exclamation-circle-fill"></i>SIGNAL</span>
+          {% elif stat.face.etat == 'panne' %}
+            <span class="spp-badge spp-badge-encours"><i class="bi bi-exclamation-triangle-fill"></i>EN PANNE</span>
+          {% endif %}
         {% else %}
           <span class="spp-badge spp-badge-resolue"><i class="bi bi-check-circle-fill"></i>OPÉRATIONNELLE</span>
         {% endif %}
@@ -250,7 +254,7 @@
 <!-- ══ TIMELINE TABLEAU ══ -->
 <div class="spp-table-card">
   <div class="spp-table-hd">
-    <span><i class="bi bi-clock-history me-2" style="color:#ef4444;"></i>Historique Chronologique des Pannes</span>
+    <span><i class="bi bi-clock-history me-2" style="color:#ef4444;"></i>Historique des signalements et des pannes</span>
     <span style="font-family:monospace;font-size:0.75rem;color:var(--text-muted);">
       Total : {{ periodes|length }} enregistrement{{ periodes|length|pluralize }}
     </span>
@@ -264,7 +268,7 @@
             {% if support.type_support == 'panneau' %}
             <th style="padding-left:20px;">Face</th>
             {% endif %}
-            <th class="{% if support.type_support != 'panneau' %}ps-4{% endif %}">Début de la panne</th>
+            <th class="{% if support.type_support != 'panneau' %}ps-4{% endif %}">Début du signalement / de la panne</th>
             <th>Fin / Résolution</th>
             <th>Durée d'indisponibilité</th>
             <th style="text-align:right;padding-right:20px;">Statut</th>
@@ -284,6 +288,18 @@
             {% endif %}
             <td class="{% if support.type_support != 'panneau' %}ps-4{% endif %}" style="font-family:monospace;font-weight:700;color:#dc2626;">
               {{ p.debut|date:"d/m/Y H:i" }}
+              {% if p.etat_debut == 'a_maintenir' %}
+                <div><span class="spp-badge mt-1" style="background:#fef3c7;color:#92400e;">SIGNAL</span></div>
+              {% elif p.etat_debut == 'panne' %}
+                <div><span class="spp-badge mt-1" style="background:#fee2e2;color:#991b1b;">EN PANNE</span></div>
+              {% endif %}
+              {% if p.etat_incident != p.etat_debut %}
+                {% if p.etat_incident == 'a_maintenir' %}
+                  <div style="font-family:Arial,sans-serif;font-size:0.7rem;color:#92400e;margin-top:3px;">Dernier état : SIGNAL</div>
+                {% elif p.etat_incident == 'panne' %}
+                  <div style="font-family:Arial,sans-serif;font-size:0.7rem;color:#991b1b;margin-top:3px;">Dernier état : EN PANNE</div>
+                {% endif %}
+              {% endif %}
             </td>
             <td style="font-family:monospace;">
               {% if p.fin %}

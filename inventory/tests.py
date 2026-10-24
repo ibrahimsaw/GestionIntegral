@@ -1,6 +1,8 @@
 import datetime
 import io
 import zipfile
+from importlib import import_module
+from django.apps import apps
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
@@ -34,14 +36,182 @@ from geoad.context_processors import inventory_villes
 
 
 class PreventiveMaintenanceStateTests(TestCase):
-    def test_maintenance_form_offers_preventive_state(self):
-        form = MaintenanceForm()
-        self.assertIn(
-            (
-                Support.ETAT_A_MAINTENIR,
-                'Fonctionnel — maintenance à prévoir',
+    def test_new_maintenance_applies_only_to_checked_panel_faces(self):
+        panel = Support.objects.create(
+            code='MAINT-SELECTED-FACES',
+            nom='Panneau avec faces sélectionnées',
+            type_support=Support.TYPE_PANNEAU,
+            latitude=12.34,
+            longitude=-1.52,
+        )
+        face_a = FacePanneau.objects.create(support=panel, label='A')
+        face_b = FacePanneau.objects.create(support=panel, label='B')
+        user = get_user_model().objects.create_user(
+            username='maintenance-admin',
+            password='test-password',
+            role='admin',
+        )
+        self.client.force_login(user)
+
+        response = self.client.get(
+            reverse('maintenance_create'),
+            {'support': panel.pk},
+        )
+        self.assertContains(response, 'Face A')
+        self.assertContains(response, 'Face B')
+        self.assertContains(response, 'Ne pas modifier')
+        for label in (
+            'Bon état',
+            'Signal',
+            'En panne',
+        ):
+            self.assertContains(response, label)
+        self.assertNotContains(response, 'Fonctionnel — maintenance à prévoir')
+        self.assertContains(response, 'type="radio"')
+        self.assertContains(response, 'btn-outline-success')
+        self.assertContains(response, 'btn-outline-warning')
+        self.assertContains(response, 'btn-outline-danger')
+        self.assertNotContains(response, '<select name="etat_face_')
+        self.assertEqual(response.context['form'][f'etat_face_{face_a.pk}'].value(), '')
+        self.assertEqual(response.context['form'][f'etat_face_{face_b.pk}'].value(), '')
+
+        response = self.client.post(
+            reverse('maintenance_create'),
+            {
+                'support': panel.pk,
+                'effectue_par': user.pk,
+                'date_intervention': '2026-10-24T10:00',
+                f'etat_face_{face_a.pk}': '',
+                f'etat_face_{face_b.pk}': '',
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(Maintenance.objects.filter(support=panel).count(), 0)
+
+        response = self.client.post(
+            reverse('maintenance_create'),
+            {
+                'support': panel.pk,
+                'effectue_par': user.pk,
+                'date_intervention': '2026-10-24T10:00',
+                f'etat_face_{face_a.pk}': Support.ETAT_PANNE,
+                f'etat_face_{face_b.pk}': '',
+            },
+        )
+
+        self.assertEqual(
+            response.status_code,
+            302,
+            response.context['form'].errors if response.context else response.content,
+        )
+        self.assertEqual(
+            list(
+                Maintenance.objects.filter(support=panel).values_list(
+                    'face_id', flat=True,
+                )
             ),
+            [face_a.pk],
+        )
+        maintenances = Maintenance.objects.filter(support=panel)
+        self.assertEqual(
+            maintenances.get(face=face_a).etat_apres,
+            Support.ETAT_PANNE,
+        )
+        face_a.refresh_from_db()
+        face_b.refresh_from_db()
+        self.assertEqual(face_a.etat, Support.ETAT_PANNE)
+        self.assertEqual(face_b.etat, Support.ETAT_BON)
+
+        self.client.post(
+            reverse(
+                'maintenance_quick_repair',
+                args=[maintenances.get(face=face_a).pk],
+            ),
+        )
+
+        response = self.client.post(
+            reverse('maintenance_create', args=[panel.pk]),
+            {
+                'support': panel.pk,
+                'effectue_par': user.pk,
+                'date_intervention': '2026-10-25T10:00',
+                f'etat_face_{face_a.pk}': '',
+                f'etat_face_{face_b.pk}': Support.ETAT_A_MAINTENIR,
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(Maintenance.objects.filter(support=panel).count(), 3)
+        self.assertEqual(
+            Maintenance.objects.filter(face=face_a).order_by('-date_intervention').first().etat_apres,
+            Support.ETAT_BON,
+        )
+        self.assertEqual(
+            Maintenance.objects.get(face=face_b).etat_apres,
+            Support.ETAT_A_MAINTENIR,
+        )
+        face_b.refresh_from_db()
+        self.assertEqual(face_b.etat, Support.ETAT_A_MAINTENIR)
+
+        response = self.client.get(
+            reverse(
+                'maintenance_detail',
+                args=[Maintenance.objects.filter(support=panel).first().pk],
+            )
+        )
+        self.assertContains(
+            response,
+            f'href="{reverse("maintenance_create", args=[panel.pk])}"',
+        )
+
+        maintenance = Maintenance.objects.get(
+            support=panel,
+            face=face_a,
+            etat_apres=Support.ETAT_PANNE,
+        )
+        update_url = reverse('maintenance_update', args=[maintenance.pk])
+        response = self.client.get(update_url)
+        self.assertContains(response, 'Face A')
+        self.assertNotContains(response, 'name="face"')
+
+        response = self.client.post(
+            update_url,
+            {
+                'support': panel.pk,
+                'effectue_par': user.pk,
+                'date_intervention': maintenance.date_intervention.strftime('%Y-%m-%dT%H:%M'),
+                'etat_apres': Support.ETAT_BON,
+                'face': face_b.pk,
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        maintenance.refresh_from_db()
+        self.assertEqual(maintenance.face_id, face_a.pk)
+        self.assertEqual(maintenance.etat_apres, Support.ETAT_BON)
+
+        response = self.client.get(reverse('maintenance_list'))
+        self.assertContains(
+            response,
+            f'href="{reverse("maintenance_create", args=[panel.pk])}"',
+        )
+
+    def test_maintenance_form_offers_only_the_three_intervention_states(self):
+        self.assertEqual(
+            dict(Support.ETAT_CHOICES)[Support.ETAT_A_MAINTENIR],
+            'Signal',
+        )
+        self.assertNotIn('ETAT_MAINTENANCE', Support.__dict__)
+        form = MaintenanceForm()
+        self.assertEqual(
             list(form.fields['etat_apres'].choices),
+            list(MaintenanceForm.ETAT_CHOICES),
+        )
+        self.assertNotIn(
+            'maintenance',
+            [state for state, _ in form.fields['etat_apres'].choices],
+        )
+        self.assertIn(
+            (Support.ETAT_A_MAINTENIR, 'Signal'),
+            form.fields['etat_apres'].choices,
         )
 
     def test_maintenance_marks_screen_functional_but_due_for_maintenance(self):
@@ -60,6 +230,242 @@ class PreventiveMaintenanceStateTests(TestCase):
 
         screen.refresh_from_db()
         self.assertEqual(screen.etat, Support.ETAT_A_MAINTENIR)
+
+    def test_signal_maintenance_detail_offers_quick_repair(self):
+        user = get_user_model().objects.create_user(
+            username='maintenance-signal-repair',
+            password='test-password',
+            role='admin',
+        )
+        self.client.force_login(user)
+        screen = Support.objects.create(
+            code='MAINT-SIGNAL-REPAIR',
+            nom='Écran avec signal',
+            type_support=Support.TYPE_ECRAN,
+            latitude=12.34,
+            longitude=-1.52,
+        )
+        maintenance = Maintenance.objects.create(
+            support=screen,
+            etat_apres=Support.ETAT_A_MAINTENIR,
+        )
+
+        response = self.client.get(
+            reverse('maintenance_detail', args=[maintenance.pk]),
+        )
+
+        self.assertContains(response, 'Ce support a été enregistré comme étant')
+        self.assertContains(response, 'SIGNAL')
+        self.assertContains(response, 'Avancement !')
+        self.assertContains(response, 'Enregistrer l\'avancement')
+        self.assertContains(response, 'name="etat_apres"')
+        self.assertContains(
+            response,
+            f'action="{reverse("maintenance_quick_repair", args=[maintenance.pk])}"',
+        )
+
+        response = self.client.post(
+            reverse('maintenance_quick_repair', args=[maintenance.pk]),
+        )
+
+        self.assertEqual(response.status_code, 302)
+        repair = Maintenance.objects.exclude(pk=maintenance.pk).get(
+            support=screen,
+        )
+        self.assertEqual(repair.etat_apres, Support.ETAT_BON)
+        screen.refresh_from_db()
+        self.assertEqual(screen.etat, Support.ETAT_BON)
+
+    def test_new_panel_maintenance_only_allows_unrepaired_faces(self):
+        user = get_user_model().objects.create_user(
+            username='maintenance-face-lock',
+            password='test-password',
+            role='admin',
+        )
+        self.client.force_login(user)
+        panel = Support.objects.create(
+            code='MAINT-FACE-LOCK',
+            nom='Panneau avec une face signalée',
+            type_support=Support.TYPE_PANNEAU,
+            latitude=12.34,
+            longitude=-1.52,
+        )
+        signal_face = FacePanneau.objects.create(support=panel, label='A')
+        available_face = FacePanneau.objects.create(support=panel, label='B')
+        signal_maintenance = Maintenance.objects.create(
+            support=panel,
+            face=signal_face,
+            etat_apres=Support.ETAT_A_MAINTENIR,
+        )
+
+        faces_response = self.client.get(
+            reverse('api_faces_support', args=[panel.pk]),
+        )
+        self.assertEqual(faces_response.status_code, 200)
+        face_data = next(
+            face for face in faces_response.json()['faces']
+            if face['id'] == signal_face.pk
+        )
+        self.assertEqual(face_data['repair_id'], signal_maintenance.pk)
+
+        response = self.client.get(
+            reverse('maintenance_create', args=[panel.pk]),
+        )
+
+        self.assertContains(
+            response,
+            reverse('maintenance_detail', args=[signal_maintenance.pk]),
+        )
+        self.assertContains(response, 'Réparer cette face')
+        self.assertContains(response, 'class="btn btn-sm btn-success"')
+        self.assertNotContains(
+            response,
+            f'name="etat_face_{signal_face.pk}"',
+        )
+        self.assertContains(
+            response,
+            f'name="etat_face_{available_face.pk}"',
+        )
+        self.assertContains(response, '2. Rapport d\'Intervention')
+
+        blocked_response = self.client.post(
+            reverse('maintenance_create', args=[panel.pk]),
+            {
+                'support': panel.pk,
+                'effectue_par': user.pk,
+                'date_intervention': '2026-10-24T10:00',
+                f'etat_face_{signal_face.pk}': Support.ETAT_BON,
+                f'etat_face_{available_face.pk}': '',
+            },
+        )
+        self.assertEqual(blocked_response.status_code, 200)
+        self.assertEqual(
+            Maintenance.objects.filter(support=panel).count(),
+            1,
+        )
+
+        allowed_response = self.client.post(
+            reverse('maintenance_create', args=[panel.pk]),
+            {
+                'support': panel.pk,
+                'effectue_par': user.pk,
+                'date_intervention': '2026-10-24T10:00',
+                f'etat_face_{signal_face.pk}': '',
+                f'etat_face_{available_face.pk}': Support.ETAT_BON,
+            },
+        )
+        self.assertEqual(allowed_response.status_code, 302)
+        self.assertEqual(
+            Maintenance.objects.filter(support=panel).count(),
+            2,
+        )
+        available_face.refresh_from_db()
+        self.assertEqual(available_face.etat, Support.ETAT_BON)
+
+        Maintenance.objects.create(
+            support=panel,
+            face=available_face,
+            etat_apres=Support.ETAT_A_MAINTENIR,
+        )
+        all_blocked_response = self.client.get(
+            reverse('maintenance_create', args=[panel.pk]),
+        )
+        self.assertTrue(all_blocked_response.context['all_faces_blocked'])
+        self.assertContains(
+            all_blocked_response,
+            'id="bloc-rapport" class="card shadow-sm mb-4" hidden',
+            html=False,
+        )
+        self.assertContains(
+            all_blocked_response,
+            'id="bloc-preuve" class="card shadow-sm mb-4" hidden',
+            html=False,
+        )
+        self.assertContains(
+            all_blocked_response,
+            'id="submit-footer" class="card-footer bg-light py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-2 border-top" hidden',
+            html=False,
+        )
+        self.assertContains(
+            all_blocked_response,
+            reverse('maintenance_detail', args=[signal_maintenance.pk]),
+        )
+        self.assertContains(
+            all_blocked_response,
+            reverse(
+                'maintenance_detail',
+                args=[Maintenance.objects.filter(face=available_face).latest('pk').pk],
+            ),
+        )
+
+    def test_blocked_support_cannot_receive_new_maintenance_until_repaired(self):
+        user = get_user_model().objects.create_user(
+            username='maintenance-blocked-create',
+            password='test-password',
+            role='admin',
+        )
+        self.client.force_login(user)
+
+        for index, state in enumerate(
+            (Support.ETAT_A_MAINTENIR, Support.ETAT_PANNE),
+            start=1,
+        ):
+            with self.subTest(state=state):
+                screen = Support.objects.create(
+                    code=f'MAINT-BLOCKED-{index}',
+                    nom='Écran à réparer',
+                    type_support=Support.TYPE_ECRAN,
+                    etat=state,
+                    latitude=12.34,
+                    longitude=-1.52,
+                )
+                existing = Maintenance.objects.create(
+                    support=screen,
+                    etat_apres=state,
+                )
+                initial_count = Maintenance.objects.filter(
+                    support=screen,
+                ).count()
+
+                response = self.client.get(
+                    reverse('maintenance_create', args=[screen.pk]),
+                )
+                self.assertContains(response, screen.get_etat_display())
+                self.assertContains(response, 'Réparez ce support')
+                self.assertContains(response, 'disabled')
+
+                response = self.client.post(
+                    reverse('maintenance_create', args=[screen.pk]),
+                    {
+                        'support': screen.pk,
+                        'effectue_par': user.pk,
+                        'date_intervention': '2026-10-24T10:00',
+                        'etat_apres': Support.ETAT_BON,
+                    },
+                )
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(
+                    Maintenance.objects.filter(support=screen).count(),
+                    initial_count,
+                )
+                self.assertContains(response, 'Réparez ce support')
+
+                self.client.post(
+                    reverse('maintenance_quick_repair', args=[existing.pk]),
+                )
+                screen.refresh_from_db()
+                self.assertEqual(screen.etat, Support.ETAT_BON)
+
+                response = self.client.post(
+                    reverse('maintenance_create', args=[screen.pk]),
+                    {
+                        'support': screen.pk,
+                        'effectue_par': user.pk,
+                        'date_intervention': '2026-10-24T10:00',
+                        'etat_apres': Support.ETAT_BON,
+                    },
+                )
+                self.assertEqual(response.status_code, 302)
 
     def test_panel_state_tracks_preventive_and_failed_faces(self):
         panel = Support.objects.create(
@@ -95,6 +501,144 @@ class PreventiveMaintenanceStateTests(TestCase):
         )
         panel.refresh_from_db()
         self.assertEqual(panel.etat, Support.ETAT_PANNE)
+
+    def test_signal_state_reports_functional_face_needing_attention(self):
+        panel = Support.objects.create(
+            code='MAINT-PANEL-ACTIVE',
+            nom='Panneau avec signal',
+            type_support=Support.TYPE_PANNEAU,
+            latitude=12.34,
+            longitude=-1.52,
+        )
+        face_a = FacePanneau.objects.create(support=panel, label='A')
+        FacePanneau.objects.create(support=panel, label='B')
+
+        Maintenance.objects.create(
+            support=panel,
+            face=face_a,
+            etat_apres=Support.ETAT_A_MAINTENIR,
+        )
+
+        panel.refresh_from_db()
+        self.assertEqual(panel.etat, Support.ETAT_A_MAINTENIR)
+
+    def test_signal_and_panne_form_one_period_until_bon_state(self):
+        panel = Support.objects.create(
+            code='MAINT-SIGNAL-PERIOD',
+            nom='Panneau avec signal puis panne',
+            type_support=Support.TYPE_PANNEAU,
+            latitude=12.34,
+            longitude=-1.52,
+        )
+        face = FacePanneau.objects.create(support=panel, label='A')
+        signal_at = datetime.datetime(2025, 1, 1, 12, tzinfo=datetime.timezone.utc)
+        panne_at = datetime.datetime(2025, 1, 2, 12, tzinfo=datetime.timezone.utc)
+        bon_at = datetime.datetime(2025, 1, 3, 12, tzinfo=datetime.timezone.utc)
+        Maintenance.objects.create(
+            support=panel,
+            face=face,
+            etat_apres=Support.ETAT_A_MAINTENIR,
+            date_intervention=signal_at,
+        )
+        Maintenance.objects.create(
+            support=panel,
+            face=face,
+            etat_apres=Support.ETAT_PANNE,
+            date_intervention=panne_at,
+        )
+        Maintenance.objects.create(
+            support=panel,
+            face=face,
+            etat_apres=Support.ETAT_BON,
+            date_intervention=bon_at,
+        )
+
+        periods = panel.get_periodes_panne()
+
+        self.assertEqual(len(periods), 1)
+        self.assertEqual(periods[0]['debut'], signal_at)
+        self.assertEqual(periods[0]['fin'], bon_at)
+        self.assertEqual(periods[0]['etat_debut'], Support.ETAT_A_MAINTENIR)
+        self.assertEqual(periods[0]['etat_incident'], Support.ETAT_PANNE)
+        self.assertEqual(
+            face.jours_disponibles_sur_periode(
+                datetime.date(2025, 1, 1),
+                datetime.date(2025, 1, 3),
+            ),
+            1,
+        )
+
+    def test_global_periods_page_includes_open_signal(self):
+        user = get_user_model().objects.create_user(
+            username='maintenance-periods-admin',
+            password='test-password',
+            role='admin',
+        )
+        self.client.force_login(user)
+        screen = Support.objects.create(
+            code='MAINT-GLOBAL-SIGNAL',
+            nom='Écran signalé',
+            type_support=Support.TYPE_ECRAN,
+            latitude=12.34,
+            longitude=-1.52,
+        )
+        signal = Maintenance.objects.create(
+            support=screen,
+            etat_apres=Support.ETAT_A_MAINTENIR,
+            description='Signalement à vérifier',
+        )
+
+        response = self.client.get(reverse('periodes_panne_liste'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['nb_en_cours'], 1)
+        period = response.context['periodes'][0]
+        self.assertEqual(period['maint_debut'], signal)
+        self.assertEqual(period['etat_debut'], Support.ETAT_A_MAINTENIR)
+        self.assertEqual(period['etat_incident'], Support.ETAT_A_MAINTENIR)
+        self.assertIsNone(period['fin'])
+        self.assertContains(response, 'Début du signalement / de la panne')
+        self.assertContains(response, 'SIGNAL')
+        self.assertContains(response, 'Signalement à vérifier')
+
+        response = self.client.get(
+            reverse('support_periodes_panne', args=[screen.pk]),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'SIGNAL')
+
+    def test_legacy_maintenance_values_are_migrated_to_signal(self):
+        panel = Support.objects.create(
+            code='MAINT-LEGACY',
+            nom='Panneau état historique',
+            type_support=Support.TYPE_PANNEAU,
+            latitude=12.34,
+            longitude=-1.52,
+        )
+        face = FacePanneau.objects.create(support=panel, label='A')
+        maintenance = Maintenance.objects.create(
+            support=panel,
+            face=face,
+            etat_apres=Support.ETAT_BON,
+        )
+        Support.objects.filter(pk=panel.pk).update(etat='maintenance')
+        FacePanneau.objects.filter(pk=face.pk).update(etat='maintenance')
+        Maintenance.objects.filter(pk=maintenance.pk).update(
+            etat_apres='maintenance',
+        )
+
+        migration = import_module(
+            'inventory.migrations.0021_signal_support_state',
+        )
+        migration.migrate_maintenance_state_to_signal(apps, None)
+
+        panel.refresh_from_db()
+        face.refresh_from_db()
+        maintenance.refresh_from_db()
+        self.assertEqual(panel.etat, Support.ETAT_A_MAINTENIR)
+        self.assertEqual(face.etat, Support.ETAT_A_MAINTENIR)
+        self.assertEqual(maintenance.etat_apres, Support.ETAT_A_MAINTENIR)
 
     def test_preventive_state_remains_selectable_for_campaigns(self):
         screen = Support.objects.create(

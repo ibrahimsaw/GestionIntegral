@@ -115,55 +115,86 @@
                 <div class="form-text text-muted mt-1" style="font-size:0.75rem;">
                   Recherchez par code (ex: <code>OUA-001</code>), quartier ou type de support.
                 </div>
+                <div id="support-repair-action" {% if not blocked_support %}hidden{% endif %} class="alert alert-warning mt-3 mb-0" role="alert" style="{% if blocked_support %}display:block;{% else %}display:none;{% endif %}">
+                  {% if blocked_support %}
+                    <strong>{{ blocked_support.code }} est en état « {{ blocked_support.get_etat_display }} ».</strong>
+                    Réparez ce support avant de créer une nouvelle intervention.
+                    {% if blocked_support_repair_id %}
+                    <a href="{% url 'maintenance_detail' blocked_support_repair_id %}" class="btn btn-sm btn-success d-inline-flex align-items-center gap-1 mt-2">
+                      <i class="bi bi-wrench-adjustable-circle"></i>Réparer ce support
+                    </a>
+                    {% endif %}
+                  {% endif %}
+                </div>
               </div>
 
-              {# Option Appliquer à tout le support #}
-              {% if form.appliquer_tout_le_support %}
-              <div class="col-12" id="bloc-appliquer-tout">
-                <div class="p-3 d-flex align-items-center gap-3"
-                     style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px !important;">
-                  <div class="form-check m-0">
-                    {{ form.appliquer_tout_le_support }}
+              {% if not form.instance.pk %}
+              <div class="col-12" id="bloc-faces" style="display:none;">
+                <div class="p-3" style="background:#f8fafc;border:1px solid #cbd5e1;border-radius:8px;">
+                  <div class="fw-bold text-dark mb-1">Faces concernées</div>
+                  <div class="text-muted mb-2" style="font-size:0.78rem;">
+                    Toutes les faces et tous les états sont affichés. Choisissez un bouton d’état uniquement pour les faces à modifier.
                   </div>
-                  <div>
-                    <label class="form-check-label fw-bold text-success mb-0" for="id_appliquer_tout" style="font-size:0.85rem; cursor:pointer;">
-                      {{ form.appliquer_tout_le_support.label }}
-                    </label>
-                    {% if form.appliquer_tout_le_support.help_text %}
-                    <div class="text-muted" style="font-size:0.75rem; margin-top:2px;">
-                      {{ form.appliquer_tout_le_support.help_text }}
+                  <div id="face-state-rows" class="d-grid gap-2">
+                    {% for row in form.face_rows %}
+                    <div class="row align-items-center g-2 p-2 bg-white border rounded">
+                      <label class="form-label fw-semibold mb-0 col-sm-4">Face {{ row.face.label }}</label>
+                      <div class="col-sm-8 d-flex flex-wrap gap-1">
+                        {% if row.blocked %}
+                        <span class="badge {% if row.face.etat == 'panne' %}text-bg-danger{% else %}text-bg-warning{% endif %} align-self-center">
+                          {{ row.face.get_etat_display }}
+                        </span>
+                        {% if row.repair_id %}
+                        <a href="{% url 'maintenance_detail' row.repair_id %}" class="btn btn-sm btn-success">
+                          <i class="bi bi-wrench-adjustable-circle me-1"></i>Réparer cette face
+                        </a>
+                        {% else %}
+                        <span class="text-danger small">Intervention de réparation introuvable.</span>
+                        {% endif %}
+                        {% else %}
+                        {% for radio in row.etat %}
+                        <input type="radio" class="btn-check" data-face-id="{{ row.face.pk }}" name="{{ row.etat.html_name }}" id="{{ radio.id_for_label }}" value="{{ radio.data.value }}" {% if radio.is_checked %}checked{% endif %}>
+                        <label class="btn btn-sm {% if radio.data.value == 'bon' %}btn-outline-success{% elif radio.data.value == 'a_maintenir' %}btn-outline-warning{% elif radio.data.value == 'panne' %}btn-outline-danger{% else %}btn-outline-secondary{% endif %}" for="{{ radio.id_for_label }}">{{ radio.choice_label }}</label>
+                        {% endfor %}
+                        {% endif %}
+                        {% if row.etat.errors %}<div class="w-100 text-danger small mt-1">{{ row.etat.errors }}</div>{% endif %}
+                      </div>
                     </div>
-                    {% endif %}
+                    {% empty %}
+                    <span class="text-muted small">Sélectionnez un panneau pour afficher ses faces.</span>
+                    {% endfor %}
                   </div>
+                  <div id="faces-load-error" class="text-danger small mt-2" role="alert" aria-live="polite"></div>
                 </div>
               </div>
               {% endif %}
 
-              {# Face spécifique #}
-              <div class="col-12" id="bloc-face" style="display:none;">
-                <label class="form-label" for="{{ form.face.id_for_label }}" style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#475569;">
-                  Face concernée
+              {# Face spécifique lors de la modification d'une maintenance existante #}
+              {% if form.instance.pk %}
+              <div class="col-12">
+                <label class="form-label" style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#475569;">
+                  Équipement modifié
                 </label>
-                <div class="input-group">
-                  <span class="input-group-text bg-light text-muted border-end-0" style="border-radius:8px 0 0 8px;">
-                    <i class="bi bi-signpost-split"></i>
-                  </span>
-                  {{ form.face }}
-                </div>
-                {% if form.face.errors %}
-                  <div class="text-danger small mt-1 fw-semibold"><i class="bi bi-exclamation-circle-fill me-1"></i>{{ form.face.errors }}</div>
-                {% endif %}
-                <div class="form-text text-muted mt-1" style="font-size:0.75rem;">
-                  <i class="bi bi-info-circle me-1"></i>Laissez vide si l'intervention concerne l'ensemble des faces.
+                <div class="p-3 bg-light border rounded d-flex align-items-center gap-2">
+                  <i class="bi bi-signpost-split text-primary"></i>
+                  <strong>
+                    {% if form.instance.face %}
+                      Face {{ form.instance.face.label }}
+                    {% else %}
+                      Support complet
+                    {% endif %}
+                  </strong>
+                  <span class="text-muted small">— cette intervention reste rattachée à cet équipement.</span>
                 </div>
               </div>
+              {% endif %}
 
             </div>
           </div>
         </div>
 
         {# ── SECTION 2 : RAPPORT TECHNIQUE & ÉTAT RÉSULTANT ── #}
-        <div class="card shadow-sm mb-4" style="border-radius:8px !important; border:1px solid #e2e8f0; overflow:hidden;">
+        <div id="bloc-rapport" class="card shadow-sm mb-4" {% if all_faces_blocked or blocked_support %}hidden{% endif %} style="{% if all_faces_blocked or blocked_support %}display:none;{% endif %}border-radius:8px !important; border:1px solid #e2e8f0; overflow:hidden;">
           <div class="card-header bg-white py-3 px-4 d-flex align-items-center justify-content-between border-bottom">
             <div class="d-flex align-items-center gap-2">
               <div class="d-flex align-items-center justify-content-center"
@@ -211,9 +242,9 @@
               </div>
 
               {# État après travaux (Radio Cards) #}
-              <div class="col-12">
+              <div class="col-12" id="bloc-etat-global">
                 <label class="form-label mb-2" style="font-size:0.75rem;font-weight:700;text-transform:uppercase;letter-spacing:0.4px;color:#475569;">
-                  État résultant du panneau <span class="text-danger">*</span>
+                  État après intervention <span class="text-danger">*</span>
                 </label>
 
                 <div class="row g-3">
@@ -231,13 +262,19 @@
                           <i class="bi bi-exclamation-triangle-fill fs-5 text-danger"></i>
                           <div>
                             <strong class="text-danger" style="font-size:0.88rem;">{{ radio.choice_label }}</strong>
-                            <div class="text-muted" style="font-size:0.72rem;">Panneau hors service / bloqué</div>
+                            <div class="text-muted" style="font-size:0.72rem;">Équipement hors service</div>
+                          </div>
+                        {% elif radio.data.value == 'a_maintenir' %}
+                          <i class="bi bi-wrench-adjustable-circle-fill fs-5 text-warning"></i>
+                          <div>
+                            <strong class="text-warning" style="font-size:0.88rem;">{{ radio.choice_label }}</strong>
+                            <div class="text-muted" style="font-size:0.72rem;">Équipement fonctionnel, signalé à surveiller</div>
                           </div>
                         {% else %}
                           <i class="bi bi-check-circle-fill fs-5 text-success"></i>
                           <div>
                             <strong class="text-success" style="font-size:0.88rem;">{{ radio.choice_label }}</strong>
-                            <div class="text-muted" style="font-size:0.72rem;">Panneau réparé & disponible</div>
+                            <div class="text-muted" style="font-size:0.72rem;">Équipement opérationnel</div>
                           </div>
                         {% endif %}
                       </div>
@@ -273,7 +310,7 @@
         </div>
 
         {# ── SECTION 3 : PREUVE PHOTOGRAPHIQUE ── #}
-        <div class="card shadow-sm mb-4" style="border-radius:8px !important; border:1px solid #e2e8f0; overflow:hidden;">
+        <div id="bloc-preuve" class="card shadow-sm mb-4" {% if all_faces_blocked or blocked_support %}hidden{% endif %} style="{% if all_faces_blocked or blocked_support %}display:none;{% endif %}border-radius:8px !important; border:1px solid #e2e8f0; overflow:hidden;">
           <div class="card-header bg-white py-3 px-4 d-flex align-items-center justify-content-between border-bottom">
             <div class="d-flex align-items-center gap-2">
               <div class="d-flex align-items-center justify-content-center"
@@ -315,12 +352,12 @@
           </div>
 
           {# ── PIED DE FORMULAIRE (ACTIONS) ── #}
-          <div class="card-footer bg-light py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-2 border-top">
+          <div id="submit-footer" class="card-footer bg-light py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-2 border-top" {% if all_faces_blocked or blocked_support %}hidden{% endif %} style="{% if all_faces_blocked or blocked_support %}display:none;{% endif %}">
             <a href="{% url 'maintenance_list' %}" class="btn btn-outline-secondary px-3" style="border-radius:8px;font-size:0.83rem;font-weight:600;">
               <i class="bi bi-x me-1"></i>Annuler
             </a>
             
-            <button type="submit" class="btn btn-primary px-4 shadow-sm d-flex align-items-center gap-2" style="border-radius:8px;font-size:0.83rem;font-weight:700;">
+            <button type="submit" class="btn btn-primary px-4 shadow-sm d-flex align-items-center gap-2" style="border-radius:8px;font-size:0.83rem;font-weight:700;" {% if blocked_support %}disabled{% endif %}>
               <i class="bi bi-cloud-arrow-up-fill"></i>
               <span>{% if form.instance.pk %}Mettre à jour le rapport{% else %}Enregistrer l'intervention{% endif %}</span>
             </button>
@@ -350,7 +387,7 @@
           </div>
           <div class="d-flex align-items-start gap-2 mb-3">
             <span class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace mt-0.5">2</span>
-            <div><strong>État après travaux :</strong> Choisissez « Bon état » si tout est réglé, ou « Fonctionnel — maintenance à prévoir » si le support reste utilisable avec un suivi nécessaire.</div>
+            <div><strong>État après travaux :</strong> choisissez « Bon état », « Signal » ou « En panne ».</div>
           </div>
           <div class="d-flex align-items-start gap-2">
             <span class="badge bg-primary-subtle text-primary border border-primary-subtle font-monospace mt-0.5">3</span>
@@ -469,69 +506,228 @@
       });
     }
 
-    // ── Logic Support / Face AJAX ──
+    // ── Sélection des faces du panneau ──
     const supportSelect    = document.getElementById('id_support');
     const faceSelect       = document.getElementById('id_face');
     const blocFace         = document.getElementById('bloc-face');
-    const blocAppliqueTout = document.getElementById('bloc-appliquer-tout');
-    const checkboxTout     = document.getElementById('id_appliquer_tout');
+    const blocFaces        = document.getElementById('bloc-faces');
+    const blocEtatGlobal   = document.getElementById('bloc-etat-global');
+    const faceStateRows    = document.getElementById('face-state-rows');
+    const facesLoadError   = document.getElementById('faces-load-error');
+    const isEditing        = {{ form.instance.pk|yesno:"true,false" }};
+    const maintenanceStates = {{ maintenance_states_json|safe }};
+    const supportStates = {{ support_states_json|safe }};
+    const maintenanceDetailBase = "{% url 'maintenance_list' %}";
+    const reportBlock = document.getElementById('bloc-rapport');
+    const evidenceBlock = document.getElementById('bloc-preuve');
+    const submitFooter = document.getElementById('submit-footer');
+    const submitButton = submitFooter ? submitFooter.querySelector('button[type="submit"]') : null;
+    const supportRepairAction = document.getElementById('support-repair-action');
 
     if (!supportSelect) return;
 
-    function chargerFaces(supportId, faceSelectionnee = null) {
-      if (!faceSelect) return Promise.resolve();
-      faceSelect.innerHTML = '<option value="">Sélectionnez une face...</option>';
-      if (!supportId) return Promise.resolve();
-      return fetch(`/gestion/inventory/api/faces/${supportId}/`)
-        .then(r => r.json())
-        .then(data => {
-          (data.faces || []).forEach(face => {
-            const opt = document.createElement('option');
-            opt.value = face.id;
-            opt.textContent = `Face ${face.label}`;
-            if (faceSelectionnee && face.id == faceSelectionnee) opt.selected = true;
-            faceSelect.appendChild(opt);
-          });
-        }).catch(() => {});
+    function setSubmissionBlocked(blocked) {
+      [reportBlock, evidenceBlock, submitFooter].forEach(element => {
+        if (element) {
+          element.hidden = blocked;
+          element.style.display = blocked ? 'none' : '';
+        }
+      });
+      if (submitButton) submitButton.disabled = blocked;
     }
 
-    function toggleFaceVisibility() {
-      if (!blocFace) return;
-      if (checkboxTout && checkboxTout.checked) {
-        blocFace.style.display = 'none';
-        if (faceSelect) faceSelect.value = '';
-      } else {
-        blocFace.style.display = '';
+    function showSupportRepairAction(state, repairId) {
+      if (!supportRepairAction) return;
+      supportRepairAction.replaceChildren();
+      if (!state) {
+        supportRepairAction.hidden = true;
+        supportRepairAction.style.display = 'none';
+        return;
       }
+      const message = document.createElement('strong');
+      message.textContent = `Ce support est en état « ${state === 'panne' ? 'En panne' : 'Signal'} ». Réparez-le avant de créer une nouvelle intervention.`;
+      supportRepairAction.appendChild(message);
+      if (repairId) {
+        const link = document.createElement('a');
+        link.href = `${maintenanceDetailBase}${repairId}/`;
+        link.className = 'btn btn-sm btn-success d-inline-flex align-items-center gap-1 mt-2';
+        link.innerHTML = '<i class="bi bi-wrench-adjustable-circle"></i>Réparer ce support';
+        supportRepairAction.appendChild(link);
+      }
+      supportRepairAction.hidden = false;
+      supportRepairAction.style.display = 'block';
     }
 
-    function onSupportChange(faceSelectionnee = null) {
+    function chargerFaces(supportId, faceSelectionnee = null) {
+      if (!supportId) return Promise.resolve();
+      if (facesLoadError) facesLoadError.textContent = '';
+      if (faceStateRows) {
+        faceStateRows.replaceChildren();
+        const loading = document.createElement('span');
+        loading.className = 'text-muted small';
+        loading.textContent = 'Chargement des faces...';
+        faceStateRows.appendChild(loading);
+      }
+      return fetch(`/gestion/inventory/api/faces/${supportId}/`)
+        .then(response => {
+          if (!response.ok) throw new Error('Impossible de charger les faces du panneau.');
+          return response.json();
+        })
+        .then(data => {
+          if (isEditing && faceSelect) {
+            faceSelect.innerHTML = '<option value="">Sélectionnez une face...</option>';
+            (data.faces || []).forEach(face => {
+              const option = document.createElement('option');
+              option.value = face.id;
+              option.textContent = `Face ${face.label}`;
+              if (faceSelectionnee && face.id == faceSelectionnee) option.selected = true;
+              faceSelect.appendChild(option);
+            });
+            return;
+          }
+          if (!faceStateRows) return;
+          faceStateRows.replaceChildren();
+          const faces = data.faces || [];
+          let blockedFaceCount = 0;
+          faces.forEach(face => {
+            const row = document.createElement('div');
+            row.className = 'row align-items-center g-2 p-2 bg-white border rounded';
+            const label = document.createElement('label');
+            label.className = 'form-label fw-semibold mb-0 col-sm-4';
+            label.textContent = `Face ${face.label}`;
+
+            const stateColumn = document.createElement('div');
+            stateColumn.className = 'col-sm-8 d-flex flex-wrap gap-1';
+            const blocked = ['a_maintenir', 'panne'].includes(face.etat);
+            if (blocked) {
+              blockedFaceCount += 1;
+              const stateBadge = document.createElement('span');
+              stateBadge.className = face.etat === 'panne'
+                ? 'badge text-bg-danger align-self-center'
+                : 'badge text-bg-warning align-self-center';
+              stateBadge.textContent = face.etat === 'panne' ? 'En panne' : 'Signal';
+              stateColumn.appendChild(stateBadge);
+              if (face.repair_id) {
+                const repairLink = document.createElement('a');
+                repairLink.href = `${maintenanceDetailBase}${face.repair_id}/`;
+                repairLink.className = 'btn btn-sm btn-success';
+                repairLink.innerHTML = '<i class="bi bi-wrench-adjustable-circle me-1"></i>Réparer cette face';
+                stateColumn.appendChild(repairLink);
+              } else {
+                const missingRepair = document.createElement('span');
+                missingRepair.className = 'text-danger small';
+                missingRepair.textContent = 'Intervention de réparation introuvable.';
+                stateColumn.appendChild(missingRepair);
+              }
+              row.append(label, stateColumn);
+              faceStateRows.appendChild(row);
+              return;
+            }
+            const choices = [{value: '', label: 'Ne pas modifier'}, ...maintenanceStates];
+            choices.forEach((state, index) => {
+              const inputId = `id_etat_face_${face.id}_${index}`;
+              const input = document.createElement('input');
+              input.type = 'radio';
+              input.name = `etat_face_${face.id}`;
+              input.value = state.value;
+              input.id = inputId;
+              input.className = 'btn-check';
+              input.dataset.faceId = face.id;
+              input.checked = state.value === '';
+              const button = document.createElement('label');
+              button.htmlFor = inputId;
+              button.className = state.value === 'bon'
+                ? 'btn btn-sm btn-outline-success'
+                : state.value === 'a_maintenir'
+                  ? 'btn btn-sm btn-outline-warning'
+                  : state.value === 'panne'
+                    ? 'btn btn-sm btn-outline-danger'
+                    : 'btn btn-sm btn-outline-secondary';
+              button.textContent = state.label;
+              stateColumn.append(input, button);
+            });
+            row.append(label, stateColumn);
+            faceStateRows.appendChild(row);
+          });
+          const hasFaces = faces.length > 0;
+          if (!hasFaces) {
+            const emptyMessage = document.createElement('span');
+            emptyMessage.className = 'text-muted small';
+            emptyMessage.textContent = 'Aucune face configurée sur ce panneau.';
+            faceStateRows.appendChild(emptyMessage);
+          }
+          const allFacesBlocked = hasFaces && blockedFaceCount === faces.length;
+          setSubmissionBlocked(allFacesBlocked);
+          showSupportRepairAction(null, null);
+          if (blocEtatGlobal) blocEtatGlobal.style.display = hasFaces ? 'none' : '';
+          if (!hasFaces) {
+            const supportState = supportStates[supportId];
+            const blockedState = supportState && ['a_maintenir', 'panne'].includes(supportState.state)
+              ? supportState.state
+              : null;
+            setSubmissionBlocked(Boolean(blockedState));
+            showSupportRepairAction(blockedState, supportState && supportState.repair_id);
+          }
+        })
+        .catch(error => {
+          if (facesLoadError) facesLoadError.textContent = error.message;
+          if (faceStateRows) faceStateRows.replaceChildren();
+        });
+    }
+
+    function onSupportChange(changed = false, faceSelectionnee = null) {
       const supportId = supportSelect.value;
       const type = supportTypes[supportId];
+      const selectedState = supportStates[supportId];
+      const blockedSupportState = selectedState && ['a_maintenir', 'panne'].includes(selectedState.state)
+        ? selectedState.state
+        : null;
       if (type === 'panneau') {
-        if (blocAppliqueTout) blocAppliqueTout.style.display = 'flex';
-        if (checkboxTout) checkboxTout.checked = true;
-        chargerFaces(supportId, faceSelectionnee).then(toggleFaceVisibility);
+        if (isEditing) {
+          if (blocFace) blocFace.style.display = '';
+          if (blocEtatGlobal) blocEtatGlobal.style.display = '';
+          if (changed) chargerFaces(supportId, faceSelectionnee);
+        } else {
+          if (blocFaces) blocFaces.style.display = '';
+          showSupportRepairAction(null, null);
+          if (changed) {
+            if (blocEtatGlobal) blocEtatGlobal.style.display = 'none';
+            setSubmissionBlocked(false);
+            chargerFaces(supportId);
+          } else if (faceStateRows && faceStateRows.children.length) {
+            if (blocEtatGlobal) blocEtatGlobal.style.display = 'none';
+            const currentFaces = Array.from(faceStateRows.querySelectorAll('.row'));
+            const blockedFaces = currentFaces.filter(row => row.querySelector('.btn-success, .text-bg-warning, .text-bg-danger'));
+            setSubmissionBlocked(currentFaces.length > 0 && currentFaces.length === blockedFaces.length);
+          } else {
+            setSubmissionBlocked(Boolean(blockedSupportState));
+            showSupportRepairAction(blockedSupportState, selectedState && selectedState.repair_id);
+          }
+        }
       } else if (type === 'ecran') {
-        if (blocAppliqueTout) blocAppliqueTout.style.display = 'none';
-        if (checkboxTout) checkboxTout.checked = false;
+        if (blocFaces) blocFaces.style.display = 'none';
+        if (blocEtatGlobal) blocEtatGlobal.style.display = '';
         if (blocFace) blocFace.style.display = 'none';
         if (faceSelect) faceSelect.innerHTML = '<option value="">---------</option>';
+        setSubmissionBlocked(Boolean(blockedSupportState));
+        showSupportRepairAction(blockedSupportState, selectedState && selectedState.repair_id);
       } else {
-        if (blocAppliqueTout) blocAppliqueTout.style.display = 'none';
+        if (blocFaces) blocFaces.style.display = 'none';
+        if (blocEtatGlobal) blocEtatGlobal.style.display = '';
         if (blocFace) blocFace.style.display = 'none';
+        setSubmissionBlocked(Boolean(blockedSupportState));
+        showSupportRepairAction(blockedSupportState, selectedState && selectedState.repair_id);
       }
     }
 
     if (window.jQuery) {
-      $(supportSelect).on('change', () => onSupportChange());
+      $(supportSelect).on('change', () => onSupportChange(true));
     } else {
-      supportSelect.addEventListener('change', () => onSupportChange());
+      supportSelect.addEventListener('change', () => onSupportChange(true));
     }
-    if (checkboxTout) checkboxTout.addEventListener('change', toggleFaceVisibility);
 
     const faceInitiale = faceSelect ? faceSelect.value : null;
-    onSupportChange(faceInitiale);
+    onSupportChange(false, faceInitiale);
   });
 </script>
 {% endblock %}

@@ -8,7 +8,12 @@
 
 {% block topbar_actions %}
   <div class="d-flex flex-wrap gap-2">
-    {% if maintenance.etat_apres == 'panne' %}
+    <a href="{% url 'maintenance_create' maintenance.support.pk %}"
+       style="background:#fef3c7;color:#92400e;border:1px solid #fcd34d;border-radius:8px;padding:6px 16px;font-weight:700;font-size:0.8rem;text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
+      <i class="bi bi-plus-lg"></i>
+      <span>Nouvelle maintenance</span>
+    </a>
+    {% if maintenance.etat_apres == 'panne' or maintenance.etat_apres == 'a_maintenir' %}
     <button type="button" class="btn btn-sm d-inline-flex align-items-center gap-2 shadow-sm"
             data-bs-toggle="modal" data-bs-target="#modalReparationRapide"
             style="background:#10b981;color:#fff;border-radius:8px;padding:6px 18px;font-weight:700;font-size:0.8rem;border:none;">
@@ -186,12 +191,12 @@
     </div>
   </div>
   <div class="d-flex align-items-center gap-2">
-    {% if maintenance.etat_apres == 'panne' %}
+    {% if maintenance.etat_apres == 'panne' or maintenance.etat_apres == 'a_maintenir' %}
     <button type="button" class="btn btn-sm d-inline-flex align-items-center gap-2 shadow"
             data-bs-toggle="modal" data-bs-target="#modalReparationRapide"
             style="background:#10b981;color:#fff;border-radius:10px;padding:8px 16px;font-weight:700;font-size:0.83rem;border:none;">
       <i class="bi bi-check2-circle fs-6"></i>
-      <span>Enregistrer la réparation</span>
+      <span>Enregistrer l'avancement</span>
     </button>
     {% endif %}
     <div class="mxd-hero-date">
@@ -265,9 +270,7 @@
             {% if maintenance.etat_apres == 'bon' %}
               <span class="mxd-badge mxd-badge-bon"><i class="bi bi-check-circle-fill"></i>Opérationnel — Support remis en service</span>
             {% elif maintenance.etat_apres == 'a_maintenir' %}
-              <span class="mxd-badge mxd-badge-maint"><i class="bi bi-exclamation-circle-fill"></i>Fonctionnel — maintenance à prévoir</span>
-            {% elif maintenance.etat_apres == 'maintenance' %}
-              <span class="mxd-badge mxd-badge-maint"><i class="bi bi-wrench"></i>En maintenance — Travaux non finalisés</span>
+              <span class="mxd-badge mxd-badge-maint"><i class="bi bi-exclamation-circle-fill"></i>Signal — Équipement fonctionnel</span>
             {% elif maintenance.etat_apres == 'panne' %}
               <span class="mxd-badge mxd-badge-panne"><i class="bi bi-exclamation-triangle-fill"></i>En panne — Problème persistant</span>
             {% else %}
@@ -278,23 +281,26 @@
         </div>
 
         <!-- ── Encart Panne & Réparation Rapide ── -->
-        {% if maintenance.etat_apres == 'panne' %}
+        {% if maintenance.etat_apres == 'panne' or maintenance.etat_apres == 'a_maintenir' %}
         <div style="background:#fff7ed;border:1px solid #ffedd5;border-radius:12px;padding:16px;margin-top:20px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
           <div class="d-flex align-items-center gap-3">
             <div style="width:42px;height:42px;border-radius:10px;background:#fef3c7;color:#d97706;display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0;">
               <i class="bi bi-exclamation-triangle-fill"></i>
             </div>
             <div>
-              <div style="font-weight:800;font-size:0.88rem;color:#9a3412;">Ce support a été enregistré comme étant EN PANNE</div>
+              <div style="font-weight:800;font-size:0.88rem;color:#9a3412;">
+                Ce support a été enregistré comme étant
+                {% if maintenance.etat_apres == 'a_maintenir' %}SIGNAL{% else %}EN PANNE{% endif %}
+              </div>
               <div style="font-size:0.78rem;color:#b45309;margin-top:2px;">
-                Cliquez sur le bouton pour enregistrer directement la réparation et rétablir l'état opérationnel.
+                Cliquez sur le bouton pour enregistrer directement l'avancement du support et mettre à jour son état.
               </div>
             </div>
           </div>
           <button type="button" class="btn btn-sm shadow-sm"
                   data-bs-toggle="modal" data-bs-target="#modalReparationRapide"
                   style="background:#10b981;color:#fff;border-radius:20px;padding:8px 20px;font-weight:700;font-size:0.82rem;border:none;white-space:nowrap;">
-            <i class="bi bi-wrench-adjustable-circle-fill me-1"></i>Enregistrer la réparation
+            <i class="bi bi-wrench-adjustable-circle-fill me-1"></i>Enregistrer l'avancement
           </button>
         </div>
         {% endif %}
@@ -357,7 +363,7 @@
       <div class="mxd-card-bd">
         <div class="mxd-etat-pill">
           <div class="mxd-etat-dot"
-               style="background:{% if maintenance.support.etat == 'bon' %}#10b981{% elif maintenance.support.etat == 'a_maintenir' or maintenance.support.etat == 'maintenance' %}#f97316{% else %}#ef4444{% endif %};"></div>
+               style="background:{% if maintenance.support.etat == 'bon' %}#10b981{% elif maintenance.support.etat == 'a_maintenir' %}#f97316{% else %}#ef4444{% endif %};"></div>
           <div style="flex:1;">
             <div style="font-weight:700;font-size:0.9rem;">{{ maintenance.support.get_etat_display }}</div>
             <a href="{% url 'support_detail' maintenance.support.uuid %}"
@@ -376,14 +382,14 @@
         Actions Rapides
       </div>
       <div class="mxd-card-bd d-flex flex-column gap-2">
-        {% if maintenance.etat_apres == 'panne' %}
+        {% if maintenance.etat_apres == 'panne' or maintenance.etat_apres == 'a_maintenir' %}
         <button type="button" class="w-100 text-start border-0 shadow-sm"
                 data-bs-toggle="modal" data-bs-target="#modalReparationRapide"
                 style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:#dcfce7;border-radius:10px;color:#166534;font-weight:700;font-size:0.84rem;cursor:pointer;">
           <i class="bi bi-wrench-adjustable-circle-fill text-success fs-5"></i>
           <div>
-            <div>Enregistrer la réparation</div>
-            <div style="font-size:0.7rem;font-weight:normal;color:#15803d;">Remettre en service opérationnel</div>
+            <div>Enregistrer l'avancement</div>
+            <div style="font-size:0.7rem;font-weight:normal;color:#15803d;">Mettre à jour le statut</div>
           </div>
         </button>
         {% endif %}
@@ -418,8 +424,8 @@
             <i class="bi bi-wrench-adjustable-circle-fill"></i>
           </div>
           <div>
-            <h5 class="modal-title fw-bold mb-0" id="modalReparationLabel" style="font-size:1.05rem;">Enregistrer la Réparation</h5>
-            <div style="font-size:0.75rem;opacity:0.85;">Remise en service immédiate de {{ maintenance.support.code }}</div>
+            <h5 class="modal-title fw-bold mb-0" id="modalReparationLabel" style="font-size:1.05rem;">Avancement !</h5>
+            <div style="font-size:0.75rem;opacity:0.85;">Mise à jour de l'état de {{ maintenance.support.code }}</div>
           </div>
         </div>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Fermer"></button>
@@ -446,7 +452,13 @@
               </div>
               <div class="col-6">
                 <span class="text-muted text-uppercase" style="font-size:0.68rem;font-weight:700;">Nouvel État :</span>
-                <div><span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-1 font-monospace">OPÉRATIONNEL (BON)</span></div>
+                <div>
+                  <select name="etat_apres" class="form-select form-select-sm rounded-3 border-success-subtle" aria-label="Choisir l'état">
+                    <option value="bon" {% if maintenance.etat_apres == 'bon' %}selected{% endif %}>Bon état</option>
+                    <option value="a_maintenir" {% if maintenance.etat_apres == 'a_maintenir' %}selected{% endif %}>Signal</option>
+                    <option value="panne" {% if maintenance.etat_apres == 'panne' %}selected{% endif %}>En panne</option>
+                  </select>
+                </div>
               </div>
             </div>
           </div>
@@ -477,7 +489,7 @@
           <div class="d-flex gap-2">
             <button type="submit" class="btn btn-success btn-sm rounded-pill px-4 fw-bold shadow-sm d-flex align-items-center gap-2">
               <i class="bi bi-check-lg"></i>
-              <span>Confirmer la réparation</span>
+              <span>Confirmer l'avancement</span>
             </button>
           </div>
         </div>

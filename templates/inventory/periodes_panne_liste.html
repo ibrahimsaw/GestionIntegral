@@ -32,7 +32,7 @@
         <i class="bi bi-exclamation-octagon-fill me-2"></i>{{ title }}
       </div>
       <div class="cl-hero-sub">
-        Historique et analyse détaillée des durées d'indisponibilité reconstitués à partir des rapports techniques.
+        Historique des signalements et des pannes reconstitué à partir des rapports techniques.
       </div>
     </div>
     <div class="d-flex gap-2 flex-wrap align-items-center">
@@ -60,7 +60,7 @@
       </div>
       <div>
         <div class="cl-kpi-val">{{ nb_total|default:0 }}</div>
-        <div class="cl-kpi-lbl">Pannes Totales</div>
+        <div class="cl-kpi-lbl">Signalements et pannes</div>
       </div>
     </div>
   </div>
@@ -207,15 +207,12 @@
   <div class="card-header bg-white py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-2 border-bottom">
     <div class="d-flex align-items-center gap-2">
       <h6 class="mb-0 fw-bold text-dark">
-        <i class="bi bi-clock-history me-2 text-danger"></i>Périodes d'indisponibilité
+        <i class="bi bi-clock-history me-2 text-danger"></i>Périodes de signalement et de panne
       </h6>
       <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2.5 py-1 font-monospace" style="font-size: 0.75rem;">
         {{ nb_total }} période{{ nb_total|pluralize }}
       </span>
     </div>
-    <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-3 py-1.5 font-monospace" style="font-size: 0.78rem;">
-      Cumul d'indisponibilité : <strong>{{ duree_totale.days|default:0 }} jour{{ duree_totale.days|pluralize }}</strong>
-    </span>
   </div>
 
   <div class="card-body p-0">
@@ -226,7 +223,7 @@
           <tr>
             <th class="ps-4">Support</th>
             <th>Face</th>
-            <th>Début de panne</th>
+            <th>Début du signalement / de la panne</th>
             <th>Fin / Résolution</th>
             <th>Durée</th>
             <th>Constat initial</th>
@@ -258,12 +255,24 @@
 
             {# Début panne #}
             <td>
-              <a href="{% url 'periode_panne_detail' p.maint_panne.pk %}" class="text-decoration-none">
+              <a href="{% url 'periode_panne_detail' p.maint_debut.pk %}" class="text-decoration-none">
                 <div class="fw-bold text-danger font-monospace" style="font-size:0.84rem;">
                   <i class="bi bi-calendar-x me-1"></i>{{ p.debut|date:"d/m/Y" }}
                 </div>
               </a>
               <div class="font-monospace text-muted mt-1" style="font-size:0.72rem;">{{ p.debut|date:"H:i" }}</div>
+              {% if p.etat_debut == 'a_maintenir' %}
+                <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle mt-1">SIGNAL</span>
+              {% elif p.etat_debut == 'panne' %}
+                <span class="badge bg-danger-subtle text-danger border border-danger-subtle mt-1">EN PANNE</span>
+              {% endif %}
+              {% if p.etat_incident != p.etat_debut %}
+                {% if p.etat_incident == 'a_maintenir' %}
+                  <div class="small mt-1 text-warning-emphasis">Dernier état : SIGNAL</div>
+                {% elif p.etat_incident == 'panne' %}
+                  <div class="small mt-1 text-danger">Dernier état : EN PANNE</div>
+                {% endif %}
+              {% endif %}
             </td>
 
             {# Fin panne #}
@@ -287,9 +296,9 @@
 
             {# Description panne #}
             <td>
-              {% if p.maint_panne.description %}
-                <div class="text-muted text-truncate" style="max-width:200px; font-size:0.8rem;" title="{{ p.maint_panne.description }}">
-                  {{ p.maint_panne.description }}
+              {% if p.maint_debut.description %}
+                <div class="text-muted text-truncate" style="max-width:200px; font-size:0.8rem;" title="{{ p.maint_debut.description }}">
+                  {{ p.maint_debut.description }}
                 </div>
               {% else %}
                 <span class="text-muted">—</span>
@@ -314,8 +323,8 @@
               {% else %}
                 <div class="d-inline-flex align-items-center gap-2">
                   <span class="badge bs-panne"><i class="bi bi-exclamation-triangle-fill me-1"></i>En cours</span>
-                  {% if p.maint_panne %}
-                  <a href="{% url 'maintenance_detail' p.maint_panne.pk %}"
+                  {% if p.maint_debut %}
+                  <a href="{% url 'maintenance_detail' p.maint_debut.pk %}"
                      class="badge bg-success text-white text-decoration-none px-2 py-1"
                      title="Réparer">
                     <i class="bi bi-wrench"></i>
@@ -328,7 +337,7 @@
             {# Actions #}
             <td class="text-end pe-4">
               <div class="d-inline-flex gap-1 justify-content-end">
-                <a href="{% url 'periode_panne_detail' p.maint_panne.pk %}"
+                <a href="{% url 'periode_panne_detail' p.maint_debut.pk %}"
                    class="btn btn-sm btn-outline-primary btn-action-icon"
                    title="Voir le détail de la période">
                   <i class="bi bi-eye"></i>
@@ -346,7 +355,7 @@
     <div class="card-body text-center py-5 text-muted">
       <div class="py-4">
         <i class="bi bi-shield-check text-success d-block mb-3" style="font-size: 2.5rem; opacity: 0.8;"></i>
-        <h6 class="fw-bold text-dark mb-1">Aucune période d'indisponibilité</h6>
+        <h6 class="fw-bold text-dark mb-1">Aucun signalement ni panne enregistré</h6>
         <p class="text-muted small mb-0">Tous les supports correspondants aux filtres sélectionnés sont 100% opérationnels.</p>
       </div>
     </div>

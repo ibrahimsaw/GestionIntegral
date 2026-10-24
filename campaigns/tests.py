@@ -531,6 +531,26 @@ class DashboardParcGroupingTests(TestCase):
         self.assertIn('Marché carte', rendered)
         self.assertIn('Marché sans panneau', rendered)
 
+    def test_market_card_links_to_all_markets_without_a_format_filter(self):
+        market = Marche.objects.create(nom='Marché lien carte', ville='Ouagadougou')
+        emplacement = Emplacement.objects.create(marche=market, code='MAP-01')
+        support = self.create_support('DASH-MARKET-MAP-LINK', 'DASH-MAR')
+        support.emplacement = emplacement
+        support.save()
+        FacePanneau.objects.create(support=support, label='A')
+        cache.clear()
+
+        request = self.make_request('/', {'ville': 'Ouagadougou'})
+        view = DashboardView()
+        view.setup(request)
+        context = view.get_context_data()
+        rendered = render_to_string(view.template_name, context, request=request)
+
+        self.assertIn(
+            'href="/gestion/campaigns/parc/format/marche/?ville=Ouagadougou"',
+            rendered,
+        )
+
     def test_screen_inventory_counts_occupancy_per_resolution(self):
         today = timezone.now().date()
         occupied_screen = Support.objects.create(

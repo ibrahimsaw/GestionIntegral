@@ -127,7 +127,7 @@ def run():
         lat = BASE_LAT + random.uniform(-0.05, 0.05)
         lng = BASE_LNG + random.uniform(-0.05, 0.05)
         quartier = random.choice(quartiers)
-        etat = random.choices(['bon', 'maintenance', 'panne'], weights=[85, 10, 5])[0]
+        etat = random.choices(['bon', 'a_maintenir', 'panne'], weights=[85, 10, 5])[0]
 
         p = Support.objects.create(
             code=code,
@@ -301,7 +301,7 @@ def run():
             adresse=adresse + ', Bobo-Dioulasso',
             ville='Bobo-Dioulasso',
             quartier=quartier,
-            etat=random.choices(['bon', 'maintenance', 'panne'], weights=[85, 10, 5])[0],
+            etat=random.choices(['bon', 'a_maintenir', 'panne'], weights=[85, 10, 5])[0],
             date_installation=today - datetime.timedelta(days=random.randint(30, 730)),
             created_by=created_admin,
         )

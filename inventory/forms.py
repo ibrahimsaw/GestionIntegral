@@ -280,12 +280,17 @@ from inventory.models import Maintenance, Support, FacePanneau
 
 
 class MaintenanceForm(forms.ModelForm):
-    appliquer_tout_le_support = forms.BooleanField(
-        required=False,
-        label="Appliquer cet état à tout le support (toutes les faces)",
-        help_text="Si coché, l'état sera appliqué à toutes les faces du panneau, "
-                   "sans avoir besoin de sélectionner une face précise.",
-        widget=forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'id_appliquer_tout'}),
+    ETAT_CHOICES = tuple(
+        (
+            state,
+            label,
+        )
+        for state, label in Support.ETAT_CHOICES
+        if state in (
+            Support.ETAT_BON,
+            Support.ETAT_A_MAINTENIR,
+            Support.ETAT_PANNE,
+        )
     )
 
     class Meta:
@@ -319,14 +324,7 @@ class MaintenanceForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
 
         # ── État enregistré après intervention ────────────────────────────
-        self.fields['etat_apres'].choices = [
-            (Maintenance.ETAT_BON, 'Bon état'),
-            (
-                Maintenance.ETAT_A_MAINTENIR,
-                'Fonctionnel — maintenance à prévoir',
-            ),
-            (Maintenance.ETAT_PANNE, 'En panne'),
-        ]
+        self.fields['etat_apres'].choices = list(self.ETAT_CHOICES)
         self.fields['etat_apres'].initial = Maintenance.ETAT_BON
 
         if self.instance.pk and self.instance.date_intervention:
@@ -360,13 +358,43 @@ class MaintenanceForm(forms.ModelForm):
             active_support_id = self.instance.support_id
 
         if active_support_id:
-            self.fields['face'].queryset = FacePanneau.objects.filter(
+            faces_qs = FacePanneau.objects.filter(
                 support_id=active_support_id
             ).order_by('label')
+            self.faces_queryset = faces_qs
+            self.fields['face'].queryset = faces_qs
+            self.blocked_face_repair_ids = {}
+            if not self.instance.pk:
+                for panel_face in faces_qs:
+                    field_name = f'etat_face_{panel_face.pk}'
+                    self.fields[field_name] = forms.ChoiceField(
+                        choices=[('', 'Ne pas modifier')]
+                        + list(self.ETAT_CHOICES),
+                        required=False,
+                        initial='',
+                        label=f'État de la face {panel_face.label}',
+                        widget=forms.RadioSelect(attrs={
+                            'class': 'btn-check',
+                            'data-face-id': panel_face.pk,
+                        }),
+                    )
+                    if panel_face.etat in (
+                        Support.ETAT_A_MAINTENIR,
+                        Support.ETAT_PANNE,
+                    ):
+                        latest_repair = Maintenance.objects.filter(
+                            face=panel_face,
+                            etat_apres=panel_face.etat,
+                        ).order_by('-date_intervention', '-pk').first()
+                        if latest_repair:
+                            self.blocked_face_repair_ids[panel_face.pk] = latest_repair.pk
         else:
+            self.faces_queryset = FacePanneau.objects.none()
             self.fields['face'].queryset = FacePanneau.objects.none()
+            self.blocked_face_repair_ids = {}
 
         self.fields['face'].required = False
+        self.fields['etat_apres'].required = bool(self.instance.pk)
 
         if support_pk:
             self.initial['support']                         = support_pk
@@ -383,17 +411,30 @@ class MaintenanceForm(forms.ModelForm):
             self.fields['effectue_par'].widget.attrs['disabled'] = 'disabled'
             self.fields['effectue_par'].required                 = False
 
-        # ── Sur une mise à jour, la case "appliquer à tout" n'a pas de sens
-        #    (on modifie une maintenance existante liée à une face précise) ──
+        # Les choix multiples ne concernent que la création; une modification
+        # reste strictement liée à la face de l'intervention existante.
         if self.instance.pk:
-            del self.fields['appliquer_tout_le_support']
+            del self.fields['face']
+
+    @property
+    def face_rows(self):
+        return [
+            {
+                'face': panel_face,
+                'etat': self[f'etat_face_{panel_face.pk}'],
+                'blocked': panel_face.etat in (
+                    Support.ETAT_A_MAINTENIR,
+                    Support.ETAT_PANNE,
+                ),
+                'repair_id': self.blocked_face_repair_ids.get(panel_face.pk),
+            }
+            for panel_face in self.faces_queryset
+        ]
 
     def clean(self):
         cleaned_data   = super().clean()
         face           = cleaned_data.get('face')
         support        = cleaned_data.get('support')
-        appliquer_tout = cleaned_data.get('appliquer_tout_le_support', False)
-
         # Le support peut être désactivé dans le widget (disabled) → il faut le retrouver manuellement
         if not support:
             support_id = self.data.get('support') or self.instance.support_id
@@ -405,9 +446,68 @@ class MaintenanceForm(forms.ModelForm):
                     cleaned_data['support'] = support
                     self.instance.support_id = support.pk
 
-        if not appliquer_tout:
-            if support and support.type_support == Support.TYPE_PANNEAU and not face:
-                self.add_error('face', "Sélectionnez une face, ou cochez « Appliquer à tout le support ».")
+        if (
+            not self.instance.pk
+            and support
+            and (
+                support.type_support != Support.TYPE_PANNEAU
+                or not self.faces_queryset.exists()
+            )
+            and support.etat in (Support.ETAT_A_MAINTENIR, Support.ETAT_PANNE)
+        ):
+            self.add_error(
+                'support',
+                f'Ce support est actuellement « {support.get_etat_display} ». '
+                'Enregistrez sa réparation avant de créer une nouvelle intervention.',
+            )
+
+        states_by_face = {
+            panel_face.pk: cleaned_data.get(f'etat_face_{panel_face.pk}')
+            for panel_face in self.faces_queryset
+        }
+        selected_faces = {
+            face_id: state
+            for face_id, state in states_by_face.items()
+            if state
+        }
+        cleaned_data['states_by_face'] = selected_faces
+        blocked_face_ids = {
+            panel_face.pk
+            for panel_face in self.faces_queryset
+            if panel_face.etat in (
+                Support.ETAT_A_MAINTENIR,
+                Support.ETAT_PANNE,
+            )
+        }
+        for face_id in selected_faces.keys() & blocked_face_ids:
+            self.add_error(
+                f'etat_face_{face_id}',
+                'Cette face doit être réparée avant de créer une nouvelle intervention.',
+            )
+
+        if (
+            not self.instance.pk
+            and support
+            and support.type_support == Support.TYPE_PANNEAU
+            and self.faces_queryset.exists()
+            and not selected_faces
+        ):
+            self.add_error(
+                None,
+                'Choisissez un état uniquement pour la face à enregistrer.',
+            )
+
+        if support and support.type_support == Support.TYPE_ECRAN and not cleaned_data.get('etat_apres'):
+            self.add_error('etat_apres', 'Sélectionnez l’état de l’écran après intervention.')
+
+        if (
+            not self.instance.pk
+            and support
+            and support.type_support == Support.TYPE_PANNEAU
+            and not self.faces_queryset.exists()
+            and not cleaned_data.get('etat_apres')
+        ):
+            self.add_error('etat_apres', 'Sélectionnez l’état du support après intervention.')
 
         if face and support:
             if face.support_id != support.pk:

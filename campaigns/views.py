@@ -317,7 +317,6 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             group['nb_actifs' if support.actif else 'nb_inactifs'] += 1
             state_key = {
                 Support.ETAT_BON: 'nb_bon',
-                Support.ETAT_MAINTENANCE: 'nb_maintenance',
                 Support.ETAT_A_MAINTENIR: 'nb_maintenance',
                 Support.ETAT_PANNE: 'nb_panne',
             }.get(support.etat)
@@ -329,7 +328,6 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                     group['nb_faces'] += 1
                     face_state_key = {
                         Support.ETAT_BON: 'nb_faces_bon',
-                        Support.ETAT_MAINTENANCE: 'nb_faces_maintenance',
                         Support.ETAT_A_MAINTENIR: 'nb_faces_maintenance',
                         Support.ETAT_PANNE: 'nb_faces_panne',
                     }.get(face.etat)
@@ -879,7 +877,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             for row in supports_qs.values('format').annotate(
                 total=Count('id'),
                 bon=Count('id', filter=Q(etat__in=Support.ETATS_OPERATIONNELS)),
-                maintenance=Count('id', filter=Q(etat=Support.ETAT_MAINTENANCE)),
+                maintenance=Count('id', filter=Q(etat=Support.ETAT_A_MAINTENIR)),
                 panne=Count('id', filter=Q(etat=Support.ETAT_PANNE)),
             )
         }

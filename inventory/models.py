@@ -64,16 +64,15 @@ TYPE_CHOICES = [
     (TYPE_ECRAN,   'Écran Numérique'),
 ]
 ETAT_BON         = 'bon'
-ETAT_MAINTENANCE = 'maintenance'
 ETAT_A_MAINTENIR = 'a_maintenir'
 ETAT_PANNE       = 'panne'
 ETAT_CHOICES = [
     (ETAT_BON,         'Bon état'),
-    (ETAT_MAINTENANCE, 'En maintenance'),
-    (ETAT_A_MAINTENIR, 'Fonctionnel — maintenance à prévoir'),
+    (ETAT_A_MAINTENIR, 'Signal'),
     (ETAT_PANNE,       'En panne'),
 ]
 ETATS_OPERATIONNELS = (ETAT_BON, ETAT_A_MAINTENIR)
+ETATS_INCIDENTS = (ETAT_A_MAINTENIR, ETAT_PANNE)
 
 
 class FormatSupport(models.Model):
@@ -319,7 +318,6 @@ class Support(models.Model):
     TYPE_ECRAN = TYPE_ECRAN
     TYPE_CHOICES = TYPE_CHOICES
     ETAT_BON = ETAT_BON
-    ETAT_MAINTENANCE = ETAT_MAINTENANCE
     ETAT_A_MAINTENIR = ETAT_A_MAINTENIR
     ETAT_PANNE = ETAT_PANNE
     ETATS_OPERATIONNELS = ETATS_OPERATIONNELS
@@ -433,7 +431,7 @@ class Support(models.Model):
             all_faces = self.faces.all()
             if all_faces.exists() and all_faces.filter(etat=self.ETAT_PANNE).count() == all_faces.count():
                 return cfg['COLOR_PANNE']
-        if self.etat in [self.ETAT_PANNE, self.ETAT_MAINTENANCE]:
+        if self.etat == self.ETAT_PANNE:
             return cfg['COLOR_PANNE']
         if self.etat == self.ETAT_A_MAINTENIR:
             return cfg['COLOR_MAINTENANCE']
@@ -617,10 +615,12 @@ class Support(models.Model):
             return round(pourcentage, 2)
         return None
     
-    def get_periodes_panne(self):
+    def get_periodes_panne(self, include_signal=True):
         """
-        Retourne la liste des périodes de panne pour ce support.
-        Une période = intervalle entre un état 'panne' et le prochain état 'bon'.
+        Retourne les périodes de panne et, par défaut, de signalement.
+
+        Avec include_signal=False, conserve le calcul historique des périodes
+        de panne pour les statistiques de disponibilité.
         
         Pour un panneau : analyse les maintenances par face.
         Pour un écran   : analyse les maintenances du support directement.
@@ -628,9 +628,9 @@ class Support(models.Model):
         Retourne une liste de dicts :
         [
             {
-                'debut'   : datetime,   # date de la mise en panne
-                'fin'     : datetime,   # date du retour en bon état (None si toujours en panne)
-                'duree'   : timedelta,  # durée de la panne (None si toujours en panne)
+                'debut'   : datetime,   # date du signalement ou de la panne
+                'fin'     : datetime,   # date du retour à l'état bon (None si encore actif)
+                'duree'   : timedelta,  # durée du signalement / de la panne
                 'face'    : FacePanneau | None,
                 'resolue' : bool,
             },
@@ -647,31 +647,42 @@ class Support(models.Model):
                     .filter(face=face)
                     .order_by('date_intervention')
                 )
-                panne_debut = None
+                incident_debut = None
+                debut_etat = None
+                dernier_etat_incident = None
 
                 for maint in maints:
-                    if maint.etat_apres == ETAT_PANNE and panne_debut is None:
-                        # Début d'une période de panne
-                        panne_debut = maint.date_intervention
+                    etats_debut = ETATS_INCIDENTS if include_signal else (ETAT_PANNE,)
+                    etats_fin = (ETAT_BON,) if include_signal else ETATS_OPERATIONNELS
+                    if maint.etat_apres in etats_debut and incident_debut is None:
+                        incident_debut = maint.date_intervention
+                        debut_etat = maint.etat_apres
+                        dernier_etat_incident = maint.etat_apres
+                    elif maint.etat_apres in etats_debut and incident_debut is not None:
+                        dernier_etat_incident = maint.etat_apres
 
-                    elif maint.etat_apres in ETATS_OPERATIONNELS and panne_debut is not None:
-                        # Fin de la période de panne
+                    elif maint.etat_apres in etats_fin and incident_debut is not None:
                         periodes.append({
-                            'debut'   : panne_debut,
+                            'debut'   : incident_debut,
                             'fin'     : maint.date_intervention,
-                            'duree'   : maint.date_intervention - panne_debut,
+                            'duree'   : maint.date_intervention - incident_debut,
                             'face'    : face,
+                            'etat_debut': debut_etat,
+                            'etat_incident': dernier_etat_incident,
                             'resolue' : True,
                         })
-                        panne_debut = None
+                        incident_debut = None
+                        debut_etat = None
+                        dernier_etat_incident = None
 
-                # Panne toujours ouverte (pas encore résolue)
-                if panne_debut is not None:
+                if incident_debut is not None:
                     periodes.append({
-                        'debut'   : panne_debut,
+                        'debut'   : incident_debut,
                         'fin'     : None,
-                        'duree'   : timezone.now() - panne_debut,
+                        'duree'   : timezone.now() - incident_debut,
                         'face'    : face,
+                        'etat_debut': debut_etat,
+                        'etat_incident': dernier_etat_incident,
                         'resolue' : False,
                     })
 
@@ -682,28 +693,42 @@ class Support(models.Model):
                 .filter(support=self, face__isnull=True)
                 .order_by('date_intervention')
             )
-            panne_debut = None
+            incident_debut = None
+            debut_etat = None
+            dernier_etat_incident = None
 
             for maint in maints:
-                if maint.etat_apres == ETAT_PANNE and panne_debut is None:
-                    panne_debut = maint.date_intervention
+                etats_debut = ETATS_INCIDENTS if include_signal else (ETAT_PANNE,)
+                etats_fin = (ETAT_BON,) if include_signal else ETATS_OPERATIONNELS
+                if maint.etat_apres in etats_debut and incident_debut is None:
+                    incident_debut = maint.date_intervention
+                    debut_etat = maint.etat_apres
+                    dernier_etat_incident = maint.etat_apres
+                elif maint.etat_apres in etats_debut and incident_debut is not None:
+                    dernier_etat_incident = maint.etat_apres
 
-                elif maint.etat_apres in ETATS_OPERATIONNELS and panne_debut is not None:
+                elif maint.etat_apres in etats_fin and incident_debut is not None:
                     periodes.append({
-                        'debut'   : panne_debut,
+                        'debut'   : incident_debut,
                         'fin'     : maint.date_intervention,
-                        'duree'   : maint.date_intervention - panne_debut,
+                        'duree'   : maint.date_intervention - incident_debut,
                         'face'    : None,
+                        'etat_debut': debut_etat,
+                        'etat_incident': dernier_etat_incident,
                         'resolue' : True,
                     })
-                    panne_debut = None
+                    incident_debut = None
+                    debut_etat = None
+                    dernier_etat_incident = None
 
-            if panne_debut is not None:
+            if incident_debut is not None:
                 periodes.append({
-                    'debut'   : panne_debut,
+                    'debut'   : incident_debut,
                     'fin'     : None,
-                    'duree'   : timezone.now() - panne_debut,
+                    'duree'   : timezone.now() - incident_debut,
                     'face'    : None,
+                    'etat_debut': debut_etat,
+                    'etat_incident': dernier_etat_incident,
                     'resolue' : False,
                 })
 
@@ -714,7 +739,7 @@ class Support(models.Model):
         Retourne True si ce support (ou au moins une face) était/est en panne
         sur tout ou partie de la période donnée.
         """
-        periodes = self.get_periodes_panne()
+        periodes = self.get_periodes_panne(include_signal=False)
         for p in periodes:
             p_debut = p['debut'].date() if hasattr(p['debut'], 'date') else p['debut']
             p_fin   = p['fin'].date()   if p['fin'] and hasattr(p['fin'], 'date') else p['fin']
@@ -747,7 +772,7 @@ class Support(models.Model):
         total_jours = (date_fin - date_debut).days + 1
         jours_panne = 0
 
-        periodes = self.get_periodes_panne()
+        periodes = self.get_periodes_panne(include_signal=False)
         #print(f"periodes panne", periodes)
         for p in periodes:
             p_debut = p['debut'].date() if hasattr(p['debut'], 'date') else p['debut']
@@ -975,7 +1000,6 @@ class FacePanneau(models.Model):
 
         for maint in maintenances:
             if maint.etat_apres == ETAT_PANNE and panne_debut is None:
-                # Début d'une période de panne
                 panne_debut = maint.date_intervention
 
             elif maint.etat_apres in ETATS_OPERATIONNELS and panne_debut is not None:
@@ -992,7 +1016,6 @@ class FacePanneau(models.Model):
 
                 panne_debut = None
 
-        # Panne toujours ouverte (pas encore résolue)
         if panne_debut is not None:
             p_debut = panne_debut.date() if hasattr(panne_debut, 'date') else panne_debut
             p_fin = date_fin
@@ -1268,7 +1291,7 @@ class Maintenance(models.Model):
         if self.face:
             return f"Maintenance {self.support.code} {self.face.label} — {self.date_intervention:%d/%m/%Y}"
         return f"Maintenance {self.support.code} — {self.date_intervention:%d/%m/%Y}"
-    
+
     def clean(self):
         from django.core.exceptions import ValidationError
 
@@ -1516,7 +1539,15 @@ class Maintenance(models.Model):
             toutes_les_faces = support.faces.all()
             if toutes_les_faces.exists():
                 toutes_en_panne = all(f.etat == ETAT_PANNE for f in toutes_les_faces)
-                nouvel_etat_support = ETAT_PANNE if toutes_en_panne else ETAT_BON
+                faces_a_maintenir = toutes_les_faces.filter(
+                    etat=Support.ETAT_A_MAINTENIR,
+                ).exists()
+                if toutes_en_panne:
+                    nouvel_etat_support = ETAT_PANNE
+                elif faces_a_maintenir:
+                    nouvel_etat_support = Support.ETAT_A_MAINTENIR
+                else:
+                    nouvel_etat_support = ETAT_BON
             else:
                 nouvel_etat_support = ETAT_BON
 

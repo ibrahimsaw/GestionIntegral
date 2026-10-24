@@ -133,8 +133,7 @@ class FormatSupportDetailView(LoginRequiredMixin, DetailView):
         # ── Répartition par état ──────────────────────────────────────
         etats = {row['etat']: row['n'] for row in supports.values('etat').annotate(n=Count('pk'))}
         nb_bon = etats.get(Support.ETAT_BON, 0)
-        nb_maintenance = etats.get(Support.ETAT_MAINTENANCE, 0)
-        nb_maintenance_preventive = etats.get(Support.ETAT_A_MAINTENIR, 0)
+        nb_maintenance = etats.get(Support.ETAT_A_MAINTENIR, 0)
         nb_panne = etats.get(Support.ETAT_PANNE, 0)
 
         # ── Répartition par ville ─────────────────────────────────────
@@ -176,7 +175,6 @@ class FormatSupportDetailView(LoginRequiredMixin, DetailView):
             'unite_surface': 'cellules' if est_ecran else 'm²',
             'nb_bon': nb_bon,
             'nb_maintenance': nb_maintenance,
-            'nb_maintenance_preventive': nb_maintenance_preventive,
             'nb_panne': nb_panne,
             'villes': villes,
             'nb_villes': len(villes),
@@ -1063,7 +1061,7 @@ class CarteView(LoginRequiredMixin, TemplateView):
                 etat=Support.ETAT_BON,
             ).count(),
             'maintenance': Support.objects.filter(
-                etat__in=(Support.ETAT_MAINTENANCE, Support.ETAT_A_MAINTENIR),
+                etat=Support.ETAT_A_MAINTENIR,
             ).count(),
             'panne': Support.objects.filter(etat='panne').count(),
             'panneaux': Support.objects.filter(type_support='panneau').count(),
@@ -1079,8 +1077,21 @@ carte = CarteView.as_view()
 from django.http import JsonResponse
 
 def get_faces_support(request, support_id):
-    faces = FacePanneau.objects.filter(support_id=support_id).values('id', 'label')
-    data = [{'id': f['id'], 'label': f['label']} for f in faces]
+    faces = FacePanneau.objects.filter(
+        support_id=support_id,
+    ).order_by('label').values('id', 'label', 'etat')
+    data = []
+    for face in faces:
+        latest_repair = Maintenance.objects.filter(
+            face_id=face['id'],
+            etat_apres=face['etat'],
+        ).order_by('-date_intervention', '-pk').first()
+        data.append({
+            'id': face['id'],
+            'label': face['label'],
+            'etat': face['etat'],
+            'repair_id': latest_repair.pk if latest_repair else None,
+        })
     return JsonResponse({'faces': data})
 
 # class TechnicienUpdateView(TechnicienRequiredMixin, FormView):
@@ -1965,7 +1976,9 @@ class MaintenanceListView(LoginRequiredMixin, SortableListMixin, ListView):
         context['kpi_operationnels'] = base_qs.filter(
             etat_apres__in=Support.ETATS_OPERATIONNELS,
         ).count()
-        context['kpi_en_maintenance'] = base_qs.filter(etat_apres='maintenance').count()
+        context['kpi_en_maintenance'] = base_qs.filter(
+            etat_apres=Support.ETAT_A_MAINTENIR,
+        ).count()
         context['kpi_en_panne'] = base_qs.filter(etat_apres='panne').count()
         context['kpi_pannes_actives'] = Support.objects.filter(actif=True, etat='panne').count()
 
@@ -2023,22 +2036,34 @@ class MaintenanceCreateView(LoginRequiredMixin, CreateView):
         if self.request.user.is_technicien:
             form.instance.effectue_par = self.request.user
 
-        appliquer_tout = form.cleaned_data.get('appliquer_tout_le_support', False)
-
-        if appliquer_tout:
-            support = form.cleaned_data['support'] or form.instance.support
-            maintenances = Maintenance.creer_pour_support_complet(
-                support=support,
-                etat_apres=form.instance.etat_apres,
-                effectue_par=form.instance.effectue_par,
-                description=form.instance.description,
-                photo=self.request.FILES.get('photo'),
-            )
-            messages.success(
-                self.request,
-                f"{len(maintenances)} face(s) mise(s) à jour pour {support.code}."
-            )
-            return redirect(self.success_url)
+        support = form.cleaned_data['support'] or form.instance.support
+        if support.type_support == Support.TYPE_PANNEAU:
+            states_by_face = form.cleaned_data.get('states_by_face', {})
+            faces = [
+                (face, states_by_face[face.pk])
+                for face in form.faces_queryset
+                if states_by_face.get(face.pk)
+            ]
+            if faces:
+                photo = self.request.FILES.get('photo')
+                with transaction.atomic():
+                    for index, (face, etat_apres) in enumerate(faces):
+                        Maintenance.objects.create(
+                            support=support,
+                            face=face,
+                            effectue_par=form.instance.effectue_par,
+                            date_intervention=form.instance.date_intervention,
+                            etat_apres=etat_apres,
+                            description=form.instance.description,
+                            photo=photo if index == 0 else None,
+                        )
+                messages.success(
+                    self.request,
+                    f"{len(faces)} face(s) mise(s) à jour pour {support.code}."
+                )
+                return redirect(self.success_url)
+            if form.faces_queryset.exists():
+                return self.form_invalid(form)
 
         response = super().form_valid(form)
         messages.success(self.request, f'Maintenance enregistrée pour {self.object.support.code}.')
@@ -2051,10 +2076,77 @@ class MaintenanceCreateView(LoginRequiredMixin, CreateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['title'] = 'Nouvelle maintenance'
+        support_id = (
+            self.kwargs.get('pk')
+            or context['form'].data.get('support')
+            or context['form'].initial.get('support')
+        )
+        if hasattr(support_id, 'pk'):
+            support_id = support_id.pk
+        context['blocked_support'] = None
+        context['blocked_support_repair_id'] = None
+        supports = list(
+            Support.objects.filter(actif=True).only('pk', 'type_support', 'etat')
+        )
+        support_ids_with_faces = set(
+            FacePanneau.objects.filter(
+                support_id__in=[s.pk for s in supports],
+            ).values_list('support_id', flat=True)
+        )
+        if support_id:
+            support = Support.objects.filter(pk=support_id).first()
+            if (
+                support
+                and (
+                    support.type_support != Support.TYPE_PANNEAU
+                    or support.pk not in support_ids_with_faces
+                )
+                and support.etat in (
+                    Support.ETAT_A_MAINTENIR,
+                    Support.ETAT_PANNE,
+                )
+            ):
+                context['blocked_support'] = support
+
         context['support_types_json'] = json.dumps({
             s.pk: s.type_support
-            for s in Support.objects.filter(actif=True).only('pk', 'type_support')
+            for s in supports
         })
+        blocked_support_ids = [
+            s.pk for s in supports
+            if s.etat in (Support.ETAT_A_MAINTENIR, Support.ETAT_PANNE)
+            and (
+                s.type_support != Support.TYPE_PANNEAU
+                or s.pk not in support_ids_with_faces
+            )
+        ]
+        support_repair_ids = {}
+        for repair in Maintenance.objects.filter(
+            support_id__in=blocked_support_ids,
+            face__isnull=True,
+            etat_apres__in=(Support.ETAT_A_MAINTENIR, Support.ETAT_PANNE),
+        ).order_by('support_id', '-date_intervention', '-pk'):
+            support_repair_ids.setdefault(repair.support_id, repair.pk)
+        context['support_states_json'] = json.dumps({
+            s.pk: {
+                'state': s.etat,
+                'repair_id': support_repair_ids.get(s.pk),
+            }
+            for s in supports
+        })
+        if context['blocked_support']:
+            context['blocked_support_repair_id'] = support_repair_ids.get(
+                context['blocked_support'].pk,
+            )
+        form = context['form']
+        context['all_faces_blocked'] = bool(form.faces_queryset.exists()) and all(
+            face.etat in (Support.ETAT_A_MAINTENIR, Support.ETAT_PANNE)
+            for face in form.faces_queryset
+        )
+        context['maintenance_states_json'] = json.dumps([
+            {'value': state, 'label': label}
+            for state, label in MaintenanceForm.ETAT_CHOICES
+        ])
         return context
 
 
@@ -2088,6 +2180,10 @@ class MaintenanceUpdateView(LoginRequiredMixin, UpdateView):
             s.pk: s.type_support
             for s in Support.objects.filter(actif=True).only('pk', 'type_support')
         })
+        context['maintenance_states_json'] = json.dumps([
+            {'value': state, 'label': label}
+            for state, label in MaintenanceForm.ETAT_CHOICES
+        ])
         return context
 
 
@@ -2105,6 +2201,10 @@ class MaintenanceQuickRepairView(LoginRequiredMixin, View):
             description = f"Réparation effectuée — Remise en service opérationnel suite à l'intervention #{maintenance.pk}{face_info}"
 
         photo = request.FILES.get('photo')
+        etat_apres = request.POST.get('etat_apres', Maintenance.ETAT_BON)
+        if etat_apres not in {Maintenance.ETAT_BON, Maintenance.ETAT_A_MAINTENIR, Maintenance.ETAT_PANNE}:
+            etat_apres = Maintenance.ETAT_BON
+
         date_str = request.POST.get('date_intervention')
         if date_str:
             try:
@@ -2121,14 +2221,19 @@ class MaintenanceQuickRepairView(LoginRequiredMixin, View):
             face=face,
             effectue_par=request.user,
             date_intervention=date_intervention,
-            etat_apres=Maintenance.ETAT_BON,
+            etat_apres=etat_apres,
             description=description,
             photo=photo,
         )
 
+        label_etat = {
+            Maintenance.ETAT_BON: 'opérationnel',
+            Maintenance.ETAT_A_MAINTENIR: 'signalé',
+            Maintenance.ETAT_PANNE: 'en panne',
+        }.get(etat_apres, 'opérationnel')
         messages.success(
             request,
-            f"Réparation enregistrée avec succès pour {support.code}{f' (Face {face.label})' if face else ''} ! Le statut est maintenant opérationnel."
+            f"Avancement enregistré avec succès pour {support.code}{f' (Face {face.label})' if face else ''} ! Le statut est maintenant {label_etat}."
         )
         return redirect('maintenance_detail', pk=nouvelle.pk)
 
@@ -2180,7 +2285,7 @@ class SupportPeriodesVanneView(LoginRequiredMixin, View):
             'duree_totale'  : duree_totale,
             'duree_moyenne' : duree_moyenne,
             'stats_par_face': stats_par_face,
-            'title'         : f'Périodes de panne — {support.code}',
+            'title'         : f'Périodes de signalement et de panne — {support.code}',
         }
         return render(request, self.template_name, context)
     
@@ -2222,38 +2327,46 @@ class PeriodesParVueView(LoginRequiredMixin, View):
             maints_group = list(group)
             support      = maints_group[0].support
             face         = maints_group[0].face
-            panne_debut  = None
-            panne_maint  = None
+            incident_debut = None
+            maintenance_debut = None
+            etat_incident = None
 
             for maint in maints_group:
-                if maint.etat_apres == ETAT_PANNE and panne_debut is None:
-                    panne_debut = maint.date_intervention
-                    panne_maint = maint
+                if maint.etat_apres in (Support.ETAT_A_MAINTENIR, ETAT_PANNE) and incident_debut is None:
+                    incident_debut = maint.date_intervention
+                    maintenance_debut = maint
+                    etat_incident = maint.etat_apres
+                elif maint.etat_apres in (Support.ETAT_A_MAINTENIR, ETAT_PANNE) and incident_debut is not None:
+                    etat_incident = maint.etat_apres
 
-                elif maint.etat_apres == ETAT_BON and panne_debut is not None:
+                elif maint.etat_apres == ETAT_BON and incident_debut is not None:
                     periodes.append({
                         'support'     : support,
                         'face'        : face,
-                        'debut'       : panne_debut,
+                        'debut'       : incident_debut,
                         'fin'         : maint.date_intervention,
-                        'duree'       : maint.date_intervention - panne_debut,
+                        'duree'       : maint.date_intervention - incident_debut,
                         'resolue'     : True,
-                        'maint_panne' : panne_maint,
+                        'maint_debut' : maintenance_debut,
+                        'etat_debut'  : maintenance_debut.etat_apres,
+                        'etat_incident': etat_incident,
                         'maint_bon'   : maint,
                     })
-                    panne_debut = None
-                    panne_maint = None
+                    incident_debut = None
+                    maintenance_debut = None
+                    etat_incident = None
 
-            # Panne toujours ouverte
-            if panne_debut is not None:
+            if incident_debut is not None:
                 periodes.append({
                     'support'     : support,
                     'face'        : face,
-                    'debut'       : panne_debut,
+                    'debut'       : incident_debut,
                     'fin'         : None,
-                    'duree'       : timezone.now() - panne_debut,
+                    'duree'       : timezone.now() - incident_debut,
                     'resolue'     : False,
-                    'maint_panne' : panne_maint,
+                    'maint_debut' : maintenance_debut,
+                    'etat_debut'  : maintenance_debut.etat_apres,
+                    'etat_incident': etat_incident,
                     'maint_bon'   : None,
                 })
 
@@ -2296,7 +2409,7 @@ class PeriodesParVueView(LoginRequiredMixin, View):
         ).distinct().order_by('code')
 
         context = {
-            'title'         : 'Périodes de panne',
+            'title'         : 'Périodes de signalement et de panne',
             'periodes'      : periodes,
             'nb_total'      : nb_total,
             'nb_resolues'   : nb_resolues,

@@ -246,6 +246,49 @@ class SupportMarketPlacementDefaultsTests(TestCase):
             first_free.pk,
         )
 
+    def test_market_panel_is_included_in_supports_geojson(self):
+        market = Marche.objects.create(
+            nom='Marché visible sur la carte',
+            latitude=12.345,
+            longitude=-1.523,
+        )
+        emplacement = Emplacement.objects.create(marche=market, code='B-01')
+        support = Support.objects.create(
+            code='MARKET-PANEL-GEOJSON',
+            nom='Panneau du marché',
+            type_support=Support.TYPE_PANNEAU,
+            format=self.market_format.code,
+            emplacement=emplacement,
+            latitude=12.345,
+            longitude=-1.523,
+        )
+        second_emplacement = Emplacement.objects.create(marche=market, code='B-02')
+        second_support = Support.objects.create(
+            code='MARKET-PANEL-GEOJSON-2',
+            nom='Deuxième panneau du marché',
+            type_support=Support.TYPE_PANNEAU,
+            format=self.market_format.code,
+            emplacement=second_emplacement,
+            latitude=0,
+            longitude=0,
+        )
+
+        response = self.client.get(reverse('api_geojson'))
+
+        self.assertEqual(response.status_code, 200)
+        features = {
+            feature['properties']['id']: feature
+            for feature in response.json()['features']
+        }
+        feature = features[support.pk]
+        second_feature = features[second_support.pk]
+        self.assertEqual(feature['geometry']['coordinates'], [-1.523, 12.345])
+        self.assertEqual(feature['properties']['marche'], market.nom)
+        self.assertEqual(feature['properties']['marche_id'], market.pk)
+        self.assertEqual(feature['properties']['emplacement_code'], emplacement.code)
+        self.assertEqual(second_feature['geometry']['coordinates'], [-1.523, 12.345])
+        self.assertEqual(second_feature['properties']['marche_id'], market.pk)
+
 
 class FormatSupportDetailViewTests(TestCase):
     def test_detail_shows_format_details_and_matching_supports(self):

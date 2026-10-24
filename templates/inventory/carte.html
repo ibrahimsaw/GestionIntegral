@@ -622,6 +622,8 @@
 <script>
   // ── Carte Leaflet ─────────────────────────────────────────
   const map = L.map('map', { center:[12.3714,-1.5197], zoom:13, zoomControl: true });
+  map.createPane('marketMarkerPane');
+  map.getPane('marketMarkerPane').style.zIndex = 550;
   window.buildSafeLeafletTiles(map, {
     attribution:'&copy; OpenStreetMap contributors',
     maxZoom:19
@@ -662,21 +664,62 @@
   const focusSupportId = urlParams.get('support');
   let layer = L.layerGroup().addTo(map);
   let markersById = {};
+  let marketSupportMarkers = [];
+
+  function marketSupportPosition(baseLatLng, index, total) {
+    const angle = (2 * Math.PI * index) / total;
+    const point = map.latLngToLayerPoint(baseLatLng);
+    const radius = 48;
+    point.x += Math.cos(angle) * radius;
+    point.y += Math.sin(angle) * radius;
+    return map.layerPointToLatLng(point);
+  }
+
+  function repositionMarketSupportMarkers() {
+    marketSupportMarkers.forEach(({ marker, baseLatLng, index, total }) => {
+      marker.setLatLng(marketSupportPosition(baseLatLng, index, total));
+    });
+  }
+  map.on('zoomend', repositionMarketSupportMarkers);
 
   function renderGeoJSON(data) {
     layer.clearLayers();
     markersById = {};
+    marketSupportMarkers = [];
+    const marketGroups = {};
+    data.features.forEach(f => {
+      const marketId = f.properties.marche_id;
+      if (marketId !== null && marketId !== undefined) {
+        (marketGroups[marketId] ||= []).push(f);
+      }
+    });
     let count = 0;
     data.features.forEach(f => {
       const p = f.properties;
       const [lng, lat] = f.geometry.coordinates;
-      const marker = L.marker([lat,lng], { icon: mkIcon(p.type, p.color, getFillColor(p.type_panneau)) });
+      const baseLatLng = L.latLng(lat, lng);
+      const marketMarkers = p.marche_id !== null && p.marche_id !== undefined
+        ? marketGroups[p.marche_id]
+        : null;
+      const marketIndex = marketMarkers ? marketMarkers.indexOf(f) : 0;
+      const markerPosition = marketMarkers
+        ? marketSupportPosition(baseLatLng, marketIndex, marketMarkers.length)
+        : baseLatLng;
+      const marker = L.marker(markerPosition, { icon: mkIcon(p.type, p.color, getFillColor(p.type_panneau)) });
       marker.on('click', () => {
         map.flyTo(marker.getLatLng(), 16, { duration:0.5 });
         openSidePanel(p.id);
       });
       layer.addLayer(marker);
       markersById[p.id.toString()] = marker;
+      if (marketMarkers) {
+        marketSupportMarkers.push({
+          marker,
+          baseLatLng,
+          index: marketIndex,
+          total: marketMarkers.length
+        });
+      }
       count++;
     });
     if (focusSupportId && markersById[focusSupportId]) {
@@ -760,7 +803,10 @@
       circle.on('click', () => { map.flyTo([lat, lng], 16, { duration: 0.5 }); openMarchePanel(p.id); });
       marcheLayer.addLayer(circle);
 
-      const marker = L.marker([lat, lng], { icon: mkMarcheIcon(p.nb_libres, p.nb_emplacements) });
+      const marker = L.marker([lat, lng], {
+        icon: mkMarcheIcon(p.nb_libres, p.nb_emplacements),
+        pane: 'marketMarkerPane'
+      });
       marker.on('click', () => {
         map.flyTo(marker.getLatLng(), 16, { duration: 0.5 });
         openMarchePanel(p.id);

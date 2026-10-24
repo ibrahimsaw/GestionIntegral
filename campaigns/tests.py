@@ -2,6 +2,7 @@ import datetime
 from types import MethodType
 
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AnonymousUser
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.cache import cache
 from django.template.loader import render_to_string
@@ -228,6 +229,11 @@ class DashboardParcGroupingTests(TestCase):
             ),
         }
 
+    def make_request(self, path='/', data=None):
+        request = RequestFactory().get(path, data or {})
+        request.user = AnonymousUser()
+        return request
+
     def test_campaign_form_accepts_support_category_without_specific_format(self):
         form = CampagneForm()
 
@@ -361,7 +367,7 @@ class DashboardParcGroupingTests(TestCase):
         LigneCampagne.objects.create(campagne=future_campaign, face=face_a)
         cache.clear()
 
-        request = RequestFactory().get('/', {'ville': 'Ouagadougou'})
+        request = self.make_request('/', {'ville': 'Ouagadougou'})
         view = DashboardView()
         view.setup(request)
         context = view.get_context_data()
@@ -463,7 +469,7 @@ class DashboardParcGroupingTests(TestCase):
         LigneCampagne.objects.create(campagne=campaign, face=occupied_face)
         LigneCampagne.objects.create(campagne=campaign, face=market_face)
         cache.clear()
-        request = RequestFactory().get('/', {'ville': 'Ouagadougou'})
+        request = self.make_request('/', {'ville': 'Ouagadougou'})
         view = DashboardView()
         view.setup(request)
         context = view.get_context_data()
@@ -589,7 +595,7 @@ class DashboardParcGroupingTests(TestCase):
         FacePanneau.objects.create(support=support, label='A')
         cache.clear()
 
-        request = RequestFactory().get('/', {'ville': 'Ouagadougou'})
+        request = self.make_request('/', {'ville': 'Ouagadougou'})
         view = DashboardView()
         view.setup(request)
         context = view.get_context_data()
@@ -611,7 +617,10 @@ class DashboardParcGroupingTests(TestCase):
         first = self.create_support('DASH-GEA-FIRST', 'DASH-GEA')
         second = self.create_support('DASH-GEA-SECOND', other_giant.code)
 
-        request = RequestFactory().get('/parc/format/geant/', {'ville': 'Ouagadougou'})
+        request = self.make_request(
+            '/parc/format/geant/',
+            {'ville': 'Ouagadougou'},
+        )
         view = FormatDetailView()
         view.setup(request, code='geant')
         context = view.get_context_data()
@@ -628,6 +637,80 @@ class DashboardParcGroupingTests(TestCase):
         self.assertIn('if (p.photo)', rendered)
         self.assertIn("image.className = 'fd-popup-image'", rendered)
 
+    def test_market_format_maps_markets_and_lists_their_installed_panels(self):
+        marche = Marche.objects.create(
+            nom='Marché de test géolocalisé',
+            ville='Ouagadougou',
+            quartier='Centre',
+            adresse='Avenue du marché',
+            latitude=12.3456789,
+            longitude=-1.5234567,
+        )
+        emplacement = Emplacement.objects.create(
+            marche=marche,
+            code='MARCHE-01',
+        )
+        Emplacement.objects.create(
+            marche=marche,
+            code='MARCHE-02-LIBRE',
+        )
+        panel = self.create_support('DASH-MARKET-PANEL', 'DASH-12')
+        panel.emplacement = emplacement
+        panel.save()
+        FacePanneau.objects.create(support=panel, label='A')
+
+        other_city_market = Marche.objects.create(
+            nom='Marché hors ville',
+            ville='Bobo-Dioulasso',
+            latitude=11.18,
+            longitude=-4.29,
+        )
+        other_city_placement = Emplacement.objects.create(
+            marche=other_city_market,
+            code='HORS-VILLE-01',
+        )
+        other_city_panel = self.create_support(
+            'DASH-MARKET-OTHER-CITY',
+            'DASH-12',
+            ville='Bobo-Dioulasso',
+        )
+        other_city_panel.emplacement = other_city_placement
+        other_city_panel.save()
+        unassociated_panel = self.create_support(
+            'DASH-MARKET-UNASSOCIATED',
+            'DASH-12',
+        )
+
+        request = self.make_request(
+            '/parc/format/marche/',
+            {'ville': 'Ouagadougou'},
+        )
+        view = FormatDetailView()
+        view.setup(request, code='marche')
+        context = view.get_context_data()
+        rendered = render_to_string(view.template_name, context, request=request)
+
+        self.assertTrue(context['marche_mode'])
+        self.assertEqual(
+            [market['nom'] for market in context['marches']],
+            ['Marché de test géolocalisé'],
+        )
+        self.assertEqual(context['marches'][0]['nb_panneaux'], 1)
+        self.assertEqual(
+            [item['code'] for item in context['panneaux']],
+            [panel.code],
+        )
+        self.assertEqual(context['panneaux'][0]['marche_nom'], marche.nom)
+        self.assertEqual(context['panneaux'][0]['emplacement_code'], emplacement.code)
+        self.assertNotIn(other_city_panel.code, [item['code'] for item in context['panneaux']])
+        self.assertNotIn(unassociated_panel.code, [item['code'] for item in context['panneaux']])
+        self.assertIn('aria-label="Carte des marchés"', rendered)
+        self.assertIn('fd-market-data', rendered)
+        self.assertIn('Marchés et panneaux associés', rendered)
+        self.assertIn('MARCHE-01', rendered)
+        self.assertIn('DASH-MARKET-PANEL', rendered)
+        self.assertIn('Marché de test géolocalisé', rendered)
+
     def test_screen_entry_links_to_format_detail_and_support_detail(self):
         screen = Support.objects.create(
             code='DASH-SCREEN-LINK',
@@ -640,7 +723,7 @@ class DashboardParcGroupingTests(TestCase):
         EcranNumerique.objects.create(support=screen, resolution='hd')
         cache.clear()
 
-        request = RequestFactory().get('/', {'ville': 'Ouagadougou'})
+        request = self.make_request('/', {'ville': 'Ouagadougou'})
         view = DashboardView()
         view.setup(request)
         context = view.get_context_data()
@@ -677,7 +760,10 @@ class DashboardParcGroupingTests(TestCase):
         )
         EcranNumerique.objects.create(support=other_city_screen, resolution='hd')
 
-        request = RequestFactory().get('/parc/format/ecrans/', {'ville': 'Ouagadougou'})
+        request = self.make_request(
+            '/parc/format/ecrans/',
+            {'ville': 'Ouagadougou'},
+        )
         view = FormatDetailView()
         view.setup(request, code='ecrans')
         context = view.get_context_data()
@@ -712,7 +798,7 @@ class DashboardParcGroupingTests(TestCase):
         LigneCampagne.objects.create(campagne=future_campaign, face=bobo_face)
 
         cache.clear()
-        request = RequestFactory().get('/', {'ville': 'Ouagadougou'})
+        request = self.make_request('/', {'ville': 'Ouagadougou'})
         view = DashboardView()
         view.setup(request)
         context = view.get_context_data()
@@ -760,7 +846,7 @@ class DashboardParcGroupingTests(TestCase):
         EcranNumerique.objects.create(support=screen)
 
         cache.clear()
-        request = RequestFactory().get('/', {'ville': 'Ville sans catégorie'})
+        request = self.make_request('/', {'ville': 'Ville sans catégorie'})
         view = DashboardView()
         view.setup(request)
         context = view.get_context_data()
@@ -785,7 +871,7 @@ class DashboardParcGroupingTests(TestCase):
         self.create_support('DASH-BOB-1', 'DASH-12', ville='Bobo-Dioulasso')
 
         cache.clear()
-        request = RequestFactory().get('/')
+        request = self.make_request()
         view = DashboardView()
         view.setup(request)
         context = view.get_context_data()
@@ -815,7 +901,7 @@ class DashboardParcGroupingTests(TestCase):
         EcranNumerique.objects.create(support=screen)
         cache.clear()
 
-        city_request = RequestFactory().get('/', {'ville': 'Ouagadougou'})
+        city_request = self.make_request('/', {'ville': 'Ouagadougou'})
         city_view = DashboardView()
         city_view.setup(city_request)
         city_context = city_view.get_context_data()
@@ -834,7 +920,7 @@ class DashboardParcGroupingTests(TestCase):
         self.assertIn('Statique — Sucettes', campaign_section)
         self.assertNotIn('Écrans numériques', campaign_section)
 
-        default_request = RequestFactory().get('/')
+        default_request = self.make_request()
         default_view = DashboardView()
         default_view.setup(default_request)
         default_context = default_view.get_context_data()

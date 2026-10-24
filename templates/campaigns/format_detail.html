@@ -1,13 +1,13 @@
 {% extends 'base.html' %}
 
-{% block title %}{% if ecrans_mode %}Écrans{% elif tous_geants %}Géants{% else %}{{ format.dimensions|default:format.code }}{% endif %} — Parc Integral{% endblock %}
+{% block title %}{% if ecrans_mode %}Écrans{% elif marche_mode %}Marchés{% elif tous_geants %}Géants{% else %}{{ format.dimensions|default:format.code }}{% endif %} — Parc Integral{% endblock %}
 
 {% block topbar_title %}
   <div class="d-flex align-items-center gap-2">
     <a href="{% url 'dashboard' %}{% if ville_active %}?ville={{ ville_active|urlencode }}{% endif %}" class="btn btn-sm btn-outline-secondary" aria-label="Retour au parc">
       <i class="bi bi-arrow-left"></i>
     </a>
-    <span class="fw-bold">{% if ecrans_mode %}Écrans{% elif tous_geants %}Géants{% else %}{{ format.categorie|default:"Format" }}{% endif %}</span>
+    <span class="fw-bold">{% if ecrans_mode %}Écrans{% elif marche_mode %}Marchés{% elif tous_geants %}Géants{% else %}{{ format.categorie|default:"Format" }}{% endif %}</span>
   </div>
 {% endblock %}
 
@@ -78,6 +78,7 @@
   .fd-marker.is-partiel { background: #d97706; }
   .fd-marker.is-panne { background: #64748b; }
   .fd-marker.is-libre { background: #2563eb; }
+  .fd-market-marker { display: grid; place-items: center; width: 34px; height: 34px; border: 2px solid #fff; border-radius: 50%; background: #f97316; color: #fff; font-size: 1rem; box-shadow: 0 2px 8px rgba(0, 0, 0, .35); }
 
   .fd-table { width: 100%; min-width: 640px; border-collapse: collapse; }
   .fd-table th { padding: .65rem .8rem; background: var(--tile); color: var(--muted); font-size: .66rem; font-weight: 700; letter-spacing: .05em; text-align: left; text-transform: uppercase; }
@@ -162,9 +163,9 @@
 {% else %}
   <header class="fd-head">
     <div>
-      <h1>{% if tous_geants %}Tous les panneaux géants{% else %}{% if format.categorie %}{{ format.categorie }} — {% endif %}{{ format.dimensions|default:format.code }}{% endif %}</h1>
+      <h1>{% if marche_mode %}Marchés et panneaux associés{% elif tous_geants %}Tous les panneaux géants{% else %}{% if format.categorie %}{{ format.categorie }} — {% endif %}{{ format.dimensions|default:format.code }}{% endif %}</h1>
       <p>
-        {{ nb_panneaux }} panneau{{ nb_panneaux|pluralize:"x" }} • {{ nb_faces }} face{{ nb_faces|pluralize }}
+        {% if marche_mode %}{{ marches|length }} marché{{ marches|length|pluralize }} • {% endif %}{{ nb_panneaux }} panneau{{ nb_panneaux|pluralize:"x" }} • {{ nb_faces }} face{{ nb_faces|pluralize }}
         {% if not tous_geants and format.superficie %}• {{ format.superficie }} m² par panneau{% endif %}
         {% if ville_active %}• {{ ville_active }}{% endif %}
       </p>
@@ -189,18 +190,22 @@
   {# ── Carte + cartes de panneaux ── #}
   <section class="fd-panel" id="panel-carte" role="tabpanel" aria-labelledby="tab-carte">
     <div class="fd-card">
-      <div id="fd-map" role="application" aria-label="Carte des panneaux"></div>
+      <div id="fd-map" role="application" aria-label="{% if marche_mode %}Carte des marchés{% else %}Carte des panneaux{% endif %}"></div>
       <div id="fd-map-error" class="alert alert-warning fd-map-error d-none" role="alert"></div>
       <div class="fd-legend">
+        {% if marche_mode %}
+        <span><i style="background:#f97316"></i>Marchés</span>
+        {% else %}
         <span><i style="background:#2563eb"></i>Libre</span>
         <span><i style="background:#d97706"></i>Partiel</span>
         <span><i style="background:#932e2b"></i>Occupé</span>
         <span><i style="background:#64748b"></i>Hors service</span>
+        {% endif %}
       </div>
     </div>
 
     <div class="fd-bar-tools">
-      <h2>Liste des {{ nb_panneaux }} panneaux{% if format.dimensions %} ({{ format.dimensions }}){% endif %}</h2>
+      <h2>Liste des {{ nb_panneaux }} panneaux{% if marche_mode %} installés dans les marchés{% elif format.dimensions %} ({{ format.dimensions }}){% endif %}</h2>
       <div class="fd-tools-right">
         <input type="search" id="fd-search" class="fd-input" placeholder="Rechercher un panneau…" aria-label="Rechercher un panneau">
         <select id="fd-sort" class="fd-select" aria-label="Trier">
@@ -215,7 +220,7 @@
       {% for p in panneaux %}
         <a class="fd-pan" href="{{ p.url }}"
            data-numero="{{ p.numero }}" data-quartier="{{ p.quartier|lower }}" data-statut="{{ p.statut }}"
-           data-search="{{ p.code|lower }} {{ p.nom|lower }} {{ p.adresse|lower }} {{ p.quartier|lower }}">
+           data-search="{{ p.code|lower }} {{ p.nom|lower }} {{ p.adresse|lower }} {{ p.quartier|lower }} {{ p.marche_nom|lower }} {{ p.emplacement_code|lower }}">
           <div class="fd-pan-img">
             {% if p.photo %}<img src="{{ p.photo }}" alt="" loading="lazy">{% else %}<i class="bi bi-image" aria-hidden="true"></i>{% endif %}
             <span class="fd-num">{{ p.numero }}</span>
@@ -223,6 +228,7 @@
           <div class="fd-pan-body">
             <div class="addr"><i class="bi bi-geo-alt-fill" aria-hidden="true"></i><span>{{ p.adresse|default:p.nom }}</span></div>
             <div class="meta">{{ p.code }}{% if tous_geants %} · {{ p.format }}{% endif %} · {{ p.nb_faces }} face{{ p.nb_faces|pluralize }}</div>
+            {% if marche_mode %}<div class="meta"><i class="bi bi-shop"></i> {{ p.marche_nom }}{% if p.emplacement_code %} · Emplacement {{ p.emplacement_code }}{% endif %}</div>{% endif %}
             <div class="fd-pan-foot">
               <span class="fd-pill is-{{ p.statut }}">{{ p.statut_label }}</span>
               <i class="bi bi-chevron-right" aria-hidden="true"></i>
@@ -242,7 +248,7 @@
       <table class="fd-table">
         <thead>
           <tr>
-            <th>N°</th><th>Code</th>{% if tous_geants %}<th>Dimension</th>{% endif %}<th>Adresse</th><th>Quartier</th>
+            <th>N°</th><th>Code</th>{% if tous_geants %}<th>Dimension</th>{% endif %}{% if marche_mode %}<th>Marché</th><th>Emplacement</th>{% endif %}<th>Adresse</th><th>Quartier</th>
             <th class="num">Faces</th><th class="num">Occupées</th><th class="num">Libres</th><th>Statut</th>
           </tr>
         </thead>
@@ -252,6 +258,7 @@
               <td><b>{{ p.numero }}</b></td>
               <td><a href="{{ p.url }}"><b>{{ p.code }}</b></a></td>
               {% if tous_geants %}<td>{{ p.format }}</td>{% endif %}
+              {% if marche_mode %}<td>{{ p.marche_nom }}</td><td>{{ p.emplacement_code }}</td>{% endif %}
               <td>{{ p.adresse|default:"—" }}</td>
               <td>{{ p.quartier|default:"—" }}</td>
               <td class="num">{{ p.nb_faces }}</td>
@@ -260,7 +267,7 @@
               <td><span class="fd-pill is-{{ p.statut }}">{{ p.statut_label }}</span></td>
             </tr>
           {% empty %}
-            <tr><td colspan="{% if tous_geants %}9{% else %}8{% endif %}" class="fd-empty">Aucun panneau.</td></tr>
+            <tr><td colspan="{% if marche_mode %}10{% elif tous_geants %}9{% else %}8{% endif %}" class="fd-empty">Aucun panneau{% if marche_mode %} associé à un marché{% endif %}.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -311,6 +318,7 @@
   {{ ecrans|json_script:"fd-screen-data" }}
 {% else %}
 {{ panneaux|json_script:"fd-data" }}
+{% if marche_mode %}{{ marches|json_script:"fd-market-data" }}{% endif %}
 {% endif %}
 {% endblock %}
 
@@ -372,6 +380,10 @@
 <script>
   (function() {
     const panneaux = JSON.parse(document.getElementById('fd-data').textContent || '[]');
+    const marcheMode = {{ marche_mode|yesno:"true,false" }};
+    const marches = marcheMode
+      ? JSON.parse(document.getElementById('fd-market-data').textContent || '[]')
+      : [];
 
     /* ── Onglets ── */
     const tabs = document.querySelectorAll('.fd-tab');
@@ -440,11 +452,13 @@
       return;
     }
 
-    const located = panneaux.filter(function(p) {
+    const located = (marcheMode ? marches : panneaux).filter(function(p) {
       return Number.isFinite(p.lat) && Number.isFinite(p.lng);
     });
     if (!located.length) {
-      showError('Aucun panneau géolocalisé pour ce format.');
+      showError(marcheMode
+        ? 'Aucun marché géolocalisé pour cette ville.'
+        : 'Aucun panneau géolocalisé pour ce format.');
       return;
     }
 
@@ -455,6 +469,50 @@
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
         attribution: '&copy; OpenStreetMap contributors', maxZoom: 19
       }).addTo(map);
+    }
+
+    if (marcheMode) {
+      const bounds = [];
+      located.forEach(function(marche, index) {
+        const icon = L.divIcon({
+          className: '',
+          html: '<div class="fd-market-marker"><i class="bi bi-shop"></i></div>',
+          iconSize: [34, 34],
+          iconAnchor: [17, 17]
+        });
+        const marker = L.marker([marche.lat, marche.lng], { icon: icon }).addTo(map);
+        const popup = document.createElement('div');
+        const title = document.createElement('strong');
+        title.className = 'fd-popup-title';
+        title.textContent = marche.nom;
+        popup.appendChild(title);
+        const details = document.createElement('div');
+        details.textContent = [
+          marche.adresse,
+          marche.quartier,
+          marche.ville,
+          marche.nb_panneaux + ' panneau(x) associé(s)'
+        ].filter(Boolean).join(' · ');
+        popup.appendChild(details);
+        const link = document.createElement('a');
+        link.href = marche.url;
+        link.textContent = 'Voir le marché';
+        popup.appendChild(link);
+        marker.bindPopup(popup);
+        if (marche.rayon_metres) {
+          L.circle([marche.lat, marche.lng], {
+            radius: marche.rayon_metres,
+            color: '#f97316',
+            fillColor: '#f97316',
+            fillOpacity: 0.08,
+            weight: 1
+          }).addTo(map);
+        }
+        bounds.push([marche.lat, marche.lng]);
+      });
+      map.fitBounds(bounds, { padding: [30, 30], maxZoom: 15 });
+      window.setTimeout(function() { map.invalidateSize(); }, 0);
+      return;
     }
 
     const markers = located.map(function(p) {

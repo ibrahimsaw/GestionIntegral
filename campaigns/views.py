@@ -1057,7 +1057,54 @@ class FormatDetailView(LoginRequiredMixin, TemplateView):
             return self._get_screen_context(context, ville_active, today)
 
         tous_geants = code == 'geant'
-        if tous_geants:
+        marche_mode = code == 'marche'
+        marches = []
+        if marche_mode:
+            format_support = FormatSupport.objects.filter(code=code).first() or {
+                'categorie': 'Marché',
+                'dimensions': 'Marché',
+                'code': code,
+            }
+            marches_qs = Marche.objects.order_by('nom')
+            if ville_active:
+                marches_qs = marches_qs.filter(ville__iexact=ville_active)
+            marche_objects = list(marches_qs)
+            panneaux_par_marche = dict(
+                Support.objects.filter(
+                    type_support=Support.TYPE_PANNEAU,
+                    emplacement__marche_id__in=[
+                        marche.pk for marche in marche_objects
+                    ],
+                ).values('emplacement__marche_id')
+                .annotate(nombre=Count('pk'))
+                .values_list('emplacement__marche_id', 'nombre')
+            )
+            marches = [
+                {
+                    'nom': marche.nom,
+                    'ville': marche.ville or '',
+                    'quartier': marche.quartier or '',
+                    'adresse': marche.adresse or '',
+                    'lat': float(marche.latitude) if marche.latitude is not None else None,
+                    'lng': float(marche.longitude) if marche.longitude is not None else None,
+                    'rayon_metres': marche.rayon_metres,
+                    'nb_panneaux': panneaux_par_marche.get(marche.pk, 0),
+                    'url': reverse('marche_detail', args=[marche.pk]),
+                }
+                for marche in marche_objects
+            ]
+            marche_ids = [marche.pk for marche in marche_objects]
+            supports_qs = Support.objects.filter(
+                type_support=Support.TYPE_PANNEAU,
+                emplacement__marche_id__in=marche_ids,
+            ).select_related('emplacement__marche')
+            format_by_code = {
+                format_obj.code: format_obj
+                for format_obj in FormatSupport.objects.filter(
+                    code__in=supports_qs.values_list('format', flat=True)
+                )
+            }
+        elif tous_geants:
             formats = formats_croissants(
                 FormatSupport.objects.filter(categorie='Géant')
             )
@@ -1073,7 +1120,7 @@ class FormatDetailView(LoginRequiredMixin, TemplateView):
                 type_support=Support.TYPE_PANNEAU, format=code,
             )
             format_by_code = {format_support.code: format_support}
-        if ville_active:
+        if ville_active and not marche_mode:
             supports_qs = supports_qs.filter(ville__iexact=ville_active)
         supports_list = list(supports_qs.order_by('code'))
 
@@ -1115,6 +1162,11 @@ class FormatDetailView(LoginRequiredMixin, TemplateView):
             lat = float(support.latitude) if support.latitude else None
             lng = float(support.longitude) if support.longitude else None
             support_format = format_by_code.get(support.format)
+            emplacement_marche = (
+                support.emplacement
+                if marche_mode and support.emplacement_id
+                else None
+            )
 
             panneaux.append({
                 'numero': numero,
@@ -1133,6 +1185,8 @@ class FormatDetailView(LoginRequiredMixin, TemplateView):
                 'lat': lat,
                 'lng': lng,
                 'url': reverse('support_detail', args=[support.uuid]),
+                'marche_nom': emplacement_marche.marche.nom if emplacement_marche else '',
+                'emplacement_code': emplacement_marche.code if emplacement_marche else '',
             })
 
             tot_faces += len(faces)
@@ -1157,6 +1211,8 @@ class FormatDetailView(LoginRequiredMixin, TemplateView):
         context.update({
             'format': format_support,
             'tous_geants': tous_geants,
+            'marche_mode': marche_mode,
+            'marches': marches,
             'ville_active': ville_active,
             'panneaux': panneaux,
             'nb_panneaux': len(panneaux),

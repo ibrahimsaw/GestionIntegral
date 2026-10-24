@@ -727,10 +727,14 @@ class ApiGeojsonView(View):
         type_panneau_filtre = request.GET.get('type_panneau', '')
         ville_filtre = request.GET.get('ville', '').strip()
         
-        qs = Support.objects.prefetch_related('faces').exclude(
-            latitude__isnull=True,
-        ).exclude(
-            longitude__isnull=True,
+        qs = Support.objects.select_related(
+            'emplacement__marche',
+        ).prefetch_related('faces').filter(
+            Q(latitude__isnull=False, longitude__isnull=False)
+            | Q(
+                emplacement__marche__latitude__isnull=False,
+                emplacement__marche__longitude__isnull=False,
+            )
         )
 
         if ville_filtre:
@@ -756,6 +760,13 @@ class ApiGeojsonView(View):
         features = []
         for s in qs:
             d = s.disponibilite_json()
+            latitude = s.latitude
+            longitude = s.longitude
+            if s.emplacement_id:
+                d['marche_id'] = s.emplacement.marche_id
+                if latitude is None or longitude is None:
+                    latitude = s.emplacement.marche.latitude
+                    longitude = s.emplacement.marche.longitude
             
             # ✅ S'assurer que type_panneau est bien exposé dans les properties
             if 'type_panneau' not in d:
@@ -763,7 +774,7 @@ class ApiGeojsonView(View):
 
             features.append({
                 'type': 'Feature',
-                'geometry': {'type': 'Point', 'coordinates': [float(s.longitude), float(s.latitude)]},
+                'geometry': {'type': 'Point', 'coordinates': [float(longitude), float(latitude)]},
                 'properties': d,
             })
 

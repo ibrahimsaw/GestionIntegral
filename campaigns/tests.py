@@ -1,6 +1,7 @@
 import datetime
 from types import MethodType
 
+from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.core.cache import cache
 from django.template.loader import render_to_string
@@ -11,6 +12,7 @@ from django.utils import timezone
 from campaigns.forms import CampagneForm, PreuveDiffusionForm
 from campaigns.models import Campagne, Client, Contrat, LigneCampagne, PreuveDiffusion
 from campaigns.views import CampagneDetailView, DashboardView, FormatDetailView
+from campaigns.views import CampagneListView
 from piges.models import PigeFichier
 from campaigns.simulation_view import (
     _enrich_resultat_metriques,
@@ -32,6 +34,176 @@ from inventory.models import (
     Marche,
     Support,
 )
+
+
+class CampagneListCategoryGroupingTests(TestCase):
+    def test_category_buttons_filter_campaigns_without_grouping_the_table(self):
+        client_obj = Client.objects.create(
+            nom='Client campagne catégories',
+            telephone='00000000',
+            email='campagnes-categories@example.com',
+        )
+        giant_format = FormatSupport.objects.create(
+            code='CAMPAIGN-GIANT',
+            categorie='Géant',
+            dimensions='8m × 6m',
+        )
+        FormatSupport.objects.create(
+            code='UNUSED-CATEGORY',
+            categorie='Catégorie sans campagne',
+            dimensions='Format inutilisé',
+        )
+        uncategorized_format = FormatSupport.objects.create(
+            code='UNCATEGORIZED-FORMAT',
+            categorie='',
+            dimensions='Format sans catégorie',
+        )
+        Campagne.objects.create(
+            client=client_obj,
+            nom='Campagne Géant',
+            type_support=giant_format.code,
+            date_debut=datetime.date(2026, 11, 1),
+            date_fin=datetime.date(2026, 11, 30),
+        )
+        Campagne.objects.create(
+            client=client_obj,
+            nom='Campagne sans catégorie',
+            type_support=uncategorized_format.code,
+            date_debut=datetime.date(2026, 11, 1),
+            date_fin=datetime.date(2026, 11, 30),
+        )
+        Campagne.objects.create(
+            client=client_obj,
+            nom='Campagne type inconnu',
+            type_support='TYPE-SANS-CATEGORIE',
+            date_debut=datetime.date(2026, 11, 1),
+            date_fin=datetime.date(2026, 11, 30),
+        )
+        Campagne.objects.create(
+            client=client_obj,
+            nom='Campagne écran',
+            type_support='ecran',
+            date_debut=datetime.date(2026, 11, 1),
+            date_fin=datetime.date(2026, 11, 30),
+        )
+        Campagne.objects.create(
+            client=client_obj,
+            nom='Campagne panneau',
+            type_support='panneau',
+            date_debut=datetime.date(2026, 11, 1),
+            date_fin=datetime.date(2026, 11, 30),
+        )
+        staff = get_user_model().objects.create_user(
+            username='campaign-category-staff',
+            password='test-password',
+            role='staff',
+        )
+        self.client.force_login(staff)
+
+        response = self.client.get(reverse('campagne_list'))
+
+        self.assertEqual(response.status_code, 200)
+        categories = [
+            category['label']
+            for category in response.context['campaign_category_filters']
+        ]
+        self.assertEqual(categories, ['Toutes', 'Géant', 'Panneau', 'Écran'])
+        self.assertNotIn(
+            'UNCATEGORIZED-FORMAT',
+            [category['label'] for category in response.context['campaign_category_filters']],
+        )
+        self.assertNotIn(
+            'TYPE-SANS-CATEGORIE',
+            [category['label'] for category in response.context['campaign_category_filters']],
+        )
+        nav_categories = [
+            category['label']
+            for category in response.context['campaign_category_nav']
+        ]
+        self.assertEqual(nav_categories, ['Géant', 'Panneau', 'Écran'])
+        self.assertNotIn('Catégorie sans campagne', nav_categories)
+        panel_filter = next(
+            category
+            for category in response.context['campaign_category_filters']
+            if category['label'] == 'Panneau'
+        )
+        self.assertEqual(panel_filter['count'], 1)
+        self.assertContains(response, 'Campagne écran')
+        self.assertContains(response, 'Campagne Géant')
+        self.assertContains(response, 'Campagne panneau')
+        self.assertContains(response, 'Campagne sans catégorie')
+        self.assertContains(response, 'Campagne type inconnu')
+        self.assertNotContains(response, 'Campagnes mères</th>')
+
+        filtered_response = self.client.get(
+            reverse('campagne_list'),
+            {'categorie': 'Géant'},
+        )
+        self.assertEqual(filtered_response.status_code, 200)
+        self.assertEqual(
+            [campaign.nom for campaign in filtered_response.context['campagnes']],
+            ['Campagne Géant'],
+        )
+        searched_response = self.client.get(
+            reverse('campagne_list'),
+            {'categorie': 'Géant', 'q': 'Campagne Géant'},
+        )
+        self.assertEqual(searched_response.status_code, 200)
+        self.assertEqual(
+            [campaign.nom for campaign in searched_response.context['campagnes']],
+            ['Campagne Géant'],
+        )
+        self.assertContains(searched_response, 'id="campaign-search-form"')
+        self.assertContains(searched_response, 'name="categorie" value="Géant"')
+        panel_response = self.client.get(
+            reverse('campagne_list'),
+            {'categorie': 'Panneau'},
+        )
+        self.assertEqual(
+            [campaign.nom for campaign in panel_response.context['campagnes']],
+            ['Campagne panneau'],
+        )
+
+    def test_admin_sees_campaign_categories_in_navigation(self):
+        client_obj = Client.objects.create(
+            nom='Client administrateur catégories',
+            telephone='00000000',
+            email='admin-campagnes-categories@example.com',
+        )
+        giant_format = FormatSupport.objects.create(
+            code='ADMIN-CAMPAIGN-GIANT',
+            categorie='Géant',
+            dimensions='8m × 6m',
+        )
+        Campagne.objects.create(
+            client=client_obj,
+            nom='Campagne Géant administrateur',
+            type_support=giant_format.code,
+            date_debut=datetime.date(2026, 11, 1),
+            date_fin=datetime.date(2026, 11, 30),
+        )
+        admin = get_user_model().objects.create_user(
+            username='campaign-category-admin',
+            password='test-password',
+            role='admin',
+        )
+        self.client.force_login(admin)
+
+        response = self.client.get(reverse('campagne_list'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            [
+                category['label']
+                for category in response.context['campaign_category_nav']
+            ],
+            ['Géant'],
+        )
+        self.assertContains(response, '?categorie=G%C3%A9ant')
+        self.assertEqual(
+            [campaign.nom for campaign in response.context['campagnes']],
+            ['Campagne Géant administrateur'],
+        )
 
 
 class DashboardParcGroupingTests(TestCase):

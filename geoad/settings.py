@@ -113,6 +113,7 @@ TEMPLATES = [
                 'geoad.context_processors.design_config',
                 'geoad.context_processors.inventory_villes',
                 'campaigns.context_processors.alerts_data',
+                'campaigns.context_processors.campaign_category_nav',
                 'geoad.context_processors.contact_info',  # ← ajoute cette ligne
             ],
         },

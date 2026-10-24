@@ -165,9 +165,22 @@
 
             {% if not user.is_technicien %}
               <div class="nav-label">Campagnes</div>
-              <a href="{% url 'campagne_list' %}" class="nav-link {% if 'campagne' in request.resolver_match.url_name %}active{% endif %}">
-                <i class="bi bi-megaphone-fill"></i>Campagnes
-              </a>
+              <details class="nav-submenu" {% if 'campagne' in request.resolver_match.url_name %}open{% endif %}>
+                <summary class="nav-link nav-submenu-header {% if 'campagne' in request.resolver_match.url_name %}parent-active{% endif %}">
+                  <i class="bi bi-megaphone-fill"></i><span class="nav-submenu-label">Campagnes</span>
+                  <i class="bi bi-chevron-down submenu-chevron"></i>
+                </summary>
+                <div class="nav-submenu-items">
+                  <a href="{% url 'campagne_list' %}" class="nav-link {% if request.resolver_match.url_name == 'campagne_list' and not request.GET.categorie %}active{% endif %}">
+                    <i class="bi bi-grid"></i>Toutes les campagnes
+                  </a>
+                  {% for category in campaign_category_nav %}
+                  <a href="{% url 'campagne_list' %}?categorie={{ category.value|urlencode }}" class="nav-link {% if request.resolver_match.url_name == 'campagne_list' and request.GET.categorie == category.value %}active{% endif %}">
+                    <i class="bi bi-tag"></i>{{ category.label }}
+                  </a>
+                  {% endfor %}
+                </div>
+              </details>
               <a href="{% url 'simulation_ecran' %}" class="nav-link {% if request.resolver_match.url_name == 'simulation_ecran' %}active{% endif %}">
                 <i class="bi bi-calculator-fill"></i>Simulateur Écran
               </a>
@@ -194,9 +207,22 @@
             <a href="{% url 'client_detail' user.client_profile.pk %}" class="nav-link {% if 'client_detail' in request.resolver_match.url_name %}active{% endif %}">
               <i class="bi bi-people-fill"></i>Client
             </a>
-            <a href="{% url 'campagne_list' %}" class="nav-link {% if 'campagne' in request.resolver_match.url_name %}active{% endif %}">
-              <i class="bi bi-megaphone-fill"></i>Campagnes
-            </a>
+            <details class="nav-submenu" {% if 'campagne' in request.resolver_match.url_name %}open{% endif %}>
+              <summary class="nav-link nav-submenu-header {% if 'campagne' in request.resolver_match.url_name %}parent-active{% endif %}">
+                <i class="bi bi-megaphone-fill"></i><span class="nav-submenu-label">Campagnes</span>
+                <i class="bi bi-chevron-down submenu-chevron"></i>
+              </summary>
+              <div class="nav-submenu-items">
+                <a href="{% url 'campagne_list' %}" class="nav-link {% if request.resolver_match.url_name == 'campagne_list' and not request.GET.categorie %}active{% endif %}">
+                  <i class="bi bi-grid"></i>Toutes les campagnes
+                </a>
+                {% for category in campaign_category_nav %}
+                <a href="{% url 'campagne_list' %}?categorie={{ category.value|urlencode }}" class="nav-link {% if request.resolver_match.url_name == 'campagne_list' and request.GET.categorie == category.value %}active{% endif %}">
+                  <i class="bi bi-tag"></i>{{ category.label }}
+                </a>
+                {% endfor %}
+              </div>
+            </details>
 
             <div class="nav-label">Rapports</div>
             <a href="{% url 'preview_client_pdf' user.client_profile.pk %}" class="nav-link {% if request.resolver_match.url_name == 'preview_client_pdf' %}active{% endif %}">

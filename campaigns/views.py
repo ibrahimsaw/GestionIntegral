@@ -14,6 +14,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ValidationError
 from django.core.cache import cache
 from django.db import transaction
+from urllib.parse import urlencode
 
 from django.urls import reverse_lazy
 from accounts.models import AuditLog
@@ -1840,29 +1841,71 @@ class CampagneListView(ClientStaffRequiredMixin, SortableListMixin, ListView):
     DEFAULT_SORT = 'statut'   # nom de colonne, sans signe
     DEFAULT_DIR  = 'asc'     # 'asc' ou 'desc'
 
+    @staticmethod
+    def _category_for_campaign(
+        campagne,
+        formats_par_code,
+        categories_existantes,
+    ):
+        if campagne.est_mere:
+            return 'Campagnes mères'
+        type_support = normaliser_categorie_format(campagne.type_support)
+        if type_support.casefold() in ('ecran', 'écran'):
+            return 'Écran'
+        if type_support.casefold() in ('marche', 'marché'):
+            return 'Marché'
+        if type_support.casefold() == 'panneau':
+            return 'Panneau'
+        categorie = normaliser_categorie_format(
+            formats_par_code.get(campagne.type_support)
+        )
+        if categorie:
+            return categorie
+        return categories_existantes.get(type_support.casefold())
+
     def get_queryset(self):
         qs = super().get_queryset().select_related('client')
 
-        if self.request.user.is_client_role and self.request.user.client_profile:
+        if self.request.user.is_client:
             qs = qs.filter(client=self.request.user.client_profile)
 
         # ── Restriction non-admin : uniquement les campagnes actives ──
         if not self.request.user.is_admin:
             qs = qs.filter(actif=True)
 
+        self.category_options_queryset = qs
         q            = self.request.GET.get('q', '')
         statut       = self.request.GET.get('statut', '')
         type_support = self.request.GET.get('type_support', '')
         actif        = self.request.GET.get('actif', '')
 
-        if type_support:
-            qs = qs.filter(type_support=type_support)
         if q:
             qs = qs.filter(Q(nom__icontains=q) | Q(client__nom__icontains=q) | Q(reference__icontains=q))
         if statut:
             qs = qs.filter(statut=statut)
         if actif:
             qs = qs.filter(actif=actif)
+
+        self.category_base_queryset = qs
+        categorie = self.request.GET.get('categorie', '').strip()
+        if type_support and not categorie:
+            qs = qs.filter(type_support=type_support)
+        if categorie == 'Campagnes mères':
+            qs = qs.filter(est_mere=True)
+        elif categorie:
+            category_codes = FormatSupport.hors_ecran().filter(
+                categorie__iexact=categorie,
+            ).values_list('code', flat=True)
+            category_filter = Q(type_support=categorie)
+            if categorie.casefold() in ('écran', 'ecran'):
+                category_filter |= Q(type_support='ecran')
+            elif categorie.casefold() == 'marché':
+                category_filter |= Q(type_support__in=['marche', 'Marché'])
+            elif categorie.casefold() == 'panneau':
+                category_filter |= Q(type_support__in=['panneau', 'Panneau'])
+            else:
+                category_filter |= Q(type_support__in=category_codes)
+            qs = qs.filter(category_filter)
 
         qs = qs.annotate(nb_supports_annotate=Count('lignes__support', distinct=True))
         qs = self.apply_sort(qs)
@@ -1873,10 +1916,28 @@ class CampagneListView(ClientStaffRequiredMixin, SortableListMixin, ListView):
         context = super().get_context_data(**kwargs)  # ne touche plus à context['campagnes']
 
         base_qs = Campagne.objects.all()
-        if self.request.user.is_client_role and self.request.user.client_profile:
+        if self.request.user.is_client:
             base_qs = base_qs.filter(client=self.request.user.client_profile)
         if not self.request.user.is_admin:
             base_qs = base_qs.filter(actif=True)
+
+        categorie_active = self.request.GET.get('categorie', '').strip()
+        if categorie_active == 'Campagnes mères':
+            base_qs = base_qs.filter(est_mere=True)
+        elif categorie_active:
+            category_codes = FormatSupport.hors_ecran().filter(
+                categorie__iexact=categorie_active,
+            ).values_list('code', flat=True)
+            category_filter = Q(type_support=categorie_active)
+            if categorie_active.casefold() in ('écran', 'ecran'):
+                category_filter |= Q(type_support='ecran')
+            elif categorie_active.casefold() == 'marché':
+                category_filter |= Q(type_support__in=['marche', 'Marché'])
+            elif categorie_active.casefold() == 'panneau':
+                category_filter |= Q(type_support__in=['panneau', 'Panneau'])
+            else:
+                category_filter |= Q(type_support__in=category_codes)
+            base_qs = base_qs.filter(category_filter)
 
         context['kpi_total'] = base_qs.count()
         context['kpi_en_cours'] = base_qs.filter(statut='en_cours').count()
@@ -1891,7 +1952,77 @@ class CampagneListView(ClientStaffRequiredMixin, SortableListMixin, ListView):
         context['type_support_choices'] = get_type_support_choices()
         context['actif']                = self.request.GET.get('actif', '')
 
+        formats_par_code = dict(
+            FormatSupport.objects.filter(
+                code__in={
+                    campagne.type_support
+                    for campagne in self.category_options_queryset
+                    if campagne.type_support
+                }
+            ).values_list('code', 'categorie')
+        )
+        categories_existantes = {
+            normaliser_categorie_format(categorie).casefold():
+            normaliser_categorie_format(categorie)
+            for categorie in FormatSupport.hors_ecran().values_list(
+                'categorie', flat=True
+            )
+            if normaliser_categorie_format(categorie)
+        }
+        categories = {
+            categorie
+            for campagne in self.category_options_queryset
+            if (categorie := self._category_for_campaign(
+                campagne,
+                formats_par_code,
+                categories_existantes,
+            ))
+        }
+        current_params = self.request.GET.copy()
+        current_params.pop('page', None)
+        current_params.pop('type_support', None)
+        category_filters = []
+        all_count = self.category_base_queryset.count()
+        all_params = current_params.copy()
+        all_params.pop('categorie', None)
+        category_filters.append({
+            'label': 'Toutes',
+            'value': '',
+            'count': all_count,
+            'url': f"{reverse('campagne_list')}?{all_params.urlencode()}" if all_params else reverse('campagne_list'),
+        })
+        for categorie in sorted(categories, key=str.casefold):
+            params = current_params.copy()
+            params['categorie'] = categorie
+            category_query = (
+                Q(est_mere=True)
+                if categorie == 'Campagnes mères'
+                else self._category_query(categorie, formats_par_code)
+            )
+            category_filters.append({
+                'label': categorie,
+                'value': categorie,
+                'count': self.category_base_queryset.filter(category_query).count(),
+                'url': f"{reverse('campagne_list')}?{params.urlencode()}",
+            })
+        context['campaign_category_filters'] = category_filters
+        context['categorie_active'] = categorie_active
+
         return context
+
+    @staticmethod
+    def _category_query(categorie, formats_par_code):
+        if categorie.casefold() in ('écran', 'ecran'):
+            return Q(type_support='ecran')
+        if categorie.casefold() == 'marché':
+            return Q(type_support__in=['marche', 'Marché'])
+        if categorie.casefold() == 'panneau':
+            return Q(type_support__in=['panneau', 'Panneau'])
+        codes = [
+            code for code, label in formats_par_code.items()
+            if (label or '').strip().casefold() == categorie.casefold()
+        ]
+        return Q(type_support=categorie) | Q(type_support__in=codes)
     def post(self, request, *args, **kwargs):
         if not request.user.is_staff_regie_role:
             messages.error(request, "Permission refusée.")

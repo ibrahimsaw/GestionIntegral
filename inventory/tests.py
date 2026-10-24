@@ -3,6 +3,7 @@ import io
 import zipfile
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.auth import get_user_model
+from django.contrib.auth.models import AnonymousUser
 from django.contrib.messages import get_messages
 from django.core.cache import cache
 from django.template.loader import render_to_string
@@ -278,6 +279,26 @@ class FormatSupportDetailViewTests(TestCase):
         self.assertEqual(list(context['supports']), [support])
         self.assertIn('4m × 3m', rendered)
         self.assertIn('Panneau du format', rendered)
+
+    def test_detail_hides_empty_category(self):
+        format_support = FormatSupport.objects.create(
+            code='DETAIL-NO-CATEGORY',
+            dimensions='4m × 3m',
+            categorie='',
+        )
+        request = RequestFactory().get(reverse(
+            'format_support_detail', args=[format_support.pk]
+        ))
+        request.user = AnonymousUser()
+        view = FormatSupportDetailView()
+        view.setup(request, pk=format_support.pk)
+        view.object = format_support
+        context = view.get_context_data(object=format_support)
+        rendered = render_to_string(view.template_name, context, request=request)
+
+        self.assertNotIn('Sans catégorie', rendered)
+        self.assertNotIn('bi-tag-fill', rendered)
+        self.assertNotIn('>Catégorie</dt>', rendered)
 
     def test_format_used_by_panel_cannot_be_deleted(self):
         format_support = FormatSupport.objects.create(
@@ -1053,6 +1074,46 @@ class EmplacementBulkActionTests(TestCase):
         )
         form_end = response.content.decode().index('</form>', form_start)
         self.assertLess(checkbox, form_end)
+
+    def test_market_detail_paginates_emplacements_and_links_installed_panel(self):
+        for number in range(3, 22):
+            Emplacement.objects.create(
+                marche=self.marche,
+                code=f'MA-{number:02d}',
+            )
+        format_support = FormatSupport.objects.create(
+            code='MARKET-DETAIL-FORMAT',
+            dimensions='4m × 3m',
+            superficie=12,
+            categorie='Standard',
+        )
+        panel = Support.objects.create(
+            code='MARKET-DETAIL-PANEL',
+            nom='Panneau installé au marché',
+            type_support=Support.TYPE_PANNEAU,
+            format=format_support.code,
+            latitude=12.34,
+            longitude=-1.52,
+            emplacement=self.first,
+        )
+
+        first_page = self.client.get(reverse('marche_detail', args=[self.marche.pk]))
+
+        self.assertEqual(first_page.status_code, 200)
+        self.assertEqual(first_page.context['paginator'].count, 21)
+        self.assertEqual(len(first_page.context['emplacements_page']), 20)
+        self.assertContains(first_page, 'Page 1 / 2')
+        self.assertContains(first_page, reverse('support_detail', args=[panel.uuid]))
+        self.assertContains(first_page, 'title="Voir le panneau associé"')
+
+        second_page = self.client.get(
+            reverse('marche_detail', args=[self.marche.pk]),
+            {'page': 2},
+        )
+        self.assertEqual(second_page.status_code, 200)
+        self.assertEqual(second_page.context['page_obj'].number, 2)
+        self.assertEqual(len(second_page.context['emplacements_page']), 1)
+        self.assertContains(second_page, 'Page 2 / 2')
 
     def test_bulk_delete_is_admin_only(self):
         self.client.raise_request_exception = False

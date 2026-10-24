@@ -116,28 +116,28 @@
     {# Onglets de statut rapides #}
     <div class="d-flex flex-wrap gap-2 mb-3 pb-3 border-bottom align-items-center">
       <span class="small text-muted fw-bold me-2" style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px;">Statut :</span>
-      <a href="?{% if q %}q={{ q }}&{% endif %}{% if type_support %}type_support={{ type_support }}&{% endif %}{% if actif %}actif={{ actif }}{% endif %}"
+      <a href="?{% if q %}q={{ q }}&{% endif %}{% if type_support %}type_support={{ type_support }}&{% endif %}{% if categorie_active %}categorie={{ categorie_active|urlencode }}&{% endif %}{% if actif %}actif={{ actif }}{% endif %}"
          class="cpl-tab-btn {% if not statut %}active{% endif %}">
         <i class="bi bi-grid-fill"></i>Toutes
         <span class="cpl-tab-badge">{{ kpi_total|default:0 }}</span>
       </a>
-      <a href="?statut=en_cours{% if q %}&q={{ q }}{% endif %}{% if type_support %}&type_support={{ type_support }}{% endif %}{% if actif %}&actif={{ actif }}{% endif %}"
+      <a href="?statut=en_cours{% if q %}&q={{ q }}{% endif %}{% if type_support %}&type_support={{ type_support }}{% endif %}{% if categorie_active %}&categorie={{ categorie_active|urlencode }}{% endif %}{% if actif %}&actif={{ actif }}{% endif %}"
          class="cpl-tab-btn {% if statut == 'en_cours' %}active{% endif %}">
         <i class="bi bi-broadcast text-success"></i>En cours
         <span class="cpl-tab-badge">{{ kpi_en_cours|default:0 }}</span>
       </a>
-      <a href="?statut=a_venir{% if q %}&q={{ q }}{% endif %}{% if type_support %}&type_support={{ type_support }}{% endif %}{% if actif %}&actif={{ actif }}{% endif %}"
+      <a href="?statut=a_venir{% if q %}&q={{ q }}{% endif %}{% if type_support %}&type_support={{ type_support }}{% endif %}{% if categorie_active %}&categorie={{ categorie_active|urlencode }}{% endif %}{% if actif %}&actif={{ actif }}{% endif %}"
          class="cpl-tab-btn {% if statut == 'a_venir' %}active{% endif %}">
         <i class="bi bi-calendar-check text-info"></i>À venir
         <span class="cpl-tab-badge">{{ kpi_a_venir|default:0 }}</span>
       </a>
-      <a href="?statut=terminee{% if q %}&q={{ q }}{% endif %}{% if type_support %}&type_support={{ type_support }}{% endif %}{% if actif %}&actif={{ actif }}{% endif %}"
+      <a href="?statut=terminee{% if q %}&q={{ q }}{% endif %}{% if type_support %}&type_support={{ type_support }}{% endif %}{% if categorie_active %}&categorie={{ categorie_active|urlencode }}{% endif %}{% if actif %}&actif={{ actif }}{% endif %}"
          class="cpl-tab-btn {% if statut == 'terminee' %}active{% endif %}">
         <i class="bi bi-check2-all text-secondary"></i>Terminées
         <span class="cpl-tab-badge">{{ kpi_terminee|default:0 }}</span>
       </a>
       {% if kpi_brouillon > 0 %}
-      <a href="?statut=brouillon{% if q %}&q={{ q }}{% endif %}{% if type_support %}&type_support={{ type_support }}{% endif %}{% if actif %}&actif={{ actif }}{% endif %}"
+      <a href="?statut=brouillon{% if q %}&q={{ q }}{% endif %}{% if type_support %}&type_support={{ type_support }}{% endif %}{% if categorie_active %}&categorie={{ categorie_active|urlencode }}{% endif %}{% if actif %}&actif={{ actif }}{% endif %}"
          class="cpl-tab-btn {% if statut == 'brouillon' %}active{% endif %}">
         <i class="bi bi-pencil-square text-warning"></i>Brouillons
         <span class="cpl-tab-badge">{{ kpi_brouillon|default:0 }}</span>
@@ -145,47 +145,32 @@
       {% endif %}
     </div>
 
-    {# Formulaire de filtres détaillés #}
-    <form method="get" class="row g-3 align-items-end">
-      <div class="col-xl-4 col-md-6">
-        <label class="filter-label"><i class="bi bi-search"></i>Recherche</label>
+    <div class="d-flex flex-wrap gap-2 mb-3 pb-3 border-bottom align-items-center">
+      <span class="small text-muted fw-bold me-2" style="font-size:0.72rem;text-transform:uppercase;letter-spacing:0.5px;">Catégorie :</span>
+      {% for category in campaign_category_filters %}
+      <a href="{{ category.url }}"
+         class="cpl-tab-btn {% if categorie_active == category.value %}active{% endif %}">
+        <i class="bi bi-tag"></i>{{ category.label }}
+        <span class="cpl-tab-badge">{{ category.count }}</span>
+      </a>
+      {% endfor %}
+    </div>
+
+    {# Recherche de campagnes #}
+    <form method="get" id="campaign-search-form" class="mb-0">
+      {% if categorie_active %}<input type="hidden" name="categorie" value="{{ categorie_active }}">{% endif %}
+      {% if statut %}<input type="hidden" name="statut" value="{{ statut }}">{% endif %}
+      <div class="col-xl-5 col-md-8">
+        <label class="filter-label" for="campaign-search"><i class="bi bi-search"></i>Recherche</label>
         <div class="input-group input-group-sm">
-          <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Client, nom de campagne, référence...">
+          <span class="input-group-text"><i class="bi bi-search"></i></span>
+          <input type="search" id="campaign-search" name="q" value="{{ q }}" class="form-control" placeholder="Client, nom de campagne, référence..." autocomplete="off">
         </div>
-      </div>
-      <div class="col-xl-3 col-md-6">
-        <label class="filter-label"><i class="bi bi-grid"></i>Type de Support</label>
-        <select name="type_support" class="form-select form-select-sm">
-          <option value="">Tous les types</option>
-          {% for k, v in type_support_choices %}
-          <option value="{{ k }}" {% if type_support == k %}selected{% endif %}>{{ v }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="col-xl-3 col-md-6">
-        <label class="filter-label"><i class="bi bi-activity"></i>Statut de diffusion</label>
-        <select name="statut" class="form-select form-select-sm">
-          <option value="">Tous les statuts</option>
-          {% for k, v in statut_choices %}
-          <option value="{{ k }}" {% if statut == k %}selected{% endif %}>{{ v }}</option>
-          {% endfor %}
-        </select>
-      </div>
-      <div class="col-xl-2 col-md-6 d-flex gap-2">
-        <button type="submit" class="btn btn-primary btn-sm flex-fill shadow-sm d-flex align-items-center justify-content-center gap-1">
-          <i class="bi bi-funnel-fill"></i>
-          <span>Filtrer</span>
-        </button>
-        {% if q or statut or type_support or actif %}
-        <a href="{% url 'campagne_list' %}" class="btn btn-outline-secondary btn-sm" title="Réinitialiser tous les filtres">
-          <i class="bi bi-arrow-counterclockwise"></i>
-        </a>
-        {% endif %}
       </div>
     </form>
 
     {# ── Badges des filtres actifs ── #}
-    {% if q or statut or type_support or actif %}
+    {% if q or statut or type_support or categorie_active or actif %}
     <div class="d-flex flex-wrap gap-2 align-items-center mt-3 pt-3 border-top">
       <span class="small text-muted fw-bold me-1" style="font-size: 0.72rem;">Filtres actifs :</span>
       {% if q %}
@@ -196,6 +181,9 @@
       {% endif %}
       {% if type_support %}
         <span class="active-filter-pill"><i class="bi bi-grid"></i>Type: {{ type_support|title }}</span>
+      {% endif %}
+      {% if categorie_active %}
+        <span class="active-filter-pill"><i class="bi bi-tag"></i>Catégorie: {{ categorie_active }}</span>
       {% endif %}
       <a href="{% url 'campagne_list' %}" class="small text-danger text-decoration-none ms-2 fw-semibold" style="font-size: 0.75rem;">
         <i class="bi bi-x-circle me-1"></i>Effacer tout
@@ -262,7 +250,7 @@
           </thead>
           <tbody>
             {% for c in campagnes %}
-            <tr class="support-row {% if user.is_admin and not c.actif %}opacity-75 bg-light{% endif %}">
+              <tr class="support-row {% if user.is_admin and not c.actif %}opacity-75 bg-light{% endif %}">
               <td class="ps-3">
                 <input type="checkbox" name="selected_ids" value="{{ c.pk }}" class="form-check-input mt-0 row-checkbox">
               </td>
@@ -391,7 +379,7 @@
               </td>
 
             </tr>
-            {% empty %}
+          {% empty %}
             <tr>
               <td colspan="12" class="text-center py-5 text-muted">
                 <div class="py-3">
@@ -406,7 +394,7 @@
                 </div>
               </td>
             </tr>
-            {% endfor %}
+          {% endfor %}
           </tbody>
         </table>
       </div>
@@ -467,6 +455,20 @@ function confirmerAction() {
   if (!confirm(`Confirmer "${action}" sur ${checked} campagne(s) ?`)) return;
   document.getElementById('action-input').value = action;
   document.getElementById('form-actions').submit();
+}
+</script>
+<script>
+const campaignSearchForm = document.getElementById('campaign-search-form');
+const campaignSearchInput = document.getElementById('campaign-search');
+let campaignSearchTimeout;
+
+if (campaignSearchForm && campaignSearchInput) {
+  campaignSearchInput.addEventListener('input', () => {
+    clearTimeout(campaignSearchTimeout);
+    campaignSearchTimeout = setTimeout(() => {
+      campaignSearchForm.requestSubmit();
+    }, 350);
+  });
 }
 </script>
 {% endblock %}

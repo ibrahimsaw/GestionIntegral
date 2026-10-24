@@ -262,11 +262,20 @@ class MarcheDetailView(LoginRequiredMixin, DetailView):
     model = Marche
     template_name = 'inventory/marche_detail.html'
     context_object_name = 'marche'
+    paginate_by = 20
 
     def get_context_data(self, **kwargs):
+        from django.core.paginator import Paginator
+
         context = super().get_context_data(**kwargs)
         emplacements = self.object.emplacements.select_related('support_installe').order_by('code')
         context['emplacements'] = emplacements
+        paginator = Paginator(emplacements, self.paginate_by)
+        page_obj = paginator.get_page(self.request.GET.get('page'))
+        context['emplacements_page'] = page_obj
+        context['page_obj'] = page_obj
+        context['paginator'] = paginator
+        context['is_paginated'] = page_obj.has_other_pages()
         context['title'] = self.object.nom
         return context
 

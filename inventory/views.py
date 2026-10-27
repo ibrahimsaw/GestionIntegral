@@ -1,13 +1,16 @@
+import io
 import json
 import re
 import unicodedata
+from datetime import datetime
 from typing import cast
 
 from django.conf import settings
 from django.contrib import messages
+from django.core.paginator import Paginator
 from django.core.cache import cache
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
@@ -2004,6 +2007,15 @@ class MaintenanceDetailView(LoginRequiredMixin, DetailView):
             qs = qs.filter(effectue_par=self.request.user)
         return qs
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        maintenance = self.object
+        element = maintenance.face or maintenance.support
+        context['etat_actuel'] = element.etat
+        context['etat_actuel_label'] = element.get_etat_display()
+        context['etat_choices'] = Maintenance.ETAT_CHOICES
+        return context
+
 
 import json
 
@@ -2195,15 +2207,24 @@ class MaintenanceQuickRepairView(LoginRequiredMixin, View):
         support = maintenance.support
         face = maintenance.face
 
+        etat_actuel = face.etat if face else support.etat
+        etat_apres = request.POST.get('etat_apres', Maintenance.ETAT_BON)
+        if etat_apres not in {
+            Maintenance.ETAT_BON,
+            Maintenance.ETAT_A_MAINTENIR,
+            Maintenance.ETAT_PANNE,
+        }:
+            etat_apres = Maintenance.ETAT_BON
+        if etat_apres == etat_actuel:
+            messages.error(request, "L'état choisi est déjà l'état actuel de cet élément.")
+            return redirect('maintenance_detail', pk=maintenance.pk)
+
         description = request.POST.get('description', '').strip()
         if not description:
             face_info = f" (Face {face.label})" if face else ""
             description = f"Réparation effectuée — Remise en service opérationnel suite à l'intervention #{maintenance.pk}{face_info}"
 
         photo = request.FILES.get('photo')
-        etat_apres = request.POST.get('etat_apres', Maintenance.ETAT_BON)
-        if etat_apres not in {Maintenance.ETAT_BON, Maintenance.ETAT_A_MAINTENIR, Maintenance.ETAT_PANNE}:
-            etat_apres = Maintenance.ETAT_BON
 
         date_str = request.POST.get('date_intervention')
         if date_str:
@@ -2244,6 +2265,9 @@ class SupportPeriodesVanneView(LoginRequiredMixin, View):
     def get(self, request, pk):
         support  = get_object_or_404(Support, pk=pk)
         periodes = support.get_periodes_panne()
+        periodes.sort(key=lambda p: p['debut'], reverse=True)
+        periodes.sort(key=lambda p: p['etat_incident'] != Support.ETAT_PANNE)
+        periodes.sort(key=lambda p: p['resolue'])
 
         # ── Statistiques globales ─────────────────────────────────
         nb_total    = len(periodes)
@@ -2257,6 +2281,7 @@ class SupportPeriodesVanneView(LoginRequiredMixin, View):
         duree_moyenne = (
             duree_totale / nb_total if nb_total > 0 else timedelta()
         )
+        page_obj = Paginator(periodes, 20).get_page(request.GET.get('page'))
 
         # ── Stats par face (panneaux uniquement) ──────────────────
         stats_par_face = {}
@@ -2278,7 +2303,10 @@ class SupportPeriodesVanneView(LoginRequiredMixin, View):
 
         context = {
             'support'       : support,
-            'periodes'      : periodes,
+            'periodes'      : page_obj,
+            'page_obj'      : page_obj,
+            'paginator'     : page_obj.paginator,
+            'is_paginated'  : page_obj.has_other_pages(),
             'nb_total'      : nb_total,
             'nb_resolues'   : nb_resolues,
             'nb_en_cours'   : nb_en_cours,
@@ -2293,105 +2321,19 @@ class PeriodesParVueView(LoginRequiredMixin, View):
     template_name = 'inventory/periodes_panne_liste.html'
 
     def get(self, request):
-        # ── Filtres ───────────────────────────────────────────────
-        support_pk  = request.GET.get('support', '')
-        face_label  = request.GET.get('face', '')
-        statut_f    = request.GET.get('statut', '')   # 'resolue' | 'en_cours'
-        date_debut  = request.GET.get('date_debut', '')
-        date_fin    = request.GET.get('date_fin', '')
-
-        # ── Construction des périodes depuis Maintenance ──────────
-        # On part des maintenances groupées par (support, face)
-        maints_qs = (
-            Maintenance.objects
-            .select_related('support', 'face')
-            .order_by('support_id', 'face_id', 'date_intervention')
-        )
-
-        if support_pk:
-            maints_qs = maints_qs.filter(support_id=support_pk)
-        if face_label:
-            maints_qs = maints_qs.filter(face__label=face_label)
-
-        # ── Groupement par (support, face) ────────────────────────
-        from itertools import groupby
-        from operator import attrgetter
-
-        periodes = []
-
-        # Grouper par support puis par face
-        def group_key(m):
-            return (m.support_id, m.face_id)
-
-        for (support_id, face_id), group in groupby(maints_qs, key=group_key):
-            maints_group = list(group)
-            support      = maints_group[0].support
-            face         = maints_group[0].face
-            incident_debut = None
-            maintenance_debut = None
-            etat_incident = None
-
-            for maint in maints_group:
-                if maint.etat_apres in (Support.ETAT_A_MAINTENIR, ETAT_PANNE) and incident_debut is None:
-                    incident_debut = maint.date_intervention
-                    maintenance_debut = maint
-                    etat_incident = maint.etat_apres
-                elif maint.etat_apres in (Support.ETAT_A_MAINTENIR, ETAT_PANNE) and incident_debut is not None:
-                    etat_incident = maint.etat_apres
-
-                elif maint.etat_apres == ETAT_BON and incident_debut is not None:
-                    periodes.append({
-                        'support'     : support,
-                        'face'        : face,
-                        'debut'       : incident_debut,
-                        'fin'         : maint.date_intervention,
-                        'duree'       : maint.date_intervention - incident_debut,
-                        'resolue'     : True,
-                        'maint_debut' : maintenance_debut,
-                        'etat_debut'  : maintenance_debut.etat_apres,
-                        'etat_incident': etat_incident,
-                        'maint_bon'   : maint,
-                    })
-                    incident_debut = None
-                    maintenance_debut = None
-                    etat_incident = None
-
-            if incident_debut is not None:
-                periodes.append({
-                    'support'     : support,
-                    'face'        : face,
-                    'debut'       : incident_debut,
-                    'fin'         : None,
-                    'duree'       : timezone.now() - incident_debut,
-                    'resolue'     : False,
-                    'maint_debut' : maintenance_debut,
-                    'etat_debut'  : maintenance_debut.etat_apres,
-                    'etat_incident': etat_incident,
-                    'maint_bon'   : None,
-                })
-
-        # ── Filtres post-construction ─────────────────────────────
-        if statut_f == 'resolue':
-            periodes = [p for p in periodes if p['resolue']]
-        elif statut_f == 'en_cours':
-            periodes = [p for p in periodes if not p['resolue']]
-
-        if date_debut:
-            try:
-                dt = datetime.strptime(date_debut, '%Y-%m-%d')
-                periodes = [p for p in periodes if p['debut'].date() >= dt.date()]
-            except ValueError:
-                pass
-
-        if date_fin:
-            try:
-                dt = datetime.strptime(date_fin, '%Y-%m-%d')
-                periodes = [p for p in periodes if p['debut'].date() <= dt.date()]
-            except ValueError:
-                pass
-
-        # ── Tri chronologique décroissant ─────────────────────────
-        periodes.sort(key=lambda p: p['debut'], reverse=True)
+        filters = {
+            'support': request.GET.get('support', ''),
+            'face': request.GET.get('face', ''),
+            'statut': request.GET.get('statut', ''),
+            'date_debut': request.GET.get('date_debut', ''),
+            'date_fin': request.GET.get('date_fin', ''),
+        }
+        from reports.pannes_report_view import build_panne_periods
+        try:
+            periodes, _, _ = build_panne_periods(filters)
+        except ValueError as error:
+            messages.error(request, str(error) or 'Les dates du rapport sont invalides.')
+            return redirect('periodes_panne_liste')
 
         # ── KPI globaux ───────────────────────────────────────────
         nb_total    = len(periodes)
@@ -2402,27 +2344,33 @@ class PeriodesParVueView(LoginRequiredMixin, View):
             timedelta()
         )
         duree_moyenne = duree_totale / nb_total if nb_total else timedelta()
+        page_obj = Paginator(periodes, 20).get_page(request.GET.get('page'))
 
         # ── Données pour les filtres ──────────────────────────────
         supports_liste = Support.objects.filter(
             maintenances__isnull=False
         ).distinct().order_by('code')
+        export_params = request.GET.copy()
+        export_params.pop('page', None)
+        export_params.pop('format', None)
 
         context = {
             'title'         : 'Périodes de signalement et de panne',
-            'periodes'      : periodes,
+            'periodes'      : page_obj,
+            'page_obj'      : page_obj,
+            'paginator'     : page_obj.paginator,
+            'is_paginated'  : page_obj.has_other_pages(),
             'nb_total'      : nb_total,
             'nb_resolues'   : nb_resolues,
-            'nb_en_cours'   : nb_en_cours,
+            'nb_en_cours'  : nb_en_cours,
             'duree_totale'  : duree_totale,
             'duree_moyenne' : duree_moyenne,
             'supports_liste': supports_liste,
+            'report_preview_url': f'{reverse("pannes_report_preview")}?{export_params.urlencode()}',
+            'export_pdf_url': f'{reverse("pannes_report_pdf")}?{export_params.urlencode()}',
+            'export_excel_url': f'{reverse("pannes_report_excel")}?{export_params.urlencode()}',
             'filters'       : {
-                'support'   : support_pk,
-                'face'      : face_label,
-                'statut'    : statut_f,
-                'date_debut': date_debut,
-                'date_fin'  : date_fin,
+                **filters,
             },
         }
         return render(request, self.template_name, context)

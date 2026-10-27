@@ -2,6 +2,7 @@ import datetime
 import io
 import zipfile
 from importlib import import_module
+import openpyxl
 from django.apps import apps
 from django.contrib.auth.models import AnonymousUser
 from django.contrib.auth import get_user_model
@@ -259,6 +260,9 @@ class PreventiveMaintenanceStateTests(TestCase):
         self.assertContains(response, 'Avancement !')
         self.assertContains(response, 'Enregistrer l\'avancement')
         self.assertContains(response, 'name="etat_apres"')
+        self.assertContains(response, 'État actuel :')
+        self.assertContains(response, '<div class="fw-bold text-dark">Signal</div>')
+        self.assertNotContains(response, '<option value="a_maintenir"')
         self.assertContains(
             response,
             f'action="{reverse("maintenance_quick_repair", args=[maintenance.pk])}"',
@@ -266,6 +270,16 @@ class PreventiveMaintenanceStateTests(TestCase):
 
         response = self.client.post(
             reverse('maintenance_quick_repair', args=[maintenance.pk]),
+            {'etat_apres': Support.ETAT_A_MAINTENIR},
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(Maintenance.objects.filter(support=screen).count(), 1)
+        screen.refresh_from_db()
+        self.assertEqual(screen.etat, Support.ETAT_A_MAINTENIR)
+
+        response = self.client.post(
+            reverse('maintenance_quick_repair', args=[maintenance.pk]),
+            {'etat_apres': Support.ETAT_BON},
         )
 
         self.assertEqual(response.status_code, 302)
@@ -607,6 +621,141 @@ class PreventiveMaintenanceStateTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'SIGNAL')
+
+    def test_global_periods_page_prioritizes_open_pannes_and_is_paginated(self):
+        user = get_user_model().objects.create_user(
+            username='maintenance-periods-pagination',
+            password='test-password',
+            role='admin',
+        )
+        self.client.force_login(user)
+
+        for index in range(22):
+            screen = Support.objects.create(
+                code=f'PERIOD-SIGNAL-{index:02d}',
+                nom='Écran avec signal à réparer',
+                type_support=Support.TYPE_ECRAN,
+                latitude=12.34,
+                longitude=-1.52,
+            )
+            Maintenance.objects.create(
+                support=screen,
+                etat_apres=Support.ETAT_A_MAINTENIR,
+            )
+
+        panne_screens = []
+        for index in range(2):
+            screen = Support.objects.create(
+                code=f'PERIOD-PANNE-{index:02d}',
+                nom='Écran en panne',
+                type_support=Support.TYPE_ECRAN,
+                latitude=12.34,
+                longitude=-1.52,
+            )
+            panne_screens.append(screen)
+            Maintenance.objects.create(
+                support=screen,
+                etat_apres=Support.ETAT_PANNE,
+            )
+
+        response = self.client.get(
+            reverse('periodes_panne_liste'),
+            {'statut': 'en_cours'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['nb_total'], 24)
+        self.assertEqual(response.context['page_obj'].paginator.num_pages, 2)
+        self.assertCountEqual(
+            [period['support'] for period in response.context['periodes'][:2]],
+            panne_screens,
+        )
+        self.assertContains(response, 'Page 1 / 2')
+        self.assertContains(response, 'statut=en_cours&amp;page=2')
+
+    def test_period_report_filters_overlapping_periods_and_exports_pdf_excel(self):
+        user = get_user_model().objects.create_user(
+            username='maintenance-period-report',
+            password='test-password',
+            role='admin',
+        )
+        self.client.force_login(user)
+        window_start = datetime.datetime(2025, 4, 10, tzinfo=datetime.timezone.utc)
+        window_end = datetime.datetime(2025, 4, 12, 23, 59, tzinfo=datetime.timezone.utc)
+
+        periods = [
+            ('REPORT-OVERLAP-BEFORE', Support.ETAT_PANNE,
+             datetime.datetime(2025, 4, 9, tzinfo=datetime.timezone.utc),
+             datetime.datetime(2025, 4, 11, tzinfo=datetime.timezone.utc)),
+            ('REPORT-OVERLAP-AFTER', Support.ETAT_A_MAINTENIR,
+             datetime.datetime(2025, 4, 12, tzinfo=datetime.timezone.utc),
+             datetime.datetime(2025, 4, 13, tzinfo=datetime.timezone.utc)),
+            ('REPORT-OUTSIDE', Support.ETAT_PANNE,
+             datetime.datetime(2025, 4, 13, tzinfo=datetime.timezone.utc),
+             datetime.datetime(2025, 4, 14, tzinfo=datetime.timezone.utc)),
+        ]
+        for code, incident_state, incident_at, repaired_at in periods:
+            screen = Support.objects.create(
+                code=code,
+                nom='Écran pour rapport',
+                type_support=Support.TYPE_ECRAN,
+                latitude=12.34,
+                longitude=-1.52,
+            )
+            Maintenance.objects.create(
+                support=screen,
+                etat_apres=incident_state,
+                date_intervention=incident_at,
+                description='Constat initial',
+            )
+            Maintenance.objects.create(
+                support=screen,
+                etat_apres=Support.ETAT_BON,
+                date_intervention=repaired_at,
+                description='Réparation effectuée',
+            )
+
+        filters = {
+            'date_debut': window_start.date().isoformat(),
+            'date_fin': window_end.date().isoformat(),
+        }
+        response = self.client.get(reverse('periodes_panne_liste'), filters)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['nb_total'], 2)
+        self.assertCountEqual(
+            [period['support'].code for period in response.context['periodes']],
+            ['REPORT-OVERLAP-BEFORE', 'REPORT-OVERLAP-AFTER'],
+        )
+
+        pdf_response = self.client.get(
+            reverse('pannes_report_pdf'),
+            filters,
+        )
+        self.assertEqual(pdf_response.status_code, 200)
+        self.assertEqual(pdf_response['Content-Type'], 'application/pdf')
+        self.assertTrue(pdf_response.content.startswith(b'%PDF'))
+
+        excel_response = self.client.get(
+            reverse('pannes_report_excel'),
+            filters,
+        )
+        self.assertEqual(excel_response.status_code, 200)
+        workbook = openpyxl.load_workbook(io.BytesIO(excel_response.content))
+        self.assertEqual(workbook.active.max_row, 3)
+        self.assertEqual(
+            {workbook.active.cell(row=row, column=1).value for row in (2, 3)},
+            {'REPORT-OVERLAP-BEFORE', 'REPORT-OVERLAP-AFTER'},
+        )
+
+        preview_response = self.client.get(
+            reverse('pannes_report_preview'),
+            filters,
+        )
+        self.assertEqual(preview_response.status_code, 200)
+        self.assertEqual(preview_response.context['nb_total'], 2)
+        self.assertContains(preview_response, 'Télécharger PDF')
+        self.assertContains(preview_response, 'Excel')
 
     def test_legacy_maintenance_values_are_migrated_to_signal(self):
         panel = Support.objects.create(

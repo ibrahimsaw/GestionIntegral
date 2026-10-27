@@ -5,6 +5,7 @@ from .supports_report_view import SupportsReportView, ExportSupportsPdfView, Exp
 from .marches_report_view import MarchesReportView, ExportMarchesPdfView, ExportMarchesExcelView
 from .clients_report_view import ClientsReportView, ExportClientsPdfView, ExportClientsExcelView
 from .campagnes_report_view import CampagnesReportView, ExportCampagnesPdfView, ExportCampagnesExcelView
+from .pannes_report_view import PannesReportView, ExportPannesPdfView, ExportPannesExcelView
 
 urlpatterns = [
     # Hub Rapports
@@ -34,6 +35,11 @@ urlpatterns = [
     path("campagnes/", CampagnesReportView.as_view(), name="campagnes_report"),
     path("campagnes/export/pdf/", ExportCampagnesPdfView.as_view(), name="campagnes_export_pdf"),
     path("campagnes/export/excel/", ExportCampagnesExcelView.as_view(), name="campagnes_export_excel"),
+
+    # 5. Pannes et maintenances
+    path("pannes/", PannesReportView.as_view(), name="pannes_report_preview"),
+    path("pannes/export/pdf/", ExportPannesPdfView.as_view(), name="pannes_report_pdf"),
+    path("pannes/export/excel/", ExportPannesExcelView.as_view(), name="pannes_report_excel"),
 
     # ══════════════════════════════════════════════════════════════════
     # RAPPORTS INDIVIDUELS (DÉTAILS PAR ÉLÉMENT)
@@ -69,5 +75,4 @@ urlpatterns = [
     path("emplacement/<int:pk>/pdf/", views.ExportEmplacementPdfView.as_view(), name="export_emplacement_pdf"),
     path("emplacement/<int:pk>/preview/", views.PreviewEmplacementPdfView.as_view(), name="preview_emplacement_pdf"),
 ]
-
 

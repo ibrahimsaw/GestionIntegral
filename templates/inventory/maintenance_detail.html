@@ -13,7 +13,7 @@
       <i class="bi bi-plus-lg"></i>
       <span>Nouvelle maintenance</span>
     </a>
-    {% if maintenance.etat_apres == 'panne' or maintenance.etat_apres == 'a_maintenir' %}
+    {% if maintenance_can_quick_repair %}
     <button type="button" class="btn btn-sm d-inline-flex align-items-center gap-2 shadow-sm"
             data-bs-toggle="modal" data-bs-target="#modalReparationRapide"
             style="background:#10b981;color:#fff;border-radius:8px;padding:6px 18px;font-weight:700;font-size:0.8rem;border:none;">
@@ -21,11 +21,13 @@
       <span>Enregistrer une réparation</span>
     </button>
     {% endif %}
+    {% if maintenance_can_manage %}
     <a href="{% url 'maintenance_update' maintenance.pk %}"
        style="background:#ede9fe;color:#5b21b6;border:1px solid #ddd6fe;border-radius:8px;padding:6px 16px;font-weight:700;font-size:0.8rem;text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
       <i class="bi bi-pencil"></i>
       <span class="d-none d-md-inline">Modifier le rapport</span>
     </a>
+    {% endif %}
   </div>
 {% endblock %}
 
@@ -169,13 +171,6 @@
   .mxd-back:hover { background: var(--color-primary); color: #fff; border-color: var(--color-primary); }
 </style>
 
-<!-- ══ BREADCRUMB ══ -->
-<div class="d-flex align-items-center gap-2 mb-3" style="font-size:0.78rem;color:var(--text-muted);">
-  <a href="{% url 'maintenance_list' %}" class="mxd-back"><i class="bi bi-arrow-left"></i></a>
-  <a href="{% url 'maintenance_list' %}" style="color:var(--text-muted);text-decoration:none;">Maintenances</a>
-  <i class="bi bi-chevron-right" style="font-size:0.65rem;"></i>
-  <span style="color:var(--text);font-weight:600;">Intervention #{{ maintenance.pk }}</span>
-</div>
 
 <!-- ══ HERO ══ -->
 <div class="mxd-hero">
@@ -188,10 +183,35 @@
         <i class="bi bi-geo-alt me-1"></i>{{ maintenance.support.adresse|default:maintenance.support.ville }}
         {% if maintenance.face %} &nbsp;·&nbsp; <span class="mxd-face" style="font-size:0.7rem;padding:2px 8px;border-radius:4px;background:rgba(99,102,241,0.2);color:#c7d2fe;border:none;">Face {{ maintenance.face.label }}</span>{% endif %}
       </div>
+      {% if maintenance_is_open_incident %}
+      <div class="mt-2">
+        {% if maintenance.reparation_commencee_le %}
+          <span class="badge bg-primary">En cours de réparation</span>
+          <span class="mxd-hero-sub ms-1">
+            depuis le {{ maintenance.reparation_commencee_le|date:"d/m/Y à H:i" }}
+            {% if maintenance.reparation_commencee_par %}
+              par {{ maintenance.reparation_commencee_par.get_full_name|default:maintenance.reparation_commencee_par.username }}
+            {% endif %}
+          </span>
+        {% else %}
+          <span class="badge bg-warning text-dark">À réparer</span>
+        {% endif %}
+      </div>
+      {% endif %}
     </div>
   </div>
   <div class="d-flex align-items-center gap-2">
-    {% if maintenance.etat_apres == 'panne' or maintenance.etat_apres == 'a_maintenir' %}
+    {% if maintenance_can_start_repair %}
+    <form method="post" action="{% url 'maintenance_start_repair' maintenance.pk %}">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-sm d-inline-flex align-items-center gap-2 shadow-sm"
+              style="background:#2563eb;color:#fff;border-radius:10px;padding:8px 16px;font-weight:700;font-size:0.83rem;border:none;">
+        <i class="bi bi-play-circle-fill"></i>
+        <span>Démarrer la réparation</span>
+      </button>
+    </form>
+    {% endif %}
+    {% if maintenance_can_quick_repair %}
     <button type="button" class="btn btn-sm d-inline-flex align-items-center gap-2 shadow"
             data-bs-toggle="modal" data-bs-target="#modalReparationRapide"
             style="background:#10b981;color:#fff;border-radius:10px;padding:8px 16px;font-weight:700;font-size:0.83rem;border:none;">
@@ -281,7 +301,7 @@
         </div>
 
         <!-- ── Encart Panne & Réparation Rapide ── -->
-        {% if maintenance.etat_apres == 'panne' or maintenance.etat_apres == 'a_maintenir' %}
+        {% if maintenance_can_quick_repair %}
         <div style="background:#fff7ed;border:1px solid #ffedd5;border-radius:12px;padding:16px;margin-top:20px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;">
           <div class="d-flex align-items-center gap-3">
             <div style="width:42px;height:42px;border-radius:10px;background:#fef3c7;color:#d97706;display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0;">
@@ -382,7 +402,7 @@
         Actions Rapides
       </div>
       <div class="mxd-card-bd d-flex flex-column gap-2">
-        {% if maintenance.etat_apres == 'panne' or maintenance.etat_apres == 'a_maintenir' %}
+        {% if maintenance_can_quick_repair %}
         <button type="button" class="w-100 text-start border-0 shadow-sm"
                 data-bs-toggle="modal" data-bs-target="#modalReparationRapide"
                 style="display:flex;align-items:center;gap:10px;padding:12px 14px;background:#dcfce7;border-radius:10px;color:#166534;font-weight:700;font-size:0.84rem;cursor:pointer;">
@@ -394,10 +414,12 @@
         </button>
         {% endif %}
 
+        {% if maintenance_can_manage %}
         <a href="{% url 'maintenance_update' maintenance.pk %}"
            style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#ede9fe;border-radius:10px;text-decoration:none;color:#5b21b6;font-weight:600;font-size:0.83rem;">
           <i class="bi bi-pencil-fill"></i>Modifier cette intervention
         </a>
+        {% endif %}
         <a href="{% url 'maintenance_list' %}"
            style="display:flex;align-items:center;gap:10px;padding:10px 14px;background:#f1f5f9;border-radius:10px;text-decoration:none;color:var(--text-muted);font-weight:600;font-size:0.83rem;">
           <i class="bi bi-list-check"></i>Retour à la liste
@@ -415,6 +437,7 @@
 <!-- ══════════════════════════════════════════════════════════════
      MODAL DE RÉPARATION RAPIDE
      ══════════════════════════════════════════════════════════════ -->
+{% if maintenance_can_manage %}
 <div class="modal fade" id="modalReparationRapide" tabindex="-1" aria-labelledby="modalReparationLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
     <div class="modal-content border-0 shadow-lg" style="border-radius:16px;overflow:hidden;">
@@ -503,4 +526,5 @@
     </div>
   </div>
 </div>
+{% endif %}
 {% endblock %}

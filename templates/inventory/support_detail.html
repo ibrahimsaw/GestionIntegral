@@ -236,6 +236,25 @@
 
         {% if support.type_support == 'panneau' %}
         <!-- Faces Panneau Statique -->
+        <div class="sdp-card mb-3">
+          <div class="sdp-card-head">
+            <h2><i class="bi bi-graph-up-arrow" style="color:var(--color-primary,#932e2b);"></i>Taux d'occupation</h2>
+          </div>
+          <div class="sdp-card-body">
+            <div class="row g-3">
+              {% for label, icon, value, color in panneau_stats %}
+              <div class="col-6 col-md-4">
+                <div class="tlm-kpi" style="border-radius:8px !important;">
+                  <div class="tlm-kpi-label">
+                    <i class="bi {{ icon }} me-1" style="color:{{ color|default:'#932e2b' }};"></i>{{ label }}
+                  </div>
+                  <div class="tlm-kpi-value" style="color:{{ color|default:'#0f172a' }}; font-size:0.95rem;">{{ value }}</div>
+                </div>
+              </div>
+              {% endfor %}
+            </div>
+          </div>
+        </div>
         <div class="sdp-card">
           <div class="sdp-card-head">
             <h2><i class="bi bi-sign-merge-right-fill" style="color:var(--color-primary,#932e2b);"></i>Faces du Panneau</h2>
@@ -245,7 +264,7 @@
           </div>
           <div class="sdp-card-body">
             <div class="row g-3">
-              {% for face in support.faces.all %}
+              {% for face in faces %}
                 {% with statut=face.get_statut %}
                 <div class="col-12 col-sm-6">
                   <div class="sdp-face {% if statut == 'libre' %}libre{% elif statut == 'reserve' %}reserve{% else %}occupe{% endif %}">
@@ -320,6 +339,11 @@
                         {% endif %}
                       </div>
 
+                      <div class="d-flex flex-wrap gap-3" style="font-size:0.76rem; color:#475569;">
+                        <span><strong>Taux actuel :</strong> {{ face.taux_actuel }}%</span>
+                        <span><strong>Taux annuel {{ annee_taux_occupation }} :</strong> {{ face.taux_annuel }}%</span>
+                      </div>
+
                       {% with camp=face.get_campagne_active %}
                       {% if camp %}
                         <div class="sdp-face-campaign active-camp" style="border-radius:8px !important;">
@@ -372,9 +396,16 @@
         <div class="sdp-card">
           <div class="sdp-card-head">
             <h2><i class="bi bi-cpu-fill" style="color:var(--color-primary,#932e2b);"></i>Diffusion DOOH & Télémétrie</h2>
-            <span class="badge" style="background:#ede9fe; color:#5b21b6; border:1px solid #c4b5fd; font-size:0.75rem; border-radius:8px !important;">
-              <i class="bi bi-broadcast me-1"></i>Écran LED Numérique
-            </span>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+              {% if user.is_staff_regie_role %}
+              <a class="btn btn-sm btn-outline-primary" href="{% url 'ecran_objectifs_annuels' support.uuid %}">
+                <i class="bi bi-bullseye me-1"></i>Objectifs annuels
+              </a>
+              {% endif %}
+              <span class="badge" style="background:#ede9fe; color:#5b21b6; border:1px solid #c4b5fd; font-size:0.75rem; border-radius:8px !important;">
+                <i class="bi bi-broadcast me-1"></i>Écran LED Numérique
+              </span>
+            </div>
           </div>
           <div class="sdp-card-body">
             <div class="row g-3 mb-4">

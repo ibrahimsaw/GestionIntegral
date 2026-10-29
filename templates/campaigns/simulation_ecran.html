@@ -319,6 +319,17 @@
   }
   .timeline-hour.active-hour span { display: flex !important; color: var(--sim-primary); font-weight: 600; }
   .timeline-hour.active-hour::before { background: var(--sim-primary); opacity: 0.85; }
+  .timeline-hour.partial-hour::before { opacity: 0.4; }
+  .timeline-hour.partial-hour { background: color-mix(in srgb, var(--sim-primary-soft) 55%, transparent); }
+
+  /* ── Alerte de boucle (visuels x durée vs fréquence) ── */
+  .loop-alert {
+    display: flex; align-items: flex-start; gap: 0.6rem;
+    border-radius: var(--radius-sm); padding: 0.7rem 0.9rem; margin-bottom: 1rem;
+    font-size: 0.82rem; font-weight: 500; border: 1px solid;
+  }
+  .loop-alert.is-dense { background: var(--sim-warning-bg); border-color: var(--sim-warning); color: #92400e; }
+  .loop-alert.is-impossible { background: var(--sim-danger-bg); border-color: var(--sim-danger); color: #991b1b; }
 
   /* ── Checklist écrans ────────────────────────────────── */
   .screen-checklist {
@@ -761,6 +772,13 @@
               {{ form.nb_spots_cible_total }}
               {% if form.nb_spots_cible_total.errors %}<div class="text-danger small mt-1">{{ form.nb_spots_cible_total.errors.0 }}</div>{% endif %}
             </div>
+            <div class="col-12">
+              <label class="form-label small mb-1 fw-semibold text-dark">
+                <i class="bi bi-cash-coin me-1 text-warning"></i>Prix par spot <span class="text-muted fw-normal">(budget estimé, optionnel)</span>
+              </label>
+              {{ form.prix_spot }}
+              {% if form.prix_spot.errors %}<div class="text-danger small mt-1">{{ form.prix_spot.errors.0 }}</div>{% endif %}
+            </div>
             <div class="col-12 form-text" style="font-size:0.7rem;">Renseignez un seul des deux objectifs. L’objectif total n’est pas multiplié par le nombre d’écrans.</div>
           </div>
 
@@ -865,7 +883,7 @@
         </div>
         
         <div class="result-sub">
-          <strong>spots prévus</strong> · <strong>{{ resultats.nb_ecrans }}</strong> écran{{ resultats.nb_ecrans|pluralize }} · <strong>{{ resultats.nb_jours }}</strong> jour{{ resultats.nb_jours|pluralize }}
+          <strong>spots prévus</strong> · <strong>{{ resultats.nb_ecrans }}</strong> écran{{ resultats.nb_ecrans|pluralize }} · <strong>{{ resultats.nb_jours_total|default:resultats.nb_jours }}</strong> jour{{ resultats.nb_jours_total|default:resultats.nb_jours|pluralize }}{% if resultats.montant_estime %} · budget estimé <strong>{{ resultats.montant_estime|format_number_fr }}</strong>{% endif %}
         </div>
       </div>
       {% if resultats.url_creer_campagne %}
@@ -875,6 +893,14 @@
       </a>
       {% endif %}
     </div>
+
+    {# 1bis. Alerte de boucle : visuels x durée vs fréquence #}
+    {% if resultats.boucle.message %}
+    <div class="loop-alert is-{{ resultats.boucle.niveau }}">
+      <i class="bi bi-exclamation-triangle-fill"></i>
+      <div>{{ resultats.boucle.message }} <span class="text-muted">(remplissage de la boucle : {{ resultats.boucle.taux_pct }} %)</span></div>
+    </div>
+    {% endif %}
 
     {# 2. Cartes KPIs / Indicateurs Clés #}
     <div class="row g-2.5 mb-3">
@@ -915,7 +941,7 @@
           </div>
           <div class="metric-value">{{ resultats.part_de_voix_pct }} %</div>
           <div class="metric-sub">
-            {{ resultats.temps_pub_par_heure_sec|format_secondes }} / heure
+            {{ resultats.temps_pub_par_heure_sec|format_secondes }} / heure · <strong>{{ resultats.presence_24h_pct }} %</strong> sur 24h
           </div>
         </div>
       </div>
@@ -956,7 +982,7 @@
       {# Barre chronologique 24h #}
       <div class="timeline-24h mb-1" id="sim-timeline">
         {% for slot in resultats.timeline_hours %}
-          <div class="timeline-hour {{ slot.cls }}" data-hour="{{ slot.h }}" title="{{ slot.h }}h00">
+          <div class="timeline-hour {{ slot.cls }}" data-hour="{{ slot.h }}" title="{{ slot.title|default:slot.h }}">
             <span>{{ slot.h }}h</span>
           </div>
         {% endfor %}
@@ -1085,7 +1111,7 @@
             <tr>
               <th>#</th>
               <th>Jours ajoutés</th>
-              <th>Écrans ajoutés</th>
+              <th title="Nombre d'écrans du bloc principal réutilisés sur les jours ajoutés">Écrans (jours ajoutés)</th>
               <th>Fréquence</th>
               <th>Tranche</th>
               <th>Spots obtenus</th>

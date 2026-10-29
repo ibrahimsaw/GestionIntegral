@@ -38,13 +38,16 @@
 </div>
 
 <div class="row g-3 mb-4">
-  <div class="col-6 col-md-4">
+  <div class="col-6 col-md-3">
     <div class="cl-kpi-card"><div class="cl-kpi-icon" style="background:#eff6ff;color:#2563eb;border:1px solid #dbeafe;"><i class="bi bi-list-check"></i></div><div><div class="cl-kpi-val">{{ nb_total }}</div><div class="cl-kpi-lbl">Périodes incluses</div></div></div>
   </div>
-  <div class="col-6 col-md-4">
-    <div class="cl-kpi-card"><div class="cl-kpi-icon" style="background:#fef2f2;color:#dc2626;border:1px solid #fee2e2;"><i class="bi bi-exclamation-triangle-fill"></i></div><div><div class="cl-kpi-val" style="color:#dc2626;">{{ nb_en_cours }}</div><div class="cl-kpi-lbl">À réparer</div></div></div>
+  <div class="col-6 col-md-3">
+    <div class="cl-kpi-card"><div class="cl-kpi-icon" style="background:#fff7ed;color:#c2410c;border:1px solid #fed7aa;"><i class="bi bi-exclamation-triangle-fill"></i></div><div><div class="cl-kpi-val" style="color:#c2410c;">{{ nb_a_reparer }}</div><div class="cl-kpi-lbl">À réparer</div></div></div>
   </div>
-  <div class="col-12 col-md-4">
+  <div class="col-6 col-md-3">
+    <div class="cl-kpi-card"><div class="cl-kpi-icon" style="background:#eff6ff;color:#2563eb;border:1px solid #dbeafe;"><i class="bi bi-tools"></i></div><div><div class="cl-kpi-val" style="color:#2563eb;">{{ nb_reparation_en_cours }}</div><div class="cl-kpi-lbl">En cours de réparation</div></div></div>
+  </div>
+  <div class="col-6 col-md-3">
     <div class="cl-kpi-card"><div class="cl-kpi-icon" style="background:#ecfdf5;color:#059669;border:1px solid #d1fae5;"><i class="bi bi-check-circle-fill"></i></div><div><div class="cl-kpi-val" style="color:#059669;">{{ nb_resolues }}</div><div class="cl-kpi-lbl">Résolues</div></div></div>
   </div>
 </div>
@@ -83,18 +86,23 @@
           <label class="rpt-filter-label"><i class="bi bi-activity me-1"></i>Statut</label>
           <select name="statut" class="rpt-select">
             <option value="">Tous</option>
-            <option value="en_cours" {% if filters.statut == 'en_cours' %}selected{% endif %}>À réparer</option>
+            <option value="en_cours" {% if filters.statut == 'en_cours' %}selected{% endif %}>Non résolues</option>
             <option value="resolue" {% if filters.statut == 'resolue' %}selected{% endif %}>Résolues</option>
           </select>
         </div>
         <div class="col-lg-2 col-md-6">
           <label class="rpt-filter-label"><i class="bi bi-calendar-event me-1"></i>Depuis le</label>
-          <input type="date" name="date_debut" value="{{ filters.date_debut }}" class="rpt-select">
+          <input type="date" id="panne-date-debut" name="date_debut" value="{{ filters.date_debut }}" class="rpt-select">
+        </div>
+        <div class="col-lg-1 col-md-6">
+          <label class="rpt-filter-label" for="panne-duree-mois">Mois</label>
+          <input type="number" id="panne-duree-mois" name="duree_mois" value="{{ filters.duree_mois }}" min="1" step="1" class="rpt-select" placeholder="1">
         </div>
         <div class="col-lg-2 col-md-6">
-          <label class="rpt-filter-label"><i class="bi bi-calendar-event me-1"></i>Jusqu’au</label>
-          <input type="date" name="date_fin" value="{{ filters.date_fin }}" class="rpt-select">
+          <label class="rpt-filter-label" for="panne-date-fin"><i class="bi bi-calendar-event me-1"></i>Jusqu’au</label>
+          <input type="date" id="panne-date-fin" name="date_fin" value="{{ filters.date_fin }}" class="rpt-select">
         </div>
+        <div class="col-12 small text-muted">Indiquez un nombre de mois pour calculer automatiquement la date de fin, ou laissez ce champ vide et saisissez directement la date de fin.</div>
         <div class="col-12">
           <div class="d-flex justify-content-end gap-2">
             <button type="submit" class="rpt-btn-apply"><i class="bi bi-funnel-fill"></i>Appliquer les filtres</button>
@@ -106,10 +114,48 @@
   </div>
 </div>
 
+<script>
+  (() => {
+    const startInput = document.getElementById('panne-date-debut');
+    const monthsInput = document.getElementById('panne-duree-mois');
+    const endInput = document.getElementById('panne-date-fin');
+
+    const updateEndDate = () => {
+      if (!monthsInput.value) {
+        return;
+      }
+      if (!startInput.value || !monthsInput.validity.valid) {
+        endInput.value = '';
+        return;
+      }
+
+      const [year, month, day] = startInput.value.split('-').map(Number);
+      const monthIndex = month - 1 + Number(monthsInput.value);
+      const endYear = year + Math.floor(monthIndex / 12);
+      const endMonth = monthIndex % 12;
+      const endDay = Math.min(day, new Date(endYear, endMonth + 1, 0).getDate());
+      endInput.value = `${endYear}-${String(endMonth + 1).padStart(2, '0')}-${String(endDay).padStart(2, '0')}`;
+    };
+
+    monthsInput.addEventListener('input', () => {
+      if (!monthsInput.value) {
+        endInput.value = '';
+        return;
+      }
+      updateEndDate();
+    });
+    startInput.addEventListener('input', updateEndDate);
+    endInput.addEventListener('input', () => {
+      monthsInput.value = '';
+    });
+    updateEndDate();
+  })();
+</script>
+
 <div class="card table-custom-card mb-4 shadow-sm" style="border:1px solid #cbd5e1;">
   <div class="card-header bg-white py-3 px-4 d-flex flex-column align-items-start gap-3 border-bottom">
     <div class="d-flex align-items-center gap-2">
-      <i class="bi bi-file-earmark-spreadsheet text-danger" style="font-size:1.2rem;"></i>
+      <i class="bi bi-card-list text-danger" style="font-size:1.2rem;"></i>
       <h6 class="mb-0 fw-bold text-dark">Rendu du rapport officiel des pannes et maintenances</h6>
       <span class="badge bg-light text-secondary border font-monospace" style="font-size:0.72rem;border-radius:8px;">A4 Paysage</span>
     </div>
@@ -118,8 +164,8 @@
       <a href="{{ export_excel_url }}" class="btn btn-sm btn-outline-success shadow-sm d-flex align-items-center gap-1" style="border-radius:8px;font-weight:700;"><i class="bi bi-file-earmark-spreadsheet"></i><span>Excel</span></a>
     </div>
   </div>
-  <div class="card-body p-3 p-lg-4" style="background:#f8fafc;overflow-x:auto;">
-    <div class="mx-auto bg-white p-3 p-lg-4 shadow-sm" style="min-width:900px;border:1px solid #e2e8f0;border-radius:8px;">
+  <div class="card-body p-3 p-lg-4" style="background:#f8fafc;">
+    <div class="mx-auto bg-white p-3 p-lg-4 shadow-sm" style="max-width:1200px;border:1px solid #e2e8f0;border-radius:8px;">
       {% include 'reports/pannes_report_document.html' %}
     </div>
   </div>

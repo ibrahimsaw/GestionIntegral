@@ -5,7 +5,9 @@ from unittest.mock import patch
 
 from django.http import Http404
 from django.test import RequestFactory, SimpleTestCase, override_settings
+from django.urls import get_resolver
 
+from core.error_views import page_not_found, permission_denied, server_error
 from core.media_views import can_access_private_media, protected_media
 
 
@@ -81,4 +83,32 @@ class PrivateMediaAuthorizationTests(SimpleTestCase):
         with self.assertRaises(Http404):
             protected_media(request, 'proofs/../secret.pdf')
 
-# Create your tests here.
+
+class ErrorPageTests(SimpleTestCase):
+    def setUp(self):
+        self.request = RequestFactory().get('/')
+
+    def test_error_handlers_are_registered(self):
+        resolver = get_resolver()
+
+        self.assertEqual(resolver.resolve_error_handler('403'), permission_denied)
+        self.assertEqual(resolver.resolve_error_handler('404'), page_not_found)
+        self.assertEqual(resolver.resolve_error_handler('500'), server_error)
+
+    def test_permission_denied_page_returns_403(self):
+        response = permission_denied(self.request)
+
+        self.assertEqual(response.status_code, 403)
+        self.assertContains(response, 'Accès refusé', status_code=403)
+
+    def test_not_found_page_returns_404(self):
+        response = page_not_found(self.request)
+
+        self.assertEqual(response.status_code, 404)
+        self.assertContains(response, 'Page introuvable', status_code=404)
+
+    def test_server_error_page_returns_500_without_exposing_exception(self):
+        response = server_error(self.request)
+
+        self.assertEqual(response.status_code, 500)
+        self.assertContains(response, 'Une erreur est survenue', status_code=500)

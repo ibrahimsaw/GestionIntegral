@@ -47,13 +47,11 @@ class LoginView(View):
                 next_url = request.GET.get('next')
                 if next_url:
                     return redirect(next_url)
-                # if user.is_admin:
-                #     return redirect('dashboard')
-                # elif user.is_client_role:
-                #     return redirect('client_espace')
                 if user.is_client:
                     return redirect('client_detail', pk=user.client_profile.pk)
-                return redirect('carte')
+                if user.is_technicien:
+                    return redirect('maintenance_list')
+                return redirect('dashboard')
 
             log_action(request, AuditLog.ACTION_LOGIN_FAILED, AuditLog.MODULE_AUTH,
                        detail=f"Tentative échouée : {username}")
@@ -80,23 +78,82 @@ class UserListView(AdminRequiredMixin, ListView):
     model = User
     template_name = 'accounts/user_list.html'
     context_object_name = 'users'
+    paginate_by = 20
     ordering = ['role', 'username']
 
     def get_queryset(self):
-        qs = super().get_queryset()
-        q = self.request.GET.get('q', '')
+        qs = super().get_queryset().select_related('client_profile')
+        q = self.request.GET.get('q', '').strip()
+        role = self.request.GET.get('role', '')
+        statut = self.request.GET.get('statut', '')
         if q:
             qs = qs.filter(
-                Q(username__icontains=q)   |
-                Q(first_name__icontains=q) |
-                Q(email__icontains=q)
+                Q(username__icontains=q)
+                | Q(first_name__icontains=q)
+                | Q(last_name__icontains=q)
+                | Q(email__icontains=q)
+                | Q(telephone__icontains=q)
+                | Q(client_profile__nom__icontains=q)
             )
-        return qs
+        if role in dict(User.ROLE_CHOICES):
+            qs = qs.filter(role=role)
+        if statut == 'actif':
+            qs = qs.filter(is_active=True)
+        elif statut == 'inactif':
+            qs = qs.filter(is_active=False)
+        return qs.order_by(*self.ordering)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['q'] = self.request.GET.get('q', '')
+        context.update({
+            'q': self.request.GET.get('q', '').strip(),
+            'selected_role': self.request.GET.get('role', ''),
+            'selected_status': self.request.GET.get('statut', ''),
+            'role_choices': User.ROLE_CHOICES,
+            'total_users': User.objects.count(),
+            'active_users': User.objects.filter(is_active=True).count(),
+            'inactive_users': User.objects.filter(is_active=False).count(),
+            'role_counts': [
+                {
+                    'value': role,
+                    'label': label,
+                    'count': User.objects.filter(role=role).count(),
+                }
+                for role, label in User.ROLE_CHOICES
+            ],
+        })
         return context
+
+    def post(self, request, *args, **kwargs):
+        target_user = get_object_or_404(User, pk=request.POST.get('user_id'))
+        if target_user.pk == request.user.pk:
+            messages.error(request, "Vous ne pouvez pas désactiver votre propre compte.")
+            return redirect('user_list')
+        if target_user.is_superuser and not request.user.is_superuser:
+            raise PermissionDenied
+
+        was_active = target_user.is_active
+        target_user.is_active = not was_active
+        target_user.save(update_fields=['is_active'])
+        log_action(
+            request,
+            AuditLog.ACTION_UPDATE,
+            AuditLog.MODULE_USERS,
+            obj=target_user,
+            changes={
+                'is_active': {
+                    'avant': str(was_active),
+                    'apres': str(target_user.is_active),
+                },
+            },
+            detail=f"Compte {'activé' if target_user.is_active else 'bloqué'}",
+        )
+        messages.success(
+            request,
+            f"Compte {target_user.username} "
+            f"{'activé' if target_user.is_active else 'désactivé'}.",
+        )
+        return redirect('user_list')
 
 
 class UserCreateView(AdminRequiredMixin, CreateView):
@@ -146,6 +203,9 @@ class UserDetailView(LoginRequiredMixin, DetailView):
     context_object_name = 'target_user'
 
     def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
+
         user = self.get_object()
         if not (request.user.is_superuser or request.user.is_admin or request.user.pk == user.pk):
             raise PermissionDenied

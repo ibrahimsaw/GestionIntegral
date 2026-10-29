@@ -17,9 +17,11 @@
     <a href="{% url 'support_list' %}" class="btn btn-outline-secondary btn-sm">
       <i class="bi bi-collection me-1"></i>Supports
     </a>
-    <a href="{% url 'campagne_create' %}" class="btn btn-primary btn-sm">
-      <i class="bi bi-plus-lg me-1"></i>Nouvelle campagne
-    </a>
+    {% if not request.user.is_technicien %}
+      <a href="{% url 'campagne_create' %}" class="btn btn-primary btn-sm">
+        <i class="bi bi-plus-lg me-1"></i>Nouvelle campagne
+      </a>
+    {% endif %}
   </div>
 {% endblock %}
 
@@ -88,8 +90,10 @@
   .pg-kpi.is-alert strong { color: var(--ko); }
 
   /* ── Mise en page ── */
+  /*
   .pg-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); gap: 1rem; align-items: start; }
-  .pg-main, .pg-side { display: grid; gap: 1rem; min-width: 0; }
+  */
+  .pg-main, .pg-side { display: grid; gap: 1rem; min-width: 0; margin-bottom: 1rem; }
   .pg-card { min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--card); overflow: hidden; }
   .pg-card.is-plain { background: transparent; border: 0; overflow: visible; }
   .pg-card-head {
@@ -143,8 +147,9 @@
   .pg-block-link i { font-size: .8rem; }
 
   /* Tuiles : libellé en haut, chiffre dessous */
-  .pg-tiles { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: .5rem; }
+  .pg-tiles { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: .5rem; }
   .pg-tiles.is-four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .pg-tiles.is-five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
   .pg-tiles.is-two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .pg-tiles.is-three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .pg-tile {
@@ -431,13 +436,14 @@
           {# 12m² : totaux seulement #}
           {% for cat in format_categories %}{% if cat.categorie == '12m²' %}
             <article class="pg-block">
-              <div class="pg-block-head"><h3>12m²</h3><a class="pg-block-link" href="{% url 'format_detail' cat.detail_code %}{% if ville_active %}?ville={{ ville_active|urlencode }}{% endif %}"><i class="bi bi-map"></i>Voir sur la carte</a></div>
+              <div class="pg-block-head"><h3>12m²</h3>{% if not request.user.is_technicien %}<a class="pg-block-link" href="{% url 'format_detail' cat.detail_code %}{% if ville_active %}?ville={{ ville_active|urlencode }}{% endif %}"><i class="bi bi-map"></i>Voir sur la carte</a>{% endif %}</div>
               <div class="pg-tiles">
                 <div class="pg-tile"><span>Panneaux</span><strong>{{ cat.nb_supports }}</strong></div>
                 <div class="pg-tile"><span>Faces</span><strong>{{ cat.nb_faces }}</strong></div>
                 <div class="pg-tile is-current"><span>Occupés</span><strong>{{ cat.nb_occupe }}</strong></div>
                 <div class="pg-tile is-good"><span>Libres</span><strong>{{ cat.nb_libre }}</strong></div>
-                <div class="pg-tile"><span>Taux occupation</span><strong>{% widthratio cat.nb_occupe cat.nb_faces 100 %}%</strong></div>
+                <div class="pg-tile"><span>Taux actuel</span><strong>{{ cat.taux_actuel }}%</strong></div>
+                <div class="pg-tile"><span>Taux annuel {{ annee_taux_occupation }}</span><strong>{{ cat.taux_annuel }}%</strong></div>
               </div>
             </article>
           {% endif %}{% endfor %}
@@ -445,13 +451,14 @@
           {# Sucette : totaux seulement #}
           {% for cat in format_categories %}{% if cat.categorie == 'Sucette' %}
             <article class="pg-block">
-              <div class="pg-block-head"><h3>Sucette</h3><a class="pg-block-link" href="{% url 'format_detail' cat.detail_code %}{% if ville_active %}?ville={{ ville_active|urlencode }}{% endif %}"><i class="bi bi-map"></i>Voir sur la carte</a></div>
+              <div class="pg-block-head"><h3>Sucette</h3>{% if not request.user.is_technicien %}<a class="pg-block-link" href="{% url 'format_detail' cat.detail_code %}{% if ville_active %}?ville={{ ville_active|urlencode }}{% endif %}"><i class="bi bi-map"></i>Voir sur la carte</a>{% endif %}</div>
               <div class="pg-tiles">
                 <div class="pg-tile"><span>Panneaux</span><strong>{{ cat.nb_supports }}</strong></div>
                 <div class="pg-tile"><span>Faces</span><strong>{{ cat.nb_faces }}</strong></div>
                 <div class="pg-tile is-current"><span>Occupés</span><strong>{{ cat.nb_occupe }}</strong></div>
                 <div class="pg-tile is-good"><span>Libres</span><strong>{{ cat.nb_libre }}</strong></div>
-                <div class="pg-tile"><span>Taux occupation</span><strong>{% widthratio cat.nb_occupe cat.nb_faces 100 %}%</strong></div>
+                <div class="pg-tile"><span>Taux actuel</span><strong>{{ cat.taux_actuel }}%</strong></div>
+                <div class="pg-tile"><span>Taux annuel {{ annee_taux_occupation }}</span><strong>{{ cat.taux_annuel }}%</strong></div>
               </div>
             </article>
           {% endif %}{% endfor %}
@@ -459,13 +466,14 @@
           {# Géant : totaux puis détail par format #}
           {% for cat in format_categories %}{% if cat.categorie == 'Géant' %}
             <article class="pg-block">
-              <div class="pg-block-head"><h3>Géant</h3><a class="pg-block-link" href="{% url 'format_detail' 'geant' %}{% if ville_active %}?ville={{ ville_active|urlencode }}{% endif %}"><i class="bi bi-map"></i>Voir sur la carte</a></div>
+              <div class="pg-block-head"><h3>Géant</h3>{% if not request.user.is_technicien %}<a class="pg-block-link" href="{% url 'format_detail' 'geant' %}{% if ville_active %}?ville={{ ville_active|urlencode }}{% endif %}"><i class="bi bi-map"></i>Voir sur la carte</a>{% endif %}</div>
               <div class="pg-tiles">
                 <div class="pg-tile"><span>Panneaux</span><strong>{{ cat.nb_supports }}</strong></div>
                 <div class="pg-tile"><span>Faces</span><strong>{{ cat.nb_faces }}</strong></div>
                 <div class="pg-tile is-current"><span>Occupés</span><strong>{{ cat.nb_occupe }}</strong></div>
                 <div class="pg-tile is-good"><span>Libres</span><strong>{{ cat.nb_libre }}</strong></div>
-                <div class="pg-tile"><span>Taux occupation</span><strong>{% widthratio cat.nb_occupe cat.nb_faces 100 %}%</strong></div>
+                <div class="pg-tile"><span>Taux actuel</span><strong>{{ cat.taux_actuel }}%</strong></div>
+                <div class="pg-tile"><span>Taux annuel {{ annee_taux_occupation }}</span><strong>{{ cat.taux_annuel }}%</strong></div>
               </div>
               <div class="pg-table-wrap">
                 <table class="pg-table">
@@ -477,8 +485,10 @@
                       <th class="num">Faces</th>
                       <th class="num">Occupés</th>
                       <th class="num">Libres</th>
-                      <th>Taux de remplissage</th>
-                      <th class="num">Action</th>
+                      <th>Taux actuel / annuel</th>
+                      {% if not request.user.is_technicien %}
+                        <th class="num">Action</th>
+                      {% endif %}
                     </tr>
                   </thead>
                   <tbody>
@@ -503,13 +513,16 @@
                       <td class="num pg-num-free">{{ format.nb_faces_libres }}</td>
                       <td>
                         <div class="pg-taux">
-                          <b>{{ format.taux }} %</b>
-                          <div class="pg-bar" role="progressbar" aria-valuenow="{{ format.taux }}" aria-valuemin="0" aria-valuemax="100"><i style="width: {{ format.taux }}%"></i></div>
+                          <b>Actuel {{ format.taux_actuel }}%</b>
+                          <small>Annuel {{ format.taux_annuel }}%</small>
+                          <div class="pg-bar" role="progressbar" aria-valuenow="{{ format.taux_actuel }}" aria-valuemin="0" aria-valuemax="100"><i style="width: {{ format.taux_actuel }}%"></i></div>
                         </div>
                       </td>
-                      <td class="num">
-                        <a class="pg-voir" href="{% url 'format_detail' format.code %}{% if ville_active %}?ville={{ ville_active|urlencode }}{% endif %}">Voir</a>
-                      </td>
+                      {% if not request.user.is_technicien %}
+                        <td class="num">
+                          <a class="pg-voir" href="{% url 'format_detail' format.code %}{% if ville_active %}?ville={{ ville_active|urlencode }}{% endif %}">Voir</a>
+                        </td>
+                      {% endif %}
                     </tr>
                     {% endif %}{% endfor %}
                   </tbody>
@@ -521,13 +534,14 @@
           {# Marché : totaux puis détail par marché #}
           {% for cat in format_categories %}{% if cat.categorie == 'Marché' %}
             <article class="pg-block">
-              <div class="pg-block-head"><h3>Marché</h3><span class="pg-block-tag">{{ marches_total }} marché{{ marches_total|pluralize }}</span><a class="pg-block-link" href="{% url 'format_detail' 'marche' %}{% if ville_active %}?ville={{ ville_active|urlencode }}{% endif %}"><i class="bi bi-map"></i>Voir sur la carte</a></div>
+              <div class="pg-block-head"><h3>Marché</h3><span class="pg-block-tag">{{ marches_total }} marché{{ marches_total|pluralize }}</span>{% if not request.user.is_technicien %}<a class="pg-block-link" href="{% url 'format_detail' 'marche' %}{% if ville_active %}?ville={{ ville_active|urlencode }}{% endif %}"><i class="bi bi-map"></i>Voir sur la carte</a>{% endif %}</div>
               <div class="pg-tiles">
                 <div class="pg-tile"><span>Panneaux</span><strong>{{ cat.nb_supports }}</strong></div>
                 <div class="pg-tile"><span>Faces</span><strong>{{ cat.nb_faces }}</strong></div>
                 <div class="pg-tile is-current"><span>Occupés</span><strong>{{ cat.nb_occupe }}</strong></div>
                 <div class="pg-tile is-good"><span>Libres</span><strong>{{ cat.nb_libre }}</strong></div>
-                <div class="pg-tile"><span>Taux occupation</span><strong>{% widthratio cat.nb_occupe cat.nb_faces 100 %}%</strong></div>
+                <div class="pg-tile"><span>Taux actuel</span><strong>{{ cat.taux_actuel }}%</strong></div>
+                <div class="pg-tile"><span>Taux annuel {{ annee_taux_occupation }}</span><strong>{{ cat.taux_annuel }}%</strong></div>
               </div>
               <div class="pg-subs">
                 {% for marche in marches_stats %}
@@ -553,12 +567,14 @@
           {# Écrans : affiché seulement si la ville possède des écrans #}
           {% if ecrans_total %}
           <article class="pg-block">
-            <div class="pg-block-head"><h3>Écrans</h3><a class="pg-block-link" href="{% url 'format_detail' 'ecrans' %}{% if ville_active %}?ville={{ ville_active|urlencode }}{% endif %}"><i class="bi bi-map"></i>Voir sur la carte</a></div>
-            <div class="pg-tiles is-four">
+            <div class="pg-block-head"><h3>Écrans</h3>{% if not request.user.is_technicien %}<a class="pg-block-link" href="{% url 'format_detail' 'ecrans' %}{% if ville_active %}?ville={{ ville_active|urlencode }}{% endif %}"><i class="bi bi-map"></i>Voir sur la carte</a>{% endif %}</div>
+            <div class="pg-tiles">
               <div class="pg-tile"><span>Écrans</span><strong>{{ ecrans_total }}</strong></div>
               <div class="pg-tile is-current"><span>Occupés</span><strong>{{ ecrans_occupees }}</strong></div>
               <div class="pg-tile is-good"><span>Libres</span><strong>{{ ecrans_libres }}</strong></div>
-              <div class="pg-tile"><span>Taux occupation</span><strong>{% widthratio ecrans_occupees ecrans_total 100 %}%</strong></div>
+              <div class="pg-tile"><span>Objectif annuel (spots)</span><strong>{{ ecrans_objectifs_total }}</strong></div>
+              <div class="pg-tile"><span>Taux actuel</span><strong>{{ ecrans_taux_actuel }}%</strong></div>
+              <div class="pg-tile"><span>Taux annuel {{ annee_taux_occupation }}</span><strong>{{ ecrans_taux_annuel }}%</strong></div>
             </div>
             <div class="pg-ecrans">
               {% for ecran in ecrans_liste %}
@@ -567,13 +583,24 @@
                     <strong><a href="{% url 'support_detail' ecran.uuid %}">{{ ecran.nom }}</a></strong>
                     <small>{{ ecran.code }}{% if ecran.quartier %} · {{ ecran.quartier }}{% endif %}{% if ecran.ville %} · {{ ecran.ville }}{% endif %}</small>
                   </div>
+                  <div class="pg-stats-inline">
+                    {% if ecran.objectif_spots_annuel %}
+                      <span><small>Objectif spots</small><b>{{ ecran.objectif_spots_annuel }}</b></span>
+                      <span class="is-current"><small>Taux actuel</small><b>{{ ecran.taux_actuel }}%</b></span>
+                      <span><small>Taux annuel {{ annee_taux_occupation }}</small><b>{{ ecran.taux_annuel }}%</b></span>
+                    {% else %}
+                      <span><small>Objectif spots</small><b>À renseigner</b></span>
+                    {% endif %}
+                  </div>
                   <div class="pg-ecran-actions">
                     {% if ecran.occupe %}
                       <span class="pg-ecran-state is-occupe">Occupé</span>
                     {% else %}
                       <span class="pg-ecran-state is-libre">Libre</span>
                     {% endif %}
-                    <a class="pg-voir" href="{% url 'support_detail' ecran.uuid %}">Voir</a>
+                    {% if not request.user.is_technicien %}
+                      <a class="pg-voir" href="{% url 'support_detail' ecran.uuid %}">Voir</a>
+                    {% endif %}
                   </div>
                 </div>
               {% empty %}
@@ -607,11 +634,18 @@
             {% if alertes %}
               <div class="pg-alerts">
                 {% for alerte in alertes %}
-                  <a href="{{ alerte.url }}" class="pg-alert is-{{ alerte.type }}">
-                    <i class="bi {% if alerte.type == 'danger' %}bi-exclamation-octagon-fill{% else %}bi-exclamation-triangle-fill{% endif %}"></i>
-                    <span>{{ alerte.msg }}</span>
-                    <i class="bi bi-arrow-up-right pg-alert-arrow"></i>
-                  </a>
+                  {% if not request.user.is_technicien %}
+                    <a href="{{ alerte.url }}" class="pg-alert is-{{ alerte.type }}">
+                      <i class="bi {% if alerte.type == 'danger' %}bi-exclamation-octagon-fill{% else %}bi-exclamation-triangle-fill{% endif %}"></i>
+                      <span>{{ alerte.msg }}</span>
+                      <i class="bi bi-arrow-up-right pg-alert-arrow"></i>
+                    </a>
+                  {% else %}
+                    <div class="pg-alert is-{{ alerte.type }}">
+                      <i class="bi {% if alerte.type == 'danger' %}bi-exclamation-octagon-fill{% else %}bi-exclamation-triangle-fill{% endif %}"></i>
+                      <span>{{ alerte.msg }}</span>
+                    </div>
+                  {% endif %}
                 {% endfor %}
               </div>
             {% else %}
@@ -630,11 +664,13 @@
             <h2 id="pg-campaign-types-title">Campagnes par type</h2>
             <p>En cours et à venir.</p>
           </div>
-          <a href="{% url 'campagne_list' %}" class="btn btn-sm btn-outline-secondary">Toutes</a>
+          {% if not request.user.is_technicien %}
+            <a href="{% url 'campagne_list' %}" class="btn btn-sm btn-outline-secondary">Toutes</a>
+          {% endif %}
         </header>
         <div class="pg-blocks">
           {% if panneaux_campagnes_en_cours or panneaux_campagnes_a_venir %}
-          <article class="pg-block">
+          <article style="padding: .9rem 1rem 1rem;">
             <div class="pg-block-head"><h3>Panneaux</h3><span class="pg-block-tag">Campagnes statiques</span></div>
             <div class="pg-tiles is-two">
               <div class="pg-tile is-current"><span>En cours</span><strong>{{ panneaux_campagnes_en_cours }}</strong></div>
@@ -643,7 +679,7 @@
           </article>
           {% endif %}
           {% if ecrans_campagnes_en_cours or ecrans_campagnes_a_venir %}
-          <article class="pg-block">
+          <article style="padding: .9rem 1rem 1rem;">
             <div class="pg-block-head"><h3>Écrans</h3><span class="pg-block-tag">Campagnes numériques</span></div>
             <div class="pg-tiles is-two">
               <div class="pg-tile is-current"><span>En cours</span><strong>{{ ecrans_campagnes_en_cours }}</strong></div>
@@ -652,7 +688,7 @@
           </article>
           {% endif %}
           {% if marches_campagnes_en_cours or marches_campagnes_a_venir %}
-          <article class="pg-block">
+          <article style="padding: .9rem 1rem 1rem;">
             <div class="pg-block-head"><h3>Marchés</h3><span class="pg-block-tag">Campagnes en marché</span></div>
             <div class="pg-tiles is-two">
               <div class="pg-tile is-current"><span>En cours</span><strong>{{ marches_campagnes_en_cours }}</strong></div>
@@ -682,7 +718,11 @@
                   {% for campagne in groupe.campagnes %}
                     <div class="pg-row">
                       <div class="pg-row-main">
-                        <a href="{% url 'campagne_detail' campagne.pk %}" class="pg-row-name">{{ campagne.nom }}</a>
+                        {% if not request.user.is_technicien %}
+                          <a href="{% url 'campagne_detail' campagne.pk %}" class="pg-row-name">{{ campagne.nom }}</a>
+                        {% else %}
+                          <span class="pg-row-name">{{ campagne.nom }}</span>
+                        {% endif %}
                         <span class="badge bg-panne" style="background-color: #dbdddd !important; color: #6c757d !important; border-color: rgba(100, 116, 139, 0.2) !important;">
                           {% if campagne.nb_faces_reservees %}<span class="ms-2">{{ campagne.nb_faces_reservees }} face{% if campagne.nb_faces_reservees != 1 %}s{% endif %} {% if campagne.statut == 'en_cours' %}occupée{% else %}réservée{% endif %}{% if campagne.nb_faces_reservees != 1 %}s{% endif %}</span>{% endif %}
                           {% if campagne.nb_ecrans_reserves %}<span class="ms-2">{{ campagne.nb_ecrans_reserves }} écran{% if campagne.nb_ecrans_reserves != 1 %}s{% endif %} {% if campagne.statut == 'en_cours' %}occupé{% else %}réservé{% endif %}{% if campagne.nb_ecrans_reserves != 1 %}s{% endif %}</span>{% endif %}
@@ -718,7 +758,11 @@
             {% for campagne in campagnes_recentes %}
               <div class="pg-row">
                 <div class="pg-row-main">
-                  <a href="{% url 'campagne_detail' campagne.pk %}" class="pg-row-name">{{ campagne.nom }}</a>
+                  {% if not request.user.is_technicien %}
+                    <a href="{% url 'campagne_detail' campagne.pk %}" class="pg-row-name">{{ campagne.nom }}</a>
+                  {% else %}
+                    <span class="pg-row-name">{{ campagne.nom }}</span>
+                  {% endif %}
                   <div class="pg-row-meta">{{ campagne.client.nom }} · {{ campagne.date_debut|date:"d/m/Y" }} – {{ campagne.date_fin|date:"d/m/Y" }}</div>
                 </div>
                 <span class="badge bg-{{ campagne.get_statut_badge }}" style="color: #ffffff;">{{ campagne.get_statut_display }}</span>

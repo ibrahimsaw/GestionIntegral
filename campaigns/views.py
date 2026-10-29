@@ -1,4 +1,5 @@
 import json
+from datetime import date, datetime, time, timedelta
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.http import JsonResponse
@@ -23,7 +24,8 @@ from accounts.audit import log_action
 from .models import *
 from inventory.models import (
     Support, FacePanneau, EcranNumerique, FormatSupport, Emplacement, Marche,
-    SupportDeletionRequest, format_sort_key, formats_croissants,
+    ObjectifSpotsEcranAnnuel, SupportDeletionRequest, format_sort_key,
+    formats_croissants,
 )
 from .forms import (
     ClientForm,
@@ -414,11 +416,183 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         return stats
 
     @staticmethod
-    def _build_screen_resolution_stats(ville_active, today):
-        """Compte les écrans occupés par une campagne en cours, regroupés par résolution."""
+    def _count_occupied_days(intervals, year_start, year_end):
+        """Compte les jours occupés sans compter deux fois les campagnes qui se chevauchent."""
+        clipped = sorted(
+            (max(start, year_start), min(end, year_end))
+            for start, end in intervals
+            if start <= year_end and end >= year_start
+        )
+        if not clipped:
+            return 0
+
+        occupied_days = 0
+        current_start, current_end = clipped[0]
+        for start, end in clipped[1:]:
+            if start <= current_end + timedelta(days=1):
+                current_end = max(current_end, end)
+                continue
+            occupied_days += (current_end - current_start).days + 1
+            current_start, current_end = start, end
+        return occupied_days + (current_end - current_start).days + 1
+
+    @classmethod
+    def _build_annual_face_occupancy(
+        cls, format_codes, ville_active, year_start, year_end, today,
+        support_ids=None, include_face_rates=False,
+    ):
+        """Calcule l'occupation depuis janvier et la prévision annuelle par format."""
+        faces = FacePanneau.objects.filter(support__format__in=format_codes)
+        lines = LigneCampagne.objects.filter(
+            face__support__format__in=format_codes,
+            campagne__date_debut__lte=year_end,
+            campagne__date_fin__gte=year_start,
+            campagne__statut__in=[
+                Campagne.STATUT_EN_COURS,
+                Campagne.STATUT_A_VENIR,
+                Campagne.STATUT_TERMINEE,
+            ],
+        )
+        if support_ids is not None:
+            faces = faces.filter(support_id__in=support_ids)
+            lines = lines.filter(face__support_id__in=support_ids)
+        if ville_active:
+            faces = faces.filter(support__ville__iexact=ville_active)
+            lines = lines.filter(face__support__ville__iexact=ville_active)
+
+        totals_by_format = {}
+        for format_code, total in faces.values('support__format').annotate(
+            total=Count('id')
+        ).values_list('support__format', 'total'):
+            totals_by_format[format_code] = {
+                'nb_faces': total,
+                'jours_occupees_cumul': 0,
+                'jours_occupees_annuel': 0,
+            }
+        if include_face_rates:
+            for face_id, format_code in faces.values_list(
+                'id', 'support__format'
+            ):
+                totals_by_format[format_code].setdefault(
+                    'taux_par_face', {}
+                )[face_id] = {
+                    'taux_actuel': 0.0,
+                    'taux_annuel': 0.0,
+                }
+
+        annual_intervals_by_face = {}
+        current_intervals_by_face = {}
+        for face_id, format_code, start, end in lines.values_list(
+            'face_id',
+            'face__support__format',
+            'campagne__date_debut',
+            'campagne__date_fin',
+        ):
+            if format_code not in totals_by_format:
+                continue
+            key = (face_id, format_code)
+            annual_intervals_by_face.setdefault(key, []).append((start, end))
+            if start <= today:
+                current_intervals_by_face.setdefault(key, []).append(
+                    (start, min(end, today))
+                )
+
+        reservations = ReservationLigne.objects.filter(
+            face__support__format__in=format_codes,
+            reservation__date_fin__gte=timezone.make_aware(datetime.combine(
+                today + timedelta(days=1), time.min,
+            )),
+            reservation__date_debut__lt=timezone.make_aware(datetime.combine(
+                year_end + timedelta(days=1), time.min,
+            )),
+            reservation__statut__in=[STATUT_EN_ATTENTE, STATUT_CONFIRMEE],
+        )
+        if support_ids is not None:
+            reservations = reservations.filter(face__support_id__in=support_ids)
+        if ville_active:
+            reservations = reservations.filter(face__support__ville__iexact=ville_active)
+        for face_id, format_code, start, end in reservations.values_list(
+            'face_id',
+            'face__support__format',
+            'reservation__date_debut',
+            'reservation__date_fin',
+        ):
+            if format_code not in totals_by_format:
+                continue
+            start = timezone.localtime(start).date() if timezone.is_aware(start) else start.date()
+            end = timezone.localtime(end).date() if timezone.is_aware(end) else end.date()
+            key = (face_id, format_code)
+            annual_intervals_by_face.setdefault(key, []).append(
+                (max(start, today + timedelta(days=1)), end)
+            )
+
+        for face_id, format_code in set(annual_intervals_by_face) | set(current_intervals_by_face):
+            totals = totals_by_format[format_code]
+            key = (face_id, format_code)
+            jours_cumules = cls._count_occupied_days(
+                current_intervals_by_face.get(key, []), year_start, today
+            )
+            jours_annuels = cls._count_occupied_days(
+                annual_intervals_by_face.get(key, []), year_start, year_end
+            )
+            totals['jours_occupees_cumul'] += jours_cumules
+            totals['jours_occupees_annuel'] += jours_annuels
+            if include_face_rates:
+                elapsed_days = (today - year_start).days + 1
+                year_days = (year_end - year_start).days + 1
+                totals['taux_par_face'][face_id] = {
+                    'taux_actuel': round(jours_cumules / elapsed_days * 100, 1),
+                    'taux_annuel': round(jours_annuels / year_days * 100, 1),
+                }
+        return totals_by_format
+
+    @classmethod
+    def _build_screen_spot_stats(cls, ville_active, today):
+        """Calcule les spots cumulés des campagnes et leur projection par écran."""
         screens = EcranNumerique.objects.all()
         if ville_active:
             screens = screens.filter(support__ville__iexact=ville_active)
+
+        year_start = date(today.year, 1, 1)
+        year_end = date(today.year, 12, 31)
+        year_days = (year_end - year_start).days + 1
+        elapsed_days = (today - year_start).days + 1
+        screen_ids = list(screens.values_list('support_id', flat=True))
+        targets = dict(
+            ObjectifSpotsEcranAnnuel.objects.filter(
+                ecran__support_id__in=screen_ids,
+                annee=today.year,
+            ).values_list('ecran__support_id', 'nombre_spots')
+        )
+        campaign_lines = LigneCampagne.objects.filter(
+            support_id__in=screen_ids,
+            campagne__statut__in=[
+                Campagne.STATUT_EN_COURS,
+                Campagne.STATUT_TERMINEE,
+            ],
+            campagne__date_debut__lte=today,
+            campagne__date_fin__gte=year_start,
+        ).select_related('campagne', 'support')
+        realized_spots = {}
+        for line in campaign_lines:
+            realized_spots[line.support_id] = (
+                realized_spots.get(line.support_id, 0)
+                + line.calculer_spots_sur_periode(year_start, today)
+            )
+
+        tomorrow = today + timedelta(days=1)
+        future_lines = LigneCampagne.objects.filter(
+            support_id__in=screen_ids,
+            campagne__statut__in=[
+                Campagne.STATUT_EN_COURS,
+                Campagne.STATUT_A_VENIR,
+            ],
+        ).select_related('campagne', 'support')
+        future_spots = {}
+        for line in future_lines:
+            future_spots[line.support_id] = future_spots.get(line.support_id, 0) + (
+                line.calculer_spots_sur_periode(tomorrow, year_end)
+            )
 
         counts_by_resolution = {
             row['resolution']: row
@@ -435,6 +609,64 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 ),
             )
         }
+        stats_by_screen = {}
+        for screen_id in screen_ids:
+            target = targets.get(screen_id)
+            realized = realized_spots.get(screen_id, 0)
+            forecast = realized + future_spots.get(screen_id, 0)
+            prorated_target = target * elapsed_days / year_days if target else 0
+            stats_by_screen[screen_id] = {
+                'objectif_spots_annuel': target,
+                'spots_realises': realized,
+                'spots_previsionnels': forecast,
+                'taux_actuel': round(realized / prorated_target * 100, 1)
+                if prorated_target else None,
+                'taux_annuel': round(realized / target * 100, 1) if target else None,
+            }
+        return stats_by_screen
+
+    @classmethod
+    def _build_screen_resolution_stats(cls, ville_active, today, stats_by_screen=None):
+        """Agrège les objectifs et taux des écrans par résolution."""
+        screens = EcranNumerique.objects.all()
+        if ville_active:
+            screens = screens.filter(support__ville__iexact=ville_active)
+        screen_rows = list(screens.values_list('support_id', 'resolution'))
+        if stats_by_screen is None:
+            stats_by_screen = cls._build_screen_spot_stats(ville_active, today)
+
+        counts_by_resolution = {
+            row['resolution']: row
+            for row in screens.values('resolution').annotate(
+                nb_ecrans=Count('support_id', distinct=True),
+                nb_occupees=Count(
+                    'support_id',
+                    filter=Q(
+                        support__lignes_campagne__campagne__statut=Campagne.STATUT_EN_COURS,
+                        support__lignes_campagne__campagne__date_debut__lte=today,
+                        support__lignes_campagne__campagne__date_fin__gte=today,
+                    ),
+                    distinct=True,
+                ),
+            )
+        }
+        grouped = {}
+        for screen_id, resolution in screen_rows:
+            group = grouped.setdefault(resolution, {
+                'objectif': 0,
+                'realises': 0,
+                'previsionnels': 0,
+            })
+            metrics = stats_by_screen.get(screen_id, {})
+            objectif = metrics.get('objectif_spots_annuel')
+            if objectif is not None:
+                group['objectif'] += objectif
+                group['realises'] += metrics.get('spots_realises', 0)
+                group['previsionnels'] += metrics.get('spots_previsionnels', 0)
+
+        year_start = date(today.year, 1, 1)
+        year_days = (date(today.year, 12, 31) - year_start).days + 1
+        elapsed_days = (today - year_start).days + 1
         return [
             {
                 'resolution': label,
@@ -444,6 +676,18 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                     counts_by_resolution[code]['nb_ecrans']
                     - counts_by_resolution[code]['nb_occupees']
                 ),
+                'objectif_spots_annuel': grouped.get(code, {}).get('objectif', 0),
+                'spots_realises': grouped.get(code, {}).get('realises', 0),
+                'spots_previsionnels': grouped.get(code, {}).get('previsionnels', 0),
+                'taux_actuel': round(
+                    grouped[code]['realises']
+                    / (grouped[code]['objectif'] * elapsed_days / year_days) * 100,
+                    1,
+                ) if grouped.get(code, {}).get('objectif') else None,
+                'taux_annuel': round(
+                    grouped[code]['realises'] / grouped[code]['objectif'] * 100,
+                    1,
+                ) if grouped.get(code, {}).get('objectif') else None,
             }
             for code, label in EcranNumerique.RESOLUTION_CHOICES
             if code in counts_by_resolution
@@ -625,7 +869,9 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         )
         faces_reservees_ids = set(
             ReservationLigne.objects.filter(
-                reservation__date_fin__gte=today,
+                reservation__date_fin__gte=timezone.make_aware(
+                    datetime.combine(today, time.min)
+                ),
                 reservation__statut__in=[STATUT_EN_ATTENTE, STATUT_CONFIRMEE],
             ).values_list('face_id', flat=True)
         )
@@ -636,6 +882,55 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         formats_stats = self._build_format_stats(
             ville_active, faces_occupees_ids, faces_reservees_ids
         )
+        year_start = date(today.year, 1, 1)
+        year_end = date(today.year, 12, 31)
+        year_days = (year_end - year_start).days + 1
+        elapsed_days = (today - year_start).days + 1
+        annual_face_occupancy = self._build_annual_face_occupancy(
+            [format_support.code for format_support in formats_croissants(
+                FormatSupport.objects.exclude(categorie__iexact='Ecran')
+            )],
+            ville_active,
+            year_start,
+            year_end,
+            today,
+        )
+        for category in format_category_stats:
+            category_formats = [
+                format_stat for format_stat in formats_stats
+                if format_stat['categorie'] == category['categorie']
+            ]
+            category['taux_actuel'] = round(
+                sum(
+                    annual_face_occupancy.get(format_stat['code'], {}).get(
+                        'jours_occupees_cumul', 0
+                    )
+                    for format_stat in category_formats
+                ) / (category['nb_faces'] * elapsed_days) * 100,
+                1,
+            ) if category['nb_faces'] else 0
+            category['taux_annuel'] = round(
+                sum(
+                    annual_face_occupancy.get(format_stat['code'], {}).get(
+                        'jours_occupees_annuel', 0
+                    )
+                    for format_stat in category_formats
+                )
+                / (category['nb_faces'] * year_days) * 100,
+                1,
+            ) if category['nb_faces'] else 0
+        for format_stat in formats_stats:
+            annual_stats = annual_face_occupancy.get(format_stat['code'], {})
+            format_stat['taux_actuel'] = round(
+                annual_stats.get('jours_occupees_cumul', 0)
+                / (format_stat['nb_faces'] * elapsed_days) * 100,
+                1,
+            ) if format_stat['nb_faces'] else 0
+            format_stat['taux_annuel'] = round(
+                annual_stats.get('jours_occupees_annuel', 0)
+                / (format_stat['nb_faces'] * year_days) * 100,
+                1,
+            ) if format_stat['nb_faces'] else 0
         support_groups, campaign_category_groups = self._build_support_and_campaign_groups(
             ville_active, campagnes_actives_list, campagnes_a_venir_list,
             faces_occupees_ids, faces_reservees_ids,
@@ -643,8 +938,9 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         marches_stats = self._build_market_stats(
             ville_active, faces_occupees_ids, faces_reservees_ids
         )
+        screen_spot_stats = self._build_screen_spot_stats(ville_active, today)
         ecrans_stats_par_resolution = self._build_screen_resolution_stats(
-            ville_active, today
+            ville_active, today, screen_spot_stats
         )
         ecrans_occupees = sum(
             item['nb_occupees'] for item in ecrans_stats_par_resolution
@@ -652,6 +948,21 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         ecrans_libres = sum(
             item['nb_libres'] for item in ecrans_stats_par_resolution
         )
+        ecran_objectifs_total = sum(
+            item['objectif_spots_annuel'] for item in ecrans_stats_par_resolution
+        )
+        ecran_spots_realises_total = sum(
+            item['spots_realises'] for item in ecrans_stats_par_resolution
+        )
+        ecrans_taux_actuel = round(
+            ecran_spots_realises_total
+            / (ecran_objectifs_total * elapsed_days / year_days) * 100,
+            1,
+        ) if ecran_objectifs_total else None
+        ecrans_taux_annuel = round(
+            ecran_spots_realises_total / ecran_objectifs_total * 100,
+            1,
+        ) if ecran_objectifs_total else None
         campaign_category_groups_present = [
             group for group in campaign_category_groups if group['nb_supports'] > 0
         ]
@@ -770,6 +1081,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 'quartier': e.support.quartier,
                 'resolution': e.get_resolution_display(),
                 'occupe': e.support_id in ecrans_occupes_ids,
+                **screen_spot_stats.get(e.support_id, {}),
             }
             for e in screens_qs
         ]
@@ -793,6 +1105,9 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             'ecrans_panne': support_totals_by_kind['ecrans']['panne'],
             'ecrans_occupees': ecrans_occupees,
             'ecrans_libres': ecrans_libres,
+            'ecrans_objectifs_total': ecran_objectifs_total,
+            'ecrans_taux_actuel': ecrans_taux_actuel,
+            'ecrans_taux_annuel': ecrans_taux_annuel,
             'ecrans_stats_par_resolution': ecrans_stats_par_resolution,
             'marches_total': len(marches_stats),
             'marches_bon_etat': support_totals_by_kind['marches']['bon'],
@@ -830,6 +1145,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             'nb_ecrans': parc['nb_ecrans'],
             'format_categories': format_category_stats,
             'formats_stats': formats_stats,
+            'annee_taux_occupation': today.year,
             'total_faces': total_faces,
             'total_faces_occupe': total_faces_occupe,
             'total_faces_reserve': total_faces_reserve,
@@ -1121,6 +1437,20 @@ class FormatDetailView(LoginRequiredMixin, TemplateView):
         if ville_active and not marche_mode:
             supports_qs = supports_qs.filter(ville__iexact=ville_active)
         supports_list = list(supports_qs.order_by('code'))
+        pige_images_by_face = {}
+        current_pige_files = PigeFichier.objects.filter(
+            ligne__face__support_id__in=[support.pk for support in supports_list],
+            ligne__campagne__statut=Campagne.STATUT_EN_COURS,
+            ligne__campagne__date_debut__lte=today,
+            ligne__campagne__date_fin__gte=today,
+        ).order_by(
+            'ligne__face_id', '-date_prise', '-ajoute_le', '-pk',
+        ).values_list('ligne__face_id', 'drive_file_id')
+        for face_id, drive_file_id in current_pige_files:
+            pige_images_by_face.setdefault(
+                face_id,
+                f'https://drive.google.com/thumbnail?id={drive_file_id}&sz=w1000',
+            )
 
         faces_by_support = {}
         for face in FacePanneau.objects.filter(support__in=supports_list):
@@ -1130,6 +1460,7 @@ class FormatDetailView(LoginRequiredMixin, TemplateView):
 
         panneaux = []
         quartiers = {}
+        support_ids_by_quartier = {}
         tot_faces = tot_occ = tot_libre = 0
 
         for numero, support in enumerate(supports_list, start=1):
@@ -1165,6 +1496,33 @@ class FormatDetailView(LoginRequiredMixin, TemplateView):
                 if marche_mode and support.emplacement_id
                 else None
             )
+            face_cards = []
+            for face in faces:
+                if support.etat == Support.ETAT_PANNE or face.etat == Support.ETAT_PANNE:
+                    face_statut = 'panne'
+                elif face.etat == Support.ETAT_A_MAINTENIR:
+                    face_statut = 'a_maintenir'
+                elif face.pk in occupees:
+                    face_statut = 'occupe'
+                elif face.pk in reservees:
+                    face_statut = 'reserve'
+                else:
+                    face_statut = 'libre'
+                face_cards.append({
+                    'id': face.pk,
+                    'label': face.label,
+                    'image': pige_images_by_face.get(face.pk, ''),
+                    'statut': face_statut,
+                    'statut_label': {
+                        'libre': 'Libre',
+                        'reserve': 'Réservée',
+                        'occupe': 'Occupée',
+                        'a_maintenir': 'À maintenir',
+                        'panne': 'En panne',
+                    }[face_statut],
+                    'taux_actuel': 0.0,
+                    'taux_annuel': 0.0,
+                })
 
             panneaux.append({
                 'numero': numero,
@@ -1175,9 +1533,18 @@ class FormatDetailView(LoginRequiredMixin, TemplateView):
                 'quartier': support.quartier or '',
                 'adresse': support.adresse or support.quartier or support.ville or '',
                 'photo': photo,
+                'pige_images': [
+                    {
+                        'url': face_card['image'],
+                        'face_label': face_card['label'],
+                    }
+                    for face_card in face_cards
+                    if face_card['image']
+                ],
                 'nb_faces': len(faces),
                 'nb_occupees': nb_occ,
                 'nb_libres': nb_libre,
+                'faces': face_cards,
                 'statut': statut,
                 'statut_label': self.STATUT_LABELS[statut],
                 'lat': lat,
@@ -1191,10 +1558,12 @@ class FormatDetailView(LoginRequiredMixin, TemplateView):
             tot_occ += nb_occ
             tot_libre += nb_libre
 
-            q = quartiers.setdefault(support.quartier or 'Non renseigné', {
-                'nom': support.quartier or 'Non renseigné',
+            quartier_nom = support.quartier or 'Non renseigné'
+            q = quartiers.setdefault(quartier_nom, {
+                'nom': quartier_nom,
                 'nb_panneaux': 0, 'nb_faces': 0, 'nb_occupees': 0, 'nb_libres': 0,
             })
+            support_ids_by_quartier.setdefault(quartier_nom, []).append(support.pk)
             q['nb_panneaux'] += 1
             q['nb_faces'] += len(faces)
             q['nb_occupees'] += nb_occ
@@ -1203,8 +1572,69 @@ class FormatDetailView(LoginRequiredMixin, TemplateView):
         stats_quartiers = sorted(
             quartiers.values(), key=lambda q: (-q['nb_panneaux'], q['nom'])
         )
+        year_start = date(today.year, 1, 1)
+        year_end = date(today.year, 12, 31)
+        year_days = (year_end - year_start).days + 1
+        elapsed_days = (today - year_start).days + 1
+        occupancy_by_format = DashboardView._build_annual_face_occupancy(
+            list({support.format for support in supports_list if support.format}),
+            ville_active,
+            year_start,
+            year_end,
+            today,
+            support_ids=[support.pk for support in supports_list],
+            include_face_rates=True,
+        )
+        format_by_support_code = {
+            support.code: support.format for support in supports_list
+        }
+        for panneau in panneaux:
+            format_stats = occupancy_by_format.get(
+                format_by_support_code[panneau['code']],
+                {},
+            )
+            rates_by_face = format_stats.get('taux_par_face', {})
+            for face in panneau['faces']:
+                rates = rates_by_face.get(face['id'], {})
+                face['taux_actuel'] = rates.get('taux_actuel', 0.0)
+                face['taux_annuel'] = rates.get('taux_annuel', 0.0)
+        occupied_days_current = sum(
+            stats['jours_occupees_cumul']
+            for stats in occupancy_by_format.values()
+        )
+        occupied_days_annual = sum(
+            stats['jours_occupees_annuel']
+            for stats in occupancy_by_format.values()
+        )
         for q in stats_quartiers:
-            q['taux'] = round(q['nb_occupees'] / q['nb_faces'] * 100) if q['nb_faces'] else 0
+            quartier_support_ids = support_ids_by_quartier[q['nom']]
+            quartier_formats = list({
+                support.format
+                for support in supports_list
+                if support.pk in quartier_support_ids and support.format
+            })
+            quartier_occupancy = DashboardView._build_annual_face_occupancy(
+                quartier_formats,
+                ville_active,
+                year_start,
+                year_end,
+                today,
+                support_ids=quartier_support_ids,
+            )
+            q['taux_actuel'] = round(
+                sum(
+                    stats['jours_occupees_cumul']
+                    for stats in quartier_occupancy.values()
+                ) / (q['nb_faces'] * elapsed_days) * 100,
+                1,
+            ) if q['nb_faces'] else 0
+            q['taux_annuel'] = round(
+                sum(
+                    stats['jours_occupees_annuel']
+                    for stats in quartier_occupancy.values()
+                ) / (q['nb_faces'] * year_days) * 100,
+                1,
+            ) if q['nb_faces'] else 0
 
         context.update({
             'format': format_support,
@@ -1218,6 +1648,13 @@ class FormatDetailView(LoginRequiredMixin, TemplateView):
             'nb_occupees': tot_occ,
             'nb_libres': tot_libre,
             'taux': round(tot_occ / tot_faces * 100) if tot_faces else 0,
+            'taux_actuel': round(
+                occupied_days_current / (tot_faces * elapsed_days) * 100, 1
+            ) if tot_faces else 0,
+            'taux_annuel': round(
+                occupied_days_annual / (tot_faces * year_days) * 100, 1
+            ) if tot_faces else 0,
+            'annee_taux_occupation': today.year,
             'stats_quartiers': stats_quartiers,
             'nb_libre_panneaux': sum(1 for p in panneaux if p['statut'] == 'libre'),
             'nb_partiel_panneaux': sum(1 for p in panneaux if p['statut'] == 'partiel'),
@@ -1683,14 +2120,7 @@ class ClientDeleteView(StaffRequiredMixin, DeleteView):
                 if force_delete:
                     campagnes = self.object.campagnes.all()
                     if campagnes.exists():
-                        campagnes_count = campagnes.count()
                         campagnes.delete()
-                        log_action(
-                            request,
-                            AuditLog.ACTION_DELETE,
-                            'commercial',
-                            detail=f"Suppression de {campagnes_count} campagnes associées à {client_name} avant suppression du client"
-                        )
                 self.object.delete()
             except ProtectedError:
                 campagnes_associees = list(self.object.campagnes.all())
@@ -1705,7 +2135,10 @@ class ClientDeleteView(StaffRequiredMixin, DeleteView):
                         associated_campaigns=campagnes_associees,
                     )
                 )
-            log_action(request, AuditLog.ACTION_DELETE, 'commercial', detail=f"Suppression client: {client_name}")
+            log_action(
+                request, AuditLog.ACTION_DELETE, 'commercial', obj=self.object,
+                detail=f"Suppression client: {client_name}",
+            )
             messages.success(request, f'Client "{client_name}" supprimé.')
             return redirect(self.get_success_url())
         # Sinon on Archive le client (actif=False) et on archive aussi les campagnes associées
@@ -1714,7 +2147,10 @@ class ClientDeleteView(StaffRequiredMixin, DeleteView):
             self.object.save()
             campagnes = self.object.campagnes.filter(actif=True)
             campagnes.update(actif=False)
-            log_action(request, AuditLog.ACTION_UPDATE, 'commercial', detail=f"Client {client_name} archivé (actif=False) avec {campagnes.count()} campagnes associées archivées.")
+            log_action(
+                request, AuditLog.ACTION_UPDATE, 'commercial', obj=self.object,
+                detail=f"Client {client_name} archivé (actif=False) avec {campagnes.count()} campagnes associées archivées.",
+            )
             messages.success(request, f'Client "{client_name}" archivé avec ses campagnes associées.')
             return redirect(self.get_success_url())
 
@@ -1833,7 +2269,10 @@ class ContratDeleteView(StaffRequiredMixin, DeleteView):
             contrat_str = str(contrat)
             response = super().delete(request, *args, **kwargs)
             transaction.on_commit(lambda: cache.delete('dashboard_alertes'))
-            log_action(request, AuditLog.ACTION_DELETE, 'commercial', detail=f"Suppression contrat: {contrat_str}")
+            log_action(
+                request, AuditLog.ACTION_DELETE, 'commercial', obj=contrat,
+                detail=f"Suppression contrat: {contrat_str}",
+            )
             messages.success(request, 'Contrat supprimé.')
             return response
         # Sinon on Archive le client (actif=False) et on archive aussi les campagnes associées
@@ -1843,7 +2282,10 @@ class ContratDeleteView(StaffRequiredMixin, DeleteView):
             contrat.archive = False
             contrat.save()
             transaction.on_commit(lambda: cache.delete('dashboard_alertes'))
-            log_action(request, AuditLog.ACTION_UPDATE, 'commercial', detail=f"Archivage contrat: {contrat_str}")
+            log_action(
+                request, AuditLog.ACTION_UPDATE, 'commercial', obj=contrat,
+                detail=f"Archivage contrat: {contrat_str}",
+            )
             messages.success(request, 'Contrat archivé.')
             return response
 
@@ -2691,7 +3133,7 @@ class CampagneLancerView(StaffRequiredMixin, View):
         if campagne.statut == Campagne.STATUT_BROUILLON:
             campagne.statut = Campagne.STATUT_A_VENIR
             campagne.save()
-        log_action(request, AuditLog.ACTION_VIEW, 'campaign', obj=campagne, detail=f"Lancement campagne: {campagne.nom}")
+        log_action(request, AuditLog.ACTION_UPDATE, 'campaigns', obj=campagne, detail=f"Lancement campagne: {campagne.nom}")
         messages.success(request, f'Campagne "{campagne.nom}" lancée.')
         return redirect('campagne_detail', pk=pk)
 
@@ -2707,7 +3149,7 @@ class CampagneDeleteView(StaffRequiredMixin, DeleteView):
         campagne = self.get_object()
         nom = str(campagne)
         response = super().delete(request, *args, **kwargs)
-        log_action(request, AuditLog.ACTION_DELETE, 'campaign', detail=f"Suppression campagne: {nom}")
+        log_action(request, AuditLog.ACTION_DELETE, 'campaign', obj=campagne, detail=f"Suppression campagne: {nom}")
         messages.success(request, f'Campagne "{nom}" supprimée.')
         return response
 

@@ -2,7 +2,7 @@ import io
 import json
 import re
 import unicodedata
-from datetime import datetime
+from datetime import datetime, time, timedelta
 from typing import cast
 
 from django.conf import settings
@@ -10,7 +10,7 @@ from django.contrib import messages
 from django.core.paginator import Paginator
 from django.core.cache import cache
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.http import HttpResponse, JsonResponse
+from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.urls import reverse, reverse_lazy
 from django.utils import timezone
@@ -18,7 +18,7 @@ from django.views.generic import ListView, DetailView, DeleteView, TemplateView,
 
 from accounts.decorators import *
 from accounts.models import AuditLog
-from accounts.audit import log_action
+from accounts.audit import log_action, log_changes
 from campaigns.mixins import StaffRequiredMixin
 from campaigns.models import *
 from core.mixins import SortableListMixin
@@ -1429,10 +1429,27 @@ class SupportDetailView(ClientStaffRequiredMixin, DetailView):
 
         ecran       = None
         ecran_stats = []
+        panneau_stats = []
         spots_data  = []
 
         # ── Logique spécifique PANNEAU ────────────────────────────────────
         if support.type_support == 'panneau':
+            occupancy_stats = self._get_panel_occupancy_stats(support, today)
+            faces = list(support.faces.all())
+            for face in faces:
+                face_stats = occupancy_stats['taux_par_face'].get(
+                    face.pk, {'taux_actuel': 0.0, 'taux_annuel': 0.0}
+                )
+                face.taux_actuel = face_stats['taux_actuel']
+                face.taux_annuel = face_stats['taux_annuel']
+            panneau_stats = [
+                ('Taux actuel', 'bi-speedometer2', f'{occupancy_stats["taux_actuel"]}%', 'var(--color-primary)'),
+                (f'Taux annuel {today.year}', 'bi-graph-up', f'{occupancy_stats["taux_annuel"]}%', 'var(--color-primary)'),
+            ]
+            info_rows += [
+                ('Taux actuel', f'{occupancy_stats["taux_actuel"]}%'),
+                (f'Taux annuel {today.year}', f'{occupancy_stats["taux_annuel"]}%'),
+            ]
             if support.format:
                 info_rows.append(('Format',     support.get_format_display()))
                 info_rows.append(('Dimensions', support.dimensions))
@@ -1478,20 +1495,24 @@ class SupportDetailView(ClientStaffRequiredMixin, DetailView):
                 h_allumage   = ecran.heure_allumage.strftime('%H:%M') if ecran.heure_allumage else '00:00'
                 h_extinction = ecran.heure_extinction.strftime('%H:%M') if ecran.heure_extinction else '00:00'
                 plage_str    = f'{h_allumage} – {h_extinction}'
-                taux         = ecran.taux_occupation_pourcentage()
+                stats_spots = self._get_screen_spot_stats(ecran, today)
 
                 info_rows += [
                     ('Résolution',      ecran.get_resolution_display()),
                     ('Cellule', f'{ecran.format_detail["dimensions"]} ({ecran.format_detail["superficie"]}m²)'),
                     ('Type écran',      ecran.get_type_ecran_display()),
                     ('Plage diffusion', plage_str),
-                    ('Occupation',      f'{taux}%'),
+                    ('Taux actuel',     f'{stats_spots["taux_actuel"]}%' if stats_spots['taux_actuel'] is not None else 'Objectif non défini'),
+                    ('Taux annuel',     f'{stats_spots["taux_annuel"]}%' if stats_spots['taux_annuel'] is not None else 'Objectif non défini'),
                 ]
 
                 ecran_stats = [
                     ('Résolution', 'bi-aspect-ratio', ecran.get_resolution_display(), 'var(--text)'),
                     ('Cellule',    'bi-tv',           f'{ecran.format_detail["dimensions"]} ({ecran.format_detail["superficie"]}m²)',              'var(--text)'),
-                    ('Occupation', 'bi-pie-chart',    f'{taux}%',                      'var(--color-primary)'),
+                    ('Taux actuel', 'bi-speedometer2', f'{stats_spots["taux_actuel"]}%' if stats_spots['taux_actuel'] is not None else '—', 'var(--color-primary)'),
+                    ('Taux annuel', 'bi-graph-up', f'{stats_spots["taux_annuel"]}%' if stats_spots['taux_annuel'] is not None else '—', 'var(--color-primary)'),
+                    ('Spots cumulés des campagnes', 'bi-broadcast', f'{stats_spots["spots_realises"]:,}'.replace(',', ' '), 'var(--text)'),
+                    ('Objectif annuel', 'bi-bullseye', f'{stats_spots["objectif_spots_annuel"]:,}'.replace(',', ' ') if stats_spots['objectif_spots_annuel'] is not None else 'Non défini', 'var(--text)'),
                     ('Diffusion',  'bi-clock',        plage_str,                       'var(--color-primary)'),
                 ]
 
@@ -1506,13 +1527,16 @@ class SupportDetailView(ClientStaffRequiredMixin, DetailView):
         # ── Contexte final ────────────────────────────────────────────────
         context.update({
             'support':        support,
+            'annee_taux_occupation': today.year,
             'lignes_actives': lignes_actives,
             'historique':     historique,
             'maintenances':   maintenances,
             'ecran':          ecran,
             'ecran_stats':    ecran_stats,
             'info_rows':      info_rows,
-            'spots_data':     spots_data,
+            'panneau_stats': panneau_stats,
+            'faces': faces if support.type_support == 'panneau' else [],
+            'spots_data': spots_data,
             'reservations':   reservations,
             'pending_deletion_request': SupportDeletionRequest.objects.filter(
                 support=support,
@@ -1520,6 +1544,226 @@ class SupportDetailView(ClientStaffRequiredMixin, DetailView):
             ).select_related('requested_by').first(),
         })
         return context
+
+    @staticmethod
+    def _count_occupied_days(intervals, period_start, period_end):
+        clipped = sorted(
+            (max(start, period_start), min(end, period_end))
+            for start, end in intervals
+            if start <= period_end and end >= period_start
+        )
+        if not clipped:
+            return 0
+
+        occupied_days = 0
+        current_start, current_end = clipped[0]
+        for start, end in clipped[1:]:
+            if start <= current_end + timedelta(days=1):
+                current_end = max(current_end, end)
+                continue
+            occupied_days += (current_end - current_start).days + 1
+            current_start, current_end = start, end
+        return occupied_days + (current_end - current_start).days + 1
+
+    @classmethod
+    def _get_panel_occupancy_stats(cls, support, today):
+        year_start = today.replace(month=1, day=1)
+        year_end = today.replace(month=12, day=31)
+        year_days = (year_end - year_start).days + 1
+        elapsed_days = (today - year_start).days + 1
+        face_ids = list(support.faces.values_list('pk', flat=True))
+        if not face_ids:
+            return {
+                'taux_actuel': 0.0,
+                'taux_annuel': 0.0,
+                'taux_par_face': {},
+            }
+
+        campaign_intervals = {}
+        lines = LigneCampagne.objects.filter(
+            face_id__in=face_ids,
+            campagne__date_debut__lte=year_end,
+            campagne__date_fin__gte=year_start,
+            campagne__statut__in=[
+                Campagne.STATUT_EN_COURS,
+                Campagne.STATUT_A_VENIR,
+                Campagne.STATUT_TERMINEE,
+            ],
+        ).values_list('face_id', 'campagne__date_debut', 'campagne__date_fin')
+        for face_id, start, end in lines:
+            campaign_intervals.setdefault(face_id, []).append((start, end))
+
+        annual_intervals = {
+            face_id: list(intervals)
+            for face_id, intervals in campaign_intervals.items()
+        }
+        current_intervals = {
+            face_id: [
+                (start, min(end, today))
+                for start, end in intervals
+                if start <= today
+            ]
+            for face_id, intervals in campaign_intervals.items()
+        }
+
+        tomorrow = today + timedelta(days=1)
+        reservations = ReservationLigne.objects.filter(
+            face_id__in=face_ids,
+            reservation__date_fin__gte=timezone.make_aware(
+                datetime.combine(tomorrow, time.min)
+            ),
+            reservation__date_debut__lt=timezone.make_aware(
+                datetime.combine(year_end + timedelta(days=1), time.min)
+            ),
+            reservation__statut__in=[STATUT_EN_ATTENTE, STATUT_CONFIRMEE],
+        ).values_list(
+            'face_id', 'reservation__date_debut', 'reservation__date_fin'
+        )
+        for face_id, start, end in reservations:
+            start = timezone.localtime(start).date() if timezone.is_aware(start) else start.date()
+            end = timezone.localtime(end).date() if timezone.is_aware(end) else end.date()
+            annual_intervals.setdefault(face_id, []).append(
+                (max(start, tomorrow), end)
+            )
+
+        occupied_days_by_face = {
+            face_id: {
+                'actuels': cls._count_occupied_days(
+                    current_intervals.get(face_id, []), year_start, today
+                ),
+                'annuels': cls._count_occupied_days(
+                    annual_intervals.get(face_id, []), year_start, year_end
+                ),
+            }
+            for face_id in face_ids
+        }
+        taux_par_face = {
+            face_id: {
+                'taux_actuel': round(
+                    stats['actuels'] / elapsed_days * 100, 1
+                ),
+                'taux_annuel': round(
+                    stats['annuels'] / year_days * 100, 1
+                ),
+            }
+            for face_id, stats in occupied_days_by_face.items()
+        }
+        occupied_days_current = sum(
+            stats['actuels'] for stats in occupied_days_by_face.values()
+        )
+        occupied_days_annual = sum(
+            stats['annuels'] for stats in occupied_days_by_face.values()
+        )
+        return {
+            'taux_actuel': round(
+                occupied_days_current / (len(face_ids) * elapsed_days) * 100,
+                1,
+            ),
+            'taux_annuel': round(
+                occupied_days_annual / (len(face_ids) * year_days) * 100,
+                1,
+            ),
+            'taux_par_face': taux_par_face,
+        }
+
+    @staticmethod
+    def _get_screen_spot_stats(ecran, today):
+        """Calcule les mêmes taux par objectif annuel que le tableau de bord."""
+        year_start = today.replace(month=1, day=1)
+        year_end = today.replace(month=12, day=31)
+        target = ecran.objectifs_annuels.filter(annee=today.year).values_list(
+            'nombre_spots', flat=True
+        ).first()
+        campaign_lines = LigneCampagne.objects.filter(
+            support=ecran.support,
+            campagne__statut__in=[
+                Campagne.STATUT_EN_COURS,
+                Campagne.STATUT_TERMINEE,
+            ],
+            campagne__date_debut__lte=today,
+            campagne__date_fin__gte=year_start,
+        ).select_related('campagne', 'support')
+        realized = sum(
+            line.calculer_spots_sur_periode(year_start, today)
+            for line in campaign_lines
+        )
+
+        future_spots = 0
+        for line in LigneCampagne.objects.filter(
+            support=ecran.support,
+            campagne__statut__in=[
+                Campagne.STATUT_EN_COURS,
+                Campagne.STATUT_A_VENIR,
+            ],
+        ).select_related('campagne', 'support'):
+            future_spots += line.calculer_spots_sur_periode(
+                today + timedelta(days=1), year_end
+            )
+
+        forecast = realized + future_spots
+        elapsed_days = (today - year_start).days + 1
+        year_days = (year_end - year_start).days + 1
+        prorated_target = target * elapsed_days / year_days if target else 0
+        return {
+            'objectif_spots_annuel': target,
+            'spots_realises': realized,
+            'spots_previsionnels': forecast,
+            'taux_actuel': round(realized / prorated_target * 100, 1)
+            if prorated_target else None,
+            'taux_annuel': round(realized / target * 100, 1) if target else None,
+        }
+
+
+class EcranObjectifsAnnuelsView(StaffRequiredMixin, View):
+    template_name = 'inventory/ecran_objectifs_annuels.html'
+
+    def get_ecran(self):
+        support = get_object_or_404(Support, uuid=self.kwargs['uuid'])
+        if support.type_support != Support.TYPE_ECRAN:
+            raise Http404
+        return get_object_or_404(EcranNumerique, support=support)
+
+    def get_context_data(self, ecran, form=None):
+        if form is None:
+            try:
+                annee = int(self.request.GET.get('annee', timezone.localdate().year))
+            except (TypeError, ValueError):
+                annee = timezone.localdate().year
+            existing = ecran.objectifs_annuels.filter(annee=annee).first()
+            form = ObjectifSpotsEcranAnnuelForm(initial={
+                'annee': annee,
+                'nombre_spots': existing.nombre_spots if existing else 200000,
+            })
+        return {
+            'support': ecran.support,
+            'ecran': ecran,
+            'form': form,
+            'objectifs': ecran.objectifs_annuels.all(),
+        }
+
+    def get(self, request, *args, **kwargs):
+        ecran = self.get_ecran()
+        return render(request, self.template_name, self.get_context_data(ecran))
+
+    def post(self, request, *args, **kwargs):
+        ecran = self.get_ecran()
+        form = ObjectifSpotsEcranAnnuelForm(request.POST)
+        if form.is_valid():
+            ObjectifSpotsEcranAnnuel.objects.update_or_create(
+                ecran=ecran,
+                annee=form.cleaned_data['annee'],
+                defaults={'nombre_spots': form.cleaned_data['nombre_spots']},
+            )
+            messages.success(request, "L'objectif annuel de l'écran a été enregistré.")
+            return redirect(
+                reverse('ecran_objectifs_annuels', kwargs={'uuid': ecran.support.uuid})
+                + f"?annee={form.cleaned_data['annee']}"
+            )
+        return render(
+            request,
+            self.template_name,
+            self.get_context_data(ecran, form=form),
+        )
     
 from django.views.generic import CreateView
 from django.db import transaction
@@ -1589,6 +1833,11 @@ class SupportCreateView(StaffRequiredMixin, CreateView):
     def form_valid(self, form):
         context = self.get_context_data()
         ecran_form = context['ecran_form']
+        if (
+            form.cleaned_data.get('type_support') == Support.TYPE_ECRAN
+            and not ecran_form.is_valid()
+        ):
+            return self.form_invalid(form)
         market_id = self.request.POST.get('marche', '').strip()
         emplacement_id = self.request.POST.get('emplacement', '').strip()
         emplacement = None
@@ -1644,7 +1893,7 @@ class SupportCreateView(StaffRequiredMixin, CreateView):
                         photo=self.request.FILES.get(f'form-{i}-photo'),
                     )
             
-            elif type_support == 'ecran' and ecran_form.is_valid():
+            elif type_support == Support.TYPE_ECRAN:
                 ecran = ecran_form.save(commit=False)
                 ecran.support = self.object
                 ecran.save()
@@ -1699,6 +1948,8 @@ class SupportUpdateView(StaffRequiredMixin, UpdateView):
         # Récupération/Validation directe du formulaire écran sans réévaluer tout le contexte
         if support.type_support == 'ecran':
             ecran_form = EcranNumeriqueForm(self.request.POST, self.request.FILES, prefix='ecran', instance=ecran_instance)
+            if not ecran_form.is_valid():
+                return self.form_invalid(form)
         else:
             ecran_form = None
 
@@ -1721,13 +1972,9 @@ class SupportUpdateView(StaffRequiredMixin, UpdateView):
 
             # 2. Cas ÉCRAN : Validation et sauvegarde
             if support.type_support == 'ecran' and ecran_form:
-                if ecran_form.is_valid():
-                    e = ecran_form.save(commit=False)
-                    e.support = support
-                    e.save()
-                else:
-                    # En cas d'erreur, on repeuple le contexte pour afficher les erreurs du formulaire écran
-                    return self.form_invalid(form)
+                e = ecran_form.save(commit=False)
+                e.support = support
+                e.save()
             
             # 3. Cas PANNEAU : Gestion dynamique des faces
             elif support.type_support == 'panneau':
@@ -1889,6 +2136,7 @@ class SupportDeleteView(StaffRequiredMixin, DeleteView):
             request,
             AuditLog.ACTION_DELETE,
             'inventory',
+            obj=support,
             detail=f"Suppression support: {code}",
         )
         messages.success(request, f'Le support {code} a été supprimé avec succès.')
@@ -1952,10 +2200,12 @@ class MaintenanceListView(LoginRequiredMixin, SortableListMixin, ListView):
     paginate_by  = 20
 
     def get_queryset(self):
-        qs = Maintenance.objects.select_related('support', 'face', 'effectue_par')
-
-        if self.request.user.is_technicien:
-            qs = qs.filter(effectue_par=self.request.user)
+        qs = Maintenance.objects.select_related(
+            'support',
+            'face',
+            'effectue_par',
+            'reparation_commencee_par',
+        )
 
         support_id = self.request.GET.get('support')
         etat_apres = self.request.GET.get('etat')
@@ -1972,8 +2222,6 @@ class MaintenanceListView(LoginRequiredMixin, SortableListMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         base_qs = Maintenance.objects.all()
-        if self.request.user.is_technicien:
-            base_qs = base_qs.filter(effectue_par=self.request.user)
 
         context['kpi_total'] = base_qs.count()
         context['kpi_operationnels'] = base_qs.filter(
@@ -1987,13 +2235,45 @@ class MaintenanceListView(LoginRequiredMixin, SortableListMixin, ListView):
 
         context['etat_choices'] = Maintenance.ETAT_CHOICES
         context['supports']     = Support.objects.filter(actif=True).order_by('code')
-        if self.request.user.is_technicien:
-            context['techniciens'] = User.objects.filter(
-                maintenances__effectue_par=self.request.user
-            ).distinct()
-        else:
-            context['techniciens'] = User.objects.filter(maintenances__isnull=False).distinct()
+        context['techniciens'] = User.objects.filter(
+            maintenances__isnull=False
+        ).distinct()
+        context['maintenance_can_manage_all'] = self.request.user.is_staff_regie_role
+        context['maintenance_can_manage_ids'] = (
+            set(_maintenance_management_queryset(self.request.user).values_list('pk', flat=True))
+            if self.request.user.is_technicien
+            else set()
+        )
         return context
+
+
+def _maintenance_management_queryset(user):
+    queryset = Maintenance.objects.all()
+    if user.is_staff_regie_role:
+        return queryset
+    if user.is_technicien:
+        return queryset.filter(
+            Q(effectue_par=user) | Q(pk__in=_open_incident_root_ids())
+        )
+    return queryset.none()
+
+
+def _open_incident_root_ids():
+    """IDs des interventions qui sont encore à réparer pour leur support/face."""
+    roots_by_element = {}
+    events = Maintenance.objects.order_by(
+        'support_id',
+        'face_id',
+        'date_intervention',
+        'pk',
+    ).values_list('support_id', 'face_id', 'pk', 'etat_apres')
+    for support_id, face_id, maintenance_id, etat_apres in events:
+        element_key = (support_id, face_id)
+        if etat_apres in (Maintenance.ETAT_A_MAINTENIR, Maintenance.ETAT_PANNE):
+            roots_by_element.setdefault(element_key, maintenance_id)
+        elif etat_apres == Maintenance.ETAT_BON:
+            roots_by_element.pop(element_key, None)
+    return set(roots_by_element.values())
 
 
 class MaintenanceDetailView(LoginRequiredMixin, DetailView):
@@ -2002,19 +2282,92 @@ class MaintenanceDetailView(LoginRequiredMixin, DetailView):
     context_object_name = 'maintenance'
 
     def get_queryset(self):
-        qs = Maintenance.objects.select_related('support', 'face', 'effectue_par')
-        if self.request.user.is_technicien:
-            qs = qs.filter(effectue_par=self.request.user)
+        qs = Maintenance.objects.select_related(
+            'support',
+            'face',
+            'effectue_par',
+            'reparation_commencee_par',
+        )
         return qs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         maintenance = self.object
+        context['maintenance_can_manage'] = _maintenance_management_queryset(
+            self.request.user
+        ).filter(pk=maintenance.pk).exists()
+        context['maintenance_can_quick_repair'] = (
+            context['maintenance_can_manage']
+            and maintenance.etat_apres in (
+                Maintenance.ETAT_PANNE,
+                Maintenance.ETAT_A_MAINTENIR,
+            )
+        )
         element = maintenance.face or maintenance.support
         context['etat_actuel'] = element.etat
         context['etat_actuel_label'] = element.get_etat_display()
         context['etat_choices'] = Maintenance.ETAT_CHOICES
+        incident_root = _get_open_incident_root(maintenance)
+        context['maintenance_is_open_incident'] = (
+            incident_root is not None and incident_root.pk == maintenance.pk
+        )
+        context['maintenance_can_start_repair'] = (
+            incident_root
+            and incident_root.pk == maintenance.pk
+            and not incident_root.reparation_commencee_le
+            and context['maintenance_can_manage']
+            and (
+                self.request.user.is_staff_regie_role
+                or self.request.user.is_technicien_role
+            )
+        )
         return context
+
+
+def _get_open_incident_root(maintenance):
+    root = None
+    events = Maintenance.objects.filter(
+        support_id=maintenance.support_id,
+        face_id=maintenance.face_id,
+    ).order_by('date_intervention', 'pk')
+    for event in events:
+        if event.etat_apres in (Maintenance.ETAT_A_MAINTENIR, Maintenance.ETAT_PANNE):
+            if root is None:
+                root = event
+        elif event.etat_apres == Maintenance.ETAT_BON:
+            root = None
+    return root
+
+
+def _log_maintenance_creation(request, maintenance, detail):
+    log_action(
+        request,
+        AuditLog.ACTION_CREATE,
+        AuditLog.MODULE_INVENTORY,
+        obj=maintenance,
+        detail=detail,
+        changes={
+            'support': {'avant': '', 'apres': maintenance.support.code},
+            'face': {
+                'avant': '',
+                'apres': maintenance.face.label if maintenance.face else '',
+            },
+            'effectue_par': {
+                'avant': '',
+                'apres': str(maintenance.effectue_par or ''),
+            },
+            'date_intervention': {
+                'avant': '',
+                'apres': maintenance.date_intervention.isoformat(),
+            },
+            'etat_apres': {'avant': '', 'apres': maintenance.etat_apres},
+            'description': {'avant': '', 'apres': maintenance.description},
+            'photo': {
+                'avant': '',
+                'apres': maintenance.photo.name if maintenance.photo else '',
+            },
+        },
+    )
 
 
 import json
@@ -2060,7 +2413,7 @@ class MaintenanceCreateView(LoginRequiredMixin, CreateView):
                 photo = self.request.FILES.get('photo')
                 with transaction.atomic():
                     for index, (face, etat_apres) in enumerate(faces):
-                        Maintenance.objects.create(
+                        maintenance = Maintenance.objects.create(
                             support=support,
                             face=face,
                             effectue_par=form.instance.effectue_par,
@@ -2068,6 +2421,11 @@ class MaintenanceCreateView(LoginRequiredMixin, CreateView):
                             etat_apres=etat_apres,
                             description=form.instance.description,
                             photo=photo if index == 0 else None,
+                        )
+                        _log_maintenance_creation(
+                            self.request,
+                            maintenance,
+                            f"Création d'une intervention pour {support.code}, face {face.label}.",
                         )
                 messages.success(
                     self.request,
@@ -2078,6 +2436,11 @@ class MaintenanceCreateView(LoginRequiredMixin, CreateView):
                 return self.form_invalid(form)
 
         response = super().form_valid(form)
+        _log_maintenance_creation(
+            self.request,
+            self.object,
+            f"Création d'une intervention pour {self.object.support.code}.",
+        )
         messages.success(self.request, f'Maintenance enregistrée pour {self.object.support.code}.')
         return response
 
@@ -2170,9 +2533,8 @@ class MaintenanceUpdateView(LoginRequiredMixin, UpdateView):
 
     def get_queryset(self):
         qs = Maintenance.objects.select_related('support', 'effectue_par')
-        if self.request.user.is_technicien:
-            qs = qs.filter(effectue_par=self.request.user)
-        return qs
+        allowed_ids = _maintenance_management_queryset(self.request.user).values('pk')
+        return qs.filter(pk__in=allowed_ids)
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -2180,7 +2542,36 @@ class MaintenanceUpdateView(LoginRequiredMixin, UpdateView):
         return kwargs
 
     def form_valid(self, form):
+        old_maintenance = Maintenance.objects.get(pk=self.object.pk)
         response = super().form_valid(form)
+        changes = log_changes(
+            old_maintenance,
+            self.object,
+            [
+                'support',
+                'face',
+                'effectue_par',
+                'date_intervention',
+                'etat_apres',
+                'description',
+                'photo',
+                'reparation_commencee_le',
+                'reparation_commencee_par',
+            ],
+        )
+        action = (
+            AuditLog.ACTION_ETAT_CHANGE
+            if changes and 'etat_apres' in changes
+            else AuditLog.ACTION_UPDATE
+        )
+        log_action(
+            self.request,
+            action,
+            AuditLog.MODULE_INVENTORY,
+            obj=self.object,
+            detail=f"Modification de l'intervention de maintenance #{self.object.pk}.",
+            changes=changes,
+        )
         messages.success(self.request, f'Maintenance mise à jour pour {self.object.support.code}.')
         return response
 
@@ -2203,7 +2594,11 @@ class MaintenanceQuickRepairView(LoginRequiredMixin, View):
     """Enregistre automatiquement une réparation pour un support ou une face en panne."""
 
     def post(self, request, pk):
-        maintenance = get_object_or_404(Maintenance.objects.select_related('support', 'face'), pk=pk)
+        queryset = _maintenance_management_queryset(request.user).select_related(
+            'support',
+            'face',
+        )
+        maintenance = get_object_or_404(queryset, pk=pk)
         support = maintenance.support
         face = maintenance.face
 
@@ -2246,6 +2641,50 @@ class MaintenanceQuickRepairView(LoginRequiredMixin, View):
             description=description,
             photo=photo,
         )
+        log_action(
+            request,
+            AuditLog.ACTION_ETAT_CHANGE,
+            AuditLog.MODULE_INVENTORY,
+            obj=nouvelle,
+            detail=(
+                f"Avancement enregistré pour l'intervention #{maintenance.pk} "
+                f"sur {support.code}."
+            ),
+            changes={
+                'intervention_source': {
+                    'avant': '',
+                    'apres': str(maintenance.pk),
+                },
+                'support': {
+                    'avant': '',
+                    'apres': support.code,
+                },
+                'face': {
+                    'avant': '',
+                    'apres': face.label if face else '',
+                },
+                'effectue_par': {
+                    'avant': '',
+                    'apres': str(request.user),
+                },
+                'date_intervention': {
+                    'avant': '',
+                    'apres': date_intervention.isoformat(),
+                },
+                'etat_element': {
+                    'avant': etat_actuel,
+                    'apres': etat_apres,
+                },
+                'description': {
+                    'avant': '',
+                    'apres': description,
+                },
+                'photo': {
+                    'avant': '',
+                    'apres': nouvelle.photo.name if nouvelle.photo else '',
+                },
+            },
+        )
 
         label_etat = {
             Maintenance.ETAT_BON: 'opérationnel',
@@ -2257,6 +2696,56 @@ class MaintenanceQuickRepairView(LoginRequiredMixin, View):
             f"Avancement enregistré avec succès pour {support.code}{f' (Face {face.label})' if face else ''} ! Le statut est maintenant {label_etat}."
         )
         return redirect('maintenance_detail', pk=nouvelle.pk)
+
+
+class MaintenanceStartRepairView(LoginRequiredMixin, View):
+    """Enregistre le démarrage effectif de la réparation d'un incident ouvert."""
+
+    def post(self, request, pk):
+        maintenance = get_object_or_404(
+            _maintenance_management_queryset(request.user).select_related(
+                'support',
+                'face',
+            ),
+            pk=pk,
+        )
+        incident_root = _get_open_incident_root(maintenance)
+        if incident_root is None or incident_root.pk != maintenance.pk:
+            messages.error(request, "Cet incident n'est plus ouvert.")
+            return redirect('maintenance_detail', pk=maintenance.pk)
+        if incident_root.reparation_commencee_le:
+            messages.info(request, "La réparation de cet incident a déjà commencé.")
+            return redirect('maintenance_detail', pk=maintenance.pk)
+
+        incident_root.reparation_commencee_le = timezone.now()
+        incident_root.reparation_commencee_par = request.user
+        date_debut = incident_root.reparation_commencee_le
+        incident_root.save(update_fields=[
+            'reparation_commencee_le',
+            'reparation_commencee_par',
+        ])
+        log_action(
+            request,
+            AuditLog.ACTION_UPDATE,
+            AuditLog.MODULE_INVENTORY,
+            obj=incident_root,
+            detail=f"Démarrage de la réparation de l'intervention #{incident_root.pk}.",
+            changes={
+                'reparation_commencee_le': {
+                    'avant': '',
+                    'apres': date_debut.isoformat(),
+                },
+                'reparation_commencee_par': {
+                    'avant': '',
+                    'apres': str(request.user),
+                },
+            },
+        )
+        messages.success(
+            request,
+            f"La réparation de {maintenance.support.code} est maintenant en cours.",
+        )
+        return redirect('maintenance_detail', pk=maintenance.pk)
 
 
 class SupportPeriodesVanneView(LoginRequiredMixin, View):
@@ -2327,13 +2816,17 @@ class PeriodesParVueView(LoginRequiredMixin, View):
             'statut': request.GET.get('statut', ''),
             'date_debut': request.GET.get('date_debut', ''),
             'date_fin': request.GET.get('date_fin', ''),
+            'duree_mois': request.GET.get('duree_mois', ''),
         }
         from reports.pannes_report_view import build_panne_periods
         try:
-            periodes, _, _ = build_panne_periods(filters)
+            periodes, _, date_fin = build_panne_periods(filters)
         except ValueError as error:
             messages.error(request, str(error) or 'Les dates du rapport sont invalides.')
             return redirect('periodes_panne_liste')
+
+        if filters['duree_mois']:
+            filters['date_fin'] = date_fin.isoformat()
 
         # ── KPI globaux ───────────────────────────────────────────
         nb_total    = len(periodes)
@@ -2353,6 +2846,8 @@ class PeriodesParVueView(LoginRequiredMixin, View):
         export_params = request.GET.copy()
         export_params.pop('page', None)
         export_params.pop('format', None)
+        if filters['duree_mois']:
+            export_params['date_fin'] = filters['date_fin']
 
         context = {
             'title'         : 'Périodes de signalement et de panne',

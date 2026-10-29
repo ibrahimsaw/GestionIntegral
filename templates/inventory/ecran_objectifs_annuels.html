@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+{% block title %}Objectifs annuels — {{ support.code }} — Integral{% endblock %}
+
+{% block topbar_title %}
+  <div class="d-flex align-items-center gap-2">
+    <i class="bi bi-bullseye text-primary"></i>
+    <span>Objectifs annuels — {{ support.code }}</span>
+  </div>
+{% endblock %}
+
+{% block content %}
+<div class="container-fluid py-3">
+  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
+    <div>
+      <h1 class="h4 mb-1">Objectifs de spots de l’écran</h1>
+      <p class="text-muted mb-0">{{ support.nom }} · {{ support.code }}</p>
+    </div>
+    <a class="btn btn-outline-secondary" href="{% url 'support_detail' support.uuid %}">
+      <i class="bi bi-arrow-left me-1"></i>Retour au support
+    </a>
+  </div>
+
+  <div class="row g-4">
+    <div class="col-lg-5">
+      <section class="card shadow-sm">
+        <div class="card-header bg-white fw-semibold">Saisir un objectif annuel</div>
+        <div class="card-body">
+          <p class="text-muted small">Chaque année est conservée dans l’historique. Une nouvelle cible est initialisée à 200&nbsp;000 spots.</p>
+          <form method="post">
+            {% csrf_token %}
+            {% for field in form %}
+              <div class="mb-3">
+                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                {{ field }}
+                {% if field.errors %}<div class="text-danger small mt-1">{{ field.errors }}</div>{% endif %}
+              </div>
+            {% endfor %}
+            {% if form.non_field_errors %}<div class="text-danger small mb-3">{{ form.non_field_errors }}</div>{% endif %}
+            <button type="submit" class="btn btn-primary">
+              <i class="bi bi-check2-circle me-1"></i>Enregistrer l’objectif
+            </button>
+          </form>
+        </div>
+      </section>
+    </div>
+
+    <div class="col-lg-7">
+      <section class="card shadow-sm">
+        <div class="card-header bg-white fw-semibold">Historique des objectifs</div>
+        <div class="table-responsive">
+          <table class="table table-hover align-middle mb-0">
+            <thead>
+              <tr><th>Année</th><th class="text-end">Objectif de spots</th><th></th></tr>
+            </thead>
+            <tbody>
+              {% for objectif in objectifs %}
+                <tr>
+                  <td>{{ objectif.annee }}</td>
+                  <td class="text-end">{{ objectif.nombre_spots }}</td>
+                  <td class="text-end">
+                    <a class="btn btn-sm btn-outline-primary" href="?annee={{ objectif.annee }}">Modifier</a>
+                  </td>
+                </tr>
+              {% empty %}
+                <tr><td colspan="3" class="text-center text-muted py-4">Aucun objectif enregistré pour cet écran.</td></tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  </div>
+</div>
+{% endblock %}

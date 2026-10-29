@@ -147,6 +147,9 @@ class AuditLog(models.Model):
     MODULE_PLANNING  = 'planning'
     MODULE_MAP       = 'map'
     MODULE_REPORTS   = 'reports'
+    MODULE_PIGES     = 'piges'
+    MODULE_PORTAIL   = 'portail'
+    MODULE_CORE      = 'core'
 
     MODULE_CHOICES = [
         (MODULE_AUTH,      'Authentification'),
@@ -157,6 +160,9 @@ class AuditLog(models.Model):
         (MODULE_PLANNING,  'Planning'),
         (MODULE_MAP,       'Carte'),
         (MODULE_REPORTS,   'Rapports'),
+        (MODULE_PIGES,     'Piges'),
+        (MODULE_PORTAIL,   'Portail'),
+        (MODULE_CORE,      'Système'),
     ]
 
     # ── Niveaux de sévérité ───────────────────────────────────────────────────

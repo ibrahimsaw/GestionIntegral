@@ -1231,6 +1231,35 @@ class EcranNumerique(models.Model):
         return round(spots_par_jour * jours_dispo)
 
 
+class ObjectifSpotsEcranAnnuel(models.Model):
+    """Objectif annuel conservé par écran pour garder l'historique des taux."""
+
+    ecran = models.ForeignKey(
+        EcranNumerique,
+        on_delete=models.CASCADE,
+        related_name='objectifs_annuels',
+        verbose_name="Écran",
+    )
+    annee = models.PositiveSmallIntegerField(verbose_name="Année")
+    nombre_spots = models.PositiveIntegerField(
+        verbose_name="Objectif annuel de spots",
+    )
+
+    class Meta:
+        ordering = ['-annee', 'ecran__support__code']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['ecran', 'annee'],
+                name='unique_objectif_spots_ecran_annee',
+            ),
+        ]
+        verbose_name = "Objectif annuel de spots d'écran"
+        verbose_name_plural = "Objectifs annuels de spots d'écran"
+
+    def __str__(self):
+        return f"{self.ecran.support.code} — {self.annee} : {self.nombre_spots} spots"
+
+
 
 def maintenance_photo_upload_path(instance, filename):
     import os
@@ -1271,6 +1300,19 @@ class Maintenance(models.Model):
     etat_apres        = models.CharField(
         max_length=20, choices=ETAT_CHOICES,
         verbose_name="État enregistré"
+    )
+    reparation_commencee_le = models.DateTimeField(
+        null=True,
+        blank=True,
+        verbose_name="Début de la réparation",
+    )
+    reparation_commencee_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='reparations_commencees',
+        verbose_name="Réparation démarrée par",
     )
     description       = models.TextField(
         blank=True,
@@ -1327,9 +1369,6 @@ class Maintenance(models.Model):
         return timezone.now() - last_maintenance.date_intervention
     
     def save(self, *args, **kwargs):
-        target_obj = self.face if self.face else self.support
-        old_etat = target_obj.etat
-
         super().save(*args, **kwargs)
 
         if self.etat_apres:
@@ -1366,20 +1405,6 @@ class Maintenance(models.Model):
                 Support.objects.filter(pk=self.support_id).update(etat=self.etat_apres)
                 self.support.etat = self.etat_apres
 
-            # Log uniquement si l'état du support a changé
-            if old_etat != self.support.etat:
-                from accounts.audit import AuditLog
-                AuditLog.objects.create(
-                    user        = self.effectue_par,
-                    action      = AuditLog.ACTION_UPDATE,
-                    module      = AuditLog.MODULE_INVENTORY,
-                    object_id   = self.support_id,
-                    object_repr = str(self.support),
-                    detail      = (
-                        f"Maintenance effectuée : {self.description}. "
-                        f"Changement état : {old_etat} → {self.support.etat}"
-                    )
-                )
     @classmethod
     def get_last_for_support(cls, support) -> Optional['Maintenance']:
         """Retourne la dernière maintenance enregistrée pour un support donné."""

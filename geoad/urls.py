@@ -19,4 +19,8 @@ urlpatterns = [
     path('gestion/', include('inventory.urls_map')),   # carte = page principale
 ] + static(settings.MEDIA_URL, document_root=settings.MEDIA_ROOT)
 
+handler403 = 'core.error_views.permission_denied'
+handler404 = 'core.error_views.page_not_found'
+handler500 = 'core.error_views.server_error'
+
     

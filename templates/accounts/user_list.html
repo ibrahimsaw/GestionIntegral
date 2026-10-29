@@ -1,168 +1,272 @@
-{% extends 'base.html' %} {% block title %}Utilisateurs — Integral{% endblock %}
-{% block topbar_title %}<i
-  class="bi bi-shield-lock me-2"
-  style="color: var(--color-primary)"
-></i
->Gestion des Utilisateurs{% endblock %} 
-{% block topbar_actions %}
-<a href="{% url 'user_create' %}" class="btn btn-primary btn-sm"
-  ><i class="bi bi-plus-lg me-1"></i>
-  <span class="d-none d-md-inline ms-1">Nouvelle utilisateur</span>
-</a>
+{% extends 'base.html' %}
+
+{% block title %}Gestion des utilisateurs — Integral{% endblock %}
+
+{% block topbar_title %}
+  <i class="bi bi-people-fill me-2" style="color:var(--color-primary)"></i>
+  Gestion des utilisateurs
 {% endblock %}
- {% block content %}
-<div class="card mb-3">
+
+{% block topbar_actions %}
+  <a href="{% url 'user_create' %}" class="btn btn-primary btn-sm">
+    <i class="bi bi-person-plus-fill me-1"></i>Nouvel utilisateur
+  </a>
+{% endblock %}
+
+{% block content %}
+<style>
+  .users-hero {
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:16px;
+    margin-bottom:22px;
+    padding:22px 24px;
+    color:#fff;
+    background:linear-gradient(120deg,#7f2725,#a23a36);
+    border-radius:14px;
+  }
+  .users-hero h1 { margin:0; font-size:1.35rem; font-weight:800; }
+  .users-hero p { margin:5px 0 0; color:rgba(255,255,255,.78); font-size:.88rem; }
+  .users-stat {
+    height:100%;
+    padding:16px;
+    background:var(--bg-card,#fff);
+    border:1px solid var(--border,#e5e7eb);
+    border-radius:12px;
+  }
+  .users-stat-label { color:var(--text-muted,#64748b); font-size:.75rem; font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
+  .users-stat-value { margin-top:5px; font-size:1.45rem; font-weight:800; line-height:1; }
+  .users-role-count { display:inline-flex; align-items:center; gap:5px; margin:4px 8px 0 0; color:var(--text-muted,#64748b); font-size:.77rem; }
+  .users-role-count strong { color:var(--text,#1f2937); }
+  .users-table th { padding:13px 15px; color:#64748b; background:#f8fafc; font-size:.69rem; letter-spacing:.06em; text-transform:uppercase; white-space:nowrap; }
+  .users-table td { padding:12px 15px; vertical-align:middle; }
+  .users-avatar { width:38px; height:38px; flex:none; border-radius:50%; object-fit:cover; }
+  .users-avatar-placeholder { display:flex; align-items:center; justify-content:center; color:#7f2725; background:#f8e9e8; font-size:1rem; }
+  .users-name { color:var(--text,#1f2937); font-size:.86rem; font-weight:700; }
+  .users-username { color:var(--text-muted,#64748b); font-family:var(--mono,monospace); font-size:.72rem; }
+  .users-actions { display:flex; align-items:center; gap:5px; white-space:nowrap; }
+  .users-actions .btn { width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center; padding:0; }
+  .users-pagination .page-link { color:#7f2725; }
+  .users-pagination .active .page-link { color:#fff; background:#932e2b; border-color:#932e2b; }
+  @media(max-width:767.98px) {
+    .users-hero { align-items:flex-start; flex-direction:column; }
+    .users-table-wrap { overflow-x:auto; }
+    .users-table { min-width:850px; }
+  }
+</style>
+
+<section class="users-hero">
+  <div>
+    <h1>Vos équipes, au même endroit</h1>
+    <p>Consultez les accès, les rôles et les profils clients associés.</p>
+  </div>
+  <i class="bi bi-shield-check d-none d-md-block" aria-hidden="true" style="font-size:2rem;color:#f6d5a5;"></i>
+</section>
+
+<div class="row g-3 mb-4">
+  <div class="col-6 col-xl-4">
+    <div class="users-stat">
+      <div class="users-stat-label"><i class="bi bi-people me-1"></i>Total</div>
+      <div class="users-stat-value">{{ total_users }}</div>
+    </div>
+  </div>
+  <div class="col-6 col-xl-4">
+    <div class="users-stat">
+      <div class="users-stat-label"><i class="bi bi-person-check me-1 text-success"></i>Comptes actifs</div>
+      <div class="users-stat-value text-success">{{ active_users }}</div>
+    </div>
+  </div>
+  <div class="col-12 col-xl-4">
+    <div class="users-stat">
+      <div class="users-stat-label"><i class="bi bi-person-x me-1 text-secondary"></i>Comptes inactifs</div>
+      <div class="users-stat-value text-secondary">{{ inactive_users }}</div>
+    </div>
+  </div>
+</div>
+
+<div class="card mb-4">
   <div class="card-body">
-    <form method="get" class="row g-2 align-items-end">
-      <div class="col-md-5">
-        <label class="form-label">Recherche</label>
-        <input
-          type="text"
-          name="q"
-          value="{{ q }}"
-          class="form-control"
-          placeholder="Nom, email..."
-        />
+    <div class="d-flex flex-wrap justify-content-between align-items-start gap-2 mb-3">
+      <div>
+        <h2 class="h6 mb-1 fw-bold">Répartition par rôle</h2>
+        <div class="small text-muted">Nombre de comptes enregistrés pour chaque rôle</div>
       </div>
-      <div class="col-md-2 d-flex gap-2">
-        <button type="submit" class="btn btn-primary flex-fill">
-          <i class="bi bi-search"></i>
-        </button>
-        <a href="{% url 'user_list' %}" class="btn btn-outline-secondary"
-          ><i class="bi bi-x-lg"></i
-        ></a>
+    </div>
+    <div>
+      {% for item in role_counts %}
+        <span class="users-role-count">
+          <span class="role-pill role-{{ item.value }}">{{ item.label }}</span>
+          <strong>{{ item.count }}</strong>
+        </span>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+
+<div class="card mb-4">
+  <div class="card-header d-flex align-items-center gap-2">
+    <i class="bi bi-funnel text-primary"></i>
+    <span class="fw-bold">Rechercher et filtrer</span>
+  </div>
+  <div class="card-body">
+    <form method="get" class="row g-3 align-items-end">
+      <div class="col-lg-5 col-md-12">
+        <label for="user-search" class="form-label">Recherche</label>
+        <div class="input-group">
+          <span class="input-group-text"><i class="bi bi-search"></i></span>
+          <input id="user-search" type="search" name="q" value="{{ q }}" class="form-control"
+                 placeholder="Nom, identifiant, email, téléphone ou client">
+        </div>
+      </div>
+      <div class="col-lg-3 col-md-5">
+        <label for="user-role" class="form-label">Rôle</label>
+        <select id="user-role" name="role" class="form-select">
+          <option value="">Tous les rôles</option>
+          {% for value, label in role_choices %}
+            <option value="{{ value }}" {% if selected_role == value %}selected{% endif %}>{{ label }}</option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-lg-2 col-md-4">
+        <label for="user-status" class="form-label">Statut</label>
+        <select id="user-status" name="statut" class="form-select">
+          <option value="">Tous</option>
+          <option value="actif" {% if selected_status == 'actif' %}selected{% endif %}>Actifs</option>
+          <option value="inactif" {% if selected_status == 'inactif' %}selected{% endif %}>Inactifs</option>
+        </select>
+      </div>
+      <div class="col-lg-2 col-md-3 d-flex gap-2">
+        <button type="submit" class="btn btn-primary flex-grow-1"><i class="bi bi-search me-1"></i>Filtrer</button>
+        <a href="{% url 'user_list' %}" class="btn btn-outline-secondary" title="Effacer les filtres" aria-label="Effacer les filtres">
+          <i class="bi bi-arrow-counterclockwise"></i>
+        </a>
       </div>
     </form>
   </div>
 </div>
 
 <div class="card">
-  <div class="card-body p-0">
-    <table class="table mb-0">
+  <div class="card-header d-flex flex-wrap justify-content-between align-items-center gap-2">
+    <div class="fw-bold"><i class="bi bi-person-vcard me-2 text-primary"></i>Comptes utilisateurs</div>
+    <span class="badge rounded-pill bg-light text-dark border">
+      {{ page_obj.paginator.count }} résultat{{ page_obj.paginator.count|pluralize }}
+    </span>
+  </div>
+  <div class="users-table-wrap">
+    <table class="table table-hover mb-0 users-table">
       <thead>
         <tr>
           <th>Utilisateur</th>
-          <th>Email</th>
+          <th>Coordonnées</th>
           <th>Rôle</th>
-          <th>Profil Client</th>
-          <th>Statut</th>
-          <th>Actions</th>
+          <th>Profil client</th>
+          <th>Accès</th>
+          <th class="text-end">Actions</th>
         </tr>
       </thead>
       <tbody>
         {% for u in users %}
-        <tr>
-          <td>
-            <div style="display: flex; align-items: center; gap: 10px">
-              {% if u.avatar %}
-              <img
-                src="{{ u.avatar.url }}"
-                style="
-                  width: 32px;
-                  height: 32px;
-                  border-radius: 50%;
-                  object-fit: cover;
-                "
-              />
+          <tr>
+            <td>
+              <div class="d-flex align-items-center gap-2">
+                {% if u.avatar %}
+                  <img src="{{ u.avatar.url }}" alt="" class="users-avatar">
+                {% else %}
+                  <div class="users-avatar users-avatar-placeholder"><i class="bi bi-person-fill"></i></div>
+                {% endif %}
+                <div>
+                  <div class="users-name">{{ u.get_full_name|default:u.username }}</div>
+                  <div class="users-username">@{{ u.username }}</div>
+                </div>
+              </div>
+            </td>
+            <td>
+              <div class="small">{{ u.email|default:"Email non renseigné" }}</div>
+              <div class="small text-muted">{{ u.telephone|default:"Téléphone non renseigné" }}</div>
+            </td>
+            <td><span class="role-pill role-{{ u.role }}">{{ u.get_role_display }}</span></td>
+            <td>
+              {% if u.client_profile %}
+                <a href="{% url 'client_detail' u.client_profile.pk %}" class="text-decoration-none">
+                  <i class="bi bi-building me-1"></i>{{ u.client_profile.nom }}
+                </a>
               {% else %}
-              <div
-                style="
-                  width: 32px;
-                  height: 32px;
-                  background: var(--bg-card2);
-                  border-radius: 50%;
-                  display: flex;
-                  align-items: center;
-                  justify-content: center;
-                "
-              >
-                <i class="bi bi-person" style="color: var(--text-muted)"></i>
-              </div>
+                <span class="text-muted small">Non associé</span>
               {% endif %}
-              <div>
-                <div style="font-weight: 700; font-size: 0.84rem">
-                  {{ u.get_full_name|default:u.username }}
-                </div>
-                <div
-                  style="
-                    font-size: 0.72rem;
-                    color: var(--text-muted);
-                    font-family: var(--mono);
-                  "
-                >
-                  {{ u.username }}
-                </div>
-              </div>
-            </div>
-          </td>
-          <td style="font-size: 0.82rem; color: var(--text-muted)">
-            {{ u.email|default:"—" }}
-          </td>
-          <td>
-            <span class="role-pill role-{{ u.role }}"
-              >{{ u.role }}</span
-            >
-          </td>
-          <td>
-            {% if u.client_profile %}
-              <a href="{% url 'client_detail' u.client_profile.pk %}" class="text-decoration-none">
-                <span class="badge bg-secondary">{{ u.client_profile.nom }}</span>
-              </a>
-            {% else %}
-              <span class="badge bg-light text-muted">Aucun</span>
-            {% endif %}
-          </td>
-          <td>
-            {% if u.is_active %}
-            <span class="badge badge-status bs-disponible">Actif</span>
-            {% else %}
-            <span class="badge badge-status bs-maintenance">Inactif</span>
-            {% endif %}
-          </td>
-          <td>
-            <div class="d-flex gap-1">
-              <a
-                href="{% url 'user_detail' u.pk %}"
-                class="btn btn-sm btn-outline-primary"
-                title="Voir le détail"
-                ><i class="bi bi-eye"></i
-              ></a>
-              <a
-                href="{% url 'user_edit' u.pk %}"
-                class="btn btn-sm btn-outline-secondary"
-                title="Modifier"
-                ><i class="bi bi-pencil"></i
-              ></a>
-              {% if u.pk != request.user.pk %}
-              <a
-                href="{% url 'user_delete' u.pk %}"
-                class="btn btn-sm"
-                style="
-                  color: var(--color-maintenance);
-                  border: 1px solid #ef444444;
-                  border-radius: 6px;
-                  padding: 4px 8px;
-                "
-                title="Supprimer"
-                ><i class="bi bi-trash"></i
-              ></a>
+            </td>
+            <td>
+              {% if u.is_active %}
+                <span class="badge rounded-pill text-bg-success-subtle text-success border border-success-subtle">Actif</span>
+              {% else %}
+                <span class="badge rounded-pill text-bg-secondary-subtle text-secondary border">Inactif</span>
               {% endif %}
-            </div>
-          </td>
-        </tr>
+            </td>
+            <td>
+              <div class="users-actions justify-content-end">
+                <a href="{% url 'user_detail' u.pk %}" class="btn btn-sm btn-outline-primary" title="Détail" aria-label="Détail de {{ u.username }}">
+                  <i class="bi bi-eye"></i>
+                </a>
+                <a href="{% url 'user_edit' u.pk %}" class="btn btn-sm btn-outline-secondary" title="Modifier" aria-label="Modifier {{ u.username }}">
+                  <i class="bi bi-pencil"></i>
+                </a>
+                <a href="{% url 'user_detail' u.pk %}#admin-actions" class="btn btn-sm btn-outline-warning" title="Changer le mot de passe" aria-label="Changer le mot de passe de {{ u.username }}">
+                  <i class="bi bi-key"></i>
+                </a>
+                {% if u.pk != request.user.pk and not u.is_superuser or request.user.is_superuser and u.pk != request.user.pk %}
+                  <form method="post" class="m-0" onsubmit="return confirm('{% if u.is_active %}Désactiver{% else %}Réactiver{% endif %} le compte {{ u.username }} ?');">
+                    {% csrf_token %}
+                    <input type="hidden" name="user_id" value="{{ u.pk }}">
+                    <button type="submit" class="btn btn-sm {% if u.is_active %}btn-outline-danger{% else %}btn-outline-success{% endif %}"
+                            title="{% if u.is_active %}Désactiver{% else %}Réactiver{% endif %}"
+                            aria-label="{% if u.is_active %}Désactiver{% else %}Réactiver{% endif %} {{ u.username }}">
+                      <i class="bi {% if u.is_active %}bi-person-x{% else %}bi-person-check{% endif %}"></i>
+                    </button>
+                  </form>
+                {% endif %}
+                {% if u.pk != request.user.pk %}
+                  <a href="{% url 'user_delete' u.pk %}" class="btn btn-sm btn-outline-danger" title="Supprimer" aria-label="Supprimer {{ u.username }}">
+                    <i class="bi bi-trash"></i>
+                  </a>
+                {% endif %}
+              </div>
+            </td>
+          </tr>
         {% empty %}
-        <tr>
-          <td
-            colspan="5"
-            class="text-center py-4"
-            style="color: var(--text-muted)"
-          >
-            Aucun utilisateur
-          </td>
-        </tr>
+          <tr>
+            <td colspan="6" class="py-5 text-center">
+              <i class="bi bi-person-exclamation d-block mb-2 text-muted" style="font-size:2rem"></i>
+              <div class="fw-semibold">Aucun utilisateur trouvé</div>
+              <div class="small text-muted">Essayez de modifier vos critères ou créez un compte.</div>
+            </td>
+          </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
+  {% if is_paginated %}
+    <div class="card-footer d-flex flex-wrap justify-content-between align-items-center gap-2">
+      <span class="small text-muted">Page {{ page_obj.number }} sur {{ page_obj.paginator.num_pages }}</span>
+      <nav aria-label="Pagination des utilisateurs">
+        <ul class="pagination pagination-sm mb-0 users-pagination">
+          {% if page_obj.has_previous %}
+            <li class="page-item"><a class="page-link" href="?q={{ q|urlencode }}&role={{ selected_role|urlencode }}&statut={{ selected_status|urlencode }}&page=1" aria-label="Première page"><i class="bi bi-chevron-double-left"></i></a></li>
+            <li class="page-item"><a class="page-link" href="?q={{ q|urlencode }}&role={{ selected_role|urlencode }}&statut={{ selected_status|urlencode }}&page={{ page_obj.previous_page_number }}" aria-label="Page précédente"><i class="bi bi-chevron-left"></i></a></li>
+          {% endif %}
+          {% for number in page_obj.paginator.page_range %}
+            {% if number == page_obj.number %}
+              <li class="page-item active" aria-current="page"><span class="page-link">{{ number }}</span></li>
+            {% elif number >= page_obj.number|add:"-2" and number <= page_obj.number|add:"2" %}
+              <li class="page-item"><a class="page-link" href="?q={{ q|urlencode }}&role={{ selected_role|urlencode }}&statut={{ selected_status|urlencode }}&page={{ number }}">{{ number }}</a></li>
+            {% endif %}
+          {% endfor %}
+          {% if page_obj.has_next %}
+            <li class="page-item"><a class="page-link" href="?q={{ q|urlencode }}&role={{ selected_role|urlencode }}&statut={{ selected_status|urlencode }}&page={{ page_obj.next_page_number }}" aria-label="Page suivante"><i class="bi bi-chevron-right"></i></a></li>
+            <li class="page-item"><a class="page-link" href="?q={{ q|urlencode }}&role={{ selected_role|urlencode }}&statut={{ selected_status|urlencode }}&page={{ page_obj.paginator.num_pages }}" aria-label="Dernière page"><i class="bi bi-chevron-double-right"></i></a></li>
+          {% endif %}
+        </ul>
+      </nav>
+    </div>
+  {% endif %}
 </div>
 {% endblock %}

@@ -1,87 +1,221 @@
 {% load static %}
 <style>
-  .panne-report { color:#0f172a; font-family:Arial,sans-serif; }
-  .panne-report-header { width:100%; border-collapse:collapse; background:#fff; border-bottom:3px solid #932e2b; margin-bottom:12px; }
-  .panne-report-header td { padding:10px 14px; vertical-align:middle; }
-  .panne-report-logo { width:42px; height:42px; object-fit:contain; }
-  .panne-report-brand { color:#94a3b8; font-size:7pt; font-weight:bold; letter-spacing:1.3px; text-transform:uppercase; }
-  .panne-report-title { color:#932e2b; font-size:14pt; font-weight:bold; margin-top:3px; text-transform:uppercase; }
-  .panne-report-subtitle { color:#64748b; font-size:8pt; margin-top:4px; }
-  .panne-report-meta { color:#64748b; font-size:7pt; line-height:1.7; text-align:right; }
-  .panne-report-meta strong { color:#334155; }
-  .panne-report-kpis { width:100%; border-collapse:separate; border-spacing:7px 0; margin:0 -7px 12px; }
-  .panne-report-kpis td { width:33.33%; background:#fff; border:1px solid #e2e8f0; border-radius:7px; padding:8px 12px; }
-  .panne-kpi-label { color:#94a3b8; font-size:6.5pt; font-weight:bold; letter-spacing:.5px; text-transform:uppercase; }
-  .panne-kpi-value { color:#932e2b; font-family:monospace; font-size:15pt; font-weight:bold; margin-top:2px; }
-  .panne-kpi-open { color:#dc2626; }
-  .panne-kpi-resolved { color:#059669; }
-  .panne-report-table { width:100%; border-collapse:collapse; table-layout:fixed; background:#fff; }
-  .panne-report-table th { background:#932e2b; border-right:1px solid rgba(255,255,255,.18); color:#fff; font-size:6.5pt; letter-spacing:.3px; padding:7px 5px; text-align:left; text-transform:uppercase; }
-  .panne-report-table td { border-bottom:1px solid #e2e8f0; color:#334155; font-size:7pt; padding:6px 5px; vertical-align:top; overflow-wrap:anywhere; }
-  .panne-report-table tbody tr:nth-child(even) td { background:#f8fafc; }
-  .panne-report-table .panne-code { color:#932e2b; font-family:monospace; font-weight:bold; }
-  .panne-report-table .panne-state { color:#991b1b; font-weight:bold; }
-  .panne-report-table .signal-state { color:#92400e; font-weight:bold; }
-  .panne-report-table .resolved-state { color:#047857; font-weight:bold; }
-  .panne-report-table .open-state { color:#b91c1c; font-weight:bold; }
-  .panne-report-empty { color:#64748b; padding:18px !important; text-align:center; }
+  /* ═══════════════ Base ═══════════════ */
+  .rp { color:#1f2933; font-family:"Helvetica Neue",Arial,sans-serif; font-size:8.5pt; line-height:1.4; background:#fff; }
+  .rp * { box-sizing:border-box; }
+  .rp table { width:100%; border-collapse:collapse; border-spacing:0; }
+  .rp td, .rp th { vertical-align:top; }
+
+  /* ═══════════════ En-tête ═══════════════ */
+  .rp-top { padding-bottom:12px; border-bottom:2px solid #932e2b; margin-bottom:14px; }
+  .rp-top td { vertical-align:middle; }
+  .rp-logo { height:46px; width:auto; object-fit:contain; display:block; }
+  .rp-id { text-align:right; }
+  .rp-brand { font-size:6.5pt; font-weight:800; letter-spacing:2px; text-transform:uppercase; color:#8b95a1; }
+  .rp-title { margin-top:3px; font-size:17pt; font-weight:800; color:#932e2b; letter-spacing:-.2px; line-height:1.1; }
+  .rp-period { margin-top:4px; font-size:8pt; color:#52606d; font-weight:600; }
+
+  /* ═══════════════ Paramètres du rapport ═══════════════ */
+  .rp-params { margin-bottom:14px; padding:8px 12px; background:#f7f5f3; border-radius:6px; font-size:7.3pt; color:#52606d; }
+  .rp-params strong { color:#1f2933; font-weight:700; }
+  .rp-params span { display:inline-block; margin-right:18px; }
+
+  /* ═══════════════ Synthèse ═══════════════ */
+  .rp-sum { margin-bottom:16px; }
+  .rp-sum td { width:25%; padding:0 14px 0 12px; border-left:3px solid #d9d4cf; }
+  .rp-sum td.is-open { border-left-color:#d64545; }
+  .rp-sum td.is-started { border-left-color:#2563eb; }
+  .rp-sum td.is-ok { border-left-color:#2f9e6e; }
+  .rp-sum td.is-rate { border-left-color:#932e2b; }
+  .rp-sum-label { font-size:6.2pt; font-weight:800; letter-spacing:.9px; text-transform:uppercase; color:#8b95a1; }
+  .rp-sum-value { margin-top:2px; font-size:20pt; font-weight:800; line-height:1.05; color:#1f2933; }
+  .rp-sum td.is-open .rp-sum-value { color:#d64545; }
+  .rp-sum td.is-started .rp-sum-value { color:#2563eb; }
+  .rp-sum td.is-ok .rp-sum-value { color:#2f9e6e; }
+  .rp-sum td.is-rate .rp-sum-value { color:#932e2b; }
+  .rp-sum-value small { font-size:9pt; margin-left:1px; }
+
+  /* ═══════════════ Tableau ═══════════════ */
+  .rp-table thead { display:table-header-group; }
+  .rp-table th { padding:7px 8px; background:#932e2b; color:#fff; font-size:6.3pt; font-weight:800; letter-spacing:.8px; text-transform:uppercase; text-align:left; }
+  .rp-table th:first-child { border-radius:6px 0 0 0; }
+  .rp-table th:last-child { border-radius:0 6px 0 0; text-align:center; }
+
+  .rp-table tbody { page-break-inside:avoid; }
+  .rp-table td { padding:8px 8px; border-bottom:1px solid #ece8e4; }
+  .rp-table tbody tr.rp-main td { border-bottom:0; padding-bottom:4px; }
+  .rp-table tbody tr.rp-detail td { padding:0 8px 9px; border-bottom:1px solid #d9d4cf; }
+  .rp-table tbody:nth-child(even) tr.rp-main td, .rp-table tbody:nth-child(even) tr.rp-detail td { background:#fbfaf9; }
+
+  .rp-code { font-family:"Courier New",monospace; font-size:7.5pt; font-weight:bold; color:#932e2b; }
+  .rp-name { font-weight:700; color:#111827; }
+  .rp-face { margin-top:1px; font-size:6.8pt; color:#8b95a1; font-weight:600; text-transform:uppercase; letter-spacing:.3px; }
+  .rp-type { font-weight:700; }
+  .rp-type.is-panne { color:#b91c1c; }
+  .rp-type.is-signal { color:#b45309; }
+  .rp-last { margin-top:1px; font-size:6.6pt; color:#8b95a1; }
+  .rp-date { font-weight:700; white-space:nowrap; }
+  .rp-time { font-size:6.8pt; color:#8b95a1; font-weight:600; }
+  .rp-pending { color:#d64545; font-weight:800; }
+  .rp-dur { font-family:"Courier New",monospace; font-weight:bold; white-space:nowrap; }
+  .rp-status { text-align:center; }
+  .rp-badge { display:inline-block; padding:2px 9px; border-radius:20px; font-size:6.3pt; font-weight:800; letter-spacing:.4px; text-transform:uppercase; white-space:nowrap; }
+  .rp-badge.is-open { background:#fde8e8; color:#b91c1c; }
+  .rp-badge.is-started { background:#dbeafe; color:#1d4ed8; }
+  .rp-badge.is-ok { background:#def7ec; color:#046c4e; }
+
+  /* Descriptions */
+  .rp-notes td { width:50%; padding:0; border:0 !important; background:transparent !important; }
+  .rp-notes td.only { width:100%; }
+  .rp-note { margin-right:8px; padding-left:9px; border-left:2px solid #d9d4cf; font-size:7.2pt; color:#52606d; overflow-wrap:anywhere; }
+  .rp-notes td:last-child .rp-note { margin-right:0; }
+  .rp-note.is-repair { border-left-color:#2f9e6e; }
+  .rp-note b { display:block; margin-bottom:1px; font-size:5.8pt; font-weight:800; letter-spacing:.7px; text-transform:uppercase; color:#8b95a1; }
+  .rp-note.is-repair b { color:#2f9e6e; }
+
+  .rp-empty { padding:30px; text-align:center; border:1px dashed #d9d4cf; border-radius:8px; color:#8b95a1; font-weight:600; }
+
+  /* Pied de page */
+  .rp-foot { margin-top:12px; padding-top:7px; border-top:1px solid #d9d4cf; font-size:6.3pt; color:#8b95a1; text-align:center; letter-spacing:.4px; }
+
   @media screen {
-    .panne-report { min-width:850px; }
+    .rp { padding:20px 24px; border:1px solid #e5e1dd; border-radius:10px; box-shadow:0 2px 10px rgba(31,41,51,.06); }
+    .rp-table tbody:hover tr.rp-main td, .rp-table tbody:hover tr.rp-detail td { background:#fdf5f4; }
+  }
+  @media screen and (max-width:700px) {
+    .rp { padding:14px; }
+    .rp-top, .rp-top tbody, .rp-top tr, .rp-top td { display:block; width:100%; text-align:left; }
+    .rp-id { margin-top:10px; }
+    .rp-sum td { display:inline-block; width:48%; margin-bottom:10px; }
+    .rp-table { display:block; overflow-x:auto; }
   }
 </style>
-<div class="panne-report">
-  <table class="panne-report-header">
+
+<div class="rp">
+
+  <!-- ═══ En-tête ═══ -->
+  <table class="rp-top">
     <tr>
-      <td style="width:68px;"><img src="{% static 'img/logo.png' %}" alt="Integral" class="panne-report-logo"></td>
-      <td>
-        <div class="panne-report-brand">Integral — Régie Publicitaire</div>
-        <div class="panne-report-title">Rapport des pannes & maintenances</div>
-        <div class="panne-report-subtitle">
+      <td style="width:120px;"><img src="{% static 'img/logo.png' %}" alt="Integral" class="rp-logo"></td>
+      <td class="rp-id">
+        <div class="rp-brand">Integral — Régie Publicitaire</div>
+        <div class="rp-title">Rapport des pannes &amp; maintenances</div>
+        <div class="rp-period">
           {% if date_debut or date_fin %}
             Période du {{ date_debut|date:"d/m/Y"|default:"début des données" }} au {{ date_fin|date:"d/m/Y"|default:"aujourd’hui" }}
           {% else %}Toutes les dates{% endif %}
         </div>
       </td>
-      <td class="panne-report-meta" style="width:150px;">
-        Généré le {{ date_generation|date:"d/m/Y à H:i" }}<br>
-        <strong>Périodes incluses :</strong> {{ nb_total }}
+    </tr>
+  </table>
+
+  <!-- ═══ Paramètres ═══ -->
+  <div class="rp-params">
+    <span><strong>Généré le</strong> {{ date_generation|date:"d/m/Y à H:i" }}</span>
+    <span><strong>Périodes incluses</strong> {{ nb_total }}</span>
+    {% if support_label %}<span><strong>Support</strong> {{ support_label }}</span>{% endif %}
+    {% if filters.face %}<span><strong>Face</strong> {{ filters.face }}</span>{% endif %}
+    {% if filters.statut %}<span><strong>Statut</strong> {{ filters.statut }}</span>{% endif %}
+  </div>
+
+  <!-- ═══ Synthèse ═══ -->
+  <table class="rp-sum">
+    <tr>
+      <td>
+        <div class="rp-sum-label">Pannes / signalements</div>
+        <div class="rp-sum-value">{{ nb_total }}</div>
+      </td>
+      <td class="is-open">
+        <div class="rp-sum-label">À réparer</div>
+        <div class="rp-sum-value">{{ nb_a_reparer }}</div>
+      </td>
+      <td class="is-started">
+        <div class="rp-sum-label">En cours de réparation</div>
+        <div class="rp-sum-value">{{ nb_reparation_en_cours }}</div>
+      </td>
+      <td class="is-ok">
+        <div class="rp-sum-label">Résolues</div>
+        <div class="rp-sum-value">{{ nb_resolues }}</div>
+      </td>
+      <td class="is-rate">
+        <div class="rp-sum-label">Taux de résolution</div>
+        <div class="rp-sum-value">{% if nb_total %}{% widthratio nb_resolues nb_total 100 %}{% else %}0{% endif %}<small>%</small></div>
       </td>
     </tr>
   </table>
 
-  <table class="panne-report-kpis">
-    <tr>
-      <td><div class="panne-kpi-label">Périodes de panne / signalement</div><div class="panne-kpi-value">{{ nb_total }}</div></td>
-      <td><div class="panne-kpi-label">À réparer</div><div class="panne-kpi-value panne-kpi-open">{{ nb_en_cours }}</div></td>
-      <td><div class="panne-kpi-label">Résolues</div><div class="panne-kpi-value panne-kpi-resolved">{{ nb_resolues }}</div></td>
-    </tr>
-  </table>
-
-  <table class="panne-report-table">
-    <colgroup>
-      <col style="width:13%"><col style="width:7%"><col style="width:8%">
-      <col style="width:10%"><col style="width:10%"><col style="width:6%">
-      <col style="width:7%"><col style="width:19%"><col style="width:20%">
-    </colgroup>
+  <!-- ═══ Tableau des incidents ═══ -->
+  {% if periodes %}
+  <table class="rp-table">
     <thead>
-      <tr><th>Support</th><th>Face</th><th>Incident</th><th>Début</th><th>Fin / réparation</th><th>Durée</th><th>Statut</th><th>Constat initial</th><th>Rapport de réparation</th></tr>
-    </thead>
-    <tbody>
-      {% for p in periodes %}
       <tr>
-        <td><span class="panne-code">{{ p.support.code }}</span><br>{{ p.support.nom }}</td>
-        <td>{% if p.face %}Face {{ p.face.label }}{% else %}Support complet{% endif %}</td>
-        <td class="{% if p.etat_incident == 'panne' %}panne-state{% else %}signal-state{% endif %}">{{ p.maint_debut.get_etat_apres_display }}{% if p.etat_incident != p.etat_debut %}<br>Dernier état : {{ p.etat_incident }}{% endif %}</td>
-        <td>{{ p.debut|date:"d/m/Y H:i" }}</td>
-        <td>{% if p.fin %}{{ p.fin|date:"d/m/Y H:i" }}{% else %}—{% endif %}</td>
-        <td>{{ p.duree.days }} j</td>
-        <td class="{% if p.resolue %}resolved-state{% else %}open-state{% endif %}">{% if p.resolue %}Résolue{% else %}À réparer{% endif %}</td>
-        <td>{{ p.maint_debut.description|default:"—" }}</td>
-        <td>{% if p.maint_bon %}{{ p.maint_bon.description|default:"—" }}{% else %}—{% endif %}</td>
+        <th style="width:27%;">Support</th>
+        <th style="width:15%;">Incident</th>
+        <th style="width:14%;">Début</th>
+        <th style="width:14%;">Fin / réparation</th>
+        <th style="width:10%;">Durée</th>
+        <th style="width:12%;">Statut</th>
       </tr>
-      {% empty %}
-      <tr><td colspan="9" class="panne-report-empty">Aucune panne ou maintenance pour les filtres sélectionnés.</td></tr>
-      {% endfor %}
+    </thead>
+    {% for p in periodes %}
+    <tbody>
+      <tr class="rp-main">
+        <td>
+          <div class="rp-code">{{ p.support.code }}</div>
+          <div class="rp-name">{{ p.support.nom }}</div>
+          <div class="rp-face">{% if p.face %}Face {{ p.face.label }}{% else %}Support complet{% endif %}</div>
+        </td>
+        <td>
+          <div class="rp-type {% if p.etat_incident == 'panne' %}is-panne{% else %}is-signal{% endif %}">{{ p.maint_debut.get_etat_apres_display }}</div>
+          {% if p.etat_incident != p.etat_debut %}<div class="rp-last">Dernier état : {{ p.etat_incident }}</div>{% endif %}
+        </td>
+        <td>
+          <div class="rp-date">{{ p.debut|date:"d/m/Y" }}</div>
+          <div class="rp-time">{{ p.debut|date:"H:i" }}</div>
+        </td>
+        <td>
+          {% if p.fin %}
+            <div class="rp-date">{{ p.fin|date:"d/m/Y" }}</div>
+            <div class="rp-time">{{ p.fin|date:"H:i" }}</div>
+          {% else %}
+            <div class="rp-pending">En attente</div>
+          {% endif %}
+        </td>
+        <td><div class="rp-dur">{{ p.duree.days }} jour{{ p.duree.days|pluralize }}</div></td>
+        <td class="rp-status">
+          <span class="rp-badge {% if p.resolue %}is-ok{% elif p.reparation_commencee_le %}is-started{% else %}is-open{% endif %}">
+            {% if p.resolue %}Résolue{% elif p.reparation_commencee_le %}En cours de réparation{% else %}À réparer{% endif %}
+          </span>
+          {% if p.reparation_commencee_le %}
+            <div class="rp-time">Depuis le {{ p.reparation_commencee_le|date:"d/m/Y à H:i" }}</div>
+            {% if p.reparation_commencee_par %}
+              <div class="rp-time">Par {{ p.reparation_commencee_par.get_full_name|default:p.reparation_commencee_par.username }}</div>
+            {% endif %}
+          {% endif %}
+        </td>
+      </tr>
+      <tr class="rp-detail">
+        <td colspan="6">
+          <table class="rp-notes">
+            <tr>
+              <td{% if not p.maint_bon %} class="only"{% endif %}>
+                <div class="rp-note"><b>Constat initial</b>{{ p.maint_debut.description|default:"Aucune description renseignée." }}</div>
+              </td>
+              {% if p.maint_bon %}
+              <td>
+                <div class="rp-note is-repair"><b>Rapport de réparation</b>{{ p.maint_bon.description|default:"Aucune description renseignée." }}</div>
+              </td>
+              {% endif %}
+            </tr>
+          </table>
+        </td>
+      </tr>
     </tbody>
+    {% endfor %}
   </table>
+  {% else %}
+    <div class="rp-empty">Aucune panne ou maintenance pour les filtres sélectionnés.</div>
+  {% endif %}
+
+  <div class="rp-foot">Integral — Régie Publicitaire · Document généré automatiquement le {{ date_generation|date:"d/m/Y à H:i" }}</div>
 </div>

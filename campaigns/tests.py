@@ -11,7 +11,10 @@ from django.urls import reverse
 from django.utils import timezone
 
 from campaigns.forms import CampagneForm, PreuveDiffusionForm
-from campaigns.models import Campagne, Client, Contrat, LigneCampagne, PreuveDiffusion
+from campaigns.models import (
+    Campagne, Client, Contrat, LigneCampagne, PreuveDiffusion, Reservation,
+    ReservationLigne, STATUT_CONFIRMEE,
+)
 from campaigns.views import CampagneDetailView, DashboardView, FormatDetailView
 from campaigns.views import CampagneListView
 from piges.models import PigeFichier
@@ -33,8 +36,10 @@ from inventory.models import (
     FacePanneau,
     FormatSupport,
     Marche,
+    ObjectifSpotsEcranAnnuel,
     Support,
 )
+from planning.models import LogDiffusion
 
 
 class CampagneListCategoryGroupingTests(TestCase):
@@ -279,6 +284,93 @@ class DashboardParcGroupingTests(TestCase):
             date_fin=end_date,
             statut=status,
         )
+
+    def test_annual_face_occupancy_counts_completed_campaign_days_once(self):
+        support = self.create_support('DASH-ANNUAL-FACE', 'DASH-12')
+        face = FacePanneau.objects.create(support=support, label='A')
+        year_start = datetime.date(datetime.date.today().year, 1, 1)
+        year_end = datetime.date(datetime.date.today().year, 12, 31)
+        reservation_start = datetime.date.today() + datetime.timedelta(days=1)
+        first_campaign = self.create_campaign(
+            'Campagne annuelle terminée 1',
+            year_start,
+            year_start + datetime.timedelta(days=4),
+            Campagne.STATUT_TERMINEE,
+        )
+        overlapping_campaign = self.create_campaign(
+            'Campagne annuelle terminée 2',
+            year_start + datetime.timedelta(days=3),
+            year_start + datetime.timedelta(days=7),
+            Campagne.STATUT_TERMINEE,
+        )
+        LigneCampagne.objects.create(campagne=first_campaign, face=face)
+        LigneCampagne.objects.create(campagne=overlapping_campaign, face=face)
+        future_reservation = Reservation.objects.create(
+            nom='Réservation prévisionnelle annuelle',
+            client=self.client_obj,
+            date_debut=timezone.make_aware(datetime.datetime.combine(
+                reservation_start, datetime.time.min,
+            )),
+            date_fin=timezone.make_aware(datetime.datetime.combine(
+                reservation_start + datetime.timedelta(days=2), datetime.time.min,
+            )),
+            statut=STATUT_CONFIRMEE,
+        )
+        ReservationLigne.objects.create(
+            reservation=future_reservation,
+            support=support,
+            face=face,
+        )
+
+        stats = DashboardView._build_annual_face_occupancy(
+            ['DASH-12'], 'Ouagadougou', year_start, year_end,
+            datetime.date.today(),
+        )
+
+        self.assertEqual(
+            stats['DASH-12'],
+            {
+                'nb_faces': 1,
+                'jours_occupees_cumul': 8,
+                'jours_occupees_annuel': 11,
+            },
+        )
+        future_reservation.delete()
+
+    def test_dashboard_renders_annual_rates_for_categories_and_formats(self):
+        today = timezone.now().date()
+        support = self.create_support('DASH-ANNUAL-DISPLAY', 'DASH-12')
+        face = FacePanneau.objects.create(support=support, label='A')
+        campaign = self.create_campaign(
+            'Campagne actuelle du format',
+            today,
+            today,
+            Campagne.STATUT_EN_COURS,
+        )
+        LigneCampagne.objects.create(campagne=campaign, face=face)
+        cache.clear()
+
+        request = self.make_request('/', {'ville': 'Ouagadougou'})
+        view = DashboardView()
+        view.setup(request)
+        context = view.get_context_data()
+        rendered = render_to_string(view.template_name, context, request=request)
+        category = next(
+            item for item in context['format_categories']
+            if item['categorie'] == '12m²'
+        )
+
+        elapsed_days = (today - datetime.date(today.year, 1, 1)).days + 1
+        expected_current_rate = round(100 / elapsed_days, 1)
+        self.assertEqual(category['taux_actuel'], expected_current_rate)
+        self.assertEqual(
+            context['formats_stats'][0]['taux_actuel'],
+            expected_current_rate,
+        )
+        self.assertNotIn('Taux d’occupation par catégorie et format', rendered)
+        self.assertIn('Taux actuel', rendered)
+        self.assertIn('Taux annuel', rendered)
+        self.assertNotIn('4m × 3m', rendered)
 
     def test_supports_and_campaigns_are_classified_from_lines_and_formats(self):
         today = datetime.date.today()
@@ -580,35 +672,194 @@ class DashboardParcGroupingTests(TestCase):
             ville='Ouagadougou',
         )
         EcranNumerique.objects.create(support=fullhd_screen, resolution='fullhd')
+        screen_without_objective = Support.objects.create(
+            code='DASH-SCREEN-NO-OBJECTIVE',
+            nom='Écran HD sans objectif',
+            type_support=Support.TYPE_ECRAN,
+            latitude=12.34,
+            longitude=-1.52,
+            ville='Ouagadougou',
+        )
+        EcranNumerique.objects.create(
+            support=screen_without_objective,
+            resolution='hd',
+        )
+        ObjectifSpotsEcranAnnuel.objects.create(
+            ecran=occupied_screen.ecran_info,
+            annee=today.year,
+            nombre_spots=100,
+        )
+        ObjectifSpotsEcranAnnuel.objects.create(
+            ecran=free_screen.ecran_info,
+            annee=today.year,
+            nombre_spots=100,
+        )
+        ObjectifSpotsEcranAnnuel.objects.create(
+            ecran=fullhd_screen.ecran_info,
+            annee=today.year,
+            nombre_spots=100,
+        )
         campaign = self.create_campaign(
             'Campagne écran en cours',
             today,
             today + datetime.timedelta(days=1),
             Campagne.STATUT_EN_COURS,
         )
-        LigneCampagne.objects.create(campagne=campaign, support=occupied_screen)
+        campaign.type_support = 'ecran'
+        campaign.duree_passage = 10
+        campaign.frequence = 120
+        campaign.tranches_horaires = '08:00-09:00'
+        campaign.save()
+        line = LigneCampagne.objects.create(campagne=campaign, support=occupied_screen)
+        LigneCampagne.objects.create(
+            campagne=campaign,
+            support=screen_without_objective,
+        )
+        LogDiffusion.objects.create(
+            ecran=occupied_screen.ecran_info,
+            ligne=line,
+            campagne=campaign,
+            client=self.client_obj,
+            timestamp=timezone.now(),
+        )
 
         stats = DashboardView._build_screen_resolution_stats(
             'Ouagadougou', today
         )
+        year_days = (
+            datetime.date(today.year, 12, 31)
+            - datetime.date(today.year, 1, 1)
+        ).days + 1
+        elapsed_days = (today - datetime.date(today.year, 1, 1)).days + 1
 
         self.assertEqual(
             stats,
             [
                 {
                     'resolution': 'HD 1280×720',
-                    'nb_ecrans': 2,
-                    'nb_occupees': 1,
+                    'nb_ecrans': 3,
+                    'nb_occupees': 2,
                     'nb_libres': 1,
+                    'objectif_spots_annuel': 200,
+                    'spots_realises': 30,
+                    'spots_previsionnels': 60,
+                    'taux_actuel': round(
+                        30 / (200 * elapsed_days / year_days) * 100, 1
+                    ),
+                    'taux_annuel': 15.0,
                 },
                 {
                     'resolution': 'Full HD 1920×1080',
                     'nb_ecrans': 1,
                     'nb_occupees': 0,
                     'nb_libres': 1,
+                    'objectif_spots_annuel': 100,
+                    'spots_realises': 0,
+                    'spots_previsionnels': 0,
+                    'taux_actuel': 0.0,
+                    'taux_annuel': 0.0,
                 },
             ],
         )
+
+    def test_dashboard_displays_total_annual_screen_objective(self):
+        today = timezone.now().date()
+        support = Support.objects.create(
+            code='DASH-SCREEN-OBJECTIVE-TOTAL',
+            nom='Écran objectif total',
+            type_support=Support.TYPE_ECRAN,
+            latitude=12.34,
+            longitude=-1.52,
+            ville='Ouagadougou',
+        )
+        screen = EcranNumerique.objects.create(support=support, resolution='hd')
+        ObjectifSpotsEcranAnnuel.objects.create(
+            ecran=screen,
+            annee=today.year,
+            nombre_spots=1250,
+        )
+        cache.clear()
+
+        request = self.make_request('/', {'ville': 'Ouagadougou'})
+        view = DashboardView()
+        view.setup(request)
+        context = view.get_context_data()
+        rendered = render_to_string(view.template_name, context, request=request)
+
+        self.assertEqual(context['ecrans_objectifs_total'], 1250)
+        screen_stats = context['ecrans_liste'][0]
+        self.assertEqual(screen_stats['objectif_spots_annuel'], 1250)
+        self.assertEqual(screen_stats['taux_actuel'], 0.0)
+        self.assertEqual(screen_stats['taux_annuel'], 0.0)
+        self.assertIn(
+            '<span>Objectif annuel (spots)</span><strong>1250</strong>',
+            rendered,
+        )
+        self.assertIn('<small>Objectif spots</small><b>1250</b>', rendered)
+        self.assertNotIn('À renseigner', rendered)
+
+    def test_screen_annual_rate_uses_campaign_spots_from_year_start_through_today(self):
+        today = timezone.localdate()
+        yesterday = today - datetime.timedelta(days=1)
+        support = Support.objects.create(
+            code='DASH-SCREEN-YTD',
+            nom='Écran cumul annuel',
+            type_support=Support.TYPE_ECRAN,
+            latitude=12.34,
+            longitude=-1.52,
+            ville='Ouagadougou',
+        )
+        screen = EcranNumerique.objects.create(support=support, resolution='hd')
+        ObjectifSpotsEcranAnnuel.objects.create(
+            ecran=screen,
+            annee=today.year,
+            nombre_spots=300,
+        )
+        completed_campaign = self.create_campaign(
+            'Campagne écran terminée',
+            yesterday,
+            yesterday,
+            Campagne.STATUT_TERMINEE,
+        )
+        current_campaign = self.create_campaign(
+            'Campagne écran en cours',
+            yesterday,
+            today,
+            Campagne.STATUT_EN_COURS,
+        )
+        future_campaign = self.create_campaign(
+            'Campagne écran à venir',
+            today + datetime.timedelta(days=1),
+            today + datetime.timedelta(days=2),
+            Campagne.STATUT_A_VENIR,
+        )
+        for campaign in (completed_campaign, current_campaign, future_campaign):
+            campaign.type_support = 'ecran'
+            campaign.duree_passage = 10
+            campaign.frequence = 120
+            campaign.tranches_horaires = '08:00-09:00'
+            campaign.save()
+            LigneCampagne.objects.create(campagne=campaign, support=support)
+
+        stats = DashboardView._build_screen_spot_stats(
+            'Ouagadougou', today
+        )[support.pk]
+
+        self.assertEqual(stats['spots_realises'], 90)
+        self.assertEqual(stats['taux_annuel'], 30.0)
+        year_days = (
+            datetime.date(today.year, 12, 31)
+            - datetime.date(today.year, 1, 1)
+        ).days + 1
+        expected_current_rate = round(
+            90 / (
+                300
+                * ((today - datetime.date(today.year, 1, 1)).days + 1)
+                / year_days
+            ) * 100,
+            1,
+        )
+        self.assertEqual(stats['taux_actuel'], expected_current_rate)
 
     def test_format_card_map_link_opens_format_detail_and_dashboard_has_no_map_card(self):
         support = self.create_support('DASH-FORMAT-DETAIL', 'DASH-12')
@@ -656,6 +907,153 @@ class DashboardParcGroupingTests(TestCase):
         self.assertIn('10m × 4m', rendered)
         self.assertIn('if (p.photo)', rendered)
         self.assertIn("image.className = 'fd-popup-image'", rendered)
+
+    def test_format_detail_shows_current_and_annual_occupancy_rates(self):
+        today = timezone.localdate()
+        panel = self.create_support('DASH-FORMAT-RATES', 'DASH-12')
+        face_a = FacePanneau.objects.create(support=panel, label='A')
+        face_b = FacePanneau.objects.create(
+            support=panel,
+            label='B',
+            etat=Support.ETAT_A_MAINTENIR,
+        )
+        completed_campaign = self.create_campaign(
+            'Campagne format terminée',
+            datetime.date(today.year, 1, 1),
+            datetime.date(today.year, 1, 2),
+            Campagne.STATUT_TERMINEE,
+        )
+        future_campaign = self.create_campaign(
+            'Campagne format à venir',
+            today + datetime.timedelta(days=1),
+            today + datetime.timedelta(days=2),
+            Campagne.STATUT_A_VENIR,
+        )
+        LigneCampagne.objects.create(campagne=completed_campaign, face=face_a)
+        LigneCampagne.objects.create(campagne=future_campaign, face=face_b)
+
+        request = self.make_request(
+            '/parc/format/DASH-12/',
+            {'ville': 'Ouagadougou'},
+        )
+        view = FormatDetailView()
+        view.setup(request, code='DASH-12')
+        context = view.get_context_data()
+        rendered = render_to_string(view.template_name, context, request=request)
+        year_days = (
+            datetime.date(today.year, 12, 31)
+            - datetime.date(today.year, 1, 1)
+        ).days + 1
+        elapsed_days = (today - datetime.date(today.year, 1, 1)).days + 1
+
+        self.assertEqual(context['taux_actuel'], round(2 / (2 * elapsed_days) * 100, 1))
+        self.assertEqual(context['taux_annuel'], round(4 / (2 * year_days) * 100, 1))
+        self.assertEqual(context['stats_quartiers'][0]['taux_actuel'], context['taux_actuel'])
+        self.assertEqual(context['stats_quartiers'][0]['taux_annuel'], context['taux_annuel'])
+        panel_faces = context['panneaux'][0]['faces']
+        self.assertEqual(panel_faces[0]['label'], 'A')
+        self.assertEqual(panel_faces[0]['statut'], 'libre')
+        self.assertEqual(
+            panel_faces[0]['taux_actuel'],
+            round(2 / elapsed_days * 100, 1),
+        )
+        self.assertEqual(
+            panel_faces[0]['taux_annuel'],
+            round(2 / year_days * 100, 1),
+        )
+        self.assertEqual(panel_faces[1]['label'], 'B')
+        self.assertEqual(panel_faces[1]['statut'], 'a_maintenir')
+        self.assertEqual(panel_faces[1]['taux_actuel'], 0.0)
+        self.assertEqual(
+            panel_faces[1]['taux_annuel'],
+            round(2 / year_days * 100, 1),
+        )
+        self.assertIn(f'<span class="fd-num">{panel.code}</span>', rendered)
+        self.assertIn('fd-face-label is-libre', rendered)
+        self.assertIn('fd-face-label is-a_maintenir', rendered)
+        self.assertIn('Face A', rendered)
+        self.assertIn('Face B', rendered)
+        panel_card = rendered.split('<a class="fd-pan"', 1)[1]
+        self.assertLess(
+            panel_card.index('<div class="fd-pan-title">'),
+            panel_card.index('<div class="fd-pan-img">'),
+        )
+        self.assertLess(
+            panel_card.index('<div class="fd-pan-img">'),
+            panel_card.index('<div class="fd-faces">'),
+        )
+        self.assertNotIn('fd-pill is-libre', panel_card)
+        self.assertNotIn('fd-pill is-partiel', panel_card)
+        self.assertIn('Taux actuel', rendered)
+        self.assertIn(f'Taux annuel {today.year}', rendered)
+        self.assertNotIn('Taux de remplissage', rendered)
+
+    def test_format_detail_uses_current_campaign_pige_images_by_face(self):
+        today = timezone.localdate()
+        panel = self.create_support('DASH-FORMAT-PIGES', 'DASH-12')
+        face_a = FacePanneau.objects.create(support=panel, label='A')
+        face_b = FacePanneau.objects.create(support=panel, label='B')
+        campaign = self.create_campaign(
+            'Campagne avec pige en cours',
+            today,
+            today,
+            Campagne.STATUT_EN_COURS,
+        )
+        line_a = LigneCampagne.objects.create(campagne=campaign, face=face_a)
+        line_b = LigneCampagne.objects.create(campagne=campaign, face=face_b)
+        PigeFichier.objects.create(
+            campagne=campaign,
+            ligne=line_a,
+            support=panel,
+            support_nom=panel.nom,
+            date_prise=today - datetime.timedelta(days=1),
+            nom_fichier='ancienne-face-a.jpg',
+            drive_file_id='old-face-a',
+        )
+        PigeFichier.objects.create(
+            campagne=campaign,
+            ligne=line_a,
+            support=panel,
+            support_nom=panel.nom,
+            date_prise=today,
+            nom_fichier='face-a.jpg',
+            drive_file_id='current-face-a',
+        )
+        PigeFichier.objects.create(
+            campagne=campaign,
+            ligne=line_b,
+            support=panel,
+            support_nom=panel.nom,
+            date_prise=today,
+            nom_fichier='face-b.jpg',
+            drive_file_id='current-face-b',
+        )
+
+        request = self.make_request('/parc/format/DASH-12/', {'ville': 'Ouagadougou'})
+        view = FormatDetailView()
+        view.setup(request, code='DASH-12')
+        context = view.get_context_data()
+        rendered = render_to_string(view.template_name, context, request=request)
+
+        self.assertEqual(
+            context['panneaux'][0]['pige_images'],
+            [
+                {
+                    'url': 'https://drive.google.com/thumbnail?id=current-face-a&sz=w1000',
+                    'face_label': 'A',
+                },
+                {
+                    'url': 'https://drive.google.com/thumbnail?id=current-face-b&sz=w1000',
+                    'face_label': 'B',
+                },
+            ],
+        )
+        self.assertIn('data-fd-slideshow', rendered)
+        self.assertIn('      }, 5000);', rendered)
+        self.assertIn(
+            'https://drive.google.com/thumbnail?id=current-face-a&amp;sz=w1000',
+            rendered,
+        )
 
     def test_market_format_maps_markets_and_lists_their_installed_panels(self):
         marche = Marche.objects.create(

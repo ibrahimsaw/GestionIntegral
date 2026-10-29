@@ -9,7 +9,7 @@ _syncing_clients = set()
 
 @receiver(post_save, sender=Client)
 def client_to_user(sender, instance, created, **kwargs):
-    if instance.pk in _syncing_clients:
+    if instance.pk in _syncing_clients or 'new' in _syncing_clients:
         return
 
     _syncing_clients.add(instance.pk)
@@ -121,6 +121,7 @@ def user_to_client(sender, instance, created, **kwargs):
             try:
                 from accounts.models import User
                 User.objects.filter(pk=instance.pk).update(client_profile=client)
+                instance.client_profile = client
             finally:
                 _syncing_users.discard(instance.pk)
 

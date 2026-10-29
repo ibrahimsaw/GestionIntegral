@@ -12,11 +12,13 @@ from django.core.cache import cache
 from django.template.loader import render_to_string
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
+from django.utils import timezone
 from unittest.mock import patch
 
 from campaigns.forms import LigneCampagneForm
 from campaigns.models import Campagne, Client, LigneCampagne
-from inventory.forms import MaintenanceForm, SupportForm
+from accounts.models import AuditLog
+from inventory.forms import EcranNumeriqueForm, MaintenanceForm, SupportForm
 from inventory.models import (
     Emplacement,
     EcranNumerique,
@@ -24,6 +26,7 @@ from inventory.models import (
     FormatSupport,
     Marche,
     Maintenance,
+    ObjectifSpotsEcranAnnuel,
     Support,
     SupportDeletionRequest,
 )
@@ -31,9 +34,675 @@ from inventory.views import (
     FormatSupportDetailView,
     FormatSupportListView,
     SupportListView,
+    SupportDetailView,
 )
+from planning.models import LogDiffusion
 from campaigns.context_processors import alerts_data
 from geoad.context_processors import inventory_villes
+
+
+class EcranAnnualObjectiveFormTests(TestCase):
+    def test_technical_form_has_no_annual_goal_field(self):
+        screen_format = FormatSupport.objects.create(
+            code='SCR-CELLS',
+            dimensions='6x4',
+            categorie='Ecran',
+        )
+        support = Support.objects.create(
+            code='SCREEN-ANNUAL-GOAL',
+            nom='Écran avec objectif annuel',
+            type_support=Support.TYPE_ECRAN,
+            latitude=12.34,
+            longitude=-1.52,
+        )
+        screen = EcranNumerique.objects.create(support=support)
+        old_goal = ObjectifSpotsEcranAnnuel.objects.create(
+            ecran=screen,
+            annee=timezone.localdate().year - 1,
+            nombre_spots=24000,
+        )
+        form = EcranNumeriqueForm(
+            data={
+                'type_ecran': 'exterieur',
+                'resolution': 'fullhd',
+                'cellule': screen_format.code,
+                'heure_allumage': '06:00',
+                'heure_extinction': '23:00',
+            },
+            instance=screen,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertNotIn('objectif_spots_annuel', form.fields)
+        form.save()
+        old_goal.refresh_from_db()
+        self.assertEqual(old_goal.nombre_spots, 24000)
+        self.assertFalse(
+            screen.objectifs_annuels.filter(annee=timezone.localdate().year).exists()
+        )
+
+
+class EcranAnnualObjectiveManagementTests(TestCase):
+    def setUp(self):
+        self.support = Support.objects.create(
+            code='SCREEN-OBJECTIVES',
+            nom='Écran objectifs annuels',
+            type_support=Support.TYPE_ECRAN,
+            latitude=12.34,
+            longitude=-1.52,
+        )
+        self.screen = EcranNumerique.objects.create(support=self.support)
+        self.url = reverse('ecran_objectifs_annuels', args=[self.support.uuid])
+        self.staff = get_user_model().objects.create_user(
+            username='screen-objectives-staff',
+            password='test-password',
+            role='staff',
+        )
+
+    def test_page_defaults_new_targets_and_lists_history(self):
+        previous = ObjectifSpotsEcranAnnuel.objects.create(
+            ecran=self.screen,
+            annee=timezone.localdate().year - 1,
+            nombre_spots=24000,
+        )
+        self.client.force_login(self.staff)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'value="200000"')
+        self.assertContains(response, str(previous.annee))
+        self.assertContains(response, '24000')
+
+    def test_saving_a_year_updates_only_that_year_and_preserves_history(self):
+        previous = ObjectifSpotsEcranAnnuel.objects.create(
+            ecran=self.screen,
+            annee=timezone.localdate().year - 1,
+            nombre_spots=24000,
+        )
+        self.client.force_login(self.staff)
+
+        response = self.client.post(self.url, {
+            'annee': previous.annee,
+            'nombre_spots': 36500,
+        })
+
+        self.assertRedirects(
+            response,
+            f'{self.url}?annee={previous.annee}',
+        )
+        previous.refresh_from_db()
+        self.assertEqual(previous.nombre_spots, 36500)
+        self.assertEqual(
+            ObjectifSpotsEcranAnnuel.objects.filter(ecran=self.screen).count(),
+            1,
+        )
+        next_year = timezone.localdate().year
+        self.client.post(self.url, {'annee': next_year, 'nombre_spots': 200000})
+        self.assertEqual(
+            set(self.screen.objectifs_annuels.values_list('annee', flat=True)),
+            {previous.annee, next_year},
+        )
+
+    def test_non_staff_cannot_manage_annual_targets(self):
+        technician = get_user_model().objects.create_user(
+            username='screen-objectives-technician',
+            password='test-password',
+            role='technicien',
+        )
+        self.client.force_login(technician)
+
+        response = self.client.get(self.url)
+
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(ObjectifSpotsEcranAnnuel.objects.exists())
+
+    def test_screen_detail_shows_dashboard_style_current_and_annual_rates(self):
+        today = timezone.localdate()
+        ObjectifSpotsEcranAnnuel.objects.create(
+            ecran=self.screen,
+            annee=today.year,
+            nombre_spots=200,
+        )
+        LogDiffusion.objects.create(
+            ecran=self.screen,
+            timestamp=timezone.now(),
+        )
+        self.client.force_login(self.staff)
+
+        response = self.client.get(reverse('support_detail', args=[self.support.uuid]))
+
+        self.assertEqual(response.status_code, 200)
+        elapsed_days = (today - today.replace(month=1, day=1)).days + 1
+        expected_current_rate = round(1 / (200 * elapsed_days / 365) * 100, 1)
+        self.assertIn(
+            ('Taux actuel', 'bi-speedometer2', f'{expected_current_rate}%', 'var(--color-primary)'),
+            response.context['ecran_stats'],
+        )
+        self.assertIn(
+            ('Taux annuel', 'bi-graph-up', '0.5%', 'var(--color-primary)'),
+            response.context['ecran_stats'],
+        )
+        self.assertContains(response, 'Objectifs annuels')
+
+
+class PanelOccupancyRateTests(TestCase):
+    def test_panel_detail_shows_current_and_annual_occupancy_rates(self):
+        today = timezone.localdate()
+        support = Support.objects.create(
+            code='PANEL-RATES',
+            nom='Panneau avec taux',
+            type_support=Support.TYPE_PANNEAU,
+            latitude=12.34,
+            longitude=-1.52,
+        )
+        face_a = FacePanneau.objects.create(support=support, label='A')
+        face_b = FacePanneau.objects.create(support=support, label='B')
+        client = Client.objects.create(
+            nom='Client taux panneau',
+            telephone='00000000',
+            email='panel-rates@example.com',
+        )
+        completed_campaign = Campagne.objects.create(
+            client=client,
+            nom='Campagne terminée panneau',
+            date_debut=today.replace(month=1, day=1),
+            date_fin=today.replace(month=1, day=2),
+            statut=Campagne.STATUT_TERMINEE,
+            type_support='12m2',
+        )
+        future_campaign = Campagne.objects.create(
+            client=client,
+            nom='Campagne future panneau',
+            date_debut=today + datetime.timedelta(days=1),
+            date_fin=today + datetime.timedelta(days=2),
+            statut=Campagne.STATUT_A_VENIR,
+            type_support='12m2',
+        )
+        LigneCampagne.objects.create(
+            campagne=completed_campaign,
+            support=support,
+            face=face_a,
+        )
+        LigneCampagne.objects.create(
+            campagne=future_campaign,
+            support=support,
+            face=face_b,
+        )
+        staff = get_user_model().objects.create_user(
+            username='panel-rates-staff',
+            password='test-password',
+            role='staff',
+        )
+        self.client.force_login(staff)
+
+        response = self.client.get(reverse('support_detail', args=[support.uuid]))
+
+        self.assertEqual(response.status_code, 200)
+        year_days = (
+            today.replace(month=12, day=31)
+            - today.replace(month=1, day=1)
+        ).days + 1
+        elapsed_days = (today - today.replace(month=1, day=1)).days + 1
+        self.assertEqual(
+            response.context['panneau_stats'],
+            [
+                (
+                    'Taux actuel',
+                    'bi-speedometer2',
+                    f'{round(2 / (2 * elapsed_days) * 100, 1)}%',
+                    'var(--color-primary)',
+                ),
+                (
+                    f'Taux annuel {today.year}',
+                    'bi-graph-up',
+                    f'{round(4 / (2 * year_days) * 100, 1)}%',
+                    'var(--color-primary)',
+                ),
+            ],
+        )
+        face_stats = {
+            face.label: (face.taux_actuel, face.taux_annuel)
+            for face in response.context['faces']
+        }
+        self.assertEqual(
+            face_stats['A'],
+            (
+                round(2 / elapsed_days * 100, 1),
+                round(2 / year_days * 100, 1),
+            ),
+        )
+        self.assertEqual(face_stats['B'], (0.0, round(2 / year_days * 100, 1)))
+        self.assertContains(response, "Taux d'occupation")
+        self.assertContains(response, f'Taux annuel {today.year}')
+        self.assertContains(response, 'Taux actuel :</strong>')
+
+
+class RepairStartTrackingTests(TestCase):
+    def test_technician_cannot_manage_another_users_completed_maintenance(self):
+        technician = get_user_model().objects.create_user(
+            username='maintenance-read-only-tech',
+            password='test-password',
+            role='technicien',
+        )
+        owner = get_user_model().objects.create_user(
+            username='maintenance-owner',
+            password='test-password',
+            role='staff',
+        )
+        support = Support.objects.create(
+            code='MAINTENANCE-READ-ONLY',
+            nom='Support consultation seule',
+            type_support=Support.TYPE_ECRAN,
+            latitude=12.34,
+            longitude=-1.52,
+        )
+        maintenance = Maintenance.objects.create(
+            support=support,
+            effectue_par=owner,
+            etat_apres=Support.ETAT_BON,
+        )
+        self.client.force_login(technician)
+
+        detail_url = reverse('maintenance_detail', args=[maintenance.pk])
+        list_response = self.client.get(reverse('maintenance_list'))
+        response = self.client.get(detail_url)
+
+        self.assertContains(list_response, maintenance.support.code)
+        self.assertNotContains(
+            list_response,
+            reverse('maintenance_update', args=[maintenance.pk]),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, maintenance.support.code)
+        self.assertNotContains(response, reverse('maintenance_update', args=[maintenance.pk]))
+        self.assertNotContains(
+            response,
+            reverse('maintenance_quick_repair', args=[maintenance.pk]),
+        )
+        self.assertEqual(
+            self.client.get(reverse('maintenance_update', args=[maintenance.pk])).status_code,
+            404,
+        )
+        self.assertEqual(
+            self.client.post(
+                reverse('maintenance_quick_repair', args=[maintenance.pk]),
+                {'etat_apres': Support.ETAT_BON},
+            ).status_code,
+            404,
+        )
+        self.assertEqual(
+            self.client.post(
+                reverse('maintenance_start_repair', args=[maintenance.pk]),
+            ).status_code,
+            404,
+        )
+        maintenance.refresh_from_db()
+        self.assertEqual(maintenance.etat_apres, Support.ETAT_BON)
+        self.assertEqual(Maintenance.objects.filter(support=support).count(), 1)
+
+    def test_maintenance_creation_is_audited_with_actor_and_values(self):
+        technician = get_user_model().objects.create_user(
+            username='maintenance-audit-create',
+            password='test-password',
+            role='technicien',
+        )
+        support = Support.objects.create(
+            code='MAINTENANCE-AUDIT-CREATE',
+            nom='Support audit création',
+            type_support=Support.TYPE_ECRAN,
+            latitude=12.34,
+            longitude=-1.52,
+        )
+        self.client.force_login(technician)
+
+        response = self.client.post(
+            reverse('maintenance_create'),
+            {
+                'support': support.pk,
+                'date_intervention': '2026-10-24T10:00',
+                'etat_apres': Support.ETAT_PANNE,
+                'description': 'Panne détectée sur site',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        maintenance = Maintenance.objects.get(support=support)
+        audit = AuditLog.objects.get(
+            user=technician,
+            action=AuditLog.ACTION_CREATE,
+            object_id=maintenance.pk,
+        )
+        self.assertIn(support.code, audit.detail)
+        self.assertEqual(audit.changes['etat_apres']['apres'], Support.ETAT_PANNE)
+        self.assertEqual(audit.changes['description']['apres'], 'Panne détectée sur site')
+
+    def test_maintenance_update_is_audited_with_changed_fields(self):
+        technician = get_user_model().objects.create_user(
+            username='maintenance-audit-update',
+            password='test-password',
+            role='technicien',
+        )
+        support = Support.objects.create(
+            code='MAINTENANCE-AUDIT-UPDATE',
+            nom='Support audit modification',
+            type_support=Support.TYPE_ECRAN,
+            latitude=12.34,
+            longitude=-1.52,
+        )
+        maintenance = Maintenance.objects.create(
+            support=support,
+            effectue_par=technician,
+            etat_apres=Support.ETAT_PANNE,
+            description='Ancienne description',
+        )
+        self.client.force_login(technician)
+
+        response = self.client.post(
+            reverse('maintenance_update', args=[maintenance.pk]),
+            {
+                'support': support.pk,
+                'date_intervention': maintenance.date_intervention.strftime('%Y-%m-%dT%H:%M'),
+                'etat_apres': Support.ETAT_BON,
+                'description': 'Panne réparée',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        audit = AuditLog.objects.get(
+            user=technician,
+            action=AuditLog.ACTION_ETAT_CHANGE,
+            object_id=maintenance.pk,
+        )
+        self.assertEqual(
+            audit.changes['etat_apres'],
+            {'avant': Support.ETAT_PANNE, 'apres': Support.ETAT_BON},
+        )
+        self.assertEqual(
+            audit.changes['description'],
+            {'avant': 'Ancienne description', 'apres': 'Panne réparée'},
+        )
+
+    def test_quick_repair_and_repair_start_are_audited(self):
+        technician = get_user_model().objects.create_user(
+            username='maintenance-audit-repair',
+            password='test-password',
+            role='technicien',
+        )
+        support = Support.objects.create(
+            code='MAINTENANCE-AUDIT-REPAIR',
+            nom='Support audit réparation',
+            type_support=Support.TYPE_ECRAN,
+            latitude=12.34,
+            longitude=-1.52,
+        )
+        maintenance = Maintenance.objects.create(
+            support=support,
+            effectue_par=technician,
+            etat_apres=Support.ETAT_PANNE,
+        )
+        self.client.force_login(technician)
+
+        response = self.client.post(
+            reverse('maintenance_quick_repair', args=[maintenance.pk]),
+            {
+                'etat_apres': Support.ETAT_BON,
+                'description': 'Écran remis en service',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        progress = Maintenance.objects.exclude(pk=maintenance.pk).get(support=support)
+        progress_audit = AuditLog.objects.get(
+            user=technician,
+            action=AuditLog.ACTION_ETAT_CHANGE,
+            object_id=progress.pk,
+        )
+        self.assertEqual(
+            progress_audit.changes['etat_element'],
+            {'avant': Support.ETAT_PANNE, 'apres': Support.ETAT_BON},
+        )
+
+        second_support = Support.objects.create(
+            code='MAINTENANCE-AUDIT-START',
+            nom='Support audit démarrage',
+            type_support=Support.TYPE_ECRAN,
+            latitude=12.35,
+            longitude=-1.53,
+        )
+        open_maintenance = Maintenance.objects.create(
+            support=second_support,
+            effectue_par=technician,
+            etat_apres=Support.ETAT_PANNE,
+        )
+        response = self.client.post(
+            reverse('maintenance_start_repair', args=[open_maintenance.pk]),
+        )
+
+        self.assertEqual(response.status_code, 302)
+        start_audit = AuditLog.objects.get(
+            user=technician,
+            action=AuditLog.ACTION_UPDATE,
+            object_id=open_maintenance.pk,
+        )
+        self.assertIn('Démarrage de la réparation', start_audit.detail)
+        self.assertEqual(
+            start_audit.changes['reparation_commencee_par']['apres'],
+            str(technician),
+        )
+
+    def test_client_cannot_manage_maintenance(self):
+        client_user = get_user_model().objects.create_user(
+            username='maintenance-read-only-client',
+            password='test-password',
+            role='client',
+        )
+        owner = get_user_model().objects.create_user(
+            username='maintenance-client-test-owner',
+            password='test-password',
+            role='staff',
+        )
+        support = Support.objects.create(
+            code='MAINTENANCE-CLIENT-READ-ONLY',
+            nom='Support client lecture seule',
+            type_support=Support.TYPE_ECRAN,
+            latitude=12.34,
+            longitude=-1.52,
+        )
+        maintenance = Maintenance.objects.create(
+            support=support,
+            effectue_par=owner,
+            etat_apres=Support.ETAT_PANNE,
+        )
+        self.client.force_login(client_user)
+
+        list_response = self.client.get(reverse('maintenance_list'))
+        detail_response = self.client.get(
+            reverse('maintenance_detail', args=[maintenance.pk]),
+        )
+
+        self.assertNotContains(
+            list_response,
+            reverse('maintenance_update', args=[maintenance.pk]),
+        )
+        self.assertEqual(detail_response.status_code, 200)
+        self.assertNotContains(
+            detail_response,
+            reverse('maintenance_update', args=[maintenance.pk]),
+        )
+        for route_name in (
+            'maintenance_update',
+            'maintenance_quick_repair',
+            'maintenance_start_repair',
+        ):
+            with self.subTest(route=route_name):
+                url = reverse(route_name, args=[maintenance.pk])
+                response = (
+                    self.client.get(url)
+                    if route_name == 'maintenance_update'
+                    else self.client.post(url, {'etat_apres': Support.ETAT_BON})
+                )
+                self.assertEqual(response.status_code, 404)
+
+        self.assertEqual(Maintenance.objects.filter(support=support).count(), 1)
+
+    def test_technician_can_start_an_open_repair_without_changing_support_state(self):
+        technician = get_user_model().objects.create_user(
+            username='repair-start-tech',
+            password='test-password',
+            role='technicien',
+        )
+        support = Support.objects.create(
+            code='REPAIR-START',
+            nom='Support réparation',
+            type_support=Support.TYPE_ECRAN,
+            latitude=12.34,
+            longitude=-1.52,
+        )
+        maintenance = Maintenance.objects.create(
+            support=support,
+            effectue_par=technician,
+            etat_apres=Support.ETAT_PANNE,
+        )
+        self.client.force_login(technician)
+
+        response = self.client.post(
+            reverse('maintenance_start_repair', args=[maintenance.pk]),
+        )
+
+        self.assertRedirects(
+            response,
+            reverse('maintenance_detail', args=[maintenance.pk]),
+        )
+        maintenance.refresh_from_db()
+        support.refresh_from_db()
+        self.assertIsNotNone(maintenance.reparation_commencee_le)
+        self.assertEqual(maintenance.reparation_commencee_par, technician)
+        self.assertEqual(support.etat, Support.ETAT_PANNE)
+
+        detail = self.client.get(reverse('maintenance_detail', args=[maintenance.pk]))
+        self.assertContains(detail, 'En cours de réparation')
+        self.assertNotContains(detail, 'Démarrer la réparation')
+
+    def test_technician_can_take_over_another_users_started_repair(self):
+        technician = get_user_model().objects.create_user(
+            username='repair-takeover-tech',
+            password='test-password',
+            role='technicien',
+        )
+        owner = get_user_model().objects.create_user(
+            username='repair-takeover-owner',
+            password='test-password',
+            role='staff',
+        )
+        support = Support.objects.create(
+            code='REPAIR-TAKEOVER',
+            nom='Support reprise réparation',
+            type_support=Support.TYPE_ECRAN,
+            latitude=12.35,
+            longitude=-1.53,
+        )
+        maintenance = Maintenance.objects.create(
+            support=support,
+            effectue_par=owner,
+            etat_apres=Support.ETAT_PANNE,
+            reparation_commencee_le=datetime.datetime(
+                2026, 10, 28, 10, 0, tzinfo=datetime.timezone.utc,
+            ),
+            reparation_commencee_par=owner,
+            description='Diagnostic initial',
+        )
+        self.client.force_login(technician)
+
+        update_url = reverse('maintenance_update', args=[maintenance.pk])
+        list_response = self.client.get(reverse('maintenance_list'))
+        self.assertContains(list_response, update_url)
+        self.assertEqual(self.client.get(update_url).status_code, 200)
+        response = self.client.post(
+            update_url,
+            {
+                'support': support.pk,
+                'date_intervention': maintenance.date_intervention.strftime('%Y-%m-%dT%H:%M'),
+                'etat_apres': Support.ETAT_PANNE,
+                'description': 'Diagnostic repris et complété',
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        maintenance.refresh_from_db()
+        self.assertEqual(maintenance.description, 'Diagnostic repris et complété')
+        self.assertEqual(maintenance.reparation_commencee_par, owner)
+
+        response = self.client.post(
+            reverse('maintenance_quick_repair', args=[maintenance.pk]),
+            {
+                'etat_apres': Support.ETAT_BON,
+                'description': 'Réparation terminée par le technicien repreneur',
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        progress = Maintenance.objects.exclude(pk=maintenance.pk).get(support=support)
+        self.assertEqual(progress.effectue_par, technician)
+        self.assertEqual(progress.etat_apres, Support.ETAT_BON)
+        self.assertEqual(
+            progress.description,
+            'Réparation terminée par le technicien repreneur',
+        )
+
+    def test_technician_can_start_an_unassigned_open_repair(self):
+        technician = get_user_model().objects.create_user(
+            username='repair-start-unassigned-tech',
+            password='test-password',
+            role='technicien',
+        )
+        support = Support.objects.create(
+            code='REPAIR-START-UNASSIGNED',
+            nom='Support réparation non attribué',
+            type_support=Support.TYPE_ECRAN,
+            latitude=12.35,
+            longitude=-1.53,
+        )
+        maintenance = Maintenance.objects.create(
+            support=support,
+            etat_apres=Support.ETAT_PANNE,
+        )
+        self.client.force_login(technician)
+
+        response = self.client.post(
+            reverse('maintenance_start_repair', args=[maintenance.pk]),
+        )
+
+        self.assertEqual(response.status_code, 302)
+        maintenance.refresh_from_db()
+        self.assertIsNotNone(maintenance.reparation_commencee_le)
+        self.assertEqual(maintenance.reparation_commencee_par, technician)
+
+    def test_staff_can_start_a_repair(self):
+        staff_user = get_user_model().objects.create_user(
+            username='repair-start-staff',
+            password='test-password',
+            role='staff',
+        )
+        support = Support.objects.create(
+            code='REPAIR-START-STAFF',
+            nom='Support réparation staff',
+            type_support=Support.TYPE_ECRAN,
+            latitude=12.36,
+            longitude=-1.54,
+        )
+        maintenance = Maintenance.objects.create(
+            support=support,
+            etat_apres=Support.ETAT_A_MAINTENIR,
+        )
+        self.client.force_login(staff_user)
+
+        response = self.client.post(
+            reverse('maintenance_start_repair', args=[maintenance.pk]),
+        )
+
+        self.assertEqual(response.status_code, 302)
+        maintenance.refresh_from_db()
+        self.assertIsNotNone(maintenance.reparation_commencee_le)
+        self.assertEqual(maintenance.reparation_commencee_par, staff_user)
 
 
 class PreventiveMaintenanceStateTests(TestCase):

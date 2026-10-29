@@ -70,13 +70,15 @@
         {% if user.is_authenticated %}
 
           {% if not user.is_client %}
-            <div class="nav-label">Navigation</div>
-            <a href="{% url 'carte' %}" class="nav-link {% if request.resolver_match.url_name == 'carte' %}active{% endif %}">
-              <i class="bi bi-map-fill"></i>Carte Interactive
-            </a>
-            <a href="{% url 'dashboard' %}" class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
-              <i class="bi bi-speedometer2"></i>Dashboard
-            </a>
+            {% if not request.user.is_technicien %}
+              <div class="nav-label">Navigation</div>
+              <a href="{% url 'carte' %}" class="nav-link {% if request.resolver_match.url_name == 'carte' %}active{% endif %}">
+                <i class="bi bi-map-fill"></i>Carte Interactive
+              </a>
+              <a href="{% url 'dashboard' %}" class="nav-link {% if request.resolver_match.url_name == 'dashboard' %}active{% endif %}">
+                <i class="bi bi-speedometer2"></i>Dashboard
+              </a>
+            {% endif %}
             
             <div class="nav-label">Inventaire</div>
             <a href="{% url 'support_list' %}" class="nav-link {% if request.resolver_match.url_name == 'support_list' and not request.GET.type and not request.GET.categorie and not request.GET.type_panneau and not request.GET.ville %}active{% endif %}">
@@ -85,9 +87,11 @@
             <a href="{% url 'marche_list' %}" class="nav-link {% if request.resolver_match.url_name == 'marche_list' %}active{% endif %}">
               <i class="bi bi-cart"></i>Marchés
             </a>
-            <a href="{% url 'format_list' %}" class="nav-link {% if request.resolver_match.url_name == 'format_list' %}active{% endif %}">
-              <i class="bi bi-grid-1x2 me-1"></i>Formats
-            </a>
+            {% if not request.user.is_technicien %}
+              <a href="{% url 'format_list' %}" class="nav-link {% if request.resolver_match.url_name == 'format_list' %}active{% endif %}">
+                <i class="bi bi-grid-1x2 me-1"></i>Formats
+              </a>
+            {% endif %}
             {% for ville_data in inventory_categories %}
               <details class="nav-submenu" {% if request.GET.ville == ville_data.ville %}open{% endif %}>
                 <summary class="nav-link nav-submenu-header {% if request.GET.ville == ville_data.ville %}parent-active{% endif %}">
@@ -150,18 +154,22 @@
                 </details>
               {% endif %}
             {% endfor %}
-            <a href="{% url 'supports_report' %}" class="nav-link {% if request.resolver_match.url_name == 'supports_report' %}active{% endif %}">
-              <i class="bi bi-file-earmark-bar-graph-fill"></i>Rapport Supports
-            </a>
+            {% if not request.user.is_technicien %}
+              <a href="{% url 'supports_report' %}" class="nav-link {% if request.resolver_match.url_name == 'supports_report' %}active{% endif %}">
+                <i class="bi bi-file-earmark-bar-graph-fill"></i>Rapport Supports
+              </a>
+            {% endif %}
             <a href="{% url 'maintenance_list' %}" class="nav-link {% if 'maintenance' in request.resolver_match.url_name %}active{% endif %}">
               <i class="bi bi-tools"></i>Maintenances
             </a>
             <a href="{% url 'periodes_panne_liste' %}" class="nav-link {% if 'panne' in request.resolver_match.url_name %}active{% endif %}">
               <i class="bi bi-exclamation-triangle-fill"></i>Pannes
             </a>
-            <a href="{% url 'reservation_list' %}" class="nav-link {% if request.resolver_match.url_name == 'reservation_list' %}active{% endif %}">
-              <i class="bi bi-calendar-event"></i>Réservations
-            </a>
+            {% if not request.user.is_technicien %}
+              <a href="{% url 'reservation_list' %}" class="nav-link {% if request.resolver_match.url_name == 'reservation_list' %}active{% endif %}">
+                <i class="bi bi-calendar-event"></i>Réservations
+              </a>
+            {% endif %}
 
             {% if not user.is_technicien %}
               <div class="nav-label">Campagnes</div>

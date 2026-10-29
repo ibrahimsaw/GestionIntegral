@@ -70,7 +70,7 @@ def _get_object_url(obj):
         return ''
     try:
         return obj.get_absolute_url()
-    except AttributeError:
+    except Exception:
         return ''
 
 
@@ -90,13 +90,22 @@ def log_action(request, action, module, obj=None, detail='', changes=None, level
         level    : forcer un niveau — sinon déduit automatiquement par _get_level()
     """
     user = request.user if request.user.is_authenticated else None
+    object_id = obj.pk if obj is not None else None
+    if obj is not None:
+        from .audit_context import object_key, suppress_object_events
+        key = object_key(obj)
+        if object_id is None and key is not None:
+            object_id = key[1]
+        captured_changes = suppress_object_events(obj, action)
+        if captured_changes:
+            changes = {**captured_changes, **(changes or {})}
 
     AuditLog.objects.create(
         user        = user,
         action      = action,
         module      = module,
         level       = level or _get_level(action),
-        object_id   = obj.pk   if obj else None,
+        object_id   = object_id,
         object_repr = str(obj) if obj else '',
         object_url  = _get_object_url(obj),
         detail      = detail,

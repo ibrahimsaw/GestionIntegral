@@ -1248,8 +1248,8 @@ class LigneCampagne(models.Model):
     def get_tranches_effective(self):
         return self.tranches_horaires or self.campagne.tranches_horaires
 
-    def calculer_spots(self):
-        """Calcule le nombre de spots pour cette ligne écran."""
+    def calculer_spots_sur_periode(self, date_debut, date_fin):
+        """Calcule les spots de la ligne sur la partie de période demandée."""
         frequence      = self.get_frequence_effective()
         duree_passage  = self.get_duree_passage_effective()
         tranches       = self.get_tranches_effective()
@@ -1257,9 +1257,12 @@ class LigneCampagne(models.Model):
         if not frequence or not duree_passage:
             return 0
 
-        # Période effective de la ligne (surcharge possible par rapport à la campagne)
-        date_debut = self.date_debut or self.campagne.date_debut
-        date_fin   = self.date_fin   or self.campagne.date_fin
+        debut_ligne = self.date_debut or self.campagne.date_debut
+        fin_ligne = self.date_fin or self.campagne.date_fin
+        date_debut = max(date_debut, debut_ligne)
+        date_fin = min(date_fin, fin_ligne)
+        if date_debut > date_fin:
+            return 0
 
         nombre_visuels = self.campagne.get_nombre_visuels_effective() if self.campagne else 1
         spots_par_heure = (3600 / frequence) * nombre_visuels
@@ -1268,6 +1271,12 @@ class LigneCampagne(models.Model):
 
         jours_dispo = self.support.jours_disponibles_sur_periode(date_debut, date_fin)
         return round(spots_par_jour * jours_dispo)
+
+    def calculer_spots(self):
+        """Calcule le nombre total de spots pour cette ligne écran."""
+        date_debut = self.date_debut or self.campagne.date_debut
+        date_fin = self.date_fin or self.campagne.date_fin
+        return self.calculer_spots_sur_periode(date_debut, date_fin)
 
 
 class PreuveDiffusion(models.Model):

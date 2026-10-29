@@ -1,4 +1,6 @@
 {% extends 'base.html' %}
+{% load duree_filters %}
+{% load l10n %}
 
 {% block title %}{% if ecrans_mode %}Écrans{% elif marche_mode %}Marchés{% elif tous_geants %}Géants{% else %}{{ format.dimensions|default:format.code }}{% endif %} — Parc Integral{% endblock %}
 
@@ -54,16 +56,29 @@
   .fd-input, .fd-select { padding: .4rem .7rem; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink); font: inherit; }
   .fd-input { min-width: 14rem; }
 
-  .fd-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: .8rem; }
+  .fd-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .8rem; }
   .fd-pan { position: relative; display: block; overflow: hidden; border: 1px solid var(--line); border-radius: 8px; background: var(--card); transition: box-shadow .15s ease, border-color .15s ease; }
   .fd-pan:hover, .fd-pan.is-hl { border-color: var(--accent); box-shadow: 0 4px 14px rgba(22, 24, 29, .1); }
   .fd-pan-img { position: relative; aspect-ratio: 16 / 10; background: var(--tile); display: grid; place-items: center; color: var(--muted); font-size: 1.6rem; }
   .fd-pan-img img { width: 100%; height: 100%; object-fit: cover; }
+  .fd-pan-img img:not(.is-active) { display: none; }
   .fd-num { position: absolute; top: .5rem; left: .5rem; min-width: 1.6rem; padding: .12rem .45rem; border-radius: 5px; background: var(--color-primary); color: #fff; font-size: .78rem; font-weight: 700; text-align: center; }
+  .fd-pan-title { overflow: hidden; padding: .6rem .75rem; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
   .fd-pan-body { display: grid; gap: .3rem; padding: .6rem .75rem .7rem; }
   .fd-pan-body .addr { display: flex; align-items: center; gap: .4rem; font-weight: 600; }
   .fd-pan-body .addr span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .fd-pan-body .meta { color: var(--muted); font-size: .8rem; }
+  .fd-faces { display: grid; gap: .4rem; margin-top: .2rem; }
+  .fd-face { display: grid; grid-template-columns: minmax(0, 1fr); gap: .35rem; padding: .4rem .5rem; border: 1px solid var(--line); border-radius: 6px; }
+  .fd-face-label { padding: .2rem .45rem; border-radius: 4px; font-size: .72rem; font-weight: 700; white-space: nowrap; }
+  .fd-face-label.is-libre { background: #d6eee1; color: var(--ok); }
+  .fd-face-label.is-reserve { background: #fbecd0; color: var(--warn); }
+  .fd-face-label.is-occupe, .fd-face-label.is-panne { background: #f8dedb; color: var(--ko); }
+  .fd-face-label.is-a_maintenir { background: #fbecd0; color: var(--warn); }
+  .fd-face-rates { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .5rem; color: var(--ink-2); font-size: .68rem; }
+  .fd-face-rate { min-width: 0; white-space: nowrap; }
+  .fd-face-rate strong { display: block; font-size: .72rem; font-variant-numeric: tabular-nums; }
+  .fd-face-rate .fd-bar { height: 4px; margin-top: .2rem; }
   .fd-pan-foot { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
 
   .fd-pill { display: inline-block; padding: .15rem .6rem; border-radius: 4px; font-size: .74rem; font-weight: 700; }
@@ -103,6 +118,11 @@
     .fd-kpi { min-width: 6.5rem; flex: 1 1 6.5rem; }
     .fd-input { min-width: 0; width: 100%; }
     .fd-screen-layout { grid-template-columns: 1fr; }
+    .fd-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+
+  @media (max-width: 480px) {
+    .fd-grid { grid-template-columns: minmax(0, 1fr); }
   }
 </style>
 
@@ -166,7 +186,7 @@
       <h1>{% if marche_mode %}Marchés et panneaux associés{% elif tous_geants %}Tous les panneaux géants{% else %}{% if format.categorie %}{{ format.categorie }} — {% endif %}{{ format.dimensions|default:format.code }}{% endif %}</h1>
       <p>
         {% if marche_mode %}{{ marches|length }} marché{{ marches|length|pluralize }} • {% endif %}{{ nb_panneaux }} panneau{{ nb_panneaux|pluralize:"x" }} • {{ nb_faces }} face{{ nb_faces|pluralize }}
-        {% if not tous_geants and format.superficie %}• {{ format.superficie }} m² par panneau{% endif %}
+        {% if not tous_geants and format.superficie %}• {{ format.superficie|format_decimal }} m² par panneau{% endif %}
         {% if ville_active %}• {{ ville_active }}{% endif %}
       </p>
     </div>
@@ -174,9 +194,14 @@
       <div class="fd-kpi is-occ"><small>Occupés</small><strong>{{ nb_occupees }}</strong></div>
       <div class="fd-kpi is-free"><small>Libres</small><strong>{{ nb_libres }}</strong></div>
       <div class="fd-kpi">
-        <small>Taux de remplissage</small>
-        <strong>{{ taux }} %</strong>
-        <div class="fd-bar"><i style="width: {{ taux }}%"></i></div>
+        <small>Taux actuel</small>
+        <strong>{{ taux_actuel }} %</strong>
+        <div class="fd-bar"><i style="width: {{ taux_actuel|unlocalize }}%"></i></div>
+      </div>
+      <div class="fd-kpi">
+        <small>Taux annuel {{ annee_taux_occupation }}</small>
+        <strong>{{ taux_annuel }} %</strong>
+        <div class="fd-bar"><i style="width: {{ taux_annuel|unlocalize }}%"></i></div>
       </div>
     </div>
   </header>
@@ -221,16 +246,38 @@
         <a class="fd-pan" href="{{ p.url }}"
            data-numero="{{ p.numero }}" data-quartier="{{ p.quartier|lower }}" data-statut="{{ p.statut }}"
            data-search="{{ p.code|lower }} {{ p.nom|lower }} {{ p.adresse|lower }} {{ p.quartier|lower }} {{ p.marche_nom|lower }} {{ p.emplacement_code|lower }}">
-          <div class="fd-pan-img">
-            {% if p.photo %}<img src="{{ p.photo }}" alt="" loading="lazy">{% else %}<i class="bi bi-image" aria-hidden="true"></i>{% endif %}
-            <span class="fd-num">{{ p.numero }}</span>
+          <div class="fd-pan-title">{{ p.nom|default:p.code }}</div>
+          <div class="fd-pan-img" data-fd-slideshow>
+            {% if p.pige_images %}
+              {% for image in p.pige_images %}
+                <img class="fd-pan-slide{% if forloop.first %} is-active{% endif %}" src="{{ image.url }}" alt="Pige de la face {{ image.face_label }} — {{ p.nom|default:p.code }}" loading="lazy">
+              {% endfor %}
+            {% elif p.photo %}
+              <img class="is-active" src="{{ p.photo }}" alt="Photo de {{ p.nom|default:p.code }}" loading="lazy">
+            {% else %}
+              <i class="bi bi-image" aria-hidden="true"></i>
+            {% endif %}
+            <span class="fd-num">{{ p.code }}</span>
           </div>
           <div class="fd-pan-body">
-            <div class="addr"><i class="bi bi-geo-alt-fill" aria-hidden="true"></i><span>{{ p.adresse|default:p.nom }}</span></div>
-            <div class="meta">{{ p.code }}{% if tous_geants %} · {{ p.format }}{% endif %} · {{ p.nb_faces }} face{{ p.nb_faces|pluralize }}</div>
+            <div class="meta">{{ p.code }}{% if p.adresse %} · {{ p.adresse }}{% endif %}{% if tous_geants %} · {{ p.format }}{% endif %}</div>
+            <div class="fd-faces">
+              {% for face in p.faces %}
+                <div class="fd-face">
+                  <span class="fd-face-label is-{{ face.statut }}" aria-label="Face {{ face.label }} : {{ face.statut_label }}">Face {{ face.label }}</span>
+                  <div class="fd-face-rates">
+                    <div class="fd-face-rate">
+                      Tx actuel <strong>{{ face.taux_actuel }}%</strong>
+                    </div>
+                    <div class="fd-face-rate">
+                      Tx annuel <strong>{{ face.taux_annuel }}%</strong>
+                    </div>
+                  </div>
+                </div>
+              {% endfor %}
+            </div>
             {% if marche_mode %}<div class="meta"><i class="bi bi-shop"></i> {{ p.marche_nom }}{% if p.emplacement_code %} · Emplacement {{ p.emplacement_code }}{% endif %}</div>{% endif %}
             <div class="fd-pan-foot">
-              <span class="fd-pill is-{{ p.statut }}">{{ p.statut_label }}</span>
               <i class="bi bi-chevron-right" aria-hidden="true"></i>
             </div>
           </div>
@@ -287,7 +334,8 @@
         <thead>
           <tr>
             <th>Quartier</th><th class="num">Panneaux</th><th class="num">Faces</th>
-            <th class="num">Occupées</th><th class="num">Libres</th><th>Taux de remplissage</th>
+            <th class="num">Occupées</th><th class="num">Libres</th>
+            <th>Taux actuel</th><th>Taux annuel {{ annee_taux_occupation }}</th>
           </tr>
         </thead>
         <tbody>
@@ -298,13 +346,17 @@
               <td class="num">{{ q.nb_faces }}</td>
               <td class="num" style="color: var(--ko); font-weight: 700;">{{ q.nb_occupees }}</td>
               <td class="num" style="color: var(--ok); font-weight: 700;">{{ q.nb_libres }}</td>
-              <td style="min-width: 140px;">
-                <b>{{ q.taux }} %</b>
-                <div class="fd-bar"><i style="width: {{ q.taux }}%"></i></div>
+              <td style="min-width: 120px;">
+                <b>{{ q.taux_actuel }} %</b>
+                <div class="fd-bar"><i style="width: {{ q.taux_actuel|unlocalize }}%"></i></div>
+              </td>
+              <td style="min-width: 120px;">
+                <b>{{ q.taux_annuel }} %</b>
+                <div class="fd-bar"><i style="width: {{ q.taux_annuel|unlocalize }}%"></i></div>
               </td>
             </tr>
           {% empty %}
-            <tr><td colspan="6" class="fd-empty">Aucune donnée.</td></tr>
+            <tr><td colspan="7" class="fd-empty">Aucune donnée.</td></tr>
           {% endfor %}
         </tbody>
       </table>
@@ -409,6 +461,28 @@
     const sortSelect = document.getElementById('fd-sort');
     const noResult = document.getElementById('fd-no-result');
     const STATUT_ORDER = { libre: 0, partiel: 1, occupe: 2, panne: 3 };
+
+    const slideshows = Array.prototype.slice.call(
+      grid.querySelectorAll('[data-fd-slideshow]')
+    ).map(function(container) {
+      return {
+        slides: Array.prototype.slice.call(
+          container.querySelectorAll('.fd-pan-slide')
+        ),
+        activeIndex: 0
+      };
+    }).filter(function(slideshow) {
+      return slideshow.slides.length > 1;
+    });
+    if (slideshows.length) {
+      window.setInterval(function() {
+        slideshows.forEach(function(slideshow) {
+          slideshow.slides[slideshow.activeIndex].classList.remove('is-active');
+          slideshow.activeIndex = (slideshow.activeIndex + 1) % slideshow.slides.length;
+          slideshow.slides[slideshow.activeIndex].classList.add('is-active');
+        });
+      }, 5000);
+    }
 
     function applyListState() {
       const query = (search.value || '').trim().toLowerCase();

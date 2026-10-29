@@ -4,9 +4,22 @@
 #   {{ p.heures_antenne|format_heures }}       -> "1h 30min"
 #   {{ p.duree_diffusion_min|format_minutes }} -> "22min 30s"
 
+from decimal import Decimal, InvalidOperation
+
 from django import template
 
 register = template.Library()
+
+
+@register.filter
+def format_decimal(valeur):
+    """Affiche un nombre sans zéros décimaux inutiles et avec un point."""
+    if valeur is None:
+        return ""
+    try:
+        return format(Decimal(str(valeur)).normalize(), "f")
+    except (InvalidOperation, TypeError, ValueError):
+        return valeur
 
 
 @register.filter

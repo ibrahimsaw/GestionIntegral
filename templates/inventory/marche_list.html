@@ -162,9 +162,11 @@
             {# Bouton vers détail, rapports & plan #}
             <div class="mt-auto pt-2 d-flex flex-column gap-2">
               <div class="d-flex gap-2" style="justify-content: end;">
-                <a href="{% url 'preview_marche_pdf' m.pk %}" class="btn btn-view btn-sm d-flex align-items-center justify-content-center shadow-sm" style="border-radius:8px !important; font-size:0.8rem; padding:6px 12px;" title="Aperçu Rapport Web">
-                  <i class="bi bi-download"></i>
-                </a>
+                {% if not request.user.is_technicien %}
+                  <a href="{% url 'preview_marche_pdf' m.pk %}" class="btn btn-view btn-sm d-flex align-items-center justify-content-center shadow-sm" style="border-radius:8px !important; font-size:0.8rem; padding:6px 12px;" title="Aperçu Rapport Web">
+                    <i class="bi bi-download"></i>
+                  </a>
+                {% endif %}
               </div>
               <div class="d-flex gap-2">
                 <a href="{% url 'marche_detail' m.pk %}" class="btn btn-outline-primary btn-sm flex-grow-1 d-flex align-items-center justify-content-center gap-1 shadow-sm" style="border-radius:8px !important; font-weight:600; font-size:0.8rem;">
@@ -172,9 +174,9 @@
                   <span>Détail</span>
                 </a>
                 {% if user.is_staff_regie_role %}
-                <a href="{% url 'emplacement_create' m.pk %}" class="btn btn-primary btn-sm d-flex align-items-center justify-content-center shadow-sm" style="border-radius:8px !important; font-size:0.8rem; padding:6px 12px;" title="Ajouter un emplacement dans ce marché">
-                  <i class="bi bi-plus-lg"></i>
-                </a>
+                  <a href="{% url 'emplacement_create' m.pk %}" class="btn btn-primary btn-sm d-flex align-items-center justify-content-center shadow-sm" style="border-radius:8px !important; font-size:0.8rem; padding:6px 12px;" title="Ajouter un emplacement dans ce marché">
+                    <i class="bi bi-plus-lg"></i>
+                  </a>
                 {% endif %}
               </div>
             </div>
@@ -190,9 +192,11 @@
             <h6 class="fw-bold text-dark mb-1">Aucun marché enregistré</h6>
             <p class="small text-muted mb-3">Créez votre premier marché pour commencer à y allouer des emplacements publicitaires.</p>
             {% if user.is_staff_regie_role or user.is_admin %}
-            <a href="{% url 'marche_create' %}?type=marche" class="btn btn-primary btn-sm px-4 shadow-sm" style="border-radius:8px; font-weight:600;">
-              <i class="bi bi-plus-lg me-1"></i>Créer le premier marché
-            </a>
+              {% if not request.user.is_technicien %}
+                <a href="{% url 'marche_create' %}?type=marche" class="btn btn-primary btn-sm px-4 shadow-sm" style="border-radius:8px; font-weight:600;">
+                  <i class="bi bi-plus-lg me-1"></i>Créer le premier marché
+                </a>
+              {% endif %}
             {% endif %}
           </div>
         </div>
@@ -200,34 +204,36 @@
       {% endfor %}
     </div>
   </div>
-  <div class="cld-export-section shadow-sm mb-4">
-    <div class="d-inline-flex align-items-center justify-content-center p-3 rounded-circle mb-3" style="background:rgba(147,46,43,0.08); color:#932e2b; width:64px; height:64px;">
-      <i class="bi bi-file-earmark-bar-graph-fill" style="font-size:1.9rem;"></i>
+  {% if not request.user.is_technicien %}
+    <div class="cld-export-section shadow-sm mb-4">
+      <div class="d-inline-flex align-items-center justify-content-center p-3 rounded-circle mb-3" style="background:rgba(147,46,43,0.08); color:#932e2b; width:64px; height:64px;">
+        <i class="bi bi-file-earmark-bar-graph-fill" style="font-size:1.9rem;"></i>
+      </div>
+
+      <div class="mb-2" style="font-size:0.72rem; letter-spacing:0.12em; text-transform:uppercase; color:#64748b; font-weight:700;">
+        {% if q %}Marchés filtrés{% else %}Portefeuille marchés{% endif %}
+      </div>
+
+      <h5 class="mb-2" style="font-weight:800; color:#0f172a; letter-spacing:-0.2px; margin:0;">
+        Rapport global des marchés
+      </h5>
+
+      <p class="cld-muted mb-4" style="max-width:680px; margin:0 auto 1.5rem; color:#64748b; font-size:0.86rem; line-height:1.6;">
+        {% if q %}
+          Synthèse du portefeuille marché pour la recherche : <strong>{{ q }}</strong> — occupation, zone active, emplacements et statut global des marchés concernés.
+        {% else %}
+          Consultez l’état général du portefeuille : occupation, emplacements, zones actives et synthèse des marchés de la régie.
+        {% endif %}
+      </p>
+
+      <div class="d-flex gap-3 justify-content-center flex-wrap">
+        <a href="{% url 'supports_report' %}?categorie=March%C3%A9{% if request.GET %}&{{ request.GET.urlencode }}{% endif %}" class="cld-btn-export cld-btn-view">
+          <i class="bi bi-eye-fill"></i> Aperçu rapport web
+        </a>
+        <a href="{% url 'supports_export_pdf' %}?categorie=March%C3%A9{% if request.GET %}&{{ request.GET.urlencode }}{% endif %}" class="cld-btn-export cld-btn-pdf">
+          <i class="bi bi-file-earmark-pdf-fill"></i> Télécharger le dossier PDF
+        </a>
+      </div>
     </div>
-
-    <div class="mb-2" style="font-size:0.72rem; letter-spacing:0.12em; text-transform:uppercase; color:#64748b; font-weight:700;">
-      {% if q %}Marchés filtrés{% else %}Portefeuille marchés{% endif %}
-    </div>
-
-    <h5 class="mb-2" style="font-weight:800; color:#0f172a; letter-spacing:-0.2px; margin:0;">
-      Rapport global des marchés
-    </h5>
-
-    <p class="cld-muted mb-4" style="max-width:680px; margin:0 auto 1.5rem; color:#64748b; font-size:0.86rem; line-height:1.6;">
-      {% if q %}
-        Synthèse du portefeuille marché pour la recherche : <strong>{{ q }}</strong> — occupation, zone active, emplacements et statut global des marchés concernés.
-      {% else %}
-        Consultez l’état général du portefeuille : occupation, emplacements, zones actives et synthèse des marchés de la régie.
-      {% endif %}
-    </p>
-
-    <div class="d-flex gap-3 justify-content-center flex-wrap">
-      <a href="{% url 'supports_report' %}?categorie=March%C3%A9{% if request.GET %}&{{ request.GET.urlencode }}{% endif %}" class="cld-btn-export cld-btn-view">
-        <i class="bi bi-eye-fill"></i> Aperçu rapport web
-      </a>
-      <a href="{% url 'supports_export_pdf' %}?categorie=March%C3%A9{% if request.GET %}&{{ request.GET.urlencode }}{% endif %}" class="cld-btn-export cld-btn-pdf">
-        <i class="bi bi-file-earmark-pdf-fill"></i> Télécharger le dossier PDF
-      </a>
-    </div>
-  </div>
+  {% endif %}
 {% endblock %}

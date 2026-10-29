@@ -1,4 +1,5 @@
 from django import forms
+from django.utils import timezone
 from .models import *
 
 W = {'class': 'form-control'}
@@ -272,6 +273,28 @@ class EcranNumeriqueForm(forms.ModelForm):
                     "L'heure d'allumage doit être antérieure à l'heure d'extinction."
                 )
         return cleaned_data
+
+
+class ObjectifSpotsEcranAnnuelForm(forms.Form):
+    annee = forms.IntegerField(
+        min_value=1,
+        max_value=32767,
+        label="Année",
+        widget=forms.NumberInput(attrs={**W, 'min': 1}),
+    )
+    nombre_spots = forms.IntegerField(
+        min_value=1,
+        label="Objectif annuel de spots",
+        initial=200000,
+        widget=forms.NumberInput(attrs={**W, 'min': 1}),
+    )
+
+    def __init__(self, *args, **kwargs):
+        initial = kwargs.get('initial') or {}
+        initial.setdefault('annee', timezone.localdate().year)
+        kwargs['initial'] = initial
+        super().__init__(*args, **kwargs)
+
 
 from collections import defaultdict
 from django import forms

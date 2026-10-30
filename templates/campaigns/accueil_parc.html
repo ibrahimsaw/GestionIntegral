@@ -81,6 +81,7 @@
   .pg-city:hover { border-color: #c5cad3; }
   .pg-city.is-active { background: var(--ink); border-color: var(--ink); color: #fff; font-weight: 600; }
   .pg-city i { display: none; }
+  .pg-current-date { flex: 0 0 auto; align-self: center; padding: .42rem .65rem; color: var(--muted); font-size: .82rem; white-space: nowrap; }
 
   /* ── Indicateurs ── */
   .pg-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .75rem; margin-bottom: 1rem; }
@@ -231,8 +232,25 @@
   .pg-ecran-actions {
     display: flex;
     align-items: center;
-    gap: .6rem;
+    justify-content: flex-end;
+    flex-wrap: wrap;
+    gap: .45rem;
   }
+  .pg-ecran-metrics { display: flex; flex-wrap: wrap; gap: .4rem; }
+  .pg-ecran-metric {
+    display: grid;
+    min-width: 6.4rem;
+    gap: .2rem;
+    padding: .38rem .55rem;
+    border: 1px solid var(--line);
+    border-radius: 6px;
+    background: #fff;
+  }
+  .pg-ecran-metric small { color: var(--muted); font-size: .62rem; font-weight: 700; letter-spacing: .04em; line-height: 1.15; text-transform: uppercase; }
+  .pg-ecran-metric b { color: var(--ink); font-size: .9rem; font-variant-numeric: tabular-nums; line-height: 1.1; }
+  .pg-ecran-metric.is-current { border-color: #e7b6b3; background: #fff8f7; }
+  .pg-ecran-metric.is-current b { color: var(--accent); }
+  .pg-ecran-metric.is-annual b { color: var(--ok); }
   .pg-ecran-main { min-width: 0; }
   .pg-ecran-main strong { display: block; font-size: .9rem; font-weight: 600; }
   .pg-ecran-main small { display: block; overflow: hidden; color: var(--muted); font-size: .74rem; text-overflow: ellipsis; white-space: nowrap; }
@@ -421,6 +439,7 @@
       {% empty %}
         <span class="pg-muted">Aucune ville renseignée dans l’inventaire.</span>
       {% endfor %}
+      <span class="pg-current-date"><i class="bi bi-calendar3 me-1" aria-hidden="true"></i>{% now "d/m/Y H:i" %}</span>
     </nav>
   </header>
 
@@ -583,16 +602,14 @@
                     <strong><a href="{% url 'support_detail' ecran.uuid %}">{{ ecran.nom }}</a></strong>
                     <small>{{ ecran.code }}{% if ecran.quartier %} · {{ ecran.quartier }}{% endif %}{% if ecran.ville %} · {{ ecran.ville }}{% endif %}</small>
                   </div>
-                  <div class="pg-stats-inline">
-                    {% if ecran.objectif_spots_annuel %}
-                      <span><small>Objectif spots</small><b>{{ ecran.objectif_spots_annuel }}</b></span>
-                      <span class="is-current"><small>Taux actuel</small><b>{{ ecran.taux_actuel }}%</b></span>
-                      <span><small>Taux annuel {{ annee_taux_occupation }}</small><b>{{ ecran.taux_annuel }}%</b></span>
-                    {% else %}
-                      <span><small>Objectif spots</small><b>À renseigner</b></span>
-                    {% endif %}
-                  </div>
                   <div class="pg-ecran-actions">
+                    {% if ecran.objectif_spots_annuel %}
+                      <div class="pg-ecran-metrics">
+                        <span class="pg-ecran-metric"><small>Objectif spots</small><b>{{ ecran.objectif_spots_annuel }}</b></span>
+                        <span class="pg-ecran-metric is-current"><small>Taux actuel</small><b>{{ ecran.taux_actuel }}%</b></span>
+                        <span class="pg-ecran-metric is-annual"><small>Taux annuel {{ annee_taux_occupation }}</small><b>{{ ecran.taux_annuel }}%</b></span>
+                      </div>
+                    {% endif %}
                     {% if ecran.occupe %}
                       <span class="pg-ecran-state is-occupe">Occupé</span>
                     {% else %}

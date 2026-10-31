@@ -292,7 +292,8 @@ class EcranProgrammeForm(forms.Form):
         widget=forms.DateInput(attrs={**W, 'type': 'date'}),
     )
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, programme=None, **kwargs):
+        self.programme = programme
         super().__init__(*args, **kwargs)
         for field_name, _, label in self.JOUR_FIELDS:
             self.fields[field_name] = forms.CharField(
@@ -305,6 +306,19 @@ class EcranProgrammeForm(forms.Form):
                     'autocomplete': 'off',
                 }),
             )
+        if programme:
+            self.fields['date_debut'].disabled = True
+            self.initial.setdefault('date_debut', programme.date_debut)
+            plages_par_jour = {jour: [] for _, jour, _ in self.JOUR_FIELDS}
+            for plage in programme.plages.all():
+                plages_par_jour[plage.jour_semaine].append(
+                    f'{plage.heure_debut:%H:%M}-{plage.heure_fin:%H:%M}'
+                )
+            for field_name, jour, _ in self.JOUR_FIELDS:
+                self.initial.setdefault(
+                    field_name,
+                    ', '.join(plages_par_jour[jour]),
+                )
 
     def clean(self):
         cleaned_data = super().clean()
@@ -314,9 +328,13 @@ class EcranProgrammeForm(forms.Form):
         )
         cleaned_data['a_enregistrer'] = a_enregistrer
         if not a_enregistrer:
+            if self.programme:
+                raise forms.ValidationError(
+                    "Conservez au moins une plage horaire pour ce programme."
+                )
             return cleaned_data
 
-        if not cleaned_data.get('date_debut'):
+        if not self.programme and not cleaned_data.get('date_debut'):
             self.add_error('date_debut', "Indiquez la date de prise d'effet.")
 
         plages = []

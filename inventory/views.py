@@ -2001,16 +2001,22 @@ class EcranObjectifsAnnuelsView(StaffRequiredMixin, View):
             })
         return historique
 
-    def get_context_data(self, ecran, programme_form=None):
+    def get_context_data(self, ecran, programme_form=None, edit_programme=None):
         today = timezone.localdate()
         annee = today.year
         if programme_form is None:
-            programme_form = EcranProgrammeForm(
-                prefix='programme',
-                initial={
-                    'date_debut': timezone.localdate() + timedelta(days=1),
-                },
-            )
+            if edit_programme:
+                programme_form = EcranProgrammeForm(
+                    prefix='programme',
+                    programme=edit_programme,
+                )
+            else:
+                programme_form = EcranProgrammeForm(
+                    prefix='programme',
+                    initial={
+                        'date_debut': timezone.localdate() + timedelta(days=1),
+                    },
+                )
         periode_debut = max(
             date(annee, 1, 1),
             timezone.localtime(ecran.support.created_at).date(),
@@ -2020,6 +2026,7 @@ class EcranObjectifsAnnuelsView(StaffRequiredMixin, View):
             'ecran': ecran,
             'annee_courante': annee,
             'programme_form': programme_form,
+            'edit_programme': edit_programme,
             'objectif_calcule': ecran.calculer_objectif_spots_annuel(annee, today),
             'periode_debut': periode_debut,
             'periode_fin': today if periode_debut <= today else None,
@@ -2028,17 +2035,37 @@ class EcranObjectifsAnnuelsView(StaffRequiredMixin, View):
 
     def get(self, request, *args, **kwargs):
         ecran = self.get_ecran()
-        return render(request, self.template_name, self.get_context_data(ecran))
+        edit_programme = None
+        programme_id = request.GET.get('modifier_programme')
+        if programme_id:
+            edit_programme = get_object_or_404(
+                ecran.programmes.prefetch_related('plages'),
+                pk=programme_id,
+            )
+        return render(
+            request,
+            self.template_name,
+            self.get_context_data(ecran, edit_programme=edit_programme),
+        )
 
     def post(self, request, *args, **kwargs):
         ecran = self.get_ecran()
+        programme_id = request.POST.get('programme_id')
+        edit_programme = None
+        if programme_id:
+            edit_programme = get_object_or_404(
+                ecran.programmes.prefetch_related('plages'),
+                pk=programme_id,
+            )
         programme_form = EcranProgrammeForm(
             request.POST,
             prefix='programme',
+            programme=edit_programme,
         )
         if programme_form.is_valid():
             if (
-                programme_form.cleaned_data.get('a_enregistrer')
+                not edit_programme
+                and programme_form.cleaned_data.get('a_enregistrer')
                 and EcranProgramme.objects.filter(
                     ecran=ecran,
                     date_debut=programme_form.cleaned_data['date_debut'],
@@ -2050,7 +2077,19 @@ class EcranObjectifsAnnuelsView(StaffRequiredMixin, View):
                 )
             else:
                 with transaction.atomic():
-                    if programme_form.cleaned_data.get('a_enregistrer'):
+                    if edit_programme:
+                        edit_programme.plages.all().delete()
+                        edit_programme.plages.bulk_create([
+                            EcranPlageHoraire(
+                                programme=edit_programme,
+                                jour_semaine=jour,
+                                heure_debut=debut,
+                                heure_fin=fin,
+                            )
+                            for jour, debut, fin in programme_form.cleaned_data['plages_validees']
+                        ])
+                        ecran.refresh_from_db()
+                    elif programme_form.cleaned_data.get('a_enregistrer'):
                         if not _creer_version_horaire(
                             ecran, programme_form, request.user
                         ):
@@ -2063,20 +2102,35 @@ class EcranObjectifsAnnuelsView(StaffRequiredMixin, View):
                                 ),
                             )
                         ecran.refresh_from_db()
-                    annee = timezone.localdate().year
-                    nombre_spots = ecran.calculer_objectif_spots_annuel(annee)
-                    ObjectifSpotsEcranAnnuel.objects.update_or_create(
-                        ecran=ecran,
-                        annee=annee,
-                        defaults={'nombre_spots': nombre_spots},
+                    annee_courante = timezone.localdate().year
+                    annees_objectifs = (
+                        set(ecran.objectifs_annuels.values_list('annee', flat=True))
+                        if edit_programme
+                        else set()
                     )
+                    annees_objectifs.add(annee_courante)
+                    for annee in annees_objectifs:
+                        nombre_spots = ecran.calculer_objectif_spots_annuel(
+                            annee,
+                            min(
+                                date(annee, 12, 31),
+                                timezone.localdate(),
+                            ),
+                        )
+                        ObjectifSpotsEcranAnnuel.objects.update_or_create(
+                            ecran=ecran,
+                            annee=annee,
+                            defaults={'nombre_spots': nombre_spots},
+                        )
+                if edit_programme:
+                    message = "Le programme a été modifié et les objectifs recalculés."
+                elif programme_form.cleaned_data.get('a_enregistrer'):
+                    message = "Le programme a été enregistré et l’objectif recalculé."
+                else:
+                    message = "L’objectif a été recalculé automatiquement."
                 messages.success(
                     request,
-                    (
-                        "Le programme a été enregistré et l’objectif recalculé."
-                        if programme_form.cleaned_data.get('a_enregistrer')
-                        else "L’objectif a été recalculé automatiquement."
-                    ),
+                    message,
                 )
                 return redirect(
                     'ecran_objectifs_annuels',
@@ -2085,7 +2139,11 @@ class EcranObjectifsAnnuelsView(StaffRequiredMixin, View):
         return render(
             request,
             self.template_name,
-            self.get_context_data(ecran, programme_form=programme_form),
+            self.get_context_data(
+                ecran,
+                programme_form=programme_form,
+                edit_programme=edit_programme,
+            ),
         )
     
 from django.views.generic import CreateView

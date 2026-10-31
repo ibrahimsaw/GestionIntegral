@@ -189,11 +189,6 @@
         <p class="goal-subtitle">{{ support.nom }} <span class="mx-1">·</span>{{ support.code }}</p>
       </div>
     </div>
-    <div class="goal-hero-action">
-      <a class="btn btn-light btn-sm fw-semibold" href="{% url 'support_detail' support.uuid %}">
-        <i class="bi bi-arrow-left me-1"></i>Retour au support
-      </a>
-    </div>
   </header>
 
   {% if messages %}
@@ -236,8 +231,14 @@
 
             {% if programme_form.non_field_errors %}<div class="text-danger small mb-3">{{ programme_form.non_field_errors }}</div>{% endif %}
 
-            <h3 class="goal-subhead"><i class="bi bi-calendar2-week me-1"></i>Nouveau programme</h3>
-            <p class="goal-section-note">Saisissez les jours et plages horaires. Un jour laissé vide signifie que l’écran sera éteint ce jour-là pendant ce programme.</p>
+            <h3 class="goal-subhead"><i class="bi bi-calendar2-week me-1"></i>{% if edit_programme %}Modifier le programme{% else %}Nouveau programme{% endif %}</h3>
+            <p class="goal-section-note">
+              {% if edit_programme %}
+                Modification des horaires du programme actif depuis le {{ edit_programme.date_debut|date:"d/m/Y" }}. Sa période d’application reste inchangée.
+              {% else %}
+                Saisissez les jours et plages horaires. Un jour laissé vide signifie que l’écran sera éteint ce jour-là pendant ce programme.
+              {% endif %}
+            </p>
 
             <div class="row g-3">
               {% for field in programme_form %}
@@ -250,9 +251,15 @@
               {% endfor %}
             </div>
 
-            <button type="submit" class="btn btn-primary goal-submit mt-4">
-              <i class="bi bi-check2-circle me-1"></i>Enregistrer le programme
-            </button>
+            {% if edit_programme %}<input type="hidden" name="programme_id" value="{{ edit_programme.pk }}">{% endif %}
+            <div class="d-flex flex-wrap gap-2 mt-4">
+              <button type="submit" class="btn btn-primary goal-submit">
+                <i class="bi bi-check2-circle me-1"></i>{% if edit_programme %}Enregistrer les modifications{% else %}Enregistrer le programme{% endif %}
+              </button>
+              {% if edit_programme %}
+                <a class="btn btn-outline-secondary" href="{% url 'ecran_objectifs_annuels' support.uuid %}">Annuler</a>
+              {% endif %}
+            </div>
           </form>
         </div>
       </section>
@@ -270,7 +277,7 @@
         <div class="table-responsive">
           <table class="table table-hover align-middle goal-table">
             <thead>
-              <tr><th>Année / objectif calculé</th><th>Période et programme appliqué</th></tr>
+              <tr><th>Année / objectif calculé</th><th>Période et programme appliqué</th><th>Action</th></tr>
             </thead>
             <tbody>
               {% for historique in historique_par_annee %}
@@ -304,10 +311,19 @@
                         </span>
                       {% endif %}
                     </td>
+                    <td>
+                      {% if periode.programme %}
+                        <a class="btn btn-sm btn-outline-primary" href="?modifier_programme={{ periode.programme.pk }}">
+                          <i class="bi bi-pencil me-1"></i>Modifier
+                        </a>
+                      {% else %}
+                        <span class="text-muted small">—</span>
+                      {% endif %}
+                    </td>
                   </tr>
                 {% endfor %}
               {% empty %}
-                <tr><td colspan="2" class="goal-empty">
+                <tr><td colspan="3" class="goal-empty">
                   <i class="bi bi-inbox"></i>Aucun historique de programme pour cet écran.
                 </td></tr>
               {% endfor %}

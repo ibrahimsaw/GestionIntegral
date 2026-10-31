@@ -392,6 +392,72 @@ class EcranAnnualObjectiveManagementTests(TestCase):
         )
         self.assertEqual(programme.date_fin, None)
 
+    def test_existing_program_can_be_edited_from_history(self):
+        today = timezone.localdate()
+        programme = EcranProgramme.objects.create(
+            ecran=self.screen,
+            date_debut=today,
+            date_fin=today,
+        )
+        EcranPlageHoraire.objects.create(
+            programme=programme,
+            jour_semaine=today.weekday(),
+            heure_debut=datetime.time(6, 0),
+            heure_fin=datetime.time(8, 0),
+        )
+        suivant = EcranProgramme.objects.create(
+            ecran=self.screen,
+            date_debut=today + datetime.timedelta(days=1),
+        )
+        ObjectifSpotsEcranAnnuel.objects.create(
+            ecran=self.screen,
+            annee=today.year,
+            nombre_spots=1,
+        )
+        self.client.force_login(self.staff)
+
+        edit_response = self.client.get(
+            self.url,
+            {'modifier_programme': programme.pk},
+        )
+
+        self.assertEqual(edit_response.status_code, 200)
+        self.assertContains(edit_response, 'Modifier le programme')
+        self.assertContains(
+            edit_response,
+            f'?modifier_programme={programme.pk}',
+        )
+        field_name = EcranProgrammeForm.JOUR_FIELDS[today.weekday()][0]
+        self.assertEqual(
+            edit_response.context['programme_form'].initial[field_name],
+            '06:00-08:00',
+        )
+        data = {
+            'programme_id': programme.pk,
+            f'programme-{field_name}': '09:00-10:00',
+        }
+        response = self.client.post(self.url, data)
+
+        self.assertRedirects(response, self.url)
+        programme.refresh_from_db()
+        suivant.refresh_from_db()
+        self.assertEqual(programme.date_debut, today)
+        self.assertEqual(programme.date_fin, today)
+        self.assertEqual(suivant.date_debut, today + datetime.timedelta(days=1))
+        self.assertEqual(
+            list(programme.plages.values_list(
+                'jour_semaine', 'heure_debut', 'heure_fin'
+            )),
+            [(today.weekday(), datetime.time(9, 0), datetime.time(10, 0))],
+        )
+        self.assertEqual(
+            self.screen.objectifs_annuels.get(annee=today.year).nombre_spots,
+            self.screen.calculer_objectif_spots_annuel(
+                today.year,
+                datetime.date(today.year, 12, 31),
+            ),
+        )
+
     def test_non_staff_cannot_manage_annual_targets(self):
         technician = get_user_model().objects.create_user(
             username='screen-objectives-technician',

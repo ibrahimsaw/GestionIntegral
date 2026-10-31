@@ -3189,10 +3189,12 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
                 if old_value != getattr(self.object, field)
             }
             for ligne in self.object.lignes.all():
+                # Un changement de fréquence de campagne s'applique à tous les écrans.
                 update_fields = {
                     field: new_value
                     for field, new_value in changed_line_fields.items()
-                    if getattr(ligne, field) == previous_values[field]
+                    if field == 'frequence'
+                    or getattr(ligne, field) == previous_values[field]
                 }
                 if update_fields:
                     LigneCampagne.objects.filter(pk=ligne.pk).update(**update_fields)

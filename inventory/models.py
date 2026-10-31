@@ -5,7 +5,7 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 import re
 import unicodedata
-from datetime import datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from datetime import datetime
 from typing import Optional
 import uuid
@@ -25,7 +25,29 @@ def calculer_duree_tranches(tranches: str) -> float:
         total_heures += duree
     return total_heures
 
-    
+
+def calculer_heures_chevauchement(plages_ecran, tranches_campagne):
+    heures = 0.0
+    for tranche in (tranches_campagne or '').split(','):
+        try:
+            debut_str, fin_str = tranche.split('-')
+            debut = datetime.strptime(debut_str.strip(), "%H:%M").time()
+            fin = datetime.strptime(fin_str.strip(), "%H:%M").time()
+        except ValueError:
+            continue
+        if fin <= debut:
+            continue
+        for debut_ecran, fin_ecran in plages_ecran:
+            intersection_debut = max(debut, debut_ecran)
+            intersection_fin = min(fin, fin_ecran)
+            if intersection_fin > intersection_debut:
+                heures += (
+                    datetime.combine(datetime.today(), intersection_fin)
+                    - datetime.combine(datetime.today(), intersection_debut)
+                ).total_seconds() / 3600
+    return heures
+
+
 # ── FORMAT — défini au niveau du Support car identique sur les deux faces ──
 # FORMAT_CHOICES = [
 #     # ── Standard ────────────────────────────────────────────
@@ -445,16 +467,23 @@ class Support(models.Model):
         """Retourne True si une campagne active couvre ce support aujourd'hui."""
         from campaigns.models import LigneCampagne
         today = timezone.now().date()
-        filters = {
-            'campagne__date_debut__lte': today,
-            'campagne__date_fin__gte': today,
-            'campagne__statut__in': ['en_cours'],
-        }
+        periode_active = Q(
+            campagne__statut__in=['en_cours', 'a_venir'],
+            campagne__date_debut__lte=today,
+            campagne__date_fin__gte=today,
+        )
+        periode_pause = Q(
+            campagne__statut='en_pause',
+            campagne__date_debut__lte=today,
+        ) & (
+            Q(campagne__date_fin__gte=today)
+            | Q(campagne__date_mise_en_pause__lte=today)
+        )
         if self.type_support == self.TYPE_PANNEAU:
-            filters['face__support'] = self
+            lignes = LigneCampagne.objects.filter(face__support=self)
         else:
-            filters['support'] = self
-        return LigneCampagne.objects.filter(**filters).exists()
+            lignes = LigneCampagne.objects.filter(support=self)
+        return lignes.filter(periode_active | periode_pause).exists()
 
     def disponibilite_json(self):
         """Retourne un dict résumant la disponibilité pour le popup carte."""
@@ -888,9 +917,19 @@ class FacePanneau(models.Model):
             date_fin = date_debut
         return not LigneCampagne.objects.filter(
             face=self,
-            campagne__date_debut__lte=date_fin,
-            campagne__date_fin__gte=date_debut,
-            campagne__statut__in=['en_cours', 'a_venir'],
+        ).filter(
+            Q(
+                campagne__statut__in=['en_cours', 'a_venir'],
+                campagne__date_debut__lte=date_fin,
+                campagne__date_fin__gte=date_debut,
+            )
+            | (
+                Q(campagne__statut='en_pause', campagne__date_debut__lte=date_fin)
+                & (
+                    Q(campagne__date_fin__gte=date_debut)
+                    | Q(campagne__date_mise_en_pause__lte=date_fin)
+                )
+            )
         ).exists()
         
     def is_disponibles(self, date_debut=None, date_fin=None):
@@ -904,12 +943,19 @@ class FacePanneau(models.Model):
             date_fin = date_debut
  
         # 1. Vérification via les LigneCampagne (campagnes actives/à venir)
-        occupee_campagne = LigneCampagne.objects.filter(
-            face=self,
-            campagne__date_debut__lte=date_fin,
-            campagne__date_fin__gte=date_debut,
-            # campagne__statut__in=['en_cours', 'a_venir'],
-            campagne__statut__in=['en_cours'],
+        occupee_campagne = LigneCampagne.objects.filter(face=self).filter(
+            Q(
+                campagne__statut__in=['en_cours', 'a_venir'],
+                campagne__date_debut__lte=date_fin,
+                campagne__date_fin__gte=date_debut,
+            )
+            | (
+                Q(campagne__statut='en_pause', campagne__date_debut__lte=date_fin)
+                & (
+                    Q(campagne__date_fin__gte=date_debut)
+                    | Q(campagne__date_mise_en_pause__lte=date_fin)
+                )
+            )
         ).exists()
  
         # 2. Vérification via ReservationLigne (nouveau modèle)
@@ -928,8 +974,19 @@ class FacePanneau(models.Model):
         today = timezone.now().date()
         lc = LigneCampagne.objects.filter(
             face=self,
-            campagne__date_debut__lte=today,
-            campagne__date_fin__gte=today,
+        ).filter(
+            Q(
+                campagne__statut__in=['en_cours', 'a_venir'],
+                campagne__date_debut__lte=today,
+                campagne__date_fin__gte=today,
+            )
+            | (
+                Q(campagne__statut='en_pause', campagne__date_debut__lte=today)
+                & (
+                    Q(campagne__date_fin__gte=today)
+                    | Q(campagne__date_mise_en_pause__lte=today)
+                )
+            )
         ).select_related('campagne__client').first()
         return lc.campagne if lc else None
     
@@ -954,12 +1011,19 @@ class FacePanneau(models.Model):
             date_fin = date_debut
  
         # Occupé = campagne active/à venir sur la période
-        occupee = LigneCampagne.objects.filter(
-            face=self,
-            campagne__date_debut__lte=date_fin,
-            campagne__date_fin__gte=date_debut,
-            # campagne__statut__in=['en_cours', 'a_venir'],
-            campagne__statut__in=['en_cours'],
+        occupee = LigneCampagne.objects.filter(face=self).filter(
+            Q(
+                campagne__statut__in=['en_cours', 'a_venir'],
+                campagne__date_debut__lte=date_fin,
+                campagne__date_fin__gte=date_debut,
+            )
+            | (
+                Q(campagne__statut='en_pause', campagne__date_debut__lte=date_fin)
+                & (
+                    Q(campagne__date_fin__gte=date_debut)
+                    | Q(campagne__date_mise_en_pause__lte=date_fin)
+                )
+            )
         ).exists()
 
         if occupee:
@@ -1053,6 +1117,9 @@ class FacePanneau(models.Model):
 class EcranNumerique(models.Model):
     """Métadonnées et logique de diffusion pour un écran numérique."""
 
+    SPOTS_PAR_MINUTE = 3
+    DUREE_SPOT_SECONDES = 20
+
     TYPE_CHOICES = [
         ('interieur', 'Intérieur'),
         ('exterieur', 'Extérieur'),
@@ -1114,6 +1181,125 @@ class EcranNumerique(models.Model):
 
     def __str__(self):
         return f"Config Technique - {self.support.code}"
+
+    def get_programme_actif(self, date_test=None):
+        date_test = date_test or timezone.localdate()
+        return self.programmes.filter(
+            date_debut__lte=date_test,
+        ).filter(
+            Q(date_fin__gte=date_test) | Q(date_fin__isnull=True)
+        ).order_by('-date_debut', '-pk').first()
+
+    def plages_actives(self, date_test=None):
+        date_test = date_test or timezone.localdate()
+        programme = self.get_programme_actif(date_test)
+        if programme:
+            return list(
+                programme.plages.filter(jour_semaine=date_test.weekday())
+                .order_by('heure_debut')
+                .values_list('heure_debut', 'heure_fin')
+            )
+        return [(self.heure_allumage, self.heure_extinction)]
+
+    def secondes_disponibles_jour(self, date_test=None):
+        total = 0
+        for heure_debut, heure_fin in self.plages_actives(date_test):
+            debut = datetime.combine(date_test or timezone.localdate(), heure_debut)
+            fin = datetime.combine(date_test or timezone.localdate(), heure_fin)
+            if fin <= debut:
+                fin += timedelta(days=1)
+            total += (fin - debut).total_seconds()
+        return total
+
+    def horaires_actifs_display(self, date_test=None):
+        plages = self.plages_actives(date_test)
+        if not plages:
+            return "Écran éteint"
+        return " · ".join(
+            f"{debut:%H:%M}–{fin:%H:%M}" for debut, fin in plages
+        )
+
+    def calculer_objectif_spots_annuel(self, annee, date_reference=None):
+        """Calcule les spots prévus depuis le début de l'année jusqu'à la date donnée."""
+        date_reference = date_reference or timezone.localdate()
+        debut = max(
+            date(annee, 1, 1),
+            timezone.localtime(self.support.created_at).date(),
+        )
+        fin = min(date(annee, 12, 31), date_reference)
+        if debut > fin:
+            return 0
+
+        prefetched_programmes = getattr(
+            self, '_prefetched_objects_cache', {}
+        ).get('programmes')
+        if prefetched_programmes is not None:
+            programmes = sorted(
+                (
+                    programme
+                    for programme in prefetched_programmes
+                    if programme.date_debut <= fin
+                ),
+                key=lambda programme: (programme.date_debut, programme.pk),
+            )
+        else:
+            programmes = list(
+                self.programmes.filter(date_debut__lte=fin)
+                .prefetch_related('plages')
+                .order_by('date_debut', 'pk')
+            )
+        plages_par_programme = {}
+        for programme in programmes:
+            plages_par_jour = {}
+            for plage in programme.plages.all():
+                plages_par_jour.setdefault(plage.jour_semaine, []).append(
+                    (plage.heure_debut, plage.heure_fin)
+                )
+            plages_par_programme[programme.pk] = plages_par_jour
+
+        secondes_total = 0
+        programme_actif = None
+        prochain_programme = 0
+        jour = debut
+        while jour <= fin:
+            while (
+                prochain_programme < len(programmes)
+                and programmes[prochain_programme].date_debut <= jour
+            ):
+                programme_actif = programmes[prochain_programme]
+                prochain_programme += 1
+
+            if (
+                programme_actif
+                and programme_actif.date_fin
+                and programme_actif.date_fin < jour
+            ):
+                programme_actif = None
+
+            if programme_actif:
+                plages = plages_par_programme[programme_actif.pk].get(
+                    jour.weekday(), []
+                )
+            else:
+                plages = [
+                    (
+                        time.fromisoformat(self.heure_allumage)
+                        if isinstance(self.heure_allumage, str)
+                        else self.heure_allumage,
+                        time.fromisoformat(self.heure_extinction)
+                        if isinstance(self.heure_extinction, str)
+                        else self.heure_extinction,
+                    )
+                ]
+
+            for heure_debut, heure_fin in plages:
+                debut_plage = datetime.combine(jour, heure_debut)
+                fin_plage = datetime.combine(jour, heure_fin)
+                if fin_plage > debut_plage:
+                    secondes_total += (fin_plage - debut_plage).total_seconds()
+            jour += timedelta(days=1)
+
+        return int(secondes_total * self.SPOTS_PAR_MINUTE // 60)
     
     @property
     def format_detail(self):
@@ -1128,15 +1314,7 @@ class EcranNumerique(models.Model):
     @property
     def secondes_totales_disponibles_jour(self):
         """Calcule le volume total de secondes de fonctionnement par jour."""
-        today = datetime.today()
-        start = datetime.combine(today, self.heure_allumage)
-        end = datetime.combine(today, self.heure_extinction)
-        
-        # Gestion du cas où l'écran s'éteint après minuit
-        if end <= start:
-            end += timedelta(days=1)
-            
-        return (end - start).total_seconds()
+        return self.secondes_disponibles_jour()
         
     def calculer_occupation_reelle(self, date_test=None):
         """
@@ -1158,11 +1336,14 @@ class EcranNumerique(models.Model):
         )
         # print(f"Calcul occupation pour {self.support.code} le {target_date} : {lignes.count()} lignes actives")
         total_occupe_sec = 0
+        plages_ecran = self.plages_actives(target_date)
+        if not plages_ecran:
+            return 0
         for ligne in lignes:
             # Calcul : (Durée du fonctionnement de l'écran en secondes / Fréquence en sec) * durée du spot
             # Note : On limite à la plage horaire du spot si elle est plus courte que celle de l'écran
             # pour calacule en prend ((3600 / pas la frequence) * pas duree de passage ) * (durée tranches horaires / 24h)
-            frequence_sec = ligne.campagne.frequence or 0
+            frequence_sec = ligne.get_frequence_effective() or 0
             # print(f"  - Ligne {ligne.pk} : durée spot {ligne.campagne.duree_passage}s, fréquence toutes {ligne.campagne.frequence}s , Tranches horaires : {ligne.campagne.tranches_horaires} , Durée tranches : {calculer_duree_tranches(ligne.campagne.tranches_horaires)}h")
             # print("    → Seconde totales disponibles par jour : ", self.secondes_totales_disponibles_jour)
             # print("    → Impact en secondes : ", (3600/ frequence_sec) * ligne.campagne.duree_passage * (calculer_duree_tranches(ligne.campagne.tranches_horaires)) if frequence_sec > 0 else "N/A")
@@ -1170,7 +1351,13 @@ class EcranNumerique(models.Model):
             if frequence_sec > 0:
                 # pour calacule en prend ((3600 / pas la frequence) * pas duree de passage ) * (durée tranches horaires / 24h)
                 # temps de  diffusion de  chanque ligne de campagne = (3600 / frequence_sec) * ligne.campagne.duree_passage * (calculer_duree_tranches(ligne.campagne.tranches_horaires))
-                temps_diffusion_sec = (3600 / frequence_sec) * ligne.campagne.duree_passage * (calculer_duree_tranches(ligne.campagne.tranches_horaires))
+                heures_communes = calculer_heures_chevauchement(
+                    plages_ecran,
+                    ligne.get_tranches_effective(),
+                )
+                temps_diffusion_sec = (
+                    3600 / frequence_sec
+                ) * self.DUREE_SPOT_SECONDES * heures_communes
                 # print("    → Temps de diffusion en secondes : ", temps_diffusion_sec)
                 total_occupe_sec += temps_diffusion_sec
         
@@ -1178,7 +1365,7 @@ class EcranNumerique(models.Model):
 
     def taux_occupation_pourcentage(self, date_test=None):
         """Retourne le pourcentage d'occupation (0 à 100)."""
-        total = self.secondes_totales_disponibles_jour
+        total = self.secondes_disponibles_jour(date_test)
         if total <= 0: return 0
         
         occupe = self.calculer_occupation_reelle(date_test)
@@ -1192,7 +1379,10 @@ class EcranNumerique(models.Model):
         """
         # 1. Calcul de l'impact du nouveau spot
         frequence_sec = frequence_min * 60
-        nb_diffusions = self.secondes_totales_disponibles_jour / frequence_sec
+        secondes_disponibles = self.secondes_disponibles_jour(date_debut)
+        if secondes_disponibles <= 0:
+            return False, "L'écran est éteint à cette date."
+        nb_diffusions = secondes_disponibles / frequence_sec
         impact_nouveau_spot = nb_diffusions * duree_sec
 
         # 2. Vérification sur la période demandée
@@ -1200,7 +1390,7 @@ class EcranNumerique(models.Model):
         # Dans un système réel, on bouclerait sur chaque jour entre date_debut et date_fin
         occupe = self.calculer_occupation_reelle(date_debut)
         
-        if (occupe + impact_nouveau_spot) > self.secondes_totales_disponibles_jour:
+        if (occupe + impact_nouveau_spot) > secondes_disponibles:
             return False, "L'écran est saturé pour cette période."
         
         return True, "Disponible"
@@ -1231,8 +1421,86 @@ class EcranNumerique(models.Model):
         return round(spots_par_jour * jours_dispo)
 
 
+class EcranProgramme(models.Model):
+    """Version datée du programme hebdomadaire d'un écran."""
+
+    ecran = models.ForeignKey(
+        EcranNumerique,
+        on_delete=models.CASCADE,
+        related_name='programmes',
+    )
+    date_debut = models.DateField(verbose_name="Actif à partir du")
+    date_fin = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Actif jusqu'au",
+    )
+    cree_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='programmes_ecrans_crees',
+    )
+    cree_le = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-date_debut', '-pk']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['ecran', 'date_debut'],
+                name='unique_ecran_programme_date_debut',
+            ),
+        ]
+        verbose_name = "Programme horaire d'écran"
+        verbose_name_plural = "Programmes horaires d'écran"
+
+    def __str__(self):
+        return f"{self.ecran.support.code} — à partir du {self.date_debut:%d/%m/%Y}"
+
+
+class EcranPlageHoraire(models.Model):
+    JOURS_SEMAINE = [
+        (0, "Lundi"),
+        (1, "Mardi"),
+        (2, "Mercredi"),
+        (3, "Jeudi"),
+        (4, "Vendredi"),
+        (5, "Samedi"),
+        (6, "Dimanche"),
+    ]
+
+    programme = models.ForeignKey(
+        EcranProgramme,
+        on_delete=models.CASCADE,
+        related_name='plages',
+    )
+    jour_semaine = models.PositiveSmallIntegerField(choices=JOURS_SEMAINE)
+    heure_debut = models.TimeField()
+    heure_fin = models.TimeField()
+
+    class Meta:
+        ordering = ['jour_semaine', 'heure_debut']
+        constraints = [
+            models.UniqueConstraint(
+                fields=[
+                    'programme', 'jour_semaine', 'heure_debut', 'heure_fin',
+                ],
+                name='unique_ecran_plage_horaire',
+            ),
+        ]
+        verbose_name = "Plage horaire d'écran"
+        verbose_name_plural = "Plages horaires d'écran"
+
+    def __str__(self):
+        return (
+            f"{self.get_jour_semaine_display()} "
+            f"{self.heure_debut:%H:%M}–{self.heure_fin:%H:%M}"
+        )
+
+
 class ObjectifSpotsEcranAnnuel(models.Model):
-    """Objectif annuel conservé par écran pour garder l'historique des taux."""
+    """Historique des objectifs calculés à partir des horaires de l'écran."""
 
     ecran = models.ForeignKey(
         EcranNumerique,

@@ -726,12 +726,23 @@ class DashboardParcGroupingTests(TestCase):
         stats = DashboardView._build_screen_resolution_stats(
             'Ouagadougou', today
         )
-        year_days = (
-            datetime.date(today.year, 12, 31)
-            - datetime.date(today.year, 1, 1)
-        ).days + 1
-        elapsed_days = (today - datetime.date(today.year, 1, 1)).days + 1
-
+        for screen in (
+            occupied_screen, free_screen, screen_without_objective,
+        ):
+            screen.ecran_info.refresh_from_db()
+        hd_target = sum(
+            screen.ecran_info.calculer_objectif_spots_annuel(
+                today.year, today
+            )
+            for screen in (occupied_screen, free_screen, screen_without_objective)
+        )
+        hd_seconds_available_today = sum(
+            screen.ecran_info.secondes_disponibles_jour(today)
+            for screen in (occupied_screen, free_screen, screen_without_objective)
+        )
+        fullhd_target = fullhd_screen.ecran_info.calculer_objectif_spots_annuel(
+            today.year, today
+        )
         self.assertEqual(
             stats,
             [
@@ -740,24 +751,26 @@ class DashboardParcGroupingTests(TestCase):
                     'nb_ecrans': 3,
                     'nb_occupees': 2,
                     'nb_libres': 1,
-                    'objectif_spots_annuel': 200,
-                    'spots_realises': 30,
-                    'spots_previsionnels': 60,
+                    'objectif_spots_annuel': hd_target,
+                    'spots_realises': 60,
+                    'spots_previsionnels': 120,
                     'taux_actuel': round(
-                        30 / (200 * elapsed_days / year_days) * 100, 1
+                        60 * EcranNumerique.DUREE_SPOT_SECONDES
+                        / hd_seconds_available_today * 100,
+                        1,
                     ),
-                    'taux_annuel': 15.0,
+                    'taux_annuel': round(60 / hd_target * 100, 1),
                 },
                 {
                     'resolution': 'Full HD 1920×1080',
                     'nb_ecrans': 1,
                     'nb_occupees': 0,
                     'nb_libres': 1,
-                    'objectif_spots_annuel': 100,
+                    'objectif_spots_annuel': fullhd_target,
                     'spots_realises': 0,
                     'spots_previsionnels': 0,
-                    'taux_actuel': 0.0,
-                    'taux_annuel': 0.0,
+                    'taux_actuel': 0.0 if fullhd_target else None,
+                    'taux_annuel': 0.0 if fullhd_target else None,
                 },
             ],
         )
@@ -786,16 +799,22 @@ class DashboardParcGroupingTests(TestCase):
         context = view.get_context_data()
         rendered = render_to_string(view.template_name, context, request=request)
 
-        self.assertEqual(context['ecrans_objectifs_total'], 1250)
+        expected_target = screen.calculer_objectif_spots_annuel(
+            today.year, today
+        )
+        self.assertEqual(context['ecrans_objectifs_total'], expected_target)
         screen_stats = context['ecrans_liste'][0]
-        self.assertEqual(screen_stats['objectif_spots_annuel'], 1250)
+        self.assertEqual(screen_stats['objectif_spots_annuel'], expected_target)
         self.assertEqual(screen_stats['taux_actuel'], 0.0)
         self.assertEqual(screen_stats['taux_annuel'], 0.0)
         self.assertIn(
-            '<span>Objectif annuel (spots)</span><strong>1250</strong>',
+            f'<span>Objectif annuel (spots)</span><strong>{expected_target}</strong>',
             rendered,
         )
-        self.assertIn('<small>Objectif spots</small><b>1250</b>', rendered)
+        self.assertIn(
+            f'<small>Objectif spots</small><b>{expected_target}</b>',
+            rendered,
+        )
         self.assertNotIn('À renseigner', rendered)
 
     def test_screen_annual_rate_uses_campaign_spots_from_year_start_through_today(self):
@@ -844,22 +863,24 @@ class DashboardParcGroupingTests(TestCase):
         stats = DashboardView._build_screen_spot_stats(
             'Ouagadougou', today
         )[support.pk]
+        screen.refresh_from_db()
 
         self.assertEqual(stats['spots_realises'], 90)
-        self.assertEqual(stats['taux_annuel'], 30.0)
-        year_days = (
-            datetime.date(today.year, 12, 31)
-            - datetime.date(today.year, 1, 1)
-        ).days + 1
         expected_current_rate = round(
-            90 / (
-                300
-                * ((today - datetime.date(today.year, 1, 1)).days + 1)
-                / year_days
-            ) * 100,
+            30 * EcranNumerique.DUREE_SPOT_SECONDES
+            / screen.secondes_disponibles_jour(today) * 100,
             1,
         )
         self.assertEqual(stats['taux_actuel'], expected_current_rate)
+        expected_annual_rate = round(
+            90
+            / screen.calculer_objectif_spots_annuel(
+                today.year, today
+            )
+            * 100,
+            1,
+        )
+        self.assertEqual(stats['taux_annuel'], expected_annual_rate)
 
     def test_format_card_map_link_opens_format_detail_and_dashboard_has_no_map_card(self):
         support = self.create_support('DASH-FORMAT-DETAIL', 'DASH-12')

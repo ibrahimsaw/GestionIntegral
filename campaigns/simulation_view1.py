@@ -1014,7 +1014,7 @@ def _construire_details_ecrans(
         if ecran_info and date_debut:
             taux_actuel = ecran_info.taux_occupation_pourcentage(date_debut)
             impact_sec  = (3600 / frequence) * duree_passage * heures
-            sec_dispo   = ecran_info.secondes_totales_disponibles_jour
+            sec_dispo   = ecran_info.secondes_disponibles_jour(date_debut)
             occupe      = ecran_info.calculer_occupation_reelle(date_debut)
             if sec_dispo:
                 taux_apres = round(min(((occupe + impact_sec) / sec_dispo) * 100, 100), 2)

@@ -2,7 +2,7 @@ import io
 import json
 import re
 import unicodedata
-from datetime import datetime, time, timedelta
+from datetime import date, datetime, time, timedelta
 from typing import cast
 
 from django.conf import settings
@@ -43,6 +43,87 @@ from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView
 from django.contrib.auth.mixins import LoginRequiredMixin # Optionnel: pour sécuriser l'accès
 from .models import FormatSupport, format_sort_key, formats_croissants
+
+
+def _creer_version_horaire(ecran, form, utilisateur):
+    date_debut = form.cleaned_data['date_debut']
+    if EcranProgramme.objects.filter(
+        ecran=ecran,
+        date_debut=date_debut,
+    ).exists():
+        form.add_error(
+            'date_debut',
+            "Un programme existe déjà à cette date. Choisissez une autre date.",
+        )
+        return False
+
+    programme = EcranProgramme.objects.create(
+        ecran=ecran,
+        date_debut=date_debut,
+        cree_par=utilisateur,
+    )
+    programme.plages.bulk_create([
+        EcranPlageHoraire(
+            programme=programme,
+            jour_semaine=jour,
+            heure_debut=debut,
+            heure_fin=fin,
+        )
+        for jour, debut, fin in form.cleaned_data['plages_validees']
+    ])
+
+    precedent = EcranProgramme.objects.filter(
+        ecran=ecran,
+        date_debut__lt=date_debut,
+    ).order_by('-date_debut').first()
+    suivant = EcranProgramme.objects.filter(
+        ecran=ecran,
+        date_debut__gt=date_debut,
+    ).order_by('date_debut').first()
+
+    if precedent:
+        precedent.date_fin = date_debut - timedelta(days=1)
+        precedent.save(update_fields=['date_fin'])
+    programme.date_fin = (
+        suivant.date_debut - timedelta(days=1) if suivant else None
+    )
+    programme.save(update_fields=['date_fin'])
+    return True
+
+
+def _initial_programme_horaire(ecran=None):
+    source_programme = None
+    demain = timezone.localdate() + timedelta(days=1)
+    initial = {'date_debut': demain}
+    if ecran:
+        dernier = ecran.programmes.order_by('-date_debut').first()
+        if dernier:
+            source_programme = dernier
+            if dernier.date_debut >= demain:
+                initial['date_debut'] = dernier.date_debut + timedelta(days=1)
+        else:
+            heure_debut = ecran.heure_allumage
+            heure_fin = ecran.heure_extinction
+
+    if source_programme:
+        plages_par_jour = {jour: [] for _, jour, _ in EcranProgrammeForm.JOUR_FIELDS}
+        for plage in source_programme.plages.all():
+            plages_par_jour[plage.jour_semaine].append(
+                f'{plage.heure_debut:%H:%M}-{plage.heure_fin:%H:%M}'
+            )
+        for field_name, jour, _ in EcranProgrammeForm.JOUR_FIELDS:
+            initial[field_name] = ', '.join(plages_par_jour[jour])
+    else:
+        heure_debut = (
+            heure_debut if ecran else time(6, 0)
+        )
+        heure_fin = (
+            heure_fin if ecran else time(23, 0)
+        )
+        horaire_standard = f'{heure_debut:%H:%M}-{heure_fin:%H:%M}'
+        for field_name, _, _ in EcranProgrammeForm.JOUR_FIELDS:
+            initial[field_name] = horaire_standard
+    return initial
 
 # 1. LISTER LES FORMATS
 class FormatSupportListView(LoginRequiredMixin, SortableListMixin, ListView):
@@ -856,9 +937,17 @@ class ApiSupportPopupView(LoginRequiredMixin, View):
                 if statut == 'occupe':
                     lc = LigneCampagne.objects.filter(
                         face=face,
-                        campagne__date_debut__lte=today,
-                        campagne__date_fin__gte=today,
-                        campagne__statut__in=['en_cours', 'a_venir'],
+                    ).filter(
+                        Q(
+                            campagne__statut__in=['en_cours', 'a_venir'],
+                            campagne__date_debut__lte=today,
+                            campagne__date_fin__gte=today,
+                        )
+                        | Q(
+                            campagne__statut='en_pause',
+                            campagne__date_debut__lte=today,
+                            campagne__date_mise_en_pause__lte=today,
+                        )
                     ).select_related('campagne__client').first()
 
                     if lc:
@@ -907,7 +996,8 @@ class ApiSupportPopupView(LoginRequiredMixin, View):
             from campaigns.models import LigneCampagne
             ecran = support.ecran_info
             taux = ecran.taux_occupation_pourcentage(today)
-            total_j = ecran.secondes_totales_disponibles_jour
+            plages_actives = ecran.plages_actives(today)
+            total_j = ecran.secondes_disponibles_jour(today)
             hours_j = total_j / 3600 if total_j > 0 else 1
             libres_1h = max(0, round(3600 - ecran.calculer_occupation_reelle(today) / hours_j))
 
@@ -916,15 +1006,30 @@ class ApiSupportPopupView(LoginRequiredMixin, View):
                 'cellule':            ecran.get_cellule_display(),
                 'taux_occupation':    taux,
                 'secondes_libres_1h': libres_1h,
-                'heure_debut':        ecran.heure_allumage.strftime('%H:%M'),
-                'heure_fin':          ecran.heure_extinction.strftime('%H:%M'),
+                'heure_debut':        plages_actives[0][0].strftime('%H:%M') if plages_actives else None,
+                'heure_fin':          plages_actives[-1][1].strftime('%H:%M') if plages_actives else None,
+                'plages_actives': [
+                    {
+                        'debut': debut.strftime('%H:%M'),
+                        'fin': fin.strftime('%H:%M'),
+                    }
+                    for debut, fin in plages_actives
+                ],
             }
 
             spots_qs = LigneCampagne.objects.filter(
                 support=support,
-                campagne__date_debut__lte=today,
-                campagne__date_fin__gte=today,
-                campagne__statut__in=['en_cours', 'a_venir'],
+            ).filter(
+                Q(
+                    campagne__statut__in=['en_cours', 'a_venir'],
+                    campagne__date_debut__lte=today,
+                    campagne__date_fin__gte=today,
+                )
+                | Q(
+                    campagne__statut='en_pause',
+                    campagne__date_debut__lte=today,
+                    campagne__date_mise_en_pause__lte=today,
+                )
             ).select_related('campagne__client').order_by('ordre_dans_boucle')
 
             spots_data = []
@@ -1386,7 +1491,7 @@ class SupportDetailView(ClientStaffRequiredMixin, DetailView):
         # Client courant pour get_statut (None si staff)
         client_courant = getattr(self.request.user, 'client_profile', None)
 
-        today = timezone.now().date()
+        today = timezone.localdate()
         now   = timezone.now()
 
         # ── Campagnes actives et historique ───────────────────────────────
@@ -1431,6 +1536,7 @@ class SupportDetailView(ClientStaffRequiredMixin, DetailView):
         ecran_stats = []
         panneau_stats = []
         spots_data  = []
+        ecran_programme_data = []
 
         # ── Logique spécifique PANNEAU ────────────────────────────────────
         if support.type_support == 'panneau':
@@ -1492,9 +1598,7 @@ class SupportDetailView(ClientStaffRequiredMixin, DetailView):
             ecran = getattr(support, 'ecran_info', None)
 
             if ecran:
-                h_allumage   = ecran.heure_allumage.strftime('%H:%M') if ecran.heure_allumage else '00:00'
-                h_extinction = ecran.heure_extinction.strftime('%H:%M') if ecran.heure_extinction else '00:00'
-                plage_str    = f'{h_allumage} – {h_extinction}'
+                plage_str = ecran.horaires_actifs_display(today)
                 stats_spots = self._get_screen_spot_stats(ecran, today)
 
                 info_rows += [
@@ -1503,25 +1607,100 @@ class SupportDetailView(ClientStaffRequiredMixin, DetailView):
                     ('Type écran',      ecran.get_type_ecran_display()),
                     ('Plage diffusion', plage_str),
                     ('Taux actuel',     f'{stats_spots["taux_actuel"]}%' if stats_spots['taux_actuel'] is not None else 'Objectif non défini'),
-                    ('Taux annuel',     f'{stats_spots["taux_annuel"]}%' if stats_spots['taux_annuel'] is not None else 'Objectif non défini'),
+                    (f'Taux annuel {today.year} (01/01 à aujourd’hui)', f'{stats_spots["taux_annuel"]}%' if stats_spots['taux_annuel'] is not None else 'Objectif non défini'),
                 ]
 
                 ecran_stats = [
                     ('Résolution', 'bi-aspect-ratio', ecran.get_resolution_display(), 'var(--text)'),
                     ('Cellule',    'bi-tv',           f'{ecran.format_detail["dimensions"]} ({ecran.format_detail["superficie"]}m²)',              'var(--text)'),
                     ('Taux actuel', 'bi-speedometer2', f'{stats_spots["taux_actuel"]}%' if stats_spots['taux_actuel'] is not None else '—', 'var(--color-primary)'),
-                    ('Taux annuel', 'bi-graph-up', f'{stats_spots["taux_annuel"]}%' if stats_spots['taux_annuel'] is not None else '—', 'var(--color-primary)'),
+                    (f'Taux annuel {today.year} (01/01 à aujourd’hui)', 'bi-graph-up', f'{stats_spots["taux_annuel"]}%' if stats_spots['taux_annuel'] is not None else '—', 'var(--color-primary)'),
                     ('Spots cumulés des campagnes', 'bi-broadcast', f'{stats_spots["spots_realises"]:,}'.replace(',', ' '), 'var(--text)'),
                     ('Objectif annuel', 'bi-bullseye', f'{stats_spots["objectif_spots_annuel"]:,}'.replace(',', ' ') if stats_spots['objectif_spots_annuel'] is not None else 'Non défini', 'var(--text)'),
                     ('Diffusion',  'bi-clock',        plage_str,                       'var(--color-primary)'),
                 ]
 
-                for ligne in lignes_actives:
+                date_fin_telemetrie = today + timedelta(days=30)
+                lignes_telemetrie = LigneCampagne.objects.filter(
+                    support=support,
+                    campagne__statut__in=[
+                        Campagne.STATUT_EN_COURS,
+                        Campagne.STATUT_A_VENIR,
+                    ],
+                    campagne__date_debut__lte=date_fin_telemetrie,
+                    campagne__date_fin__gte=today,
+                ).filter(
+                    Q(date_debut__lte=date_fin_telemetrie)
+                    | Q(date_debut__isnull=True)
+                ).filter(
+                    Q(date_fin__gte=today) | Q(date_fin__isnull=True)
+                ).select_related(
+                    'campagne__client', 'campagne', 'support'
+                ).prefetch_related('campagne__pauses')
+
+                for ligne in lignes_telemetrie:
                     spots_data.append({
                         'id':       ligne.pk,
                         'name':     f"{ligne.campagne.client.nom} — {ligne.campagne.nom}",
-                        'dur':      ligne.campagne.duree_passage or 20,
-                        'interval': ligne.campagne.frequence or 120,
+                        'dur':      EcranNumerique.DUREE_SPOT_SECONDES,
+                        'interval': ligne.get_frequence_effective() or 0,
+                        'windows':  ligne.get_tranches_effective() or '',
+                        'start':    max(
+                            ligne.date_debut or ligne.campagne.date_debut,
+                            ligne.campagne.date_debut,
+                        ).isoformat(),
+                        'end':      min(
+                            ligne.date_fin or ligne.campagne.date_fin,
+                            ligne.campagne.date_fin,
+                        ).isoformat(),
+                        'visuals':  ligne.campagne.get_nombre_visuels_effective(),
+                        'pauses':   [
+                            {
+                                'start': pause.date_debut.isoformat(),
+                                'end': (pause.date_fin or date_fin_telemetrie).isoformat(),
+                            }
+                            for pause in ligne.campagne.pauses.all()
+                            if pause.date_debut <= date_fin_telemetrie
+                            and (pause.date_fin is None or pause.date_fin >= today)
+                        ],
+                    })
+                programmes = list(
+                    ecran.programmes.prefetch_related('plages').order_by(
+                        'date_debut', 'pk'
+                    )
+                )
+                for offset in range(32):
+                    jour = today + timedelta(days=offset)
+                    programmes_actifs = [
+                        programme for programme in programmes
+                        if programme.date_debut <= jour
+                        and (
+                            programme.date_fin is None
+                            or programme.date_fin >= jour
+                        )
+                    ]
+                    programme = (
+                        max(
+                            programmes_actifs,
+                            key=lambda item: (item.date_debut, item.pk),
+                        )
+                        if programmes_actifs else None
+                    )
+                    plages = (
+                        [
+                            (plage.heure_debut, plage.heure_fin)
+                            for plage in programme.plages.all()
+                            if plage.jour_semaine == jour.weekday()
+                        ]
+                        if programme else
+                        [(ecran.heure_allumage, ecran.heure_extinction)]
+                    )
+                    ecran_programme_data.append({
+                        'date': jour.isoformat(),
+                        'windows': [
+                            [debut.strftime('%H:%M'), fin.strftime('%H:%M')]
+                            for debut, fin in plages
+                        ],
                     })
 
         # ── Contexte final ────────────────────────────────────────────────
@@ -1537,6 +1716,7 @@ class SupportDetailView(ClientStaffRequiredMixin, DetailView):
             'panneau_stats': panneau_stats,
             'faces': faces if support.type_support == 'panneau' else [],
             'spots_data': spots_data,
+            'ecran_programme_data': ecran_programme_data,
             'reservations':   reservations,
             'pending_deletion_request': SupportDeletionRequest.objects.filter(
                 support=support,
@@ -1587,6 +1767,7 @@ class SupportDetailView(ClientStaffRequiredMixin, DetailView):
             campagne__statut__in=[
                 Campagne.STATUT_EN_COURS,
                 Campagne.STATUT_A_VENIR,
+                Campagne.STATUT_EN_PAUSE,
                 Campagne.STATUT_TERMINEE,
             ],
         ).values_list('face_id', 'campagne__date_debut', 'campagne__date_fin')
@@ -1668,16 +1849,16 @@ class SupportDetailView(ClientStaffRequiredMixin, DetailView):
 
     @staticmethod
     def _get_screen_spot_stats(ecran, today):
-        """Calcule les mêmes taux par objectif annuel que le tableau de bord."""
+        """Calcule le taux quotidien et le cumul annuel d'occupation de l'écran."""
         year_start = today.replace(month=1, day=1)
         year_end = today.replace(month=12, day=31)
-        target = ecran.objectifs_annuels.filter(annee=today.year).values_list(
-            'nombre_spots', flat=True
-        ).first()
+        target = ecran.calculer_objectif_spots_annuel(today.year, today)
         campaign_lines = LigneCampagne.objects.filter(
             support=ecran.support,
             campagne__statut__in=[
                 Campagne.STATUT_EN_COURS,
+                Campagne.STATUT_EN_PAUSE,
+                Campagne.STATUT_A_VENIR,
                 Campagne.STATUT_TERMINEE,
             ],
             campagne__date_debut__lte=today,
@@ -1686,6 +1867,30 @@ class SupportDetailView(ClientStaffRequiredMixin, DetailView):
         realized = sum(
             line.calculer_spots_sur_periode(year_start, today)
             for line in campaign_lines
+        )
+
+        todays_lines = LigneCampagne.objects.filter(
+            support=ecran.support,
+            campagne__statut__in=[
+                Campagne.STATUT_EN_COURS,
+                Campagne.STATUT_A_VENIR,
+            ],
+            campagne__date_debut__lte=today,
+            campagne__date_fin__gte=today,
+        ).select_related('campagne', 'support')
+        spots_today = sum(
+            line.calculer_spots_sur_periode(today, today)
+            for line in todays_lines
+        )
+        available_seconds_today = ecran.secondes_disponibles_jour(today)
+        reserved_seconds_today = (
+            spots_today * EcranNumerique.DUREE_SPOT_SECONDES
+        )
+        available_seconds_year_to_date = (
+            target * EcranNumerique.DUREE_SPOT_SECONDES
+        )
+        reserved_seconds_year_to_date = (
+            realized * EcranNumerique.DUREE_SPOT_SECONDES
         )
 
         future_spots = 0
@@ -1701,16 +1906,23 @@ class SupportDetailView(ClientStaffRequiredMixin, DetailView):
             )
 
         forecast = realized + future_spots
-        elapsed_days = (today - year_start).days + 1
-        year_days = (year_end - year_start).days + 1
-        prorated_target = target * elapsed_days / year_days if target else 0
         return {
             'objectif_spots_annuel': target,
             'spots_realises': realized,
+            'spots_aujourdhui': spots_today,
             'spots_previsionnels': forecast,
-            'taux_actuel': round(realized / prorated_target * 100, 1)
-            if prorated_target else None,
-            'taux_annuel': round(realized / target * 100, 1) if target else None,
+            'secondes_reservees_aujourdhui': reserved_seconds_today,
+            'secondes_disponibles_aujourdhui': available_seconds_today,
+            'secondes_reservees_cumulees': reserved_seconds_year_to_date,
+            'secondes_disponibles_cumulees': available_seconds_year_to_date,
+            'taux_actuel': round(
+                reserved_seconds_today / available_seconds_today * 100, 1
+            ) if available_seconds_today else None,
+            'taux_annuel': round(
+                reserved_seconds_year_to_date
+                / available_seconds_year_to_date * 100,
+                1,
+            ) if available_seconds_year_to_date else None,
         }
 
 
@@ -1721,24 +1933,97 @@ class EcranObjectifsAnnuelsView(StaffRequiredMixin, View):
         support = get_object_or_404(Support, uuid=self.kwargs['uuid'])
         if support.type_support != Support.TYPE_ECRAN:
             raise Http404
-        return get_object_or_404(EcranNumerique, support=support)
+        return get_object_or_404(
+            EcranNumerique.objects.select_related('support').prefetch_related(
+                'programmes__plages', 'programmes__cree_par'
+            ),
+            support=support,
+        )
 
-    def get_context_data(self, ecran, form=None):
-        if form is None:
-            try:
-                annee = int(self.request.GET.get('annee', timezone.localdate().year))
-            except (TypeError, ValueError):
-                annee = timezone.localdate().year
-            existing = ecran.objectifs_annuels.filter(annee=annee).first()
-            form = ObjectifSpotsEcranAnnuelForm(initial={
+    @staticmethod
+    def _historique_par_annee(ecran, today):
+        created_on = timezone.localtime(ecran.support.created_at).date()
+        fin_annee_courante = date(today.year, 12, 31)
+        programmes = list(
+            ecran.programmes.prefetch_related('plages', 'cree_par')
+            .filter(date_debut__lte=fin_annee_courante)
+            .order_by('date_debut', 'pk')
+        )
+        historique = []
+        for annee in range(created_on.year, today.year + 1):
+            debut_annee = max(date(annee, 1, 1), created_on)
+            fin_annee = date(annee, 12, 31)
+            if debut_annee > fin_annee:
+                continue
+
+            periodes = []
+            curseur = debut_annee
+            programmes_annee = [
+                programme for programme in programmes
+                if programme.date_debut <= fin_annee
+                and (programme.date_fin is None or programme.date_fin >= debut_annee)
+            ]
+            for programme in programmes_annee:
+                debut_programme = max(programme.date_debut, debut_annee)
+                fin_programme = min(
+                    programme.date_fin or fin_annee,
+                    fin_annee,
+                )
+                if debut_programme > fin_programme:
+                    continue
+                if curseur < debut_programme:
+                    periodes.append({
+                        'debut': curseur,
+                        'fin': debut_programme - timedelta(days=1),
+                        'programme': None,
+                    })
+                periodes.append({
+                    'debut': debut_programme,
+                    'fin': fin_programme,
+                    'programme': programme,
+                })
+                curseur = max(curseur, fin_programme + timedelta(days=1))
+
+            if curseur <= fin_annee:
+                periodes.append({
+                    'debut': curseur,
+                    'fin': fin_annee,
+                    'programme': None,
+                })
+
+            historique.append({
                 'annee': annee,
-                'nombre_spots': existing.nombre_spots if existing else 200000,
+                'objectif': ecran.calculer_objectif_spots_annuel(
+                    annee, fin_annee
+                ),
+                'periodes': periodes,
+                'est_annee_courante': annee == today.year,
             })
+        return historique
+
+    def get_context_data(self, ecran, programme_form=None):
+        today = timezone.localdate()
+        annee = today.year
+        if programme_form is None:
+            programme_form = EcranProgrammeForm(
+                prefix='programme',
+                initial={
+                    'date_debut': timezone.localdate() + timedelta(days=1),
+                },
+            )
+        periode_debut = max(
+            date(annee, 1, 1),
+            timezone.localtime(ecran.support.created_at).date(),
+        )
         return {
             'support': ecran.support,
             'ecran': ecran,
-            'form': form,
-            'objectifs': ecran.objectifs_annuels.all(),
+            'annee_courante': annee,
+            'programme_form': programme_form,
+            'objectif_calcule': ecran.calculer_objectif_spots_annuel(annee, today),
+            'periode_debut': periode_debut,
+            'periode_fin': today if periode_debut <= today else None,
+            'historique_par_annee': self._historique_par_annee(ecran, today),
         }
 
     def get(self, request, *args, **kwargs):
@@ -1747,22 +2032,60 @@ class EcranObjectifsAnnuelsView(StaffRequiredMixin, View):
 
     def post(self, request, *args, **kwargs):
         ecran = self.get_ecran()
-        form = ObjectifSpotsEcranAnnuelForm(request.POST)
-        if form.is_valid():
-            ObjectifSpotsEcranAnnuel.objects.update_or_create(
-                ecran=ecran,
-                annee=form.cleaned_data['annee'],
-                defaults={'nombre_spots': form.cleaned_data['nombre_spots']},
-            )
-            messages.success(request, "L'objectif annuel de l'écran a été enregistré.")
-            return redirect(
-                reverse('ecran_objectifs_annuels', kwargs={'uuid': ecran.support.uuid})
-                + f"?annee={form.cleaned_data['annee']}"
-            )
+        programme_form = EcranProgrammeForm(
+            request.POST,
+            prefix='programme',
+        )
+        if programme_form.is_valid():
+            if (
+                programme_form.cleaned_data.get('a_enregistrer')
+                and EcranProgramme.objects.filter(
+                    ecran=ecran,
+                    date_debut=programme_form.cleaned_data['date_debut'],
+                ).exists()
+            ):
+                programme_form.add_error(
+                    'date_debut',
+                    "Un programme existe déjà à cette date. Choisissez une autre date.",
+                )
+            else:
+                with transaction.atomic():
+                    if programme_form.cleaned_data.get('a_enregistrer'):
+                        if not _creer_version_horaire(
+                            ecran, programme_form, request.user
+                        ):
+                            return render(
+                                request,
+                                self.template_name,
+                                self.get_context_data(
+                                    ecran,
+                                    programme_form=programme_form,
+                                ),
+                            )
+                        ecran.refresh_from_db()
+                    annee = timezone.localdate().year
+                    nombre_spots = ecran.calculer_objectif_spots_annuel(annee)
+                    ObjectifSpotsEcranAnnuel.objects.update_or_create(
+                        ecran=ecran,
+                        annee=annee,
+                        defaults={'nombre_spots': nombre_spots},
+                    )
+                messages.success(
+                    request,
+                    (
+                        "Le programme a été enregistré et l’objectif recalculé."
+                        if programme_form.cleaned_data.get('a_enregistrer')
+                        else "L’objectif a été recalculé automatiquement."
+                    ),
+                )
+                return redirect(
+                    'ecran_objectifs_annuels',
+                    uuid=ecran.support.uuid,
+                )
         return render(
             request,
             self.template_name,
-            self.get_context_data(ecran, form=form),
+            self.get_context_data(ecran, programme_form=programme_form),
         )
     
 from django.views.generic import CreateView
@@ -1897,6 +2220,16 @@ class SupportCreateView(StaffRequiredMixin, CreateView):
                 ecran = ecran_form.save(commit=False)
                 ecran.support = self.object
                 ecran.save()
+                annee = timezone.localdate().year
+                ObjectifSpotsEcranAnnuel.objects.update_or_create(
+                    ecran=ecran,
+                    annee=annee,
+                    defaults={
+                        'nombre_spots': ecran.calculer_objectif_spots_annuel(
+                            annee
+                        ),
+                    },
+                )
 
         log_action(self.request, AuditLog.ACTION_CREATE, 'inventory', obj=self.object, detail=f"Création support: {self.object.code}")
         messages.success(self.request, f'Support {self.object.code} créé.')

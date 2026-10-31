@@ -1,6 +1,176 @@
 {% extends 'base.html' %}
 {% block title %}Objectifs annuels — {{ support.code }} — Integral{% endblock %}
 
+{% block extra_css %}
+<style>
+  .annual-goals {
+    --goal-accent: var(--color-primary, #932e2b);
+    --goal-ink: #172033;
+    --goal-muted: #667085;
+    --goal-line: #e6eaf0;
+    padding-bottom: 2rem;
+  }
+  .goal-hero {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1.25rem;
+    overflow: hidden;
+    padding: clamp(1.25rem, 3vw, 2rem);
+    margin-bottom: 1.25rem;
+    border-radius: 1.1rem;
+    color: #fff;
+    background:
+      radial-gradient(circle at 88% 12%, rgba(255,255,255,.2), transparent 16rem),
+      linear-gradient(120deg, #5e1c1a, var(--goal-accent) 58%, #bd5144);
+    box-shadow: 0 1rem 2rem rgba(92,35,32,.16);
+  }
+  .goal-hero::after {
+    position: absolute;
+    right: -3rem;
+    bottom: -8rem;
+    width: 15rem;
+    height: 15rem;
+    border: 1px solid rgba(255,255,255,.18);
+    border-radius: 50%;
+    box-shadow: 0 0 0 1.5rem rgba(255,255,255,.05), 0 0 0 3rem rgba(255,255,255,.035);
+    content: "";
+    pointer-events: none;
+  }
+  .goal-hero-content, .goal-hero-action { position: relative; z-index: 1; }
+  .goal-eyebrow { color: rgba(255,255,255,.72); font-size: .68rem; font-weight: 800; letter-spacing: .12em; text-transform: uppercase; }
+  .goal-title { margin: .25rem 0; color: #fff; font-size: clamp(1.35rem, 3vw, 1.8rem); font-weight: 800; }
+  .goal-subtitle { margin: 0; color: rgba(255,255,255,.78); font-size: .86rem; }
+  .goal-hero-icon {
+    display: grid;
+    width: 3.2rem;
+    height: 3.2rem;
+    flex: 0 0 auto;
+    place-items: center;
+    border: 1px solid rgba(255,255,255,.28);
+    border-radius: .9rem;
+    background: rgba(255,255,255,.14);
+    font-size: 1.4rem;
+  }
+  .goal-panel {
+    height: 100%;
+    overflow: hidden;
+    border: 1px solid var(--goal-line);
+    border-radius: 1rem;
+    background: #fff;
+    box-shadow: 0 .45rem 1.3rem rgba(25,35,55,.055);
+  }
+  .goal-panel-head {
+    display: flex;
+    align-items: center;
+    gap: .75rem;
+    padding: 1rem 1.25rem;
+    border-bottom: 1px solid #edf0f4;
+    background: linear-gradient(100deg, #fff, #f9fafc);
+  }
+  .goal-panel-icon {
+    display: grid;
+    width: 2.45rem;
+    height: 2.45rem;
+    flex: 0 0 auto;
+    place-items: center;
+    border-radius: .75rem;
+    background: #fff0ee;
+    color: var(--goal-accent);
+  }
+  .goal-panel-title { margin: 0; color: var(--goal-ink); font-size: .92rem; font-weight: 800; }
+  .goal-panel-hint { margin: .15rem 0 0; color: var(--goal-muted); font-size: .74rem; }
+  .goal-panel-body { padding: clamp(1rem, 2vw, 1.4rem); }
+  .goal-explainer {
+    padding: .85rem 1rem;
+    margin-bottom: 1.2rem;
+    border: 1px solid #e8edf5;
+    border-radius: .8rem;
+    background: #f8fafc;
+    color: #475467;
+    font-size: .78rem;
+    line-height: 1.55;
+  }
+  .goal-explainer strong { color: var(--goal-accent); }
+  .goal-result {
+    position: relative;
+    overflow: hidden;
+    padding: 1.1rem 1.2rem;
+    margin: 1.15rem 0 1.35rem;
+    border: 1px solid #f1d8d5;
+    border-radius: .9rem;
+    background: linear-gradient(115deg, #fff7f6, #fff 75%);
+  }
+  .goal-result-label { color: var(--goal-muted); font-size: .72rem; font-weight: 700; }
+  .goal-result-value { margin: .1rem 0; color: var(--goal-accent); font-size: clamp(1.8rem, 4vw, 2.35rem); font-weight: 850; letter-spacing: -.04em; line-height: 1.15; }
+  .goal-result-period { color: var(--goal-muted); font-size: .73rem; }
+  .goal-subhead { margin: 1.25rem 0 .25rem; color: var(--goal-ink); font-size: .88rem; font-weight: 800; }
+  .goal-section-note { margin: 0 0 .9rem; color: var(--goal-muted); font-size: .75rem; line-height: 1.45; }
+  .goal-form .form-label { color: #344054; font-size: .72rem; font-weight: 750; }
+  .goal-form .form-control {
+    min-height: 2.75rem;
+    border-color: #d7dde6;
+    border-radius: .65rem;
+    font-size: .86rem;
+  }
+  .goal-form .form-control:focus {
+    border-color: var(--goal-accent);
+    box-shadow: 0 0 0 .2rem rgba(147,46,43,.12);
+  }
+  .goal-submit {
+    min-height: 2.75rem;
+    padding-inline: 1.15rem;
+    border: 0;
+    border-radius: .7rem;
+    background: var(--goal-accent);
+    font-size: .84rem;
+    font-weight: 750;
+    box-shadow: 0 .4rem .8rem rgba(147,46,43,.18);
+  }
+  .goal-submit:hover { background: #742421; }
+  .goal-table { margin: 0; }
+  .goal-table thead th {
+    padding: .8rem 1rem;
+    border-bottom: 1px solid var(--goal-line);
+    background: #f8fafc;
+    color: #667085;
+    font-size: .67rem;
+    font-weight: 800;
+    letter-spacing: .06em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .goal-table tbody td { padding: .85rem 1rem; border-color: #f0f2f5; color: #344054; font-size: .82rem; }
+  .goal-table tbody tr:last-child td { border-bottom: 0; }
+  .goal-year { color: var(--goal-ink); font-weight: 800; }
+  .goal-number { color: var(--goal-accent); font-weight: 800; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .goal-empty { padding: 2.5rem 1rem !important; color: #98a2b3 !important; text-align: center; }
+  .goal-empty i { display: block; margin-bottom: .5rem; color: #cbd5e1; font-size: 1.6rem; }
+  .goal-schedule-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    padding: .35rem .55rem;
+    margin: .12rem;
+    border: 1px solid #e5eaf1;
+    border-radius: 999px;
+    background: #f8fafc;
+    color: #475467;
+    font-size: .7rem;
+    white-space: nowrap;
+  }
+  .goal-table .btn { border-radius: .55rem; font-size: .72rem; font-weight: 700; }
+  @media (max-width: 575.98px) {
+    .goal-hero { align-items: flex-start; }
+    .goal-hero-action { align-self: flex-start; }
+    .goal-hero-action .btn { padding: .4rem .55rem; font-size: .74rem; }
+    .goal-panel-head { padding: .85rem 1rem; }
+    .goal-table tbody td, .goal-table thead th { padding: .7rem .75rem; }
+  }
+</style>
+{% endblock %}
+
 {% block topbar_title %}
   <div class="d-flex align-items-center gap-2">
     <i class="bi bi-bullseye text-primary"></i>
@@ -9,66 +179,144 @@
 {% endblock %}
 
 {% block content %}
-<div class="container-fluid py-3">
-  <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-4">
-    <div>
-      <h1 class="h4 mb-1">Objectifs de spots de l’écran</h1>
-      <p class="text-muted mb-0">{{ support.nom }} · {{ support.code }}</p>
+<div class="container-fluid py-3 annual-goals">
+  <header class="goal-hero">
+    <div class="d-flex align-items-center gap-3 goal-hero-content">
+      <div class="goal-hero-icon"><i class="bi bi-bullseye"></i></div>
+      <div>
+        <div class="goal-eyebrow">Pilotage de la diffusion</div>
+        <h1 class="goal-title">Objectifs annuels</h1>
+        <p class="goal-subtitle">{{ support.nom }} <span class="mx-1">·</span>{{ support.code }}</p>
+      </div>
     </div>
-    <a class="btn btn-outline-secondary" href="{% url 'support_detail' support.uuid %}">
-      <i class="bi bi-arrow-left me-1"></i>Retour au support
-    </a>
-  </div>
+    <div class="goal-hero-action">
+      <a class="btn btn-light btn-sm fw-semibold" href="{% url 'support_detail' support.uuid %}">
+        <i class="bi bi-arrow-left me-1"></i>Retour au support
+      </a>
+    </div>
+  </header>
 
-  <div class="row g-4">
-    <div class="col-lg-5">
-      <section class="card shadow-sm">
-        <div class="card-header bg-white fw-semibold">Saisir un objectif annuel</div>
-        <div class="card-body">
-          <p class="text-muted small">Chaque année est conservée dans l’historique. Une nouvelle cible est initialisée à 200&nbsp;000 spots.</p>
-          <form method="post">
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags|default:'info' }} alert-dismissible fade show" role="alert">
+        {{ message }}
+        <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Fermer"></button>
+      </div>
+    {% endfor %}
+  {% endif %}
+
+  <div class="row g-3 g-xl-4">
+    <div class="col-xl-5">
+      <section class="goal-panel">
+        <div class="goal-panel-head">
+          <div class="goal-panel-icon"><i class="bi bi-sliders2"></i></div>
+          <div>
+            <h2 class="goal-panel-title">Programmation & calcul</h2>
+            <p class="goal-panel-hint">Configurez les horaires de l’écran</p>
+          </div>
+        </div>
+        <div class="goal-panel-body">
+          <div class="goal-explainer">
+            <i class="bi bi-info-circle me-1"></i>
+            Calcul à <strong>3 spots par minute</strong>. Les horaires de base de l’écran s’appliquent avant
+            le premier programme; chaque nouveau programme les remplace à sa date d’effet. L’objectif de
+            l’année <strong>{{ annee_courante }}</strong> est calculé automatiquement jusqu’à aujourd’hui.
+          </div>
+          <form method="post" class="goal-form">
             {% csrf_token %}
-            {% for field in form %}
-              <div class="mb-3">
-                <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
-                {{ field }}
-                {% if field.errors %}<div class="text-danger small mt-1">{{ field.errors }}</div>{% endif %}
-              </div>
-            {% endfor %}
-            {% if form.non_field_errors %}<div class="text-danger small mb-3">{{ form.non_field_errors }}</div>{% endif %}
-            <button type="submit" class="btn btn-primary">
-              <i class="bi bi-check2-circle me-1"></i>Enregistrer l’objectif
+            <div class="goal-result">
+              <div class="goal-result-label"><i class="bi bi-graph-up-arrow me-1"></i>Objectif {{ annee_courante }} calculé</div>
+              <div class="goal-result-value">{{ objectif_calcule }}</div>
+              {% if periode_fin %}
+                <div class="goal-result-period">Spots prévus du {{ periode_debut|date:"d/m/Y" }} au {{ periode_fin|date:"d/m/Y" }}</div>
+              {% else %}
+                <div class="goal-result-period">Aucune journée écoulée pour cette année.</div>
+              {% endif %}
+            </div>
+
+            {% if programme_form.non_field_errors %}<div class="text-danger small mb-3">{{ programme_form.non_field_errors }}</div>{% endif %}
+
+            <h3 class="goal-subhead"><i class="bi bi-calendar2-week me-1"></i>Nouveau programme</h3>
+            <p class="goal-section-note">Saisissez les jours et plages horaires. Un jour laissé vide signifie que l’écran sera éteint ce jour-là pendant ce programme.</p>
+
+            <div class="row g-3">
+              {% for field in programme_form %}
+                <div class="{% if field.name == 'date_debut' %}col-12{% else %}col-md-6{% endif %}">
+                  <label class="form-label" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                  {{ field }}
+                  {% if field.help_text %}<div class="form-text">{{ field.help_text }}</div>{% endif %}
+                  {% if field.errors %}<div class="text-danger small mt-1">{{ field.errors }}</div>{% endif %}
+                </div>
+              {% endfor %}
+            </div>
+
+            <button type="submit" class="btn btn-primary goal-submit mt-4">
+              <i class="bi bi-check2-circle me-1"></i>Enregistrer le programme
             </button>
           </form>
         </div>
       </section>
     </div>
 
-    <div class="col-lg-7">
-      <section class="card shadow-sm">
-        <div class="card-header bg-white fw-semibold">Historique des objectifs</div>
+    <div class="col-xl-7">
+      <section class="goal-panel">
+        <div class="goal-panel-head">
+          <div class="goal-panel-icon"><i class="bi bi-clock-history"></i></div>
+          <div>
+            <h2 class="goal-panel-title">Historique des programmes</h2>
+            <p class="goal-panel-hint">Horaires appliqués et changements de programme par année</p>
+          </div>
+        </div>
         <div class="table-responsive">
-          <table class="table table-hover align-middle mb-0">
+          <table class="table table-hover align-middle goal-table">
             <thead>
-              <tr><th>Année</th><th class="text-end">Objectif de spots</th><th></th></tr>
+              <tr><th>Année / objectif calculé</th><th>Période et programme appliqué</th></tr>
             </thead>
             <tbody>
-              {% for objectif in objectifs %}
-                <tr>
-                  <td>{{ objectif.annee }}</td>
-                  <td class="text-end">{{ objectif.nombre_spots }}</td>
-                  <td class="text-end">
-                    <a class="btn btn-sm btn-outline-primary" href="?annee={{ objectif.annee }}">Modifier</a>
-                  </td>
-                </tr>
+              {% for historique in historique_par_annee %}
+                {% for periode in historique.periodes %}
+                  <tr>
+                    {% if forloop.first %}
+                      <td rowspan="{{ historique.periodes|length }}" class="align-top">
+                        <div class="goal-year">{{ historique.annee }}</div>
+                        <div class="goal-number mt-1">{{ historique.objectif }} spots</div>
+                        {% if historique.est_annee_courante %}
+                          <span class="badge rounded-pill bg-primary-subtle text-primary-emphasis mt-2">Année en cours</span>
+                        {% endif %}
+                      </td>
+                    {% endif %}
+                    <td>
+                      <div class="small fw-semibold text-dark">
+                        {{ periode.debut|date:"d/m/Y" }} – {{ periode.fin|date:"d/m/Y" }}
+                      </div>
+                      {% if periode.programme %}
+                        <div class="small text-muted mb-1">Programme modifié le {{ periode.programme.date_debut|date:"d/m/Y" }}</div>
+                        {% for plage in periode.programme.plages.all %}
+                          <span class="goal-schedule-chip">
+                            <i class="bi bi-clock"></i>{{ plage.get_jour_semaine_display }} {{ plage.heure_debut|time:"H:i" }}–{{ plage.heure_fin|time:"H:i" }}
+                          </span>
+                        {% empty %}
+                          <span class="text-muted small">Aucune plage — écran éteint</span>
+                        {% endfor %}
+                      {% else %}
+                        <span class="goal-schedule-chip">
+                          <i class="bi bi-display"></i>Horaire de base {{ ecran.heure_allumage|time:"H:i" }}–{{ ecran.heure_extinction|time:"H:i" }}
+                        </span>
+                      {% endif %}
+                    </td>
+                  </tr>
+                {% endfor %}
               {% empty %}
-                <tr><td colspan="3" class="text-center text-muted py-4">Aucun objectif enregistré pour cet écran.</td></tr>
+                <tr><td colspan="2" class="goal-empty">
+                  <i class="bi bi-inbox"></i>Aucun historique de programme pour cet écran.
+                </td></tr>
               {% endfor %}
             </tbody>
           </table>
         </div>
       </section>
     </div>
+
   </div>
 </div>
 {% endblock %}

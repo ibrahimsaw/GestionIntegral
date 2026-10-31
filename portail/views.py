@@ -19,6 +19,7 @@ from django.views.generic import TemplateView
 from django.views.generic import ListView, DetailView, DeleteView, TemplateView, FormView, View
 from django.utils.safestring import mark_safe
 from campaigns.models import (
+    Campagne,
     DemandeReservation,
     LigneCampagne,
     Reservation,
@@ -26,7 +27,9 @@ from campaigns.models import (
     STATUT_EN_ATTENTE,
     STATUT_CONFIRMEE,
 )
-from inventory.models import FacePanneau, FormatSupport, Support, format_sort_key
+from inventory.models import (
+    EcranNumerique, FacePanneau, FormatSupport, Support, format_sort_key,
+)
 
 from .forms import *
 
@@ -64,7 +67,7 @@ def _get_compteurs():
     if cached:
         return cached
 
-    today = timezone.now().date()
+    today = timezone.localdate()
     supports = Support.objects.filter(actif=True)
     nb_supports = supports.filter(type_support='panneau').count()
     nb_ecrans   = supports.filter(type_support='ecran').count()
@@ -903,7 +906,7 @@ class SupportDetailView(DetailView):
         # Client courant pour get_statut (None si staff)
         client_courant = getattr(self.request.user, 'client_profile', None)
 
-        today = timezone.now().date()
+        today = timezone.localdate()
         now   = timezone.now()
 
         # ── Campagnes actives et historique ───────────────────────────────
@@ -939,6 +942,7 @@ class SupportDetailView(DetailView):
         ecran       = None
         ecran_stats = []
         spots_data  = []
+        ecran_programme_data = []
 
         # ── Logique spécifique PANNEAU ────────────────────────────────────
         if support.type_support == 'panneau':
@@ -1004,12 +1008,87 @@ class SupportDetailView(DetailView):
                     ('Diffusion',  'bi-clock',        plage_str,                       'var(--color-primary)'),
                 ]
 
-                for ligne in lignes_actives:
+                date_fin_telemetrie = today + timedelta(days=30)
+                lignes_telemetrie = LigneCampagne.objects.filter(
+                    support=support,
+                    campagne__statut__in=[
+                        Campagne.STATUT_EN_COURS,
+                        Campagne.STATUT_A_VENIR,
+                    ],
+                    campagne__date_debut__lte=date_fin_telemetrie,
+                    campagne__date_fin__gte=today,
+                ).filter(
+                    Q(date_debut__lte=date_fin_telemetrie)
+                    | Q(date_debut__isnull=True)
+                ).filter(
+                    Q(date_fin__gte=today) | Q(date_fin__isnull=True)
+                ).select_related(
+                    'campagne__client', 'campagne', 'support'
+                ).prefetch_related('campagne__pauses')
+
+                for ligne in lignes_telemetrie:
                     spots_data.append({
                         'id':       ligne.pk,
                         'name':     f"{ligne.campagne.client.nom} — {ligne.campagne.nom}",
-                        'dur':      ligne.campagne.duree_passage or 20,
-                        'interval': ligne.campagne.frequence or 120,
+                        'dur':      EcranNumerique.DUREE_SPOT_SECONDES,
+                        'interval': ligne.get_frequence_effective() or 0,
+                        'windows':  ligne.get_tranches_effective() or '',
+                        'start':    max(
+                            ligne.date_debut or ligne.campagne.date_debut,
+                            ligne.campagne.date_debut,
+                        ).isoformat(),
+                        'end':      min(
+                            ligne.date_fin or ligne.campagne.date_fin,
+                            ligne.campagne.date_fin,
+                        ).isoformat(),
+                        'visuals':  ligne.campagne.get_nombre_visuels_effective(),
+                        'pauses':   [
+                            {
+                                'start': pause.date_debut.isoformat(),
+                                'end': (pause.date_fin or date_fin_telemetrie).isoformat(),
+                            }
+                            for pause in ligne.campagne.pauses.all()
+                            if pause.date_debut <= date_fin_telemetrie
+                            and (pause.date_fin is None or pause.date_fin >= today)
+                        ],
+                    })
+                programmes = list(
+                    ecran.programmes.prefetch_related('plages').order_by(
+                        'date_debut', 'pk'
+                    )
+                )
+                for offset in range(32):
+                    jour = today + timedelta(days=offset)
+                    programmes_actifs = [
+                        programme for programme in programmes
+                        if programme.date_debut <= jour
+                        and (
+                            programme.date_fin is None
+                            or programme.date_fin >= jour
+                        )
+                    ]
+                    programme = (
+                        max(
+                            programmes_actifs,
+                            key=lambda item: (item.date_debut, item.pk),
+                        )
+                        if programmes_actifs else None
+                    )
+                    plages = (
+                        [
+                            (plage.heure_debut, plage.heure_fin)
+                            for plage in programme.plages.all()
+                            if plage.jour_semaine == jour.weekday()
+                        ]
+                        if programme else
+                        [(ecran.heure_allumage, ecran.heure_extinction)]
+                    )
+                    ecran_programme_data.append({
+                        'date': jour.isoformat(),
+                        'windows': [
+                            [debut.strftime('%H:%M'), fin.strftime('%H:%M')]
+                            for debut, fin in plages
+                        ],
                     })
 
         # ── Contexte final ────────────────────────────────────────────────
@@ -1022,6 +1101,7 @@ class SupportDetailView(DetailView):
             'ecran_stats':    ecran_stats,
             'info_rows':      info_rows,
             'spots_data':     spots_data,
+            'ecran_programme_data': ecran_programme_data,
             'reservations':   reservations,
         })
         return context

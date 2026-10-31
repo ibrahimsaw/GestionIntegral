@@ -175,6 +175,17 @@ class CampagneForm(forms.ModelForm):
                 args = (data, *args[1:])
 
         super().__init__(*args, **kwargs)
+        statuts_geres_par_actions = {
+            Campagne.STATUT_EN_PAUSE,
+            Campagne.STATUT_ANNULEE,
+        }
+        if self.instance.pk and self.instance.statut in statuts_geres_par_actions:
+            self.fields['statut'].disabled = True
+        else:
+            self.fields['statut'].choices = [
+                choice for choice in self.fields['statut'].choices
+                if choice[0] not in statuts_geres_par_actions
+            ]
         self.fields['client'].required = False
         self.fields['client'].help_text = "Laissez vide pour une campagne propre à INTEGRAL."
 

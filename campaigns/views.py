@@ -24,8 +24,7 @@ from accounts.audit import log_action
 from .models import *
 from inventory.models import (
     Support, FacePanneau, EcranNumerique, FormatSupport, Emplacement, Marche,
-    ObjectifSpotsEcranAnnuel, SupportDeletionRequest, format_sort_key,
-    formats_croissants,
+    SupportDeletionRequest, format_sort_key, formats_croissants,
 )
 from .forms import (
     ClientForm,
@@ -167,7 +166,9 @@ def api_dashboard_campagnes(request, statut):
 
 def api_dashboard_client_campagnes(request, client_id):
     client = get_object_or_404(Client, pk=client_id)
-    campagnes_qs = client.campagnes.filter(statut__in=['en_cours', 'a_venir']).order_by('-date_debut')
+    campagnes_qs = client.campagnes.filter(
+        statut__in=['en_cours', 'a_venir', 'en_pause']
+    ).order_by('-date_debut')
 
     back_button = format_html(
         '''<button class="btn btn-sm btn-outline-secondary mb-3"
@@ -450,6 +451,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             campagne__statut__in=[
                 Campagne.STATUT_EN_COURS,
                 Campagne.STATUT_A_VENIR,
+                Campagne.STATUT_EN_PAUSE,
                 Campagne.STATUT_TERMINEE,
             ],
         )
@@ -548,26 +550,29 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
     @classmethod
     def _build_screen_spot_stats(cls, ville_active, today):
-        """Calcule les spots cumulés des campagnes et leur projection par écran."""
+        """Calcule les taux quotidien et cumulé d'occupation des écrans."""
         screens = EcranNumerique.objects.all()
         if ville_active:
             screens = screens.filter(support__ville__iexact=ville_active)
 
         year_start = date(today.year, 1, 1)
         year_end = date(today.year, 12, 31)
-        year_days = (year_end - year_start).days + 1
-        elapsed_days = (today - year_start).days + 1
-        screen_ids = list(screens.values_list('support_id', flat=True))
-        targets = dict(
-            ObjectifSpotsEcranAnnuel.objects.filter(
-                ecran__support_id__in=screen_ids,
-                annee=today.year,
-            ).values_list('ecran__support_id', 'nombre_spots')
+        screen_rows = list(
+            screens.select_related('support').prefetch_related('programmes__plages')
         )
+        screen_ids = [screen.support_id for screen in screen_rows]
+        targets = {
+            screen.support_id: screen.calculer_objectif_spots_annuel(
+                today.year, today
+            )
+            for screen in screen_rows
+        }
         campaign_lines = LigneCampagne.objects.filter(
             support_id__in=screen_ids,
             campagne__statut__in=[
                 Campagne.STATUT_EN_COURS,
+                Campagne.STATUT_EN_PAUSE,
+                Campagne.STATUT_A_VENIR,
                 Campagne.STATUT_TERMINEE,
             ],
             campagne__date_debut__lte=today,
@@ -578,6 +583,22 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             realized_spots[line.support_id] = (
                 realized_spots.get(line.support_id, 0)
                 + line.calculer_spots_sur_periode(year_start, today)
+            )
+
+        todays_campaign_lines = LigneCampagne.objects.filter(
+            support_id__in=screen_ids,
+            campagne__statut__in=[
+                Campagne.STATUT_EN_COURS,
+                Campagne.STATUT_A_VENIR,
+            ],
+            campagne__date_debut__lte=today,
+            campagne__date_fin__gte=today,
+        ).select_related('campagne', 'support')
+        today_spots = {}
+        for line in todays_campaign_lines:
+            today_spots[line.support_id] = (
+                today_spots.get(line.support_id, 0)
+                + line.calculer_spots_sur_periode(today, today)
             )
 
         tomorrow = today + timedelta(days=1)
@@ -601,7 +622,10 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 nb_occupees=Count(
                     'support_id',
                     filter=Q(
-                        support__lignes_campagne__campagne__statut=Campagne.STATUT_EN_COURS,
+                        support__lignes_campagne__campagne__statut__in=[
+                            Campagne.STATUT_EN_COURS,
+                            Campagne.STATUT_EN_PAUSE,
+                        ],
                         support__lignes_campagne__campagne__date_debut__lte=today,
                         support__lignes_campagne__campagne__date_fin__gte=today,
                     ),
@@ -610,18 +634,40 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             )
         }
         stats_by_screen = {}
+        screens_by_id = {screen.support_id: screen for screen in screen_rows}
         for screen_id in screen_ids:
             target = targets.get(screen_id)
             realized = realized_spots.get(screen_id, 0)
+            screen = screens_by_id[screen_id]
+            spots_today = today_spots.get(screen_id, 0)
+            available_seconds_today = screen.secondes_disponibles_jour(today)
+            reserved_seconds_today = (
+                spots_today * EcranNumerique.DUREE_SPOT_SECONDES
+            )
+            available_seconds_year_to_date = (
+                (target or 0) * EcranNumerique.DUREE_SPOT_SECONDES
+            )
+            reserved_seconds_year_to_date = (
+                realized * EcranNumerique.DUREE_SPOT_SECONDES
+            )
             forecast = realized + future_spots.get(screen_id, 0)
-            prorated_target = target * elapsed_days / year_days if target else 0
             stats_by_screen[screen_id] = {
                 'objectif_spots_annuel': target,
                 'spots_realises': realized,
+                'spots_aujourdhui': spots_today,
                 'spots_previsionnels': forecast,
-                'taux_actuel': round(realized / prorated_target * 100, 1)
-                if prorated_target else None,
-                'taux_annuel': round(realized / target * 100, 1) if target else None,
+                'secondes_reservees_aujourdhui': reserved_seconds_today,
+                'secondes_disponibles_aujourdhui': available_seconds_today,
+                'secondes_reservees_cumulees': reserved_seconds_year_to_date,
+                'secondes_disponibles_cumulees': available_seconds_year_to_date,
+                'taux_actuel': round(
+                    reserved_seconds_today / available_seconds_today * 100, 1
+                ) if available_seconds_today else None,
+                'taux_annuel': round(
+                    reserved_seconds_year_to_date
+                    / available_seconds_year_to_date * 100,
+                    1,
+                ) if available_seconds_year_to_date else None,
             }
         return stats_by_screen
 
@@ -642,7 +688,10 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 nb_occupees=Count(
                     'support_id',
                     filter=Q(
-                        support__lignes_campagne__campagne__statut=Campagne.STATUT_EN_COURS,
+                        support__lignes_campagne__campagne__statut__in=[
+                            Campagne.STATUT_EN_COURS,
+                            Campagne.STATUT_EN_PAUSE,
+                        ],
                         support__lignes_campagne__campagne__date_debut__lte=today,
                         support__lignes_campagne__campagne__date_fin__gte=today,
                     ),
@@ -656,6 +705,10 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 'objectif': 0,
                 'realises': 0,
                 'previsionnels': 0,
+                'secondes_reservees_aujourdhui': 0,
+                'secondes_disponibles_aujourdhui': 0,
+                'secondes_reservees_cumulees': 0,
+                'secondes_disponibles_cumulees': 0,
             })
             metrics = stats_by_screen.get(screen_id, {})
             objectif = metrics.get('objectif_spots_annuel')
@@ -663,10 +716,14 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 group['objectif'] += objectif
                 group['realises'] += metrics.get('spots_realises', 0)
                 group['previsionnels'] += metrics.get('spots_previsionnels', 0)
+            for key in (
+                'secondes_reservees_aujourdhui',
+                'secondes_disponibles_aujourdhui',
+                'secondes_reservees_cumulees',
+                'secondes_disponibles_cumulees',
+            ):
+                group[key] += metrics.get(key, 0)
 
-        year_start = date(today.year, 1, 1)
-        year_days = (date(today.year, 12, 31) - year_start).days + 1
-        elapsed_days = (today - year_start).days + 1
         return [
             {
                 'resolution': label,
@@ -680,14 +737,15 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 'spots_realises': grouped.get(code, {}).get('realises', 0),
                 'spots_previsionnels': grouped.get(code, {}).get('previsionnels', 0),
                 'taux_actuel': round(
-                    grouped[code]['realises']
-                    / (grouped[code]['objectif'] * elapsed_days / year_days) * 100,
+                    grouped[code]['secondes_reservees_aujourdhui']
+                    / grouped[code]['secondes_disponibles_aujourdhui'] * 100,
                     1,
-                ) if grouped.get(code, {}).get('objectif') else None,
+                ) if grouped.get(code, {}).get('secondes_disponibles_aujourdhui') else None,
                 'taux_annuel': round(
-                    grouped[code]['realises'] / grouped[code]['objectif'] * 100,
+                    grouped[code]['secondes_reservees_cumulees']
+                    / grouped[code]['secondes_disponibles_cumulees'] * 100,
                     1,
-                ) if grouped.get(code, {}).get('objectif') else None,
+                ) if grouped.get(code, {}).get('secondes_disponibles_cumulees') else None,
             }
             for code, label in EcranNumerique.RESOLUTION_CHOICES
             if code in counts_by_resolution
@@ -790,7 +848,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         revenu_a_venir = sum(c.montant_total() for c in campagnes_a_venir_list)
 
         campagnes_meres_qs = Campagne.objects.filter(
-            est_mere=True, statut__in=['en_cours', 'a_venir']
+            est_mere=True, statut__in=['en_cours', 'a_venir', 'en_pause']
         ).prefetch_related('sous_campagnes__lignes__face__support')
         campagnes_meres_count = campagnes_meres_qs.count()
         revenu_meres = sum(c.montant_total() for c in campagnes_meres_qs)
@@ -813,9 +871,9 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
         # ── Faces les plus productives ──
         top_faces_qs = FacePanneau.objects.select_related('support').annotate(
-            usage_count=Count('lignes_campagne', filter=Q(lignes_campagne__campagne__statut__in=['en_cours', 'a_venir'])),
+            usage_count=Count('lignes_campagne', filter=Q(lignes_campagne__campagne__statut__in=['en_cours', 'a_venir', 'en_pause'])),
             revenue=Coalesce(
-                Sum('lignes_campagne__campagne__prix', filter=Q(lignes_campagne__campagne__statut__in=['en_cours', 'a_venir'])),
+                Sum('lignes_campagne__campagne__prix', filter=Q(lignes_campagne__campagne__statut__in=['en_cours', 'a_venir', 'en_pause'])),
                 Value(0, output_field=DecimalField(max_digits=12, decimal_places=2)),
                 output_field=DecimalField(max_digits=12, decimal_places=2),
             ),
@@ -862,9 +920,16 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         # ── Faces occupées / réservées (déjà optimal) ──
         faces_occupees_ids = set(
             LigneCampagne.objects.filter(
-                campagne__date_debut__lte=today,
-                campagne__date_fin__gte=today,
-                campagne__statut__in=['en_cours', 'a_venir'],
+                Q(
+                    campagne__statut__in=['en_cours', 'a_venir'],
+                    campagne__date_debut__lte=today,
+                    campagne__date_fin__gte=today,
+                )
+                | Q(
+                    campagne__statut='en_pause',
+                    campagne__date_debut__lte=today,
+                    campagne__date_mise_en_pause__lte=today,
+                )
             ).values_list('face_id', flat=True)
         )
         faces_reservees_ids = set(
@@ -954,15 +1019,32 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         ecran_spots_realises_total = sum(
             item['spots_realises'] for item in ecrans_stats_par_resolution
         )
+        ecran_secondes_reservees_aujourdhui = sum(
+            item['secondes_reservees_aujourdhui']
+            for item in screen_spot_stats.values()
+        )
+        ecran_secondes_disponibles_aujourdhui = sum(
+            item['secondes_disponibles_aujourdhui']
+            for item in screen_spot_stats.values()
+        )
+        ecran_secondes_reservees_cumulees = sum(
+            item['secondes_reservees_cumulees']
+            for item in screen_spot_stats.values()
+        )
+        ecran_secondes_disponibles_cumulees = sum(
+            item['secondes_disponibles_cumulees']
+            for item in screen_spot_stats.values()
+        )
         ecrans_taux_actuel = round(
-            ecran_spots_realises_total
-            / (ecran_objectifs_total * elapsed_days / year_days) * 100,
+            ecran_secondes_reservees_aujourdhui
+            / ecran_secondes_disponibles_aujourdhui * 100,
             1,
-        ) if ecran_objectifs_total else None
+        ) if ecran_secondes_disponibles_aujourdhui else None
         ecrans_taux_annuel = round(
-            ecran_spots_realises_total / ecran_objectifs_total * 100,
+            ecran_secondes_reservees_cumulees
+            / ecran_secondes_disponibles_cumulees * 100,
             1,
-        ) if ecran_objectifs_total else None
+        ) if ecran_secondes_disponibles_cumulees else None
         campaign_category_groups_present = [
             group for group in campaign_category_groups if group['nb_supports'] > 0
         ]
@@ -1065,10 +1147,18 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         # Même règle que _build_screen_resolution_stats : campagne en cours à la date du jour
         ecrans_occupes_ids = set(
             LigneCampagne.objects.filter(
-                campagne__statut=Campagne.STATUT_EN_COURS,
-                campagne__date_debut__lte=today,
-                campagne__date_fin__gte=today,
                 support_id__isnull=False,
+            ).filter(
+                Q(
+                    campagne__statut=Campagne.STATUT_EN_COURS,
+                    campagne__date_debut__lte=today,
+                    campagne__date_fin__gte=today,
+                )
+                | Q(
+                    campagne__statut=Campagne.STATUT_EN_PAUSE,
+                    campagne__date_debut__lte=today,
+                    campagne__date_mise_en_pause__lte=today,
+                )
             ).values_list('support_id', flat=True)
         )
 
@@ -1337,9 +1427,16 @@ def _faces_occupees_et_reservees(today):
     """Mêmes règles que DashboardView.get_context_data."""
     occupees = set(
         LigneCampagne.objects.filter(
-            campagne__date_debut__lte=today,
-            campagne__date_fin__gte=today,
-            campagne__statut__in=['en_cours', 'a_venir'],
+            Q(
+                campagne__statut__in=['en_cours', 'a_venir'],
+                campagne__date_debut__lte=today,
+                campagne__date_fin__gte=today,
+            )
+            | Q(
+                campagne__statut='en_pause',
+                campagne__date_debut__lte=today,
+                campagne__date_mise_en_pause__lte=today,
+            )
         ).values_list('face_id', flat=True)
     )
     reservees = set(
@@ -2437,6 +2534,7 @@ class CampagneListView(ClientStaffRequiredMixin, SortableListMixin, ListView):
 
         context['kpi_total'] = base_qs.count()
         context['kpi_en_cours'] = base_qs.filter(statut='en_cours').count()
+        context['kpi_en_pause'] = base_qs.filter(statut='en_pause').count()
         context['kpi_a_venir'] = base_qs.filter(statut='a_venir').count()
         context['kpi_terminee'] = base_qs.filter(statut='terminee').count()
         context['kpi_brouillon'] = base_qs.filter(statut='brouillon').count()
@@ -2535,11 +2633,132 @@ class CampagneListView(ClientStaffRequiredMixin, SortableListMixin, ListView):
             request.session['selected_campagne_ids'] = selected_ids
             return redirect('campagne_selected_delete')
         elif action == 'archiver':
-            count = qs.update(actif=False)
+            count = qs.filter(actif=True).update(actif=False)
             messages.success(request, f"{count} campagne(s) archivée(s).")
+        elif action == 'desarchiver':
+            count = qs.filter(actif=False).update(actif=True)
+            messages.success(request, f"{count} campagne(s) désarchivée(s).")
+        elif action in {
+            'mettre_en_pause',
+            'annuler',
+            'reprendre_prolonger',
+            'reprendre_garder',
+        }:
+            resultats = [
+                _transition_campagne(campagne, action)
+                for campagne in qs
+            ]
+            nombre_ok = sum(1 for succes, _ in resultats if succes)
+            details = [message for succes, message in resultats if not succes]
+            if nombre_ok:
+                messages.success(
+                    request, f"{nombre_ok} campagne(s) mise(s) à jour."
+                )
+            if details:
+                messages.warning(request, " ".join(details[:3]))
         else:
             messages.error(request, f"Action inconnue : {action}")
         return redirect('campagne_list')
+
+
+@transaction.atomic
+def _transition_campagne(campagne, action):
+    aujourd_hui = timezone.localdate()
+    statuts_modifiables = {
+        Campagne.STATUT_EN_COURS,
+        Campagne.STATUT_A_VENIR,
+        Campagne.STATUT_EN_PAUSE,
+    }
+
+    if action == 'mettre_en_pause':
+        if campagne.statut not in {
+            Campagne.STATUT_EN_COURS,
+            Campagne.STATUT_A_VENIR,
+        }:
+            return False, f"{campagne.nom} ne peut pas être mise en pause."
+        campagne.statut = Campagne.STATUT_EN_PAUSE
+        campagne.date_mise_en_pause = aujourd_hui
+        campagne.save(update_fields=['statut', 'date_mise_en_pause', 'updated_at'])
+        CampagnePause.objects.create(campagne=campagne, date_debut=aujourd_hui)
+        return True, ''
+
+    if action == 'annuler':
+        if campagne.statut not in statuts_modifiables:
+            return False, f"{campagne.nom} ne peut pas être annulée."
+        if campagne.statut == Campagne.STATUT_EN_PAUSE:
+            campagne.pauses.filter(date_fin__isnull=True).update(
+                date_fin=aujourd_hui - timedelta(days=1)
+            )
+        campagne.statut = Campagne.STATUT_ANNULEE
+        campagne.date_annulation = aujourd_hui
+        campagne.date_fin = min(
+            campagne.date_fin, aujourd_hui - timedelta(days=1)
+        )
+        campagne.date_mise_en_pause = None
+        campagne.save(update_fields=[
+            'statut', 'date_annulation', 'date_fin', 'date_mise_en_pause',
+            'updated_at',
+        ])
+        return True, ''
+
+    if action in {'reprendre_prolonger', 'reprendre_garder'}:
+        if campagne.statut != Campagne.STATUT_EN_PAUSE:
+            return False, f"{campagne.nom} n'est pas en pause."
+        date_pause = campagne.date_mise_en_pause or aujourd_hui
+        jours_pause = max((aujourd_hui - date_pause).days, 0)
+        if action == 'reprendre_prolonger':
+            campagne.date_fin += timedelta(days=jours_pause)
+        campagne.pauses.filter(date_fin__isnull=True).update(
+            date_fin=aujourd_hui - timedelta(days=1)
+        )
+        campagne.date_mise_en_pause = None
+        if campagne.date_debut > aujourd_hui:
+            campagne.statut = Campagne.STATUT_A_VENIR
+        elif campagne.date_fin >= aujourd_hui:
+            campagne.statut = Campagne.STATUT_EN_COURS
+        else:
+            campagne.statut = Campagne.STATUT_TERMINEE
+        campagne.save(update_fields=[
+            'statut', 'date_fin', 'date_mise_en_pause', 'updated_at',
+        ])
+        return True, ''
+
+    return False, f"Action inconnue pour {campagne.nom}."
+
+
+class CampagneStateChangeView(StaffRequiredMixin, View):
+    def post(self, request, pk):
+        campagne = get_object_or_404(Campagne, pk=pk)
+        action = request.POST.get('action', '')
+        succes, message = _transition_campagne(campagne, action)
+        if succes:
+            messages.success(request, "État de la campagne mis à jour.")
+        else:
+            messages.error(request, message)
+        return redirect('campagne_detail', pk=campagne.pk)
+
+
+class CampagneArchiveToggleView(StaffRequiredMixin, View):
+    """Archive or restore a campaign from its detail page."""
+
+    def post(self, request, pk):
+        campagne = get_object_or_404(Campagne, pk=pk)
+        action = request.POST.get('action')
+        if action not in {'archiver', 'desarchiver'}:
+            messages.error(request, "Action d'archivage inconnue.")
+            return redirect('campagne_detail', pk=campagne.pk)
+        if action == 'archiver' and campagne.actif:
+            campagne.actif = False
+            campagne.save(update_fields=['actif'])
+            messages.success(request, 'Campagne archivée.')
+        elif action == 'desarchiver' and not campagne.actif:
+            campagne.actif = True
+            campagne.save(update_fields=['actif'])
+            messages.success(request, 'Campagne désarchivée.')
+        else:
+            messages.info(request, 'La campagne est déjà dans cet état.')
+        return redirect('campagne_detail', pk=campagne.pk)
+
 
 class CampagneSelectedDeleteView(StaffRequiredMixin, TemplateView):
     # On cible ton fichier HTML générique de confirmation
@@ -2757,12 +2976,20 @@ def serialize_supports_for_map(lignes):
                     ecran_info = None
                     if support.type_support == 'ecran' and hasattr(support, 'ecran_info'):
                         e_info = support.ecran_info
+                        plages_actives = e_info.plages_actives()
                         ecran_info = {
                             'type_ecran': e_info.get_type_ecran_display(),
                             'resolution': e_info.get_resolution_display(),
                             'cellule': e_info.get_cellule_display() if hasattr(e_info, 'get_cellule_display') else e_info.cellule,
-                            'heure_allumage': str(e_info.heure_allumage)[:5],
-                            'heure_extinction': str(e_info.heure_extinction)[:5],
+                            'heure_allumage': plages_actives[0][0].strftime('%H:%M') if plages_actives else None,
+                            'heure_extinction': plages_actives[-1][1].strftime('%H:%M') if plages_actives else None,
+                            'plages_horaires': [
+                                {
+                                    'debut': debut.strftime('%H:%M'),
+                                    'fin': fin.strftime('%H:%M'),
+                                }
+                                for debut, fin in plages_actives
+                            ],
                             'spots': supp_lignes[0].calculer_spots() if supp_lignes else 0,
                             'frequence': supp_lignes[0].get_frequence_effective() if supp_lignes else '',
                             'duree': supp_lignes[0].get_duree_passage_effective() if supp_lignes else '',
@@ -4565,10 +4792,18 @@ def verifier_dispo_faces_api(request, client_pk=None):
 
     # ── Conflits via LigneCampagne (campagnes actives) ────────────────────
     qs_camp = LigneCampagne.objects.filter(
-        campagne__date_debut__lte=date_fin.date(),
-        campagne__date_fin__gte=date_debut.date(),
-        campagne__statut__in=['en_cours', 'a_venir'],
         face__isnull=False,
+    ).filter(
+        Q(
+            campagne__statut__in=['en_cours', 'a_venir'],
+            campagne__date_debut__lte=date_fin.date(),
+            campagne__date_fin__gte=date_debut.date(),
+        )
+        | Q(
+            campagne__statut='en_pause',
+            campagne__date_debut__lte=date_fin.date(),
+            campagne__date_mise_en_pause__lte=date_fin.date(),
+        )
     )
     faces_campagnes = set(qs_camp.values_list('face_id', flat=True))
 
@@ -4640,9 +4875,16 @@ def api_check_dispo(request, client_pk):
         lc['face_id']: lc
         for lc in LigneCampagne.objects
         .filter(
-            campagne__date_debut__lte=date_fin.date(),
-            campagne__date_fin__gte=date_debut.date(),
-            campagne__statut__in=['en_cours', 'a_venir'],
+            Q(
+                campagne__statut__in=['en_cours', 'a_venir'],
+                campagne__date_debut__lte=date_fin.date(),
+                campagne__date_fin__gte=date_debut.date(),
+            )
+            | Q(
+                campagne__statut='en_pause',
+                campagne__date_debut__lte=date_fin.date(),
+                campagne__date_mise_en_pause__lte=date_fin.date(),
+            )
         )
         .select_related('campagne__client')
         .values(
@@ -4956,9 +5198,17 @@ class AjaxCheckFacesDispoView(StaffOnlyMixin, View):
                 if statut == 'occupe':
                     lc = LigneCampagne.objects.filter(
                         face=face,
-                        campagne__date_debut__lte=date_fin_d,
-                        campagne__date_fin__gte=date_debut_d,
-                        campagne__statut__in=['en_cours', 'a_venir'],
+                    ).filter(
+                        Q(
+                            campagne__statut__in=['en_cours', 'a_venir'],
+                            campagne__date_debut__lte=date_fin_d,
+                            campagne__date_fin__gte=date_debut_d,
+                        )
+                        | Q(
+                            campagne__statut='en_pause',
+                            campagne__date_debut__lte=date_fin_d,
+                            campagne__date_mise_en_pause__lte=date_fin_d,
+                        )
                     ).select_related('campagne').first()
                     if lc:
                         conflits.append({

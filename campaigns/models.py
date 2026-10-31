@@ -5,11 +5,13 @@ from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import FileExtensionValidator
 from django.db import models
+from django.db.models import Q
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
 from inventory.models import (
     FormatSupport,
+    calculer_heures_chevauchement,
     get_dynamic_format_choices,
     normaliser_categorie_format,
 )
@@ -61,6 +63,7 @@ FREQUENCE_CHOICES = [
 STATUT_BROUILLON = 'brouillon'
 STATUT_A_VENIR   = 'a_venir'
 STATUT_EN_COURS  = 'en_cours'
+STATUT_EN_PAUSE  = 'en_pause'
 STATUT_TERMINEE  = 'terminee'
 STATUT_ANNULEE   = 'annulee'
 
@@ -68,6 +71,7 @@ STATUT_CHOICES = [
     (STATUT_BROUILLON, 'Brouillon'),
     (STATUT_A_VENIR,   'À venir'),
     (STATUT_EN_COURS,  'En cours'),
+    (STATUT_EN_PAUSE,  'En pause'),
     (STATUT_TERMINEE,  'Terminée'),
     (STATUT_ANNULEE,   'Annulée'),
 ]
@@ -882,6 +886,7 @@ class Campagne(models.Model):
     STATUT_BROUILLON = STATUT_BROUILLON
     STATUT_A_VENIR   = STATUT_A_VENIR
     STATUT_EN_COURS  = STATUT_EN_COURS
+    STATUT_EN_PAUSE  = STATUT_EN_PAUSE
     STATUT_TERMINEE  = STATUT_TERMINEE
     STATUT_ANNULEE   = STATUT_ANNULEE
     STATUT_CHOICES   = STATUT_CHOICES
@@ -902,6 +907,12 @@ class Campagne(models.Model):
     )
     date_debut   = models.DateField(verbose_name="Date de début")
     date_fin     = models.DateField(verbose_name="Date de fin")
+    date_mise_en_pause = models.DateField(
+        null=True, blank=True, verbose_name="Date de mise en pause"
+    )
+    date_annulation = models.DateField(
+        null=True, blank=True, verbose_name="Date d'annulation"
+    )
     statut       = models.CharField(max_length=20, choices=STATUT_CHOICES, default=STATUT_EN_COURS,blank=True)
     type_support = models.CharField(
         max_length=20,
@@ -962,6 +973,7 @@ class Campagne(models.Model):
             self.STATUT_BROUILLON: 'secondary',
             self.STATUT_A_VENIR:   'info',
             self.STATUT_EN_COURS:  'success',
+            self.STATUT_EN_PAUSE:  'warning',
             self.STATUT_TERMINEE:  'dark',
             self.STATUT_ANNULEE:   'danger',
         }
@@ -1133,7 +1145,11 @@ class Campagne(models.Model):
 
     def auto_update_statut(self):
         today = timezone.now().date()
-        if self.statut in (self.STATUT_BROUILLON, self.STATUT_ANNULEE):
+        if self.statut in (
+            self.STATUT_BROUILLON,
+            self.STATUT_EN_PAUSE,
+            self.STATUT_ANNULEE,
+        ):
             return
         if today < self.date_debut:
             self.statut = self.STATUT_A_VENIR
@@ -1202,6 +1218,21 @@ class CampagneVisuel(models.Model):
         return f"Visuel pour {self.campagne.nom}"
 
 
+class CampagnePause(models.Model):
+    campagne = models.ForeignKey(
+        'Campagne', on_delete=models.CASCADE, related_name='pauses'
+    )
+    date_debut = models.DateField(verbose_name="Date de mise en pause")
+    date_fin = models.DateField(
+        null=True, blank=True, verbose_name="Date de reprise"
+    )
+
+    class Meta:
+        ordering = ['date_debut', 'pk']
+        verbose_name = "Pause de campagne"
+        verbose_name_plural = "Pauses de campagne"
+
+
 class LigneCampagne(models.Model):
     """Lien entre une campagne et un support (ou un emplacement de marché) avec ses surcharges spécifiques."""
     campagne = models.ForeignKey(Campagne, on_delete=models.CASCADE, related_name='lignes')
@@ -1250,6 +1281,15 @@ class LigneCampagne(models.Model):
 
     def calculer_spots_sur_periode(self, date_debut, date_fin):
         """Calcule les spots de la ligne sur la partie de période demandée."""
+        campagne_debut = self.campagne.date_debut
+        campagne_fin = self.campagne.date_fin
+        debut_ligne = max(self.date_debut or campagne_debut, campagne_debut)
+        fin_ligne = min(self.date_fin or campagne_fin, campagne_fin)
+        date_debut = max(date_debut, debut_ligne)
+        date_fin = min(date_fin, fin_ligne)
+        if date_debut > date_fin:
+            return 0
+
         frequence      = self.get_frequence_effective()
         duree_passage  = self.get_duree_passage_effective()
         tranches       = self.get_tranches_effective()
@@ -1257,20 +1297,125 @@ class LigneCampagne(models.Model):
         if not frequence or not duree_passage:
             return 0
 
-        debut_ligne = self.date_debut or self.campagne.date_debut
-        fin_ligne = self.date_fin or self.campagne.date_fin
-        date_debut = max(date_debut, debut_ligne)
-        date_fin = min(date_fin, fin_ligne)
-        if date_debut > date_fin:
-            return 0
-
         nombre_visuels = self.campagne.get_nombre_visuels_effective() if self.campagne else 1
         spots_par_heure = (3600 / frequence) * nombre_visuels
+        if self.support_id and self.support.type_support == 'ecran':
+            return self._calculer_spots_ecran_sur_periode(
+                date_debut,
+                date_fin,
+                spots_par_heure,
+                duree_passage,
+                tranches,
+            )
+
         heures_tranches = calculer_duree_tranches(tranches)
         spots_par_jour  = spots_par_heure * heures_tranches
 
-        jours_dispo = self.support.jours_disponibles_sur_periode(date_debut, date_fin)
-        return round(spots_par_jour * jours_dispo)
+        pauses = self.campagne.pauses.filter(
+            date_debut__lte=date_fin,
+        ).filter(
+            Q(date_fin__gte=date_debut) | Q(date_fin__isnull=True)
+        ).order_by('date_debut')
+        jours_disponibles = 0
+        date_courante = date_debut
+        for pause in pauses:
+            pause_debut = max(pause.date_debut, date_debut)
+            pause_fin = min(
+                pause.date_fin or date_fin,
+                date_fin,
+            )
+            if pause_fin < date_courante:
+                continue
+            if pause_debut > date_courante:
+                jours_disponibles += self.support.jours_disponibles_sur_periode(
+                    date_courante, pause_debut - datetime.timedelta(days=1)
+                )
+            date_courante = max(
+                date_courante, pause_fin + datetime.timedelta(days=1)
+            )
+            if date_courante > date_fin:
+                break
+        if date_courante <= date_fin:
+            jours_disponibles += self.support.jours_disponibles_sur_periode(
+                date_courante, date_fin
+            )
+        return round(spots_par_jour * jours_disponibles)
+
+    def _calculer_spots_ecran_sur_periode(
+        self, date_debut, date_fin, spots_par_heure, duree_passage, tranches
+    ):
+        ecran = getattr(self.support, 'ecran_info', None)
+        if ecran is None:
+            jours_disponibles = self.support.jours_disponibles_sur_periode(
+                date_debut, date_fin
+            )
+            return round(
+                spots_par_heure
+                * calculer_duree_tranches(tranches)
+                * jours_disponibles
+            )
+        programmes = list(
+            ecran.programmes.filter(
+                date_debut__lte=date_fin,
+            ).filter(
+                Q(date_fin__gte=date_debut) | Q(date_fin__isnull=True)
+            ).prefetch_related('plages').order_by('-date_debut')
+        )
+        pauses = list(
+            self.campagne.pauses.filter(
+                date_debut__lte=date_fin,
+            ).filter(
+                Q(date_fin__gte=date_debut) | Q(date_fin__isnull=True)
+            ).values_list('date_debut', 'date_fin')
+        )
+        pannes = []
+        for periode in self.support.get_periodes_panne(include_signal=False):
+            debut = periode['debut']
+            fin = periode['fin'] or date_fin
+            debut = debut.date() if hasattr(debut, 'date') else debut
+            fin = fin.date() if hasattr(fin, 'date') else fin
+            pannes.append((debut, fin))
+
+        total_spots = 0.0
+        date_courante = date_debut
+        while date_courante <= date_fin:
+            if any(
+                debut_pause <= date_courante <= (fin_pause or date_fin)
+                for debut_pause, fin_pause in pauses
+            ) or any(
+                debut_panne <= date_courante <= fin_panne
+                for debut_panne, fin_panne in pannes
+            ):
+                date_courante += datetime.timedelta(days=1)
+                continue
+
+            programme_actif = next(
+                (
+                    programme for programme in programmes
+                    if programme.date_debut <= date_courante
+                    and (
+                        programme.date_fin is None
+                        or programme.date_fin >= date_courante
+                    )
+                ),
+                None,
+            )
+            if programme_actif:
+                plages_ecran = [
+                    (plage.heure_debut, plage.heure_fin)
+                    for plage in programme_actif.plages.all()
+                    if plage.jour_semaine == date_courante.weekday()
+                ]
+            else:
+                plages_ecran = [(ecran.heure_allumage, ecran.heure_extinction)]
+
+            heures_actives = calculer_heures_chevauchement(plages_ecran, tranches)
+            total_spots += (
+                spots_par_heure * heures_actives
+                if plages_ecran else 0
+            )
+            date_courante += datetime.timedelta(days=1)
+        return round(total_spots)
 
     def calculer_spots(self):
         """Calcule le nombre total de spots pour cette ligne écran."""

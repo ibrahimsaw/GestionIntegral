@@ -18,10 +18,17 @@ from unittest.mock import patch
 from campaigns.forms import LigneCampagneForm
 from campaigns.models import Campagne, Client, LigneCampagne
 from accounts.models import AuditLog
-from inventory.forms import EcranNumeriqueForm, MaintenanceForm, SupportForm
+from inventory.forms import (
+    EcranNumeriqueForm,
+    EcranProgrammeForm,
+    MaintenanceForm,
+    SupportForm,
+)
 from inventory.models import (
     Emplacement,
     EcranNumerique,
+    EcranPlageHoraire,
+    EcranProgramme,
     FacePanneau,
     FormatSupport,
     Marche,
@@ -36,7 +43,9 @@ from inventory.views import (
     SupportListView,
     SupportDetailView,
 )
+from inventory.views import _creer_version_horaire
 from planning.models import LogDiffusion
+from planning.views import _generer_timeline
 from campaigns.context_processors import alerts_data
 from geoad.context_processors import inventory_villes
 
@@ -82,6 +91,202 @@ class EcranAnnualObjectiveFormTests(TestCase):
         )
 
 
+class EcranProgrammeHoraireTests(TestCase):
+    def setUp(self):
+        self.support = Support.objects.create(
+            code='SCREEN-SCHEDULE',
+            nom='Écran horaires programmés',
+            type_support=Support.TYPE_ECRAN,
+            latitude=12.34,
+            longitude=-1.52,
+        )
+        self.ecran = EcranNumerique.objects.create(support=self.support)
+
+    def form_data(self, date_debut, **horaires):
+        data = {
+            'programme-activer_programme': 'on',
+            'programme-date_debut': date_debut.isoformat(),
+        }
+        data.update({
+            f'programme-{jour}': horaires.get(jour, '')
+            for jour in (
+                'lundi', 'mardi', 'mercredi', 'jeudi',
+                'vendredi', 'samedi', 'dimanche',
+            )
+        })
+        return data
+
+    def save_programme(self, date_debut, **horaires):
+        form = EcranProgrammeForm(
+            data=self.form_data(date_debut, **horaires),
+            prefix='programme',
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        _creer_version_horaire(self.ecran, form, None)
+        return self.ecran.programmes.get(date_debut=date_debut)
+
+    def test_schedule_supports_multiple_daily_windows_and_history(self):
+        first_date = datetime.date(2030, 1, 7)
+        first = self.save_programme(
+            first_date,
+            lundi='06:00-12:00, 13:00-22:00',
+        )
+        second_date = datetime.date(2030, 1, 10)
+        second = self.save_programme(
+            second_date,
+            jeudi='08:00-12:00, 14:00-18:00',
+        )
+
+        first.refresh_from_db()
+        self.assertEqual(first.date_fin, datetime.date(2030, 1, 9))
+        self.assertIsNone(second.date_fin)
+        self.assertEqual(
+            self.ecran.plages_actives(first_date),
+            [
+                (datetime.time(6, 0), datetime.time(12, 0)),
+                (datetime.time(13, 0), datetime.time(22, 0)),
+            ],
+        )
+        self.assertEqual(self.ecran.secondes_disponibles_jour(first_date), 15 * 3600)
+        self.assertEqual(self.ecran.plages_actives(datetime.date(2030, 1, 8)), [])
+        self.assertEqual(
+            self.ecran.plages_actives(second_date),
+            [
+                (datetime.time(8, 0), datetime.time(12, 0)),
+                (datetime.time(14, 0), datetime.time(18, 0)),
+            ],
+        )
+        self.assertEqual(self.ecran.programmes.count(), 2)
+
+    def test_schedule_rejects_overlapping_or_invalid_periods(self):
+        form = EcranProgrammeForm(
+            data=self.form_data(
+                datetime.date(2030, 1, 7),
+                lundi='06:00-12:00, 11:00-14:00',
+            ),
+            prefix='programme',
+        )
+
+        self.assertFalse(form.is_valid())
+        self.assertIn('lundi', form.errors)
+
+    def test_screen_spot_count_uses_operating_windows_for_each_day(self):
+        date_cible = datetime.date(2030, 1, 7)
+        self.save_programme(
+            date_cible,
+            lundi='06:00-10:00, 13:00-22:00',
+        )
+        campaign = Campagne.objects.create(
+            client=Client.objects.create(
+                nom='Client horaires test',
+                telephone='00000002',
+                email='screen-schedule@example.com',
+            ),
+            nom='Campagne horaires test',
+            type_support='ecran',
+            date_debut=date_cible,
+            date_fin=date_cible,
+            frequence=3600,
+            duree_passage=20,
+            tranches_horaires='06:00-23:00',
+        )
+        line = LigneCampagne.objects.create(
+            campagne=campaign,
+            support=self.support,
+        )
+
+        self.assertEqual(
+            line.calculer_spots_sur_periode(date_cible, date_cible),
+            13,
+        )
+        self.assertEqual(self.ecran.calculer_occupation_reelle(date_cible), 260)
+
+    def test_planning_timeline_restarts_at_each_activation_window(self):
+        date_cible = datetime.date(2030, 1, 7)
+        self.save_programme(
+            date_cible,
+            lundi='06:00-06:01, 13:00-13:01',
+        )
+        campaign = Campagne.objects.create(
+            client=Client.objects.create(
+                nom='Client timeline test',
+                telephone='00000003',
+                email='screen-timeline@example.com',
+            ),
+            nom='Campagne timeline test',
+            type_support='ecran',
+            date_debut=date_cible,
+            date_fin=date_cible,
+            frequence=3600,
+            duree_passage=20,
+            tranches_horaires='06:00-23:00',
+        )
+        LigneCampagne.objects.create(campagne=campaign, support=self.support)
+
+        timeline = _generer_timeline(self.ecran, date_cible)
+        times = {item['time'] for item in timeline}
+
+        self.assertIn('06:00:00', times)
+        self.assertIn('13:00:00', times)
+        self.assertNotIn('12:00:00', times)
+
+    def test_schedule_history_is_managed_from_annual_objectives(self):
+        debut_programme = timezone.localdate() - datetime.timedelta(days=10)
+        self.save_programme(
+            debut_programme,
+            lundi='06:00-10:00, 13:00-22:00',
+        )
+        staff = get_user_model().objects.create_user(
+            username='screen-schedule-staff',
+            password='test-password',
+            role='staff',
+        )
+        self.client.force_login(staff)
+
+        response = self.client.get(
+            reverse('support_edit', args=[self.support.uuid])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'Historique des programmes')
+
+        response = self.client.get(
+            reverse('ecran_objectifs_annuels', args=[self.support.uuid])
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Historique des programmes')
+        self.assertContains(response, debut_programme.strftime('%d/%m/%Y'))
+        self.assertContains(response, 'Programme modifié le')
+        self.assertContains(response, '06:00')
+        self.assertContains(response, '22:00')
+
+    def test_annual_objective_uses_base_hours_then_replaced_programs_to_date(self):
+        debut_ecran = datetime.datetime(2030, 1, 12, 8)
+        Support.objects.filter(pk=self.support.pk).update(
+            created_at=timezone.make_aware(debut_ecran)
+        )
+        self.support.refresh_from_db()
+        self.ecran.heure_allumage = datetime.time(6)
+        self.ecran.heure_extinction = datetime.time(22)
+        self.ecran.save()
+        self.save_programme(
+            datetime.date(2030, 1, 20),
+            lundi='08:00-09:00',
+            mardi='08:00-09:00',
+            mercredi='08:00-09:00',
+            jeudi='08:00-09:00',
+            vendredi='08:00-09:00',
+            samedi='08:00-09:00',
+            dimanche='08:00-09:00',
+        )
+
+        objectif = self.ecran.calculer_objectif_spots_annuel(
+            2030, datetime.date(2030, 3, 12)
+        )
+
+        self.assertEqual(objectif, 32400)
+
+
 class EcranAnnualObjectiveManagementTests(TestCase):
     def setUp(self):
         self.support = Support.objects.create(
@@ -110,11 +315,26 @@ class EcranAnnualObjectiveManagementTests(TestCase):
         response = self.client.get(self.url)
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'value="200000"')
-        self.assertContains(response, str(previous.annee))
-        self.assertContains(response, '24000')
+        self.assertContains(
+            response,
+            f'Objectif {timezone.localdate().year} calculé',
+        )
+        self.assertContains(response, 'Historique des programmes')
+        self.assertContains(response, str(timezone.localdate().year))
+        self.assertContains(
+            response,
+            f'>{response.context["objectif_calcule"]}<',
+        )
+        self.assertContains(response, 'Horaire de base')
+        self.assertNotContains(response, 'Historique des objectifs')
+        self.assertContains(response, '3 spots par minute')
+        self.assertNotIn('form', response.context)
+        self.assertEqual(
+            response.context['historique_par_annee'][0]['annee'],
+            previous.annee + 1,
+        )
 
-    def test_saving_a_year_updates_only_that_year_and_preserves_history(self):
+    def test_year_is_automatic_and_save_updates_current_year_only(self):
         previous = ObjectifSpotsEcranAnnuel.objects.create(
             ecran=self.screen,
             annee=timezone.localdate().year - 1,
@@ -124,25 +344,53 @@ class EcranAnnualObjectiveManagementTests(TestCase):
 
         response = self.client.post(self.url, {
             'annee': previous.annee,
-            'nombre_spots': 36500,
         })
 
-        self.assertRedirects(
-            response,
-            f'{self.url}?annee={previous.annee}',
-        )
+        self.assertRedirects(response, self.url)
         previous.refresh_from_db()
-        self.assertEqual(previous.nombre_spots, 36500)
+        self.assertEqual(previous.nombre_spots, 24000)
         self.assertEqual(
-            ObjectifSpotsEcranAnnuel.objects.filter(ecran=self.screen).count(),
-            1,
+            self.screen.objectifs_annuels.get(
+                annee=timezone.localdate().year
+            ).nombre_spots,
+            self.screen.calculer_objectif_spots_annuel(
+                timezone.localdate().year
+            ),
         )
-        next_year = timezone.localdate().year
-        self.client.post(self.url, {'annee': next_year, 'nombre_spots': 200000})
         self.assertEqual(
             set(self.screen.objectifs_annuels.values_list('annee', flat=True)),
-            {previous.annee, next_year},
+            {previous.annee, timezone.localdate().year},
         )
+
+    def test_program_saved_here_recalculates_the_target_automatically(self):
+        today = timezone.localdate()
+        jour_actif = today.weekday()
+        data = {
+            'annee': today.year,
+            'programme-date_debut': today.isoformat(),
+        }
+        data.update({
+            f'programme-{field_name}': (
+                '08:00-09:00' if jour == jour_actif else ''
+            )
+            for field_name, jour, _ in EcranProgrammeForm.JOUR_FIELDS
+        })
+        self.client.force_login(self.staff)
+
+        response = self.client.post(self.url, data)
+
+        self.assertRedirects(response, self.url)
+        programme = self.screen.programmes.get(date_debut=today)
+        self.assertEqual(
+            self.screen.plages_actives(today),
+            [(datetime.time(8, 0), datetime.time(9, 0))],
+        )
+        objectif = self.screen.objectifs_annuels.get(annee=today.year)
+        self.assertEqual(
+            objectif.nombre_spots,
+            self.screen.calculer_objectif_spots_annuel(today.year, today),
+        )
+        self.assertEqual(programme.date_fin, None)
 
     def test_non_staff_cannot_manage_annual_targets(self):
         technician = get_user_model().objects.create_user(
@@ -159,28 +407,73 @@ class EcranAnnualObjectiveManagementTests(TestCase):
 
     def test_screen_detail_shows_dashboard_style_current_and_annual_rates(self):
         today = timezone.localdate()
-        ObjectifSpotsEcranAnnuel.objects.create(
-            ecran=self.screen,
-            annee=today.year,
-            nombre_spots=200,
+        client = Client.objects.create(
+            nom='Client taux écran',
+            telephone='00000001',
+            email='screen-rates@example.com',
         )
-        LogDiffusion.objects.create(
+        campaign = Campagne.objects.create(
+            client=client,
+            nom='Campagne taux écran',
+            type_support='ecran',
+            date_debut=today,
+            date_fin=today,
+            statut=Campagne.STATUT_EN_COURS,
+            frequence=120,
+            duree_passage=10,
+            tranches_horaires='08:00-09:00',
+        )
+        line = LigneCampagne.objects.create(campagne=campaign, support=self.support)
+        line = LigneCampagne.objects.select_related(
+            'campagne', 'support__ecran_info'
+        ).get(pk=line.pk)
+        self.screen.refresh_from_db()
+        programme = EcranProgramme.objects.create(
             ecran=self.screen,
-            timestamp=timezone.now(),
+            date_debut=today,
+        )
+        EcranPlageHoraire.objects.create(
+            programme=programme,
+            jour_semaine=today.weekday(),
+            heure_debut=datetime.time(8, 0),
+            heure_fin=datetime.time(9, 0),
         )
         self.client.force_login(self.staff)
 
         response = self.client.get(reverse('support_detail', args=[self.support.uuid]))
 
         self.assertEqual(response.status_code, 200)
-        elapsed_days = (today - today.replace(month=1, day=1)).days + 1
-        expected_current_rate = round(1 / (200 * elapsed_days / 365) * 100, 1)
+        telemetry_spot = response.context['spots_data'][0]
+        self.assertEqual(telemetry_spot['dur'], 20)
+        self.assertEqual(telemetry_spot['interval'], 120)
+        self.assertEqual(
+            response.context['ecran_programme_data'][0]['windows'],
+            [['08:00', '09:00']],
+        )
+        expected_current_rate = round(
+            line.calculer_spots_sur_periode(today, today)
+            * EcranNumerique.DUREE_SPOT_SECONDES
+            / self.screen.secondes_disponibles_jour(today)
+            * 100,
+            1,
+        )
+        expected_annual_rate = round(
+            line.calculer_spots_sur_periode(today, today)
+            / self.screen.calculer_objectif_spots_annuel(today.year, today)
+            * 100,
+            1,
+        )
         self.assertIn(
             ('Taux actuel', 'bi-speedometer2', f'{expected_current_rate}%', 'var(--color-primary)'),
             response.context['ecran_stats'],
         )
         self.assertIn(
-            ('Taux annuel', 'bi-graph-up', '0.5%', 'var(--color-primary)'),
+            (
+                f'Taux annuel {today.year} (01/01 à aujourd’hui)',
+                'bi-graph-up',
+                f'{expected_annual_rate}%',
+                'var(--color-primary)',
+            ),
             response.context['ecran_stats'],
         )
         self.assertContains(response, 'Objectifs annuels')

@@ -1091,6 +1091,9 @@
     if (d.ecran) {
       const taux = d.ecran.taux_occupation;
       const tcolor = taux >= {{ cfg.TAUX_CRITIQUE }} ? '#ef4444' : taux >= {{ cfg.TAUX_ALERTE }} ? '#f59e0b' : '#10b981';
+      const plagesActives = Array.isArray(d.ecran.plages_actives)
+        ? d.ecran.plages_actives.map(plage => `${plage.debut}–${plage.fin}`).join(' · ')
+        : `${d.ecran.heure_debut}–${d.ecran.heure_fin}`;
       html += `<div class="sp-section">Écran Numérique</div>
       <div class="face-card">
         <div style="display:flex;justify-content:space-between;align-items:center">
@@ -1099,7 +1102,7 @@
         </div>
         <div class="occ-bar"><div class="occ-fill" style="width:${taux}%;background:${tcolor}"></div></div>
         <div style="font-size:.7rem;color:var(--map-muted);margin-top:5px;display:flex;gap:10px">
-          <span><i class="bi bi-clock me-1"></i>${d.ecran.heure_debut}h–${d.ecran.heure_fin}h</span>
+          <span><i class="bi bi-clock me-1"></i>${plagesActives || 'Écran éteint'}</span>
           <span><i class="bi bi-lightning me-1"></i>${d.ecran.secondes_libres_1h}s libres/h</span>
         </div>
       </div>`;

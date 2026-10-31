@@ -3,6 +3,7 @@ import json
 
 from django.views import View
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db.models import Q
 from django.shortcuts import get_object_or_404
 from django.http import JsonResponse
 from django.utils import timezone
@@ -78,29 +79,31 @@ def _generer_timeline(ecran, date_cible):
         cursor += duree
 
     boucle_duration = max(cursor, 1)
-    start_dt  = datetime.combine(date_cible, ecran.heure_allumage)
-    end_dt    = datetime.combine(date_cible, ecran.heure_extinction)
-    if end_dt <= start_dt:
-        end_dt += timedelta(days=1)
-
     timeline       = []
     midnight       = datetime.combine(date_cible, time(0, 0))
-    current_start  = start_dt
+    for heure_debut, heure_fin in ecran.plages_actives(date_cible):
+        debut_plage = datetime.combine(date_cible, heure_debut)
+        fin_plage = datetime.combine(date_cible, heure_fin)
+        if fin_plage <= debut_plage:
+            fin_plage += timedelta(days=1)
+        current_start = debut_plage
 
-    while current_start < end_dt:
-        for item in boucle:
-            event_dt = current_start + timedelta(seconds=item['debut_dans_boucle'])
-            if event_dt >= end_dt:
-                break
-            abs_sec = int((event_dt - midnight).total_seconds())
-            timeline.append({
-                'time':     event_dt.time().strftime('%H:%M:%S'),
-                'abs_sec':  abs_sec,
-                'client':   item['client'],
-                'campagne': item['campagne'],
-                'duree':    item['duree'],
-            })
-        current_start += timedelta(seconds=boucle_duration)
+        while current_start < fin_plage:
+            for item in boucle:
+                event_dt = current_start + timedelta(
+                    seconds=item['debut_dans_boucle']
+                )
+                if event_dt >= fin_plage:
+                    break
+                abs_sec = int((event_dt - midnight).total_seconds())
+                timeline.append({
+                    'time':     event_dt.time().strftime('%H:%M:%S'),
+                    'abs_sec':  abs_sec,
+                    'client':   item['client'],
+                    'campagne': item['campagne'],
+                    'duree':    item['duree'],
+                })
+            current_start += timedelta(seconds=boucle_duration)
 
     return timeline[:2000]
 
@@ -165,14 +168,25 @@ class PlanningCalendrierView(LoginRequiredMixin, View):
 
         # ── Campagnes actives ce mois ─────────────────────────────────────────
         campagnes = Campagne.objects.filter(
-            date_debut__lte=dernier_jour,
-            date_fin__gte=premier_jour,
+            Q(date_debut__lte=dernier_jour, date_fin__gte=premier_jour)
+            | Q(
+                statut='en_pause',
+                date_debut__lte=dernier_jour,
+                date_mise_en_pause__lte=dernier_jour,
+            )
         ).select_related('client').prefetch_related('lignes__support').order_by('date_debut')
         
         campagnes_actives = Campagne.objects.filter(
-            date_debut__lte=dernier_jour,
-            date_fin__gte=premier_jour,
-            statut__in=['en_cours', 'a_venir'],
+            Q(
+                statut__in=['en_cours', 'a_venir'],
+                date_debut__lte=dernier_jour,
+                date_fin__gte=premier_jour,
+            )
+            | Q(
+                statut='en_pause',
+                date_debut__lte=dernier_jour,
+                date_mise_en_pause__lte=dernier_jour,
+            )
         ).select_related('client').prefetch_related('lignes__support').order_by('date_debut')
 
         # Attribution de couleur stable par client
@@ -188,6 +202,7 @@ class PlanningCalendrierView(LoginRequiredMixin, View):
             # Badges statut
             statut_labels = {
                 'en_cours':  'En cours',
+                'en_pause':  'En pause',
                 'a_venir':   'À venir',
                 'brouillon': 'Brouillon',
                 'terminee':  'Terminée',
@@ -198,7 +213,12 @@ class PlanningCalendrierView(LoginRequiredMixin, View):
                 'id':          c.pk,
                 'title':       c.nom,
                 'start':       c.date_debut.isoformat(),
-                'end':         (c.date_fin + timedelta(days=1)).isoformat(),
+                'end':         (
+                    (
+                        max(c.date_fin, dernier_jour)
+                        if c.statut == 'en_pause' else c.date_fin
+                    ) + timedelta(days=1)
+                ).isoformat(),
                 'color':       color,
                 'url':         reverse('campagne_detail', kwargs={'pk': c.pk}),
                 'extendedProps': {
@@ -217,16 +237,28 @@ class PlanningCalendrierView(LoginRequiredMixin, View):
         for s in Support.objects.filter(actif=True).order_by('type_support', 'code')[:30]:
             lignes = LigneCampagne.objects.filter(
                 support=s,
-                campagne__date_debut__lte=dernier_jour,
-                campagne__date_fin__gte=premier_jour,
-                campagne__statut__in=['en_cours', 'a_venir'],
+            ).filter(
+                Q(
+                    campagne__statut__in=['en_cours', 'a_venir'],
+                    campagne__date_debut__lte=dernier_jour,
+                    campagne__date_fin__gte=premier_jour,
+                )
+                | Q(
+                    campagne__statut='en_pause',
+                    campagne__date_debut__lte=dernier_jour,
+                    campagne__date_mise_en_pause__lte=dernier_jour,
+                )
             ).select_related('campagne')
 
             jours_occupe = set()
             campagnes_noms = []
             for ligne in lignes:
                 start = max(ligne.campagne.date_debut, premier_jour)
-                end   = min(ligne.campagne.date_fin,   dernier_jour)
+                end = (
+                    dernier_jour
+                    if ligne.campagne.statut == 'en_pause'
+                    else min(ligne.campagne.date_fin, dernier_jour)
+                )
                 jours_occupe.update(iter_dates(start, end))
                 campagnes_noms.append(ligne.campagne.nom)
 

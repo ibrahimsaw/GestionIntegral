@@ -22,6 +22,31 @@
         <i class="bi bi-trash me-1"></i>
         <span class="d-none d-md-inline ms-1">Supprimer</span>
       </a>
+      {% if user.is_staff_regie_role %}
+        <form method="post" action="{% url 'campagne_archive_toggle' campagne.pk %}" class="d-inline">
+          {% csrf_token %}
+          {% if campagne.actif %}
+            <input type="hidden" name="action" value="archiver">
+            <button type="submit" class="btn btn-outline-warning btn-sm shadow-sm">
+              <i class="bi bi-archive me-1"></i>
+              <span class="d-none d-md-inline ms-1">Archiver</span>
+            </button>
+          {% else %}
+            <input type="hidden" name="action" value="desarchiver">
+            <button type="submit" class="btn btn-success btn-sm shadow-sm">
+              <i class="bi bi-archive me-1"></i>
+              <span class="d-none d-md-inline ms-1">Désarchiver</span>
+            </button>
+          {% endif %}
+        </form>
+        {% if campagne.statut == 'en_cours' or campagne.statut == 'a_venir' or campagne.statut == 'en_pause' %}
+          <button type="button" class="btn btn-outline-primary btn-sm shadow-sm"
+                  data-bs-toggle="modal" data-bs-target="#modalGestionCampagne">
+            <i class="bi bi-sliders me-1"></i>
+            <span class="d-none d-md-inline ms-1">Gérer le statut</span>
+          </button>
+        {% endif %}
+      {% endif %}
       {% if campagne.statut == 'brouillon' %}
         <form method="post" action="{% url 'campagne_lancer' campagne.pk %}" class="d-inline">
           {% csrf_token %}
@@ -90,6 +115,7 @@
   }
   .cpd-badge-brouillon { background: rgba(108,117,125,0.25); color: #e2e8f0; }
   .cpd-badge-en_cours  { background: rgba(34,197,94,0.28); color: #bbf7d0; }
+  .cpd-badge-en_pause  { background: rgba(245,158,11,0.28); color: #fde68a; }
   .cpd-badge-a_venir   { background: rgba(56,189,248,0.28); color: #bae6fd; }
   .cpd-badge-terminee  { background: rgba(255,255,255,0.22); color: #e2e8f0; }
   .cpd-badge-annulee   { background: rgba(239,68,68,0.28); color: #fecaca; }
@@ -762,6 +788,18 @@
           <i class="bi bi-circle-fill" style="font-size:6px;"></i>
           {{ campagne.get_statut_display }}
         </span>
+        {% if not campagne.actif %}
+          <span class="badge bg-danger-subtle text-danger border border-danger-subtle">Archivée</span>
+        {% endif %}
+        {% if campagne.date_annulation %}
+          <span class="badge bg-danger-subtle text-danger border border-danger-subtle">
+            Arrêtée le {{ campagne.date_annulation|date:"d/m/Y" }}
+          </span>
+        {% elif campagne.date_mise_en_pause %}
+          <span class="badge bg-warning-subtle text-warning-emphasis border border-warning-subtle">
+            En pause depuis le {{ campagne.date_mise_en_pause|date:"d/m/Y" }}
+          </span>
+        {% endif %}
       </div>
     </div>
   </div>
@@ -1198,7 +1236,7 @@
                   </div>
                   <div class="cpd-spec-pill">
                     <span class="cpd-spec-pill-label">Allumage / Extinction</span>
-                    <span class="cpd-spec-pill-val">{{ row.support.ecran_info.heure_allumage|time:"H:i" }} → {{ row.support.ecran_info.heure_extinction|time:"H:i" }}</span>
+                    <span class="cpd-spec-pill-val">{{ row.support.ecran_info.horaires_actifs_display }}</span>
                   </div>
                   <div class="cpd-spec-pill">
                     <span class="cpd-spec-pill-label">Durée & Fréquence</span>
@@ -1578,4 +1616,72 @@
   </div>
 
 </div>
+
+{% if user.is_staff_regie_role %}
+{% if campagne.statut == 'en_pause' or campagne.statut == 'en_cours' or campagne.statut == 'a_venir' %}
+<div class="modal fade" id="modalGestionCampagne" tabindex="-1" aria-labelledby="modalGestionCampagneLabel" aria-hidden="true">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content border-0 shadow">
+      <form method="post" action="{% url 'campagne_state_change' campagne.pk %}">
+        {% csrf_token %}
+        <div class="modal-header">
+          <div>
+            <h5 class="modal-title fw-bold" id="modalGestionCampagneLabel">
+              <i class="bi bi-sliders me-2 text-primary"></i>Gestion du statut
+            </h5>
+            <div class="small text-muted mt-1">{{ campagne.nom }} · {{ campagne.get_statut_display }}</div>
+          </div>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
+        </div>
+        <div class="modal-body">
+          {% if campagne.statut == 'en_pause' %}
+            <p class="mb-3">Choisissez comment reprendre cette campagne :</p>
+            <div class="form-check border rounded-3 p-3 ps-5 mb-2">
+              <input class="form-check-input" type="radio" name="action" id="repriseProlonger"
+                     value="reprendre_prolonger" required>
+              <label class="form-check-label fw-semibold" for="repriseProlonger">
+                Prolonger la date de fin
+                <span class="d-block small text-muted fw-normal">La durée de la pause sera ajoutée à la date de fin.</span>
+              </label>
+            </div>
+            <div class="form-check border rounded-3 p-3 ps-5">
+              <input class="form-check-input" type="radio" name="action" id="repriseGarder"
+                     value="reprendre_garder" required>
+              <label class="form-check-label fw-semibold" for="repriseGarder">
+                Garder la date de fin
+                <span class="d-block small text-muted fw-normal">La campagne reprendra sans modifier la date prévue.</span>
+              </label>
+            </div>
+          {% else %}
+            <p class="mb-3">Choisissez l’action à effectuer :</p>
+            <div class="form-check border rounded-3 p-3 ps-5 mb-2">
+              <input class="form-check-input" type="radio" name="action" id="actionPause"
+                     value="mettre_en_pause" required>
+              <label class="form-check-label fw-semibold" for="actionPause">
+                Mettre en pause
+                <span class="d-block small text-muted fw-normal">Les supports restent réservés et la campagne pourra reprendre.</span>
+              </label>
+            </div>
+            <div class="form-check border border-danger-subtle rounded-3 p-3 ps-5">
+              <input class="form-check-input" type="radio" name="action" id="actionAnnuler"
+                     value="annuler" required>
+              <label class="form-check-label fw-semibold text-danger" for="actionAnnuler">
+                Annuler définitivement
+                <span class="d-block small text-muted fw-normal">La campagne ne pourra pas reprendre et ses supports seront libérés à partir d’aujourd’hui.</span>
+              </label>
+            </div>
+          {% endif %}
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Fermer</button>
+          <button type="submit" class="btn btn-primary">
+            <i class="bi bi-check-lg me-1"></i>Confirmer
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endif %}
 {% endblock %}

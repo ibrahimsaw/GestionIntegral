@@ -275,25 +275,90 @@ class EcranNumeriqueForm(forms.ModelForm):
         return cleaned_data
 
 
-class ObjectifSpotsEcranAnnuelForm(forms.Form):
-    annee = forms.IntegerField(
-        min_value=1,
-        max_value=32767,
-        label="Année",
-        widget=forms.NumberInput(attrs={**W, 'min': 1}),
-    )
-    nombre_spots = forms.IntegerField(
-        min_value=1,
-        label="Objectif annuel de spots",
-        initial=200000,
-        widget=forms.NumberInput(attrs={**W, 'min': 1}),
+class EcranProgrammeForm(forms.Form):
+    JOUR_FIELDS = [
+        ('lundi', 0, 'Lundi'),
+        ('mardi', 1, 'Mardi'),
+        ('mercredi', 2, 'Mercredi'),
+        ('jeudi', 3, 'Jeudi'),
+        ('vendredi', 4, 'Vendredi'),
+        ('samedi', 5, 'Samedi'),
+        ('dimanche', 6, 'Dimanche'),
+    ]
+
+    date_debut = forms.DateField(
+        required=False,
+        label="Actif à partir du",
+        widget=forms.DateInput(attrs={**W, 'type': 'date'}),
     )
 
     def __init__(self, *args, **kwargs):
-        initial = kwargs.get('initial') or {}
-        initial.setdefault('annee', timezone.localdate().year)
-        kwargs['initial'] = initial
         super().__init__(*args, **kwargs)
+        for field_name, _, label in self.JOUR_FIELDS:
+            self.fields[field_name] = forms.CharField(
+                required=False,
+                label=label,
+                help_text="Ex. 06:00-12:00, 13:00-22:00",
+                widget=forms.TextInput(attrs={
+                    **W,
+                    'placeholder': '06:00-12:00, 13:00-22:00',
+                    'autocomplete': 'off',
+                }),
+            )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        a_enregistrer = any(
+            cleaned_data.get(field_name, '').strip()
+            for field_name, _, _ in self.JOUR_FIELDS
+        )
+        cleaned_data['a_enregistrer'] = a_enregistrer
+        if not a_enregistrer:
+            return cleaned_data
+
+        if not cleaned_data.get('date_debut'):
+            self.add_error('date_debut', "Indiquez la date de prise d'effet.")
+
+        plages = []
+        total_plages = 0
+        for field_name, jour, _ in self.JOUR_FIELDS:
+            saisie = cleaned_data.get(field_name, '').strip()
+            jour_plages = []
+            if saisie:
+                for valeur in saisie.split(','):
+                    try:
+                        debut_str, fin_str = valeur.strip().split('-', 1)
+                        debut = datetime.strptime(debut_str.strip(), '%H:%M').time()
+                        fin = datetime.strptime(fin_str.strip(), '%H:%M').time()
+                    except ValueError:
+                        self.add_error(
+                            field_name,
+                            "Format invalide. Saisissez des plages HH:MM-HH:MM séparées par des virgules.",
+                        )
+                        break
+                    if debut >= fin:
+                        self.add_error(
+                            field_name,
+                            "Chaque plage doit se terminer après son heure de début (pas de passage à minuit).",
+                        )
+                        break
+                    jour_plages.append((debut, fin))
+
+            jour_plages.sort()
+            if any(
+                jour_plages[index][0] < jour_plages[index - 1][1]
+                for index in range(1, len(jour_plages))
+            ):
+                self.add_error(field_name, "Les plages horaires ne doivent pas se chevaucher.")
+            plages.extend((jour, debut, fin) for debut, fin in jour_plages)
+            total_plages += len(jour_plages)
+
+        if total_plages == 0:
+            raise forms.ValidationError(
+                "Ajoutez au moins une plage horaire sur la semaine."
+            )
+        cleaned_data['plages_validees'] = plages
+        return cleaned_data
 
 
 from collections import defaultdict

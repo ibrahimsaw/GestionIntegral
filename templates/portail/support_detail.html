@@ -485,20 +485,28 @@ function durationOf(intervals) {
 
 function telemetryPeriod() {
   const seconds = vd();
-  const start = Date.now();
-  const end = start + seconds * 1000;
+  const now = new Date();
+  const start = seconds === 86400
+    ? new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+    : now.getTime();
+  const endDate = new Date(start);
+  if (seconds === 86400) endDate.setDate(endDate.getDate() + 1);
+  else endDate.setTime(start + seconds * 1000);
+  const end = endDate.getTime();
   const availableSeconds = durationOf(screenIntervals(start, end));
   const calculatedSpots = spots.map(spot => {
     const intervals = scheduleIntervals(start, end, spot);
     const scheduledSeconds = durationOf(intervals);
     const airSeconds = spot.interval > 0
-      ? scheduledSeconds / spot.interval * spot.dur * Math.max(1, spot.visuals || 1)
+      ? Math.round(
+          scheduledSeconds / spot.interval * Math.max(1, spot.visuals || 1)
+        ) * spot.dur
       : 0;
     return { ...spot, intervals, airSeconds };
   });
   const totalAirSeconds = calculatedSpots.reduce((total, spot) => total + spot.airSeconds, 0);
   const occupancy = availableSeconds > 0
-    ? Math.min(100, Math.round(totalAirSeconds / availableSeconds * 100))
+    ? Math.min(100, Math.round(totalAirSeconds / availableSeconds * 1000) / 10)
     : 0;
   return { seconds, start, end, availableSeconds, calculatedSpots, totalAirSeconds, occupancy };
 }
@@ -519,11 +527,15 @@ function renderMetrics() {
   if (!el) return;
   const period = telemetryPeriod();
   const vl = viewLabel(period.seconds);
+  const occupancyText = period.occupancy.toLocaleString('fr-FR', {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1
+  });
   el.innerHTML = `
     <div class="p-2.5 bg-white border rounded-2 flex-grow-1"><div class="text-muted font-monospace" style="font-size:0.65rem; font-weight:700;">Spots actifs</div><div class="fw-bold fs-6 text-primary">${spots.length}</div></div>
     <div class="p-2.5 bg-white border rounded-2 flex-grow-1"><div class="text-muted font-monospace" style="font-size:0.65rem; font-weight:700;">Pub totale / ${vl}</div><div class="fw-bold fs-6">${Math.round(period.totalAirSeconds / 60)} min</div></div>
     <div class="p-2.5 bg-white border rounded-2 flex-grow-1"><div class="text-muted font-monospace" style="font-size:0.65rem; font-weight:700;">Temps écran actif / ${vl}</div><div class="fw-bold fs-6">${Math.round(period.availableSeconds / 60)} min</div></div>
-    <div class="p-2.5 bg-white border rounded-2 flex-grow-1"><div class="text-muted font-monospace" style="font-size:0.65rem; font-weight:700;">% antenne / ${vl}</div><div class="fw-bold fs-6 text-success">${period.occupancy}%</div></div>
+    <div class="p-2.5 bg-white border rounded-2 flex-grow-1"><div class="text-muted font-monospace" style="font-size:0.65rem; font-weight:700;">% antenne / ${vl}</div><div class="fw-bold fs-6 text-success">${occupancyText}%</div></div>
   `;
 }
 
@@ -609,7 +621,7 @@ function renderFrise() {
 
   const note = document.getElementById('frise-note');
   if (note) {
-    note.textContent = `${hasDense ? 'Barre pleine = diffusions très denses à cette échelle. ' : ''}Calcul basé sur ${Math.round(period.availableSeconds / 60)} min de fonctionnement programmé et des spots fixes de 20 secondes.`;
+    note.textContent = `${hasDense ? 'Barre pleine = diffusions très denses à cette échelle. ' : ''}${period.seconds === 86400 ? 'Calcul sur la journée d’aujourd’hui (00:00–24:00), comme le taux actuel. ' : `Calcul sur ${Math.round(period.availableSeconds / 60)} min de fonctionnement programmé. `}Spots fixes de 20 secondes.`;
   }
 }
 

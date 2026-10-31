@@ -1108,18 +1108,26 @@ function buildFrise() {
 
   const scale  = getCurrentScale();
   const sLabel = scaleLabel(scale);
-  const periodStart = Date.now();
-  const periodEnd = periodStart + scale * 1000;
+  const now = new Date();
+  const periodStart = scale === 86400
+    ? new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()
+    : now.getTime();
+  const periodEndDate = new Date(periodStart);
+  if (scale === 86400) periodEndDate.setDate(periodEndDate.getDate() + 1);
+  else periodEndDate.setTime(periodStart + scale * 1000);
+  const periodEnd = periodEndDate.getTime();
   const availableIntervals = screenIntervals(periodStart, periodEnd);
   const availableSeconds = durationOf(availableIntervals);
   const spotsCalc = spots.map((sp, i) => {
     const intervals = scheduleIntervals(periodStart, periodEnd, sp);
     const eligibleSeconds = durationOf(intervals);
     const perScale = sp.interval > 0
-      ? eligibleSeconds / sp.interval * sp.dur * Math.max(1, sp.visuals || 1)
+      ? Math.round(
+          eligibleSeconds / sp.interval * Math.max(1, sp.visuals || 1)
+        ) * sp.dur
       : 0;
     const pct = availableSeconds > 0
-      ? Math.min(100, Math.round(perScale / availableSeconds * 100))
+      ? Math.min(100, Math.round(perScale / availableSeconds * 1000) / 10)
       : 0;
     return {
       ...sp,
@@ -1132,15 +1140,19 @@ function buildFrise() {
   });
   const totalAirSec = spotsCalc.reduce((total, sp) => total + sp.perScale, 0);
   const totalPct = availableSeconds > 0
-    ? Math.min(100, Math.round(totalAirSec / availableSeconds * 100))
+    ? Math.min(100, Math.round(totalAirSec / availableSeconds * 1000) / 10)
     : 0;
+  const formattedTotalPct = totalPct.toLocaleString('fr-FR', {
+    minimumFractionDigits: 1,
+    maximumFractionDigits: 1
+  });
 
   if (metricsEl) {
     metricsEl.innerHTML = `
       <div class="tlm-kpi" style="border-radius:8px !important;"><div class="tlm-kpi-label">Spots actifs</div><div class="tlm-kpi-value" style="color:#6366f1;">${spots.length}</div></div>
       <div class="tlm-kpi" style="border-radius:8px !important;"><div class="tlm-kpi-label">Pub totale / ${sLabel}</div><div class="tlm-kpi-value">${fmtDur(totalAirSec)}</div></div>
       <div class="tlm-kpi" style="border-radius:8px !important;"><div class="tlm-kpi-label">Temps écran actif / ${sLabel}</div><div class="tlm-kpi-value">${fmtDur(availableSeconds)}</div></div>
-      <div class="tlm-kpi" style="border-radius:8px !important;"><div class="tlm-kpi-label">% antenne / ${sLabel}</div><div class="tlm-kpi-value" style="color:#10b981;">${totalPct}<span style="font-size:0.75rem;color:#94a3b8;"> %</span></div></div>
+      <div class="tlm-kpi" style="border-radius:8px !important;"><div class="tlm-kpi-label">% antenne / ${sLabel}</div><div class="tlm-kpi-value" style="color:#10b981;">${formattedTotalPct}<span style="font-size:0.75rem;color:#94a3b8;"> %</span></div></div>
     `;
   }
 
@@ -1185,7 +1197,7 @@ function buildFrise() {
           <i class="bi bi-broadcast me-1" style="color:var(--color-primary,#932e2b);"></i>
           Occupation globale de l'antenne / ${sLabel}
         </span>
-        <span style="font-size:0.88rem; font-weight:800; color:${totalPct > 80 ? '#ef4444' : totalPct > 50 ? '#f59e0b' : '#10b981'};">${totalPct}%</span>
+        <span style="font-size:0.88rem; font-weight:800; color:${totalPct > 80 ? '#ef4444' : totalPct > 50 ? '#f59e0b' : '#10b981'};">${formattedTotalPct}%</span>
       </div>
       <div style="background:#e2e8f0; border-radius:8px !important; height:12px; overflow:hidden;">
         <div style="height:100%; width:${totalPct}%; background:linear-gradient(90deg,#932e2b,#1e40af); border-radius:8px !important; transition:width 0.6s ease;"></div>
@@ -1205,7 +1217,9 @@ function buildFrise() {
 
   if (noteEl) {
     const s = noteEl.querySelector('span') || noteEl;
-    s.textContent = `Calcul sur ${fmtDur(availableSeconds)} de fonctionnement programmé, avec des spots fixes de 20 secondes.`;
+    s.textContent = scale === 86400
+      ? `Calcul sur la journée d’aujourd’hui (00:00–24:00), comme le taux actuel, avec des spots fixes de 20 secondes.`
+      : `Calcul sur ${fmtDur(availableSeconds)} de fonctionnement programmé, avec des spots fixes de 20 secondes.`;
   }
 }
 

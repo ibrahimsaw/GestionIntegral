@@ -1,9 +1,10 @@
+import calendar
 import json
 from datetime import date, datetime, time, timedelta
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.http import JsonResponse
-from django.db.models import Q, Count, Sum, DecimalField, Value
+from django.db.models import Q, Count, Sum, DecimalField, Value, Max
 from django.db.models.deletion import ProtectedError
 from django.db.models.functions import Coalesce
 from django.utils import timezone
@@ -436,6 +437,215 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             occupied_days += (current_end - current_start).days + 1
             current_start, current_end = start, end
         return occupied_days + (current_end - current_start).days + 1
+
+    @classmethod
+    def _build_parc_analytics(
+        cls, format_category_stats, format_categories_codes, ville_active, today,
+        faces_occupees_ids, faces_reservees_ids,
+    ):
+        """Indicateurs détaillés par catégorie au format du tableau de bord de démonstration."""
+        year_start = date(today.year, 1, 1)
+        year_end = date(today.year, 12, 31)
+        year_days = (year_end - year_start).days + 1
+        elapsed_days = (today - year_start).days + 1
+        tomorrow = today + timedelta(days=1)
+        month_ranges = [
+            (date(today.year, m, 1), date(today.year, m, calendar.monthrange(today.year, m)[1]))
+            for m in range(1, 13)
+        ]
+        month_lengths = [(end - start).days + 1 for start, end in month_ranges]
+
+        meta = {
+            'year': today.year,
+            'today': today.isoformat(),
+            'month': today.month,
+            'elapsed_days': elapsed_days,
+            'year_days': year_days,
+            'lecture_seule': False,
+        }
+
+        codes_all = [code for codes in format_categories_codes.values() for code in codes]
+        if not codes_all:
+            return [], meta
+
+        formats = {f.code: f for f in FormatSupport.objects.filter(code__in=codes_all)}
+        faces_qs = (
+            FacePanneau.objects
+            .filter(support__format__in=codes_all)
+            .select_related('support__emplacement__marche')
+            .order_by('support__code', 'label')
+        )
+        if ville_active:
+            faces_qs = faces_qs.filter(support__ville__iexact=ville_active)
+        faces = list(faces_qs)
+        face_ids = [face.pk for face in faces]
+
+        statuts_campagne = [
+            Campagne.STATUT_EN_COURS,
+            Campagne.STATUT_A_VENIR,
+            Campagne.STATUT_EN_PAUSE,
+            Campagne.STATUT_TERMINEE,
+        ]
+
+        camp_intervals = {}
+        for face_id, start, end in LigneCampagne.objects.filter(
+            face_id__in=face_ids,
+            campagne__statut__in=statuts_campagne,
+            campagne__date_debut__lte=year_end,
+            campagne__date_fin__gte=year_start,
+        ).values_list('face_id', 'campagne__date_debut', 'campagne__date_fin'):
+            camp_intervals.setdefault(face_id, []).append((start, end))
+
+        last_end = dict(
+            LigneCampagne.objects.filter(
+                face_id__in=face_ids,
+                campagne__statut__in=statuts_campagne,
+                campagne__date_debut__lte=today,
+            ).values('face_id').annotate(
+                derniere=Max('campagne__date_fin')
+            ).values_list('face_id', 'derniere')
+        )
+
+        resa_intervals = {}
+        for face_id, start, end in ReservationLigne.objects.filter(
+            face_id__in=face_ids,
+            reservation__statut=STATUT_CONFIRMEE,
+            reservation__date_fin__gte=timezone.make_aware(
+                datetime.combine(tomorrow, time.min)
+            ),
+            reservation__date_debut__lt=timezone.make_aware(
+                datetime.combine(year_end + timedelta(days=1), time.min)
+            ),
+        ).values_list('face_id', 'reservation__date_debut', 'reservation__date_fin'):
+            start = timezone.localtime(start).date() if timezone.is_aware(start) else start.date()
+            end = timezone.localtime(end).date() if timezone.is_aware(end) else end.date()
+            resa_intervals.setdefault(face_id, []).append((max(start, tomorrow), end))
+
+        rows = []
+        for face in faces:
+            fid = face.pk
+            support = face.support
+            campagnes = camp_intervals.get(fid, [])
+            realise = [(s, min(e, today)) for s, e in campagnes if s <= today]
+            securise = campagnes + resa_intervals.get(fid, [])
+
+            jours_realises = cls._count_occupied_days(realise, year_start, today)
+            jours_secures = cls._count_occupied_days(securise, year_start, year_end)
+            mensuel_jours = [
+                cls._count_occupied_days(securise, start, end)
+                for start, end in month_ranges
+            ]
+
+            if face.etat == Support.ETAT_PANNE:
+                statut = 'panne'
+            elif fid in faces_occupees_ids:
+                statut = 'occupee'
+            elif fid in faces_reservees_ids:
+                statut = 'reservee'
+            else:
+                statut = 'libre'
+
+            libre_depuis = None
+            derniere = None
+            if statut in ('libre', 'reservee'):
+                last = last_end.get(fid)
+                if last:
+                    derniere = min(last, today)
+                    libre_depuis = max((today - last).days, 0)
+            libre_60 = statut == 'libre' and (libre_depuis is None or libre_depuis > 60)
+
+            fmt = formats.get(support.format)
+            lieu = (
+                support.emplacement.marche.nom
+                if support.emplacement_id
+                else (support.quartier or support.ville or '')
+            )
+            row = {
+                'id': fid,
+                'code': support.code,
+                'label': face.label,
+                'nom': support.nom,
+                'lieu': lieu,
+                'format_code': support.format,
+                'format': (fmt.dimensions if fmt else '') or support.format or '',
+                'statut': statut,
+                'jours': jours_realises,
+                'jours_secures': jours_secures,
+                'taux': round(jours_realises / elapsed_days * 100, 1),
+                'secure': round(jours_secures / year_days * 100, 1),
+                'libre_depuis': libre_depuis,
+                'derniere': derniere.isoformat() if derniere else None,
+                'libre_60': libre_60,
+                'mois': [
+                    round(jours / month_lengths[i] * 100)
+                    for i, jours in enumerate(mensuel_jours)
+                ],
+                'url': reverse('support_detail', args=[support.uuid]),
+            }
+            rows.append((row, mensuel_jours))
+
+        def monthly_pct(subset):
+            total = len(subset)
+            if not total:
+                return [0.0] * 12
+            return [
+                round(
+                    sum(jours[i] for _, jours in subset)
+                    / (total * month_lengths[i]) * 100,
+                    1,
+                )
+                for i in range(12)
+            ]
+
+        result = []
+        for stat in format_category_stats:
+            codes = format_categories_codes.get(stat['categorie'], [])
+            cat_rows = [(r, j) for r, j in rows if r['format_code'] in codes]
+            n = len(cat_rows)
+            if not n:
+                continue
+
+            nb_occ = sum(1 for r, _ in cat_rows if r['statut'] == 'occupee')
+            nb_res = sum(1 for r, _ in cat_rows if r['statut'] == 'reservee')
+            nb_lib = sum(1 for r, _ in cat_rows if r['statut'] == 'libre')
+            nb_pan = sum(1 for r, _ in cat_rows if r['statut'] == 'panne')
+            jours_realises = sum(r['jours'] for r, _ in cat_rows)
+            jours_secures = sum(r['jours_secures'] for r, _ in cat_rows)
+            capacite = n * year_days
+
+            formats_cat = []
+            for code in codes:
+                subset = [(r, j) for r, j in cat_rows if r['format_code'] == code]
+                if subset:
+                    fmt = formats.get(code)
+                    formats_cat.append({
+                        'code': code,
+                        'label': (fmt.dimensions if fmt else '') or code,
+                        'nb_faces': len(subset),
+                        'mensuel': monthly_pct(subset),
+                    })
+
+            result.append({
+                **stat,
+                'nb_faces': n,
+                'nb_occupe': nb_occ,
+                'nb_reserve': nb_res,
+                'nb_libre': nb_lib,
+                'nb_panne': nb_pan,
+                'nb_disponibles': n - nb_occ,
+                'capacite': capacite,
+                'jours_realises': jours_realises,
+                'jours_secures': jours_secures,
+                'taux_jour': round(nb_occ / n * 100, 1),
+                'taux_cumule': round(jours_realises / (n * elapsed_days) * 100, 1),
+                'annuel_realise': round(jours_realises / capacite * 100, 1),
+                'annuel_securise': round(jours_secures / capacite * 100, 1),
+                'libres_60': sum(1 for r, _ in cat_rows if r['libre_60']),
+                'mensuel': monthly_pct(cat_rows),
+                'formats': formats_cat,
+                'faces': [r for r, _ in cat_rows],
+            })
+        return result, meta
 
     @classmethod
     def _build_annual_face_occupancy(
@@ -947,6 +1157,13 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         formats_stats = self._build_format_stats(
             ville_active, faces_occupees_ids, faces_reservees_ids
         )
+        parc_categories, parc_meta = self._build_parc_analytics(
+            format_category_stats, format_categories_codes, ville_active, today,
+            faces_occupees_ids, faces_reservees_ids,
+        )
+        parc_meta['lecture_seule'] = bool(
+            getattr(self.request.user, 'is_technicien', False)
+        )
         year_start = date(today.year, 1, 1)
         year_end = date(today.year, 12, 31)
         year_days = (year_end - year_start).days + 1
@@ -1235,12 +1452,20 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             'nb_ecrans': parc['nb_ecrans'],
             'format_categories': format_category_stats,
             'formats_stats': formats_stats,
+            'parc_categories': parc_categories,
+            'parc_meta': parc_meta,
             'annee_taux_occupation': today.year,
             'total_faces': total_faces,
             'total_faces_occupe': total_faces_occupe,
             'total_faces_reserve': total_faces_reserve,
             'total_faces_libre': total_faces_libre,
             'total_faces_panne': total_faces_panne,
+            'total_faces_disponibles': max(total_faces - total_faces_occupe, 0),
+            'taux_jour_global': round(total_faces_occupe / total_faces * 100, 1) if total_faces else 0,
+            'taux_cumule_global': round(total_faces_occupe / total_faces * 100, 1) if total_faces else 0,
+            'annuel_realise_global': round(total_faces_occupe / total_faces * 100, 1) if total_faces else 0,
+            'annuel_securise_global': round(total_faces_occupe / total_faces * 100, 1) if total_faces else 0,
+            'capacite_annuelle_totale': total_faces * 365,
 
             'revenu_actif': revenu_actif,
             'revenu_a_venir': revenu_a_venir,

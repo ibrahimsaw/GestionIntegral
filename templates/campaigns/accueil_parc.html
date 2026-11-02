@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load l10n %}
 
 {% block title %}Accueil — Parc Integral{% endblock %}
 
@@ -30,395 +31,213 @@
 {% block content %}
 <style>
   .pg {
-    --bg: #f4f5f7;
-    --card: #ffffff;
-    --tile: #eceef2;
-    --ink: #16181d;
-    --ink-2: #434956;
-    --muted: #6f7681;
-    --line: #e2e5ea;
-    --accent: #932e2b;
-    --ok: #1d7a4b;
-    --warn: #a35f0a;
-    --ko: #b42318;
-    --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --navy: #101c32;
+    --blue: #2457d6;
+    --bg: #f4f6fa;
+    --text: #18263c;
+    --muted: #718097;
+    --line: #e4e9f1;
+    --green: #11876b;
+    --amber: #c47c16;
+    --red: #c94a55;
 
     background: var(--bg);
-    color: var(--ink);
-    font-family: var(--sans);
-    font-size: .9rem;
+    color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+    font-size: 14px;
     max-width: 1600px;
     margin: 0 auto;
-    padding: clamp(1rem, 2.2vw, 1.5rem);
+    padding: clamp(1rem, 2.4vw, 2rem);
   }
   .pg *, .pg *::before, .pg *::after { box-sizing: border-box; }
   .pg a { color: inherit; }
+  .pg [hidden] { display: none !important; }
 
   /* ── En-tête ── */
-  .pg-head {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: flex-end;
-    justify-content: space-between;
-    gap: 1rem;
-    margin-bottom: 1.1rem;
+  .pg-top { display: flex; justify-content: space-between; gap: 15px; align-items: flex-start; flex-wrap: wrap; }
+  .pg-eyebrow { color: var(--blue); font-weight: 750; font-size: 11px; letter-spacing: 1.6px; text-transform: uppercase; }
+  .pg h1 { margin: 7px 0 5px; font-size: 29px; letter-spacing: -.8px; font-weight: 800; line-height: 1.15; }
+  .pg-hint { color: var(--muted); margin: 0; }
+  .pg-controls { display: flex; gap: 9px; align-items: center; flex-wrap: wrap; }
+  .pg-select, .pg-input {
+    font: inherit; background: #fff; border: 1px solid var(--line);
+    border-radius: 8px; padding: 10px 12px; color: var(--text);
   }
-  .pg-kicker { margin: 0; color: var(--muted); font-size: .74rem; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; }
-  .pg-head h1 { margin: .2rem 0 0; font-size: 1.6rem; font-weight: 700; letter-spacing: -.02em; line-height: 1.15; }
-  .pg-sub { margin: .25rem 0 0; color: var(--muted); }
-  .pg-cities { display: flex; flex-wrap: nowrap; gap: .4rem; max-width: 100%; overflow-x: auto; }
-  .pg-city {
-    flex: 0 0 auto;
-    padding: .42rem .8rem;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    background: var(--card);
-    color: var(--ink-2);
-    font-size: .85rem;
-    text-decoration: none;
-    white-space: nowrap;
+  .pg-input { width: 200px; }
+  .pg-btn {
+    font: inherit; background: #fff; border: 1px solid var(--line); border-radius: 8px;
+    padding: 10px 12px; color: var(--text); cursor: pointer; text-decoration: none;
   }
-  .pg-city:hover { border-color: #c5cad3; }
-  .pg-city.is-active { background: var(--ink); border-color: var(--ink); color: #fff; font-weight: 600; }
-  .pg-city i { display: none; }
-  .pg-current-date { flex: 0 0 auto; align-self: center; padding: .42rem .65rem; color: var(--muted); font-size: .82rem; white-space: nowrap; }
+  .pg-btn:hover { border-color: #c5cfe0; }
+
+  /* ── Sélecteur de catégorie ── */
+  .pg-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 24px 0 20px; }
+  .pg-tab {
+    display: inline-flex; align-items: center; gap: 9px;
+    font: inherit; padding: 10px 16px; border-radius: 10px; cursor: pointer;
+    background: #fff; border: 1px solid var(--line); color: #4b5d78; font-weight: 650;
+  }
+  .pg-tab:hover { border-color: #b9c6df; }
+  .pg-tab .pg-dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
+  .pg-tab small { color: var(--muted); font-weight: 600; font-size: 11px; }
+  .pg-tab.is-active { background: var(--navy); border-color: var(--navy); color: #fff; }
+  .pg-tab.is-active small { color: #a9b8d4; }
 
   /* ── Indicateurs ── */
-  .pg-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .75rem; margin-bottom: 1rem; }
-  .pg-kpi { padding: .9rem 1.05rem; border: 1px solid var(--line); border-radius: 8px; background: var(--card); }
-  .pg-kpi strong { display: block; font-size: 1.55rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
-  .pg-kpi span { display: block; margin-top: .35rem; color: var(--muted); font-size: .8rem; }
-  .pg-kpi.is-alert strong { color: var(--ko); }
+  .pg-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 14px; }
+  .pg-metrics.is-three { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 14px; }
+  .pg-metric {
+    background: #fff; border: 1px solid var(--line); border-radius: 13px;
+    padding: 19px 19px 16px; box-shadow: 0 3px 14px #23365106;
+  }
+  .pg-metric .pg-label { color: #6c7c91; font-size: 12px; font-weight: 650; text-transform: uppercase; letter-spacing: .3px; }
+  .pg-metric .pg-num { font-size: 32px; font-weight: 800; letter-spacing: -1px; margin: 11px 0 8px; font-variant-numeric: tabular-nums; }
+  .pg-metric .pg-num small { font-size: 14px; color: #8d9aab; font-weight: 600; letter-spacing: 0; }
+  .pg-metric .pg-foot { font-size: 11px; color: #8391a4; }
+  .pg-metric .pg-mdot { float: right; width: 8px; height: 8px; border-radius: 100%; background: var(--blue); margin-top: 4px; }
+  .pg-metric.is-green .pg-mdot { background: var(--green); }
+  .pg-metric.is-orange .pg-mdot { background: var(--amber); }
+  .pg-metric.is-red .pg-mdot { background: var(--red); }
 
-  /* ── Mise en page ── */
-  /*
-  .pg-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(300px, 380px); gap: 1rem; align-items: start; }
-  */
-  .pg-main, .pg-side { display: grid; gap: 1rem; min-width: 0; margin-bottom: 1rem; }
-  .pg-card { min-width: 0; border: 1px solid var(--line); border-radius: 8px; background: var(--card); overflow: hidden; }
-  .pg-card.is-plain { background: transparent; border: 0; overflow: visible; }
-  .pg-card-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: .6rem 1rem;
-    padding: .85rem 1.05rem;
-    border-bottom: 1px solid var(--line);
-  }
-  .pg-card-head h2 { margin: 0; font-size: .97rem; font-weight: 700; }
-  .pg-card-head p { margin: .15rem 0 0; color: var(--muted); font-size: .8rem; }
-  .pg-card-body { padding: .9rem 1.05rem; }
-  .pg-muted { color: var(--muted); font-size: .82rem; }
+  /* ── Panneaux ── */
+  .pg-section { margin-top: 23px; }
+  .pg-row { display: grid; grid-template-columns: 1.45fr 1fr; gap: 17px; align-items: stretch; }
+  .pg-panel { background: #fff; border: 1px solid var(--line); border-radius: 13px; padding: 21px 23px; min-width: 0; }
+  .pg-panel h2 { font-size: 16px; margin: 0 0 5px; font-weight: 700; }
+  .pg-desc { font-size: 12px; color: var(--muted); margin: 0 0 23px; }
+  .pg-panelhead { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-bottom: 20px; }
+  .pg-panelhead h2 { margin: 0 0 5px; }
+  .pg-panelhead .pg-desc { margin: 0; }
 
-  /* ── Blocs par catégorie ── */
-  .pg-blocks { display: grid; gap: .75rem; padding: 0; }
-  .pg-block {
-    min-width: 0;
-    padding: .9rem 1rem 1rem;
-    border: 1px solid var(--line);
-    border-radius: 8px;
-    background: #ffffff;
-  }
-  .pg-block-head {
-    display: flex;
-    align-items: baseline;
-    justify-content: space-between;
-    gap: .75rem;
-    margin-bottom: .7rem;
-  }
-  .pg-block-head h3 { margin: 0; font-size: .98rem; font-weight: 700; }
-  .pg-block-tag { color: var(--muted); font-size: .76rem; }
-  .pg-block-link {
-    display: inline-flex;
-    align-items: center;
-    gap: .35rem;
-    margin-left: auto;
-    padding: .3rem .6rem;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    background: #ffffff;
-    color: var(--ink-2);
-    font-size: .76rem;
-    font-weight: 600;
-    text-decoration: none;
-    white-space: nowrap;
-  }
-  .pg-block-link:hover { border-color: var(--ink); color: var(--ink); }
-  .pg-block-link i { font-size: .8rem; }
+  /* Histogramme */
+  .pg-chart { display: flex; align-items: flex-end; gap: 13px; overflow-x: auto; padding-bottom: 6px; }
+  .pg-grp { display: flex; flex-direction: column; align-items: center; gap: 9px; flex: 1 0 auto; min-width: 38px; }
+  .pg-bars { display: flex; align-items: flex-end; gap: 6px; height: 190px; border-bottom: 1px solid var(--line); padding: 0 3px; width: 100%; justify-content: center; }
+  .pg-bcol { display: flex; flex-direction: column; align-items: center; justify-content: flex-end; gap: 5px; }
+  .pg-val { font-size: 10px; color: #526581; font-weight: 700; white-space: nowrap; }
+  .pg-bar { width: 26px; border-radius: 5px 5px 0 0; background: #6d91ed; min-height: 3px; }
+  .pg-bar.is-forecast { background: repeating-linear-gradient(45deg, #cbd8f5, #cbd8f5 5px, #e6edfc 5px, #e6edfc 10px); }
+  .pg-grp label { font-size: 10px; color: #758398; text-align: center; max-width: 110px; line-height: 1.25; }
+  .pg-chartfoot { margin-top: 14px; font-size: 11px; color: #7a879b; }
+  .pg-legend { display: flex; gap: 14px; align-items: center; margin-top: 12px; color: #7a879b; font-size: 11px; }
+  .pg-swatch { width: 9px; height: 9px; background: #6d91ed; border-radius: 2px; display: inline-block; margin-right: 4px; }
+  .pg-swatch.is-future { background: #d2dff7; }
 
-  /* Tuiles : libellé en haut, chiffre dessous */
-  .pg-tiles { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: .5rem; }
-  .pg-tiles.is-four { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .pg-tiles.is-five { grid-template-columns: repeat(5, minmax(0, 1fr)); }
-  .pg-tiles.is-two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .pg-tiles.is-three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .pg-tile {
-    min-width: 0;
-    padding: .6rem .7rem .65rem;
-    border-radius: 6px;
-    background: var(--tile);
+  /* Anneau */
+  .pg-donutrow { display: flex; align-items: center; justify-content: center; gap: 30px; margin: 16px 0 23px; flex-wrap: wrap; }
+  .pg-donut {
+    height: 160px; width: 160px; border-radius: 50%; display: grid; place-items: center;
+    background: conic-gradient(var(--green) 0 var(--occ), #e7ecf4 var(--occ) 100%);
   }
-  .pg-tile span {
-    display: block;
-    color: var(--muted);
-    font-size: .66rem;
-    font-weight: 700;
-    letter-spacing: .05em;
-    text-transform: uppercase;
-    line-height: 1.2;
-  }
-  .pg-tile strong {
-    display: block;
-    margin-top: .3rem;
-    font-size: 1.3rem;
-    font-weight: 700;
-    line-height: 1;
-    font-variant-numeric: tabular-nums;
-  }
-  .pg-tile.is-current strong { color: var(--accent); }
-  .pg-tile.is-good strong { color: var(--ok); }
-  .pg-tile.is-upcoming strong { color: var(--ink-2); }
+  .pg-donutinner { background: #fff; border-radius: 50%; height: 119px; width: 119px; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+  .pg-donutinner strong { font-size: 29px; }
+  .pg-donutinner span { font-size: 10px; color: var(--muted); }
+  .pg-donutlegend { line-height: 2.5; color: #68778e; font-size: 12px; }
+  .pg-donutlegend b { color: #1c2b42; margin-left: 10px; }
+  .pg-chips { display: flex; gap: 10px; flex-wrap: wrap; }
+  .pg-chip { padding: 9px 12px; border-radius: 8px; background: #f3f6fa; color: #596c84; font-size: 11px; }
 
-  /* Sous-blocs : formats, marchés, résolutions */
-  .pg-subs { display: grid; gap: .5rem; margin-top: .75rem; }
-  .pg-sub {
-    padding: .6rem .75rem;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    background: #ffffff;
+  /* Tableau */
+  .pg-tabletop { display: flex; align-items: center; justify-content: space-between; gap: 15px; flex-wrap: wrap; margin-bottom: 17px; }
+  .pg-tabletop h2 { margin: 0 0 5px; }
+  .pg-tabletop .pg-desc { margin: 0; }
+  .pg-table-wrap { overflow: auto; }
+  .pg-table { width: 100%; border-collapse: collapse; text-align: left; min-width: 760px; }
+  .pg-table th { font-size: 11px; text-transform: uppercase; letter-spacing: .5px; color: #8795a7; background: #f7f9fc; padding: 13px 12px; white-space: nowrap; }
+  .pg-table td { padding: 14px 12px; border-bottom: 1px solid #edf0f5; font-size: 12.5px; vertical-align: middle; font-variant-numeric: tabular-nums; }
+  .pg-table .num { text-align: center; }
+  .pg-table tbody tr[data-i] { cursor: pointer; }
+  .pg-table tbody tr[data-i]:hover { background: #f5f8ff; }
+  .pg-sub { display: block; color: var(--muted); font-size: 11px; margin-top: 2px; }
+  .pg-progress { height: 6px; background: #edf1f6; border-radius: 8px; width: 90px; display: inline-block; vertical-align: middle; margin-right: 8px; overflow: hidden; }
+  .pg-progress i { display: block; background: #547de0; height: 100%; border-radius: 8px; }
+  .pg-pill { display: inline-block; border-radius: 30px; padding: 5px 9px; font-size: 11px; font-weight: 650; white-space: nowrap; }
+  .pg-pill.is-occupee, .pg-pill.is-occupe { background: #e5f6f0; color: #137c63; }
+  .pg-pill.is-libre { background: #fff0ed; color: #c15b4e; }
+  .pg-pill.is-reservee { background: #fff5e0; color: #a86a0f; }
+  .pg-pill.is-panne { background: #eceff4; color: #5f6e84; }
+  .pg a.pg-voir {
+    display: inline-block; padding: 6px 14px; border: 1px solid var(--line); border-radius: 7px;
+    background: #fff; color: #3a4c68; font-size: 12px; font-weight: 650; text-decoration: none;
   }
-  .pg-sub-row {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    justify-content: space-between;
-    gap: .4rem 1rem;
-  }
-  .pg-sub-title { font-size: 1rem; font-weight: 600; color: var(--ink);}
-  .pg-sub-title small { margin-left: .4rem; color: var(--muted); font-size: .74rem; font-weight: 400; }
-  .pg-sub .pg-tile { background: var(--tile); }
+  .pg a.pg-voir:hover { background: var(--blue); border-color: var(--blue); color: #fff; }
+  .pg-tablefoot { display: flex; justify-content: space-between; align-items: center; gap: 12px; color: #8b98a9; font-size: 11px; margin-top: 15px; }
+  .pg-empty { color: var(--muted); font-size: 13px; padding: 12px 0; margin: 0; }
 
-  /* Valeurs affichées à côté du nom : Panneaux · Faces · Occupés · Libres */
-  .pg-stats-inline { display: flex; flex-wrap: wrap; gap: .5rem 1.1rem; }
-  .pg-stats-inline { gap: .45rem; }
-  .pg-stats-inline > span {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    min-width: 4.4rem;
-    padding: .45rem .65rem .5rem;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    background: var(--tile);
-    text-align: center;
-  }
-  .pg-stats-inline small { color: var(--muted); font-size: .64rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; line-height: 1.2; }
-  .pg-stats-inline b { margin-top: .25rem; color: var(--ink); font-size: 1.1rem; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
-  .pg-stats-inline .is-current b { color: var(--accent); }
-  .pg-stats-inline .is-good b { color: var(--ok); }
+  /* Fiche individuelle */
+  .pg-modalback { position: fixed; inset: 0; background: #101a2a99; display: flex; align-items: center; justify-content: center; padding: 20px; z-index: 2000; }
+  .pg-modal { background: #fff; border-radius: 16px; padding: 27px; width: min(560px, 100%); max-height: 92vh; overflow: auto; box-shadow: 0 20px 80px #0003; }
+  .pg-modalhead { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .pg-modalhead h2 { margin: 6px 0 6px; font-size: 20px; font-weight: 800; }
+  .pg-close { border: 0; background: #f2f4f8; border-radius: 50%; width: 30px; height: 30px; cursor: pointer; font-size: 18px; line-height: 1; }
+  .pg-detailgrid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-top: 22px; }
+  .pg-detail { background: #f6f8fb; border-radius: 9px; padding: 15px; }
+  .pg-detail span { display: block; font-size: 11px; color: #7a889c; }
+  .pg-detail b { display: block; font-size: 19px; margin-top: 8px; }
+  .pg-calendar { display: flex; gap: 4px; margin-top: 12px; }
+  .pg-calendar div { flex: 1; height: 26px; border-radius: 3px; background: #e5eaf2; }
+  .pg-calmonths { display: flex; gap: 4px; margin-top: 4px; }
+  .pg-calmonths span { flex: 1; text-align: center; font-size: 9px; color: #8795a7; }
+  .pg-modalnote { font-size: 12px; color: #7e8ba0; margin: 15px 0 0; }
+  .pg-modalfoot { margin-top: 18px; }
 
-  /* Écrans : liste à plat, un écran par ligne */
-  .pg-ecrans { display: grid; gap: .45rem; margin-top: .75rem; }
-  .pg-ecran {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: .75rem;
-    padding: .6rem .75rem;
-    border-radius: 6px;
-    background: var(--tile);
-  }
-  .pg-ecran-actions {
-    display: flex;
-    align-items: center;
-    justify-content: flex-end;
-    flex-wrap: wrap;
-    gap: .45rem;
-  }
-  .pg-ecran-metrics { display: flex; flex-wrap: wrap; gap: .4rem; }
-  .pg-ecran-metric {
-    display: grid;
-    min-width: 6.4rem;
-    gap: .2rem;
-    padding: .38rem .55rem;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    background: #fff;
-  }
-  .pg-ecran-metric small { color: var(--muted); font-size: .62rem; font-weight: 700; letter-spacing: .04em; line-height: 1.15; text-transform: uppercase; }
-  .pg-ecran-metric b { color: var(--ink); font-size: .9rem; font-variant-numeric: tabular-nums; line-height: 1.1; }
-  .pg-ecran-metric.is-current { border-color: #e7b6b3; background: #fff8f7; }
-  .pg-ecran-metric.is-current b { color: var(--accent); }
-  .pg-ecran-metric.is-annual b { color: var(--ok); }
-  .pg-ecran-main { min-width: 0; }
-  .pg-ecran-main strong { display: block; font-size: .9rem; font-weight: 600; }
-  .pg-ecran-main small { display: block; overflow: hidden; color: var(--muted); font-size: .74rem; text-overflow: ellipsis; white-space: nowrap; }
-  .pg-ecran-state { flex: 0 0 auto; padding: .25rem .65rem; border-radius: 999px; font-size: .72rem; font-weight: 700; }
-  .pg-ecran-state.is-occupe { background: #f8dedb; color: var(--accent); }
-  .pg-ecran-state.is-libre { background: #d6eee1; color: var(--ok); }
-
-  /* ── Alertes ── */
-  .pg-alerts { display: grid; gap: .5rem; }
+  /* ── Alertes / campagnes ── */
+  .pg-two { display: grid; grid-template-columns: 1fr 1fr; gap: 17px; align-items: start; }
+  .pg-stack { display: grid; gap: 17px; min-width: 0; }
+  .pg-alerts { display: grid; gap: 8px; max-height: 19.5rem; overflow-y: auto; }
   .pg-alert {
-    display: flex;
-    align-items: flex-start;
-    gap: .6rem;
-    padding: .6rem .7rem;
-    border: 1px solid var(--line);
-    border-radius: 6px;
-    font-size: .85rem;
-    line-height: 1.35;
-    text-decoration: none;
+    display: flex; align-items: flex-start; gap: .6rem; padding: .65rem .75rem;
+    border: 1px solid var(--line); border-radius: 8px; font-size: 12.5px; line-height: 1.35; text-decoration: none;
   }
-  .pg-alert:hover { background: #fafbfc; }
-  .pg-alert i { margin-top: .12rem; color: var(--muted); }
   .pg-alert.is-danger { border-color: #f3c9c5; background: #fff8f7; }
-  .pg-alert.is-danger i { color: var(--ko); }
+  .pg-alert.is-danger i { color: var(--red); }
   .pg-alert.is-warning { border-color: #f1dcb5; background: #fffbf3; }
-  .pg-alert.is-warning i { color: var(--warn); }
+  .pg-alert.is-warning i { color: var(--amber); }
   .pg-alert-arrow { margin-left: auto; color: var(--muted); }
-  .pg-ok {
-    display: flex;
-    align-items: center;
-    gap: .5rem;
-    padding: .6rem .7rem;
-    border: 1px solid #cfe7da;
-    border-radius: 6px;
-    background: #f3faf6;
-    color: var(--ok);
-    font-size: .85rem;
-  }
-
-  /* ── Campagnes : détail par catégorie ── */
+  .pg-ok { display: flex; align-items: center; gap: .5rem; padding: .65rem .75rem; border: 1px solid #cfe7da; border-radius: 8px; background: #f3faf6; color: var(--green); font-size: 12.5px; }
+  .pg-typegrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .pg-type { background: #f6f8fb; border-radius: 9px; padding: 14px; }
+  .pg-type h3 { margin: 0 0 2px; font-size: 13px; font-weight: 700; }
+  .pg-type p { margin: 0 0 10px; font-size: 11px; color: var(--muted); }
+  .pg-type div { display: flex; gap: 14px; }
+  .pg-type span { font-size: 11px; color: #7a889c; display: block; }
+  .pg-type b { display: block; font-size: 20px; margin-top: 4px; }
+  .pg-type .is-current b { color: var(--blue); }
   .pg-cat { border-top: 1px solid var(--line); }
-  .pg-cat:first-child { border-top: 0; }
-  .pg-cat > summary {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: .75rem;
-    padding: .75rem 1.05rem;
-    list-style: none;
-    cursor: pointer;
-    font-weight: 600;
+  .pg-cat:first-of-type { border-top: 0; }
+  .pg-cat > summary, .pg-recent > summary {
+    display: flex; align-items: center; justify-content: space-between; gap: .75rem;
+    padding: .8rem 0; list-style: none; cursor: pointer; font-weight: 650;
   }
-  .pg-cat > summary::-webkit-details-marker { display: none; }
-  .pg-cat > summary:hover { background: #fafbfc; }
-  .pg-cat-count {
-    display: inline-flex;
-    align-items: center;
-    gap: .4rem;
-    color: var(--ink-2);
-    font-variant-numeric: tabular-nums;
-    font-weight: 600;
-  }
+  .pg-cat > summary::-webkit-details-marker, .pg-recent > summary::-webkit-details-marker { display: none; }
+  .pg-cat-count { display: inline-flex; align-items: center; gap: .4rem; color: #3a4c68; font-weight: 700; }
   .pg-cat-count i, .pg-recent > summary i { color: var(--muted); font-size: .7rem; transition: transform .15s ease; }
   .pg-cat[open] .pg-cat-count i, .pg-recent[open] > summary i { transform: rotate(180deg); }
-  .pg-cat-body { padding: 0 1.05rem .75rem; }
-  /* Listes : six lignes visibles, ensuite défilement */
   .pg-list { max-height: 19.5rem; overflow-y: auto; }
-  .pg-alerts { max-height: 19.5rem; overflow-y: auto; padding-right: .25rem; }
+  .pg-lrow { display: flex; align-items: center; justify-content: space-between; gap: .6rem; padding: .55rem 0; border-top: 1px solid var(--line); }
+  .pg-lrow:first-child { border-top: 0; }
+  .pg-lrow-main { min-width: 0; }
+  .pg-lrow-name { display: block; overflow: hidden; font-weight: 650; text-overflow: ellipsis; white-space: nowrap; text-decoration: none; }
+  .pg-lrow-name:hover { color: var(--blue); }
+  .pg-lrow-meta { color: var(--muted); font-size: 11.5px; }
+  .pg-tag { display: inline-block; background: #eef1f6; color: #6b7a90; border-radius: 6px; padding: 2px 7px; font-size: 11px; margin: 2px 4px 2px 0; }
 
-  /* Bloc repliable (Alertes) */
-  .pg-fold > summary { list-style: none; cursor: pointer; }
-  .pg-fold > summary::-webkit-details-marker { display: none; }
-  .pg-fold > summary:hover { background: #fafbfc; }
-  .pg-fold:not([open]) > summary { border-bottom: 0; }
-  .pg-fold-right { display: inline-flex; align-items: center; gap: .6rem; }
-  .pg-fold-icon { color: var(--muted); font-size: .72rem; transition: transform .15s ease; }
-  .pg-fold[open] .pg-fold-icon { transform: rotate(180deg); }
-  .pg-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: .6rem;
-    padding: .55rem 0;
-    border-top: 1px solid var(--line);
-  }
-  .pg-row:first-child { border-top: 0; }
-  .pg-row-main { min-width: 0; }
-  .pg-row-name {
-    display: block;
-    overflow: hidden;
-    font-weight: 600;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-    text-decoration: none;
-  }
-  .pg-row-name:hover { color: var(--accent); }
-  .pg-row-meta { color: var(--muted); font-size: .76rem; }
-
-  .pg-recent > summary {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: .8rem 1.05rem;
-    list-style: none;
-    cursor: pointer;
-    font-weight: 600;
-  }
-  .pg-recent > summary::-webkit-details-marker { display: none; }
-  .pg-recent > summary:hover { background: #fafbfc; }
-  .pg-recent .pg-list { padding: 0 1.05rem .6rem; }
-
-  /* ── Carte ── */
-  #parc-home-map { height: clamp(320px, 38vw, 440px); background: #e9ecef; }
-  #parc-map-error { margin: .75rem; }
-
-  /* Filtres et légende des catégories sur la carte */
-  .pg-filters { display: flex; flex-wrap: wrap; gap: .4rem; padding: .75rem 1rem 0; }
-  .pg-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: .45rem;
-    padding: .32rem .65rem;
-    border: 1px solid var(--line);
-    border-radius: 999px;
-    background: #ffffff;
-    color: var(--ink-2);
-    font: inherit;
-    font-size: .8rem;
-    cursor: pointer;
-  }
-  .pg-chip:hover { border-color: #c5cad3; }
-  .pg-chip[aria-pressed="true"] { border-color: var(--ink); background: var(--ink); color: #ffffff; }
-  .pg-chip-dot { width: .55rem; height: .55rem; border-radius: 50%; }
-  .pg-chip[aria-pressed="false"] .pg-chip-dot { opacity: .35; }
-  .pg-chip-count { opacity: .7; font-variant-numeric: tabular-nums; }
-  .pg-chip.is-back { border-style: dashed; }
-  .pg-block-head { flex-wrap: wrap; }
-
-  /* ── Tableau des formats (Géant) ── */
-  .pg-table-wrap { margin-top: .75rem; overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; }
-  .pg-table { width: 100%; min-width: 780px; border-collapse: collapse; }
-  .pg-table th { padding: .65rem .8rem; background: var(--tile); color: #000000; font-size: .66rem; font-weight: 900; letter-spacing: .05em; text-align: left; text-transform: uppercase; white-space: nowrap; }
-  .pg-table td { padding: .7rem .8rem; border-top: 1px solid var(--line); vertical-align: middle; font-variant-numeric: tabular-nums; }
-  .pg-table .num { text-align: center; }
-  .pg-table tbody tr:hover { background: #fafbfc; }
-  .pg-dim { display: flex; align-items: center; gap: .7rem; }
-  .pg-dim b { display: block; font-size: 1rem; }
-  .pg-dim small { color: var(--muted); font-size: .74rem; }
-  .pg-thumb { display: grid; flex: 0 0 auto; place-items: center; width: 56px; height: 42px; overflow: hidden; border-radius: 6px; background: var(--tile); color: var(--muted); }
-  .pg-thumb img { width: 100%; height: 100%; object-fit: cover; }
-  .pg-table .pg-num-occ { color: var(--ko); font-weight: 700; }
-  .pg-table .pg-num-free { color: var(--ok); font-weight: 700; }
-  .pg-taux { display: grid; gap: .3rem; min-width: 110px; }
-  .pg-bar { height: 6px; overflow: hidden; border-radius: 999px; background: var(--tile); }
-  .pg-bar > i { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
-  .pg .pg-voir { display: inline-block; padding: .35rem .95rem; border: 1px solid var(--line); border-radius: 6px; background: #fff; color: var(--ink-2); font-size: .82rem; font-weight: 600; text-decoration: none; }
-  .pg .pg-voir:hover { border-color: var(--accent); background: var(--accent); color: #fff; }
-
-  /* ── Responsive ── */
   @media (max-width: 1100px) {
-    .pg-layout { grid-template-columns: minmax(0, 1fr); }
+    .pg-row, .pg-two { grid-template-columns: 1fr; }
+    .pg-metrics { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   }
-  @media (max-width: 700px) {
-    .pg-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .pg-tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    .pg-tile strong { font-size: 1.15rem; }
-    .pg-card-body { padding: .75rem; }
-    .pg-blocks { padding: .7rem; }
+  @media (max-width: 680px) {
+    .pg { padding: 1rem; }
+    .pg-metrics, .pg-metrics.is-three, .pg-typegrid { gap: 9px; }
+    .pg-metrics.is-three { grid-template-columns: repeat(1, minmax(0, 1fr)); }
+    .pg-typegrid { grid-template-columns: 1fr; }
+    .pg-metric { padding: 13px; }
+    .pg-metric .pg-num { font-size: 26px; }
+    .pg-panel { padding: 14px; }
+    .pg-donut { height: 130px; width: 130px; }
+    .pg-donutinner { height: 94px; width: 94px; }
+    .pg h1 { font-size: 24px; }
+    .pg-input { width: 100%; }
   }
   @media (prefers-reduced-motion: reduce) {
     .pg *, .pg *::before, .pg *::after { transition: none !important; }
@@ -428,714 +247,767 @@
 <main class="pg">
 
   {# ── En-tête ── #}
-  <header class="pg-head">
+  <header class="pg-top">
     <div>
-      <p class="pg-kicker">Tableau de bord</p>
-      <h1>{% if ville_active %}{{ ville_active }}{% else %}Parc publicitaire{% endif %}</h1>
+      <div class="pg-eyebrow">Pilotage commercial{% if ville_active %} / {{ ville_active }}{% endif %}</div>
+      <h1>Réseau publicitaire — <span id="pg-cat-title"></span></h1>
+      <p class="pg-hint">Vue générale du parc · Situation au {% now "d/m/Y" %}</p>
     </div>
-    <nav class="pg-cities" aria-label="Filtrer par ville">
-      {% for ville in villes %}
-        <a class="pg-city {% if ville_active == ville %}is-active{% endif %}" href="{% url 'dashboard' %}?ville={{ ville|urlencode }}">{{ ville }}</a>
-      {% empty %}
-        <span class="pg-muted">Aucune ville renseignée dans l’inventaire.</span>
-      {% endfor %}
-      <span class="pg-current-date"><i class="bi bi-calendar3 me-1" aria-hidden="true"></i>{% now "d/m/Y H:i" %}</span>
-    </nav>
+    <div class="pg-controls">
+      {% if villes %}
+        <select class="pg-select" aria-label="Ville"
+                onchange="window.location.href='{% url 'dashboard' %}?ville=' + encodeURIComponent(this.value)">
+          {% for ville in villes %}
+            <option value="{{ ville }}" {% if ville_active == ville %}selected{% endif %}>{{ ville }}</option>
+          {% endfor %}
+        </select>
+      {% else %}
+        <span class="pg-hint">Aucune ville renseignée dans l’inventaire.</span>
+      {% endif %}
+      <button type="button" class="pg-btn" onclick="window.print()"><i class="bi bi-printer me-1"></i>Exporter</button>
+    </div>
   </header>
 
+  {% if total_faces %}
+  <div class="pg-metrics" style="margin-top: 22px;">
+    <div class="pg-metric">
+      <span class="pg-mdot"></span>
+      <div class="pg-label">Total des faces</div>
+      <div class="pg-num">{{ total_faces }}</div>
+      <div class="pg-foot">Capacité annuelle : {{ capacite_annuelle_totale|floatformat:"0g" }} journées-faces</div>
+    </div>
+    <div class="pg-metric is-green">
+      <span class="pg-mdot"></span>
+      <div class="pg-label">Occupées aujourd'hui</div>
+      <div class="pg-num">{{ total_faces_occupe }} <small>/ {{ total_faces }}</small></div>
+      <div class="pg-foot">{{ total_faces_disponibles }} face{{ total_faces_disponibles|pluralize }} disponible{{ total_faces_disponibles|pluralize }}</div>
+    </div>
+    <div class="pg-metric is-orange">
+      <span class="pg-mdot"></span>
+      <div class="pg-label">Occupation du jour</div>
+      <div class="pg-num">{{ taux_jour_global }} %</div>
+      <div class="pg-foot">Photo instantanée au {% now "d/m" %}</div>
+    </div>
+    <div class="pg-metric">
+      <span class="pg-mdot"></span>
+      <div class="pg-label">Occupation cumulée</div>
+      <div class="pg-num">{{ taux_cumule_global }} %</div>
+      <div class="pg-foot">Depuis le 1er janvier • {{ parc_meta.elapsed_days|default:0 }} jours</div>
+    </div>
+  </div>
+  <div class="pg-metrics is-three" style="margin-top: 12px;">
+    <div class="pg-metric">
+      <div class="pg-label">Annuel réalisé à date</div>
+      <div class="pg-num">{{ annuel_realise_global }} %</div>
+      <div class="pg-foot">Journées réalisées ÷ {{ capacite_annuelle_totale|floatformat:"0g" }}</div>
+    </div>
+    <div class="pg-metric is-green">
+      <div class="pg-label">Annuel sécurisé</div>
+      <div class="pg-num">{{ annuel_securise_global }} %</div>
+      <div class="pg-foot">Réalisé + contrats futurs fermes</div>
+    </div>
+    <div class="pg-metric is-red">
+      <div class="pg-label">Faces libres depuis +60 j</div>
+      <div class="pg-num">{{ total_faces_libre }}</div>
+      <div class="pg-foot">À traiter en priorité par les commerciaux</div>
+    </div>
+  </div>
+  {% endif %}
 
-  <div class="pg-layout">
+  {# ── Choix de la catégorie ── #}
+  <nav class="pg-tabs" role="tablist" aria-label="Catégorie de supports">
+    {% for cat in parc_categories %}
+      <button type="button" class="pg-tab" role="tab" data-target="cat-{{ forloop.counter }}" data-label="{{ cat.categorie }}" aria-selected="false">
+        <span class="pg-dot" style="background: {{ cat.color }}"></span>
+        {{ cat.categorie }}
+        <small>{{ cat.nb_faces }} face{{ cat.nb_faces|pluralize }}</small>
+      </button>
+    {% endfor %}
+    {% if ecrans_total %}
+      <button type="button" class="pg-tab" role="tab" data-target="cat-ecrans" data-label="Écrans" aria-selected="false">
+        <span class="pg-dot" style="background: #06b6d4"></span>
+        Écrans
+        <small>{{ ecrans_total }}</small>
+      </button>
+    {% endif %}
+  </nav>
 
-    {# ── Colonne principale : supports et carte ── #}
-    <div class="pg-main">
+  {# ══════════ Panneaux par catégorie ══════════ #}
+  {% for cat in parc_categories %}
+  <section class="pg-catpanel" id="cat-{{ forloop.counter }}" data-index="{{ forloop.counter0 }}" hidden>
 
-      <section class="pg-card is-plain" aria-label="Supports par format">
-        <div class="pg-blocks">
-
-          {# 12m² : totaux seulement #}
-          {% for cat in format_categories %}{% if cat.categorie == '12m²' %}
-            <article class="pg-block">
-              <div class="pg-block-head"><h3>12m²</h3>{% if not request.user.is_technicien %}<a class="pg-block-link" href="{% url 'format_detail' cat.detail_code %}{% if ville_active %}?ville={{ ville_active|urlencode }}{% endif %}"><i class="bi bi-map"></i>Voir sur la carte</a>{% endif %}</div>
-              <div class="pg-tiles">
-                <div class="pg-tile"><span>Panneaux</span><strong>{{ cat.nb_supports }}</strong></div>
-                <div class="pg-tile"><span>Faces</span><strong>{{ cat.nb_faces }}</strong></div>
-                <div class="pg-tile is-current"><span>Occupés</span><strong>{{ cat.nb_occupe }}</strong></div>
-                <div class="pg-tile is-good"><span>Libres</span><strong>{{ cat.nb_libre }}</strong></div>
-                <div class="pg-tile"><span>Taux actuel</span><strong>{{ cat.taux_actuel }}%</strong></div>
-                <div class="pg-tile"><span>Taux annuel {{ annee_taux_occupation }}</span><strong>{{ cat.taux_annuel }}%</strong></div>
-              </div>
-            </article>
-          {% endif %}{% endfor %}
-
-          {# Sucette : totaux seulement #}
-          {% for cat in format_categories %}{% if cat.categorie == 'Sucette' %}
-            <article class="pg-block">
-              <div class="pg-block-head"><h3>Sucette</h3>{% if not request.user.is_technicien %}<a class="pg-block-link" href="{% url 'format_detail' cat.detail_code %}{% if ville_active %}?ville={{ ville_active|urlencode }}{% endif %}"><i class="bi bi-map"></i>Voir sur la carte</a>{% endif %}</div>
-              <div class="pg-tiles">
-                <div class="pg-tile"><span>Panneaux</span><strong>{{ cat.nb_supports }}</strong></div>
-                <div class="pg-tile"><span>Faces</span><strong>{{ cat.nb_faces }}</strong></div>
-                <div class="pg-tile is-current"><span>Occupés</span><strong>{{ cat.nb_occupe }}</strong></div>
-                <div class="pg-tile is-good"><span>Libres</span><strong>{{ cat.nb_libre }}</strong></div>
-                <div class="pg-tile"><span>Taux actuel</span><strong>{{ cat.taux_actuel }}%</strong></div>
-                <div class="pg-tile"><span>Taux annuel {{ annee_taux_occupation }}</span><strong>{{ cat.taux_annuel }}%</strong></div>
-              </div>
-            </article>
-          {% endif %}{% endfor %}
-
-          {# Géant : totaux puis détail par format #}
-          {% for cat in format_categories %}{% if cat.categorie == 'Géant' %}
-            <article class="pg-block">
-              <div class="pg-block-head"><h3>Géant</h3>{% if not request.user.is_technicien %}<a class="pg-block-link" href="{% url 'format_detail' 'geant' %}{% if ville_active %}?ville={{ ville_active|urlencode }}{% endif %}"><i class="bi bi-map"></i>Voir sur la carte</a>{% endif %}</div>
-              <div class="pg-tiles">
-                <div class="pg-tile"><span>Panneaux</span><strong>{{ cat.nb_supports }}</strong></div>
-                <div class="pg-tile"><span>Faces</span><strong>{{ cat.nb_faces }}</strong></div>
-                <div class="pg-tile is-current"><span>Occupés</span><strong>{{ cat.nb_occupe }}</strong></div>
-                <div class="pg-tile is-good"><span>Libres</span><strong>{{ cat.nb_libre }}</strong></div>
-                <div class="pg-tile"><span>Taux actuel</span><strong>{{ cat.taux_actuel }}%</strong></div>
-                <div class="pg-tile"><span>Taux annuel {{ annee_taux_occupation }}</span><strong>{{ cat.taux_annuel }}%</strong></div>
-              </div>
-              <div class="pg-table-wrap">
-                <table class="pg-table">
-                  <thead>
-                    <tr>
-                      <th>Dimension</th>
-                      <th>Surface</th>
-                      <th class="num">Panneaux</th>
-                      <th class="num">Faces</th>
-                      <th class="num">Occupés</th>
-                      <th class="num">Libres</th>
-                      <th>Taux actuel / annuel</th>
-                      {% if not request.user.is_technicien %}
-                        <th class="num">Action</th>
-                      {% endif %}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {% for format in formats_stats %}{% if format.categorie == 'Géant' %}
-                    <tr>
-                      <td>
-                        <div class="pg-dim">
-                          <span class="pg-thumb">{% if format.photo %}<img src="{{ format.photo }}" alt="" loading="lazy">{% else %}<i class="bi bi-signpost-2" aria-hidden="true"></i>{% endif %}</span>
-                          
-                          <div>
-                            <b>{{ format.dimensions|default:format.code }}</b>
-                            <!--
-                            <small>{{ format.code }}</small>
-                            -->
-                          </div>
-                        </div>
-                      </td>
-                      <td style="color: #000000; font-size: .66rem; font-weight: 900;">{% if format.superficie %}{{ format.superficie }} m²{% else %}—{% endif %}</td>
-                      <td class="num"><b>{{ format.nb_supports }}</b></td>
-                      <td class="num"><b>{{ format.nb_faces }}</b></td>
-                      <td class="num pg-num-occ">{{ format.nb_faces_occupees }}</td>
-                      <td class="num pg-num-free">{{ format.nb_faces_libres }}</td>
-                      <td>
-                        <div class="pg-taux">
-                          <b>Actuel {{ format.taux_actuel }}%</b>
-                          <small>Annuel {{ format.taux_annuel }}%</small>
-                          <div class="pg-bar" role="progressbar" aria-valuenow="{{ format.taux_actuel }}" aria-valuemin="0" aria-valuemax="100"><i style="width: {{ format.taux_actuel }}%"></i></div>
-                        </div>
-                      </td>
-                      {% if not request.user.is_technicien %}
-                        <td class="num">
-                          <a class="pg-voir" href="{% url 'format_detail' format.code %}{% if ville_active %}?ville={{ ville_active|urlencode }}{% endif %}">Voir</a>
-                        </td>
-                      {% endif %}
-                    </tr>
-                    {% endif %}{% endfor %}
-                  </tbody>
-                </table>
-              </div>
-            </article>
-          {% endif %}{% endfor %}
-
-          {# Marché : totaux puis détail par marché #}
-          {% for cat in format_categories %}{% if cat.categorie == 'Marché' %}
-            <article class="pg-block">
-              <div class="pg-block-head"><h3>Marché</h3><span class="pg-block-tag">{{ marches_total }} marché{{ marches_total|pluralize }}</span>{% if not request.user.is_technicien %}<a class="pg-block-link" href="{% url 'format_detail' 'marche' %}{% if ville_active %}?ville={{ ville_active|urlencode }}{% endif %}"><i class="bi bi-map"></i>Voir sur la carte</a>{% endif %}</div>
-              <div class="pg-tiles">
-                <div class="pg-tile"><span>Panneaux</span><strong>{{ cat.nb_supports }}</strong></div>
-                <div class="pg-tile"><span>Faces</span><strong>{{ cat.nb_faces }}</strong></div>
-                <div class="pg-tile is-current"><span>Occupés</span><strong>{{ cat.nb_occupe }}</strong></div>
-                <div class="pg-tile is-good"><span>Libres</span><strong>{{ cat.nb_libre }}</strong></div>
-                <div class="pg-tile"><span>Taux actuel</span><strong>{{ cat.taux_actuel }}%</strong></div>
-                <div class="pg-tile"><span>Taux annuel {{ annee_taux_occupation }}</span><strong>{{ cat.taux_annuel }}%</strong></div>
-              </div>
-              <div class="pg-subs">
-                {% for marche in marches_stats %}
-                  <div class="pg-sub">
-                    <div class="pg-sub-row">
-                      <div class="pg-sub-title">{{ marche.nom }}</div>
-                      <div class="pg-stats-inline">
-                        <span><small>Panneaux</small><b>{{ marche.nb_panneaux }}</b></span>
-                        <span><small>Faces</small><b>{{ marche.nb_faces }}</b></span>
-                        <span class="is-current"><small>Occupés</small><b>{{ marche.nb_faces_occupees }}</b></span>
-                        <span class="is-good"><small>Libres</small><b>{{ marche.nb_faces_libres }}</b></span>
-                        <span><small>Taux occ.</small><b>{% widthratio marche.nb_faces_occupees marche.nb_faces 100 %}%</b></span>
-                      </div>
-                    </div>
-                  </div>
-                {% empty %}
-                  <p class="pg-muted mb-0">Aucun marché enregistré dans cette ville.</p>
-                {% endfor %}
-              </div>
-            </article>
-          {% endif %}{% endfor %}
-
-          {# Écrans : affiché seulement si la ville possède des écrans #}
-          {% if ecrans_total %}
-          <article class="pg-block">
-            <div class="pg-block-head"><h3>Écrans</h3>{% if not request.user.is_technicien %}<a class="pg-block-link" href="{% url 'format_detail' 'ecrans' %}{% if ville_active %}?ville={{ ville_active|urlencode }}{% endif %}"><i class="bi bi-map"></i>Voir sur la carte</a>{% endif %}</div>
-            <div class="pg-tiles">
-              <div class="pg-tile"><span>Écrans</span><strong>{{ ecrans_total }}</strong></div>
-              <div class="pg-tile is-current"><span>Occupés</span><strong>{{ ecrans_occupees }}</strong></div>
-              <div class="pg-tile is-good"><span>Libres</span><strong>{{ ecrans_libres }}</strong></div>
-              <div class="pg-tile"><span>Objectif annuel (spots)</span><strong>{{ ecrans_objectifs_total }}</strong></div>
-              <div class="pg-tile"><span>Taux actuel</span><strong>{{ ecrans_taux_actuel }}%</strong></div>
-              <div class="pg-tile"><span>Taux annuel {{ annee_taux_occupation }} (01/01 à aujourd'hui)</span><strong>{{ ecrans_taux_annuel }}%</strong></div>
-            </div>
-            <div class="pg-ecrans">
-              {% for ecran in ecrans_liste %}
-                <div class="pg-ecran">
-                  <div class="pg-ecran-main">
-                    <strong><a href="{% url 'support_detail' ecran.uuid %}">{{ ecran.nom }}</a></strong>
-                    <small>{{ ecran.code }}{% if ecran.quartier %} · {{ ecran.quartier }}{% endif %}{% if ecran.ville %} · {{ ecran.ville }}{% endif %}</small>
-                  </div>
-                  <div class="pg-ecran-actions">
-                    {% if ecran.objectif_spots_annuel %}
-                      <div class="pg-ecran-metrics">
-                        <span class="pg-ecran-metric"><small>Objectif spots</small><b>{{ ecran.objectif_spots_annuel }}</b></span>
-                        <span class="pg-ecran-metric is-current"><small>Taux actuel</small><b>{{ ecran.taux_actuel }}%</b></span>
-                        <span class="pg-ecran-metric is-annual"><small>Taux annuel {{ annee_taux_occupation }}</small><b>{{ ecran.taux_annuel }}%</b></span>
-                      </div>
-                    {% endif %}
-                    <!--
-                    {% if ecran.occupe %}
-                      <span class="pg-ecran-state is-occupe">Occupé</span>
-                    {% else %}
-                      <span class="pg-ecran-state is-libre">Libre</span>
-                    {% endif %}
-                    -->
-                    {% if not request.user.is_technicien %}
-                      <a class="pg-voir" href="{% url 'support_detail' ecran.uuid %}">Voir</a>
-                    {% endif %}
-                  </div>
-                </div>
-              {% empty %}
-                <p class="pg-muted mb-0">Aucun écran enregistré dans cette ville.</p>
-              {% endfor %}
-            </div>
-          </article>
-          {% endif %}
-
-        </div>
-      </section>
-
+    <div class="pg-metrics">
+      <div class="pg-metric">
+        <span class="pg-mdot"></span>
+        <div class="pg-label">Total des faces</div>
+        <div class="pg-num">{{ cat.nb_faces }}</div>
+        <div class="pg-foot">Capacité annuelle : {{ cat.capacite|floatformat:"0g" }} journées-faces</div>
+      </div>
+      <div class="pg-metric is-green">
+        <span class="pg-mdot"></span>
+        <div class="pg-label">Occupées aujourd'hui</div>
+        <div class="pg-num">{{ cat.nb_occupe }} <small>/ {{ cat.nb_faces }}</small></div>
+        <div class="pg-foot">{{ cat.nb_disponibles }} face{{ cat.nb_disponibles|pluralize }} disponible{{ cat.nb_disponibles|pluralize }}</div>
+      </div>
+      <div class="pg-metric is-orange">
+        <span class="pg-mdot"></span>
+        <div class="pg-label">Occupation du jour</div>
+        <div class="pg-num">{{ cat.taux_jour }} %</div>
+        <div class="pg-foot">Photo instantanée au {% now "d/m" %}</div>
+      </div>
+      <div class="pg-metric">
+        <span class="pg-mdot"></span>
+        <div class="pg-label">Occupation cumulée</div>
+        <div class="pg-num">{{ cat.taux_cumule }} %</div>
+        <div class="pg-foot">Depuis le 1er janvier • {{ parc_meta.elapsed_days }} jours</div>
+      </div>
     </div>
 
-    {# ── Colonne latérale : alertes et campagnes ── #}
-    <aside class="pg-side">
+    <div class="pg-metrics is-three">
+      <div class="pg-metric">
+        <div class="pg-label">Annuel réalisé à date</div>
+        <div class="pg-num">{{ cat.annuel_realise }} %</div>
+        <div class="pg-foot">Journées réalisées ÷ {{ cat.capacite|floatformat:"0g" }}</div>
+      </div>
+      <div class="pg-metric is-green">
+        <div class="pg-label">Annuel sécurisé</div>
+        <div class="pg-num">{{ cat.annuel_securise }} %</div>
+        <div class="pg-foot">Réalisé + contrats futurs fermes</div>
+      </div>
+      <div class="pg-metric is-red">
+        <div class="pg-label">Faces libres depuis +60 j</div>
+        <div class="pg-num">{{ cat.libres_60 }}</div>
+        <div class="pg-foot">À traiter en priorité par les commerciaux</div>
+      </div>
+    </div>
 
-      <section class="pg-card" aria-labelledby="pg-alerts-title">
-        <details class="pg-fold">
-          <summary class="pg-card-head">
-            <div>
-              <h2 id="pg-alerts-title">Alertes</h2>
-              <p>Campagnes sans document commercial ou bon de commande en attente.</p>
-            </div>
-            <span class="pg-fold-right">
-              <span class="badge {% if alertes %}text-bg-warning{% else %}text-bg-success{% endif %}">{{ alertes|length }}</span>
-              <i class="bi bi-chevron-down pg-fold-icon" aria-hidden="true"></i>
-            </span>
-          </summary>
-          <div class="pg-card-body">
-            {% if alertes %}
-              <div class="pg-alerts">
-                {% for alerte in alertes %}
-                  {% if not request.user.is_technicien %}
-                    <a href="{{ alerte.url }}" class="pg-alert is-{{ alerte.type }}">
-                      <i class="bi {% if alerte.type == 'danger' %}bi-exclamation-octagon-fill{% else %}bi-exclamation-triangle-fill{% endif %}"></i>
-                      <span>{{ alerte.msg }}</span>
-                      <i class="bi bi-arrow-up-right pg-alert-arrow"></i>
-                    </a>
-                  {% else %}
-                    <div class="pg-alert is-{{ alerte.type }}">
-                      <i class="bi {% if alerte.type == 'danger' %}bi-exclamation-octagon-fill{% else %}bi-exclamation-triangle-fill{% endif %}"></i>
-                      <span>{{ alerte.msg }}</span>
-                    </div>
-                  {% endif %}
-                {% endfor %}
-              </div>
-            {% else %}
-              <div class="pg-ok">
-                <i class="bi bi-check-circle-fill"></i>
-                <span>Aucune alerte : les campagnes actives ou à venir ont leurs documents.</span>
-              </div>
-            {% endif %}
+    <div class="pg-row pg-section">
+      <div class="pg-panel">
+        <div class="pg-panelhead">
+          <div>
+            <h2>Évolution de l'occupation mensuelle</h2>
+            <p class="pg-desc">Pourcentage des journées-faces occupées par mois</p>
           </div>
-        </details>
+          <select class="pg-select" data-role="format-select" aria-label="Choisir un format"></select>
+        </div>
+        <div class="pg-chart" data-role="chart"></div>
+        <div class="pg-chartfoot">Mois à venir : prévisions issues des campagnes et des réservations confirmées.</div>
+        <div class="pg-legend">
+          <span><i class="pg-swatch"></i> Réalisé</span>
+          <span><i class="pg-swatch is-future"></i> Prévision</span>
+        </div>
+      </div>
+
+      <div class="pg-panel">
+        <h2>Situation du réseau aujourd'hui</h2>
+        <p class="pg-desc">Occupation instantanée des {{ cat.nb_faces }} faces</p>
+        <div class="pg-donutrow">
+          <div class="pg-donut" style="--occ: {{ cat.taux_jour|unlocalize }}%;">
+            <div class="pg-donutinner"><strong>{{ cat.taux_jour }} %</strong><span>occupées</span></div>
+          </div>
+          <div class="pg-donutlegend">
+            <div><span style="color:#11876b">●</span> Occupées <b>{{ cat.nb_occupe }}</b></div>
+            <div><span style="color:#b6c0d0">●</span> Disponibles <b>{{ cat.nb_disponibles }}</b></div>
+            <div><span style="color:#c94a55">●</span> Libres +60 j <b>{{ cat.libres_60 }}</b></div>
+          </div>
+        </div>
+        <div class="pg-chips">
+          <span class="pg-chip">{{ cat.nb_faces }} faces suivies</span>
+          <span class="pg-chip">{{ cat.nb_libre }} disponible{{ cat.nb_libre|pluralize }} à vendre</span>
+          <span class="pg-chip">{{ cat.libres_60 }} alerte{{ cat.libres_60|pluralize }} commerciale{{ cat.libres_60|pluralize }}</span>
+          {% if cat.nb_reserve %}<span class="pg-chip">{{ cat.nb_reserve }} réservée{{ cat.nb_reserve|pluralize }}</span>{% endif %}
+          {% if cat.nb_panne %}<span class="pg-chip">{{ cat.nb_panne }} en panne</span>{% endif %}
+        </div>
+      </div>
+    </div>
+
+    <div class="pg-panel pg-section">
+      <div class="pg-tabletop">
+        <div>
+          <h2>Détail des faces publicitaires</h2>
+          <p class="pg-desc">Cliquez sur une face pour ouvrir sa fiche et consulter son historique</p>
+        </div>
+        <div class="pg-controls">
+          <input class="pg-input" type="search" data-role="search" placeholder="Rechercher face / emplacement">
+          <select class="pg-select" data-role="status" aria-label="Filtrer par statut">
+            <option value="all">Toutes les faces</option>
+            <option value="occupee">Occupées</option>
+            <option value="dispo">Disponibles (non occupées)</option>
+            <option value="libre">Libres</option>
+            <option value="reservee">Réservées</option>
+            <option value="libre60">Libres depuis +60 j</option>
+            <option value="panne">En panne</option>
+          </select>
+          <select class="pg-select" data-role="sort" aria-label="Trier">
+            <option value="id">Numéro de face</option>
+            <option value="rateDesc">Taux décroissant</option>
+            <option value="rateAsc">Taux croissant</option>
+            <option value="vacant">Inoccupation la plus longue</option>
+          </select>
+          {% if not request.user.is_technicien %}
+            <a class="pg-btn" href="{% if cat.categorie == 'Géant' %}{% url 'format_detail' 'geant' %}{% elif cat.categorie == 'Marché' %}{% url 'format_detail' 'marche' %}{% else %}{% url 'format_detail' cat.detail_code %}{% endif %}{% if ville_active %}?ville={{ ville_active|urlencode }}{% endif %}">
+              <i class="bi bi-map me-1"></i>Carte
+            </a>
+          {% endif %}
+        </div>
+      </div>
+      <div class="pg-table-wrap">
+        <table class="pg-table">
+          <thead>
+            <tr>
+              <th>Face</th>
+              <th>Emplacement</th>
+              <th>Statut aujourd'hui</th>
+              <th>Jours occupés</th>
+              <th>Taux cumulé</th>
+              <th>Annuel sécurisé</th>
+              <th>Libre depuis</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody data-role="tbody"></tbody>
+        </table>
+      </div>
+      <div class="pg-tablefoot">
+        <span data-role="count"></span>
+        <button type="button" class="pg-btn" data-role="more" hidden>Afficher plus</button>
+      </div>
+    </div>
+  </section>
+  {% endfor %}
+
+  {# ══════════ Écrans ══════════ #}
+  {% if ecrans_total %}
+  <section class="pg-catpanel" id="cat-ecrans" hidden>
+    {% widthratio ecrans_occupees ecrans_total 100 as pct_ecr %}
+
+    <div class="pg-metrics">
+      <div class="pg-metric">
+        <span class="pg-mdot"></span>
+        <div class="pg-label">Total des écrans</div>
+        <div class="pg-num">{{ ecrans_total }}</div>
+        <div class="pg-foot">Écrans numériques LED</div>
+      </div>
+      <div class="pg-metric is-green">
+        <span class="pg-mdot"></span>
+        <div class="pg-label">Occupés aujourd'hui</div>
+        <div class="pg-num">{{ ecrans_occupees }} <small>/ {{ ecrans_total }}</small></div>
+        <div class="pg-foot">{{ ecrans_libres }} écran{{ ecrans_libres|pluralize }} disponible{{ ecrans_libres|pluralize }}</div>
+      </div>
+      <div class="pg-metric is-orange">
+        <span class="pg-mdot"></span>
+        <div class="pg-label">Taux actuel</div>
+        <div class="pg-num">{% if ecrans_taux_actuel is not None %}{{ ecrans_taux_actuel }} %{% else %}—{% endif %}</div>
+        <div class="pg-foot">Temps d'antenne réservé aujourd'hui</div>
+      </div>
+      <div class="pg-metric">
+        <span class="pg-mdot"></span>
+        <div class="pg-label">Taux annuel {{ annee_taux_occupation }}</div>
+        <div class="pg-num">{% if ecrans_taux_annuel is not None %}{{ ecrans_taux_annuel }} %{% else %}—{% endif %}</div>
+        <div class="pg-foot">Du 01/01 à aujourd'hui</div>
+      </div>
+    </div>
+
+    <div class="pg-metrics is-three">
+      <div class="pg-metric">
+        <div class="pg-label">Objectif annuel (spots)</div>
+        <div class="pg-num">{{ ecrans_objectifs_total }}</div>
+        <div class="pg-foot">Somme des objectifs par écran</div>
+      </div>
+      <div class="pg-metric is-green">
+        <div class="pg-label">Écrans libres</div>
+        <div class="pg-num">{{ ecrans_libres }}</div>
+        <div class="pg-foot">À proposer en priorité</div>
+      </div>
+      <div class="pg-metric is-red">
+        <div class="pg-label">Écrans en panne</div>
+        <div class="pg-num">{{ ecrans_panne }}</div>
+        <div class="pg-foot">À remettre en service</div>
+      </div>
+    </div>
+
+    <div class="pg-row pg-section">
+      <div class="pg-panel">
+        <h2>Occupation par écran</h2>
+        <p class="pg-desc">Taux actuel et taux annuel {{ annee_taux_occupation }} pour chaque écran</p>
+        <div class="pg-chart">
+          {% for e in ecrans_liste %}
+            <div class="pg-grp" style="min-width:66px">
+              <div class="pg-bars">
+                <div class="pg-bcol"><span class="pg-val">{{ e.taux_actuel|default_if_none:0 }}%</span><div class="pg-bar" style="height: calc({{ e.taux_actuel|default_if_none:0|unlocalize }} * 1.5px)"></div></div>
+                <div class="pg-bcol"><span class="pg-val">{{ e.taux_annuel|default_if_none:0 }}%</span><div class="pg-bar is-forecast" style="height: calc({{ e.taux_annuel|default_if_none:0|unlocalize }} * 1.5px)"></div></div>
+              </div>
+              <label>{{ e.code }}</label>
+            </div>
+          {% empty %}
+            <p class="pg-empty">Aucun écran enregistré dans cette ville.</p>
+          {% endfor %}
+        </div>
+        <div class="pg-legend">
+          <span><i class="pg-swatch"></i> Taux actuel</span>
+          <span><i class="pg-swatch is-future"></i> Taux annuel</span>
+        </div>
+      </div>
+
+      <div class="pg-panel">
+        <h2>Situation aujourd'hui</h2>
+        <p class="pg-desc">Occupation instantanée des {{ ecrans_total }} écrans</p>
+        <div class="pg-donutrow">
+          <div class="pg-donut" style="--occ: {{ pct_ecr|unlocalize }}%;">
+            <div class="pg-donutinner"><strong>{{ pct_ecr }} %</strong><span>occupés</span></div>
+          </div>
+          <div class="pg-donutlegend">
+            <div><span style="color:#11876b">●</span> Occupés <b>{{ ecrans_occupees }}</b></div>
+            <div><span style="color:#b6c0d0">●</span> Libres <b>{{ ecrans_libres }}</b></div>
+          </div>
+        </div>
+        <div class="pg-chips">
+          {% for r in ecrans_stats_par_resolution %}
+            <span class="pg-chip">{{ r.resolution }} · {{ r.nb_ecrans }}</span>
+          {% endfor %}
+        </div>
+      </div>
+    </div>
+
+    <div class="pg-panel pg-section">
+      <div class="pg-tabletop">
+        <div>
+          <h2>Détail des écrans</h2>
+          <p class="pg-desc">Objectif de spots, taux actuel et taux annuel de chaque écran</p>
+        </div>
+        <div class="pg-controls">
+          <input class="pg-input" type="search" placeholder="Rechercher…" data-filter="tbody-ecrans">
+          {% if not request.user.is_technicien %}
+            <a class="pg-btn" href="{% url 'format_detail' 'ecrans' %}{% if ville_active %}?ville={{ ville_active|urlencode }}{% endif %}">
+              <i class="bi bi-map me-1"></i>Carte
+            </a>
+          {% endif %}
+        </div>
+      </div>
+      <div class="pg-table-wrap">
+        <table class="pg-table">
+          <thead>
+            <tr>
+              <th>Écran</th>
+              <th>Statut aujourd'hui</th>
+              <th class="num">Objectif spots</th>
+              <th>Taux actuel</th>
+              <th>Taux annuel {{ annee_taux_occupation }}</th>
+              {% if not request.user.is_technicien %}<th class="num">Action</th>{% endif %}
+            </tr>
+          </thead>
+          <tbody id="tbody-ecrans">
+            {% for e in ecrans_liste %}
+              <tr>
+                <td>
+                  <strong><a href="{% url 'support_detail' e.uuid %}">{{ e.nom }}</a></strong>
+                  <span class="pg-sub">{{ e.code }}{% if e.quartier %} · {{ e.quartier }}{% endif %}{% if e.ville %} · {{ e.ville }}{% endif %}</span>
+                </td>
+                <td>{% if e.occupe %}<span class="pg-pill is-occupe">● Occupé</span>{% else %}<span class="pg-pill is-libre">● Libre</span>{% endif %}</td>
+                <td class="num">{% if e.objectif_spots_annuel %}{{ e.objectif_spots_annuel }}{% else %}—{% endif %}</td>
+                <td>{% if e.taux_actuel is not None %}<span class="pg-progress"><i style="width: {{ e.taux_actuel|unlocalize }}%"></i></span>{{ e.taux_actuel }} %{% else %}—{% endif %}</td>
+                <td>{% if e.taux_annuel is not None %}<span class="pg-progress"><i style="width: {{ e.taux_annuel|unlocalize }}%"></i></span>{{ e.taux_annuel }} %{% else %}—{% endif %}</td>
+                {% if not request.user.is_technicien %}
+                  <td class="num"><a class="pg-voir" href="{% url 'support_detail' e.uuid %}">Voir</a></td>
+                {% endif %}
+              </tr>
+            {% empty %}
+              <tr><td colspan="6"><p class="pg-empty">Aucun écran enregistré dans cette ville.</p></td></tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
+  {% if not parc_categories and not ecrans_total %}
+    <div class="pg-panel"><p class="pg-empty">Aucun support classé dans cette ville.</p></div>
+  {% endif %}
+
+  {# ══════════ Alertes & campagnes ══════════ #}
+  <div class="pg-two pg-section">
+
+    <div class="pg-stack">
+      <section class="pg-panel" aria-labelledby="pg-alerts-title">
+        <div class="pg-panelhead">
+          <div>
+            <h2 id="pg-alerts-title">Alertes</h2>
+            <p class="pg-desc">Campagnes sans document commercial ou bon de commande en attente.</p>
+          </div>
+          <span class="badge {% if alertes %}text-bg-warning{% else %}text-bg-success{% endif %}">{{ alertes|length }}</span>
+        </div>
+        {% if alertes %}
+          <div class="pg-alerts">
+            {% for alerte in alertes %}
+              {% if not request.user.is_technicien %}
+                <a href="{{ alerte.url }}" class="pg-alert is-{{ alerte.type }}">
+                  <i class="bi {% if alerte.type == 'danger' %}bi-exclamation-octagon-fill{% else %}bi-exclamation-triangle-fill{% endif %}"></i>
+                  <span>{{ alerte.msg }}</span>
+                  <i class="bi bi-arrow-up-right pg-alert-arrow"></i>
+                </a>
+              {% else %}
+                <div class="pg-alert is-{{ alerte.type }}">
+                  <i class="bi {% if alerte.type == 'danger' %}bi-exclamation-octagon-fill{% else %}bi-exclamation-triangle-fill{% endif %}"></i>
+                  <span>{{ alerte.msg }}</span>
+                </div>
+              {% endif %}
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="pg-ok">
+            <i class="bi bi-check-circle-fill"></i>
+            <span>Aucune alerte : les campagnes actives ou à venir ont leurs documents.</span>
+          </div>
+        {% endif %}
       </section>
 
-      <section class="pg-card" aria-labelledby="pg-campaign-types-title">
-        <header class="pg-card-head">
+      <section class="pg-panel" aria-labelledby="pg-campaign-types-title">
+        <div class="pg-panelhead">
           <div>
             <h2 id="pg-campaign-types-title">Campagnes par type</h2>
-            <p>En cours et à venir.</p>
+            <p class="pg-desc">En cours et à venir.</p>
           </div>
           {% if not request.user.is_technicien %}
-            <a href="{% url 'campagne_list' %}" class="btn btn-sm btn-outline-secondary">Toutes</a>
+            <a href="{% url 'campagne_list' %}" class="pg-btn">Toutes</a>
           {% endif %}
-        </header>
-        <div class="pg-blocks">
+        </div>
+        <div class="pg-typegrid">
           {% if panneaux_campagnes_en_cours or panneaux_campagnes_a_venir %}
-          <article style="padding: .9rem 1rem 1rem;">
-            <div class="pg-block-head"><h3>Panneaux</h3><span class="pg-block-tag">Campagnes statiques</span></div>
-            <div class="pg-tiles is-two">
-              <div class="pg-tile is-current"><span>En cours</span><strong>{{ panneaux_campagnes_en_cours }}</strong></div>
-              <div class="pg-tile is-upcoming"><span>À venir</span><strong>{{ panneaux_campagnes_a_venir }}</strong></div>
+            <div class="pg-type">
+              <h3>Panneaux</h3><p>Campagnes statiques</p>
+              <div>
+                <div class="is-current"><span>En cours</span><b>{{ panneaux_campagnes_en_cours }}</b></div>
+                <div><span>À venir</span><b>{{ panneaux_campagnes_a_venir }}</b></div>
+              </div>
             </div>
-          </article>
           {% endif %}
           {% if ecrans_campagnes_en_cours or ecrans_campagnes_a_venir %}
-          <article style="padding: .9rem 1rem 1rem;">
-            <div class="pg-block-head"><h3>Écrans</h3><span class="pg-block-tag">Campagnes numériques</span></div>
-            <div class="pg-tiles is-two">
-              <div class="pg-tile is-current"><span>En cours</span><strong>{{ ecrans_campagnes_en_cours }}</strong></div>
-              <div class="pg-tile is-upcoming"><span>À venir</span><strong>{{ ecrans_campagnes_a_venir }}</strong></div>
+            <div class="pg-type">
+              <h3>Écrans</h3><p>Campagnes numériques</p>
+              <div>
+                <div class="is-current"><span>En cours</span><b>{{ ecrans_campagnes_en_cours }}</b></div>
+                <div><span>À venir</span><b>{{ ecrans_campagnes_a_venir }}</b></div>
+              </div>
             </div>
-          </article>
           {% endif %}
           {% if marches_campagnes_en_cours or marches_campagnes_a_venir %}
-          <article style="padding: .9rem 1rem 1rem;">
-            <div class="pg-block-head"><h3>Marchés</h3><span class="pg-block-tag">Campagnes en marché</span></div>
-            <div class="pg-tiles is-two">
-              <div class="pg-tile is-current"><span>En cours</span><strong>{{ marches_campagnes_en_cours }}</strong></div>
-              <div class="pg-tile is-upcoming"><span>À venir</span><strong>{{ marches_campagnes_a_venir }}</strong></div>
+            <div class="pg-type">
+              <h3>Marchés</h3><p>Campagnes en marché</p>
+              <div>
+                <div class="is-current"><span>En cours</span><b>{{ marches_campagnes_en_cours }}</b></div>
+                <div><span>À venir</span><b>{{ marches_campagnes_a_venir }}</b></div>
+              </div>
             </div>
-          </article>
           {% endif %}
         </div>
       </section>
+    </div>
 
-      <section class="pg-card" aria-labelledby="pg-campaign-groups-title">
-        <header class="pg-card-head">
+    <div class="pg-stack">
+      <section class="pg-panel" aria-labelledby="pg-campaign-groups-title">
+        <div class="pg-panelhead">
           <div>
             <h2 id="pg-campaign-groups-title">Campagnes par catégorie</h2>
-            <p>Regroupées selon les supports réservés.</p>
+            <p class="pg-desc">Regroupées selon les supports réservés.</p>
           </div>
-        </header>
+        </div>
         {% for groupe in campaign_category_groups_present %}{% if groupe.nb_campagnes %}
           <details class="pg-cat">
             <summary>
               <span>{% if groupe.key == 'statique_12m2' %}12m²{% else %}{{ groupe.label|cut:"Statique — " }}{% endif %}</span>
               <span class="pg-cat-count">{{ groupe.nb_campagnes }}<i class="bi bi-chevron-down" aria-hidden="true"></i></span>
             </summary>
-            <div class="pg-cat-body">
-              {% if groupe.campagnes %}
-                <div class="pg-list">
-                  {% for campagne in groupe.campagnes %}
-                    <div class="pg-row">
-                      <div class="pg-row-main">
-                        {% if not request.user.is_technicien %}
-                          <a href="{% url 'campagne_detail' campagne.pk %}" class="pg-row-name">{{ campagne.nom }}</a>
-                        {% else %}
-                          <span class="pg-row-name">{{ campagne.nom }}</span>
-                        {% endif %}
-                        <span class="badge bg-panne" style="background-color: #dbdddd !important; color: #6c757d !important; border-color: rgba(100, 116, 139, 0.2) !important;">
-                          {% if campagne.nb_faces_reservees %}<span class="ms-2">{{ campagne.nb_faces_reservees }} face{% if campagne.nb_faces_reservees != 1 %}s{% endif %} {% if campagne.statut == 'en_cours' %}occupée{% else %}réservée{% endif %}{% if campagne.nb_faces_reservees != 1 %}s{% endif %}</span>{% endif %}
-                          {% if campagne.nb_ecrans_reserves %}<span class="ms-2">{{ campagne.nb_ecrans_reserves }} écran{% if campagne.nb_ecrans_reserves != 1 %}s{% endif %} {% if campagne.statut == 'en_cours' %}occupé{% else %}réservé{% endif %}{% if campagne.nb_ecrans_reserves != 1 %}s{% endif %}</span>{% endif %}
-                          {% if campagne.nb_emplacements_reserves %}<span class="ms-2">{{ campagne.nb_emplacements_reserves }} emplacement{% if campagne.nb_emplacements_reserves != 1 %}s{% endif %} {% if campagne.statut == 'en_cours' %}occupé{% else %}réservé{% endif %}{% if campagne.nb_emplacements_reserves != 1 %}s{% endif %}</span>{% endif %}
-                        </span>
-                        <div class="pg-row-meta">
-                          {{ campagne.date_debut|date:"d/m/Y" }} – {{ campagne.date_fin|date:"d/m/Y" }}
-                        </div>
-                      </div>
-                      <div class="d-flex align-items-center gap-2">
-                        <span class="badge bg-{{ campagne.get_statut_badge }}" style="color: #ffffff;">{{ campagne.get_statut_display }}</span>
-                      </div>
+            <div class="pg-list">
+              {% for campagne in groupe.campagnes %}
+                <div class="pg-lrow">
+                  <div class="pg-lrow-main">
+                    {% if not request.user.is_technicien %}
+                      <a href="{% url 'campagne_detail' campagne.pk %}" class="pg-lrow-name">{{ campagne.nom }}</a>
+                    {% else %}
+                      <span class="pg-lrow-name">{{ campagne.nom }}</span>
+                    {% endif %}
+                    <div>
+                      {% if campagne.nb_faces_reservees %}<span class="pg-tag">{{ campagne.nb_faces_reservees }} face{% if campagne.nb_faces_reservees != 1 %}s{% endif %} {% if campagne.statut == 'en_cours' %}occupée{% else %}réservée{% endif %}{% if campagne.nb_faces_reservees != 1 %}s{% endif %}</span>{% endif %}
+                      {% if campagne.nb_ecrans_reserves %}<span class="pg-tag">{{ campagne.nb_ecrans_reserves }} écran{% if campagne.nb_ecrans_reserves != 1 %}s{% endif %} {% if campagne.statut == 'en_cours' %}occupé{% else %}réservé{% endif %}{% if campagne.nb_ecrans_reserves != 1 %}s{% endif %}</span>{% endif %}
+                      {% if campagne.nb_emplacements_reserves %}<span class="pg-tag">{{ campagne.nb_emplacements_reserves }} emplacement{% if campagne.nb_emplacements_reserves != 1 %}s{% endif %} {% if campagne.statut == 'en_cours' %}occupé{% else %}réservé{% endif %}{% if campagne.nb_emplacements_reserves != 1 %}s{% endif %}</span>{% endif %}
                     </div>
-                  {% endfor %}
+                    <div class="pg-lrow-meta">{{ campagne.date_debut|date:"d/m/Y" }} – {{ campagne.date_fin|date:"d/m/Y" }}</div>
+                  </div>
+                  <span class="badge bg-{{ campagne.get_statut_badge }}" style="color:#fff;">{{ campagne.get_statut_display }}</span>
                 </div>
-              {% else %}
-                <p class="pg-muted mb-0">Aucune campagne en cours ou à venir pour cette catégorie.</p>
-              {% endif %}
+              {% endfor %}
             </div>
           </details>
         {% endif %}{% empty %}
-          <p class="pg-muted p-3 mb-0">Aucune campagne en cours ou à venir.</p>
+          <p class="pg-empty">Aucune campagne en cours ou à venir.</p>
         {% endfor %}
       </section>
 
-      <section class="pg-card">
+      <section class="pg-panel">
         <details class="pg-recent">
           <summary>
-            <span>Campagnes récentes <span class="pg-muted fw-normal">({{ campagnes_recentes|length }})</span></span>
+            <span>Campagnes récentes <span class="pg-hint fw-normal">({{ campagnes_recentes|length }})</span></span>
             <i class="bi bi-chevron-down" aria-hidden="true"></i>
           </summary>
           <div class="pg-list">
             {% for campagne in campagnes_recentes %}
-              <div class="pg-row">
-                <div class="pg-row-main">
+              <div class="pg-lrow">
+                <div class="pg-lrow-main">
                   {% if not request.user.is_technicien %}
-                    <a href="{% url 'campagne_detail' campagne.pk %}" class="pg-row-name">{{ campagne.nom }}</a>
+                    <a href="{% url 'campagne_detail' campagne.pk %}" class="pg-lrow-name">{{ campagne.nom }}</a>
                   {% else %}
-                    <span class="pg-row-name">{{ campagne.nom }}</span>
+                    <span class="pg-lrow-name">{{ campagne.nom }}</span>
                   {% endif %}
-                  <div class="pg-row-meta">{{ campagne.client.nom }} · {{ campagne.date_debut|date:"d/m/Y" }} – {{ campagne.date_fin|date:"d/m/Y" }}</div>
+                  <div class="pg-lrow-meta">{{ campagne.client.nom }} · {{ campagne.date_debut|date:"d/m/Y" }} – {{ campagne.date_fin|date:"d/m/Y" }}</div>
                 </div>
-                <span class="badge bg-{{ campagne.get_statut_badge }}" style="color: #ffffff;">{{ campagne.get_statut_display }}</span>
+                <span class="badge bg-{{ campagne.get_statut_badge }}" style="color:#fff;">{{ campagne.get_statut_display }}</span>
               </div>
             {% empty %}
-              <p class="pg-muted mb-0">Aucune campagne à afficher pour cette sélection.</p>
+              <p class="pg-empty">Aucune campagne à afficher pour cette sélection.</p>
             {% endfor %}
           </div>
         </details>
       </section>
+    </div>
 
-    </aside>
   </div>
 
+  {# ── Fiche individuelle d'une face ── #}
+  <div class="pg-modalback" id="pg-modal" hidden>
+    <div class="pg-modal" role="dialog" aria-modal="true" aria-labelledby="pg-mtitle">
+      <div class="pg-modalhead">
+        <div>
+          <div class="pg-eyebrow">Fiche individuelle</div>
+          <h2 id="pg-mtitle"></h2>
+          <div id="pg-msub" class="pg-hint"></div>
+        </div>
+        <button type="button" class="pg-close" id="pg-mclose" aria-label="Fermer">×</button>
+      </div>
+      <div class="pg-detailgrid" id="pg-mdetails"></div>
+      <h3 style="margin:24px 0 0;font-size:14px;font-weight:700">Calendrier annuel simplifié</h3>
+      <div class="pg-calendar" id="pg-mcal"></div>
+      <div class="pg-calmonths" id="pg-mmonths"></div>
+      <p class="pg-modalnote">Chaque case représente un mois : plus elle est foncée, plus la face est occupée.</p>
+      <div class="pg-modalfoot" id="pg-mfoot"></div>
+    </div>
+  </div>
 </main>
+
+{{ parc_categories|json_script:"pg-data" }}
+{{ parc_meta|json_script:"pg-meta" }}
 {% endblock %}
 
 {% block extra_js %}
 <script>
-  (function() {
-    const mapElement = document.getElementById('parc-home-map');
-    const countElement = document.getElementById('parc-map-count');
-    const errorElement = document.getElementById('parc-map-error');
-    const filtersElement = document.getElementById('parc-filters');
+  (function () {
+    var MONTHS = ['JAN', 'FÉV', 'MAR', 'AVR', 'MAI', 'JUN', 'JUL', 'AOÛ', 'SEP', 'OCT', 'NOV', 'DÉC'];
+    var STATUS = {
+      occupee: 'Occupée', reservee: 'Réservée', libre: 'Disponible', panne: 'En panne'
+    };
+    var PAGE = 25;
+    var data = JSON.parse(document.getElementById('pg-data').textContent || '[]');
+    var meta = JSON.parse(document.getElementById('pg-meta').textContent || '{}');
 
-    const CATEGORY_ORDER = ['12m²', 'Sucette', 'Géant', 'Marché', 'Écrans'];
-    const PALETTE = ['#932e2b', '#7c3aed', '#d97706', '#0f766e', '#0b7893', '#64748b'];
-    const NO_CITY = 'Ville non renseignée';
-
-    function showMapError(message) {
-      countElement.textContent = 'Carte indisponible';
-      errorElement.textContent = message;
-      errorElement.classList.remove('d-none');
+    function esc(value) {
+      return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+      });
+    }
+    function fmt(n) { return Number(n).toFixed(1).replace('.', ','); }
+    function faceName(f) { return f.code + '-' + f.label; }
+    function libreText(f) {
+      if (f.statut !== 'libre' && f.statut !== 'reservee') return '—';
+      if (f.libre_depuis === null || f.libre_depuis === undefined) return 'Jamais occupée';
+      return f.libre_depuis + ' jour' + (f.libre_depuis > 1 ? 's' : '');
+    }
+    function dateFr(iso) {
+      if (!iso) return '—';
+      var p = iso.split('-');
+      return p[2] + '/' + p[1] + '/' + p[0];
     }
 
-    // Ramène les libellés venant de la base (« Ecran », « ecrans », « Écran »…)
-    // à la même clé que les boutons « Voir sur la carte ».
-    function canonicalKey(raw) {
-      const value = String(raw || '').trim().toLowerCase();
-      if (!value) return 'Autre';
-      if (/^[ée]cran/.test(value)) return 'Écrans';
-      if (/^march[ée]/.test(value)) return 'Marché';
-      if (/^g[ée]ant/.test(value)) return 'Géant';
-      if (/^sucette/.test(value)) return 'Sucette';
-      if (/^12\s?m[²2]/.test(value)) return '12m²';
-      return String(raw).trim();
+    /* ── Onglets de catégorie ── */
+    var tabs = Array.prototype.slice.call(document.querySelectorAll('.pg-tab'));
+    var panels = Array.prototype.slice.call(document.querySelectorAll('.pg-catpanel'));
+    var title = document.getElementById('pg-cat-title');
+
+    function select(id, updateHash) {
+      var current = null;
+      tabs.forEach(function (tab) {
+        var on = tab.dataset.target === id;
+        tab.classList.toggle('is-active', on);
+        tab.setAttribute('aria-selected', on ? 'true' : 'false');
+        if (on) current = tab;
+      });
+      panels.forEach(function (panel) { panel.hidden = panel.id !== id; });
+      if (title && current) title.textContent = current.dataset.label;
+      if (updateHash && window.history && history.replaceState) {
+        history.replaceState(null, '', '#' + id);
+      }
+    }
+    if (tabs.length) {
+      tabs.forEach(function (tab) {
+        tab.addEventListener('click', function () { select(tab.dataset.target, true); });
+      });
+      var fromHash = window.location.hash.replace('#', '');
+      var known = tabs.some(function (tab) { return tab.dataset.target === fromHash; });
+      select(known ? fromHash : tabs[0].dataset.target, false);
+    } else if (title) {
+      title.textContent = 'Parc';
     }
 
-    function categoryOf(feature) {
-      const p = feature.properties || {};
-      const key = canonicalKey(p.categorie);
-      return { key: key, label: key, color: p.categorie_color || null };
-    }
+    /* ── Fiche individuelle ── */
+    var modal = document.getElementById('pg-modal');
+    function closeModal() { modal.hidden = true; }
+    document.getElementById('pg-mclose').addEventListener('click', closeModal);
+    modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
+    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModal(); });
 
-    function cityOf(feature) {
-      return (feature.properties && feature.properties.ville) || NO_CITY;
-    }
-
-    function getLatLng(feature) {
-      return [
-        Number(feature.geometry.coordinates[1]),
-        Number(feature.geometry.coordinates[0])
+    function openModal(f, cat) {
+      document.getElementById('pg-mtitle').textContent = 'FACE ' + faceName(f) + ' — ' + f.nom;
+      document.getElementById('pg-msub').textContent =
+        cat.categorie + (f.format ? ' · ' + f.format : '') + (f.lieu ? ' · ' + f.lieu : '');
+      var items = [
+        ['Statut actuel', STATUS[f.statut] || f.statut],
+        ['Jours occupés depuis janvier', f.jours + ' jours'],
+        ['Taux cumulé', fmt(f.taux) + ' %'],
+        ['Annuel sécurisé', fmt(f.secure) + ' %'],
+        ['Libre depuis', libreText(f)],
+        ['Dernière occupation', f.statut === 'occupee' ? 'En cours' : dateFr(f.derniere)]
       ];
+      document.getElementById('pg-mdetails').innerHTML = items.map(function (it) {
+        return '<div class="pg-detail"><span>' + esc(it[0]) + '</span><b>' + esc(it[1]) + '</b></div>';
+      }).join('');
+      document.getElementById('pg-mcal').innerHTML = f.mois.map(function (v, i) {
+        var style = v > 0 ? 'background:#6d91ed;opacity:' + (0.35 + 0.65 * v / 100).toFixed(2) : '';
+        return '<div style="' + style + '" title="' + MONTHS[i] + ' : ' + v + ' %"></div>';
+      }).join('');
+      document.getElementById('pg-mmonths').innerHTML = MONTHS.map(function (m) {
+        return '<span>' + m.charAt(0) + '</span>';
+      }).join('');
+      document.getElementById('pg-mfoot').innerHTML = meta.lecture_seule
+        ? ''
+        : '<a class="pg-voir" href="' + esc(f.url) + '">Ouvrir la fiche du support</a>';
+      modal.hidden = false;
     }
 
-    function isValidFeature(feature) {
-      return feature.geometry &&
-        Array.isArray(feature.geometry.coordinates) &&
-        Number.isFinite(Number(feature.geometry.coordinates[0])) &&
-        Number.isFinite(Number(feature.geometry.coordinates[1]));
-    }
+    /* ── Tableau de bord de chaque catégorie ── */
+    panels.forEach(function (panel) {
+      if (panel.dataset.index === undefined) return;
+      var cat = data[Number(panel.dataset.index)];
+      if (!cat) return;
 
-    function sortKeys(keys) {
-      return keys.slice().sort(function(a, b) {
-        const ia = CATEGORY_ORDER.indexOf(a);
-        const ib = CATEGORY_ORDER.indexOf(b);
-        if (ia !== -1 || ib !== -1) {
-          return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib);
-        }
-        return a.localeCompare(b, 'fr');
+      var chart = panel.querySelector('[data-role=chart]');
+      var formatSelect = panel.querySelector('[data-role=format-select]');
+      var search = panel.querySelector('[data-role=search]');
+      var statusSel = panel.querySelector('[data-role=status]');
+      var sortSel = panel.querySelector('[data-role=sort]');
+      var tbody = panel.querySelector('[data-role=tbody]');
+      var count = panel.querySelector('[data-role=count]');
+      var more = panel.querySelector('[data-role=more]');
+
+      /* Histogramme mensuel + choix du format */
+      var optAll = document.createElement('option');
+      optAll.value = 'all';
+      optAll.textContent = 'Tous les formats (' + cat.nb_faces + ' faces)';
+      formatSelect.appendChild(optAll);
+      cat.formats.forEach(function (f, i) {
+        var opt = document.createElement('option');
+        opt.value = String(i);
+        opt.textContent = (f.label || f.code) + ' (' + f.nb_faces + ' face' + (f.nb_faces > 1 ? 's' : '') + ')';
+        formatSelect.appendChild(opt);
       });
-    }
+      if (cat.formats.length < 2) formatSelect.hidden = true;
 
-    function citiesCountLabel(features) {
-      const cities = new Set(features.map(cityOf));
-      return cities.size + ' ville' + (cities.size === 1 ? '' : 's');
-    }
+      function drawChart() {
+        var values = formatSelect.value === 'all' ? cat.mensuel : cat.formats[Number(formatSelect.value)].mensuel;
+        chart.innerHTML = values.map(function (v, i) {
+          var forecast = i + 1 > meta.month;
+          return '<div class="pg-grp"><div class="pg-bars"><div class="pg-bcol">' +
+            '<span class="pg-val">' + Math.round(v) + '%</span>' +
+            '<div class="pg-bar' + (forecast ? ' is-forecast' : '') + '" style="height:' + Math.max(v * 1.65, 3) + 'px"></div>' +
+            '</div></div><label>' + MONTHS[i] + '</label></div>';
+        }).join('');
+      }
+      formatSelect.addEventListener('change', drawChart);
+      drawChart();
 
-    if (!mapElement) return;
-    if (typeof L === 'undefined') {
-      showMapError('La bibliothèque cartographique ne s’est pas chargée. Vérifiez votre connexion puis rechargez la page.');
-      return;
-    }
+      /* Tableau des faces */
+      var limit = PAGE;
+      var shown = [];
 
-    try {
-      const map = L.map(mapElement, { scrollWheelZoom: false });
-      if (typeof window.buildSafeLeafletTiles === 'function') {
-        window.buildSafeLeafletTiles(map, {
-          attribution: '&copy; OpenStreetMap contributors',
-          maxZoom: 19
+      function matches(f, st) {
+        if (st === 'all') return true;
+        if (st === 'dispo') return f.statut !== 'occupee';
+        if (st === 'libre60') return f.libre_60;
+        return f.statut === st;
+      }
+      function vacancy(f) {
+        if (f.statut !== 'libre' && f.statut !== 'reservee') return -1;
+        return f.libre_depuis === null ? 99999 : f.libre_depuis;
+      }
+
+      function renderTable() {
+        var q = search.value.trim().toLowerCase();
+        var st = statusSel.value;
+        var rows = cat.faces.filter(function (f) {
+          if (!matches(f, st)) return false;
+          if (!q) return true;
+          return (faceName(f) + ' ' + f.nom + ' ' + f.lieu + ' ' + f.format).toLowerCase().indexOf(q) !== -1;
         });
-      } else {
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-          attribution: '&copy; OpenStreetMap contributors',
-          maxZoom: 19
-        }).addTo(map);
-      }
-      const markersLayer = L.layerGroup().addTo(map);
+        var sort = sortSel.value;
+        if (sort === 'rateDesc') rows.sort(function (a, b) { return b.taux - a.taux; });
+        if (sort === 'rateAsc') rows.sort(function (a, b) { return a.taux - b.taux; });
+        if (sort === 'vacant') rows.sort(function (a, b) { return vacancy(b) - vacancy(a); });
 
-      const countryBounds = L.latLngBounds([[9.3, -5.6], [15.1, 2.5]]);
-      const selectedCity = '{{ ville_active|escapejs }}';
-      if (selectedCity) {
-        map.fitBounds(countryBounds, { padding: [20, 20] });
-      } else {
-        map.fitBounds(countryBounds, { padding: [12, 12] });
-        map.setMaxBounds(countryBounds.pad(0.12));
-        map.setMaxBoundsViscosity(0.8);
-      }
-
-      const endpoint = new URL('{% url "api_geojson" %}', window.location.origin);
-      if (selectedCity) endpoint.searchParams.set('ville', selectedCity);
-
-      let features = [];
-      let allKeys = [];
-      let activeKeys = new Set();
-      let colorByKey = {};
-      let focusCity = null;
-
-      function colorOf(key) {
-        return colorByKey[key] || PALETTE[0];
-      }
-
-      function visibleFeatures() {
-        return features.filter(function(feature) {
-          return activeKeys.has(categoryOf(feature).key);
-        });
-      }
-
-      function toggleKey(key) {
-        if (activeKeys.has(key)) {
-          activeKeys.delete(key);
-        } else {
-          activeKeys.add(key);
+        shown = rows.slice(0, limit);
+        tbody.innerHTML = shown.map(function (f, i) {
+          return '<tr data-i="' + i + '" tabindex="0">' +
+            '<td><strong>' + esc(faceName(f)) + '</strong></td>' +
+            '<td>' + esc(f.nom) + (f.lieu ? '<span class="pg-sub">' + esc(f.lieu) + '</span>' : '') + '</td>' +
+            '<td><span class="pg-pill is-' + esc(f.statut) + '">● ' + esc(STATUS[f.statut] || f.statut) + '</span></td>' +
+            '<td>' + f.jours + ' j</td>' +
+            '<td><span class="pg-progress"><i style="width:' + Math.min(f.taux, 100) + '%"></i></span>' + fmt(f.taux) + ' %</td>' +
+            '<td>' + fmt(f.secure) + ' %</td>' +
+            '<td>' + esc(libreText(f)) + '</td>' +
+            '<td style="color:#567ee3;font-size:18px">›</td></tr>';
+        }).join('');
+        if (!rows.length) {
+          tbody.innerHTML = '<tr><td colspan="8"><p class="pg-empty">Aucune face ne correspond à ce filtre.</p></td></tr>';
         }
-        if (!activeKeys.size) activeKeys = new Set(allKeys);
-        render();
+        count.textContent = rows.length + ' face(s) trouvée(s) • ' + shown.length + ' affichée(s)';
+        more.hidden = rows.length <= shown.length;
       }
 
-      function showAll() {
-        activeKeys = new Set(allKeys);
-        render();
-      }
+      [search, statusSel, sortSel].forEach(function (el) {
+        el.addEventListener('input', function () { limit = PAGE; renderTable(); });
+        el.addEventListener('change', function () { limit = PAGE; renderTable(); });
+      });
+      more.addEventListener('click', function () { limit += PAGE; renderTable(); });
+      tbody.addEventListener('click', function (e) {
+        var tr = e.target.closest('tr[data-i]');
+        if (tr) openModal(shown[Number(tr.dataset.i)], cat);
+      });
+      tbody.addEventListener('keydown', function (e) {
+        if (e.key !== 'Enter') return;
+        var tr = e.target.closest('tr[data-i]');
+        if (tr) openModal(shown[Number(tr.dataset.i)], cat);
+      });
+      renderTable();
+    });
 
-      function makeChip(label, color, pressed, count, onClick, extraClass) {
-        const button = document.createElement('button');
-        button.type = 'button';
-        button.className = 'pg-chip' + (extraClass ? ' ' + extraClass : '');
-        button.setAttribute('aria-pressed', pressed ? 'true' : 'false');
-        if (color) {
-          const dot = document.createElement('span');
-          dot.className = 'pg-chip-dot';
-          dot.style.background = color;
-          button.appendChild(dot);
-        }
-        const text = document.createElement('span');
-        text.textContent = label;
-        button.appendChild(text);
-        if (count !== null && count !== undefined) {
-          const counter = document.createElement('span');
-          counter.className = 'pg-chip-count';
-          counter.textContent = count;
-          button.appendChild(counter);
-        }
-        button.addEventListener('click', onClick);
-        return button;
-      }
-
-      function renderFilters() {
-        filtersElement.textContent = '';
-        if (!allKeys.length) {
-          filtersElement.classList.add('d-none');
-          return;
-        }
-        filtersElement.classList.remove('d-none');
-
-        const countByKey = {};
-        features.forEach(function(feature) {
-          const key = categoryOf(feature).key;
-          countByKey[key] = (countByKey[key] || 0) + 1;
-        });
-
-        const allPressed = activeKeys.size === allKeys.length;
-        filtersElement.appendChild(makeChip('Toutes', null, allPressed, features.length, showAll));
-        allKeys.forEach(function(key) {
-          filtersElement.appendChild(makeChip(
-            key,
-            colorOf(key),
-            activeKeys.has(key),
-            countByKey[key] || 0,
-            function() { toggleKey(key); }
-          ));
-        });
-
-        if (focusCity && !selectedCity) {
-          filtersElement.appendChild(makeChip('Toutes les villes', null, false, null, function() {
-            focusCity = null;
-            render();
-          }, 'is-back'));
-        }
-      }
-
-      function popupFor(feature) {
-        const properties = feature.properties || {};
-        const popup = document.createElement('div');
-        const name = document.createElement('strong');
-        name.textContent = properties.nom || properties.code || 'Support';
-        popup.appendChild(name);
-        const details = document.createElement('div');
-        details.textContent = [properties.code, categoryOf(feature).label, properties.ville, properties.quartier]
-          .filter(Boolean)
-          .join(' · ');
-        popup.appendChild(details);
-        return popup;
-      }
-
-      function drawSupports(list) {
-        const markers = [];
-        list.forEach(function(feature) {
-          const marker = L.circleMarker(getLatLng(feature), {
-            radius: 8,
-            color: '#ffffff',
-            weight: 2,
-            fillColor: colorOf(categoryOf(feature).key),
-            fillOpacity: 0.95
-          });
-          marker.bindPopup(popupFor(feature));
-          marker.addTo(markersLayer);
-          markers.push(marker);
-        });
-        if (markers.length) {
-          const bounds = L.featureGroup(markers).getBounds();
-          if (bounds.isValid()) map.fitBounds(bounds, { padding: [28, 28], maxZoom: 14 });
-        }
-      }
-
-      function drawCities(list) {
-        const cities = new Map();
-        list.forEach(function(feature) {
-          const city = cityOf(feature);
-          if (!cities.has(city)) cities.set(city, []);
-          cities.get(city).push(feature);
-        });
-
-        cities.forEach(function(cityFeatures, city) {
-          const center = cityFeatures.reduce(function(total, feature) {
-            const point = getLatLng(feature);
-            total.lat += point[0];
-            total.lng += point[1];
-            return total;
-          }, { lat: 0, lng: 0 });
-          center.lat /= cityFeatures.length;
-          center.lng /= cityFeatures.length;
-
-          const marker = L.circleMarker([center.lat, center.lng], {
-            radius: Math.min(24, 10 + Math.sqrt(cityFeatures.length) * 1.5),
-            color: '#ffffff',
-            weight: 2,
-            fillColor: PALETTE[0],
-            fillOpacity: 0.9
-          });
-          marker.bindTooltip(city + ' · ' + cityFeatures.length + ' support(s)');
-          marker.on('click', function() {
-            focusCity = city;
-            render();
-          });
-          marker.addTo(markersLayer);
-        });
-        return cities;
-      }
-
-      function render() {
-        markersLayer.clearLayers();
-        const visible = visibleFeatures();
-
-        if (selectedCity) {
-          drawSupports(visible);
-          countElement.textContent = visible.length + ' support' + (visible.length === 1 ? '' : 's');
-        } else if (focusCity) {
-          const inCity = visible.filter(function(feature) { return cityOf(feature) === focusCity; });
-          drawSupports(inCity);
-          countElement.textContent = inCity.length + ' support' + (inCity.length === 1 ? '' : 's') + ' · ' + focusCity;
-        } else {
-          drawCities(visible);
-          countElement.textContent = citiesCountLabel(visible);
-        }
-
-        renderFilters();
-      }
-
-      // Boutons « Voir sur la carte » : n'affiche que la catégorie choisie
-      let pendingKey = null;
-      function applyCategoryFilter(key) {
-        if (!allKeys.length) {
-          pendingKey = key;
-          return;
-        }
-        focusCity = null;
-        activeKeys = allKeys.indexOf(key) === -1 ? new Set(allKeys) : new Set([key]);
-        render();
-      }
-      document.querySelectorAll('[data-map-filter]').forEach(function(link) {
-        link.addEventListener('click', function() {
-          applyCategoryFilter(link.getAttribute('data-map-filter'));
+    /* ── Recherche dans le tableau des écrans ── */
+    document.querySelectorAll('[data-filter]').forEach(function (input) {
+      input.addEventListener('input', function () {
+        var body = document.getElementById(input.dataset.filter);
+        if (!body) return;
+        var q = input.value.trim().toLowerCase();
+        body.querySelectorAll('tr').forEach(function (row) {
+          row.hidden = q && row.textContent.toLowerCase().indexOf(q) === -1;
         });
       });
-
-      fetch(endpoint, { headers: { 'Accept': 'application/json' } })
-        .then(function(response) {
-          if (!response.ok) throw new Error('La requête cartographique a échoué.');
-          return response.json();
-        })
-        .then(function(data) {
-          features = (data.features || []).filter(isValidFeature);
-
-          allKeys = sortKeys(Array.from(new Set(features.map(function(feature) {
-            return categoryOf(feature).key;
-          }))));
-          colorByKey = {};
-          allKeys.forEach(function(key, index) {
-            const sample = features.find(function(feature) { return categoryOf(feature).key === key; });
-            colorByKey[key] = (sample && categoryOf(sample).color) || PALETTE[index % PALETTE.length];
-          });
-          activeKeys = new Set(allKeys);
-          if (pendingKey) {
-            const key = pendingKey;
-            pendingKey = null;
-            applyCategoryFilter(key);
-          }
-
-          if (!features.length) {
-            showMapError('Aucun support géolocalisé n’a été renvoyé pour la carte.');
-            return;
-          }
-          render();
-          window.setTimeout(function() { map.invalidateSize(); }, 0);
-        })
-        .catch(function(error) {
-          console.error('Erreur de chargement de la carte du parc:', error);
-          showMapError('Les supports cartographiques n’ont pas pu être chargés. Vérifiez l’accès aux données puis rechargez la page.');
-        });
-    } catch (error) {
-      console.error('Erreur d’initialisation de la carte du parc:', error);
-      showMapError('La carte n’a pas pu être initialisée. Rechargez la page ou vérifiez le chargement de Leaflet.');
-    }
+    });
   })();
 </script>
 {% endblock %}

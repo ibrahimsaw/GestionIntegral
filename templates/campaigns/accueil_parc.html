@@ -69,6 +69,9 @@
     padding: 10px 12px; color: var(--text); cursor: pointer; text-decoration: none;
   }
   .pg-btn:hover { border-color: #c5cfe0; }
+  .pg-btn.is-active { background: var(--navy); border-color: var(--navy); color: #fff; }
+  .pg-control-group { display: flex; flex-wrap: wrap; gap: 6px; }
+  .pg-control-group .pg-btn { padding: 8px 10px; font-size: 12px; }
 
   /* ── Sélecteur de catégorie ── */
   .pg-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 24px 0 20px; }
@@ -162,6 +165,10 @@
   }
   .pg a.pg-voir:hover { background: var(--blue); border-color: var(--blue); color: #fff; }
   .pg-tablefoot { display: flex; justify-content: space-between; align-items: center; gap: 12px; color: #8b98a9; font-size: 11px; margin-top: 15px; }
+  .pg-pagination { display: flex; align-items: center; justify-content: flex-end; gap: 5px; flex-wrap: wrap; }
+  .pg-pagination .pg-btn { padding: 6px 9px; font-size: 12px; }
+  .pg-pagination .pg-btn[aria-current="page"] { background: var(--navy); border-color: var(--navy); color: #fff; }
+  .pg-page-gap { padding: 0 3px; }
   .pg-empty { color: var(--muted); font-size: 13px; padding: 12px 0; margin: 0; }
 
   /* Fiche individuelle */
@@ -255,72 +262,29 @@
     </div>
     <div class="pg-controls">
       {% if villes %}
-        <select class="pg-select" aria-label="Ville"
-                onchange="window.location.href='{% url 'dashboard' %}?ville=' + encodeURIComponent(this.value)">
+        <nav class="pg-control-group" aria-label="Choisir une ville">
           {% for ville in villes %}
-            <option value="{{ ville }}" {% if ville_active == ville %}selected{% endif %}>{{ ville }}</option>
+            <a class="pg-btn{% if ville_active == ville %} is-active{% endif %}"
+               href="{% url 'dashboard' %}?ville={{ ville|urlencode }}"
+               {% if ville_active == ville %}aria-current="page"{% endif %}>{{ ville }}</a>
           {% endfor %}
-        </select>
+        </nav>
       {% else %}
         <span class="pg-hint">Aucune ville renseignée dans l’inventaire.</span>
       {% endif %}
-      <button type="button" class="pg-btn" onclick="window.print()"><i class="bi bi-printer me-1"></i>Exporter</button>
     </div>
   </header>
 
-  {% if total_faces %}
-  <div class="pg-metrics" style="margin-top: 22px;">
-    <div class="pg-metric">
-      <span class="pg-mdot"></span>
-      <div class="pg-label">Total des faces</div>
-      <div class="pg-num">{{ total_faces }}</div>
-      <div class="pg-foot">Capacité annuelle : {{ capacite_annuelle_totale|floatformat:"0g" }} journées-faces</div>
-    </div>
-    <div class="pg-metric is-green">
-      <span class="pg-mdot"></span>
-      <div class="pg-label">Occupées aujourd'hui</div>
-      <div class="pg-num">{{ total_faces_occupe }} <small>/ {{ total_faces }}</small></div>
-      <div class="pg-foot">{{ total_faces_disponibles }} face{{ total_faces_disponibles|pluralize }} disponible{{ total_faces_disponibles|pluralize }}</div>
-    </div>
-    <div class="pg-metric is-orange">
-      <span class="pg-mdot"></span>
-      <div class="pg-label">Occupation du jour</div>
-      <div class="pg-num">{{ taux_jour_global }} %</div>
-      <div class="pg-foot">Photo instantanée au {% now "d/m" %}</div>
-    </div>
-    <div class="pg-metric">
-      <span class="pg-mdot"></span>
-      <div class="pg-label">Occupation cumulée</div>
-      <div class="pg-num">{{ taux_cumule_global }} %</div>
-      <div class="pg-foot">Depuis le 1er janvier • {{ parc_meta.elapsed_days|default:0 }} jours</div>
-    </div>
-  </div>
-  <div class="pg-metrics is-three" style="margin-top: 12px;">
-    <div class="pg-metric">
-      <div class="pg-label">Annuel réalisé à date</div>
-      <div class="pg-num">{{ annuel_realise_global }} %</div>
-      <div class="pg-foot">Journées réalisées ÷ {{ capacite_annuelle_totale|floatformat:"0g" }}</div>
-    </div>
-    <div class="pg-metric is-green">
-      <div class="pg-label">Annuel sécurisé</div>
-      <div class="pg-num">{{ annuel_securise_global }} %</div>
-      <div class="pg-foot">Réalisé + contrats futurs fermes</div>
-    </div>
-    <div class="pg-metric is-red">
-      <div class="pg-label">Faces libres depuis +60 j</div>
-      <div class="pg-num">{{ total_faces_libre }}</div>
-      <div class="pg-foot">À traiter en priorité par les commerciaux</div>
-    </div>
-  </div>
-  {% endif %}
-
   {# ── Choix de la catégorie ── #}
   <nav class="pg-tabs" role="tablist" aria-label="Catégorie de supports">
+    <button type="button" class="pg-tab" role="tab" data-target="cat-toutes" data-label="Toutes les catégories" aria-selected="false">
+      <span class="pg-dot" style="background: var(--blue)"></span>
+      Toutes les catégories
+    </button>
     {% for cat in parc_categories %}
       <button type="button" class="pg-tab" role="tab" data-target="cat-{{ forloop.counter }}" data-label="{{ cat.categorie }}" aria-selected="false">
         <span class="pg-dot" style="background: {{ cat.color }}"></span>
         {{ cat.categorie }}
-        <small>{{ cat.nb_faces }} face{{ cat.nb_faces|pluralize }}</small>
       </button>
     {% endfor %}
     {% if ecrans_total %}
@@ -331,6 +295,141 @@
       </button>
     {% endif %}
   </nav>
+
+  <section class="pg-catpanel" id="cat-toutes" data-index="global" hidden>
+    {% if total_faces %}
+    <div class="pg-metrics pg-section">
+      <div class="pg-metric">
+        <span class="pg-mdot"></span>
+        <div class="pg-label">Total des faces</div>
+        <div class="pg-num">{{ total_faces }}</div>
+        <div class="pg-foot">Capacité annuelle : {{ capacite_annuelle_totale|floatformat:"0g" }} journées-faces</div>
+      </div>
+      <div class="pg-metric is-green">
+        <span class="pg-mdot"></span>
+        <div class="pg-label">Occupées aujourd'hui</div>
+        <div class="pg-num">{{ total_faces_occupe }} <small>/ {{ total_faces }}</small></div>
+        <div class="pg-foot">{{ total_faces_disponibles }} face{{ total_faces_disponibles|pluralize }} disponible{{ total_faces_disponibles|pluralize }}</div>
+      </div>
+      <div class="pg-metric is-orange">
+        <span class="pg-mdot"></span>
+        <div class="pg-label">Occupation du jour</div>
+        <div class="pg-num">{{ taux_jour_global }} %</div>
+        <div class="pg-foot">Photo instantanée au {% now "d/m" %}</div>
+      </div>
+      <div class="pg-metric">
+        <span class="pg-mdot"></span>
+        <div class="pg-label">Occupation cumulée</div>
+        <div class="pg-num">{{ taux_cumule_global }} %</div>
+        <div class="pg-foot">Depuis le 1er janvier • {{ parc_meta.elapsed_days|default:0 }} jours</div>
+      </div>
+    </div>
+    <div class="pg-metrics is-three">
+      <div class="pg-metric">
+        <div class="pg-label">Annuel réalisé à date</div>
+        <div class="pg-num">{{ annuel_realise_global }} %</div>
+        <div class="pg-foot">Journées réalisées ÷ {{ capacite_annuelle_totale|floatformat:"0g" }}</div>
+      </div>
+      <div class="pg-metric is-green">
+        <div class="pg-label">Annuel sécurisé</div>
+        <div class="pg-num">{{ annuel_securise_global }} %</div>
+        <div class="pg-foot">Réalisé + contrats futurs fermes</div>
+      </div>
+      <div class="pg-metric is-red">
+        <div class="pg-label">Faces libres depuis +60 j</div>
+        <div class="pg-num">{{ total_faces_libres_60 }}</div>
+        <div class="pg-foot">À traiter en priorité par les commerciaux</div>
+      </div>
+    </div>
+    <div class="pg-row pg-section">
+      <div class="pg-panel">
+        <div class="pg-panelhead">
+          <div>
+            <h2>Évolution de l'occupation mensuelle</h2>
+            <p class="pg-desc">Pourcentage des journées-faces occupées par mois</p>
+          </div>
+          <div class="pg-control-group" data-role="format-controls" role="group" aria-label="Choisir un format"></div>
+        </div>
+        <div class="pg-chart" data-role="chart"></div>
+        <div class="pg-chartfoot">Mois à venir : prévisions issues des campagnes et des réservations confirmées.</div>
+        <div class="pg-legend">
+          <span><i class="pg-swatch"></i> Réalisé</span>
+          <span><i class="pg-swatch is-future"></i> Prévision</span>
+        </div>
+      </div>
+      <div class="pg-panel">
+        <h2>Situation du réseau aujourd'hui</h2>
+        <p class="pg-desc">Occupation instantanée des {{ parc_global.nb_faces }} faces</p>
+        <div class="pg-donutrow">
+          <div class="pg-donut" style="--occ: {{ parc_global.taux_jour|unlocalize }}%;">
+            <div class="pg-donutinner"><strong>{{ parc_global.taux_jour }} %</strong><span>occupées</span></div>
+          </div>
+          <div class="pg-donutlegend">
+            <div><span style="color:#11876b">●</span> Occupées <b>{{ parc_global.nb_occupe }}</b></div>
+            <div><span style="color:#b6c0d0">●</span> Disponibles <b>{{ parc_global.nb_disponibles }}</b></div>
+            <div><span style="color:#c94a55">●</span> Libres +60 j <b>{{ parc_global.libres_60 }}</b></div>
+          </div>
+        </div>
+        <div class="pg-chips">
+          <span class="pg-chip">{{ parc_global.nb_faces }} faces suivies</span>
+          <span class="pg-chip">{{ parc_global.nb_libre }} disponible{{ parc_global.nb_libre|pluralize }} à vendre</span>
+          <span class="pg-chip">{{ parc_global.libres_60 }} alerte{{ parc_global.libres_60|pluralize }} commerciale{{ parc_global.libres_60|pluralize }}</span>
+          {% if parc_global.nb_reserve %}<span class="pg-chip">{{ parc_global.nb_reserve }} réservée{{ parc_global.nb_reserve|pluralize }}</span>{% endif %}
+          {% if parc_global.nb_panne %}<span class="pg-chip">{{ parc_global.nb_panne }} en panne</span>{% endif %}
+        </div>
+      </div>
+    </div>
+    <div class="pg-panel pg-section">
+      <div class="pg-tabletop">
+        <div>
+          <h2>Détail des faces publicitaires</h2>
+          <p class="pg-desc">Cliquez sur une face pour ouvrir sa fiche et consulter son historique</p>
+        </div>
+        <div class="pg-controls">
+          <input class="pg-input" type="search" data-role="search" placeholder="Rechercher face / emplacement">
+          <div class="pg-control-group" role="group" aria-label="Filtrer par statut">
+            <button type="button" class="pg-btn is-active" data-status-filter="all" aria-pressed="true">Toutes</button>
+            <button type="button" class="pg-btn" data-status-filter="occupee" aria-pressed="false">Occupées</button>
+            <button type="button" class="pg-btn" data-status-filter="dispo" aria-pressed="false">Disponibles</button>
+            <button type="button" class="pg-btn" data-status-filter="libre" aria-pressed="false">Libres</button>
+            <button type="button" class="pg-btn" data-status-filter="reservee" aria-pressed="false">Réservées</button>
+            <button type="button" class="pg-btn" data-status-filter="libre60" aria-pressed="false">Libres +60 j</button>
+            <button type="button" class="pg-btn" data-status-filter="panne" aria-pressed="false">En panne</button>
+          </div>
+          <div class="pg-control-group" role="group" aria-label="Trier les faces">
+            <button type="button" class="pg-btn is-active" data-sort-by="id" aria-pressed="true">N° de face</button>
+            <button type="button" class="pg-btn" data-sort-by="rateDesc" aria-pressed="false">Taux décroissant</button>
+            <button type="button" class="pg-btn" data-sort-by="rateAsc" aria-pressed="false">Taux croissant</button>
+            <button type="button" class="pg-btn" data-sort-by="vacant" aria-pressed="false">Inoccupation la plus longue</button>
+          </div>
+        </div>
+      </div>
+      <div class="pg-table-wrap">
+        <table class="pg-table">
+          <thead>
+            <tr>
+              <th>Face</th>
+              <th>Emplacement</th>
+              <th>Statut aujourd'hui</th>
+              <th>Jours occupés</th>
+              <th>Taux cumulé</th>
+              <th>Annuel sécurisé</th>
+              <th>Libre depuis</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody data-role="tbody"></tbody>
+        </table>
+      </div>
+      <div class="pg-tablefoot">
+        <span data-role="count"></span>
+        <nav class="pg-pagination" data-role="pagination" aria-label="Pagination des faces"></nav>
+      </div>
+    </div>
+    {% else %}
+    <div class="pg-panel pg-section"><p class="pg-empty">Aucune face n’est renseignée dans ce périmètre.</p></div>
+    {% endif %}
+  </section>
 
   {# ══════════ Panneaux par catégorie ══════════ #}
   {% for cat in parc_categories %}
@@ -388,7 +487,7 @@
             <h2>Évolution de l'occupation mensuelle</h2>
             <p class="pg-desc">Pourcentage des journées-faces occupées par mois</p>
           </div>
-          <select class="pg-select" data-role="format-select" aria-label="Choisir un format"></select>
+          <div class="pg-control-group" data-role="format-controls" role="group" aria-label="Choisir un format"></div>
         </div>
         <div class="pg-chart" data-role="chart"></div>
         <div class="pg-chartfoot">Mois à venir : prévisions issues des campagnes et des réservations confirmées.</div>
@@ -429,21 +528,21 @@
         </div>
         <div class="pg-controls">
           <input class="pg-input" type="search" data-role="search" placeholder="Rechercher face / emplacement">
-          <select class="pg-select" data-role="status" aria-label="Filtrer par statut">
-            <option value="all">Toutes les faces</option>
-            <option value="occupee">Occupées</option>
-            <option value="dispo">Disponibles (non occupées)</option>
-            <option value="libre">Libres</option>
-            <option value="reservee">Réservées</option>
-            <option value="libre60">Libres depuis +60 j</option>
-            <option value="panne">En panne</option>
-          </select>
-          <select class="pg-select" data-role="sort" aria-label="Trier">
-            <option value="id">Numéro de face</option>
-            <option value="rateDesc">Taux décroissant</option>
-            <option value="rateAsc">Taux croissant</option>
-            <option value="vacant">Inoccupation la plus longue</option>
-          </select>
+          <div class="pg-control-group" role="group" aria-label="Filtrer par statut">
+            <button type="button" class="pg-btn is-active" data-status-filter="all" aria-pressed="true">Toutes</button>
+            <button type="button" class="pg-btn" data-status-filter="occupee" aria-pressed="false">Occupées</button>
+            <button type="button" class="pg-btn" data-status-filter="dispo" aria-pressed="false">Disponibles</button>
+            <button type="button" class="pg-btn" data-status-filter="libre" aria-pressed="false">Libres</button>
+            <button type="button" class="pg-btn" data-status-filter="reservee" aria-pressed="false">Réservées</button>
+            <button type="button" class="pg-btn" data-status-filter="libre60" aria-pressed="false">Libres +60 j</button>
+            <button type="button" class="pg-btn" data-status-filter="panne" aria-pressed="false">En panne</button>
+          </div>
+          <div class="pg-control-group" role="group" aria-label="Trier les faces">
+            <button type="button" class="pg-btn is-active" data-sort-by="id" aria-pressed="true">N° de face</button>
+            <button type="button" class="pg-btn" data-sort-by="rateDesc" aria-pressed="false">Taux décroissant</button>
+            <button type="button" class="pg-btn" data-sort-by="rateAsc" aria-pressed="false">Taux croissant</button>
+            <button type="button" class="pg-btn" data-sort-by="vacant" aria-pressed="false">Inoccupation la plus longue</button>
+          </div>
           {% if not request.user.is_technicien %}
             <a class="pg-btn" href="{% if cat.categorie == 'Géant' %}{% url 'format_detail' 'geant' %}{% elif cat.categorie == 'Marché' %}{% url 'format_detail' 'marche' %}{% else %}{% url 'format_detail' cat.detail_code %}{% endif %}{% if ville_active %}?ville={{ ville_active|urlencode }}{% endif %}">
               <i class="bi bi-map me-1"></i>Carte
@@ -470,7 +569,7 @@
       </div>
       <div class="pg-tablefoot">
         <span data-role="count"></span>
-        <button type="button" class="pg-btn" data-role="more" hidden>Afficher plus</button>
+        <nav class="pg-pagination" data-role="pagination" aria-label="Pagination des faces"></nav>
       </div>
     </div>
   </section>
@@ -795,6 +894,7 @@
 </main>
 
 {{ parc_categories|json_script:"pg-data" }}
+{{ parc_global|json_script:"pg-global-data" }}
 {{ parc_meta|json_script:"pg-meta" }}
 {% endblock %}
 
@@ -807,6 +907,7 @@
     };
     var PAGE = 25;
     var data = JSON.parse(document.getElementById('pg-data').textContent || '[]');
+    var globalData = JSON.parse(document.getElementById('pg-global-data').textContent || '{}');
     var meta = JSON.parse(document.getElementById('pg-meta').textContent || '{}');
 
     function esc(value) {
@@ -852,7 +953,10 @@
       });
       var fromHash = window.location.hash.replace('#', '');
       var known = tabs.some(function (tab) { return tab.dataset.target === fromHash; });
-      select(known ? fromHash : tabs[0].dataset.target, false);
+      var defaultTab = tabs.find(function (tab) {
+        return tab.dataset.label === '12m²';
+      }) || tabs[0];
+      select(known ? fromHash : defaultTab.dataset.target, false);
     } else if (title) {
       title.textContent = 'Parc';
     }
@@ -895,33 +999,49 @@
     /* ── Tableau de bord de chaque catégorie ── */
     panels.forEach(function (panel) {
       if (panel.dataset.index === undefined) return;
-      var cat = data[Number(panel.dataset.index)];
+      var cat = panel.dataset.index === 'global'
+        ? globalData
+        : data[Number(panel.dataset.index)];
       if (!cat) return;
 
       var chart = panel.querySelector('[data-role=chart]');
-      var formatSelect = panel.querySelector('[data-role=format-select]');
+      var formatControls = panel.querySelector('[data-role=format-controls]');
       var search = panel.querySelector('[data-role=search]');
-      var statusSel = panel.querySelector('[data-role=status]');
-      var sortSel = panel.querySelector('[data-role=sort]');
+      var statusButtons = panel.querySelectorAll('[data-status-filter]');
+      var sortButtons = panel.querySelectorAll('[data-sort-by]');
       var tbody = panel.querySelector('[data-role=tbody]');
       var count = panel.querySelector('[data-role=count]');
-      var more = panel.querySelector('[data-role=more]');
+      var pagination = panel.querySelector('[data-role=pagination]');
+      var selectedFormat = 'all';
 
       /* Histogramme mensuel + choix du format */
-      var optAll = document.createElement('option');
-      optAll.value = 'all';
-      optAll.textContent = 'Tous les formats (' + cat.nb_faces + ' faces)';
-      formatSelect.appendChild(optAll);
+      function addFormatButton(value, label) {
+        var button = document.createElement('button');
+        button.type = 'button';
+        button.className = 'pg-btn' + (value === selectedFormat ? ' is-active' : '');
+        button.dataset.format = value;
+        button.setAttribute('aria-pressed', String(value === selectedFormat));
+        button.textContent = label;
+        button.addEventListener('click', function () {
+          selectedFormat = value;
+          formatControls.querySelectorAll('[data-format]').forEach(function (item) {
+            var active = item === button;
+            item.classList.toggle('is-active', active);
+            item.setAttribute('aria-pressed', String(active));
+          });
+          drawChart();
+        });
+        formatControls.appendChild(button);
+      }
+
+      addFormatButton('all', 'Tous les formats (' + cat.nb_faces + ' faces)');
       cat.formats.forEach(function (f, i) {
-        var opt = document.createElement('option');
-        opt.value = String(i);
-        opt.textContent = (f.label || f.code) + ' (' + f.nb_faces + ' face' + (f.nb_faces > 1 ? 's' : '') + ')';
-        formatSelect.appendChild(opt);
+        addFormatButton(String(i), (f.label || f.code) + ' (' + f.nb_faces + ' face' + (f.nb_faces > 1 ? 's' : '') + ')');
       });
-      if (cat.formats.length < 2) formatSelect.hidden = true;
+      if (cat.formats.length < 2) formatControls.hidden = true;
 
       function drawChart() {
-        var values = formatSelect.value === 'all' ? cat.mensuel : cat.formats[Number(formatSelect.value)].mensuel;
+        var values = selectedFormat === 'all' ? cat.mensuel : cat.formats[Number(selectedFormat)].mensuel;
         chart.innerHTML = values.map(function (v, i) {
           var forecast = i + 1 > meta.month;
           return '<div class="pg-grp"><div class="pg-bars"><div class="pg-bcol">' +
@@ -930,12 +1050,13 @@
             '</div></div><label>' + MONTHS[i] + '</label></div>';
         }).join('');
       }
-      formatSelect.addEventListener('change', drawChart);
       drawChart();
 
       /* Tableau des faces */
-      var limit = PAGE;
+      var currentPage = 1;
       var shown = [];
+      var statusFilter = 'all';
+      var sortBy = 'id';
 
       function matches(f, st) {
         if (st === 'all') return true;
@@ -948,20 +1069,83 @@
         return f.libre_depuis === null ? 99999 : f.libre_depuis;
       }
 
+      function renderPagination(pageCount) {
+        pagination.innerHTML = '';
+        pagination.hidden = pageCount <= 1;
+        if (pageCount <= 1) return;
+
+        function addButton(label, page, options) {
+          var button = document.createElement('button');
+          button.type = 'button';
+          button.className = 'pg-btn';
+          button.textContent = label;
+          if (options.current) {
+            button.setAttribute('aria-current', 'page');
+            button.setAttribute('aria-label', 'Page ' + page + ', page actuelle');
+          } else {
+            button.setAttribute('aria-label', options.label);
+          }
+          button.disabled = options.disabled || false;
+          button.addEventListener('click', function () {
+            currentPage = page;
+            renderTable();
+          });
+          pagination.appendChild(button);
+        }
+
+        function addGap() {
+          var gap = document.createElement('span');
+          gap.className = 'pg-page-gap';
+          gap.textContent = '…';
+          pagination.appendChild(gap);
+        }
+
+        addButton('‹', Math.max(1, currentPage - 1), {
+          disabled: currentPage === 1,
+          label: 'Page précédente'
+        });
+        addButton('1', 1, {
+          current: currentPage === 1,
+          label: 'Aller à la page 1'
+        });
+
+        var firstVisible = Math.max(2, currentPage - 1);
+        var lastVisible = Math.min(pageCount - 1, currentPage + 1);
+        if (firstVisible > 2) addGap();
+        for (var page = firstVisible; page <= lastVisible; page += 1) {
+          addButton(String(page), page, {
+            current: currentPage === page,
+            label: 'Aller à la page ' + page
+          });
+        }
+        if (lastVisible < pageCount - 1) addGap();
+        if (pageCount > 1) {
+          addButton(String(pageCount), pageCount, {
+            current: currentPage === pageCount,
+            label: 'Aller à la page ' + pageCount
+          });
+        }
+        addButton('›', Math.min(pageCount, currentPage + 1), {
+          disabled: currentPage === pageCount,
+          label: 'Page suivante'
+        });
+      }
+
       function renderTable() {
         var q = search.value.trim().toLowerCase();
-        var st = statusSel.value;
         var rows = cat.faces.filter(function (f) {
-          if (!matches(f, st)) return false;
+          if (!matches(f, statusFilter)) return false;
           if (!q) return true;
           return (faceName(f) + ' ' + f.nom + ' ' + f.lieu + ' ' + f.format).toLowerCase().indexOf(q) !== -1;
         });
-        var sort = sortSel.value;
-        if (sort === 'rateDesc') rows.sort(function (a, b) { return b.taux - a.taux; });
-        if (sort === 'rateAsc') rows.sort(function (a, b) { return a.taux - b.taux; });
-        if (sort === 'vacant') rows.sort(function (a, b) { return vacancy(b) - vacancy(a); });
+        if (sortBy === 'rateDesc') rows.sort(function (a, b) { return b.taux - a.taux; });
+        if (sortBy === 'rateAsc') rows.sort(function (a, b) { return a.taux - b.taux; });
+        if (sortBy === 'vacant') rows.sort(function (a, b) { return vacancy(b) - vacancy(a); });
 
-        shown = rows.slice(0, limit);
+        var pageCount = Math.max(1, Math.ceil(rows.length / PAGE));
+        currentPage = Math.min(currentPage, pageCount);
+        var start = (currentPage - 1) * PAGE;
+        shown = rows.slice(start, start + PAGE);
         tbody.innerHTML = shown.map(function (f, i) {
           return '<tr data-i="' + i + '" tabindex="0">' +
             '<td><strong>' + esc(faceName(f)) + '</strong></td>' +
@@ -976,15 +1160,35 @@
         if (!rows.length) {
           tbody.innerHTML = '<tr><td colspan="8"><p class="pg-empty">Aucune face ne correspond à ce filtre.</p></td></tr>';
         }
-        count.textContent = rows.length + ' face(s) trouvée(s) • ' + shown.length + ' affichée(s)';
-        more.hidden = rows.length <= shown.length;
+        count.textContent = rows.length + ' face(s) trouvée(s) • page ' + currentPage + ' / ' + pageCount;
+        renderPagination(pageCount);
       }
 
-      [search, statusSel, sortSel].forEach(function (el) {
-        el.addEventListener('input', function () { limit = PAGE; renderTable(); });
-        el.addEventListener('change', function () { limit = PAGE; renderTable(); });
+      search.addEventListener('input', function () { currentPage = 1; renderTable(); });
+      statusButtons.forEach(function (button) {
+        button.addEventListener('click', function () {
+          statusFilter = button.dataset.statusFilter;
+          statusButtons.forEach(function (item) {
+            var active = item === button;
+            item.classList.toggle('is-active', active);
+            item.setAttribute('aria-pressed', String(active));
+          });
+          currentPage = 1;
+          renderTable();
+        });
       });
-      more.addEventListener('click', function () { limit += PAGE; renderTable(); });
+      sortButtons.forEach(function (button) {
+        button.addEventListener('click', function () {
+          sortBy = button.dataset.sortBy;
+          sortButtons.forEach(function (item) {
+            var active = item === button;
+            item.classList.toggle('is-active', active);
+            item.setAttribute('aria-pressed', String(active));
+          });
+          currentPage = 1;
+          renderTable();
+        });
+      });
       tbody.addEventListener('click', function (e) {
         var tr = e.target.closest('tr[data-i]');
         if (tr) openModal(shown[Number(tr.dataset.i)], cat);

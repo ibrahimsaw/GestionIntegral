@@ -580,6 +580,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                     round(jours / month_lengths[i] * 100)
                     for i, jours in enumerate(mensuel_jours)
                 ],
+                'mois_jours': mensuel_jours,
                 'url': reverse('support_detail', args=[support.uuid]),
             }
             rows.append((row, mensuel_jours))
@@ -645,6 +646,18 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 'formats': formats_cat,
                 'faces': [r for r, _ in cat_rows],
             })
+        category_order = {
+            '12m²': 0,
+            'Sucette': 1,
+            'Géant': 2,
+            'Marché': 3,
+        }
+        result.sort(
+            key=lambda category: (
+                category_order.get(category['categorie'], len(category_order)),
+                category['categorie'].casefold(),
+            )
+        )
         return result, meta
 
     @classmethod
@@ -1311,11 +1324,96 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             for kind, statuses in campaign_ids_by_kind_and_status.items()
         }
 
-        total_faces_occupe = sum(cat['nb_occupe'] for cat in format_category_stats)
-        total_faces_reserve = sum(cat['nb_reserve'] for cat in format_category_stats)
-        total_faces_libre = sum(cat['nb_libre'] for cat in format_category_stats)
-        total_faces_panne = sum(cat['nb_panne'] for cat in format_category_stats)
-        total_faces = sum(cat['nb_faces'] for cat in format_category_stats)
+        total_faces = sum(cat['nb_faces'] for cat in parc_categories)
+        total_faces_occupe = sum(cat['nb_occupe'] for cat in parc_categories)
+        total_faces_reserve = sum(cat['nb_reserve'] for cat in parc_categories)
+        total_faces_libre = sum(cat['nb_libre'] for cat in parc_categories)
+        total_faces_panne = sum(cat['nb_panne'] for cat in parc_categories)
+        parc_global_faces = [
+            face for category in parc_categories for face in category['faces']
+        ]
+        total_faces = len(parc_global_faces)
+        total_faces_occupe = sum(
+            face['statut'] == 'occupee' for face in parc_global_faces
+        )
+        total_faces_reserve = sum(
+            face['statut'] == 'reservee' for face in parc_global_faces
+        )
+        total_faces_libre = sum(
+            face['statut'] == 'libre' for face in parc_global_faces
+        )
+        total_faces_panne = sum(
+            face['statut'] == 'panne' for face in parc_global_faces
+        )
+        jours_realises_total = sum(face['jours'] for face in parc_global_faces)
+        jours_secures_total = sum(face['jours_secures'] for face in parc_global_faces)
+        month_lengths = [
+            calendar.monthrange(today.year, month)[1] for month in range(1, 13)
+        ]
+        global_formats = {}
+        for face in parc_global_faces:
+            global_formats.setdefault(face['format_code'], []).append(face)
+        parc_global = {
+            'categorie': 'Toutes les catégories',
+            'nb_faces': total_faces,
+            'nb_occupe': total_faces_occupe,
+            'nb_reserve': total_faces_reserve,
+            'nb_libre': total_faces_libre,
+            'nb_panne': total_faces_panne,
+            'nb_disponibles': max(total_faces - total_faces_occupe, 0),
+            'capacite': total_faces * parc_meta['year_days'],
+            'jours_realises': jours_realises_total,
+            'jours_secures': jours_secures_total,
+            'taux_jour': round(total_faces_occupe / total_faces * 100, 1) if total_faces else 0,
+            'taux_cumule': round(
+                jours_realises_total / (total_faces * parc_meta['elapsed_days']) * 100,
+                1,
+            ) if total_faces else 0,
+            'annuel_realise': round(
+                jours_realises_total / (total_faces * parc_meta['year_days']) * 100,
+                1,
+            ) if total_faces else 0,
+            'annuel_securise': round(
+                jours_secures_total / (total_faces * parc_meta['year_days']) * 100,
+                1,
+            ) if total_faces else 0,
+            'libres_60': sum(face['libre_60'] for face in parc_global_faces),
+            'faces': parc_global_faces,
+            'mensuel': [
+                round(
+                    sum(face['mois_jours'][index] for face in parc_global_faces)
+                    / (total_faces * month_lengths[index]) * 100,
+                    1,
+                ) if total_faces else 0
+                for index in range(12)
+            ],
+            'formats': [
+                {
+                    'code': code,
+                    'label': face_rows[0]['format'],
+                    'nb_faces': len(face_rows),
+                    'mensuel': [
+                        round(
+                            sum(face['mois_jours'][index] for face in face_rows)
+                            / (len(face_rows) * month_lengths[index]) * 100,
+                            1,
+                        )
+                        for index in range(12)
+                    ],
+                }
+                for code, face_rows in sorted(
+                    global_formats.items(),
+                    key=lambda item: (item[1][0]['format'].casefold(), item[0]),
+                )
+            ],
+        }
+        total_faces_disponibles = max(total_faces - total_faces_occupe, 0)
+        capacite_annuelle_totale = parc_global['capacite']
+        taux_jour_global = round(total_faces_occupe / total_faces * 100, 1) if total_faces else 0
+        taux_cumule_global = parc_global['taux_cumule']
+        annuel_realise_global = parc_global['annuel_realise']
+        annuel_securise_global = parc_global['annuel_securise']
+        total_faces_libres_60 = sum(cat['libres_60'] for cat in parc_categories)
 
         category_index = {cat['categorie']: cat for cat in format_category_stats}
         standard = category_index.get('12m²', {})
@@ -1453,6 +1551,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             'format_categories': format_category_stats,
             'formats_stats': formats_stats,
             'parc_categories': parc_categories,
+            'parc_global': parc_global,
             'parc_meta': parc_meta,
             'annee_taux_occupation': today.year,
             'total_faces': total_faces,
@@ -1460,12 +1559,13 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             'total_faces_reserve': total_faces_reserve,
             'total_faces_libre': total_faces_libre,
             'total_faces_panne': total_faces_panne,
-            'total_faces_disponibles': max(total_faces - total_faces_occupe, 0),
-            'taux_jour_global': round(total_faces_occupe / total_faces * 100, 1) if total_faces else 0,
-            'taux_cumule_global': round(total_faces_occupe / total_faces * 100, 1) if total_faces else 0,
-            'annuel_realise_global': round(total_faces_occupe / total_faces * 100, 1) if total_faces else 0,
-            'annuel_securise_global': round(total_faces_occupe / total_faces * 100, 1) if total_faces else 0,
-            'capacite_annuelle_totale': total_faces * 365,
+            'total_faces_disponibles': total_faces_disponibles,
+            'taux_jour_global': taux_jour_global,
+            'taux_cumule_global': taux_cumule_global,
+            'annuel_realise_global': annuel_realise_global,
+            'annuel_securise_global': annuel_securise_global,
+            'capacite_annuelle_totale': capacite_annuelle_totale,
+            'total_faces_libres_60': total_faces_libres_60,
 
             'revenu_actif': revenu_actif,
             'revenu_a_venir': revenu_a_venir,

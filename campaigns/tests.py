@@ -372,6 +372,48 @@ class DashboardParcGroupingTests(TestCase):
         self.assertIn('Taux annuel', rendered)
         self.assertNotIn('4m × 3m', rendered)
 
+    def test_parc_category_tabs_are_ordered_and_default_to_12m2(self):
+        for key in ('12m2', 'sucette', 'geant', 'marche'):
+            support = self.create_support(
+                f'DASH-TAB-{key.upper()}',
+                self.formats[key].code,
+            )
+            FacePanneau.objects.create(support=support, label='A')
+
+        screen = Support.objects.create(
+            code='DASH-TAB-SCREEN',
+            nom='Écran du dashboard',
+            type_support=Support.TYPE_ECRAN,
+            latitude=12.34,
+            longitude=-1.52,
+            ville='Ouagadougou',
+        )
+        EcranNumerique.objects.create(support=screen)
+
+        cache.clear()
+        request = self.make_request('/', {'ville': 'Ouagadougou'})
+        view = DashboardView()
+        view.setup(request)
+        rendered = render_to_string(
+            view.template_name,
+            view.get_context_data(),
+            request=request,
+        )
+        tabs = rendered.split('<nav class="pg-tabs"', 1)[1].split('</nav>', 1)[0]
+        ordered_labels = ['12m²', 'Sucette', 'Géant', 'Marché', 'Écrans']
+
+        positions = [tabs.index(f'data-label="{label}"') for label in ordered_labels]
+        self.assertEqual(positions, sorted(positions))
+        self.assertLess(
+            tabs.index('data-label="Toutes les catégories"'),
+            positions[0],
+        )
+        self.assertNotIn('face</small>', tabs)
+        self.assertIn("tab.dataset.label === '12m²'", rendered)
+        all_tab = rendered.split('id="cat-toutes"', 1)[1].split('</section>', 1)[0]
+        self.assertIn('Total des faces', all_tab)
+        self.assertNotIn('<table', all_tab)
+
     def test_supports_and_campaigns_are_classified_from_lines_and_formats(self):
         today = datetime.date.today()
         standard = self.create_support('DASH-P12', 'DASH-12')

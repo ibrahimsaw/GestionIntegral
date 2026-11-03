@@ -26,6 +26,7 @@ from .models import *
 from inventory.models import (
     Support, FacePanneau, EcranNumerique, FormatSupport, Emplacement, Marche,
     SupportDeletionRequest, format_sort_key, formats_croissants,
+    calculer_heures_chevauchement,
 )
 from .forms import (
     ClientForm,
@@ -34,9 +35,13 @@ from .forms import (
     LigneCampagneForm,
     PreuveDiffusionForm,
     DemandeCampagneForm,
+    EcranParametresExploitationForm,
+    EcranBilanMensuelForm,
+    PackageEcranForm,
     normaliser_categorie_format,
 )
 from piges.models import PigeFichier
+from planning.models import LogDiffusion
 # from .mixins import *
 from datetime import datetime, date, timedelta
 today = timezone.now().date()
@@ -227,6 +232,101 @@ from .models import (
 
 class DashboardView(LoginRequiredMixin, TemplateView):
     template_name = 'campaigns/accueil_parc.html'
+
+    def post(self, request, *args, **kwargs):
+        if not request.user.is_staff_regie_role:
+            messages.error(request, "Permission refusée.")
+            return redirect(f"{reverse('dashboard')}#cat-ecrans")
+
+        action = request.POST.get('led_action')
+        if action in ('exploitation', 'bilan'):
+            try:
+                support_id = int(request.POST.get('ecran_id', ''))
+            except (TypeError, ValueError):
+                messages.error(request, "Sélectionnez un écran valide.")
+                return redirect(f"{reverse('dashboard')}#cat-ecrans")
+            ecran = get_object_or_404(
+                EcranNumerique.objects.select_related('support'),
+                support_id=support_id,
+            )
+            ville = request.POST.get('ville', '').strip()
+            if ville and ecran.support.ville.casefold() != ville.casefold():
+                messages.error(request, "L’écran sélectionné ne correspond pas à la ville.")
+                return redirect(f"{reverse('dashboard')}#cat-ecrans")
+
+            if action == 'exploitation':
+                instance = EcranParametresExploitation.objects.filter(
+                    ecran=ecran
+                ).first() or EcranParametresExploitation(ecran=ecran)
+                form = EcranParametresExploitationForm(
+                    request.POST, instance=instance
+                )
+                label = "paramètres d'exploitation"
+            else:
+                try:
+                    annee = int(request.POST.get('annee', ''))
+                    mois = int(request.POST.get('mois', ''))
+                    if not 2000 <= annee <= 2100 or not 1 <= mois <= 12:
+                        raise ValueError
+                except (TypeError, ValueError):
+                    messages.error(request, "La période du bilan est invalide.")
+                    return redirect(f"{reverse('dashboard')}#cat-ecrans")
+                instance = EcranBilanMensuel.objects.filter(
+                    ecran=ecran, annee=annee, mois=mois
+                ).first() or EcranBilanMensuel(
+                    ecran=ecran, annee=annee, mois=mois
+                )
+                form = EcranBilanMensuelForm(request.POST, instance=instance)
+                label = "bilan mensuel"
+
+            if form.is_valid():
+                form.save()
+                messages.success(request, f"Les {label} de {ecran.support.code} ont été enregistrés.")
+            else:
+                errors = '; '.join(
+                    f'{field}: {error}'
+                    for field, field_errors in form.errors.items()
+                    for error in field_errors
+                )
+                messages.error(
+                    request,
+                    f"Enregistrement impossible : {errors}",
+                )
+        elif action == 'package':
+            contrat_id = request.POST.get('contrat')
+            instance = None
+            if contrat_id and contrat_id.isdecimal():
+                instance = PackageEcran.objects.filter(
+                    contrat_id=int(contrat_id)
+                ).first()
+            form = PackageEcranForm(request.POST, instance=instance)
+            if form.is_valid():
+                form.save()
+                messages.success(request, "Le package écran a été enregistré.")
+            else:
+                errors = '; '.join(
+                    f'{field}: {error}'
+                    for field, field_errors in form.errors.items()
+                    for error in field_errors
+                )
+                messages.error(
+                    request,
+                    f"Enregistrement impossible : {errors}",
+                )
+        else:
+            messages.error(request, "Action de sauvegarde inconnue.")
+
+        params = {
+            key: request.POST[key]
+            for key in (
+                'ville', 'ecran_annee', 'ecran_date', 'ecran_id', 'led_tab'
+            )
+            if request.POST.get(key)
+        }
+        redirect_url = reverse('dashboard')
+        if params:
+            redirect_url += f"?{urlencode(params)}"
+        return redirect(f"{redirect_url}#cat-ecrans")
 
     SUPPORT_GROUP_DEFINITIONS = (
         ('statique_12m2', 'Statique — 12 m²', '12m2'),
@@ -974,9 +1074,557 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             if code in counts_by_resolution
         ]
 
+    @classmethod
+    def _build_led_dashboard_data(cls, ville_active, reference_date, stats_by_screen):
+        """Prépare les vues LED à partir des campagnes, contrats et logs enregistrés."""
+        year_start = date(reference_date.year, 1, 1)
+        year_end = date(reference_date.year, 12, 31)
+        screens = EcranNumerique.objects.select_related('support').prefetch_related(
+            'programmes__plages', 'parametres_exploitation'
+        )
+        if ville_active:
+            screens = screens.filter(support__ville__iexact=ville_active)
+        screen_rows = list(screens.order_by('support__code'))
+        screen_ids = [screen.support_id for screen in screen_rows]
+        screen_objects_by_id = {
+            screen.support_id: screen for screen in screen_rows
+        }
+        bilan_rows = EcranBilanMensuel.objects.filter(
+            ecran_id__in=[screen.pk for screen in screen_rows],
+            annee=reference_date.year,
+        )
+        bilans_by_screen_month = {
+            (bilan.ecran_id, bilan.mois): bilan for bilan in bilan_rows
+        }
+        screen_data = []
+        monthly_by_screen = {}
+        monthly_capacity_by_screen = {}
+        monthly_names = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Juin',
+                         'Juil', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
+        for screen in screen_rows:
+            support = screen.support
+            exploitation = getattr(screen, 'parametres_exploitation', None)
+            metrics = stats_by_screen.get(screen.support_id, {})
+            monthly_by_screen[screen.support_id] = [0] * 12
+            monthly_capacity = []
+            debut_journee = datetime.combine(
+                date(reference_date.year, 1, 1), screen.heure_allumage
+            )
+            fin_journee = datetime.combine(
+                date(reference_date.year, 1, 1), screen.heure_extinction
+            )
+            duree_allumage = fin_journee - debut_journee
+            if duree_allumage.total_seconds() < 0:
+                duree_allumage += timedelta(days=1)
+            spots_par_jour = (
+                duree_allumage.total_seconds() / 3600
+                * 60
+                * EcranNumerique.SPOTS_PAR_MINUTE
+            )
+            for month in range(1, 13):
+                nombre_jours = calendar.monthrange(
+                    reference_date.year, month
+                )[1]
+                monthly_capacity.append(
+                    int(nombre_jours * spots_par_jour)
+                )
+            monthly_capacity_by_screen[screen.support_id] = monthly_capacity
+            screen_data.append({
+                'id': screen.support_id,
+                'code': support.code,
+                'nom': support.nom,
+                'uuid': str(support.uuid),
+                'url': reverse('support_detail', args=[support.uuid]),
+                'ville': support.ville,
+                'quartier': support.quartier,
+                'etat': support.get_etat_display(),
+                'resolution': screen.get_resolution_display(),
+                'cellule': screen.get_cellule_display(),
+                'type_ecran': screen.get_type_ecran_display(),
+                'duree_spot_secondes': EcranNumerique.DUREE_SPOT_SECONDES,
+                'horaires': screen.horaires_actifs_display(reference_date),
+                'heure_allumage': screen.heure_allumage.strftime('%H:%M'),
+                'heure_extinction': screen.heure_extinction.strftime('%H:%M'),
+                'objectif_annuel': metrics.get('objectif_spots_annuel') or 0,
+                'spots_programmes_cumules': metrics.get('spots_realises', 0),
+                'spots_programmes_annee': 0,
+                'spots_programmes_jour': metrics.get('spots_aujourdhui', 0),
+                'taux_jour': metrics.get('taux_actuel'),
+                'taux_annuel': metrics.get('taux_annuel'),
+                'secondes_reservees': metrics.get(
+                    'secondes_reservees_aujourdhui', 0
+                ),
+                'secondes_disponibles': metrics.get(
+                    'secondes_disponibles_aujourdhui', 0
+                ),
+                'spots_diffuses': 0,
+                'valeur_programmee': 0.0,
+                'valeur_diffusee_estimee': 0.0,
+                'mensuel_diffuse': [0] * 12,
+                'mensuel_duree_diffusee': [0] * 12,
+                'mensuel_valeur_diffusee': [0.0] * 12,
+                'mensuel_programme': [0] * 12,
+                'mensuel_capacite': monthly_capacity,
+                'mensuel_taux_diffusion': [None] * 12,
+                'mensuel_valeur_programmee': [0.0] * 12,
+                'programmation_horaire': [],
+                'puissance_kw': (
+                    float(exploitation.puissance_kw)
+                    if exploitation and exploitation.puissance_kw is not None
+                    else None
+                ),
+                'mode_commande': (
+                    exploitation.get_mode_commande_display()
+                    if exploitation and exploitation.mode_commande
+                    else None
+                ),
+                'cout_intervention_fcfa': (
+                    float(exploitation.cout_intervention_fcfa)
+                    if exploitation and exploitation.cout_intervention_fcfa is not None
+                    else None
+                ),
+                'seuil_extinction_heures': (
+                    float(exploitation.seuil_extinction_heures)
+                    if exploitation and exploitation.seuil_extinction_heures is not None
+                    else None
+                ),
+                'mensuel_bilans': [
+                    cls._serialize_led_bilan(
+                        bilans_by_screen_month.get((screen.pk, month))
+                    )
+                    for month in range(1, 13)
+                ],
+            })
+
+        if not screen_ids:
+            return {
+                'ecran_dashboard_screens': screen_data,
+                'ecran_dashboard_monthly': [
+                    {
+                        'mois': month,
+                        'spots': 0,
+                        'capacite': 0,
+                        'taux_programme': None,
+                        'diffusions': 0,
+                    }
+                    for month in monthly_names
+                ],
+                'ecran_dashboard_campaigns': [],
+                'ecran_dashboard_contracts': [],
+                'ecran_dashboard_has_logs': False,
+            }
+
+        lines = list(
+            LigneCampagne.objects.filter(
+                support_id__in=screen_ids,
+                campagne__date_debut__lte=year_end,
+                campagne__date_fin__gte=year_start,
+            ).exclude(
+                campagne__statut__in=[
+                    Campagne.STATUT_BROUILLON,
+                    Campagne.STATUT_ANNULEE,
+                ]
+            ).select_related(
+                'support',
+                'campagne',
+                'campagne__client',
+                'campagne__contrat__package_ecran',
+            ).prefetch_related('campagne__pauses').order_by(
+                'campagne__date_debut', 'campagne__nom', 'support__code'
+            )
+        )
+
+        campaigns = []
+        contracts = {}
+        value_by_screen = {}
+        unit_price_by_campaign_screen = {}
+        screen_data_index = {
+            screen['id']: index for index, screen in enumerate(screen_data)
+        }
+        for line in lines:
+            campaign = line.campagne
+            actual_line_start = max(
+                line.date_debut or campaign.date_debut, campaign.date_debut
+            )
+            actual_line_end = min(
+                line.date_fin or campaign.date_fin, campaign.date_fin
+            )
+            line_start = max(actual_line_start, year_start)
+            line_end = min(actual_line_end, year_end)
+            if line_start > line_end:
+                continue
+            planned_spots = line.calculer_spots_sur_periode(line_start, line_end)
+            planned_today = line.calculer_spots_sur_periode(
+                reference_date, reference_date
+            )
+            unit_price = campaign.prix or 0
+            campaign_value = float(unit_price * planned_spots)
+            screen_id = line.support_id
+            value_by_screen[screen_id] = value_by_screen.get(screen_id, 0) + campaign_value
+            unit_price_by_campaign_screen[(screen_id, campaign.pk)] = (
+                float(unit_price) if unit_price else None
+            )
+            screen_index = screen_data_index[screen_id]
+            screen_data[screen_index]['spots_programmes_annee'] += planned_spots
+            if (
+                actual_line_start <= reference_date <= actual_line_end
+                and planned_today
+            ):
+                screen = screen_objects_by_id[screen_id]
+                active_ranges = screen.plages_actives(reference_date)
+                frequency = line.get_frequence_effective()
+                visual_count = (
+                    campaign.get_nombre_visuels_effective() or 1
+                )
+                if frequency:
+                    for hour in range(24):
+                        hour_start = time(hour, 0)
+                        hour_end = time(hour + 1, 0) if hour < 23 else time(23, 59, 59)
+                        clipped_ranges = [
+                            (max(start, hour_start), min(end, hour_end))
+                            for start, end in active_ranges
+                            if max(start, hour_start) < min(end, hour_end)
+                        ]
+                        overlap_hours = calculer_heures_chevauchement(
+                            clipped_ranges,
+                            line.get_tranches_effective(),
+                        )
+                        if not overlap_hours:
+                            continue
+                        hourly_spots = (
+                            overlap_hours * (3600 / frequency) * visual_count
+                        )
+                        schedule = screen_data[screen_index][
+                            'programmation_horaire'
+                        ]
+                        hour_row = next(
+                            (
+                                row for row in schedule
+                                if row['heure'] == f'{hour:02d}:00'
+                            ),
+                            None,
+                        )
+                        if hour_row is None:
+                            capacity = sum(
+                                (
+                                    datetime.combine(
+                                        reference_date,
+                                        min(end, hour_end),
+                                    )
+                                    - datetime.combine(
+                                        reference_date,
+                                        max(start, hour_start),
+                                    )
+                                ).total_seconds() / 60
+                                * EcranNumerique.SPOTS_PAR_MINUTE
+                                for start, end in active_ranges
+                                if max(start, hour_start) < min(end, hour_end)
+                            )
+                            hour_row = {
+                                'heure': f'{hour:02d}:00',
+                                'spots_bruts': 0.0,
+                                'capacite': round(capacity),
+                                'campagnes': [],
+                            }
+                            schedule.append(hour_row)
+                        hour_row['spots_bruts'] += hourly_spots
+                        hour_row['campagnes'].append({
+                            'nom': campaign.nom,
+                            'client': campaign.client.nom,
+                            'spots': round(hourly_spots),
+                        })
+            selected_month_spots = 0
+            for month in range(1, 13):
+                month_start = date(reference_date.year, month, 1)
+                month_end = date(
+                    reference_date.year,
+                    month,
+                    calendar.monthrange(reference_date.year, month)[1],
+                )
+                overlap_start = max(actual_line_start, month_start)
+                overlap_end = min(actual_line_end, month_end)
+                month_spots = (
+                    line.calculer_spots_sur_periode(overlap_start, overlap_end)
+                    if overlap_start <= overlap_end else 0
+                )
+                screen_data[screen_index]['mensuel_programme'][month - 1] += (
+                    month_spots
+                )
+                screen_data[screen_index]['mensuel_valeur_programmee'][month - 1] += (
+                    float(unit_price * month_spots)
+                )
+                if month == reference_date.month:
+                    selected_month_spots = month_spots
+            contract = campaign.contrat
+            contract_reference = ''
+            if contract:
+                contract_reference = contract.reference or contract.get_type_document_display()
+                package = getattr(contract, 'package_ecran', None)
+                contract_row = contracts.setdefault(contract.pk, {
+                    'id': contract.pk,
+                    'reference': contract_reference,
+                    'nom': contract.nom or contract_reference,
+                    'client': contract.client.nom,
+                    'type': contract.get_type_document_display(),
+                    'type_contrat': contract.get_type_contrat_display(),
+                    'date_debut': contract.date_debut.isoformat(),
+                    'date_fin': contract.date_fin.isoformat(),
+                    'actif': contract.actif,
+                    'nb_spots': contract.nb_spots,
+                    'campagnes': [],
+                    'screen_ids': [],
+                    'campagne_ids': [],
+                    'spots_programmes': 0,
+                    'valeur_programmee_estimee': 0.0,
+                    'agence': package.agence if package else '',
+                    'annonceur': package.annonceur if package else '',
+                    'prix_unitaire_package': (
+                        float(package.prix_unitaire_fcfa)
+                        if package and package.prix_unitaire_fcfa is not None
+                        else None
+                    ),
+                })
+                campaign_label = campaign.nom
+                if campaign_label not in contract_row['campagnes']:
+                    contract_row['campagnes'].append(campaign_label)
+                if screen_id not in contract_row['screen_ids']:
+                    contract_row['screen_ids'].append(screen_id)
+                if campaign.pk not in contract_row['campagne_ids']:
+                    contract_row['campagne_ids'].append(campaign.pk)
+                contract_row['spots_programmes'] += planned_spots
+                contract_row['valeur_programmee_estimee'] += campaign_value
+
+            campaigns.append({
+                'campagne_id': campaign.pk,
+                'ligne_id': line.pk,
+                'screen_id': screen_id,
+                'screen_code': line.support.code,
+                'screen_nom': line.support.nom,
+                'nom': campaign.nom,
+                'client': campaign.client.nom,
+                'statut': campaign.get_statut_display(),
+                'date_reference': reference_date.isoformat(),
+                'active_a_date': (
+                    actual_line_start <= reference_date <= actual_line_end
+                ),
+                'date_debut': actual_line_start.isoformat(),
+                'date_fin': actual_line_end.isoformat(),
+                'spots_programmes': planned_spots,
+                'spots_programmes_mois_selectionne': selected_month_spots,
+                'mois_selectionne': reference_date.month,
+                'spots_programmes_jour': planned_today,
+                'mensuel_diffuse': [0] * 12,
+                'duree': line.get_duree_passage_effective() or 0,
+                'frequence': line.get_frequence_effective() or 0,
+                'tranches': line.get_tranches_effective() or '',
+                'contrat': contract_reference,
+                'valeur_programmee': campaign_value,
+                'prix_unitaire': float(unit_price),
+                'prix_renseigne': bool(unit_price),
+                'spots_diffuses': 0,
+            })
+
+        logs = list(
+            LogDiffusion.objects.filter(
+                ecran__support_id__in=screen_ids,
+                timestamp__date__gte=year_start,
+                timestamp__date__lte=year_end,
+            ).values(
+                'ecran__support_id',
+                'campagne_id',
+                'ligne_id',
+                'timestamp__month',
+            ).annotate(
+                nombre=Count('pk'),
+                duree_totale=Sum('duree_sec'),
+            )
+        )
+        screen_data_by_id = {screen['id']: screen for screen in screen_data}
+        logs_by_campaign_screen = {}
+        logs_by_line = {}
+        logs_by_line_month = {}
+        for log in logs:
+            screen_id = log['ecran__support_id']
+            month_index = log['timestamp__month'] - 1
+            monthly_by_screen[screen_id][month_index] += log['nombre']
+            screen_data_by_id[screen_id]['mensuel_diffuse'][month_index] += log['nombre']
+            screen_data_by_id[screen_id]['mensuel_duree_diffusee'][month_index] += (
+                log['duree_totale'] or 0
+            )
+            screen_data_by_id[screen_id]['spots_diffuses'] += log['nombre']
+            unit_price = unit_price_by_campaign_screen.get(
+                (screen_id, log['campagne_id'])
+            )
+            if unit_price is not None:
+                screen_data_by_id[screen_id]['mensuel_valeur_diffusee'][month_index] += (
+                    unit_price * log['nombre']
+                )
+            if log['campagne_id']:
+                key = (screen_id, log['campagne_id'])
+                logs_by_campaign_screen[key] = (
+                    logs_by_campaign_screen.get(key, 0) + log['nombre']
+                )
+            if log['ligne_id']:
+                logs_by_line[log['ligne_id']] = (
+                    logs_by_line.get(log['ligne_id'], 0) + log['nombre']
+                )
+                line_month_key = (log['ligne_id'], month_index)
+                logs_by_line_month[line_month_key] = (
+                    logs_by_line_month.get(line_month_key, 0) + log['nombre']
+                )
+
+        for screen in screen_data:
+            for hour_row in screen['programmation_horaire']:
+                hour_row['spots'] = round(hour_row.pop('spots_bruts'))
+            screen['valeur_programmee'] = round(value_by_screen.get(screen['id'], 0), 2)
+            screen['valeur_diffusee_estimee'] = round(sum(
+                price * logs_by_campaign_screen.get((screen['id'], campaign_id), 0)
+                for (campaign_screen_id, campaign_id), price
+                in unit_price_by_campaign_screen.items()
+                if campaign_screen_id == screen['id'] and price is not None
+            ), 2)
+            for month, planned in enumerate(screen['mensuel_programme']):
+                capacity = monthly_capacity_by_screen[screen['id']][month]
+                screen['mensuel_taux_diffusion'][month] = (
+                    round(
+                        screen['mensuel_duree_diffusee'][month]
+                        / (
+                            capacity
+                            * EcranNumerique.DUREE_SPOT_SECONDES
+                        )
+                        * 100,
+                        1,
+                    )
+                    if capacity else None
+                )
+        for campaign in campaigns:
+            campaign['spots_diffuses'] = logs_by_line.get(campaign['ligne_id'], 0)
+            campaign['mensuel_diffuse'] = [
+                logs_by_line_month.get((campaign['ligne_id'], month), 0)
+                for month in range(12)
+            ]
+        for contract in contracts.values():
+            contract['spots_diffuses_journalises'] = sum(
+                count
+                for (screen_id, campaign_id), count in logs_by_campaign_screen.items()
+                if campaign_id in contract['campagne_ids']
+            )
+
+        return {
+            'ecran_dashboard_screens': screen_data,
+            'ecran_dashboard_monthly': [
+                {
+                    'mois': month,
+                    'spots': sum(values[index] for values in monthly_by_screen.values()),
+                    'capacite': sum(
+                        values[index]
+                        for values in monthly_capacity_by_screen.values()
+                    ),
+                    'taux_programme': (
+                        round(
+                            sum(
+                                screen['mensuel_programme'][index]
+                                for screen in screen_data
+                            )
+                            / sum(
+                                values[index]
+                                for values in monthly_capacity_by_screen.values()
+                            )
+                            * 100,
+                            1,
+                        )
+                        if sum(
+                            values[index]
+                            for values in monthly_capacity_by_screen.values()
+                        )
+                        else None
+                    ),
+                    'taux_diffusion_journalisee': (
+                        round(
+                            sum(
+                                screen['mensuel_duree_diffusee'][index]
+                                for screen in screen_data
+                            )
+                            / (
+                                sum(
+                                    values[index]
+                                    for values in monthly_capacity_by_screen.values()
+                                )
+                                * EcranNumerique.DUREE_SPOT_SECONDES
+                            )
+                            * 100,
+                            1,
+                        )
+                        if sum(
+                            values[index]
+                            for values in monthly_capacity_by_screen.values()
+                        )
+                        else None
+                    ),
+                    'spots_programmes': sum(
+                        screen['mensuel_programme'][index]
+                        for screen in screen_data
+                    ),
+                }
+                for index, month in enumerate(monthly_names)
+            ],
+            'ecran_dashboard_campaigns': campaigns,
+            'ecran_dashboard_contracts': list(contracts.values()),
+            'ecran_dashboard_has_logs': bool(logs),
+        }
+
+    @staticmethod
+    def _serialize_led_bilan(bilan):
+        if not bilan:
+            return None
+        return {
+            'consommation_kwh': (
+                float(bilan.consommation_kwh)
+                if bilan.consommation_kwh is not None else None
+            ),
+            'tarif_energie_fcfa_kwh': (
+                float(bilan.tarif_energie_fcfa_kwh)
+                if bilan.tarif_energie_fcfa_kwh is not None else None
+            ),
+            'cout_electricite_fcfa': (
+                float(bilan.cout_electricite_fcfa)
+                if bilan.cout_electricite_fcfa is not None else None
+            ),
+            'total_charges_fcfa': (
+                float(bilan.total_charges_fcfa)
+                if bilan.total_charges_fcfa is not None else None
+            ),
+            'encaissements_fcfa': (
+                float(bilan.encaissements_fcfa)
+                if bilan.encaissements_fcfa is not None else None
+            ),
+        }
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         today = timezone.now().date()
+        current_date = timezone.localdate()
+        try:
+            selected_screen_year = int(
+                self.request.GET.get('ecran_annee', current_date.year)
+            )
+            if not 2000 <= selected_screen_year <= 2100:
+                raise ValueError
+        except (TypeError, ValueError):
+            selected_screen_year = current_date.year
+        raw_screen_date = self.request.GET.get('ecran_date', '')
+        try:
+            selected_screen_date = (
+                date.fromisoformat(raw_screen_date)
+                if raw_screen_date
+                else current_date
+            )
+        except ValueError:
+            selected_screen_date = current_date
+        if not raw_screen_date and selected_screen_year != current_date.year:
+            selected_screen_date = date(selected_screen_year, 1, 1)
+        elif selected_screen_date.year != selected_screen_year:
+            selected_screen_date = date(selected_screen_year, 1, 1)
         ville_active = self.request.GET.get("ville", "").strip()
         supports_classes = Support.objects.filter(
             Q(type_support=Support.TYPE_ECRAN)
@@ -1233,9 +1881,14 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         marches_stats = self._build_market_stats(
             ville_active, faces_occupees_ids, faces_reservees_ids
         )
-        screen_spot_stats = self._build_screen_spot_stats(ville_active, today)
+        screen_spot_stats = self._build_screen_spot_stats(
+            ville_active, selected_screen_date
+        )
         ecrans_stats_par_resolution = self._build_screen_resolution_stats(
-            ville_active, today, screen_spot_stats
+            ville_active, selected_screen_date, screen_spot_stats
+        )
+        ecran_dashboard_data = self._build_led_dashboard_data(
+            ville_active, selected_screen_date, screen_spot_stats
         )
         ecrans_occupees = sum(
             item['nb_occupees'] for item in ecrans_stats_par_resolution
@@ -1466,13 +2119,13 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             ).filter(
                 Q(
                     campagne__statut=Campagne.STATUT_EN_COURS,
-                    campagne__date_debut__lte=today,
-                    campagne__date_fin__gte=today,
+                    campagne__date_debut__lte=selected_screen_date,
+                    campagne__date_fin__gte=selected_screen_date,
                 )
                 | Q(
                     campagne__statut=Campagne.STATUT_EN_PAUSE,
-                    campagne__date_debut__lte=today,
-                    campagne__date_mise_en_pause__lte=today,
+                    campagne__date_debut__lte=selected_screen_date,
+                    campagne__date_mise_en_pause__lte=selected_screen_date,
                 )
             ).values_list('support_id', flat=True)
         )
@@ -1490,11 +2143,68 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             }
             for e in screens_qs
         ]
+        dashboard_screen_ids = {
+            str(screen['id'])
+            for screen in ecran_dashboard_data['ecran_dashboard_screens']
+        }
+        selected_screen_id = self.request.GET.get('ecran_id', '')
+        if selected_screen_id not in dashboard_screen_ids:
+            selected_screen_id = ''
+        selected_screen = next(
+            (
+                screen for screen in screens_qs
+                if str(screen.support_id) == selected_screen_id
+            ),
+            None,
+        )
+        selected_bilan = None
+        exploitation_form = None
+        bilan_form = None
+        if selected_screen:
+            selected_bilan = EcranBilanMensuel.objects.filter(
+                ecran=selected_screen,
+                annee=selected_screen_year,
+                mois=selected_screen_date.month,
+            ).first()
+            exploitation_form = EcranParametresExploitationForm(
+                instance=(
+                    EcranParametresExploitation.objects.filter(
+                        ecran=selected_screen
+                    ).first()
+                )
+            )
+            bilan_form = EcranBilanMensuelForm(instance=selected_bilan)
+
+        package_contrat_id = self.request.GET.get('package_contrat_id', '')
+        package_instance = None
+        if package_contrat_id.isdecimal():
+            package_instance = PackageEcran.objects.filter(
+                contrat_id=int(package_contrat_id)
+            ).first()
+        package_form = PackageEcranForm(instance=package_instance)
+        if package_instance is None and package_contrat_id.isdecimal():
+            package_form = PackageEcranForm(
+                initial={'contrat': int(package_contrat_id)}
+            )
 
         context.update({
             'ville_active': ville_active,
             'villes': villes,
             'ecrans_liste': ecrans_liste,
+            'ecran_dashboard_data': ecran_dashboard_data,
+            'ecran_annee_selectionnee': selected_screen_year,
+            'ecran_date_selectionnee': selected_screen_date,
+            'ecran_id_selectionne': selected_screen_id,
+            'ecran_form_exploitation': exploitation_form,
+            'ecran_form_bilan': bilan_form,
+            'ecran_form_package': package_form,
+            'ecran_can_edit': bool(
+                getattr(self.request.user, 'is_staff_regie_role', False)
+            ),
+            'ecran_annee_options': sorted(
+                set(range(current_date.year - 2, current_date.year + 3))
+                | {selected_screen_year}
+            ),
 
             'total_supports': parc['total'],
             'total_campagnes': campagnes_qs.count(),

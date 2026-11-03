@@ -3,7 +3,7 @@ import uuid
 from decimal import Decimal
 from django.conf import settings
 from django.core.exceptions import ValidationError
-from django.core.validators import FileExtensionValidator
+from django.core.validators import FileExtensionValidator, MaxValueValidator, MinValueValidator
 from django.db import models
 from django.db.models import Q
 from django.utils import timezone
@@ -295,6 +295,173 @@ class Contrat(models.Model):
     def is_actif(self):
         today = timezone.now().date()
         return self.actif and self.date_debut <= today <= self.date_fin
+
+
+class PackageEcran(models.Model):
+    """Informations commerciales d'un package rattaché à un contrat."""
+    contrat = models.OneToOneField(
+        Contrat,
+        on_delete=models.CASCADE,
+        related_name='package_ecran',
+    )
+    agence = models.CharField(max_length=200, blank=True)
+    annonceur = models.CharField(max_length=200, blank=True)
+    prix_unitaire_fcfa = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(0)],
+        verbose_name="Prix contractuel par spot (FCFA)",
+    )
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        verbose_name = "Package écran"
+        verbose_name_plural = "Packages écran"
+
+    def __str__(self):
+        return self.contrat.nom or str(self.contrat)
+
+
+class EcranParametresExploitation(models.Model):
+    """Hypothèses techniques et d'exploitation, saisies sans valeur fictive."""
+    MODE_MANUEL = 'manuel'
+    MODE_DISTANCE = 'distance'
+    MODE_CHOICES = [
+        (MODE_MANUEL, 'Manuelle / déplacement'),
+        (MODE_DISTANCE, 'À distance'),
+    ]
+
+    ecran = models.OneToOneField(
+        'inventory.EcranNumerique',
+        on_delete=models.CASCADE,
+        related_name='parametres_exploitation',
+    )
+    puissance_kw = models.DecimalField(
+        max_digits=8, decimal_places=3, null=True, blank=True,
+        validators=[MinValueValidator(0)],
+        verbose_name="Puissance électrique (kW)",
+    )
+    mode_commande = models.CharField(
+        max_length=12, choices=MODE_CHOICES, blank=True,
+    )
+    cout_intervention_fcfa = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True,
+        validators=[MinValueValidator(0)],
+        verbose_name="Coût d'un déplacement (FCFA)",
+    )
+    seuil_extinction_heures = models.DecimalField(
+        max_digits=5, decimal_places=1, null=True, blank=True,
+        validators=[MinValueValidator(0)],
+        verbose_name="Seuil d'extinction (heures)",
+    )
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        verbose_name = "Paramètres d'exploitation écran"
+        verbose_name_plural = "Paramètres d'exploitation écrans"
+
+    def __str__(self):
+        return f"Exploitation — {self.ecran.support.code}"
+
+
+class EcranBilanMensuel(models.Model):
+    """Relevés mensuels de consommation et dépenses réelles d'un écran."""
+    MOIS_CHOICES = [
+        (1, 'Janvier'), (2, 'Février'), (3, 'Mars'), (4, 'Avril'),
+        (5, 'Mai'), (6, 'Juin'), (7, 'Juillet'), (8, 'Août'),
+        (9, 'Septembre'), (10, 'Octobre'), (11, 'Novembre'),
+        (12, 'Décembre'),
+    ]
+
+    ecran = models.ForeignKey(
+        'inventory.EcranNumerique',
+        on_delete=models.CASCADE,
+        related_name='bilans_mensuels',
+    )
+    annee = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(2000), MaxValueValidator(2100)]
+    )
+    mois = models.PositiveSmallIntegerField(
+        choices=MOIS_CHOICES,
+        validators=[MinValueValidator(1), MaxValueValidator(12)],
+    )
+    consommation_kwh = models.DecimalField(
+        max_digits=12, decimal_places=3, null=True, blank=True,
+        validators=[MinValueValidator(0)],
+        verbose_name="Consommation électrique (kWh)",
+    )
+    tarif_energie_fcfa_kwh = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True,
+        validators=[MinValueValidator(0)],
+        verbose_name="Tarif électrique (FCFA/kWh)",
+    )
+    taxes_publicitaires_fcfa = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True,
+        validators=[MinValueValidator(0)],
+        verbose_name="Taxes publicitaires municipales (FCFA)",
+    )
+    loyer_site_fcfa = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True,
+        validators=[MinValueValidator(0)],
+        verbose_name="Loyer / redevance du site (FCFA)",
+    )
+    maintenance_fcfa = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True,
+        validators=[MinValueValidator(0)],
+        verbose_name="Maintenance (FCFA)",
+    )
+    frais_techniques_fcfa = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True,
+        validators=[MinValueValidator(0)],
+        verbose_name="Connexion et frais techniques (FCFA)",
+    )
+    autres_charges_fcfa = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True,
+        validators=[MinValueValidator(0)],
+        verbose_name="Autres charges (FCFA)",
+    )
+    encaissements_fcfa = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True,
+        validators=[MinValueValidator(0)],
+        verbose_name="Encaissements justifiés (FCFA)",
+    )
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ['-annee', '-mois', 'ecran__support__code']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['ecran', 'annee', 'mois'],
+                name='unique_ecran_bilan_mensuel',
+            ),
+        ]
+        verbose_name = "Bilan mensuel écran"
+        verbose_name_plural = "Bilans mensuels écrans"
+
+    def __str__(self):
+        return f"{self.ecran.support.code} — {self.mois:02d}/{self.annee}"
+
+    @property
+    def cout_electricite_fcfa(self):
+        if self.consommation_kwh is None or self.tarif_energie_fcfa_kwh is None:
+            return None
+        return self.consommation_kwh * self.tarif_energie_fcfa_kwh
+
+    @property
+    def total_charges_fcfa(self):
+        charges = [
+            self.cout_electricite_fcfa,
+            self.taxes_publicitaires_fcfa,
+            self.loyer_site_fcfa,
+            self.maintenance_fcfa,
+            self.frais_techniques_fcfa,
+            self.autres_charges_fcfa,
+        ]
+        if any(value is None for value in charges):
+            return None
+        return sum(charges, Decimal('0.00'))
 
 
 # ══════════════════════════════════════════════════════════════════════════════

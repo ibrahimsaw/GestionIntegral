@@ -8,6 +8,9 @@ from .models import (
     PreuveDiffusion,
     Reservation,
     ReservationLigne,
+    PackageEcran,
+    EcranParametresExploitation,
+    EcranBilanMensuel,
 )
 
 
@@ -100,6 +103,26 @@ class ContratAdmin(admin.ModelAdmin):
     list_display = ['reference', 'type_document', 'client', 'nom', 'type_contrat', 'date_debut', 'date_fin', 'nb_spots', 'actif']
     list_filter = ['type_document', 'type_contrat', 'actif']
     search_fields = ['reference', 'client__nom', 'nom']
+
+
+@admin.register(PackageEcran)
+class PackageEcranAdmin(admin.ModelAdmin):
+    list_display = ['contrat', 'agence', 'annonceur', 'prix_unitaire_fcfa']
+    search_fields = ['contrat__reference', 'contrat__nom', 'agence', 'annonceur']
+
+
+@admin.register(EcranParametresExploitation)
+class EcranParametresExploitationAdmin(admin.ModelAdmin):
+    list_display = ['ecran', 'puissance_kw', 'mode_commande', 'cout_intervention_fcfa']
+    list_filter = ['mode_commande']
+    search_fields = ['ecran__support__code', 'ecran__support__nom']
+
+
+@admin.register(EcranBilanMensuel)
+class EcranBilanMensuelAdmin(admin.ModelAdmin):
+    list_display = ['ecran', 'annee', 'mois', 'consommation_kwh', 'encaissements_fcfa']
+    list_filter = ['annee', 'mois']
+    search_fields = ['ecran__support__code', 'ecran__support__nom']
 
 
 @admin.register(Campagne)

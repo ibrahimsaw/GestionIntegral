@@ -9,6 +9,9 @@ from .models import (
     LigneCampagne,
     CampagneVisuel,
     PreuveDiffusion,
+    EcranParametresExploitation,
+    EcranBilanMensuel,
+    PackageEcran,
 )
 from inventory.models import (
     Support,
@@ -72,6 +75,57 @@ class ContratForm(forms.ModelForm):
         if document and document.size > 15 * 1024 * 1024:
             raise forms.ValidationError("Le PDF ne doit pas dépasser 15 Mo.")
         return document
+
+
+class EcranParametresExploitationForm(forms.ModelForm):
+    class Meta:
+        model = EcranParametresExploitation
+        fields = [
+            'puissance_kw', 'mode_commande', 'cout_intervention_fcfa',
+            'seuil_extinction_heures', 'notes',
+        ]
+        widgets = {
+            'puissance_kw': forms.NumberInput(attrs={**W, 'step': '0.001', 'min': '0'}),
+            'mode_commande': forms.Select(attrs=S),
+            'cout_intervention_fcfa': forms.NumberInput(attrs={**W, 'step': '0.01', 'min': '0'}),
+            'seuil_extinction_heures': forms.NumberInput(attrs={**W, 'step': '0.5', 'min': '0'}),
+            'notes': forms.Textarea(attrs={**W, 'rows': 2}),
+        }
+
+
+class EcranBilanMensuelForm(forms.ModelForm):
+    class Meta:
+        model = EcranBilanMensuel
+        fields = [
+            'consommation_kwh', 'tarif_energie_fcfa_kwh',
+            'taxes_publicitaires_fcfa', 'loyer_site_fcfa',
+            'maintenance_fcfa', 'frais_techniques_fcfa',
+            'autres_charges_fcfa', 'encaissements_fcfa', 'notes',
+        ]
+        widgets = {
+            'consommation_kwh': forms.NumberInput(attrs={**W, 'step': '0.001', 'min': '0'}),
+            'tarif_energie_fcfa_kwh': forms.NumberInput(attrs={**W, 'step': '0.01', 'min': '0'}),
+            'taxes_publicitaires_fcfa': forms.NumberInput(attrs={**W, 'step': '0.01', 'min': '0'}),
+            'loyer_site_fcfa': forms.NumberInput(attrs={**W, 'step': '0.01', 'min': '0'}),
+            'maintenance_fcfa': forms.NumberInput(attrs={**W, 'step': '0.01', 'min': '0'}),
+            'frais_techniques_fcfa': forms.NumberInput(attrs={**W, 'step': '0.01', 'min': '0'}),
+            'autres_charges_fcfa': forms.NumberInput(attrs={**W, 'step': '0.01', 'min': '0'}),
+            'encaissements_fcfa': forms.NumberInput(attrs={**W, 'step': '0.01', 'min': '0'}),
+            'notes': forms.Textarea(attrs={**W, 'rows': 2}),
+        }
+
+
+class PackageEcranForm(forms.ModelForm):
+    class Meta:
+        model = PackageEcran
+        fields = ['contrat', 'agence', 'annonceur', 'prix_unitaire_fcfa', 'notes']
+        widgets = {
+            'contrat': forms.Select(attrs=S),
+            'agence': forms.TextInput(attrs=W),
+            'annonceur': forms.TextInput(attrs=W),
+            'prix_unitaire_fcfa': forms.NumberInput(attrs={**W, 'step': '0.01', 'min': '0'}),
+            'notes': forms.Textarea(attrs={**W, 'rows': 2}),
+        }
 
 
 class MultipleFileInput(forms.ClearableFileInput):

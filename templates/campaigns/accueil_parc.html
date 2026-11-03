@@ -228,6 +228,22 @@
   .pg-lrow-name:hover { color: var(--blue); }
   .pg-lrow-meta { color: var(--muted); font-size: 11.5px; }
   .pg-tag { display: inline-block; background: #eef1f6; color: #6b7a90; border-radius: 6px; padding: 2px 7px; font-size: 11px; margin: 2px 4px 2px 0; }
+  .pg-led-tabs { display: flex; flex-wrap: wrap; gap: 7px; margin: 18px 0; border-bottom: 1px solid var(--line); }
+  .pg-led-tab { border: 0; border-bottom: 2px solid transparent; background: transparent; color: #65748b; padding: 11px 13px; font: inherit; font-size: 12px; font-weight: 650; cursor: pointer; }
+  .pg-led-tab.is-active { color: var(--blue); border-bottom-color: var(--blue); }
+  .pg-led-panel { display: grid; gap: 16px; }
+  .pg-led-note { border: 1px solid #d9e3f6; background: #f5f8ff; color: #536884; border-radius: 9px; padding: 12px 14px; font-size: 12px; line-height: 1.5; }
+  .pg-led-note.is-warning { border-color: #f1dcb5; background: #fffbf3; color: #80602d; }
+  .pg-led-profile { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+  .pg-led-profile > div { background: #f6f8fb; border-radius: 8px; padding: 12px; }
+  .pg-led-profile span { display: block; color: var(--muted); font-size: 11px; }
+  .pg-led-profile b { display: block; margin-top: 5px; font-size: 13px; }
+  .pg-led-chart { display: grid; grid-template-columns: repeat(12, minmax(28px, 1fr)); gap: 9px; align-items: end; min-height: 205px; overflow-x: auto; }
+  .pg-led-month { display: grid; grid-template-rows: auto 1fr auto; gap: 7px; min-width: 28px; height: 190px; text-align: center; }
+  .pg-led-monthbar { grid-row: 2; min-height: 3px; align-self: end; border-radius: 5px 5px 0 0; background: #5b86e5; }
+  .pg-led-month-label { grid-row: 3; color: var(--muted); font-size: 10px; }
+  .pg-led-month-rate { grid-row: 1; color: var(--muted); font-size: 9px; white-space: nowrap; }
+  .pg-led-empty { padding: 20px; text-align: center; color: var(--muted); }
 
   @media (max-width: 1100px) {
     .pg-row, .pg-two { grid-template-columns: 1fr; }
@@ -241,6 +257,8 @@
     .pg-metric { padding: 13px; }
     .pg-metric .pg-num { font-size: 26px; }
     .pg-panel { padding: 14px; }
+    .pg-led-profile { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .pg-led-tabs { overflow-x: auto; flex-wrap: nowrap; }
     .pg-donut { height: 130px; width: 130px; }
     .pg-donutinner { height: 94px; width: 94px; }
     .pg h1 { font-size: 24px; }
@@ -287,13 +305,11 @@
         {{ cat.categorie }}
       </button>
     {% endfor %}
-    {% if ecrans_total %}
-      <button type="button" class="pg-tab" role="tab" data-target="cat-ecrans" data-label="Écrans" aria-selected="false">
-        <span class="pg-dot" style="background: #06b6d4"></span>
-        Écrans
-        <small>{{ ecrans_total }}</small>
-      </button>
-    {% endif %}
+    <button type="button" class="pg-tab" role="tab" data-target="cat-ecrans" data-label="Écrans" aria-selected="false">
+      <span class="pg-dot" style="background: #06b6d4"></span>
+      Écrans
+      <small>{{ ecrans_total }}</small>
+    </button>
   </nav>
 
   <section class="pg-catpanel" id="cat-toutes" data-index="global" hidden>
@@ -576,153 +592,258 @@
   {% endfor %}
 
   {# ══════════ Écrans ══════════ #}
-  {% if ecrans_total %}
   <section class="pg-catpanel" id="cat-ecrans" hidden>
-    {% widthratio ecrans_occupees ecrans_total 100 as pct_ecr %}
-
-    <div class="pg-metrics">
-      <div class="pg-metric">
-        <span class="pg-mdot"></span>
-        <div class="pg-label">Total des écrans</div>
-        <div class="pg-num">{{ ecrans_total }}</div>
-        <div class="pg-foot">Écrans numériques LED</div>
+    {% if messages %}
+      <div class="pg-section">
+        {% for message in messages %}
+          <div class="alert alert-{% if message.tags == 'error' %}danger{% else %}{{ message.tags|default:'info' }}{% endif %} mb-2" role="status">{{ message }}</div>
+        {% endfor %}
       </div>
-      <div class="pg-metric is-green">
-        <span class="pg-mdot"></span>
-        <div class="pg-label">Occupés aujourd'hui</div>
-        <div class="pg-num">{{ ecrans_occupees }} <small>/ {{ ecrans_total }}</small></div>
-        <div class="pg-foot">{{ ecrans_libres }} écran{{ ecrans_libres|pluralize }} disponible{{ ecrans_libres|pluralize }}</div>
-      </div>
-      <div class="pg-metric is-orange">
-        <span class="pg-mdot"></span>
-        <div class="pg-label">Taux actuel</div>
-        <div class="pg-num">{% if ecrans_taux_actuel is not None %}{{ ecrans_taux_actuel }} %{% else %}—{% endif %}</div>
-        <div class="pg-foot">Temps d'antenne réservé aujourd'hui</div>
-      </div>
-      <div class="pg-metric">
-        <span class="pg-mdot"></span>
-        <div class="pg-label">Taux annuel {{ annee_taux_occupation }}</div>
-        <div class="pg-num">{% if ecrans_taux_annuel is not None %}{{ ecrans_taux_annuel }} %{% else %}—{% endif %}</div>
-        <div class="pg-foot">Du 01/01 à aujourd'hui</div>
-      </div>
-    </div>
-
-    <div class="pg-metrics is-three">
-      <div class="pg-metric">
-        <div class="pg-label">Objectif annuel (spots)</div>
-        <div class="pg-num">{{ ecrans_objectifs_total }}</div>
-        <div class="pg-foot">Somme des objectifs par écran</div>
-      </div>
-      <div class="pg-metric is-green">
-        <div class="pg-label">Écrans libres</div>
-        <div class="pg-num">{{ ecrans_libres }}</div>
-        <div class="pg-foot">À proposer en priorité</div>
-      </div>
-      <div class="pg-metric is-red">
-        <div class="pg-label">Écrans en panne</div>
-        <div class="pg-num">{{ ecrans_panne }}</div>
-        <div class="pg-foot">À remettre en service</div>
-      </div>
-    </div>
-
-    <div class="pg-row pg-section">
-      <div class="pg-panel">
-        <h2>Occupation par écran</h2>
-        <p class="pg-desc">Taux actuel et taux annuel {{ annee_taux_occupation }} pour chaque écran</p>
-        <div class="pg-chart">
-          {% for e in ecrans_liste %}
-            <div class="pg-grp" style="min-width:66px">
-              <div class="pg-bars">
-                <div class="pg-bcol"><span class="pg-val">{{ e.taux_actuel|default_if_none:0 }}%</span><div class="pg-bar" style="height: calc({{ e.taux_actuel|default_if_none:0|unlocalize }} * 1.5px)"></div></div>
-                <div class="pg-bcol"><span class="pg-val">{{ e.taux_annuel|default_if_none:0 }}%</span><div class="pg-bar is-forecast" style="height: calc({{ e.taux_annuel|default_if_none:0|unlocalize }} * 1.5px)"></div></div>
-              </div>
-              <label>{{ e.code }}</label>
-            </div>
-          {% empty %}
-            <p class="pg-empty">Aucun écran enregistré dans cette ville.</p>
-          {% endfor %}
-        </div>
-        <div class="pg-legend">
-          <span><i class="pg-swatch"></i> Taux actuel</span>
-          <span><i class="pg-swatch is-future"></i> Taux annuel</span>
-        </div>
-      </div>
-
-      <div class="pg-panel">
-        <h2>Situation aujourd'hui</h2>
-        <p class="pg-desc">Occupation instantanée des {{ ecrans_total }} écrans</p>
-        <div class="pg-donutrow">
-          <div class="pg-donut" style="--occ: {{ pct_ecr|unlocalize }}%;">
-            <div class="pg-donutinner"><strong>{{ pct_ecr }} %</strong><span>occupés</span></div>
-          </div>
-          <div class="pg-donutlegend">
-            <div><span style="color:#11876b">●</span> Occupés <b>{{ ecrans_occupees }}</b></div>
-            <div><span style="color:#b6c0d0">●</span> Libres <b>{{ ecrans_libres }}</b></div>
-          </div>
-        </div>
-        <div class="pg-chips">
-          {% for r in ecrans_stats_par_resolution %}
-            <span class="pg-chip">{{ r.resolution }} · {{ r.nb_ecrans }}</span>
-          {% endfor %}
-        </div>
-      </div>
-    </div>
-
-    <div class="pg-panel pg-section">
-      <div class="pg-tabletop">
+    {% endif %}
+    <div class="pg-panel">
+      <div class="pg-panelhead">
         <div>
-          <h2>Détail des écrans</h2>
-          <p class="pg-desc">Objectif de spots, taux actuel et taux annuel de chaque écran</p>
+          <div class="pg-eyebrow">Pilotage LED</div>
+          <h2>Écrans numériques</h2>
+          <p class="pg-desc">Données de diffusion, campagnes et configuration réellement enregistrées.</p>
         </div>
-        <div class="pg-controls">
-          <input class="pg-input" type="search" placeholder="Rechercher…" data-filter="tbody-ecrans">
-          {% if not request.user.is_technicien %}
-            <a class="pg-btn" href="{% url 'format_detail' 'ecrans' %}{% if ville_active %}?ville={{ ville_active|urlencode }}{% endif %}">
-              <i class="bi bi-map me-1"></i>Carte
-            </a>
-          {% endif %}
-        </div>
+        {% if not request.user.is_technicien %}
+          <a class="pg-btn" href="{% url 'format_detail' 'ecrans' %}{% if ville_active %}?ville={{ ville_active|urlencode }}{% endif %}">
+            <i class="bi bi-map me-1"></i>Carte des écrans
+          </a>
+        {% endif %}
       </div>
-      <div class="pg-table-wrap">
-        <table class="pg-table">
-          <thead>
-            <tr>
-              <th>Écran</th>
-              <th>Statut aujourd'hui</th>
-              <th class="num">Objectif spots</th>
-              <th>Taux actuel</th>
-              <th>Taux annuel {{ annee_taux_occupation }}</th>
-              {% if not request.user.is_technicien %}<th class="num">Action</th>{% endif %}
-            </tr>
-          </thead>
-          <tbody id="tbody-ecrans">
-            {% for e in ecrans_liste %}
-              <tr>
-                <td>
-                  <strong><a href="{% url 'support_detail' e.uuid %}">{{ e.nom }}</a></strong>
-                  <span class="pg-sub">{{ e.code }}{% if e.quartier %} · {{ e.quartier }}{% endif %}{% if e.ville %} · {{ e.ville }}{% endif %}</span>
-                </td>
-                <td>{% if e.occupe %}<span class="pg-pill is-occupe">● Occupé</span>{% else %}<span class="pg-pill is-libre">● Libre</span>{% endif %}</td>
-                <td class="num">{% if e.objectif_spots_annuel %}{{ e.objectif_spots_annuel }}{% else %}—{% endif %}</td>
-                <td>{% if e.taux_actuel is not None %}<span class="pg-progress"><i style="width: {{ e.taux_actuel|unlocalize }}%"></i></span>{{ e.taux_actuel }} %{% else %}—{% endif %}</td>
-                <td>{% if e.taux_annuel is not None %}<span class="pg-progress"><i style="width: {{ e.taux_annuel|unlocalize }}%"></i></span>{{ e.taux_annuel }} %{% else %}—{% endif %}</td>
-                {% if not request.user.is_technicien %}
-                  <td class="num"><a class="pg-voir" href="{% url 'support_detail' e.uuid %}">Voir</a></td>
-                {% endif %}
-              </tr>
-            {% empty %}
-              <tr><td colspan="6"><p class="pg-empty">Aucun écran enregistré dans cette ville.</p></td></tr>
-            {% endfor %}
-          </tbody>
-        </table>
-      </div>
+      <form class="pg-controls" id="led-filter-form" method="get" aria-label="Filtres des écrans">
+        {% if ville_active %}<input type="hidden" name="ville" value="{{ ville_active }}">{% endif %}
+        <label for="led-year">Année</label>
+        <select class="pg-select" id="led-year" name="ecran_annee">
+          {% for year in ecran_annee_options %}
+            <option value="{{ year }}" {% if year == ecran_annee_selectionnee %}selected{% endif %}>{{ year }}</option>
+          {% endfor %}
+        </select>
+        <label for="led-date">Date de référence</label>
+        <input class="pg-input" id="led-date" type="date" name="ecran_date" value="{{ ecran_date_selectionnee|date:'Y-m-d' }}">
+        <label for="led-screen">Écran</label>
+        <select class="pg-select" id="led-screen" name="ecran_id">
+          <option value="all">Tous les écrans</option>
+          {% for ecran in ecran_dashboard_data.ecran_dashboard_screens %}
+            <option value="{{ ecran.id }}" {% if ecran.id|stringformat:"s" == ecran_id_selectionne %}selected{% endif %}>{{ ecran.code }} — {{ ecran.nom }}</option>
+          {% endfor %}
+        </select>
+        <button class="pg-btn is-active" type="submit">Appliquer</button>
+      </form>
     </div>
-  </section>
-  {% endif %}
+    {% if not ecrans_total %}
+      <div class="pg-panel"><p class="pg-empty">Aucun écran numérique n’est enregistré dans cette ville. Les rubriques et formulaires restent disponibles dès qu’un écran est ajouté à l’inventaire.</p></div>
+    {% endif %}
 
-  {% if not parc_categories and not ecrans_total %}
-    <div class="pg-panel"><p class="pg-empty">Aucun support classé dans cette ville.</p></div>
-  {% endif %}
+    <nav class="pg-led-tabs" role="tablist" aria-label="Vues des écrans">
+      <button type="button" class="pg-led-tab is-active" role="tab" aria-selected="true" data-led-tab="vue">Vue générale</button>
+      <button type="button" class="pg-led-tab" role="tab" aria-selected="false" data-led-tab="fiche">Fiche écran</button>
+      <button type="button" class="pg-led-tab" role="tab" aria-selected="false" data-led-tab="historique">Historique des campagnes</button>
+      <button type="button" class="pg-led-tab" role="tab" aria-selected="false" data-led-tab="contrats">Contrats &amp; packages</button>
+      <button type="button" class="pg-led-tab" role="tab" aria-selected="false" data-led-tab="finance">Bilan financier</button>
+      <button type="button" class="pg-led-tab" role="tab" aria-selected="false" data-led-tab="energie">Allumage &amp; extinction</button>
+    </nav>
+
+    <section class="pg-led-panel" data-led-panel="vue">
+      <div class="pg-metrics">
+        <div class="pg-metric is-orange"><span class="pg-mdot"></span><div class="pg-label">Occupation commerciale · jour J</div><div class="pg-num" data-led-kpi="day-rate">—</div><div class="pg-foot">{{ ecran_date_selectionnee|date:"d/m/Y" }} · spots planifiés / capacité</div></div>
+        <div class="pg-metric"><span class="pg-mdot"></span><div class="pg-label">Occupation commerciale · mois</div><div class="pg-num" data-led-kpi="month-rate">—</div><div class="pg-foot" data-led-kpi="month-label"></div></div>
+        <div class="pg-metric"><span class="pg-mdot"></span><div class="pg-label">Occupation commerciale · année</div><div class="pg-num" data-led-kpi="year-rate">—</div><div class="pg-foot">Cumul à la date sélectionnée · {{ ecran_annee_selectionnee }}</div></div>
+        <div class="pg-metric"><span class="pg-mdot"></span><div class="pg-label">Écrans suivis</div><div class="pg-num" data-led-kpi="screens">0</div><div class="pg-foot">Inventaire de la ville sélectionnée</div></div>
+      </div>
+      <div class="pg-metrics is-three">
+        <div class="pg-metric is-green"><span class="pg-mdot"></span><div class="pg-label">Diffusions journalisées</div><div class="pg-num" data-led-kpi="logs">0</div><div class="pg-foot">Passages consignés durant l'année</div></div>
+        <div class="pg-metric"><span class="pg-mdot"></span><div class="pg-label">Valorisation des diffusions programmées</div><div class="pg-num" data-led-kpi="value">—</div><div class="pg-foot">Prix connus × spots planifiés · montant non encaissé</div></div>
+        <div class="pg-metric is-red"><span class="pg-mdot"></span><div class="pg-label">Charges / résultat opérationnel</div><div class="pg-num">Non suivis</div><div class="pg-foot">Coûts et paiements non enregistrés</div></div>
+      </div>
+      <div class="pg-row">
+        <div class="pg-panel">
+          <h2>Occupation commerciale mensuelle · {{ ecran_annee_selectionnee }}</h2>
+          <p class="pg-desc">Capacité mensuelle = jours du mois × heures d’allumage quotidiennes × 60 × 3 spots/minute. Le taux compare les spots des campagnes actives ce mois à cette capacité.</p>
+          <div class="pg-led-chart" id="led-monthly-chart" aria-label="Occupation commerciale mensuelle"></div>
+          <p class="pg-chartfoot" id="led-chart-note"></p>
+          <p class="pg-chartfoot" id="led-monthly-logs-note">Les journaux de diffusion sont présentés séparément : leur absence ne prouve pas l'absence de diffusion.</p>
+        </div>
+        <div class="pg-panel">
+          <h2>Situation du réseau</h2>
+          <p class="pg-desc">Passages planifiés, capacité et contrats enregistrés.</p>
+          <div class="pg-detailgrid">
+            <div class="pg-detail"><span>Spots programmés à la date</span><b data-led-kpi="planned">0</b></div>
+            <div class="pg-detail"><span>Écrans en panne</span><b data-led-kpi="broken">0</b></div>
+            <div class="pg-detail"><span>Campagnes liées</span><b data-led-kpi="campaigns">0</b></div>
+            <div class="pg-detail"><span>Campagnes avec contrat</span><b data-led-kpi="contracted">0</b></div>
+          </div>
+          <p class="pg-chartfoot">Capacité indicative : 3 spots/minute selon la configuration métier, pendant les plages d'ouverture enregistrées.</p>
+        </div>
+      </div>
+      <div class="pg-panel">
+        <h2>Détail du réseau</h2>
+        <p class="pg-desc">Taux jour, mois et année calculés à partir des programmations ; valorisation disponible uniquement si le prix unitaire est renseigné.</p>
+        <div class="pg-table-wrap"><table class="pg-table">
+          <thead><tr><th>Écran</th><th>Jour J</th><th>Mois</th><th>Année</th><th>Valorisation annuelle estimée</th><th>Résultat</th><th>Occupation du jour</th></tr></thead>
+          <tbody id="led-overview-rows"></tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <section class="pg-led-panel" data-led-panel="fiche" hidden>
+      <div class="pg-panel">
+        <div class="pg-panelhead"><div><h2>Fiche par écran</h2><p class="pg-desc">Indicateurs jour/mois/année et programmation réelle à la date choisie.</p></div></div>
+        <div id="led-screen-profile" class="pg-led-empty">Choisissez un écran dans le filtre pour consulter sa fiche.</div>
+      </div>
+      <div class="pg-panel">
+        <h2>Programmations actives au jour J</h2>
+        <div class="pg-table-wrap"><table class="pg-table">
+          <thead><tr><th>Annonceur / campagne</th><th>Plages horaires</th><th>Fréquence</th><th class="num">Passages programmés / jour</th><th>Type de réservation</th><th>Contrat</th></tr></thead>
+          <tbody id="led-screen-campaigns"></tbody>
+        </table></div>
+        <p class="pg-led-note">Aucune ligne distincte n'identifie les spots gratuits dans les données métier. Les passages gratuits et les créneaux libres ne sont donc pas estimés.</p>
+      </div>
+      <div class="pg-panel">
+        <h2>Programmation horaire · {{ ecran_date_selectionnee|date:"Y-m-d" }}</h2>
+        <p class="pg-desc">Spots commerciaux estimés par heure, selon les campagnes actives, leurs plages et leur fréquence. Ce planning est prévisionnel, pas un journal de diffusion.</p>
+        <div class="pg-table-wrap"><table class="pg-table">
+          <thead><tr><th>Heure</th><th>Écran / campagnes actives</th><th class="num">Spots prévus</th><th class="num">Capacité de l’heure</th><th class="num">Occupation</th></tr></thead>
+          <tbody id="led-hourly-schedule"></tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <section class="pg-led-panel" data-led-panel="historique" hidden>
+      <div class="pg-panel">
+        <div class="pg-panelhead"><div><h2>Historique des campagnes</h2><p class="pg-desc">Programmations écran de l'année ou du mois sélectionné, confrontées aux journaux disponibles.</p></div>
+          <select class="pg-select" id="led-history-month" aria-label="Filtrer l'historique par mois">
+            <option value="all">Toute l'année</option>
+            <option value="01">Janvier</option><option value="02">Février</option><option value="03">Mars</option>
+            <option value="04">Avril</option><option value="05">Mai</option><option value="06">Juin</option>
+            <option value="07">Juillet</option><option value="08">Août</option><option value="09">Septembre</option>
+            <option value="10">Octobre</option><option value="11">Novembre</option><option value="12">Décembre</option>
+          </select>
+          <input class="pg-input" type="search" id="led-campaign-search" placeholder="Rechercher une campagne ou un client">
+          <button type="button" class="pg-btn" id="led-history-export">Exporter CSV</button>
+        </div>
+        <div class="pg-table-wrap"><table class="pg-table">
+          <thead><tr><th>Écran</th><th>Campagne</th><th>Client</th><th>Période</th><th>Statut</th><th class="num">Spots programmés · année</th><th class="num">Logs</th><th>Contrat</th></tr></thead>
+          <tbody id="led-history-rows"></tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <section class="pg-led-panel" data-led-panel="contrats" hidden>
+      <div class="pg-panel">
+        <h2>Contrats associés aux campagnes écran</h2>
+        <p class="pg-desc">Les volumes de spots viennent des contrats et campagnes enregistrés. Les informations de package sont saisies séparément et restent vides tant qu’elles ne sont pas renseignées.</p>
+        <div class="pg-metrics">
+          <div class="pg-metric"><div class="pg-label">Contrats associés</div><div class="pg-num" data-led-kpi="contracts">0</div></div>
+          <div class="pg-metric"><div class="pg-label">Volume contractuel</div><div class="pg-num" data-led-kpi="contract-volume">0</div><div class="pg-foot">Spots définis sur les contrats affichés</div></div>
+          <div class="pg-metric is-green"><div class="pg-label">Diffusions journalisées</div><div class="pg-num" data-led-kpi="contract-logs">0</div><div class="pg-foot">Sur les campagnes associées, année sélectionnée</div></div>
+          <div class="pg-metric is-orange"><div class="pg-label">Solde package</div><div class="pg-num">Non calculé</div><div class="pg-foot">Package et relevé exhaustif non suivis</div></div>
+        </div>
+        <div class="pg-table-wrap"><table class="pg-table">
+          <thead><tr><th>Référence / contrat</th><th>Client</th><th>Document / type</th><th>Période</th><th>Statut</th><th class="num">Volume contractuel</th><th class="num">Spots programmés</th><th class="num">Logs dans l'année</th><th>Package</th><th>Campagnes liées</th></tr></thead>
+          <tbody id="led-contract-rows"></tbody>
+        </table></div>
+        {% if ecran_can_edit %}
+          <div class="pg-panel mt-3">
+            <h3>Enregistrer les informations d’un package</h3>
+            <p class="pg-desc">Agence, annonceur et prix unitaire contractuel. Aucun paiement ne sera présumé à partir de ces données.</p>
+            <form method="post" class="pg-led-form">
+              {% csrf_token %}
+              <input type="hidden" name="led_action" value="package">
+              <input type="hidden" name="led_tab" value="contrats">
+              <input type="hidden" name="ville" value="{{ ville_active }}">
+              <input type="hidden" name="ecran_annee" value="{{ ecran_annee_selectionnee }}">
+              <input type="hidden" name="ecran_date" value="{{ ecran_date_selectionnee|date:'Y-m-d' }}">
+              <input type="hidden" name="ecran_id" value="{{ ecran_id_selectionne }}">
+              {{ ecran_form_package.as_p }}
+              <button class="pg-btn is-active" type="submit">Enregistrer le package</button>
+            </form>
+          </div>
+        {% endif %}
+      </div>
+    </section>
+
+    <section class="pg-led-panel" data-led-panel="finance" hidden>
+      <div class="pg-metrics">
+        <div class="pg-metric"><span class="pg-mdot"></span><div class="pg-label">Valeur des diffusions programmées</div><div class="pg-num" data-led-kpi="value">—</div><div class="pg-foot">Valorisation au prix de campagne renseigné</div></div>
+        <div class="pg-metric is-red"><span class="pg-mdot"></span><div class="pg-label">Charges saisies · année</div><div class="pg-num" data-led-kpi="charges">—</div><div class="pg-foot">Total annuel affiché seulement si tous les postes sont renseignés sur les 12 mois</div></div>
+        <div class="pg-metric is-orange"><span class="pg-mdot"></span><div class="pg-label">Encaissements saisis · année</div><div class="pg-num" data-led-kpi="income">—</div><div class="pg-foot">Total affiché seulement si tous les écrans et les 12 mois sont renseignés</div></div>
+        <div class="pg-metric"><span class="pg-mdot"></span><div class="pg-label">Résultat indicatif</div><div class="pg-num" data-led-kpi="result">—</div><div class="pg-foot">Encaissements saisis − charges complètes ; non rapproché en comptabilité</div></div>
+      </div>
+      <div class="pg-panel"><h2>Lecture financière</h2>
+        <p class="pg-led-note is-warning">La valorisation des spots programmés n'est pas un chiffre d'affaires comptabilisé. Les prix de campagne ne sont pas une preuve d'encaissement. Les charges et encaissements ci-dessous sont des saisies mensuelles ; le résultat n'est calculé que si les 12 mois sont complets pour tous les écrans et ne remplace pas un rapprochement comptable.</p>
+        <div class="pg-detailgrid">
+          <div class="pg-detail"><span>Valeur nominale programmée (prix connus)</span><b data-led-kpi="value-known">—</b></div>
+          <div class="pg-detail"><span>Campagnes sans prix unitaire renseigné</span><b data-led-kpi="missing-price">0</b></div>
+          <div class="pg-detail"><span>Valeur comptable encaissée</span><b>Non rapprochée</b></div>
+          <div class="pg-detail"><span>Résultat opérationnel indicatif</span><b data-led-kpi="result">—</b></div>
+        </div>
+        <div class="pg-table-wrap"><table class="pg-table">
+          <thead><tr><th>Écran</th><th class="num">Spots programmés</th><th class="num">Diffusions journalisées</th><th class="num">Valorisation indicative</th><th class="num">Charges complètes · mois</th><th class="num">Encaissements saisis · mois</th></tr></thead>
+          <tbody id="led-finance-rows"></tbody>
+        </table></div>
+        {% if ecran_can_edit and ecran_form_bilan %}
+          <div class="pg-panel mt-3">
+            <h3>Saisir le bilan du mois sélectionné</h3>
+            <p class="pg-desc">{{ ecran_id_selectionne }} · {{ ecran_date_selectionnee|date:'F Y' }}. Les postes non renseignés restent inconnus et ne sont pas convertis en zéro.</p>
+            <form method="post" class="pg-led-form">
+              {% csrf_token %}
+              <input type="hidden" name="led_action" value="bilan">
+              <input type="hidden" name="led_tab" value="finance">
+              <input type="hidden" name="ecran_id" value="{{ ecran_id_selectionne }}">
+              <input type="hidden" name="annee" value="{{ ecran_annee_selectionnee }}">
+              <input type="hidden" name="mois" value="{{ ecran_date_selectionnee|date:'n' }}">
+              <input type="hidden" name="ville" value="{{ ville_active }}">
+              <input type="hidden" name="ecran_annee" value="{{ ecran_annee_selectionnee }}">
+              <input type="hidden" name="ecran_date" value="{{ ecran_date_selectionnee|date:'Y-m-d' }}">
+              {{ ecran_form_bilan.as_p }}
+              <button class="pg-btn is-active" type="submit">Enregistrer le bilan</button>
+            </form>
+          </div>
+        {% endif %}
+      </div>
+      <div class="pg-panel">
+        <h2>Charges complètes mensuelles</h2>
+        <p class="pg-desc">Seuls les mois dont tous les postes de charges sont renseignés sont totalisés.</p>
+        <div class="pg-led-chart" id="led-finance-chart" aria-label="Valorisation des programmations par mois"></div>
+      </div>
+    </section>
+
+    <section class="pg-led-panel" data-led-panel="energie" hidden>
+      <div class="pg-panel">
+        <h2>Horaires et disponibilité configurés</h2>
+        <p class="pg-desc">Plages configurées dans la fiche de chaque écran, à la date de référence.</p>
+        <div class="pg-table-wrap"><table class="pg-table">
+          <thead><tr><th>Écran</th><th>État inventaire</th><th>Plages actives</th><th>Allumage configuré</th><th>Extinction configurée</th><th>Puissance (kW)</th><th>Mode de commande</th><th>Intervention (FCFA)</th><th>Seuil (h)</th></tr></thead>
+          <tbody id="led-energy-rows"></tbody>
+        </table></div>
+        <p class="pg-led-note is-warning">Les horaires et paramètres sont des informations configurées, pas une télémétrie de fonctionnement. Aucune commande automatique n'est exécutée et aucune économie n'est estimée sans relevé de consommation et contraintes du site.</p>
+        {% if ecran_can_edit and ecran_form_exploitation %}
+          <div class="pg-panel mt-3">
+            <h3>Paramètres d’exploitation de l’écran sélectionné</h3>
+            <p class="pg-desc">Choisissez d’abord un écran dans le filtre ci-dessus. Laissez vide toute information inconnue.</p>
+            <form method="post" class="pg-led-form">
+              {% csrf_token %}
+              <input type="hidden" name="led_action" value="exploitation">
+              <input type="hidden" name="led_tab" value="energie">
+              <input type="hidden" name="ecran_id" value="{{ ecran_id_selectionne }}">
+              <input type="hidden" name="ville" value="{{ ville_active }}">
+              <input type="hidden" name="ecran_annee" value="{{ ecran_annee_selectionnee }}">
+              <input type="hidden" name="ecran_date" value="{{ ecran_date_selectionnee|date:'Y-m-d' }}">
+              {{ ecran_form_exploitation.as_p }}
+              <button class="pg-btn is-active" type="submit">Enregistrer les paramètres</button>
+            </form>
+          </div>
+        {% endif %}
+      </div>
+    </section>
+    {{ ecran_dashboard_data.ecran_dashboard_screens|json_script:"led-screens-data" }}
+    {{ ecran_dashboard_data.ecran_dashboard_monthly|json_script:"led-monthly-data" }}
+    {{ ecran_dashboard_data.ecran_dashboard_campaigns|json_script:"led-campaigns-data" }}
+    {{ ecran_dashboard_data.ecran_dashboard_contracts|json_script:"led-contracts-data" }}
+  </section>
 
   {# ══════════ Alertes & campagnes ══════════ #}
   <div class="pg-two pg-section">
@@ -1212,6 +1333,566 @@
         });
       });
     });
+  })();
+</script>
+<script>
+  (function () {
+    var screensNode = document.getElementById('led-screens-data');
+    if (!screensNode) return;
+    var screens = JSON.parse(screensNode.textContent);
+    var monthly = JSON.parse(document.getElementById('led-monthly-data').textContent);
+    var campaigns = JSON.parse(document.getElementById('led-campaigns-data').textContent);
+    var contracts = JSON.parse(document.getElementById('led-contracts-data').textContent);
+    var screenSelect = document.getElementById('led-screen');
+    var yearSelect = document.getElementById('led-year');
+    var dateInput = document.getElementById('led-date');
+    var campaignSearch = document.getElementById('led-campaign-search');
+    var historyMonth = document.getElementById('led-history-month');
+    var filterForm = document.getElementById('led-filter-form');
+    var monthNames = monthly.map(function (item) { return item.mois; });
+
+    function escapeHtml(value) {
+      return String(value == null ? '' : value).replace(/[&<>"']/g, function (char) {
+        return {'&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'}[char];
+      });
+    }
+    function number(value) {
+      return new Intl.NumberFormat('fr-FR', {maximumFractionDigits: 0}).format(value || 0);
+    }
+    function amount(value) {
+      return new Intl.NumberFormat('fr-FR', {maximumFractionDigits: 2}).format(value || 0);
+    }
+    function dateFr(value) {
+      if (!value) return '—';
+      var parts = value.split('-');
+      return parts.length === 3 ? parts[2] + '/' + parts[1] + '/' + parts[0] : value;
+    }
+    function selectedScreenIds() {
+      if (screenSelect.value === 'all') return screens.map(function (screen) { return screen.id; });
+      return [Number(screenSelect.value)];
+    }
+    function selectedScreens() {
+      var ids = selectedScreenIds();
+      return screens.filter(function (screen) { return ids.indexOf(screen.id) !== -1; });
+    }
+    function selectedCampaigns() {
+      var ids = selectedScreenIds();
+      return campaigns.filter(function (campaign) { return ids.indexOf(campaign.screen_id) !== -1; });
+    }
+    function emptyRow(colspan, text) {
+      return '<tr><td colspan="' + colspan + '" class="pg-led-empty">' + escapeHtml(text) + '</td></tr>';
+    }
+    function percent(value) {
+      return value == null ? '—' : number(value) + ' %';
+    }
+    function currentMonthIndex() {
+      return Math.max(0, Math.min(11, Number(dateInput.value.slice(5, 7)) - 1));
+    }
+    function visibleContracts() {
+      var ids = selectedScreenIds();
+      return contracts.filter(function (contract) {
+        return contract.screen_ids.some(function (id) { return ids.indexOf(id) !== -1; });
+      });
+    }
+    function updateOverview() {
+      var visibleScreens = selectedScreens();
+      var visibleCampaigns = selectedCampaigns();
+      var visibleContractRows = visibleContracts();
+      var monthIndex = currentMonthIndex();
+      var totals = visibleScreens.reduce(function (acc, screen) {
+        acc.logs += screen.spots_diffuses || 0;
+        acc.planned += screen.spots_programmes_jour || 0;
+        acc.yearPlanned += screen.spots_programmes_cumules || 0;
+        acc.reserved += screen.secondes_reservees || 0;
+        acc.available += screen.secondes_disponibles || 0;
+        acc.value += screen.valeur_programmee || 0;
+        if ((screen.etat || '').toLowerCase().indexOf('panne') !== -1) acc.broken += 1;
+        return acc;
+      }, {logs: 0, planned: 0, yearPlanned: 0, reserved: 0, available: 0, value: 0, broken: 0});
+      var dayRate = totals.available ? totals.reserved / totals.available * 100 : null;
+      var yearCapacity = visibleScreens.reduce(function (sum, screen) {
+        return sum + (screen.objectif_annuel || 0);
+      }, 0);
+      var monthPlanned = 0;
+      var monthCapacity = 0;
+      visibleScreens.forEach(function (screen) {
+        monthPlanned += (screen.mensuel_programme || [])[monthIndex] || 0;
+        monthCapacity += (screen.mensuel_capacite || [])[monthIndex] || 0;
+      });
+      var monthRate = monthCapacity ? monthPlanned / monthCapacity * 100 : null;
+      var uniqueCampaigns = {};
+      var contractedCampaigns = {};
+      var missingPriceCampaigns = {};
+      visibleCampaigns.forEach(function (campaign) {
+        uniqueCampaigns[campaign.campagne_id] = true;
+        if (campaign.contrat) contractedCampaigns[campaign.campagne_id] = true;
+        if (!campaign.prix_renseigne) missingPriceCampaigns[campaign.campagne_id] = true;
+      });
+      var totalContractVolume = visibleContractRows.reduce(function (sum, contract) {
+        return sum + (contract.nb_spots || 0);
+      }, 0);
+      var contractLogs = visibleContractRows.reduce(function (sum, contract) {
+        return sum + (contract.spots_diffuses_journalises || 0);
+      }, 0);
+      document.querySelector('[data-led-kpi="screens"]').textContent = number(visibleScreens.length);
+      document.querySelector('[data-led-kpi="logs"]').textContent = number(totals.logs);
+      document.querySelector('[data-led-kpi="planned"]').textContent = number(totals.planned);
+      document.querySelector('[data-led-kpi="day-rate"]').textContent = percent(dayRate);
+      document.querySelector('[data-led-kpi="month-rate"]').textContent = percent(monthRate);
+      document.querySelector('[data-led-kpi="year-rate"]').textContent = percent(
+        yearCapacity
+          ? totals.yearPlanned / yearCapacity * 100
+          : null
+      );
+      document.querySelector('[data-led-kpi="month-label"]').textContent =
+        monthNames[monthIndex] + ' ' + yearSelect.value;
+      document.querySelector('[data-led-kpi="campaigns"]').textContent =
+        number(Object.keys(uniqueCampaigns).length);
+      document.querySelector('[data-led-kpi="contracted"]').textContent =
+        number(Object.keys(contractedCampaigns).length);
+      document.querySelector('[data-led-kpi="broken"]').textContent = number(totals.broken);
+      document.querySelectorAll('[data-led-kpi="value"]').forEach(function (item) {
+        item.textContent = totals.value ? amount(totals.value) : '—';
+      });
+      document.querySelector('[data-led-kpi="value-known"]').textContent =
+        totals.value ? amount(totals.value) : '—';
+      document.querySelector('[data-led-kpi="missing-price"]').textContent =
+        number(Object.keys(missingPriceCampaigns).length);
+      document.querySelector('[data-led-kpi="contracts"]').textContent =
+        number(visibleContractRows.length);
+      document.querySelector('[data-led-kpi="contract-volume"]').textContent =
+        number(totalContractVolume);
+      document.querySelector('[data-led-kpi="contract-logs"]').textContent =
+        number(contractLogs);
+
+      var monthlyPlanned = Array(12).fill(0);
+      var monthlyCapacity = Array(12).fill(0);
+      var monthlyLogs = Array(12).fill(0);
+      visibleScreens.forEach(function (screen) {
+        (screen.mensuel_programme || []).forEach(function (spots, index) {
+          monthlyPlanned[index] += spots || 0;
+        });
+        (screen.mensuel_capacite || []).forEach(function (capacity, index) {
+          monthlyCapacity[index] += capacity || 0;
+        });
+        (screen.mensuel_diffuse || []).forEach(function (count, index) {
+          monthlyLogs[index] += count || 0;
+        });
+      });
+      var monthlyRates = monthlyPlanned.map(function (spots, index) {
+        return monthlyCapacity[index]
+          ? spots / monthlyCapacity[index] * 100
+          : null;
+      });
+      var maxMonthly = Math.max.apply(null, monthlyRates.map(function (rate) {
+        return rate || 0;
+      }).concat([1]));
+      document.getElementById('led-monthly-chart').innerHTML = monthlyRates.map(function (rate, index) {
+        var height = rate == null ? 3 : Math.max(4, rate / maxMonthly * 130);
+        var title = monthNames[index] + ' : ' + percent(rate) +
+          ' · ' + number(monthlyPlanned[index]) + ' spots programmés / ' +
+          number(monthlyCapacity[index]) + ' spots de capacité';
+        return '<div class="pg-led-month" title="' + escapeHtml(title) + '">' +
+          '<div class="pg-led-monthbar" style="height:' + height + 'px"></div>' +
+          '<span class="pg-led-month-rate">' + percent(rate) + '</span>' +
+          '<span class="pg-led-month-label">' + escapeHtml(monthNames[index]) + '</span></div>';
+      }).join('');
+      var plannedTotal = monthlyPlanned.reduce(function (sum, value) { return sum + value; }, 0);
+      var capacityTotal = monthlyCapacity.reduce(function (sum, value) { return sum + value; }, 0);
+      document.getElementById('led-chart-note').textContent = capacityTotal
+        ? number(plannedTotal) + ' spots programmés sur ' + number(capacityTotal) +
+          ' spots de capacité sur l’année (' + percent(plannedTotal / capacityTotal * 100) + ').'
+        : 'Aucune capacité d’écran disponible pour cette sélection.';
+      var loggedTotal = monthlyLogs.reduce(function (sum, value) { return sum + value; }, 0);
+      document.getElementById('led-monthly-logs-note').textContent = loggedTotal
+        ? number(loggedTotal) + ' diffusion(s) consignée(s) dans les journaux sur l’année.'
+        : 'Aucun journal de diffusion enregistré sur l’année ; il n’est pas possible d’en déduire qu’aucune diffusion n’a eu lieu.';
+      document.getElementById('led-overview-rows').innerHTML = visibleScreens.length
+        ? visibleScreens.map(function (screen) {
+          var monthValue = (screen.mensuel_valeur_programmee || [])[monthIndex] || 0;
+          var yearRate = screen.objectif_annuel
+            ? (screen.spots_programmes_cumules || 0) / screen.objectif_annuel * 100
+            : null;
+          return '<tr><td><strong>' + escapeHtml(screen.code) + '</strong><span class="pg-sub">' +
+            escapeHtml(screen.nom) + '</span></td><td>' + percent(screen.taux_jour) +
+            '</td><td>' + percent(
+              (screen.mensuel_capacite || [])[monthIndex]
+                ? (screen.mensuel_programme || [])[monthIndex]
+                  / screen.mensuel_capacite[monthIndex] * 100
+                : null
+            ) + '</td><td>' + percent(yearRate) +
+            '</td><td>' + (screen.valeur_programmee ? amount(screen.valeur_programmee) : '—') +
+            (monthValue ? '<span class="pg-sub">Mois : ' + amount(monthValue) + '</span>' : '') +
+            '</td><td>Non calculable</td><td><span class="pg-progress"><i style="width:' +
+            Math.min(100, Math.max(0, screen.taux_jour || 0)) + '%"></i></span>' +
+            percent(screen.taux_jour) + '</td></tr>';
+        }).join('')
+        : emptyRow(7, 'Aucun écran ne correspond au filtre.');
+      updateProfile(visibleScreens);
+      updateHistory(visibleCampaigns);
+      updateContracts(visibleContractRows);
+      updateFinance(visibleScreens, visibleCampaigns);
+      updateEnergy(visibleScreens);
+    }
+    function updateProfile(visibleScreens) {
+      var selected = screenSelect.value === 'all' ? null : visibleScreens[0];
+      var profile = document.getElementById('led-screen-profile');
+      var rows = document.getElementById('led-screen-campaigns');
+      if (!selected) {
+        profile.className = 'pg-led-empty';
+        profile.textContent = 'Choisissez un écran dans le filtre pour consulter sa fiche.';
+        rows.innerHTML = emptyRow(6, 'Sélectionnez un écran pour afficher ses campagnes.');
+        document.getElementById('led-hourly-schedule').innerHTML = emptyRow(
+          5,
+          'Sélectionnez un écran pour afficher sa programmation horaire.'
+        );
+        return;
+      }
+      profile.className = '';
+      profile.innerHTML = '<div class="pg-panelhead"><div><h3>' + escapeHtml(selected.code) + ' — ' +
+        escapeHtml(selected.nom) + '</h3><p class="pg-desc">' + escapeHtml(selected.quartier || selected.ville || '') +
+        '</p></div><a class="pg-btn" href="' + escapeHtml(selected.url) + '">Ouvrir la fiche</a></div>' +
+        '<div class="pg-led-profile">' +
+        '<div><span>État inventaire</span><b>' + escapeHtml(selected.etat) + '</b></div>' +
+        '<div><span>Résolution</span><b>' + escapeHtml(selected.resolution) + '</b></div>' +
+        '<div><span>Cellule</span><b>' + escapeHtml(selected.cellule) + '</b></div>' +
+        '<div><span>Type</span><b>' + escapeHtml(selected.type_ecran) + '</b></div>' +
+        '<div><span>Plages actives à la date</span><b>' + escapeHtml(selected.horaires) + '</b></div>' +
+        '<div><span>Spots programmés à la date</span><b>' + number(selected.spots_programmes_jour) + '</b></div>' +
+        '<div><span>Taux d’occupation à la date</span><b>' + percent(selected.taux_jour) + '</b></div>' +
+        '<div><span>Occupation du mois</span><b>' + percent(
+          (selected.mensuel_capacite || [])[currentMonthIndex()]
+            ? selected.mensuel_programme[currentMonthIndex()]
+              / selected.mensuel_capacite[currentMonthIndex()] * 100
+            : null
+        ) + '</b></div>' +
+        '<div><span>Occupation cumulée de l’année</span><b>' + percent(
+          selected.objectif_annuel
+            ? selected.spots_programmes_cumules / selected.objectif_annuel * 100
+            : null
+        ) + '</b></div>' +
+        '<div><span>Diffusions journalisées sur l’année</span><b>' + number(selected.spots_diffuses) + '</b></div>' +
+        '<div><span>Valorisation annuelle des programmations</span><b>' +
+          (selected.valeur_programmee ? amount(selected.valeur_programmee) : '—') +
+        '</b></div></div>';
+      var rowsForScreen = campaigns.filter(function (campaign) {
+        return campaign.screen_id === selected.id && campaign.active_a_date;
+      });
+      rows.innerHTML = rowsForScreen.length ? rowsForScreen.map(function (campaign) {
+        return '<tr><td><strong>' + escapeHtml(campaign.client) + '</strong><span class="pg-sub">' +
+          escapeHtml(campaign.nom) + '</span></td><td>' + escapeHtml(campaign.tranches || 'Plage non renseignée') +
+          '</td><td>1 / ' + number(campaign.frequence / 60) + ' min</td><td class="num">' +
+          number(campaign.spots_programmes_jour) + '</td><td>' +
+          (campaign.contrat ? 'Sous contrat' : 'Sans contrat lié') + '</td><td>' +
+          escapeHtml(campaign.contrat || '—') + '</td></tr>';
+      }).join('') : emptyRow(6, 'Aucune programmation commerciale active à cette date.');
+      updateHourlySchedule([selected]);
+    }
+    function updateHourlySchedule(visibleScreens) {
+      var hours = {};
+      visibleScreens.forEach(function (screen) {
+        (screen.programmation_horaire || []).forEach(function (slot) {
+          var row = hours[slot.heure] || {
+            spots: 0,
+            capacite: 0,
+            campagnes: []
+          };
+          row.spots += slot.spots || 0;
+          row.capacite += slot.capacite || 0;
+          (slot.campagnes || []).forEach(function (campaign) {
+            row.campagnes.push(
+              screen.code + ' · ' + campaign.client + ' — ' +
+              campaign.nom + ' (' + number(campaign.spots) + ')'
+            );
+          });
+          hours[slot.heure] = row;
+        });
+      });
+      var orderedHours = Object.keys(hours).sort();
+      document.getElementById('led-hourly-schedule').innerHTML = orderedHours.length
+        ? orderedHours.map(function (hour) {
+          var row = hours[hour];
+          var rate = row.capacite ? row.spots / row.capacite * 100 : null;
+          return '<tr><td><strong>' + escapeHtml(hour) + '–' +
+            escapeHtml(String(Number(hour.slice(0, 2)) + 1).padStart(2, '0')) +
+            ':00</strong></td><td>' +
+            (row.campagnes.length
+              ? row.campagnes.map(escapeHtml).join('<br>')
+              : 'Aucune campagne') +
+            '</td><td class="num">' + number(row.spots) +
+            '</td><td class="num">' + number(row.capacite) +
+            '</td><td class="num">' + percent(rate) + '</td></tr>';
+        }).join('')
+        : emptyRow(5, 'Aucune plage horaire active pour cet écran à cette date.');
+    }
+    function filteredHistory(visibleCampaigns) {
+      var query = (campaignSearch.value || '').trim().toLowerCase();
+      var selectedMonth = historyMonth.value;
+      return visibleCampaigns.filter(function (campaign) {
+        if (selectedMonth !== 'all') {
+          var monthStart = yearSelect.value + '-' + selectedMonth + '-01';
+          var lastDay = new Date(Number(yearSelect.value), Number(selectedMonth), 0).getDate();
+          var monthEnd = yearSelect.value + '-' + selectedMonth + '-' + String(lastDay).padStart(2, '0');
+          if (campaign.date_debut > monthEnd || campaign.date_fin < monthStart) return false;
+        }
+        return !query || (campaign.nom + ' ' + campaign.client + ' ' + campaign.screen_code).toLowerCase().indexOf(query) !== -1;
+      });
+    }
+    function updateHistory(visibleCampaigns) {
+      var rows = filteredHistory(visibleCampaigns);
+      document.getElementById('led-history-rows').innerHTML = rows.length ? rows.map(function (campaign) {
+        var monthIndex = historyMonth.value === 'all'
+          ? null
+          : Number(historyMonth.value) - 1;
+        var scheduled = monthIndex === null
+          ? number(campaign.spots_programmes)
+          : campaign.mois_selectionne === monthIndex + 1
+            ? number(campaign.spots_programmes_mois_selectionne)
+            : '—';
+        var logged = monthIndex === null
+          ? number(campaign.spots_diffuses)
+          : number((campaign.mensuel_diffuse || [])[monthIndex] || 0);
+        return '<tr><td>' + escapeHtml(campaign.screen_code) + '</td><td>' + escapeHtml(campaign.nom) +
+          '</td><td>' + escapeHtml(campaign.client) + '</td><td>' + dateFr(campaign.date_debut) +
+          ' – ' + dateFr(campaign.date_fin) + '</td><td>' + escapeHtml(campaign.statut) +
+          '</td><td class="num">' + scheduled + '</td><td class="num">' +
+          logged + '</td><td>' + escapeHtml(campaign.contrat || '—') + '</td></tr>';
+      }).join('') : emptyRow(
+        8,
+        campaignSearch.value.trim()
+          ? 'Aucune campagne ne correspond à la recherche.'
+          : 'Aucune campagne écran sur cette période.'
+      );
+    }
+    function exportHistory() {
+      var rows = filteredHistory(selectedCampaigns());
+      var selectedMonthIndex = historyMonth.value === 'all'
+        ? null
+        : Number(historyMonth.value) - 1;
+      var quote = function (value) {
+        return '"' + String(value == null ? '' : value).replace(/"/g, '""') + '"';
+      };
+      var lines = [[
+        'Ecran', 'Annonceur', 'Campagne', 'Debut', 'Fin', 'Plages horaires',
+        'Frequence (minutes)', 'Spots programmes', 'Diffusions journalisees',
+        'Contrat', 'Statut'
+      ].join(';')].concat(rows.map(function (campaign) {
+        return [
+          campaign.screen_code,
+          campaign.client,
+          campaign.nom,
+          campaign.date_debut,
+          campaign.date_fin,
+          campaign.tranches,
+          campaign.frequence / 60,
+          selectedMonthIndex === null
+            ? campaign.spots_programmes
+            : campaign.mois_selectionne === selectedMonthIndex + 1
+              ? campaign.spots_programmes_mois_selectionne
+              : '',
+          selectedMonthIndex === null
+            ? campaign.spots_diffuses
+            : (campaign.mensuel_diffuse || [])[selectedMonthIndex] || 0,
+          campaign.contrat,
+          campaign.statut
+        ].map(quote).join(';');
+      }));
+      var blob = new Blob(['\ufeff' + lines.join('\r\n')], {
+        type: 'text/csv;charset=utf-8'
+      });
+      var url = URL.createObjectURL(blob);
+      var link = document.createElement('a');
+      link.href = url;
+      link.download = 'integral_historique_ecrans_' + yearSelect.value + '.csv';
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+    function updateContracts(rows) {
+      document.querySelector('[data-led-kpi="contracts"]').textContent = number(rows.length);
+      document.querySelector('[data-led-kpi="contract-volume"]').textContent = number(
+        rows.reduce(function (sum, contract) { return sum + (contract.nb_spots || 0); }, 0)
+      );
+      document.querySelector('[data-led-kpi="contract-logs"]').textContent = number(
+        rows.reduce(function (sum, contract) {
+          return sum + (contract.spots_diffuses_journalises || 0);
+        }, 0)
+      );
+      document.getElementById('led-contract-rows').innerHTML = rows.length ? rows.map(function (contract) {
+        return '<tr><td><strong>' + escapeHtml(contract.reference) + '</strong>' +
+          (contract.nom !== contract.reference ? '<span class="pg-sub">' + escapeHtml(contract.nom) + '</span>' : '') +
+          '</td><td>' + escapeHtml(contract.client) + '</td><td>' +
+          escapeHtml(contract.type + ' · ' + contract.type_contrat) +
+          '</td><td>' + dateFr(contract.date_debut) + ' – ' + dateFr(contract.date_fin) +
+          '</td><td>' + (contract.actif ? 'Actif' : 'Inactif / archivé') +
+          '</td><td class="num">' + number(contract.nb_spots) +
+          '</td><td class="num">' + number(contract.spots_programmes) +
+          '</td><td class="num">' + number(contract.spots_diffuses_journalises) +
+          '</td><td>' + escapeHtml(contract.agence || '—') + ' · ' +
+          escapeHtml(contract.annonceur || '—') + '<span class="pg-sub">' +
+          (contract.prix_unitaire_package == null
+            ? 'Prix par spot non renseigné'
+            : amount(contract.prix_unitaire_package) + ' FCFA / spot') +
+          '</span><button type="button" class="pg-link" data-package-edit="' +
+          contract.id + '">' + (contract.agence || contract.annonceur
+            ? 'Modifier le package' : 'Renseigner le package') +
+          '</button></td><td>' + escapeHtml(contract.campagnes.join(', ')) + '</td></tr>';
+      }).join('') : emptyRow(10, 'Aucun contrat n’est lié aux campagnes écran de cette période.');
+    }
+    function updateFinance(visibleScreens, visibleCampaigns) {
+      var monthlyValues = Array(12).fill(null);
+      var monthlyIncome = Array(12).fill(null);
+      for (var month = 0; month < 12; month += 1) {
+        var charges = 0;
+        var income = 0;
+        var allChargesComplete = visibleScreens.length > 0;
+        var allIncomeComplete = visibleScreens.length > 0;
+        visibleScreens.forEach(function (screen) {
+          var bilan = (screen.mensuel_bilans || [])[month];
+          if (!bilan || bilan.total_charges_fcfa == null) {
+            allChargesComplete = false;
+          } else {
+            charges += bilan.total_charges_fcfa;
+          }
+          if (bilan && bilan.encaissements_fcfa != null) {
+            income += bilan.encaissements_fcfa;
+          } else {
+            allIncomeComplete = false;
+          }
+        });
+        if (allChargesComplete) monthlyValues[month] = charges;
+        if (allIncomeComplete) monthlyIncome[month] = income;
+      }
+      var annualChargesComplete = monthlyValues.every(function (value) {
+        return value != null;
+      });
+      var annualIncomeComplete = monthlyIncome.every(function (value) {
+        return value != null;
+      });
+      var annualIncome = annualIncomeComplete
+        ? monthlyIncome.reduce(function (a, b) { return a + b; }, 0)
+        : null;
+      var selectedMonth = currentMonthIndex();
+      document.querySelector('[data-led-kpi="charges"]').textContent =
+        annualChargesComplete
+          ? amount(monthlyValues.reduce(function (a, b) { return a + b; }, 0)) + ' FCFA'
+          : 'Incomplet';
+      document.querySelector('[data-led-kpi="income"]').textContent =
+        annualIncome == null ? 'Incomplet' : amount(annualIncome) + ' FCFA';
+      var result = annualIncomeComplete && annualChargesComplete
+        ? amount(annualIncome - monthlyValues.reduce(function (a, b) { return a + b; }, 0)) + ' FCFA'
+        : 'Incomplet';
+      document.querySelectorAll('[data-led-kpi="result"]').forEach(function (item) {
+        item.textContent = result;
+      });
+      var monthlyMax = Math.max.apply(null, monthlyValues.filter(function (value) {
+        return value != null;
+      }).concat([1]));
+      document.getElementById('led-finance-chart').innerHTML = monthlyValues.map(function (value, index) {
+        var height = value == null ? 3 : Math.max(4, value / monthlyMax * 150);
+        return '<div class="pg-led-month" title="' + escapeHtml(monthNames[index]) + ' : ' +
+          (value == null ? 'données absentes ou incomplètes' : amount(value) + ' FCFA') +
+          '"><div class="pg-led-monthbar" style="height:' + height +
+          'px"></div><span class="pg-led-month-label">' +
+          escapeHtml(monthNames[index]) + '</span></div>';
+      }).join('');
+      document.getElementById('led-finance-rows').innerHTML = visibleScreens.length
+        ? visibleScreens.map(function (screen) {
+          var screenCampaigns = visibleCampaigns.filter(function (campaign) {
+            return campaign.screen_id === screen.id;
+          });
+          var selectedBilan = (screen.mensuel_bilans || [])[selectedMonth];
+          var planned = screenCampaigns.reduce(function (sum, campaign) {
+            return sum + (campaign.spots_programmes || 0);
+          }, 0);
+          return '<tr><td>' + escapeHtml(screen.code) + ' — ' + escapeHtml(screen.nom) +
+            '</td><td class="num">' + number(planned) + '</td><td class="num">' +
+            number(screen.spots_diffuses) + '</td><td class="num">' +
+            (screen.valeur_programmee ? amount(screen.valeur_programmee) : '—') +
+            '</td><td class="num">' +
+            (selectedBilan && selectedBilan.total_charges_fcfa != null
+              ? amount(selectedBilan.total_charges_fcfa) + ' FCFA' : '—') +
+            '</td><td class="num">' +
+            (selectedBilan && selectedBilan.encaissements_fcfa != null
+              ? amount(selectedBilan.encaissements_fcfa) + ' FCFA' : '—') +
+            '</td></tr>';
+        }).join('')
+        : emptyRow(6, 'Aucun écran ne correspond au filtre.');
+    }
+    function updateEnergy(visibleScreens) {
+      document.getElementById('led-energy-rows').innerHTML = visibleScreens.length
+        ? visibleScreens.map(function (screen) {
+          return '<tr><td><strong>' + escapeHtml(screen.code) + '</strong><span class="pg-sub">' +
+            escapeHtml(screen.nom) + '</span></td><td>' + escapeHtml(screen.etat) +
+            '</td><td>' + escapeHtml(screen.horaires) + '</td><td>' +
+            escapeHtml(screen.heure_allumage) + '</td><td>' +
+            escapeHtml(screen.heure_extinction) + '</td><td>' +
+            (screen.puissance_kw == null ? '—' : amount(screen.puissance_kw)) +
+            '</td><td>' + escapeHtml(screen.mode_commande || '—') + '</td><td>' +
+            (screen.cout_intervention_fcfa == null
+              ? '—' : amount(screen.cout_intervention_fcfa) + ' FCFA') +
+            '</td><td>' + (screen.seuil_extinction_heures == null
+              ? '—' : amount(screen.seuil_extinction_heures)) + '</td></tr>';
+        }).join('')
+        : emptyRow(9, 'Aucun écran ne correspond au filtre.');
+    }
+
+    document.querySelectorAll('[data-led-tab]').forEach(function (tab) {
+      tab.addEventListener('click', function () {
+        document.querySelectorAll('[data-led-tab]').forEach(function (item) {
+          var active = item === tab;
+          item.classList.toggle('is-active', active);
+          item.setAttribute('aria-selected', String(active));
+        });
+        document.querySelectorAll('[data-led-panel]').forEach(function (panel) {
+          panel.hidden = panel.dataset.ledPanel !== tab.dataset.ledTab;
+        });
+      });
+    });
+    screenSelect.addEventListener('change', updateOverview);
+    campaignSearch.addEventListener('input', function () {
+      updateHistory(selectedCampaigns());
+    });
+    historyMonth.addEventListener('change', function () {
+      updateHistory(selectedCampaigns());
+    });
+    document.getElementById('led-history-export').addEventListener('click', exportHistory);
+    document.getElementById('led-contract-rows').addEventListener('click', function (event) {
+      var button = event.target.closest('[data-package-edit]');
+      if (!button) return;
+      var query = new URLSearchParams(window.location.search);
+      query.set('package_contrat_id', button.dataset.packageEdit);
+      window.location.search = query.toString();
+    });
+    yearSelect.addEventListener('change', function () {
+      dateInput.value = yearSelect.value + '-01-01';
+      historyMonth.value = 'all';
+      filterForm.submit();
+    });
+    dateInput.addEventListener('change', function () {
+      var year = dateInput.value.slice(0, 4);
+      if (!year) return;
+      var optionExists = Array.prototype.some.call(yearSelect.options, function (option) {
+        return option.value === year;
+      });
+      if (!optionExists) {
+        var option = document.createElement('option');
+        option.value = year;
+        option.textContent = year;
+        yearSelect.appendChild(option);
+      }
+      yearSelect.value = year;
+      historyMonth.value = 'all';
+      filterForm.submit();
+    });
+    updateOverview();
+    var query = new URLSearchParams(window.location.search);
+    var requestedLedTab = query.get('led_tab') ||
+      (query.has('package_contrat_id') ? 'contrats' : '');
+    var ledTab = Array.prototype.find.call(
+      document.querySelectorAll('[data-led-tab]'),
+      function (tab) { return tab.dataset.ledTab === requestedLedTab; }
+    );
+    if (ledTab) ledTab.click();
   })();
 </script>
 {% endblock %}

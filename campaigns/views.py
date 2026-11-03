@@ -1129,6 +1129,14 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                     int(nombre_jours * spots_par_jour)
                 )
             monthly_capacity_by_screen[screen.support_id] = monthly_capacity
+            available_seconds_today = screen.secondes_disponibles_jour(
+                reference_date
+            )
+            daily_spot_capacity = int(
+                available_seconds_today
+                * EcranNumerique.SPOTS_PAR_MINUTE
+                // 60
+            )
             screen_data.append({
                 'id': screen.support_id,
                 'code': support.code,
@@ -1148,8 +1156,9 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 'objectif_annuel': metrics.get('objectif_spots_annuel') or 0,
                 'spots_programmes_cumules': metrics.get('spots_realises', 0),
                 'spots_programmes_annee': 0,
-                'spots_programmes_jour': metrics.get('spots_aujourdhui', 0),
-                'taux_jour': metrics.get('taux_actuel'),
+                'spots_programmes_jour': 0,
+                'taux_jour': None,
+                'capacite_spots_jour': daily_spot_capacity,
                 'taux_annuel': metrics.get('taux_annuel'),
                 'secondes_reservees': metrics.get(
                     'secondes_reservees_aujourdhui', 0
@@ -1257,14 +1266,15 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             planned_today = line.calculer_spots_sur_periode(
                 reference_date, reference_date
             )
+            screen_id = line.support_id
+            screen_index = screen_data_index[screen_id]
+            screen_data[screen_index]['spots_programmes_jour'] += planned_today
             unit_price = campaign.prix or 0
             campaign_value = float(unit_price * planned_spots)
-            screen_id = line.support_id
             value_by_screen[screen_id] = value_by_screen.get(screen_id, 0) + campaign_value
             unit_price_by_campaign_screen[(screen_id, campaign.pk)] = (
                 float(unit_price) if unit_price else None
             )
-            screen_index = screen_data_index[screen_id]
             screen_data[screen_index]['spots_programmes_annee'] += planned_spots
             if (
                 actual_line_start <= reference_date <= actual_line_end
@@ -1474,6 +1484,14 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 )
 
         for screen in screen_data:
+            capacity = screen['capacite_spots_jour']
+            screen['taux_jour'] = (
+                round(
+                    screen['spots_programmes_jour'] / capacity * 100,
+                    1,
+                )
+                if capacity else None
+            )
             for hour_row in screen['programmation_horaire']:
                 hour_row['spots'] = round(hour_row.pop('spots_bruts'))
             screen['valeur_programmee'] = round(value_by_screen.get(screen['id'], 0), 2)
@@ -1508,6 +1526,12 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 count
                 for (screen_id, campaign_id), count in logs_by_campaign_screen.items()
                 if campaign_id in contract['campagne_ids']
+            )
+
+        for index, screen in enumerate(screen_data):
+            print(
+                f"screen_data[{index}]: "
+                f"{json.dumps(screen, ensure_ascii=False, default=str)}"
             )
 
         return {

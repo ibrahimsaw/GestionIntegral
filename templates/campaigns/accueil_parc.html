@@ -654,7 +654,7 @@
         <div class="pg-metric"><span class="pg-mdot"></span><div class="pg-label">Écrans suivis</div><div class="pg-num" data-led-kpi="screens">0</div><div class="pg-foot">Inventaire de la ville sélectionnée</div></div>
       </div>
       <div class="pg-metrics is-three">
-        <div class="pg-metric is-green"><span class="pg-mdot"></span><div class="pg-label">Diffusions journalisées</div><div class="pg-num" data-led-kpi="logs">0</div><div class="pg-foot">Passages consignés durant l'année</div></div>
+        <div class="pg-metric is-green"><span class="pg-mdot"></span><div class="pg-label">Spots planifiés</div><div class="pg-num" data-led-kpi="year-planned">0</div><div class="pg-foot">Cumul de l’année jusqu’à la date sélectionnée</div></div>
         <div class="pg-metric"><span class="pg-mdot"></span><div class="pg-label">Valorisation des diffusions programmées</div><div class="pg-num" data-led-kpi="value">—</div><div class="pg-foot">Prix connus × spots planifiés · montant non encaissé</div></div>
         <div class="pg-metric is-red"><span class="pg-mdot"></span><div class="pg-label">Charges / résultat opérationnel</div><div class="pg-num">Non suivis</div><div class="pg-foot">Coûts et paiements non enregistrés</div></div>
       </div>
@@ -1383,7 +1383,9 @@
       return '<tr><td colspan="' + colspan + '" class="pg-led-empty">' + escapeHtml(text) + '</td></tr>';
     }
     function percent(value) {
-      return value == null ? '—' : number(value) + ' %';
+      return value == null
+        ? '—'
+        : new Intl.NumberFormat('fr-FR', {maximumFractionDigits: 1}).format(value) + ' %';
     }
     function currentMonthIndex() {
       return Math.max(0, Math.min(11, Number(dateInput.value.slice(5, 7)) - 1));
@@ -1400,16 +1402,14 @@
       var visibleContractRows = visibleContracts();
       var monthIndex = currentMonthIndex();
       var totals = visibleScreens.reduce(function (acc, screen) {
-        acc.logs += screen.spots_diffuses || 0;
         acc.planned += screen.spots_programmes_jour || 0;
         acc.yearPlanned += screen.spots_programmes_cumules || 0;
-        acc.reserved += screen.secondes_reservees || 0;
-        acc.available += screen.secondes_disponibles || 0;
+        acc.dayCapacity += screen.capacite_spots_jour || 0;
         acc.value += screen.valeur_programmee || 0;
         if ((screen.etat || '').toLowerCase().indexOf('panne') !== -1) acc.broken += 1;
         return acc;
-      }, {logs: 0, planned: 0, yearPlanned: 0, reserved: 0, available: 0, value: 0, broken: 0});
-      var dayRate = totals.available ? totals.reserved / totals.available * 100 : null;
+      }, {planned: 0, yearPlanned: 0, dayCapacity: 0, value: 0, broken: 0});
+      var dayRate = totals.dayCapacity ? totals.planned / totals.dayCapacity * 100 : null;
       var yearCapacity = visibleScreens.reduce(function (sum, screen) {
         return sum + (screen.objectif_annuel || 0);
       }, 0);
@@ -1435,7 +1435,7 @@
         return sum + (contract.spots_diffuses_journalises || 0);
       }, 0);
       document.querySelector('[data-led-kpi="screens"]').textContent = number(visibleScreens.length);
-      document.querySelector('[data-led-kpi="logs"]').textContent = number(totals.logs);
+      document.querySelector('[data-led-kpi="year-planned"]').textContent = number(totals.yearPlanned);
       document.querySelector('[data-led-kpi="planned"]').textContent = number(totals.planned);
       document.querySelector('[data-led-kpi="day-rate"]').textContent = percent(dayRate);
       document.querySelector('[data-led-kpi="month-rate"]').textContent = percent(monthRate);

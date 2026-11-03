@@ -112,6 +112,18 @@ class LedDashboardDataTests(TestCase):
         )
 
         self.assertEqual(data['ecran_dashboard_screens'][0]['spots_diffuses'], 1)
+        self.assertEqual(
+            data['ecran_dashboard_screens'][0]['capacite_spots_jour'],
+            3060,
+        )
+        self.assertEqual(
+            data['ecran_dashboard_screens'][0]['taux_jour'],
+            1.0,
+        )
+        self.assertEqual(
+            data['ecran_dashboard_screens'][0]['spots_programmes_jour'],
+            30,
+        )
         self.assertEqual(data['ecran_dashboard_monthly'][today.month - 1]['spots'], 1)
         self.assertEqual(data['ecran_dashboard_campaigns'][0]['spots_diffuses'], 1)
         self.assertEqual(

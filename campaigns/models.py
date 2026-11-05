@@ -684,8 +684,10 @@ class DemandeReservation(models.Model):
     STATUT_EN_COURS  = 'en_cours'
     STATUT_VALIDEE   = 'validee'
     STATUT_REFUSEE   = 'refusee'
+    STATUT_BROUILLON = 'brouillon'
 
     STATUT_CHOICES = [
+        (STATUT_BROUILLON, 'En attente de confirmation du client'),
         (STATUT_NOUVELLE,  'Nouvelle'),
         (STATUT_EN_COURS,  'En cours de traitement'),
         (STATUT_VALIDEE,   'Validée — Réservation créée'),
@@ -714,6 +716,13 @@ class DemandeReservation(models.Model):
         blank=True,
         verbose_name="Référence",
         help_text="Générée automatiquement. Ex: DEM-2026-A3F9K2",
+    )
+    token_partage = models.UUIDField(
+        null=True,
+        blank=True,
+        unique=True,
+        editable=False,
+        verbose_name="Lien sécurisé de confirmation client",
     )
 
     # ── Coordonnées du visiteur ───────────────────────────────────────────────
@@ -979,6 +988,7 @@ class DemandeReservation(models.Model):
     def get_statut_badge(self) -> str:
         """Retourne la classe Bootstrap pour le badge de statut."""
         return {
+            self.STATUT_BROUILLON: 'secondary',
             self.STATUT_NOUVELLE:  'warning',
             self.STATUT_EN_COURS:  'info',
             self.STATUT_VALIDEE:   'success',
@@ -988,6 +998,7 @@ class DemandeReservation(models.Model):
     def get_statut_icon(self) -> str:
         """Retourne l'icône Bootstrap Icons pour le statut."""
         return {
+            self.STATUT_BROUILLON: 'bi-send',
             self.STATUT_NOUVELLE:  'bi-clock',
             self.STATUT_EN_COURS:  'bi-hourglass-split',
             self.STATUT_VALIDEE:   'bi-check-circle-fill',
@@ -1059,6 +1070,12 @@ class Campagne(models.Model):
     STATUT_CHOICES   = STATUT_CHOICES
     
     client       = models.ForeignKey(Client, on_delete=models.PROTECT, related_name='campagnes')
+    annonceur    = models.CharField(
+        max_length=200,
+        blank=True,
+        verbose_name="Client / annonceur",
+        help_text="Client sélectionné ou saisi pour cette campagne.",
+    )
     nom          = models.CharField(max_length=200, verbose_name="Nom de la campagne")
     # les champs ne sont pas obligatoir
     prix         = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="Prix unitaire face",blank=True)

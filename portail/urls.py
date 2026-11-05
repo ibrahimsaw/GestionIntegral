@@ -93,6 +93,16 @@ urlpatterns = [
          views.ReserverEtape3View.as_view(),
          name='reserver_etape3'),
 
+    path('demande-partage/<uuid:token>/',
+         views.DemandePartageEtape1View.as_view(),
+         name='demande_partage'),
+    path('demande-partage/<uuid:token>/etape2/',
+         views.DemandePartageEtape2View.as_view(),
+         name='demande_partage_etape2'),
+    path('demande-partage/<uuid:token>/etape3/',
+         views.DemandePartageEtape3View.as_view(),
+         name='demande_partage_etape3'),
+
     path('confirmation/<uuid:uuid>/',
          views.ConfirmationView.as_view(),
          name='confirmation'),

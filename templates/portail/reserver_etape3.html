@@ -1,8 +1,9 @@
-{% extends 'portail/base_portail.html' %}
+{% extends base_template|default:'portail/base_portail.html' %}
 {% load static %}
 
-{% block title %}Demande de réservation — Étape 3{% endblock %}
-{% block topbar_title %}<i class="bi bi-person-fill me-1" style="color:var(--color-primary)"></i> Demande de réservation{% endblock %}
+{% block title %}{% if editing_request %}Modifier la demande — {% elif shared_request_mode %}Confirmer la demande — {% endif %}Demande de réservation — Étape 3{% endblock %}
+{% block topbar_title %}<i class="bi bi-person-fill me-1" style="color:var(--color-primary)"></i> {% if editing_request %}Modifier les informations du demandeur{% elif staff_mode %}Demande de réservation client{% elif shared_request_mode %}Vérifiez votre demande{% else %}Demande de réservation{% endif %}{% endblock %}
+{% block page_toolbar %}{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -227,6 +228,11 @@
 
 {% block content %}
 <div class="reservation-page">
+  {% if shared_request_mode %}
+  <div class="alert alert-info">
+    Vérifiez vos coordonnées. La réservation ne sera pas confirmée avant le traitement de votre demande par notre équipe.
+  </div>
+  {% endif %}
 
   <!-- WIZARD -->
   <div class="wizard-steps">
@@ -259,12 +265,81 @@
       <div class="e3-card">
         <div class="e3-card-header">
           <i class="bi bi-person-fill" style="color:var(--color-primary)"></i>
-          Vos coordonnées
+          {% if staff_mode %}Informations du demandeur{% else %}Vos coordonnées{% endif %}
         </div>
         <div class="e3-card-body">
-          <form method="post" id="form-etape3" novalidate>
+          <form method="post" id="form-etape3" {% if not staff_mode %}novalidate{% endif %}>
             {% csrf_token %}
 
+            {% if staff_mode %}
+            {% if form.non_field_errors %}
+              <div class="form-error-msg show">{{ form.non_field_errors }}</div>
+            {% endif %}
+            <div class="form-row">
+              <label class="form-label-e3">
+                <i class="bi bi-person-badge"></i> Demande faite pour <span class="req">*</span>
+              </label>
+              <div class="client-type-toggle">
+                <label class="client-type-option" for="type_client_nouveau">
+                  <input type="radio" name="type_client" id="type_client_nouveau" value="nouveau"
+                         {% if form.type_client.value != 'existant' %}checked{% endif %}>
+                  <i class="bi bi-person-plus-fill"></i>
+                  <span>Nouveau prospect</span>
+                </label>
+                <label class="client-type-option" for="type_client_existant">
+                  <input type="radio" name="type_client" id="type_client_existant" value="existant"
+                         {% if form.type_client.value == 'existant' %}checked{% endif %}>
+                  <i class="bi bi-person-check-fill"></i>
+                  <span>Client enregistré</span>
+                </label>
+              </div>
+              {% for error in form.type_client.errors %}<div class="form-error-msg show">{{ error }}</div>{% endfor %}
+            </div>
+
+            <div class="form-row" id="bloc-client-existant" style="display:none">
+              <label class="form-label-e3" for="{{ form.client.id_for_label }}">
+                <i class="bi bi-person-check-fill"></i> Client <span class="req">*</span>
+              </label>
+              {{ form.client }}
+              {% for error in form.client.errors %}
+                <div class="form-error-msg show"><i class="bi bi-exclamation-circle"></i>{{ error }}</div>
+              {% endfor %}
+            </div>
+
+            <div id="bloc-coordonnees-nouveau">
+              <div class="form-grid-2">
+                <div class="form-row">
+                  <label class="form-label-e3" for="{{ form.nom_contact.id_for_label }}"><i class="bi bi-person"></i> Nom complet <span class="req">*</span></label>
+                  {{ form.nom_contact }}
+                  {% for error in form.nom_contact.errors %}<div class="form-error-msg show"><i class="bi bi-exclamation-circle"></i>{{ error }}</div>{% endfor %}
+                </div>
+                <div class="form-row">
+                  <label class="form-label-e3" for="{{ form.societe.id_for_label }}"><i class="bi bi-building"></i> Société / Organisation <span class="req">*</span></label>
+                  {{ form.societe }}
+                  {% for error in form.societe.errors %}<div class="form-error-msg show"><i class="bi bi-exclamation-circle"></i>{{ error }}</div>{% endfor %}
+                </div>
+              </div>
+              <div class="form-grid-2">
+                <div class="form-row">
+                  <label class="form-label-e3" for="{{ form.email.id_for_label }}"><i class="bi bi-envelope"></i> Email <span class="req">*</span></label>
+                  {{ form.email }}
+                  {% for error in form.email.errors %}<div class="form-error-msg show"><i class="bi bi-exclamation-circle"></i>{{ error }}</div>{% endfor %}
+                </div>
+                <div class="form-row">
+                  <label class="form-label-e3" for="{{ form.telephone.id_for_label }}"><i class="bi bi-telephone"></i> Téléphone <span class="req">*</span></label>
+                  {{ form.telephone }}
+                  {% for error in form.telephone.errors %}<div class="form-error-msg show"><i class="bi bi-exclamation-circle"></i>{{ error }}</div>{% endfor %}
+                </div>
+              </div>
+            </div>
+
+            <div class="form-row">
+              <label class="check-row" for="{{ form.accepte_contact.id_for_label }}">
+                {{ form.accepte_contact }}
+                <span>Le demandeur accepte d’être recontacté par l’équipe commerciale au sujet de cette demande.</span>
+              </label>
+            </div>
+            {% else %}
             <!-- Type de client (NOUVEAU) -->
             <div class="form-row">
               <label class="form-label-e3">
@@ -307,7 +382,7 @@
             </div>
 
             <!-- Coordonnées (masquées si "Client existant") -->
-            <div id="bloc-coordonnees-nouveau">
+            <div id="bloc-coordonnees-nouveau" {% if not shared_request_mode and form.type_client.value == 'existant' %}style="display:none"{% endif %}>
               <!-- Nom + Société -->
               <div class="form-grid-2">
                 <div class="form-row">
@@ -379,6 +454,7 @@
                 </span>
               </div>
             </div>
+            {% endif %}
 
           </form>
         </div>
@@ -454,16 +530,16 @@
       <!-- BOUTONS NAVIGATION -->
       <div class="recap-block">
         <div class="recap-body">
-          <a href="{% url 'portail:reserver_etape2' %}" class="btn-retour-e3">
+          <a href="{% if staff_mode or shared_request_mode %}{{ step2_url }}{% else %}{% url 'portail:reserver_etape2' %}{% endif %}" class="btn-retour-e3">
             <i class="bi bi-arrow-left"></i> Retour — Modifier le projet
           </a>
           <button type="submit" form="form-etape3" class="btn-envoyer" id="btn-envoyer">
             <span class="spinner-btn" id="spinner-btn"></span>
             <i class="bi bi-send-fill" id="icon-send"></i>
-            <span id="btn-label">Envoyer ma demande</span>
+            <span id="btn-label">{% if editing_request %}Enregistrer les modifications{% elif staff_mode %}Créer la demande{% elif shared_request_mode %}Confirmer la demande{% else %}Envoyer ma demande{% endif %}</span>
           </button>
           <div style="font-size:.68rem;color:var(--text-muted);text-align:center;margin-top:8px;line-height:1.5">
-            En soumettant, vous acceptez d'être recontacté(e) par notre équipe.
+            {% if staff_mode %}La demande sera ajoutée à la liste des demandes à traiter.{% elif shared_request_mode %}Votre demande sera transmise au staff, qui confirmera ensuite la réservation.{% else %}En soumettant, vous acceptez d'être recontacté(e) par notre équipe.{% endif %}
           </div>
         </div>
       </div>
@@ -504,6 +580,34 @@
 <script>
   "use strict";
 
+  {% if staff_mode %}
+  function toggleStaffDemandeType() {
+    const estExistant = document.getElementById('type_client_existant').checked;
+    const blocClient = document.getElementById('bloc-client-existant');
+    const blocCoordonnees = document.getElementById('bloc-coordonnees-nouveau');
+    const champClient = document.getElementById('id_client');
+
+    blocClient.style.display = estExistant ? 'block' : 'none';
+    blocCoordonnees.style.display = estExistant ? 'none' : 'block';
+    champClient.required = estExistant;
+    ['id_nom_contact', 'id_societe', 'id_email', 'id_telephone'].forEach(id => {
+      document.getElementById(id).required = !estExistant;
+    });
+  }
+  document.getElementById('type_client_nouveau').addEventListener('change', toggleStaffDemandeType);
+  document.getElementById('type_client_existant').addEventListener('change', toggleStaffDemandeType);
+  toggleStaffDemandeType();
+
+  document.getElementById('form-etape3').addEventListener('submit', function() {
+    const btn = document.getElementById('btn-envoyer');
+    btn.disabled = true;
+    document.getElementById('spinner-btn').style.display = 'block';
+    document.getElementById('icon-send').style.display = 'none';
+    document.getElementById('btn-label').textContent = 'Création en cours…';
+  });
+  {% else %}
+  const sharedRequestMode = {{ shared_request_mode|yesno:"true,false" }};
+
   // ── Type de client : affiche/masque référence VS coordonnées ──────────────
   function toggleTypeClient() {
     const estExistant = document.getElementById('type_client_existant').checked;
@@ -512,7 +616,7 @@
     const champReference  = document.getElementById('reference_client_saisie');
 
     blocReference.style.display   = estExistant ? 'block' : 'none';
-    blocCoordonnees.style.display = estExistant ? 'none'  : 'block';
+    blocCoordonnees.style.display = estExistant && !sharedRequestMode ? 'none' : 'block';
 
     champReference.required = estExistant;
     if (!estExistant) {
@@ -523,7 +627,7 @@
 
     ['nom_contact', 'email', 'telephone'].forEach(id => {
       const el = document.getElementById(id);
-      el.required = !estExistant;
+      el.required = !estExistant || sharedRequestMode;
       if (estExistant) {
         el.classList.remove('error');
         const errEl = el.parentElement.querySelector('.form-error-msg');
@@ -540,7 +644,14 @@
     const estExistant = document.getElementById('type_client_existant').checked;
 
     const fields = estExistant
-      ? [{ id: 'reference_client_saisie', msg: 'Merci de renseigner votre référence client.' }]
+      ? [
+          { id: 'reference_client_saisie', msg: 'Merci de renseigner votre référence client.' },
+          ...(sharedRequestMode ? [
+            { id: 'nom_contact', msg: 'Ce champ est obligatoire.' },
+            { id: 'email', msg: 'Email obligatoire.' },
+            { id: 'telephone', msg: 'Téléphone obligatoire.' },
+          ] : []),
+        ]
       : [
           { id: 'nom_contact',  msg: 'Ce champ est obligatoire.' },
           { id: 'email',        msg: 'Email obligatoire.' },
@@ -563,7 +674,7 @@
     });
 
     // Validation format email (uniquement en mode "nouveau client")
-    if (!estExistant) {
+    if (!estExistant || sharedRequestMode) {
       const emailEl = document.getElementById('email');
       if (emailEl.value.trim() && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailEl.value.trim())) {
         emailEl.classList.add('error');
@@ -607,5 +718,6 @@
       }
     });
   });
+  {% endif %}
 </script>
 {% endblock %}

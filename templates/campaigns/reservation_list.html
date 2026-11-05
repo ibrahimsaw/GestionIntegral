@@ -11,30 +11,436 @@
   {% endif %}
 {% endblock %}
 
+{% block extra_head %}
+<style>
+  .reservation-list-page {
+    --rl-ink: #1f2328;
+    --rl-muted: #64748b;
+    --rl-line: #e4e7ec;
+    --rl-brand: var(--color-primary, #932e2b);
+    --rl-soft: #faf8f7;
+    color: var(--rl-ink);
+  }
+
+  .reservation-list-intro {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 22px;
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    padding: clamp(22px, 4vw, 34px);
+    margin-bottom: 20px;
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 14px;
+    color: #fff;
+    background: linear-gradient(118deg, #681e1c 0%, var(--color-primary, #932e2b) 56%, #a8463d 100%);
+    box-shadow: 0 12px 28px rgba(90, 27, 25, .16);
+  }
+  .reservation-list-intro::after {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    width: 290px;
+    height: 290px;
+    right: 12%;
+    top: -190px;
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 50%;
+    box-shadow: 0 0 0 26px rgba(255,255,255,.035), 0 0 0 54px rgba(255,255,255,.025);
+  }
+  .reservation-list-intro-main {
+    display: flex;
+    align-items: center;
+    gap: 17px;
+    min-width: 0;
+  }
+  .reservation-list-intro-icon {
+    display: grid;
+    place-items: center;
+    flex: 0 0 56px;
+    width: 56px;
+    height: 56px;
+    border: 1px solid rgba(255,255,255,.25);
+    border-radius: 15px;
+    background: rgba(255,255,255,.13);
+    color: #fff;
+    font-size: 1.45rem;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.12);
+  }
+  .reservation-list-intro-eyebrow {
+    margin-bottom: 5px;
+    color: rgba(255,255,255,.72);
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+  }
+  .reservation-list-intro h1 {
+    margin: 0 0 5px;
+    font-size: clamp(1.35rem, 3vw, 1.85rem);
+    font-weight: 750;
+    letter-spacing: -.025em;
+  }
+  .reservation-list-intro p {
+    max-width: 62ch;
+    margin: 0;
+    color: rgba(255,255,255,.82);
+    font-size: .9rem;
+    line-height: 1.55;
+  }
+  .reservation-list-total {
+    display: flex;
+    align-items: center;
+    gap: 13px;
+    flex: 0 0 auto;
+    min-width: 174px;
+    padding: 12px 16px;
+    border: 1px solid rgba(255,255,255,.2);
+    border-radius: 12px;
+    background: rgba(255,255,255,.11);
+    backdrop-filter: blur(6px);
+  }
+  .reservation-list-total-icon {
+    display: grid;
+    place-items: center;
+    flex: 0 0 38px;
+    width: 38px;
+    height: 38px;
+    border-radius: 10px;
+    background: rgba(255,255,255,.16);
+    font-size: 1rem;
+  }
+  .reservation-list-total strong {
+    display: block;
+    color: #fff;
+    font-size: 1.45rem;
+    line-height: 1.1;
+    font-weight: 750;
+    font-variant-numeric: tabular-nums;
+  }
+  .reservation-list-total-label {
+    display: block;
+    margin-top: 3px;
+    color: rgba(255,255,255,.76);
+    font-size: .76rem;
+    white-space: nowrap;
+  }
+
+  .reservation-list-page .cl-kpi-card {
+    min-height: 84px;
+    border-radius: 10px !important;
+    padding: 1rem 1.1rem !important;
+    box-shadow: 0 2px 8px rgba(22,26,34,.035) !important;
+  }
+  .reservation-list-page .cl-kpi-card:hover {
+    border-color: rgba(147,46,43,.22) !important;
+    box-shadow: 0 8px 20px rgba(22,26,34,.075) !important;
+  }
+  .reservation-list-page .cl-kpi-icon {
+    width: 42px;
+    height: 42px;
+    border-radius: 11px !important;
+  }
+  .reservation-list-page .cl-kpi-val {
+    font-variant-numeric: tabular-nums;
+  }
+  .reservation-list-page .rl-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+    width: fit-content;
+    max-width: 100%;
+    padding: 4px;
+    margin-bottom: 18px;
+    border: 1px solid var(--rl-line);
+    border-radius: 10px;
+    background: #fff;
+  }
+  .reservation-list-page .rl-tab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 8px 13px;
+    border-radius: 7px;
+    color: var(--rl-muted);
+    font-size: .86rem;
+    font-weight: 650;
+    text-decoration: none;
+    transition: background .15s, color .15s;
+    white-space: nowrap;
+  }
+  .reservation-list-page .rl-tab:hover {
+    color: var(--rl-ink);
+    background: var(--rl-soft);
+  }
+  .reservation-list-page .rl-tab.is-active {
+    color: #fff;
+    background: var(--rl-brand);
+  }
+  .reservation-list-page .rl-tab-count {
+    min-width: 23px;
+    padding: 1px 7px;
+    border: 1px solid var(--rl-line);
+    border-radius: 999px;
+    color: var(--rl-ink);
+    background: var(--rl-soft);
+    font-size: .74rem;
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+  }
+  .reservation-list-page .rl-tab.is-active .rl-tab-count {
+    border-color: transparent;
+    color: #fff;
+    background: rgba(255,255,255,.2);
+  }
+  .reservation-list-page .filter-card {
+    padding: 0 !important;
+    margin-bottom: 20px !important;
+    border: 1px solid var(--rl-line) !important;
+    border-radius: 10px !important;
+    box-shadow: 0 2px 8px rgba(22,26,34,.035) !important;
+    overflow: hidden;
+  }
+  .reservation-list-page .rl-filter-head {
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--rl-line);
+    color: var(--rl-ink);
+    font-size: .95rem;
+    font-weight: 700;
+  }
+  .reservation-list-page .rl-filter-head i {
+    margin-right: 8px;
+    color: var(--rl-brand);
+  }
+  .reservation-list-page .filter-card .card-body {
+    padding: 18px 20px 20px !important;
+  }
+  .reservation-list-page .filter-label {
+    margin-bottom: 7px;
+    color: var(--rl-muted);
+    font-size: .72rem;
+    font-weight: 700;
+    letter-spacing: .045em;
+  }
+  .reservation-list-page .filter-label i {
+    color: var(--rl-brand);
+  }
+  .reservation-list-page .form-control,
+  .reservation-list-page .form-select {
+    min-height: 38px;
+    border: 1px solid var(--rl-line);
+    border-radius: 8px !important;
+    color: var(--rl-ink);
+    background-color: #fff;
+    box-shadow: none;
+  }
+  .reservation-list-page .form-control:focus,
+  .reservation-list-page .form-select:focus {
+    border-color: rgba(147,46,43,.55);
+    box-shadow: 0 0 0 3px rgba(147,46,43,.1);
+  }
+  .reservation-list-page .btn-filter {
+    min-height: 38px;
+    border-radius: 8px;
+    font-weight: 650;
+  }
+  .reservation-list-page .rl-card {
+    margin-bottom: 0;
+    overflow: hidden;
+    border: 1px solid var(--rl-line);
+    border-radius: 10px;
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(22,26,34,.035);
+  }
+  .reservation-list-page .rl-card-head {
+    min-height: 58px;
+    padding: 14px 20px;
+    border-bottom: 1px solid var(--rl-line);
+    background: #fff;
+  }
+  .reservation-list-page .rl-card-title {
+    margin: 0;
+    color: var(--rl-ink);
+    font-size: .98rem;
+    font-weight: 700;
+  }
+  .reservation-list-page .rl-card-title i {
+    margin-right: 8px;
+    color: var(--rl-brand);
+  }
+  .reservation-list-page .rl-result-count {
+    padding: 3px 10px;
+    border: 1px solid var(--rl-line);
+    border-radius: 999px;
+    color: var(--rl-muted);
+    background: var(--rl-soft);
+    font-size: .76rem;
+    font-weight: 650;
+    white-space: nowrap;
+  }
+  .reservation-list-page .rl-table {
+    margin: 0 !important;
+  }
+  .reservation-list-page .rl-table thead th {
+    padding: 12px 16px !important;
+    border-top: 0 !important;
+    border-bottom: 1px solid var(--rl-line) !important;
+    background: var(--rl-soft) !important;
+    color: var(--rl-muted) !important;
+    font-size: .72rem !important;
+    font-weight: 700 !important;
+    letter-spacing: .045em !important;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .reservation-list-page .rl-table tbody td {
+    padding: 13px 16px !important;
+    border-bottom: 1px solid #eef0f3 !important;
+    background: #fff !important;
+    color: var(--rl-ink);
+    font-size: .86rem !important;
+    vertical-align: middle;
+  }
+  .reservation-list-page .rl-table tbody tr:hover td {
+    background: #faf9f8 !important;
+  }
+  .reservation-list-page .rl-table tbody tr:last-child td {
+    border-bottom: 0 !important;
+  }
+  .reservation-list-page .rl-row {
+    --rl-status: #64748b;
+  }
+  .reservation-list-page .rl-status-en_attente { --rl-status: #d97706; }
+  .reservation-list-page .rl-status-confirmee { --rl-status: #15803d; }
+  .reservation-list-page .rl-status-annulee,
+  .reservation-list-page .rl-status-expiree { --rl-status: #64748b; }
+  .reservation-list-page .rl-row td:first-child {
+    box-shadow: inset 3px 0 0 var(--rl-status);
+  }
+  .reservation-list-page .rl-reservation-name {
+    color: var(--rl-ink) !important;
+    font-weight: 700 !important;
+    line-height: 1.35;
+  }
+  .reservation-list-page .rl-reference {
+    color: var(--rl-brand);
+    font-size: .75rem;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+  }
+  .reservation-list-page .rl-client-name {
+    color: var(--rl-ink) !important;
+    font-weight: 650 !important;
+  }
+  .reservation-list-page .mx-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 50% !important;
+    font-size: .78rem;
+  }
+  .reservation-list-page .resa-period-text {
+    color: var(--rl-ink);
+    font-size: .82rem;
+    white-space: nowrap;
+  }
+  .reservation-list-page .resa-period-text i {
+    color: var(--rl-brand) !important;
+  }
+  .reservation-list-page .resa-faces-badge,
+  .reservation-list-page .badge-statut-en-attente,
+  .reservation-list-page .badge-statut-confirmee,
+  .reservation-list-page .badge-statut-annulee,
+  .reservation-list-page .badge-statut-expiree {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 5px 10px !important;
+    border-radius: 999px !important;
+    font-size: .76rem !important;
+    font-weight: 650;
+    white-space: nowrap;
+  }
+  .reservation-list-page .rl-empty {
+    padding: 52px 20px;
+    color: var(--rl-muted);
+    text-align: center;
+  }
+  .reservation-list-page .rl-empty-icon {
+    display: block;
+    margin-bottom: 10px;
+    color: #aab2bf;
+    font-size: 2.4rem;
+  }
+  .reservation-list-page .rl-empty-title {
+    margin: 0 0 5px;
+    color: var(--rl-ink);
+    font-size: 1rem;
+    font-weight: 700;
+  }
+  .reservation-list-page .rl-empty p {
+    margin: 0;
+    font-size: .88rem;
+  }
+  .reservation-list-page .rl-pagination .page-link {
+    border-color: var(--rl-line);
+    color: var(--rl-brand);
+  }
+  .reservation-list-page .rl-pagination .page-item.active .page-link {
+    border-color: var(--rl-brand);
+    color: #fff;
+    background: var(--rl-brand);
+  }
+
+  @media (max-width: 575.98px) {
+    .reservation-list-intro {
+      align-items: stretch;
+      gap: 18px;
+      padding: 20px;
+      border-radius: 12px;
+    }
+    .reservation-list-intro-main { align-items: flex-start; gap: 12px; }
+    .reservation-list-intro-icon {
+      flex-basis: 44px;
+      width: 44px;
+      height: 44px;
+      border-radius: 12px;
+      font-size: 1.2rem;
+    }
+    .reservation-list-total { width: 100%; min-width: 0; padding: 10px 12px; }
+    .reservation-list-page .rl-tabs { width: 100%; }
+    .reservation-list-page .rl-tab { flex: 1 1 auto; }
+    .reservation-list-page .filter-card .card-body { padding: 15px !important; }
+    .reservation-list-page .rl-card-head { padding: 13px 15px; }
+    .reservation-list-page .rl-table thead th,
+    .reservation-list-page .rl-table tbody td { padding-right: 12px !important; padding-left: 12px !important; }
+  }
+</style>
+{% endblock %}
+
 {% block content %}
 
-{# ═══════════════════════════════════════════ #}
-{# ── BANNIÈRE HÉRO DES RÉSERVATIONS ── #}
-{# ═══════════════════════════════════════════ #}
-<div class="cl-hero mb-4">
-  <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+<div class="reservation-list-page">
+<header class="reservation-list-intro">
+  <div class="reservation-list-intro-main">
+    <span class="reservation-list-intro-icon" aria-hidden="true"><i class="bi bi-calendar2-check-fill"></i></span>
     <div>
-      <div class="cl-hero-title">
-        <i class="bi bi-calendar-check-fill me-2"></i>Gestion des Réservations d'Emplacements
-      </div>
-      <div class="cl-hero-sub">
-        Suivez les options posées sur les faces publicitaires, validez les demandes et convertissez-les en campagnes officielles.
-      </div>
+      <div class="reservation-list-intro-eyebrow">Espace de gestion</div>
+      <h1>Gestion des réservations</h1>
+      <p>Suivez les options posées sur les faces publicitaires, validez les demandes et convertissez-les en campagnes officielles.</p>
     </div>
-    {% if user.is_staff_regie_role %}
-    <div class="d-flex gap-2 flex-wrap align-items-center d-inline d-md-none me-1">
-      <a href="{% url 'reservation_wizard_etape1' %}" class="btn btn-light shadow-sm d-inline d-md-none me-1" style="font-weight: 700; color: #932e2b; border-radius: 8px; padding: 0.55rem 1.3rem;">
-        <i class="bi bi-plus-lg me-1"></i>Nouvelle Réservation
-      </a>
-    </div>
-    {% endif %}
   </div>
-</div>
+  <div class="reservation-list-total">
+    <span class="reservation-list-total-icon" aria-hidden="true"><i class="bi bi-clipboard2-check"></i></span>
+    <div>
+      <strong>{{ reservations|length }}</strong>
+      <span class="reservation-list-total-label">réservation{{ reservations|length|pluralize }} affichée{{ reservations|length|pluralize }}</span>
+    </div>
+  </div>
+</header>
 
 {# ═══════════════════════════════════════════ #}
 {# ── RUBAN DE 4 CARTES KPI STATISTIQUES ── #}
@@ -89,10 +495,31 @@
   </div>
 </div>
 
+<nav class="rl-tabs" aria-label="Filtrer les réservations par statut">
+  <a href="{{ statut_tab_urls.a_suivre }}" class="rl-tab {% if statut_f == 'a_suivre' %}is-active{% endif %}">
+    À suivre <span class="rl-tab-count">{{ statut_counts.a_suivre }}</span>
+  </a>
+  <a href="{{ statut_tab_urls.en_attente }}" class="rl-tab {% if statut_f == 'en_attente' %}is-active{% endif %}">
+    En attente <span class="rl-tab-count">{{ statut_counts.en_attente }}</span>
+  </a>
+  <a href="{{ statut_tab_urls.confirmee }}" class="rl-tab {% if statut_f == 'confirmee' %}is-active{% endif %}">
+    Confirmées <span class="rl-tab-count">{{ statut_counts.confirmee }}</span>
+  </a>
+  <a href="{{ statut_tab_urls.annulee }}" class="rl-tab {% if statut_f == 'annulee' %}is-active{% endif %}">
+    Annulées <span class="rl-tab-count">{{ statut_counts.annulee }}</span>
+  </a>
+  <a href="{{ statut_tab_urls.expiree }}" class="rl-tab {% if statut_f == 'expiree' %}is-active{% endif %}">
+    Expirées <span class="rl-tab-count">{{ statut_counts.expiree }}</span>
+  </a>
+</nav>
+
 {# ═══════════════════════════════════════════ #}
 {# ── FORMULAIRE DE RECHERCHE & FILTRES ── #}
 {# ═══════════════════════════════════════════ #}
 <div class="card filter-card mb-4">
+  <div class="rl-filter-head">
+    <i class="bi bi-sliders" aria-hidden="true"></i>Recherche et filtres
+  </div>
   <div class="card-body p-3 p-lg-4">
     <form method="get" class="row g-3 align-items-end">
       <div class="col-xl-3 col-lg-4 col-md-6">
@@ -128,11 +555,11 @@
       </div>
 
       <div class="col-xl-2 col-lg-2 col-md-12 d-flex gap-2">
-        <button type="submit" class="btn btn-primary btn-sm flex-fill shadow-sm d-flex align-items-center justify-content-center gap-1" style="border-radius: 8px;">
+        <button type="submit" class="btn btn-primary btn-sm btn-filter flex-fill shadow-sm d-flex align-items-center justify-content-center gap-1">
           <i class="bi bi-funnel-fill"></i>
           <span>Filtrer</span>
         </button>
-        {% if q or statut_f or client_f or date_f %}
+        {% if q or client_f or date_f or statut_f != 'a_suivre' %}
         <a href="{% url 'reservation_list' %}" class="btn btn-outline-secondary btn-sm" style="border-radius: 8px;" title="Réinitialiser les filtres">
           <i class="bi bi-arrow-counterclockwise"></i>
         </a>
@@ -145,20 +572,20 @@
 {# ═══════════════════════════════════════════ #}
 {# ── TABLEAU DES RÉSULTATS ── #}
 {# ═══════════════════════════════════════════ #}
-<div class="card table-custom-card">
-  <div class="card-header bg-white py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-2 border-bottom">
+<section class="rl-card">
+  <div class="rl-card-head d-flex align-items-center justify-content-between flex-wrap gap-2">
     <div class="d-flex align-items-center gap-2">
-      <h6 class="mb-0 fw-bold text-dark">
-        <i class="bi bi-table me-2 text-primary"></i>Liste des Réservations
-      </h6>
-      <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2.5 py-1 font-monospace" style="font-size: 0.75rem; border-radius: 8px;">
+      <h2 class="rl-card-title">
+        <i class="bi bi-table"></i>Liste des réservations
+      </h2>
+      <span class="rl-result-count">
         {{ reservations|length }} résultat{{ reservations|length|pluralize }}
       </span>
     </div>
   </div>
 
   <div class="table-responsive">
-    <table class="table table-hover mb-0 align-middle table-supports">
+    <table class="table table-hover mb-0 align-middle table-supports rl-table">
       <thead>
         <tr>
           <th class="ps-4">{% sortable_th sort_links sort_key sort_dir 'nom' 'Réf. & Nom' %}</th>
@@ -172,14 +599,14 @@
       </thead>
       <tbody>
         {% for r in reservations %}
-        <tr class="support-row">
+        <tr class="support-row rl-row rl-status-{{ r.statut }}">
           <td class="ps-4">
             <div>
-              <a href="{% url 'reservation_detail' r.client.pk r.pk %}" class="fw-bold text-decoration-none text-dark">
+              <a href="{% url 'reservation_detail' r.client.pk r.pk %}" class="rl-reservation-name text-decoration-none">
                 {{ r.nom }}
               </a>
               <div class="d-flex flex-column align-items-start gap-1 mt-1">
-                <span class="code-primary fw-bold font-monospace" style="font-size:0.75rem;">
+                <span class="rl-reference font-monospace">
                   {{ r.reference }}
                 </span>
                 {% if r.notes %}
@@ -197,7 +624,7 @@
                 {{ r.client.nom|slice:":2"|upper }}
               </div>
               <div>
-                <span class="fw-semibold d-block text-dark">{{ r.client.nom }}</span>
+                <span class="rl-client-name d-block">{{ r.client.nom }}</span>
                 {% if r.client.telephone %}
                 <small class="text-muted font-monospace">{{ r.client.telephone }}</small>
                 {% endif %}
@@ -296,9 +723,11 @@
         </tr>
         {% empty %}
         <tr>
-          <td colspan="7" class="text-center py-5 text-muted">
-            <i class="bi bi-calendar-x d-block fs-2 mb-2 opacity-30"></i>
-            Aucune réservation trouvée.
+          <td colspan="7">
+            <div class="rl-empty">
+              <i class="bi bi-calendar-x rl-empty-icon" aria-hidden="true"></i>
+              <h3 class="rl-empty-title">Aucune réservation trouvée</h3>
+              <p>Les réservations correspondant à vos critères apparaîtront ici.</p>
             <div class="mt-2">
               {% if q or statut_f or client_f or date_f %}
                 <a href="{% url 'reservation_list' %}" class="btn btn-outline-primary btn-sm px-3" style="border-radius: 8px;">
@@ -310,15 +739,17 @@
                 </a>
               {% endif %}
             </div>
+            </div>
           </td>
         </tr>
         {% endfor %}
       </tbody>
     </table>
   </div>
-</div>
+</section>
 
-<div class="mt-4">
+<div class="mt-4 rl-pagination">
   {% pagination_nav %}
+</div>
 </div>
 {% endblock %}

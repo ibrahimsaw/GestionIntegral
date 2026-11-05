@@ -1,8 +1,9 @@
-{% extends 'portail/base_portail.html' %}
+{% extends base_template|default:'portail/base_portail.html' %}
 {% load static %}
 
-{% block title %}Demande de réservation — Étape 2{% endblock %}
-{% block topbar_title %}<i class="bi bi-calendar-check me-1" style="color:var(--color-primary)"></i> Demande de réservation{% endblock %}
+{% block title %}{% if editing_request %}Modifier la demande — {% elif shared_request_mode %}Confirmer la demande — {% endif %}Demande de réservation — Étape 2{% endblock %}
+{% block topbar_title %}<i class="bi bi-calendar-check me-1" style="color:var(--color-primary)"></i> {% if editing_request %}Modifier le projet{% elif staff_mode %}Demande de réservation client{% elif shared_request_mode %}Vérifiez votre demande{% else %}Demande de réservation{% endif %}{% endblock %}
+{% block page_toolbar %}{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -187,6 +188,11 @@
 
 {% block content %}
 <div class="reservation-page">
+  {% if shared_request_mode %}
+  <div class="alert alert-info">
+    Vous pouvez modifier le nom du projet et ajouter des précisions avant de transmettre la demande à notre équipe.
+  </div>
+  {% endif %}
 
   <!-- WIZARD -->
   <div class="wizard-steps">
@@ -238,7 +244,7 @@
             <span style="font-size:.78rem;color:var(--text-muted)">Aucun emplacement</span>
           {% endif %}
           <div style="margin-top:10px">
-            <a href="{% url 'portail:reserver_etape1' %}"
+            <a href="{% if staff_mode or shared_request_mode %}{{ step1_url }}{% else %}{% url 'portail:reserver_etape1' %}{% endif %}"
                style="font-size:.75rem;color:var(--color-primary);font-weight:700;text-decoration:none">
               <i class="bi bi-pencil me-1"></i>
               <span class="d-none d-md-inline ms-1">Modifier la sélection</span>
@@ -252,7 +258,7 @@
         <div class="e2-card-header">
           <i class="bi bi-calendar-range-fill" style="color:var(--color-primary)"></i>
           Période sélectionnée
-          <a href="{% url 'portail:reserver_etape1' %}"
+          <a href="{% if staff_mode or shared_request_mode %}{{ step1_url }}{% else %}{% url 'portail:reserver_etape1' %}{% endif %}"
              style="margin-left:auto;font-size:.72rem;color:var(--color-primary);font-weight:700;text-decoration:none">
             <i class="bi bi-pencil me-1"></i>
             <span class="d-none d-md-inline ms-1">Modifier</span>

@@ -1,8 +1,8 @@
-{% extends 'portail/base_portail.html' %}
+{% extends base_template|default:'portail/base_portail.html' %}
 {% load static %}
 
-{% block title %}Sélectionnez votre emplacement — Étape 1{% endblock %}
-{% block topbar_title %}<i class="bi bi-plus-circle-fill me-1" style="color:var(--color-primary)"></i>Sélectionnez votre emplacement{% endblock %}
+{% block title %}{% if editing_request %}Modifier la demande — {% elif staff_mode %}Demande client — {% elif shared_request_mode %}Confirmer la demande — {% endif %}Sélectionnez votre emplacement — Étape 1{% endblock %}
+{% block topbar_title %}<i class="bi bi-plus-circle-fill me-1" style="color:var(--color-primary)"></i>{% if editing_request %}Modifier les emplacements de la demande{% elif staff_mode %}Sélectionnez les emplacements du client{% elif shared_request_mode %}Vérifiez votre demande{% else %}Sélectionnez votre emplacement{% endif %}{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -128,6 +128,7 @@
     border-radius: var(--radius-md); padding: 3px;
     flex-direction:column;
   }
+  #btn-vue-carte { display: none !important; }
   .vt-btn {
     display: flex; align-items: center; gap: 6px;
     padding: 6px 14px; border-radius: 8px;
@@ -193,7 +194,7 @@
   #view-liste::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
   .liste-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+    grid-template-columns: minmax(0, 1fr);
     gap: 10px; padding: 10px;
   }
   .liste-empty {
@@ -205,15 +206,20 @@
 
   /* ── CARD SUPPORT ────────────────────────────────────────── */
   .support-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(220px, 34%);
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas: "header faces" "map faces";
+    align-items: stretch;
     background: var(--bg-card2); border: 1px solid var(--border);
     border-radius: var(--radius-md); overflow: hidden; transition: all .15s;
   }
   .support-card:hover { box-shadow: var(--shadow-md); }
   .support-card.has-selected { border-color: var(--color-primary); box-shadow: 0 0 0 2px rgba(59,93,80,.12); }
   .sc-header {
-    padding: 9px 11px; background: var(--bg-card);
+    grid-area: header; min-width: 0; padding: 12px 14px; background: var(--bg-card);
     border-bottom: 1px solid var(--border);
-    display: flex; align-items: center; gap: 8px;
+    display: flex; align-items: flex-start; gap: 10px;
   }
   .sc-icon {
     width: 30px; height: 30px; border-radius: 50%;
@@ -221,16 +227,16 @@
     display: flex; align-items: center; justify-content: center;
     font-size: .7rem; font-weight: 800; flex-shrink: 0;
   }
-  .sc-info { flex: 1; overflow: hidden; }
+  .sc-info { flex: 1; min-width: 0; }
   .sc-code { font-size: .68rem; font-weight: 800; color: var(--color-primary); letter-spacing: .05em; }
-  .sc-nom  { font-size: .78rem; font-weight: 700; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .sc-addr { font-size: .66rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sc-nom  { font-size: .9rem; font-weight: 700; color: var(--text); white-space: normal; overflow-wrap: anywhere; line-height: 1.4; }
+  .sc-addr { font-size: .72rem; color: var(--text-muted); white-space: normal; overflow-wrap: anywhere; line-height: 1.4; }
   .sc-format {
     font-size: .62rem; font-weight: 700; padding: 2px 7px; border-radius: 20px;
     background: var(--bg-card2); border: 1px solid var(--border);
     color: var(--text-muted); white-space: nowrap; flex-shrink: 0;
   }
-  .sc-faces { padding: 7px 9px; display: flex; flex-direction: column; gap: 5px; }
+  .sc-faces { grid-area: faces; align-self: center; padding: 10px; display: flex; flex-direction: column; gap: 7px; }
 
   /* ── BOUTON FACE ─────────────────────────────────────────── */
   .face-btn {
@@ -411,14 +417,24 @@
 
   /* ── BOUTON "VOIR SUR LA CARTE" ──────────────────────────────── */
   .sc-map-btn {
-    display: flex; align-items: center; justify-content: center; gap: 6px;
-    width: 100%; padding: 7px 0;
-    border: none; border-top: 1px solid var(--border);
+    display: none !important;
+    grid-area: map; align-items: center; justify-content: center; justify-self: start; gap: 6px;
+    margin: 10px 14px; padding: 7px 11px;
+    border: 1px solid var(--border); border-radius: 8px;
     background: var(--bg-card); color: var(--color-primary);
     font-size: .72rem; font-weight: 700;
     cursor: pointer; transition: background .15s ease;
   }
   .sc-map-btn:hover { background: var(--bg-card2); }
+  @media (max-width: 640px) {
+    .support-card {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto auto auto;
+      grid-template-areas: "header" "faces" "map";
+    }
+    .sc-faces { padding-top: 8px; }
+    .sc-map-btn { margin-top: 0; }
+  }
   /* ── Carte preview photo (desktop: hover / mobile: tap) ─────────────────── */
   /* ── Ligne face-btn + icône photo à droite ────────────────────────────── */
   .rl-face-row, .face-row {
@@ -578,9 +594,15 @@
 {% endblock %}
 
 {% block full_page %} {% endblock %}
+{% block page_toolbar %}{% endblock %}
 
 {% block content %}
   <div class="reservation-page">
+    {% if shared_request_mode %}
+    <div class="alert alert-info">
+      Vérifiez les emplacements et les dates préparés par notre équipe. Vous pourrez les modifier avant d’envoyer la demande.
+    </div>
+    {% endif %}
 
     {% if form.errors %}
     <div style="padding:10px 14px;border-radius:8px;margin-bottom:12px;font-size:.82rem;

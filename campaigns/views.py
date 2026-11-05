@@ -1,5 +1,6 @@
 import calendar
 import json
+import uuid
 from datetime import date, datetime, time, timedelta
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
@@ -38,10 +39,12 @@ from .forms import (
     EcranParametresExploitationForm,
     EcranBilanMensuelForm,
     PackageEcranForm,
+    DemandeGestionContactForm,
     normaliser_categorie_format,
 )
 from piges.models import PigeFichier
 from planning.models import LogDiffusion
+from portail.forms import Etape1Form, Etape2Form
 # from .mixins import *
 from datetime import datetime, date, timedelta
 today = timezone.now().date()
@@ -1526,12 +1529,6 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 count
                 for (screen_id, campaign_id), count in logs_by_campaign_screen.items()
                 if campaign_id in contract['campagne_ids']
-            )
-
-        for index, screen in enumerate(screen_data):
-            print(
-                f"screen_data[{index}]: "
-                f"{json.dumps(screen, ensure_ascii=False, default=str)}"
             )
 
         return {
@@ -4179,6 +4176,34 @@ class CampagneDetailView(ClientStaffRequiredMixin, DetailView):
 
 
 
+def _importer_faces_reservation(campagne, reservation, formats_autorises):
+    reservation_lignes = (
+        reservation.lignes
+        .filter(
+            face__isnull=False,
+            face__support__format__in=formats_autorises,
+        )
+        .select_related('face__support')
+    )
+    face_ids_existants = set(
+        campagne.lignes
+        .filter(face__isnull=False)
+        .values_list('face_id', flat=True)
+    )
+    lignes_a_importer = [
+        LigneCampagne(
+            campagne=campagne,
+            support=reservation_ligne.face.support,
+            face=reservation_ligne.face,
+        )
+        for reservation_ligne in reservation_lignes
+        if reservation_ligne.face_id not in face_ids_existants
+    ]
+    if lignes_a_importer:
+        LigneCampagne.objects.bulk_create(lignes_a_importer)
+    return len(lignes_a_importer)
+
+
 class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
     model = Campagne
     form_class = CampagneForm
@@ -4240,6 +4265,14 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
         
         self.object = form.save()
         transaction.on_commit(lambda: cache.delete('dashboard_alertes'))
+
+        faces_importees = 0
+        if form.reservation_source:
+            faces_importees = _importer_faces_reservation(
+                self.object,
+                form.reservation_source,
+                form.reservation_formats,
+            )
 
         if not is_create:
             changed_line_fields = {
@@ -4334,6 +4367,8 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
         
         action = AuditLog.ACTION_CREATE if is_create else AuditLog.ACTION_UPDATE
         msg_text = f"Campagne {'créée' if is_create else 'mise à jour'} avec succès."
+        if faces_importees:
+            msg_text += f" {faces_importees} face(s) importée(s) depuis la réservation {form.reservation_source.reference}."
         
         log_action(
             self.request,
@@ -4433,13 +4468,28 @@ class CampagneDeleteView(StaffRequiredMixin, DeleteView):
     model = Campagne
     template_name = 'partials/confirm_delete.html'
 
-    def delete(self, request, *args, **kwargs):
-        campagne = self.get_object()
+    def post(self, request, *args, **kwargs):
+        campagne = Campagne.objects.filter(pk=kwargs.get('pk')).first()
+        if campagne is None:
+            messages.info(request, "Cette campagne a déjà été supprimée ou n'existe plus.")
+            return redirect(self.get_success_url())
+
+        self.object = campagne
         nom = str(campagne)
-        response = super().delete(request, *args, **kwargs)
-        log_action(request, AuditLog.ACTION_DELETE, 'campaign', obj=campagne, detail=f"Suppression campagne: {nom}")
+        deleted_count, _ = campagne.delete()
+        if not deleted_count:
+            messages.info(request, "Cette campagne a déjà été supprimée ou n'existe plus.")
+            return redirect(self.get_success_url())
+
+        log_action(
+            request,
+            AuditLog.ACTION_DELETE,
+            'campaign',
+            obj=campagne,
+            detail=f"Suppression campagne: {nom}",
+        )
         messages.success(request, f'Campagne "{nom}" supprimée.')
-        return response
+        return redirect(self.get_success_url())
 
     def get_success_url(self):
         return reverse('campagne_list')
@@ -5750,7 +5800,7 @@ class ReservationListView(StaffRequiredMixin, SortableListMixin, ListView):
         qs = Reservation.objects.select_related('client', 'created_by').prefetch_related('lignes__face__support')
 
         q        = self.request.GET.get('q', '').strip()
-        statut_f = self.request.GET.get('statut', '')
+        statut_f = self.request.GET.get('statut', 'a_suivre')
         client_f = self.request.GET.get('client', '')
         date_f   = self.request.GET.get('date', '')
 
@@ -5759,7 +5809,9 @@ class ReservationListView(StaffRequiredMixin, SortableListMixin, ListView):
                 Q(nom__icontains=q) |
                 Q(client__nom__icontains=q)
             )
-        if statut_f:
+        if statut_f == 'a_suivre':
+            qs = qs.filter(statut__in=[STATUT_EN_ATTENTE, STATUT_CONFIRMEE])
+        elif statut_f:
             qs = qs.filter(statut=statut_f)
         if client_f:
             qs = qs.filter(client__pk=client_f)
@@ -5770,18 +5822,39 @@ class ReservationListView(StaffRequiredMixin, SortableListMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        query_params = self.request.GET.copy()
+        query_params.pop('page', None)
+        statut_tab_urls = {}
+        for statut_tab in ('a_suivre', STATUT_EN_ATTENTE, STATUT_CONFIRMEE, STATUT_ANNULEE, STATUT_EXPIREE):
+            tab_params = query_params.copy()
+            tab_params['statut'] = statut_tab
+            statut_tab_urls[statut_tab] = f"?{tab_params.urlencode()}"
 
         context.update({
             'q':        self.request.GET.get('q', ''),
-            'statut_f': self.request.GET.get('statut', ''),
+            'statut_f': self.request.GET.get('statut', 'a_suivre'),
             'client_f': self.request.GET.get('client', ''),
             'date_f':   self.request.GET.get('date', ''),
+            'statut_counts': {
+                'a_suivre': Reservation.objects.filter(
+                    statut__in=[STATUT_EN_ATTENTE, STATUT_CONFIRMEE]
+                ).count(),
+                'en_attente': Reservation.objects.filter(statut=STATUT_EN_ATTENTE).count(),
+                'confirmee': Reservation.objects.filter(statut=STATUT_CONFIRMEE).count(),
+                'annulee': Reservation.objects.filter(statut=STATUT_ANNULEE).count(),
+                'expiree': Reservation.objects.filter(statut=STATUT_EXPIREE).count(),
+            },
+            'statut_tab_urls': statut_tab_urls,
             'statut_choices': [
+                ('a_suivre', 'À suivre'),
                 (STATUT_EN_ATTENTE, 'En attente'),
                 (STATUT_CONFIRMEE,  'Confirmée'),
                 (STATUT_ANNULEE,    'Annulée'),
+                (STATUT_EXPIREE,    'Expirée'),
             ],
-            'clients': Client.objects.order_by('nom'),
+            'clients': Client.objects.filter(
+                reservations_globales__isnull=False
+            ).distinct().order_by('nom'),
         })
         return context
 
@@ -6348,6 +6421,7 @@ class DemandesListView(LoginRequiredMixin, SortableListMixin, View):
         else:
             # Par défaut : uniquement les demandes qui nécessitent une action
             qs = qs.filter(statut__in=[
+                DemandeReservation.STATUT_BROUILLON,
                 DemandeReservation.STATUT_NOUVELLE,
                 DemandeReservation.STATUT_EN_COURS,
             ])
@@ -6355,6 +6429,7 @@ class DemandesListView(LoginRequiredMixin, SortableListMixin, View):
         qs = self.apply_sort(qs)
 
         compteurs = {
+            'brouillon': DemandeReservation.objects.filter(statut=DemandeReservation.STATUT_BROUILLON).count(),
             'nouvelle': DemandeReservation.objects.filter(statut=DemandeReservation.STATUT_NOUVELLE).count(),
             'en_cours': DemandeReservation.objects.filter(statut=DemandeReservation.STATUT_EN_COURS).count(),
             'validee':  DemandeReservation.objects.filter(statut=DemandeReservation.STATUT_VALIDEE).count(),
@@ -6370,6 +6445,264 @@ class DemandesListView(LoginRequiredMixin, SortableListMixin, View):
         return render(request, self.template_name, context)
 
 
+class StaffDemandeWizardBase(StaffRequiredMixin, View):
+    template_context = {
+        'staff_mode': True,
+        'base_template': 'base.html',
+    }
+    session_faces_key = 'gestion_demande_faces'
+    session_supports_key = 'gestion_demande_supports'
+    session_period_key = 'gestion_demande_periode'
+    session_project_key = 'gestion_demande_projet'
+    session_contact_key = 'gestion_demande_contact'
+    session_edit_key = 'gestion_demande_edit_uuid'
+
+    def get_selections(self, request):
+        face_ids = request.session.get(self.session_faces_key, [])
+        support_ids = request.session.get(self.session_supports_key, [])
+        faces = list(
+            FacePanneau.objects.filter(pk__in=face_ids)
+            .select_related('support')
+        )
+        supports = list(Support.objects.filter(pk__in=support_ids))
+        return faces, supports
+
+    def clear_wizard_session(self, request):
+        for key in (
+            self.session_faces_key,
+            self.session_supports_key,
+            self.session_period_key,
+            self.session_project_key,
+            self.session_contact_key,
+            self.session_edit_key,
+        ):
+            request.session.pop(key, None)
+
+    def step_context(self, request, **context):
+        context.update(self.template_context)
+        context.update({
+            'step1_url': reverse('demande_creation'),
+            'step2_url': reverse('demande_creation_etape2'),
+            'step3_url': reverse('demande_creation_etape3'),
+            'cancel_url': (
+                reverse(
+                    'demande_detail',
+                    kwargs={'uuid': request.session[self.session_edit_key]},
+                )
+                if request.session.get(self.session_edit_key)
+                else reverse('demandes_liste')
+            ),
+            'editing_request': bool(request.session.get(self.session_edit_key)),
+        })
+        return context
+
+
+class DemandeCreationView(StaffDemandeWizardBase):
+    """Étape 1 du formulaire de demande, avec la même carte que le portail."""
+    template_name = 'portail/reserver_etape1.html'
+
+    def get(self, request):
+        periode = request.session.get(self.session_period_key, {})
+        form = Etape1Form(initial={
+            'faces_selectionnees': json.dumps(
+                request.session.get(self.session_faces_key, [])
+            ),
+            'supports_selectionnees': json.dumps(
+                request.session.get(self.session_supports_key, [])
+            ),
+            'date_debut': periode.get('date_debut'),
+            'date_fin': periode.get('date_fin'),
+        })
+        return render(request, self.template_name, self.step_context(
+            request,
+            form=form,
+            panier=self.get_selections(request)[0],
+            filtres={
+                'ville': request.GET.get('ville', '').strip(),
+                'categorie': request.GET.get('categorie', '').strip(),
+                'format': request.GET.get('format', '').strip(),
+            },
+        ))
+
+    def post(self, request):
+        form = Etape1Form(request.POST)
+        if not form.is_valid():
+            return render(request, self.template_name, self.step_context(
+                request,
+                form=form,
+                panier=self.get_selections(request)[0],
+                filtres={},
+            ))
+
+        data = form.cleaned_data
+        request.session[self.session_faces_key] = data['faces_uuids']
+        request.session[self.session_supports_key] = data['supports_uuids']
+        request.session[self.session_period_key] = {
+            'date_debut': str(data['date_debut']),
+            'date_fin': str(data['date_fin']),
+        }
+        if not request.session.get(self.session_edit_key):
+            request.session.pop(self.session_project_key, None)
+        return redirect('demande_creation_etape2')
+
+
+class DemandeCreationEtape2View(StaffDemandeWizardBase):
+    """Étape 2 du formulaire de demande : nom et précisions du projet."""
+    template_name = 'portail/reserver_etape2.html'
+
+    def _context(self, request, form):
+        faces, supports = self.get_selections(request)
+        periode = request.session.get(self.session_period_key, {})
+        date_debut = periode.get('date_debut')
+        date_fin = periode.get('date_fin')
+        if not date_debut or not date_fin or (not faces and not supports):
+            messages.warning(request, "Veuillez compléter la sélection des emplacements et des dates.")
+            return None
+        days = (
+            date.fromisoformat(date_fin) - date.fromisoformat(date_debut)
+        ).days + 1
+        return self.step_context(
+            request,
+            form=form,
+            faces=faces,
+            supports=supports,
+            periode=periode,
+            duree_jours=days,
+        )
+
+    def get(self, request):
+        context = self._context(
+            request,
+            Etape2Form(initial=request.session.get(self.session_project_key, {})),
+        )
+        if context is None:
+            return redirect('demande_creation')
+        return render(request, self.template_name, context)
+
+    def post(self, request):
+        context = self._context(request, Etape2Form(request.POST))
+        if context is None:
+            return redirect('demande_creation')
+        form = context['form']
+        if not form.is_valid():
+            return render(request, self.template_name, context)
+        request.session[self.session_project_key] = {
+            'nom_campagne': form.cleaned_data.get('nom_campagne', ''),
+            'message': form.cleaned_data.get('message', ''),
+        }
+        return redirect('demande_creation_etape3')
+
+
+class DemandeCreationEtape3View(StaffDemandeWizardBase):
+    """Étape 3 : rattachement au client ou saisie d'un prospect."""
+    template_name = 'portail/reserver_etape3.html'
+
+    def _context(self, request, form):
+        faces, supports = self.get_selections(request)
+        periode = request.session.get(self.session_period_key, {})
+        if not periode.get('date_debut') or not periode.get('date_fin') or (
+            not faces and not supports
+        ):
+            messages.warning(request, "Veuillez compléter les étapes précédentes.")
+            return None
+        project = request.session.get(self.session_project_key, {})
+        date_debut = date.fromisoformat(periode['date_debut'])
+        date_fin = date.fromisoformat(periode['date_fin'])
+        etape2 = {
+            'date_debut': periode['date_debut'],
+            'date_fin': periode['date_fin'],
+            'nom_campagne': project.get('nom_campagne', ''),
+            'message': project.get('message', ''),
+        }
+        return self.step_context(
+            request,
+            form=form,
+            faces=faces,
+            supports=supports,
+            etape2=etape2,
+            duree_jours=(date_fin - date_debut).days + 1,
+        )
+
+    def get(self, request):
+        form = DemandeGestionContactForm(
+            initial=request.session.get(self.session_contact_key, {})
+        )
+        context = self._context(request, form)
+        if context is None:
+            return redirect('demande_creation')
+        return render(request, self.template_name, context)
+
+    def post(self, request):
+        form = DemandeGestionContactForm(request.POST)
+        context = self._context(request, form)
+        if context is None:
+            return redirect('demande_creation')
+        if not form.is_valid():
+            return render(request, self.template_name, context)
+
+        data = form.cleaned_data
+        client = (
+            data['client']
+            if data['type_client'] == DemandeReservation.TYPE_CLIENT_EXISTANT
+            else None
+        )
+        edit_uuid = request.session.get(self.session_edit_key)
+        demande_uuid = edit_uuid
+        try:
+            with transaction.atomic():
+                if edit_uuid:
+                    demande = DemandeReservation.objects.select_for_update().get(
+                        uuid=edit_uuid,
+                        statut__in=(
+                            DemandeReservation.STATUT_NOUVELLE,
+                            DemandeReservation.STATUT_EN_COURS,
+                        ),
+                    )
+                else:
+                    demande = DemandeReservation(
+                        statut=DemandeReservation.STATUT_EN_COURS,
+                        token_partage=uuid.uuid4(),
+                    )
+                demande.client = client
+                demande.type_client = data['type_client']
+                demande.reference_client_saisie = client.reference if client else ''
+                demande.nom_contact = (
+                    (client.contact_nom or client.nom) if client else data['nom_contact']
+                )
+                demande.societe = client.nom if client else data['societe']
+                demande.email = client.email if client else data['email']
+                demande.telephone = client.telephone if client else data['telephone']
+                demande.accepte_contact = data['accepte_contact']
+                demande.date_debut_souhaitee = date.fromisoformat(context['etape2']['date_debut'])
+                demande.date_fin_souhaitee = date.fromisoformat(context['etape2']['date_fin'])
+                demande.nom_campagne = context['etape2']['nom_campagne']
+                demande.message = context['etape2']['message']
+                demande.full_clean(exclude=['reference'])
+                demande.save()
+                demande.faces_souhaitees.set(context['faces'])
+                demande.supports_souhaites.set(context['supports'])
+        except DemandeReservation.DoesNotExist:
+            messages.error(
+                request,
+                "Le lien client est actif ou la demande a déjà été traitée; "
+                "les modifications du gestionnaire ne sont pas autorisées.",
+            )
+            return redirect('demande_detail', uuid=demande_uuid)
+        except ValidationError as exc:
+            form.add_error(None, "; ".join(exc.messages))
+            return render(request, self.template_name, context)
+
+        self.clear_wizard_session(request)
+        if edit_uuid:
+            messages.success(request, f"La demande {demande.reference} a été modifiée.")
+            return redirect('demande_detail', uuid=demande.uuid)
+        messages.success(
+            request,
+            f"La demande {demande.reference} est prête à être partagée avec le client.",
+        )
+        return redirect('demande_detail', uuid=demande.uuid)
+
+
 class DemandeDetailView(LoginRequiredMixin, View):
     """Détail d'une demande : emplacements, période, contact, actions."""
     template_name = 'campaigns/demande_detail.html'
@@ -6382,14 +6715,111 @@ class DemandeDetailView(LoginRequiredMixin, View):
             uuid=uuid,
         )
 
-        # Passe automatiquement en "en_cours" dès l'ouverture par le staff
-        if demande.est_nouvelle:
+        # Les demandes du portail passent en traitement à la première ouverture.
+        # Une demande partagée reste "nouvelle" jusqu'à sa validation par le client.
+        if demande.est_nouvelle and not demande.token_partage:
             demande.marquer_en_cours(user=request.user)
 
-        return render(request, self.template_name, {
+        context = {
             'demande': demande,
             'campagne_form': DemandeCampagneForm(demande=demande),
-        })
+        }
+        context['peut_modifier_demande'] = (
+            request.user.is_staff_regie_role
+            and demande.statut in (
+                DemandeReservation.STATUT_NOUVELLE,
+                DemandeReservation.STATUT_EN_COURS,
+            )
+        )
+        if (
+            request.user.is_staff_regie_role
+            and demande.statut == DemandeReservation.STATUT_BROUILLON
+            and demande.token_partage
+        ):
+            context['share_url'] = request.build_absolute_uri(
+                reverse(
+                    'portail:demande_partage',
+                    kwargs={'token': demande.token_partage},
+                )
+            )
+        return render(request, self.template_name, context)
+
+
+class DemandeAutoriserModificationView(StaffRequiredMixin, View):
+    """Active ou réactive le lien de modification du client."""
+
+    def post(self, request, uuid):
+        demande = get_object_or_404(
+            DemandeReservation,
+            uuid=uuid,
+            token_partage__isnull=False,
+        )
+        if demande.statut == DemandeReservation.STATUT_BROUILLON:
+            demande.statut = DemandeReservation.STATUT_EN_COURS
+            demande.save(update_fields=['statut', 'updated_at'])
+            messages.success(request, "Le lien de modification client est désactivé.")
+            return redirect('demande_detail', uuid=uuid)
+
+        if demande.statut not in (
+            DemandeReservation.STATUT_EN_COURS,
+            DemandeReservation.STATUT_NOUVELLE,
+        ):
+            messages.error(request, "Cette demande ne peut plus être modifiée par le client.")
+            return redirect('demande_detail', uuid=uuid)
+
+        demande.statut = DemandeReservation.STATUT_BROUILLON
+        demande.save(update_fields=['statut', 'updated_at'])
+        messages.success(
+            request,
+            "La modification client est autorisée. Vous pouvez copier et partager le lien.",
+        )
+        return redirect('demande_detail', uuid=uuid)
+
+
+class DemandeModifierView(StaffRequiredMixin, View):
+    """Ouvre le même assistant de création avec les données de la demande."""
+
+    def get(self, request, uuid):
+        demande = get_object_or_404(
+            DemandeReservation.objects.select_related('client'),
+            uuid=uuid,
+            statut__in=(
+                DemandeReservation.STATUT_BROUILLON,
+                DemandeReservation.STATUT_NOUVELLE,
+                DemandeReservation.STATUT_EN_COURS,
+            ),
+        )
+        if demande.statut == DemandeReservation.STATUT_BROUILLON:
+            messages.error(
+                request,
+                "Désactivez d'abord le lien de modification client pour modifier la demande.",
+            )
+            return redirect('demande_detail', uuid=uuid)
+        request.session[StaffDemandeWizardBase.session_edit_key] = str(demande.uuid)
+        request.session[StaffDemandeWizardBase.session_faces_key] = list(
+            demande.faces_souhaitees.values_list('pk', flat=True)
+        )
+        request.session[StaffDemandeWizardBase.session_supports_key] = list(
+            demande.supports_souhaites.values_list('pk', flat=True)
+        )
+        request.session[StaffDemandeWizardBase.session_period_key] = {
+            'date_debut': demande.date_debut_souhaitee.isoformat(),
+            'date_fin': demande.date_fin_souhaitee.isoformat(),
+        }
+        request.session[StaffDemandeWizardBase.session_project_key] = {
+            'nom_campagne': demande.nom_campagne,
+            'message': demande.message,
+        }
+        request.session[StaffDemandeWizardBase.session_contact_key] = {
+            'type_client': demande.type_client,
+            'client': demande.client_id or '',
+            'nom_contact': demande.nom_contact,
+            'societe': demande.societe,
+            'email': demande.email,
+            'telephone': demande.telephone,
+            'accepte_contact': demande.accepte_contact,
+        }
+        return redirect('demande_creation')
 
 
 class DemandeAssocierCampagneView(StaffRequiredMixin, View):
@@ -6430,7 +6860,15 @@ class DemandeValiderView(LoginRequiredMixin, View):
 
         if not demande.peut_etre_traitee:
             messages.error(request, "Cette demande a déjà été traitée.")
-            return redirect('campaigns:demande_detail', uuid=uuid)
+            return redirect('demande_detail', uuid=uuid)
+
+        if demande.supports_souhaites.exists():
+            messages.error(
+                request,
+                "Cette demande comprend un écran numérique et doit être traitée "
+                "manuellement. Aucune réservation n'a été créée.",
+            )
+            return redirect('demande_detail', uuid=uuid)
 
         faces = list(demande.faces_souhaitees.select_related('support').all())
         if not faces:
@@ -6439,7 +6877,7 @@ class DemandeValiderView(LoginRequiredMixin, View):
                 "Impossible de valider : aucune face n'est associée à cette demande "
                 "(cas des écrans numériques non géré automatiquement — traiter manuellement)."
             )
-            return redirect('campaigns:demande_detail', uuid=uuid)
+            return redirect('demande_detail', uuid=uuid)
 
         try:
             with transaction.atomic():

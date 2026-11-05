@@ -5,254 +5,407 @@
   {{ demande.reference }}
 {% endblock %}
 {% block topbar_actions %}
+
 {% endblock %}
 
-{% block extra_head %}
-<style>
-  .bs-dem-nouvelle { background:#fef9c3; color:#854d0e; }
-  .bs-dem-en_cours { background:#dbeafe; color:#1d4ed8; }
-  .bs-dem-validee  { background: var(--color-disponible_bg); color: var(--color-disponible); }
-  .bs-dem-refusee  { background:#fee2e2; color:#b91c1c; }
+{% block contentbouton %}
+  {% if user.is_staff_regie_role %}
+    {% if peut_modifier_demande %}
+      <a href="{% url 'demande_modifier' demande.uuid %}" class="btn btn-outline-secondary btn-sm shadow-sm px-3">
+        <i class="bi bi-pencil-square me-1"></i>Modifier
+      </a>
+    {% endif %}
+  {% endif %}
 
-  .emplacement-row {
-    display:flex; align-items:center; gap:10px;
-    padding:10px 16px; border-bottom:1px solid var(--border); font-size:.84rem;
+  {% if user.is_staff_regie_role and demande.token_partage and demande.statut != 'validee' and demande.statut != 'refusee' %}
+    {% if demande.statut == 'brouillon' %}
+    <form method="post" action="{% url 'demande_autoriser_modification' demande.uuid %}">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-outline-danger btn-sm px-3">
+        <i class="bi bi-lock me-1"></i>Désactiver la modification client
+      </button>
+    </form>
+    {% else %}
+    <form method="post" action="{% url 'demande_autoriser_modification' demande.uuid %}">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-primary btn-sm px-3">
+        <i class="bi bi-unlock me-1"></i>Autoriser la modification client
+      </button>
+    </form>
+    {% endif %}
+  {% endif %}
+{% endblock contentbouton %}
+
+{% block extra_head %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&display=swap" rel="stylesheet">
+<style>
+  .fd {
+    --ink: #161a22;
+    --muted: #667085;
+    --line: #e4e7ec;
+    --paper: #ffffff;
+    --sunk: #f5f6f8;
+    --brand: var(--color-primary, #932e2b);
+    --brand-deep: #6f201e;
+    --display: 'Bricolage Grotesque', var(--bs-body-font-family, system-ui), sans-serif;
+    color: var(--ink);
   }
-  .emplacement-row:last-child { border-bottom:none; }
-  .emplacement-row i { color:var(--color-primary); }
-  .emplacement-row .meta { margin-left:auto; color:var(--text-muted); font-size:.78rem; }
+
+  /* ── États : couleur + libellé ── */
+  .fd-st-nouvelle  { --st: #b45309; --st-bg: #fef3c7; }
+  .fd-st-brouillon { --st: #475569; --st-bg: #e2e8f0; }
+  .fd-st-en_cours  { --st: #1d4ed8; --st-bg: #dbeafe; }
+  .fd-st-validee   { --st: #15803d; --st-bg: #dcfce7; }
+  .fd-st-refusee   { --st: #b91c1c; --st-bg: #fee2e2; }
+
+  /* ═════════ Bandeau ═════════ */
+  .fd-band {
+    background: var(--brand); color: #fff;
+    border-radius: 8px; padding: 26px 30px 0; margin-bottom: 22px;
+    position: relative; overflow: hidden;
+  }
+  .fd-band::after {            /* grand « signe » décoratif discret */
+    content: "\F3E5"; font-family: "bootstrap-icons";
+    position: absolute; right: -10px; top: -30px; font-size: 11rem; line-height: 1;
+    color: rgba(255,255,255,.07); pointer-events: none;
+  }
+  .fd-band-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 14px; position: relative; z-index: 1; }
+  .fd-ref { font-family: var(--display); font-size: 2.1rem; font-weight: 800; letter-spacing: -.02em; line-height: 1.05; margin: 0; }
+  .fd-who { margin: 8px 0 0; font-size: 1rem; opacity: .92; }
+  .fd-who b { font-weight: 650; }
+  .fd-chip {
+    display: inline-flex; align-items: center; gap: 7px;
+    background: #fff; color: var(--st); border-radius: 999px;
+    padding: 7px 15px; font-weight: 700; font-size: .85rem;
+  }
+
+  .fd-facts { display: flex; flex-wrap: wrap; margin: 24px -30px 0; border-top: 1px solid rgba(255,255,255,.18); position: relative; z-index: 1; background: var(--brand-deep); }
+  .fd-fact { flex: 1 1 180px; padding: 15px 30px; border-right: 1px solid rgba(255,255,255,.14); min-width: 0; }
+  .fd-fact:last-child { border-right: none; }
+  .fd-fact span { display: block; font-size: .8rem; opacity: .72; margin-bottom: 2px; }
+  .fd-fact strong { font-family: var(--display); font-size: 1.12rem; font-weight: 700; font-variant-numeric: tabular-nums; }
+  @media (max-width: 575.98px) {
+    .fd-band { padding: 20px 18px 0; }
+    .fd-facts { margin-left: -18px; margin-right: -18px; }
+    .fd-fact { padding: 12px 18px; flex-basis: 50%; }
+    .fd-ref { font-size: 1.6rem; }
+  }
+
+  /* ═════════ Parcours (vraie séquence) ═════════ */
+  .fd-flow { display: flex; background: var(--paper); border: 1px solid var(--line); border-radius: 8px; margin-bottom: 22px; overflow: hidden; }
+  .fd-step { flex: 1; display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-right: 1px solid var(--line); color: var(--muted); font-size: .9rem; min-width: 0; }
+  .fd-step:last-child { border-right: none; }
+  .fd-step-dot { width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border: 2px solid var(--line); font-size: .8rem; }
+  .fd-step b { display: block; color: var(--ink); font-weight: 650; line-height: 1.2; }
+  .fd-step small { color: var(--muted); }
+  .fd-step.is-done .fd-step-dot { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .fd-step.is-current { background: var(--st-bg); }
+  .fd-step.is-current .fd-step-dot { background: var(--st); border-color: var(--st); color: #fff; }
+  .fd-step.is-current b { color: var(--st); }
+  @media (max-width: 767.98px) {
+    .fd-flow { flex-direction: column; }
+    .fd-step { border-right: none; border-bottom: 1px solid var(--line); }
+    .fd-step:last-child { border-bottom: none; }
+  }
+
+  /* ═════════ Panneaux ═════════ */
+  .fd-panel { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; margin-bottom: 22px; overflow: hidden; }
+  .fd-panel-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 16px 22px 0; }
+  .fd-panel-title { font-family: var(--display); font-size: 1.1rem; font-weight: 700; margin: 0; letter-spacing: -.01em; }
+  .fd-panel-title i { color: var(--brand); margin-right: 9px; }
+  .fd-badge { font-size: .8rem; font-weight: 700; color: var(--brand); background: rgba(147,46,43,.09); border-radius: 999px; padding: 3px 11px; font-variant-numeric: tabular-nums; }
+  .fd-panel-body { padding: 16px 22px 22px; }
+  .fd-hint { margin: 0; color: var(--muted); font-size: .88rem; line-height: 1.6; }
+
+  /* ═════════ Plaques d'emplacement ═════════ */
+  .fd-plates { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; padding: 16px 22px 22px; }
+  .fd-plate { display: flex; align-items: stretch; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--paper); transition: border-color .15s, box-shadow .15s; }
+  .fd-plate:hover { border-color: var(--brand); box-shadow: 0 2px 10px rgba(22,26,34,.08); }
+  .fd-plate-key {
+    width: 54px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    background: var(--ink); color: #fff; font-family: var(--display); font-weight: 800; font-size: 1.5rem;
+  }
+  .fd-plate-key.is-screen { background: #4c1d95; font-size: 1.25rem; }
+  .fd-plate-main { padding: 11px 14px; min-width: 0; }
+  .fd-plate-code { font-weight: 700; font-size: .95rem; line-height: 1.25; }
+  .fd-plate-kind { font-size: .82rem; color: var(--muted); }
+  .fd-plate-loc { font-size: .8rem; color: var(--muted); margin-top: 3px; }
+  .fd-plate-loc i { color: var(--brand); margin-right: 4px; }
+  .fd-empty { padding: 26px 22px 30px; text-align: center; color: var(--muted); }
+  .fd-empty i { display: block; font-size: 1.8rem; opacity: .35; margin-bottom: 6px; }
+
+  /* ═════════ Lignes d'info ═════════ */
+  .fd-rows { margin: 12px 0 0; padding: 0; }
+  .fd-row { display: flex; align-items: flex-start; gap: 12px; padding: 12px 22px; border-top: 1px solid var(--line); font-size: .9rem; }
+  .fd-row:first-child { border-top: none; }
+  .fd-row > i { color: var(--brand); width: 18px; text-align: center; margin-top: 2px; flex-shrink: 0; }
+  .fd-row-label { color: var(--muted); flex: 0 0 auto; min-width: 118px; }
+  .fd-row-value { font-weight: 600; margin-left: auto; text-align: right; min-width: 0; overflow-wrap: anywhere; }
+  .fd-row-value a { color: var(--brand); text-decoration: none; }
+  .fd-row-value a:hover { text-decoration: underline; }
+  .fd-row.is-stack .fd-row-value { margin-left: 0; text-align: left; }
+
+  /* ═════════ Texte libre ═════════ */
+  .fd-text { margin: 0; font-size: .95rem; line-height: 1.7; white-space: pre-wrap; max-width: 72ch; }
+  .fd-note { background: #fffbeb; border-left: 4px solid #f59e0b; border-radius: 0 8px 8px 0; padding: 14px 18px; }
+
+  .fd-warn { display: flex; gap: 10px; padding: 12px 14px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; color: #92400e; font-size: .86rem; line-height: 1.5; }
+  .fd-warn i { margin-top: 2px; }
+
+  /* ═════════ Panneau d'action ═════════ */
+  .fd-action { border: 2px solid var(--st); }
+  .fd-action .fd-panel-head { padding-bottom: 0; }
+  .fd-share { border-style: dashed; border-color: var(--brand); }
+
+  .fd select, .fd .form-select { width: 100%; }
+  .fd :focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="row g-3">
-  <div class="col-12">
-    <a href="javascript:void(0)" onclick="history.back()" class="btn btn-outline-secondary btn-sm mb-3">
-      <i class="bi bi-arrow-left me-1"></i>Retour
-    </a>
-  </div>
+<div class="fd fd-st-{{ demande.statut }}">
 
-  <!-- Col gauche -->
-  <div class="col-md-4">
-
-    <!-- Contact -->
-    <div class="card mb-3">
-      <div class="card-header"><i class="bi bi-person-fill me-2"></i>Contact</div>
-      <div class="card-body p-0">
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);font-size:.84rem">
-          <span style="color:var(--text-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.5px">Nom</span>
-          <span style="font-weight:600;text-align:right">{{ demande.nom_contact }}</span>
-        </div>
-        {% if demande.societe %}
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);font-size:.84rem">
-          <span style="color:var(--text-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.5px">Société</span>
-          <span style="font-weight:600;text-align:right">{{ demande.societe }}</span>
-        </div>
-        {% endif %}
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);font-size:.84rem">
-          <span style="color:var(--text-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.5px">Email</span>
-          <a href="mailto:{{ demande.email }}" style="font-weight:600;text-align:right">{{ demande.email }}</a>
-        </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);font-size:.84rem">
-          <span style="color:var(--text-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.5px">Téléphone</span>
-          <a href="tel:{{ demande.telephone }}" style="font-weight:600;text-align:right">{{ demande.telephone }}</a>
-        </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;font-size:.84rem">
-          <span style="color:var(--text-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.5px">Contact accepté</span>
-          {% if demande.accepte_contact %}
-            <span class="badge badge-status bs-disponible"><i class="bi bi-check2 me-1"></i>Oui</span>
-          {% else %}
-            <span class="badge badge-status bs-panne"><i class="bi bi-x me-1"></i>Non</span>
-          {% endif %}
-        </div>
+  {# ═════════ Bandeau ═════════ #}
+  <header class="fd-band">
+    <div class="fd-band-top">
+      <div>
+        <h1 class="fd-ref">{{ demande.reference }}</h1>
+        <p class="fd-who"><b>{{ demande.nom_contact }}</b>{% if demande.societe %} · {{ demande.societe }}{% endif %}</p>
       </div>
+      <span class="fd-chip"><i class="bi {{ demande.get_statut_icon }}"></i>{{ demande.get_statut_display }}</span>
     </div>
+    <div class="fd-facts">
+      <div class="fd-fact"><span>Période souhaitée</span><strong>{{ demande.date_debut_souhaitee|date:"d/m/Y" }} → {{ demande.date_fin_souhaitee|date:"d/m/Y" }}</strong></div>
+      <div class="fd-fact"><span>Durée</span><strong>{{ demande.duree_jours }} jour{{ demande.duree_jours|pluralize }}</strong></div>
+      <div class="fd-fact"><span>Emplacements</span><strong>{{ demande.nb_emplacements }}</strong></div>
+      <div class="fd-fact"><span>Reçue le</span><strong>{{ demande.created_at|date:"d/m/Y à H:i" }}</strong></div>
+    </div>
+  </header>
 
-    <!-- Traitement -->
-    <div class="card mb-3">
-      <div class="card-header"><i class="bi bi-check2-square me-2"></i>Statut</div>
-      <div class="card-body">
-        <div class="mb-3">
-          <span class="badge badge-status bs-dem-{{ demande.statut }}" style="font-size:.78rem;padding:6px 14px">
-            <i class="bi {{ demande.get_statut_icon }} me-1"></i>{{ demande.get_statut_display }}
-          </span>
-        </div>
-
-        {% if demande.peut_etre_traitee %}
-          <div class="d-grid gap-2">
-            <form method="post" action="{% url 'demande_valider' demande.uuid %}"
-                  onsubmit="return confirm('Confirmer la validation ? Cela va créer le client et la réservation.');">
-              {% csrf_token %}
-              <button type="submit" class="btn btn-disponible w-100">
-                <i class="bi bi-check-circle-fill me-1"></i>Valider la demande
-              </button>
-            </form>
-            <button type="button" class="btn btn-panne w-100" data-bs-toggle="modal" data-bs-target="#modalRefus">
-              <i class="bi bi-x-circle me-1"></i>Refuser la demande
-            </button>
-          </div>
-        {% else %}
-          <p style="font-size:.82rem;color:var(--text-muted);margin:0">
-            Cette demande a déjà été traitée
-            {% if demande.traite_par %} par <strong>{{ demande.traite_par.get_full_name|default:demande.traite_par.username }}</strong>{% endif %}
-            {% if demande.traite_le %} le {{ demande.traite_le|date:"d/m/Y à H:i" }}{% endif %}.
-          </p>
-          {% if demande.reservation %}
-          <a href="{% url 'reservation_detail_direct' pk=demande.reservation.pk %}" class="btn btn-sm btn-outline-secondary mt-2">
-            <i class="bi bi-arrow-up-right-square me-1"></i>Voir la réservation {{ demande.reservation.reference }}
-          </a>
-          {% endif %}
-        {% endif %}
+  {# ═════════ Parcours de la demande ═════════ #}
+  <ol class="fd-flow" style="list-style:none;padding:0" aria-label="Avancement de la demande">
+    <li class="fd-step {% if demande.statut == 'brouillon' or demande.statut == 'nouvelle' %}is-current{% else %}is-done{% endif %}">
+      <span class="fd-step-dot"><i class="bi {% if demande.statut == 'brouillon' or demande.statut == 'nouvelle' %}bi-inbox{% else %}bi-check-lg{% endif %}"></i></span>
+      <div>
+        <b>{% if demande.statut == 'brouillon' %}Brouillon client{% else %}Reçue{% endif %}</b>
+        <small>{% if demande.statut == 'brouillon' %}Le client doit confirmer{% else %}{{ demande.created_at|date:"d/m/Y" }}{% endif %}</small>
       </div>
-    </div>
-
-    {% if user.is_staff_regie_role %}
-    <div class="card mb-3">
-      <div class="card-header"><i class="bi bi-camera-fill me-2"></i>Campagne et piges du suivi</div>
-      <div class="card-body">
-        {% if demande.campagne and demande.campagne.lien_piges %}
-          <a href="{{ demande.campagne.lien_piges }}" target="_blank" rel="noopener noreferrer"
-             class="btn btn-sm btn-outline-primary mb-3">
-            <i class="bi bi-folder2-open me-1"></i>Ouvrir les piges de la campagne
-          </a>
-        {% endif %}
-        {% if demande.client or demande.reservation %}
-          <form method="post" action="{% url 'demande_associer_campagne' demande.uuid %}">
-            {% csrf_token %}
-            <label class="form-label" for="{{ campagne_form.campagne.id_for_label }}">
-              {{ campagne_form.campagne.label }}
-            </label>
-            {{ campagne_form.campagne }}
-            {% for error in campagne_form.campagne.errors %}
-              <div class="invalid-feedback d-block">{{ error }}</div>
-            {% endfor %}
-            <div class="form-text mb-3">
-              Seules les campagnes du client associé sont proposées. Le lien Drive apparaîtra dans son suivi s'il existe.
-            </div>
-            <button type="submit" class="btn btn-primary btn-sm">
-              <i class="bi bi-link-45deg me-1"></i>Enregistrer l'association
-            </button>
-          </form>
-        {% else %}
-          <p class="small text-muted mb-0">
-            Associez d'abord cette demande à un client pour sélectionner l'une de ses campagnes.
-          </p>
-        {% endif %}
+    </li>
+    <li class="fd-step {% if demande.statut == 'en_cours' %}is-current{% elif demande.statut == 'validee' or demande.statut == 'refusee' %}is-done{% endif %}">
+      <span class="fd-step-dot"><i class="bi {% if demande.statut == 'validee' or demande.statut == 'refusee' %}bi-check-lg{% else %}bi-hourglass-split{% endif %}"></i></span>
+      <div><b>En traitement</b><small>Étude par l’équipe</small></div>
+    </li>
+    <li class="fd-step {% if demande.statut == 'validee' or demande.statut == 'refusee' %}is-current{% endif %}">
+      <span class="fd-step-dot"><i class="bi {% if demande.statut == 'validee' %}bi-check2-circle{% elif demande.statut == 'refusee' %}bi-x-circle{% else %}bi-flag{% endif %}"></i></span>
+      <div>
+        <b>{% if demande.statut == 'validee' %}Validée{% elif demande.statut == 'refusee' %}Refusée{% else %}Décision{% endif %}</b>
+        <small>{% if demande.traite_le %}{{ demande.traite_le|date:"d/m/Y" }}{% else %}Valider ou refuser{% endif %}</small>
       </div>
-    </div>
-    {% endif %}
+    </li>
+  </ol>
 
-    <!-- Historique -->
-    <div class="card">
-      <div class="card-header"><i class="bi bi-clock-history me-2"></i>Historique</div>
-      <div class="card-body p-0">
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);font-size:.84rem">
-          <span style="color:var(--text-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.5px">Reçue le</span>
-          <span style="font-weight:600">{{ demande.created_at|date:"d/m/Y H:i" }}</span>
-        </div>
-        {% if demande.traite_le %}
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);font-size:.84rem">
-          <span style="color:var(--text-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.5px">Traitée le</span>
-          <span style="font-weight:600">{{ demande.traite_le|date:"d/m/Y H:i" }}</span>
-        </div>
-        {% endif %}
-        {% if demande.traite_par %}
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;font-size:.84rem">
-          <span style="color:var(--text-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.5px">Traitée par</span>
-          <span style="font-weight:600">{{ demande.traite_par.get_full_name|default:demande.traite_par.username }}</span>
-        </div>
-        {% endif %}
-      </div>
-    </div>
+  <div class="row g-4">
 
-  </div>
+    {# ═════════ Colonne principale ═════════ #}
+    <div class="col-lg-8 order-lg-1 order-2">
 
-  <!-- Col droite -->
-  <div class="col-md-8">
-
-    <!-- Emplacements -->
-    <div class="card mb-3">
-      <div class="card-header"><i class="bi bi-geo-alt-fill me-2" style="color:#a78bfa"></i>Emplacements demandés ({{ demande.nb_emplacements }})</div>
-      <div class="card-body p-0">
-        {% for face in demande.faces_souhaitees.all %}
-        <div class="emplacement-row">
-          <i class="bi bi-sign-merge-right"></i>
-          <span style="font-weight:700">{{ face.support.code }}</span>
-          <span>Face {{ face.label }}</span>
-          <span class="meta">{{ face.support.ville }}{% if face.support.quartier %} · {{ face.support.quartier }}{% endif %}</span>
+      <section class="fd-panel">
+        <div class="fd-panel-head">
+          <h2 class="fd-panel-title"><i class="bi bi-geo-alt-fill"></i>Emplacements demandés</h2>
+          <span class="fd-badge">{{ demande.nb_emplacements }}</span>
         </div>
-        {% endfor %}
-        {% for support in demande.supports_souhaites.all %}
-        <div class="emplacement-row">
-          <i class="bi bi-display"></i>
-          <span style="font-weight:700">{{ support.code }}</span>
-          <span>Écran numérique</span>
-          <span class="meta">{{ support.ville }}{% if support.quartier %} · {{ support.quartier }}{% endif %}</span>
-        </div>
-        {% endfor %}
         {% if demande.nb_emplacements == 0 %}
-        <p style="margin:0;color:var(--text-muted);padding:12px 16px">Aucun emplacement enregistré.</p>
+          <div class="fd-empty"><i class="bi bi-inbox"></i>Aucun emplacement enregistré.</div>
+        {% else %}
+        <div class="fd-plates">
+          {% for face in demande.faces_souhaitees.all %}
+          <div class="fd-plate">
+            <div class="fd-plate-key" title="Face {{ face.label }}">{{ face.label }}</div>
+            <div class="fd-plate-main">
+              <div class="fd-plate-code">{{ face.support.code }}</div>
+              <div class="fd-plate-kind">Face {{ face.label }}</div>
+              <div class="fd-plate-loc"><i class="bi bi-geo-alt"></i>{{ face.support.ville }}{% if face.support.quartier %} · {{ face.support.quartier }}{% endif %}</div>
+            </div>
+          </div>
+          {% endfor %}
+          {% for support in demande.supports_souhaites.all %}
+          <div class="fd-plate">
+            <div class="fd-plate-key is-screen" title="Écran numérique"><i class="bi bi-display"></i></div>
+            <div class="fd-plate-main">
+              <div class="fd-plate-code">{{ support.code }}</div>
+              <div class="fd-plate-kind">Écran numérique</div>
+              <div class="fd-plate-loc"><i class="bi bi-geo-alt"></i>{{ support.ville }}{% if support.quartier %} · {{ support.quartier }}{% endif %}</div>
+            </div>
+          </div>
+          {% endfor %}
+        </div>
         {% endif %}
-      </div>
-    </div>
+      </section>
 
-    <!-- Période & projet -->
-    <div class="card mb-3">
-      <div class="card-header"><i class="bi bi-calendar3 me-2"></i>Période & projet</div>
-      <div class="card-body p-0">
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-bottom:1px solid var(--border);font-size:.84rem">
-          <span style="color:var(--text-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.5px">Période souhaitée</span>
-          <span style="font-weight:600">{{ demande.date_debut_souhaitee|date:"d/m/Y" }} → {{ demande.date_fin_souhaitee|date:"d/m/Y" }}</span>
+      <section class="fd-panel">
+        <div class="fd-panel-head"><h2 class="fd-panel-title"><i class="bi bi-calendar3"></i>Période et projet</h2></div>
+        <div class="fd-rows">
+          <div class="fd-row"><i class="bi bi-calendar-range"></i><span class="fd-row-label">Période souhaitée</span><span class="fd-row-value">{{ demande.date_debut_souhaitee|date:"d/m/Y" }} → {{ demande.date_fin_souhaitee|date:"d/m/Y" }}</span></div>
+          <div class="fd-row"><i class="bi bi-hourglass-split"></i><span class="fd-row-label">Durée</span><span class="fd-row-value">{{ demande.duree_jours }} jour{{ demande.duree_jours|pluralize }}</span></div>
+          {% if demande.nom_campagne %}
+          <div class="fd-row"><i class="bi bi-megaphone"></i><span class="fd-row-label">Campagne / projet</span><span class="fd-row-value">{{ demande.nom_campagne }}</span></div>
+          {% endif %}
         </div>
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;{% if demande.nom_campagne %}border-bottom:1px solid var(--border);{% endif %}font-size:.84rem">
-          <span style="color:var(--text-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.5px">Durée</span>
-          <span style="font-weight:600">{{ demande.duree_jours }} jour{{ demande.duree_jours|pluralize }}</span>
+      </section>
+
+      {% if demande.message %}
+      <section class="fd-panel">
+        <div class="fd-panel-head"><h2 class="fd-panel-title"><i class="bi bi-chat-left-text-fill"></i>Message du client</h2></div>
+        <div class="fd-panel-body"><p class="fd-text">{{ demande.message }}</p></div>
+      </section>
+      {% endif %}
+
+      {% if demande.notes_staff %}
+      <section class="fd-panel">
+        <div class="fd-panel-head"><h2 class="fd-panel-title"><i class="bi bi-sticky-fill" style="color:#d97706"></i>Notes internes</h2></div>
+        <div class="fd-panel-body"><p class="fd-text fd-note">{{ demande.notes_staff }}</p></div>
+      </section>
+      {% endif %}
+
+    </div>
+
+    {# ═════════ Colonne latérale ═════════ #}
+    <div class="col-lg-4 order-lg-2 order-1">
+
+      <section class="fd-panel fd-action">
+        <div class="fd-panel-head"><h2 class="fd-panel-title"><i class="bi bi-check2-square"></i>Traitement</h2></div>
+        <div class="fd-panel-body">
+          {% if demande.peut_etre_traitee %}
+            <div class="d-grid gap-2">
+              <form method="post" action="{% url 'demande_valider' demande.uuid %}"
+                    onsubmit="return confirm('Confirmer la validation ? Cela va créer le client et la réservation.');">
+                {% csrf_token %}
+                {% if demande.supports_souhaites.exists %}
+                  <div class="fd-warn"><i class="bi bi-exclamation-triangle-fill"></i><span>Cette demande comprend un écran numérique. Son traitement doit être fait manuellement.</span></div>
+                {% else %}
+                  <button type="submit" class="btn btn-disponible w-100 py-2 fw-semibold">
+                    <i class="bi bi-check-circle-fill me-1"></i>Valider la demande
+                  </button>
+                {% endif %}
+              </form>
+              <button type="button" class="btn btn-panne w-100 py-2 fw-semibold" data-bs-toggle="modal" data-bs-target="#modalRefus">
+                <i class="bi bi-x-circle me-1"></i>Refuser la demande
+              </button>
+            </div>
+          {% else %}
+            {% if demande.statut == 'brouillon' %}
+              <p class="fd-hint">Le client doit vérifier et confirmer cette demande avant qu’elle puisse être traitée comme réservation.</p>
+            {% elif demande.statut == 'en_cours' and demande.token_partage %}
+              <p class="fd-hint">La demande est en cours de traitement. Vous pouvez la valider ou la refuser, ou autoriser le client à la modifier.</p>
+            {% else %}
+              <p class="fd-hint">
+                Cette demande a déjà été traitée
+                {% if demande.traite_par %} par <strong>{{ demande.traite_par.get_full_name|default:demande.traite_par.username }}</strong>{% endif %}
+                {% if demande.traite_le %} le {{ demande.traite_le|date:"d/m/Y à H:i" }}{% endif %}.
+              </p>
+            {% endif %}
+            {% if demande.reservation %}
+            <a href="{% url 'reservation_detail_direct' pk=demande.reservation.pk %}" class="btn btn-sm btn-outline-secondary mt-3">
+              <i class="bi bi-arrow-up-right-square me-1"></i>Voir la réservation {{ demande.reservation.reference }}
+            </a>
+            {% endif %}
+          {% endif %}
         </div>
-        {% if demande.nom_campagne %}
-        <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 16px;font-size:.84rem">
-          <span style="color:var(--text-muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.5px">Campagne / Projet</span>
-          <span style="font-weight:600">{{ demande.nom_campagne }}</span>
+      </section>
+
+      {% if share_url %}
+      <section class="fd-panel fd-share">
+        <div class="fd-panel-head"><h2 class="fd-panel-title"><i class="bi bi-share-fill"></i>Partager avec le client</h2></div>
+        <div class="fd-panel-body">
+          <p class="fd-hint mb-3">Envoyez ce lien au client. Il pourra modifier les emplacements, les dates, le projet et ses coordonnées, puis confirmer la demande. La réservation restera à valider par le staff.</p>
+          <div class="input-group">
+            <input type="text" class="form-control" id="demande-share-url" value="{{ share_url }}" readonly>
+            <button type="button" class="btn btn-primary" id="copy-demande-link"><i class="bi bi-clipboard me-1"></i>Copier</button>
+          </div>
         </div>
-        {% endif %}
-      </div>
-    </div>
+      </section>
+      {% endif %}
 
-    <!-- Message -->
-    {% if demande.message %}
-    <div class="card mb-3">
-      <div class="card-header"><i class="bi bi-chat-left-text-fill me-2"></i>Message du client</div>
-      <div class="card-body">
-        <p style="margin:0;font-size:.85rem;line-height:1.6;white-space:pre-wrap">{{ demande.message }}</p>
-      </div>
-    </div>
-    {% endif %}
+      <section class="fd-panel">
+        <div class="fd-panel-head"><h2 class="fd-panel-title"><i class="bi bi-person-fill"></i>Contact</h2></div>
+        <div class="fd-rows">
+          <div class="fd-row is-stack"><i class="bi bi-person"></i><span class="fd-row-value">{{ demande.nom_contact }}{% if demande.societe %}<br><span style="font-weight:400;color:var(--muted)">{{ demande.societe }}</span>{% endif %}</span></div>
+          <div class="fd-row is-stack"><i class="bi bi-envelope"></i><span class="fd-row-value"><a href="mailto:{{ demande.email }}">{{ demande.email }}</a></span></div>
+          <div class="fd-row is-stack"><i class="bi bi-telephone"></i><span class="fd-row-value"><a href="tel:{{ demande.telephone }}">{{ demande.telephone }}</a></span></div>
+          <div class="fd-row">
+            <i class="bi bi-chat-check"></i><span class="fd-row-label" style="min-width:0">Contact accepté</span>
+            <span class="fd-row-value">
+              {% if demande.accepte_contact %}
+                <span class="badge badge-status bs-disponible"><i class="bi bi-check2 me-1"></i>Oui</span>
+              {% else %}
+                <span class="badge badge-status bs-panne"><i class="bi bi-x me-1"></i>Non</span>
+              {% endif %}
+            </span>
+          </div>
+        </div>
+        <div style="height:10px"></div>
+      </section>
 
-    <!-- Notes internes -->
-    {% if demande.notes_staff %}
-    <div class="card">
-      <div class="card-header"><i class="bi bi-sticky-fill me-2" style="color:#fbbf24"></i>Notes internes</div>
-      <div class="card-body">
-        <p style="margin:0;font-size:.85rem;line-height:1.6;white-space:pre-wrap">{{ demande.notes_staff }}</p>
-      </div>
-    </div>
-    {% endif %}
+      {% if user.is_staff_regie_role %}
+      <section class="fd-panel">
+        <div class="fd-panel-head"><h2 class="fd-panel-title"><i class="bi bi-camera-fill"></i>Campagne et piges</h2></div>
+        <div class="fd-panel-body">
+          {% if demande.campagne and demande.campagne.lien_piges %}
+            <a href="{{ demande.campagne.lien_piges }}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-primary mb-3">
+              <i class="bi bi-folder2-open me-1"></i>Ouvrir les piges de la campagne
+            </a>
+          {% endif %}
+          {% if demande.client or demande.reservation %}
+            <form method="post" action="{% url 'demande_associer_campagne' demande.uuid %}">
+              {% csrf_token %}
+              <label class="form-label fw-semibold" for="{{ campagne_form.campagne.id_for_label }}">{{ campagne_form.campagne.label }}</label>
+              {{ campagne_form.campagne }}
+              {% for error in campagne_form.campagne.errors %}
+                <div class="invalid-feedback d-block">{{ error }}</div>
+              {% endfor %}
+              <div class="form-text mb-3">Seules les campagnes du client associé sont proposées. Le lien Drive apparaîtra dans son suivi s'il existe.</div>
+              <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-link-45deg me-1"></i>Enregistrer l'association</button>
+            </form>
+          {% else %}
+            <p class="fd-hint">Associez d'abord cette demande à un client pour sélectionner l'une de ses campagnes.</p>
+          {% endif %}
+        </div>
+      </section>
+      {% endif %}
 
+      <section class="fd-panel">
+        <div class="fd-panel-head"><h2 class="fd-panel-title"><i class="bi bi-clock-history"></i>Historique</h2></div>
+        <div class="fd-rows">
+          <div class="fd-row"><span class="fd-row-label" style="min-width:0">Reçue le</span><span class="fd-row-value">{{ demande.created_at|date:"d/m/Y H:i" }}</span></div>
+          {% if demande.traite_le %}
+          <div class="fd-row"><span class="fd-row-label" style="min-width:0">Traitée le</span><span class="fd-row-value">{{ demande.traite_le|date:"d/m/Y H:i" }}</span></div>
+          {% endif %}
+          {% if demande.traite_par %}
+          <div class="fd-row"><span class="fd-row-label" style="min-width:0">Traitée par</span><span class="fd-row-value">{{ demande.traite_par.get_full_name|default:demande.traite_par.username }}</span></div>
+          {% endif %}
+        </div>
+        <div style="height:10px"></div>
+      </section>
+
+    </div>
   </div>
 </div>
 
 <!-- Modal Refus -->
 <div class="modal fade" id="modalRefus" tabindex="-1" aria-hidden="true">
-  <div class="modal-dialog">
-    <div class="modal-content">
+  <div class="modal-dialog modal-dialog-centered">
+    <div class="modal-content" style="border-radius:14px;">
       <form method="post" action="{% url 'demande_refuser' demande.uuid %}">
         {% csrf_token %}
         <div class="modal-header">
           <h5 class="modal-title"><i class="bi bi-x-circle-fill me-2" style="color:var(--color-panne)"></i>Refuser {{ demande.reference }}</h5>
-          <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Fermer"></button>
         </div>
         <div class="modal-body">
-          <label class="form-label">Motif du refus</label>
-          <textarea name="motif" class="form-control" rows="4" placeholder="Ce message sera envoyé au client par email…" required></textarea>
+          <label class="form-label fw-semibold" for="motif-refus">Motif du refus</label>
+          <textarea id="motif-refus" name="motif" class="form-control" rows="4" placeholder="Ce message sera envoyé au client par e-mail…" required></textarea>
         </div>
         <div class="modal-footer">
           <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Annuler</button>
@@ -263,4 +416,23 @@
   </div>
 </div>
 
+{% endblock %}
+
+{% block extra_js %}
+{% if share_url %}
+<script>
+  document.getElementById('copy-demande-link').addEventListener('click', async function () {
+    const field = document.getElementById('demande-share-url');
+    try {
+      await navigator.clipboard.writeText(field.value);
+    } catch (error) {
+      field.select();
+      if (!document.execCommand('copy')) {
+        return;
+      }
+    }
+    this.innerHTML = '<i class="bi bi-check2 me-1"></i>Lien copié';
+  });
+</script>
+{% endif %}
 {% endblock %}

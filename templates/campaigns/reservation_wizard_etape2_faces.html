@@ -140,32 +140,44 @@
   .leg-dot  { width: 9px; height: 9px; border-radius: 50%; }
 
   #view-liste { display: none; flex: 1; overflow-y: auto; }
+  .main-section.map-disabled [hidden] { display: none !important; }
+  .main-section.map-disabled .view-toggle,
+  .main-section.map-disabled #filtres-carte,
+  .main-section.map-disabled #view-carte,
+  .main-section.map-disabled .sc-map-btn { display: none !important; }
+  .main-section.map-disabled #filtres-liste { display: flex !important; }
+  .main-section.map-disabled #view-liste { display: block !important; }
+  #btn-vue-carte { display: none !important; }
   .liste-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-    gap: 12px; padding: 14px;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px; padding: 14px;
   }
   .liste-empty { grid-column: 1/-1; padding: 60px 20px; text-align: center; color: #64748b; }
   .liste-empty i { font-size: 2.4rem; opacity: .25; display: block; margin-bottom: 8px; }
   .liste-empty p { font-size: 0.85rem; }
 
   .support-card {
+    display: grid;
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas: "header faces" "map faces";
+    align-items: stretch;
     background: #ffffff; border: 1px solid #e2e8f0;
     border-radius: var(--radius-md); overflow: hidden; transition: all .15s;
   }
   .support-card:hover { box-shadow: var(--shadow-md); border-color: #cbd5e1; }
   .support-card.has-selected { border-color: var(--color-primary, #932e2b); box-shadow: 0 0 0 2px rgba(147, 46, 43, 0.15); }
-  .sc-header { padding: 10px 12px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; align-items: center; gap: 8px; }
+  .sc-header { grid-area: header; min-width: 0; padding: 12px 14px; background: #f8fafc; border-bottom: 1px solid #e2e8f0; display: flex; align-items: flex-start; gap: 10px; }
   .sc-icon { width: 32px; height: 32px; border-radius: var(--radius-sm); background: var(--color-primary, #932e2b); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 0.75rem; font-weight: 800; flex-shrink: 0; }
-  .sc-info { flex: 1; overflow: hidden; }
+  .sc-info { flex: 1; min-width: 0; }
   .sc-code { font-size: 0.72rem; font-weight: 800; color: var(--color-primary, #932e2b); letter-spacing: 0.05em; }
-  .sc-nom  { font-size: 0.82rem; font-weight: 700; color: #0f172a; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .sc-nom  { font-size: 0.9rem; font-weight: 700; color: #0f172a; white-space: normal; overflow-wrap: anywhere; line-height: 1.4; }
   .sc-format { font-size: 0.65rem; font-weight: 700; padding: 2px 8px; border-radius: 8px; background: #ffffff; border: 1px solid #e2e8f0; color: #64748b; white-space: nowrap; flex-shrink: 0; }
-  .sc-faces { padding: 8px 10px; display: flex; flex-direction: column; gap: 6px; }
+  .sc-faces { grid-area: faces; align-self: center; padding: 10px; display: flex; flex-direction: column; gap: 7px; }
 
   .face-btn {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 7px 12px; border-radius: var(--radius-sm); border: 1.5px solid;
+    min-height: 36px; padding: 7px 12px; border-radius: var(--radius-sm); border: 1.5px solid;
     font-size: 0.76rem; font-weight: 700; cursor: pointer; transition: all .15s; background: transparent; width: 100%;
   }
   .face-btn .fb-left { display: flex; align-items: center; gap: 6px; }
@@ -230,8 +242,17 @@
   .liste-group-quartier { grid-column: 1/-1; display: flex; align-items: center; gap: 7px; padding: 4px 4px 2px 14px; font-size: 0.74rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; }
   .liste-group-quartier i { font-size: 0.72rem; color: var(--color-primary, #932e2b); opacity: .8; }
 
-  .sc-map-btn { display: flex; align-items: center; justify-content: center; gap: 6px; width: 100%; padding: 8px 0; border: none; border-top: 1px solid #e2e8f0; background: #ffffff; color: var(--color-primary, #932e2b); font-size: 0.75rem; font-weight: 700; cursor: pointer; transition: background .15s ease; }
-  .sc-map-btn:hover { background: #f8fafc; }
+  .sc-map-btn { grid-area: map; display: inline-flex; align-items: center; justify-content: center; justify-self: start; gap: 6px; margin: 10px 14px; padding: 7px 11px; border: 1px solid #e2e8f0; border-radius: 8px; background: #ffffff; color: var(--color-primary, #932e2b); font-size: 0.75rem; font-weight: 700; cursor: pointer; transition: background .15s ease; }
+  .sc-map-btn:hover { background: #f8fafc; border-color: #cbd5e1; }
+  @media (max-width: 640px) {
+    .support-card {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto auto auto;
+      grid-template-areas: "header" "faces" "map";
+    }
+    .sc-faces { padding-top: 8px; }
+    .sc-map-btn { margin-top: 0; }
+  }
 </style>
 
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
@@ -293,7 +314,7 @@
   <div class="resa-grid">
 
     <!-- Section Principale (Carte / Liste) -->
-    <div class="main-section">
+    <div class="main-section map-disabled">
       <div class="section-header">
 
         <div class="availability-heading">
@@ -301,7 +322,7 @@
           <strong>Supports disponibles</strong>
         </div>
 
-        <div class="view-toggle">
+        <div id="map-view-toggle" class="view-toggle" hidden style="display:none !important">
           <button class="vt-btn active" id="btn-vue-carte" onclick="switchView('carte')">
             <i class="bi bi-map-fill"></i> Carte
           </button>
@@ -310,7 +331,7 @@
           </button>
         </div>
 
-        <div id="filtres-carte" style="display:flex;gap:6px;flex-wrap:wrap;flex:1">
+        <div id="filtres-carte" hidden style="display:none !important;gap:6px;flex-wrap:wrap;flex:1">
           <select class="mf-select" id="filter-ville"><option value="">Toutes les villes</option></select>
           <select class="mf-select" id="filter-categorie"><option value="">Toutes catégories</option></select>
           <select class="mf-select" id="filter-format"><option value="">Tous formats</option></select>
@@ -321,7 +342,7 @@
           </select>
         </div>
 
-        <div id="filtres-liste" style="display:none;gap:6px;flex-wrap:wrap;flex:1;align-items:center">
+        <div id="filtres-liste" style="display:flex;gap:6px;flex-wrap:wrap;flex:1;align-items:center">
           <input type="search" class="list-search" id="list-search" placeholder="Code ou nom du panneau…">
           <select class="mf-select" id="list-filter-ville"><option value="">Toutes les villes</option></select>
           <select class="mf-select" id="list-filter-categorie"><option value="">Toutes catégories</option></select>
@@ -335,7 +356,7 @@
 
       </div>
 
-      <div id="view-carte" style="flex:1;display:flex;flex-direction:column;">
+      <div id="view-carte" hidden style="display:none !important;flex:1;flex-direction:column;">
         <div id="map-resa" style="flex:1;min-height:380px;"></div>
         <div class="map-legend">
           <span class="leg-item"><span class="leg-dot" style="background:#10b981"></span>Libre</span>
@@ -347,7 +368,7 @@
         </div>
       </div>
 
-      <div id="view-liste">
+      <div id="view-liste" style="display:block">
         <div class="liste-grid" id="liste-grid">
           <div class="liste-empty"><i class="bi bi-hourglass-split"></i><p>Chargement des panneaux…</p></div>
         </div>
@@ -411,7 +432,7 @@
     let facesOccupees  = new Set();
     let markersMap     = {};
     let panier         = {};
-    let currentView    = 'carte';
+    let currentView    = 'liste';
     let currentPopup   = null;
     let datesOk        = false;
     let checkDispoTimer = null;
@@ -708,7 +729,7 @@
           ${formatBadge}
         </div>
         <div class="sc-faces">${facesHtml || '<span style="font-size:.7rem;color:#94a3b8;padding:4px">Aucune face disponible</span>'}</div>
-        <button type="button" class="sc-map-btn" onclick="goToOnMap('${p.id}')"><i class="bi bi-map"></i> Voir sur la carte</button>
+        <button type="button" class="sc-map-btn" hidden style="display:none !important" onclick="goToOnMap('${p.id}')"><i class="bi bi-map"></i> Voir sur la carte</button>
       </div>`;
     }
 

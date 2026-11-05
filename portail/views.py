@@ -6,13 +6,15 @@ from datetime import date, timedelta
 from django.conf import settings
 from django.contrib import messages
 from django.core.cache import cache
-from django.core.exceptions import PermissionDenied
+from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.mail import send_mail
 from django.core.paginator import Paginator
+from django.db import transaction
 from django.db.models import Count, Prefetch, Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.template.loader import render_to_string
+from django.urls import reverse
 from django.utils import timezone
 from django.views import View
 from django.views.generic import TemplateView
@@ -20,6 +22,7 @@ from django.views.generic import ListView, DetailView, DeleteView, TemplateView,
 from django.utils.safestring import mark_safe
 from campaigns.models import (
     Campagne,
+    Client,
     DemandeReservation,
     LigneCampagne,
     Reservation,
@@ -1536,6 +1539,290 @@ class ReserverEtape3View(View):
             )
         except Exception as exc:
             logger.error("Email visiteur échoué : %s", exc)
+
+
+class DemandePartageWizardBase(View):
+    template_context = {'shared_request_mode': True}
+
+    def get_draft(self, token):
+        return get_object_or_404(
+            DemandeReservation.objects.prefetch_related(
+                'faces_souhaitees__support',
+                'supports_souhaites',
+            ),
+            token_partage=token,
+        )
+
+    def session_key(self, token):
+        return f'demande_partage_{token.hex}'
+
+    def get_state(self, request, demande, token):
+        key = self.session_key(token)
+        state = request.session.get(key)
+        if state is None:
+            state = {
+                'faces': list(demande.faces_souhaitees.values_list('pk', flat=True)),
+                'supports': list(demande.supports_souhaites.values_list('pk', flat=True)),
+                'date_debut': demande.date_debut_souhaitee.isoformat(),
+                'date_fin': demande.date_fin_souhaitee.isoformat(),
+                'nom_campagne': demande.nom_campagne,
+                'message': demande.message,
+                'nom_contact': demande.nom_contact,
+                'societe': demande.societe,
+                'email': demande.email,
+                'telephone': demande.telephone,
+                'type_client': demande.type_client,
+                'reference_client_saisie': demande.reference_client_saisie,
+            }
+            request.session[key] = state
+        return state
+
+    def get_selections(self, request, demande, token):
+        state = self.get_state(request, demande, token)
+        faces = list(
+            FacePanneau.objects.filter(pk__in=state['faces'])
+            .select_related('support')
+        )
+        supports = list(Support.objects.filter(pk__in=state['supports']))
+        return state, faces, supports
+
+    def step_context(self, token, **context):
+        context.update(self.template_context)
+        context.update({
+            'step1_url': reverse('portail:demande_partage', kwargs={'token': token}),
+            'step2_url': reverse('portail:demande_partage_etape2', kwargs={'token': token}),
+            'step3_url': reverse('portail:demande_partage_etape3', kwargs={'token': token}),
+        })
+        return context
+
+    def redirect_if_submitted(self, demande):
+        if demande.statut != DemandeReservation.STATUT_BROUILLON:
+            return redirect('portail:confirmation', uuid=demande.uuid)
+        return None
+
+
+class DemandePartageEtape1View(DemandePartageWizardBase):
+    """Le client peut ajuster les emplacements et les dates du brouillon."""
+    template_name = 'portail/reserver_etape1.html'
+
+    def get(self, request, token):
+        demande = self.get_draft(token)
+        response = self.redirect_if_submitted(demande)
+        if response:
+            return response
+        state, faces, _ = self.get_selections(request, demande, token)
+        form = Etape1Form(initial={
+            'faces_selectionnees': json.dumps(state['faces']),
+            'supports_selectionnees': json.dumps(state['supports']),
+            'date_debut': state['date_debut'],
+            'date_fin': state['date_fin'],
+        })
+        return render(request, self.template_name, self.step_context(
+            token,
+            form=form,
+            panier=faces,
+            filtres={
+                'ville': request.GET.get('ville', '').strip(),
+                'categorie': request.GET.get('categorie', '').strip(),
+                'format': request.GET.get('format', '').strip(),
+            },
+        ))
+
+    def post(self, request, token):
+        demande = self.get_draft(token)
+        response = self.redirect_if_submitted(demande)
+        if response:
+            return response
+        form = Etape1Form(request.POST)
+        state, faces, _ = self.get_selections(request, demande, token)
+        if not form.is_valid():
+            return render(request, self.template_name, self.step_context(
+                token, form=form, panier=faces, filtres={},
+            ))
+
+        data = form.cleaned_data
+        state.update({
+            'faces': data['faces_uuids'],
+            'supports': data['supports_uuids'],
+            'date_debut': data['date_debut'].isoformat(),
+            'date_fin': data['date_fin'].isoformat(),
+        })
+        request.session[self.session_key(token)] = state
+        return redirect('portail:demande_partage_etape2', token=token)
+
+
+class DemandePartageEtape2View(DemandePartageWizardBase):
+    """Le client peut modifier le nom et les précisions de son projet."""
+    template_name = 'portail/reserver_etape2.html'
+
+    def build_context(self, request, demande, token, form):
+        state, faces, supports = self.get_selections(request, demande, token)
+        if (not faces and not supports) or not state.get('date_debut') or not state.get('date_fin'):
+            return None
+        days = (
+            date.fromisoformat(state['date_fin'])
+            - date.fromisoformat(state['date_debut'])
+        ).days + 1
+        return self.step_context(
+            token,
+            form=form,
+            faces=faces,
+            supports=supports,
+            periode={
+                'date_debut': state['date_debut'],
+                'date_fin': state['date_fin'],
+            },
+            duree_jours=days,
+        )
+
+    def get(self, request, token):
+        demande = self.get_draft(token)
+        response = self.redirect_if_submitted(demande)
+        if response:
+            return response
+        state = self.get_state(request, demande, token)
+        context = self.build_context(
+            request,
+            demande,
+            token,
+            Etape2Form(initial={
+                'nom_campagne': state['nom_campagne'],
+                'message': state['message'],
+            }),
+        )
+        if context is None:
+            messages.warning(request, "Veuillez d'abord vérifier les emplacements et les dates.")
+            return redirect('portail:demande_partage', token=token)
+        return render(request, self.template_name, context)
+
+    def post(self, request, token):
+        demande = self.get_draft(token)
+        response = self.redirect_if_submitted(demande)
+        if response:
+            return response
+        form = Etape2Form(request.POST)
+        context = self.build_context(request, demande, token, form)
+        if context is None:
+            messages.warning(request, "Veuillez d'abord vérifier les emplacements et les dates.")
+            return redirect('portail:demande_partage', token=token)
+        if not form.is_valid():
+            return render(request, self.template_name, context)
+
+        state = self.get_state(request, demande, token)
+        state.update({
+            'nom_campagne': form.cleaned_data['nom_campagne'],
+            'message': form.cleaned_data['message'],
+        })
+        request.session[self.session_key(token)] = state
+        return redirect('portail:demande_partage_etape3', token=token)
+
+
+class DemandePartageEtape3View(DemandePartageWizardBase):
+    """Le client ajuste ses coordonnées puis confirme la demande au staff."""
+    template_name = 'portail/reserver_etape3.html'
+
+    def build_context(self, request, demande, token, form):
+        state, faces, supports = self.get_selections(request, demande, token)
+        if (not faces and not supports) or not state.get('date_debut') or not state.get('date_fin'):
+            return None
+        debut = date.fromisoformat(state['date_debut'])
+        fin = date.fromisoformat(state['date_fin'])
+        return self.step_context(
+            token,
+            form=form,
+            faces=faces,
+            supports=supports,
+            etape2={
+                'date_debut': state['date_debut'],
+                'date_fin': state['date_fin'],
+                'nom_campagne': state['nom_campagne'],
+                'message': state['message'],
+            },
+            duree_jours=(fin - debut).days + 1,
+        )
+
+    def get(self, request, token):
+        demande = self.get_draft(token)
+        response = self.redirect_if_submitted(demande)
+        if response:
+            return response
+        state = self.get_state(request, demande, token)
+        form = Etape3Form(initial={
+            'nom_contact': state['nom_contact'],
+            'societe': state['societe'],
+            'email': state['email'],
+            'telephone': state['telephone'],
+            'type_client': state['type_client'],
+            'reference_client_saisie': state['reference_client_saisie'],
+        })
+        context = self.build_context(request, demande, token, form)
+        if context is None:
+            messages.warning(request, "Veuillez d'abord vérifier les étapes précédentes.")
+            return redirect('portail:demande_partage', token=token)
+        return render(request, self.template_name, context)
+
+    def post(self, request, token):
+        demande = self.get_draft(token)
+        response = self.redirect_if_submitted(demande)
+        if response:
+            return response
+        form = Etape3Form(request.POST)
+        context = self.build_context(request, demande, token, form)
+        if context is None:
+            messages.warning(request, "Veuillez d'abord vérifier les étapes précédentes.")
+            return redirect('portail:demande_partage', token=token)
+        if not form.is_valid():
+            return render(request, self.template_name, context)
+
+        state, faces, supports = self.get_selections(request, demande, token)
+        data = form.cleaned_data
+        debut = date.fromisoformat(state['date_debut'])
+        fin = date.fromisoformat(state['date_fin'])
+        if any(not face.is_disponibles(debut, fin) for face in faces):
+            form.add_error(
+                None,
+                "Un emplacement sélectionné n'est plus disponible sur cette période. "
+                "Retournez à l'étape 1 pour modifier votre demande.",
+            )
+            return render(request, self.template_name, context)
+
+        try:
+            with transaction.atomic():
+                demande = (
+                    DemandeReservation.objects
+                    .select_for_update()
+                    .get(pk=demande.pk, statut=DemandeReservation.STATUT_BROUILLON)
+                )
+                reference = data.get('reference_client_saisie', '').strip()
+                client = None
+                if data['type_client'] == DemandeReservation.TYPE_CLIENT_EXISTANT:
+                    client = Client.objects.filter(reference__iexact=reference).first()
+
+                demande.type_client = data['type_client']
+                demande.reference_client_saisie = reference
+                demande.client = client
+                demande.nom_contact = data['nom_contact']
+                demande.societe = data.get('societe', '')
+                demande.email = data['email']
+                demande.telephone = data['telephone']
+                demande.accepte_contact = data['accepte_contact']
+                demande.date_debut_souhaitee = debut
+                demande.date_fin_souhaitee = fin
+                demande.nom_campagne = state['nom_campagne']
+                demande.message = state['message']
+                demande.statut = DemandeReservation.STATUT_NOUVELLE
+                demande.full_clean(exclude=['reference'])
+                demande.save()
+                demande.faces_souhaitees.set(faces)
+                demande.supports_souhaites.set(supports)
+        except DemandeReservation.DoesNotExist:
+            return redirect('portail:confirmation', uuid=demande.uuid)
+        except ValidationError as exc:
+            form.add_error(None, "; ".join(exc.messages))
+            return render(request, self.template_name, context)
+
+        request.session.pop(self.session_key(token), None)
+        return redirect('portail:confirmation', uuid=demande.uuid)
 
 
 class ConfirmationView(View):

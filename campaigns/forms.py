@@ -1,3 +1,5 @@
+import json
+
 from django import forms
 from django.db.models import Q
 from django.utils import timezone
@@ -12,6 +14,7 @@ from .models import (
     EcranParametresExploitation,
     EcranBilanMensuel,
     PackageEcran,
+    DemandeReservation,
 )
 from inventory.models import (
     Support,
@@ -152,11 +155,31 @@ from inventory.models import Support
 
 from django import forms
 from inventory.models import Support
-from .models import Campagne, Contrat, CampagneVisuel
+from .models import (
+    Campagne,
+    Contrat,
+    CampagneVisuel,
+    Reservation,
+    ReservationLigne,
+    STATUT_CONFIRMEE,
+    STATUT_EN_ATTENTE,
+)
 # adaptez les imports ci-dessus selon vos vrais chemins (MultipleFileField, MultipleFileInput, S, W, D)
 
 
 class CampagneForm(forms.ModelForm):
+    reservation_reference = forms.CharField(
+        required=False,
+        label="Référence de réservation",
+        widget=forms.TextInput(attrs={
+            **W,
+            'list': 'reservations-agence',
+            'placeholder': 'Ex. RES-2026-ABC123',
+            'autocomplete': 'off',
+        }),
+        help_text="Importe automatiquement les faces de cette réservation si elle appartient à l’agence sélectionnée.",
+    )
+
     # Champ de choix dynamique pour le type / format de campagne
     type_support = forms.ChoiceField(
         required=False,
@@ -188,13 +211,19 @@ class CampagneForm(forms.ModelForm):
     class Meta:
         model = Campagne
         fields = [
-            'client', 'nom', 'prix', 'prix_affichage', 'prix_impression', 'campagne_parente', 'est_mere',
+            'client', 'annonceur', 'nom', 'prix', 'prix_affichage', 'prix_impression', 'campagne_parente', 'est_mere',
             'date_debut', 'date_fin', 'statut', 'lieu',
             'type_support', 'duree_passage', 'frequence', 'nombre_visuels',
             'tranches_horaires', 'notes', 'contrat', 'bon_commande_en_attente'
         ]
         widgets = {
             'client': forms.Select(attrs=S),
+            'annonceur': forms.TextInput(attrs={
+                **W,
+                'list': 'annonceurs-existants',
+                'placeholder': 'Sélectionner ou saisir un client',
+                'autocomplete': 'off',
+            }),
             'nom': forms.TextInput(attrs=W),
             'prix': forms.NumberInput(attrs={**W, 'step': '0.01', 'min': '0'}),
             'prix_affichage': forms.NumberInput(attrs={**W, 'step': '0.01', 'min': '0'}),
@@ -229,6 +258,47 @@ class CampagneForm(forms.ModelForm):
                 args = (data, *args[1:])
 
         super().__init__(*args, **kwargs)
+        self.annonceurs_existants = (
+            Client.objects.filter(actif=True)
+            .exclude(nom='')
+            .order_by('nom')
+            .values_list('nom', flat=True)
+            .distinct()
+        )
+        reservations = list(
+            Reservation.objects
+            .filter(
+                statut__in=[STATUT_EN_ATTENTE, STATUT_CONFIRMEE],
+                lignes__face__isnull=False,
+            )
+            .select_related('client')
+            .distinct()
+            .order_by('client__nom', '-created_at')
+        )
+        categories_par_format = dict(FormatSupport.objects.values_list('code', 'categorie'))
+        for reservation in reservations:
+            categories = {}
+            for ligne in reservation.lignes.select_related('face__support').all():
+                support = ligne.face.support if ligne.face_id else None
+                format_code = support.format if support else ''
+                categorie = normaliser_categorie_format(
+                    categories_par_format.get(format_code, '')
+                )
+                if categorie:
+                    categories.setdefault(categorie, set()).add(format_code)
+            reservation.categories_pour_formulaire = [
+                {
+                    'nom': categorie,
+                    'formats': sorted(codes),
+                }
+                for categorie, codes in sorted(categories.items())
+            ]
+            reservation.categories_json = json.dumps(reservation.categories_pour_formulaire)
+        self.reservations_existantes = reservations
+        self.categories_par_format = {
+            code: normaliser_categorie_format(categorie)
+            for code, categorie in categories_par_format.items()
+        }
         statuts_geres_par_actions = {
             Campagne.STATUT_EN_PAUSE,
             Campagne.STATUT_ANNULEE,
@@ -242,6 +312,9 @@ class CampagneForm(forms.ModelForm):
             ]
         self.fields['client'].required = False
         self.fields['client'].help_text = "Laissez vide pour une campagne propre à INTEGRAL."
+        self.reservation_source = None
+        self.reservation_categorie = None
+        self.reservation_formats = set()
 
         # 1. Déterminer le client à utiliser pour filtrer contrat / campagne_parente
         #    Ordre de priorité :
@@ -304,6 +377,85 @@ class CampagneForm(forms.ModelForm):
         contrat = cleaned.get('contrat')
         bon_commande_en_attente = cleaned.get('bon_commande_en_attente')
         parent = cleaned.get('campagne_parente')
+        reservation_reference = cleaned.get('reservation_reference', '').strip()
+        client = cleaned.get('client')
+
+        if reservation_reference:
+            if not client:
+                self.add_error(
+                    'reservation_reference',
+                    "Sélectionnez d’abord l’agence propriétaire de la réservation.",
+                )
+            elif cleaned.get('est_mere'):
+                self.add_error(
+                    'reservation_reference',
+                    "Une campagne mère ne peut pas importer directement des faces.",
+                )
+            elif cleaned.get('type_support') in {'ecran', 'marche'}:
+                self.add_error(
+                    'reservation_reference',
+                    "Les faces d’une réservation ne peuvent être importées que dans une campagne de panneaux.",
+                )
+            else:
+                reservation = (
+                    Reservation.objects
+                    .filter(
+                        reference__iexact=reservation_reference,
+                        client=client,
+                        statut__in=[STATUT_EN_ATTENTE, STATUT_CONFIRMEE],
+                    )
+                    .prefetch_related('lignes__face')
+                    .first()
+                )
+                if not reservation:
+                    self.add_error(
+                        'reservation_reference',
+                        "Aucune réservation active ne correspond à cette référence pour l’agence sélectionnée.",
+                    )
+                elif not reservation.lignes.filter(face__isnull=False).exists():
+                    self.add_error(
+                        'reservation_reference',
+                        "Cette réservation ne contient aucune face de panneau à importer.",
+                    )
+                else:
+                    self.reservation_source = reservation
+                    categorie_par_type = {
+                        code: categorie
+                        for code, categorie in self.categories_par_format.items()
+                    }
+                    categorie_selectionnee = categorie_par_type.get(
+                        type_support,
+                        normaliser_categorie_format(type_support),
+                    )
+                    categories_reservation = {}
+                    for ligne in reservation.lignes.select_related('face__support').all():
+                        support = ligne.face.support if ligne.face_id else None
+                        format_code = support.format if support else ''
+                        categorie = self.categories_par_format.get(format_code, '')
+                        if categorie:
+                            categories_reservation.setdefault(categorie, set()).add(format_code)
+                    if categorie_selectionnee not in categories_reservation:
+                        self.add_error(
+                            'type_support',
+                            "Choisissez une catégorie présente parmi les faces de cette réservation.",
+                        )
+                    else:
+                        self.reservation_categorie = categorie_selectionnee
+                        self.reservation_formats = categories_reservation[categorie_selectionnee]
+                    reservation_debut = timezone.localdate(reservation.date_debut)
+                    reservation_fin = timezone.localdate(reservation.date_fin)
+                    if d1 and d1 < reservation_debut:
+                        self.add_error(
+                            'date_debut',
+                            f"La date de début doit être au plus tôt le {reservation_debut:%d/%m/%Y}, "
+                            "selon la période de la réservation.",
+                        )
+                    if d2 and d2 > reservation_fin:
+                        self.add_error(
+                            'date_fin',
+                            f"La date de fin ne peut pas dépasser le {reservation_fin:%d/%m/%Y}, "
+                            "selon la période de la réservation.",
+                        )
 
         if bon_commande_en_attente and contrat:
             self.add_error(
@@ -591,7 +743,6 @@ class PreuveDiffusionForm(forms.ModelForm):
             self.add_error('ligne', "Choisissez un support rattaché à cette campagne.")
         return cleaned_data
 
-
 class DemandeCampagneForm(forms.Form):
     campagne = forms.ModelChoiceField(
         queryset=Campagne.objects.none(),
@@ -617,3 +768,67 @@ class DemandeCampagneForm(forms.Form):
         self.fields['campagne'].queryset = campagnes.order_by('nom', 'pk')
         if not self.is_bound:
             self.initial['campagne'] = demande.campagne_id
+
+
+class DemandeGestionContactForm(forms.Form):
+    type_client = forms.ChoiceField(
+        choices=DemandeReservation.TYPE_CLIENT_CHOICES,
+        initial=DemandeReservation.TYPE_CLIENT_EXISTANT,
+        widget=forms.RadioSelect,
+    )
+    client = forms.ModelChoiceField(
+        queryset=Client.objects.none(),
+        required=False,
+        label="Client",
+        empty_label="— Choisir un client —",
+        widget=forms.Select(attrs={'class': 'form-control-e3'}),
+    )
+    nom_contact = forms.CharField(
+        max_length=200,
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-control-e3'}),
+    )
+    societe = forms.CharField(
+        max_length=200,
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-control-e3'}),
+    )
+    email = forms.EmailField(
+        required=False,
+        widget=forms.EmailInput(attrs={'class': 'form-control-e3'}),
+    )
+    telephone = forms.CharField(
+        max_length=30,
+        required=False,
+        widget=forms.TextInput(attrs={'class': 'form-control-e3'}),
+    )
+    accepte_contact = forms.BooleanField(
+        required=False,
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['client'].queryset = Client.objects.filter(
+            actif=True
+        ).order_by('nom')
+        self.fields['client'].label_from_instance = (
+            lambda client: f"{client.reference} · {client.nom}"
+        )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if cleaned_data.get('type_client') == DemandeReservation.TYPE_CLIENT_EXISTANT:
+            client = cleaned_data.get('client')
+            if not client:
+                self.add_error('client', "Sélectionnez le client concerné.")
+            elif not client.email or not client.telephone:
+                self.add_error(
+                    'client',
+                    "La fiche du client doit contenir un e-mail et un téléphone.",
+                )
+        else:
+            for field in ('nom_contact', 'societe', 'email', 'telephone'):
+                if not cleaned_data.get(field):
+                    self.add_error(field, "Ce champ est obligatoire pour un prospect.")
+        return cleaned_data

@@ -5,60 +5,215 @@
   Traiter la réservation {{ reservation.reference }}
 {% endblock %}
 
-{% block content %}
-<div class="mb-4">
+{% block extra_head %}
+<style>
+  .rt {
+    --rt-ink: #1f2328;
+    --rt-muted: #64748b;
+    --rt-line: #e4e7ec;
+    --rt-brand: var(--color-primary, #932e2b);
+    --rt-soft: #faf8f7;
+    color: var(--rt-ink);
+  }
+  .rt-hero {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 20px;
+    position: relative;
+    isolation: isolate;
+    overflow: hidden;
+    padding: clamp(22px, 4vw, 32px);
+    margin-bottom: 20px;
+    border-radius: 14px;
+    color: #fff;
+    background: linear-gradient(118deg, #681e1c 0%, var(--rt-brand) 56%, #a8463d 100%);
+    box-shadow: 0 12px 28px rgba(90,27,25,.16);
+  }
+  .rt-hero::after {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    width: 270px;
+    height: 270px;
+    top: -175px;
+    right: 12%;
+    border: 1px solid rgba(255,255,255,.12);
+    border-radius: 50%;
+    box-shadow: 0 0 0 26px rgba(255,255,255,.035), 0 0 0 54px rgba(255,255,255,.025);
+  }
+  .rt-hero-main { display: flex; align-items: center; gap: 16px; min-width: 0; }
+  .rt-hero-icon {
+    display: grid;
+    place-items: center;
+    flex: 0 0 54px;
+    width: 54px;
+    height: 54px;
+    border: 1px solid rgba(255,255,255,.24);
+    border-radius: 14px;
+    background: rgba(255,255,255,.13);
+    font-size: 1.4rem;
+  }
+  .rt-eyebrow { margin-bottom: 4px; color: rgba(255,255,255,.72); font-size: .72rem; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; }
+  .rt-hero h1 { margin: 0; font-size: clamp(1.35rem, 3vw, 1.8rem); font-weight: 750; letter-spacing: -.025em; }
+  .rt-hero p { margin: 5px 0 0; color: rgba(255,255,255,.82); font-size: .9rem; }
+  .rt-ref { display: inline-block; margin-left: 8px; color: rgba(255,255,255,.78); font-size: .8rem; font-weight: 600; letter-spacing: .02em; }
+  .rt-hero-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  .rt-hero-actions .btn { border-radius: 8px; font-weight: 650; }
+  .rt-hero-actions .btn-light { color: var(--rt-brand); }
+  .rt-card {
+    overflow: hidden;
+    margin-bottom: 20px;
+    border: 1px solid var(--rt-line) !important;
+    border-radius: 10px !important;
+    background: #fff;
+    box-shadow: 0 2px 8px rgba(22,26,34,.035) !important;
+  }
+  .rt-summary-head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 15px 20px !important;
+    border-bottom: 1px solid var(--rt-line) !important;
+    background: #fff !important;
+  }
+  .rt-summary-name { color: var(--rt-ink); font-size: 1rem; font-weight: 700; }
+  .rt-summary-ref { color: var(--rt-muted); background: var(--rt-soft) !important; border: 1px solid var(--rt-line) !important; border-radius: 999px; font-size: .74rem !important; }
+  .rt-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px !important;
+    border: 1px solid #fde68a;
+    border-radius: 999px !important;
+    color: #92400e;
+    background: #fef3c7;
+    font-size: .76rem !important;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .rt-status.is-confirmed { border-color: #bbf7d0; color: #166534; background: #dcfce7; }
+  .rt-card .card-body { padding: 20px !important; }
+  .rt-fact {
+    height: 100%;
+    padding: 14px !important;
+    border: 1px solid var(--rt-line) !important;
+    border-radius: 9px !important;
+    background: #f8fafc !important;
+  }
+  .rt-fact-label { color: var(--rt-muted) !important; font-size: .68rem !important; font-weight: 700 !important; letter-spacing: .06em !important; }
+  .rt-fact-value { color: var(--rt-ink); font-size: .88rem; font-weight: 650; overflow-wrap: anywhere; }
+  .rt-fact-value a { color: var(--rt-brand); }
+  .rt-section-title {
+    margin: 0 0 12px;
+    color: var(--rt-ink);
+    font-size: .98rem;
+    font-weight: 700;
+  }
+  .rt-section-title i { margin-right: 7px; color: var(--rt-brand); }
+  .rt-table-wrap { overflow: hidden; border: 1px solid var(--rt-line); border-radius: 9px; }
+  .rt-table { margin: 0 !important; }
+  .rt-table thead th {
+    padding: 12px 14px !important;
+    border: 0 !important;
+    border-bottom: 1px solid var(--rt-line) !important;
+    color: var(--rt-muted) !important;
+    background: var(--rt-soft) !important;
+    font-size: .72rem !important;
+    font-weight: 700 !important;
+    letter-spacing: .045em;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .rt-table tbody td { padding: 12px 14px !important; border-color: #eef0f3 !important; color: var(--rt-ink); font-size: .84rem; }
+  .rt-table tbody tr:last-child td { border-bottom: 0 !important; }
+  .rt-support-code { color: var(--rt-brand); font-weight: 700; }
+  .rt-face-badge { border: 1px solid #bae6fd; border-radius: 999px; color: #0369a1; background: #e0f2fe; font-size: .76rem; font-weight: 650; }
+  .rt-note { padding: 12px 14px; border: 1px solid #fde68a; border-left: 3px solid #f59e0b; border-radius: 8px; background: #fffbeb; color: var(--rt-ink); white-space: pre-line; }
+  .rt-actions { height: 100%; border: 1px solid var(--rt-line) !important; border-radius: 10px !important; background: #fff; box-shadow: 0 2px 8px rgba(22,26,34,.035) !important; }
+  .rt-actions.is-locked { background: #fafafa; }
+  .rt-action-icon { display: grid; place-items: center; width: 40px; height: 40px; flex: 0 0 40px; border-radius: 11px; font-size: 1.1rem; }
+  .rt-action-icon.is-approve { color: #166534; background: #dcfce7; }
+  .rt-action-icon.is-cancel { color: #991b1b; background: #fee2e2; }
+  .rt-action-title { margin: 0; font-size: 1rem; font-weight: 700; }
+  .rt-action-copy { margin: 14px 0 20px; color: var(--rt-muted); font-size: .86rem; line-height: 1.6; }
+  .rt-actions .btn { min-height: 42px; border-radius: 8px !important; font-weight: 700; }
+  .rt-actions textarea { border-color: var(--rt-line); border-radius: 8px; font-size: .86rem; }
+  .rt-actions textarea:focus { border-color: rgba(147,46,43,.55); box-shadow: 0 0 0 3px rgba(147,46,43,.1); }
+  .rt-alert { border-radius: 8px; font-size: .82rem; }
+  .rt :focus-visible { outline: 2px solid var(--rt-brand); outline-offset: 2px; }
+  @media (max-width: 575.98px) {
+    .rt-hero { align-items: stretch; padding: 20px; border-radius: 12px; }
+    .rt-hero-main { align-items: flex-start; gap: 12px; }
+    .rt-hero-icon { flex-basis: 44px; width: 44px; height: 44px; border-radius: 12px; font-size: 1.2rem; }
+    .rt-hero-actions { width: 100%; }
+    .rt-hero-actions .btn { flex: 1 1 auto; }
+    .rt-card .card-body { padding: 15px !important; }
+    .rt-summary-head { padding: 13px 15px !important; }
+  }
+</style>
+{% endblock %}
 
-  <!-- Bouton Retour & Titre -->
-  <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
-    <div class="d-flex align-items-center gap-3">
-      <a href="{% url 'reservation_detail' reservation.client.pk reservation.pk %}" class="btn btn-light border btn-sm d-flex align-items-center justify-content-center shadow-sm" style="width: 38px; height: 38px; border-radius: 10px;" title="Retour au détail">
-        <i class="bi bi-arrow-left fs-6"></i>
-      </a>
+{% block content %}
+<div class="rt">
+
+  <header class="rt-hero">
+    <div class="rt-hero-main">
+      <span class="rt-hero-icon" aria-hidden="true"><i class="bi bi-clipboard-check"></i></span>
       <div>
-        <h1 class="h4 fw-bold mb-0" style="color: #0f172a;">Traitement de la réservation</h1>
-        <p class="text-muted small mb-0">Double contrôle et décision : validation ou annulation définitive.</p>
+        <div class="rt-eyebrow">Traitement · Double contrôle</div>
+        <h1>Décision sur la réservation</h1>
+        <p><strong>{{ reservation.nom }}</strong><span class="rt-ref">{{ reservation.reference }}</span></p>
       </div>
     </div>
-    <a href="{% url 'reservation_list' %}" class="btn btn-outline-secondary btn-sm" style="border-radius: 8px;">
-      <i class="bi bi-list-ul me-1"></i>Liste des réservations
-    </a>
-  </div>
+    <div class="rt-hero-actions">
+      <a href="{% url 'reservation_detail' reservation.client.pk reservation.pk %}" class="btn btn-light btn-sm px-3">
+        <i class="bi bi-arrow-left me-1"></i>Détail
+      </a>
+      <a href="{% url 'reservation_list' %}" class="btn btn-outline-light btn-sm px-3">
+        <i class="bi bi-list-ul me-1"></i>Liste des réservations
+      </a>
+    </div>
+  </header>
 
   <!-- Récapitulatif de la réservation -->
-  <div class="card border-0 shadow-sm mb-4" style="border-radius: 16px; border: 1px solid #e2e8f0; overflow: hidden;">
-    <div class="card-header bg-white py-3 px-4 d-flex align-items-center justify-content-between border-bottom" style="border-color: #e2e8f0;">
+  <section class="card rt-card">
+    <div class="card-header rt-summary-head">
       <div class="d-flex align-items-center gap-2">
-        <span class="fw-bold" style="color: #1e293b; font-size: 1rem;">{{ reservation.nom }}</span>
-        <span class="badge font-monospace text-muted px-2 py-1" style="background: #f1f5f9; border: 1px solid #e2e8f0; font-size: 0.78rem;">
+        <span class="rt-summary-name">{{ reservation.nom }}</span>
+        <span class="badge font-monospace px-2 py-1 rt-summary-ref">
           {{ reservation.reference }}
         </span>
       </div>
       {% if reservation.statut == 'en_attente' %}
-        <span class="badge px-3 py-2" style="background: #fef3c7; color: #92400e; border: 1px solid #fde68a; font-weight: 700; font-size: 0.75rem; border-radius: 20px;">
+        <span class="badge rt-status">
           <i class="bi bi-clock-history me-1"></i>En attente
         </span>
       {% else %}
-        <span class="badge px-3 py-2" style="background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; font-weight: 700; font-size: 0.75rem; border-radius: 20px;">
+        <span class="badge rt-status is-confirmed">
           <i class="bi bi-check-circle-fill me-1"></i>Confirmée
         </span>
       {% endif %}
     </div>
 
-    <div class="card-body p-4">
+    <div class="card-body">
       <div class="row g-3 mb-4">
         <div class="col-md-3 col-sm-6">
-          <div class="p-3 rounded-3" style="background: #f8fafc; border: 1px solid #e2e8f0;">
-            <div class="text-uppercase text-muted fw-bold mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Client</div>
-            <a href="{% url 'client_detail' reservation.client.pk %}" class="fw-bold text-decoration-none d-block text-truncate" style="color: var(--color-primary); font-size: 0.95rem;">
+          <div class="rt-fact">
+            <div class="text-uppercase fw-bold mb-1 rt-fact-label">Client</div>
+            <a href="{% url 'client_detail' reservation.client.pk %}" class="text-decoration-none d-block text-truncate rt-fact-value">
               {{ reservation.client.nom }}
             </a>
           </div>
         </div>
 
         <div class="col-md-3 col-sm-6">
-          <div class="p-3 rounded-3" style="background: #f8fafc; border: 1px solid #e2e8f0;">
-            <div class="text-uppercase text-muted fw-bold mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Période</div>
-            <div class="fw-bold font-monospace text-dark" style="font-size: 0.88rem;">
+          <div class="rt-fact">
+            <div class="text-uppercase fw-bold mb-1 rt-fact-label">Période</div>
+            <div class="font-monospace rt-fact-value">
               {{ reservation.date_debut|date:"d/m/Y" }} → {{ reservation.date_fin|date:"d/m/Y" }}
             </div>
             <small class="text-muted">({{ reservation.duree_jours }} jour{{ reservation.duree_jours|pluralize }})</small>
@@ -66,9 +221,9 @@
         </div>
 
         <div class="col-md-3 col-sm-6">
-          <div class="p-3 rounded-3" style="background: #f8fafc; border: 1px solid #e2e8f0;">
-            <div class="text-uppercase text-muted fw-bold mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Créateur</div>
-            <div class="fw-semibold text-dark" style="font-size: 0.9rem;">
+          <div class="rt-fact">
+            <div class="text-uppercase fw-bold mb-1 rt-fact-label">Créateur</div>
+            <div class="rt-fact-value">
               <i class="bi bi-person me-1 text-secondary"></i>{{ reservation.created_by|default:"—" }}
             </div>
             <small class="text-muted">{{ reservation.created_at|date:"d/m/Y H:i" }}</small>
@@ -76,9 +231,9 @@
         </div>
 
         <div class="col-md-3 col-sm-6">
-          <div class="p-3 rounded-3" style="background: #f8fafc; border: 1px solid #e2e8f0;">
-            <div class="text-uppercase text-muted fw-bold mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Volume faces</div>
-            <div class="fw-bold text-dark" style="font-size: 1rem;">
+          <div class="rt-fact">
+            <div class="text-uppercase fw-bold mb-1 rt-fact-label">Volume faces</div>
+            <div class="rt-fact-value">
               <i class="bi bi-grid-fill text-primary me-1"></i>{{ reservation.lignes.count }} face{{ reservation.lignes.count|pluralize }}
             </div>
           </div>
@@ -86,49 +241,51 @@
 
         {% if reservation.notes %}
         <div class="col-12">
-          <div class="p-3 rounded-3" style="background: #fffbeb; border: 1px solid #fef3c7;">
-            <div class="text-uppercase text-warning-emphasis fw-bold mb-1" style="font-size: 0.7rem; letter-spacing: 0.05em;">Notes internes</div>
-            <div class="text-dark small" style="white-space: pre-line;">{{ reservation.notes }}</div>
+          <div class="rt-note">
+            <div class="text-uppercase fw-bold mb-1 rt-fact-label">Notes internes</div>
+            <div class="small">{{ reservation.notes }}</div>
           </div>
         </div>
         {% endif %}
       </div>
 
       <!-- Faces réservées -->
-      <h6 class="fw-bold text-dark mb-3" style="font-size: 0.9rem;">
-        <i class="bi bi-list-check me-1 text-primary"></i>Détail des faces concernées
-      </h6>
-      <div class="table-responsive border rounded-3 overflow-hidden">
-        <table class="table table-hover align-middle mb-0" style="border-collapse: separate; border-spacing: 0;">
+      <h2 class="rt-section-title">
+        <i class="bi bi-list-check"></i>Détail des faces concernées
+      </h2>
+      <div class="table-responsive rt-table-wrap">
+        <table class="table table-hover align-middle rt-table">
           <thead>
-            <tr style="background-color: #1e293b; color: #ffffff;">
-              <th class="py-2 px-3" style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: #f8fafc; border: none;">Support</th>
-              <th class="py-2 px-3" style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: #f8fafc; border: none;">Face</th>
-              <th class="py-2 px-3" style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: #f8fafc; border: none;">Localisation</th>
-              <th class="py-2 px-3" style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: #f8fafc; border: none;">Format</th>
+            <tr>
+              <th>Support</th>
+              <th>Face</th>
+              <th>Localisation</th>
+              <th>Format</th>
             </tr>
           </thead>
           <tbody>
             {% for ligne in reservation.lignes.all %}
-            <tr style="border-bottom: 1px solid #f1f5f9;">
-              <td class="py-2 px-3 font-monospace fw-bold" style="color: var(--color-primary); font-size: 0.85rem;">
+            <tr>
+              <td class="font-monospace fw-bold">
                 {{ ligne.support.code }}
               </td>
-              <td class="py-2 px-3">
-                <span class="badge px-2 py-1" style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd;">
+              <td>
+                <span class="badge px-2 py-1 rt-face-badge">
                   Face {{ ligne.face.label|default:"—" }}
                 </span>
               </td>
-              <td class="py-2 px-3 text-muted small">
+              <td class="text-muted small">
                 {{ ligne.support.quartier|default:ligne.support.ville|default:"—" }}
               </td>
-              <td class="py-2 px-3 text-muted small">
+              <td class="text-muted small">
                 {{ ligne.support.get_format_display|default:ligne.support.format|default:"Standard" }}
               </td>
             </tr>
             {% empty %}
             <tr>
-              <td colspan="4" class="text-center text-muted py-3 small">Aucune face associée.</td>
+              <td colspan="4" class="text-center text-muted py-4 small">
+                <i class="bi bi-inbox me-1"></i>Aucune face associée.
+              </td>
             </tr>
             {% endfor %}
           </tbody>
@@ -136,26 +293,26 @@
       </div>
 
     </div>
-  </div>
+  </section>
 
   <!-- Actions : Valider et Annuler côte à côte -->
   <div class="row g-4">
 
     <!-- Colonne Valider -->
     <div class="col-md-6">
-      <div class="card h-100 border-0 shadow-sm" style="border-radius: 16px; border: 1px solid #e2e8f0; {% if not peut_valider %}opacity:.65; background:#fafafa;{% endif %}">
+      <section class="card rt-actions h-100 {% if not peut_valider %}is-locked{% endif %}">
         <div class="card-body p-4 d-flex flex-column">
           <div class="d-flex align-items-center gap-2 mb-2">
-            <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; background: #dcfce7; color: #166534;">
-              <i class="bi bi-check-circle-fill fs-5"></i>
+            <div class="rt-action-icon is-approve">
+              <i class="bi bi-check-circle-fill"></i>
             </div>
             <div>
-              <h5 class="fw-bold mb-0 text-success">Valider la réservation</h5>
+              <h2 class="rt-action-title text-success">Valider la réservation</h2>
               <small class="text-muted">Statut passe à « Confirmée »</small>
             </div>
           </div>
 
-          <p class="text-muted my-3" style="font-size: 0.85rem; line-height: 1.5;">
+          <p class="rt-action-copy">
             Confirme définitivement la réservation des faces sélectionnées pour le client <strong>{{ reservation.client.nom }}</strong>. 
             Un contrôle par un second membre de l'équipe est requis pour la conformité.
           </p>
@@ -164,36 +321,36 @@
             <form method="post" class="mt-auto">
               {% csrf_token %}
               <input type="hidden" name="action" value="valider">
-              <button type="submit" class="btn btn-success w-100 py-2 d-flex align-items-center justify-content-center gap-2 shadow-sm fw-bold" style="border-radius: 10px;">
+              <button type="submit" class="btn btn-success w-100 py-2 d-flex align-items-center justify-content-center gap-2 shadow-sm">
                 <i class="bi bi-check-lg fs-5"></i>
                 <span>Confirmer et valider la réservation</span>
               </button>
             </form>
           {% else %}
-            <div class="alert alert-secondary mb-0 mt-auto py-2 d-flex align-items-center gap-2" style="font-size: 0.8rem; border-radius: 8px;">
+            <div class="alert alert-secondary rt-alert mb-0 mt-auto py-2 d-flex align-items-center gap-2">
               <i class="bi bi-lock-fill text-muted flex-shrink-0"></i>
               <span>{{ erreur_valider }}</span>
             </div>
           {% endif %}
         </div>
-      </div>
+      </section>
     </div>
 
     <!-- Colonne Annuler -->
     <div class="col-md-6">
-      <div class="card h-100 border-0 shadow-sm" style="border-radius: 16px; border: 1px solid #e2e8f0; {% if not peut_annuler %}opacity:.65; background:#fafafa;{% endif %}">
+      <section class="card rt-actions h-100 {% if not peut_annuler %}is-locked{% endif %}">
         <div class="card-body p-4 d-flex flex-column">
           <div class="d-flex align-items-center gap-2 mb-2">
-            <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; background: #fee2e2; color: #991b1b;">
-              <i class="bi bi-x-circle-fill fs-5"></i>
+            <div class="rt-action-icon is-cancel">
+              <i class="bi bi-x-circle-fill"></i>
             </div>
             <div>
-              <h5 class="fw-bold mb-0 text-danger">Annuler la réservation</h5>
+              <h2 class="rt-action-title text-danger">Annuler la réservation</h2>
               <small class="text-muted">Libération immédiate des espaces</small>
             </div>
           </div>
 
-          <p class="text-muted my-3" style="font-size: 0.85rem; line-height: 1.5;">
+          <p class="rt-action-copy">
             Libère immédiatement toutes les faces bloquées par cette réservation et la passe au statut « Annulée ».
             Cette action est irréversible.
           </p>
@@ -203,22 +360,22 @@
               {% csrf_token %}
               <input type="hidden" name="action" value="annuler">
               <div class="mb-3">
-                <label class="form-label text-muted fw-bold" style="font-size: 0.72rem; letter-spacing: 0.05em;">Motif d'annulation (facultatif)</label>
-                <textarea name="motif" class="form-control" rows="2" placeholder="Raison de l'annulation…" style="border-radius: 8px; font-size: 0.85rem;"></textarea>
+                <label class="form-label text-muted fw-bold small" for="motif-annulation">Motif d'annulation (facultatif)</label>
+                <textarea id="motif-annulation" name="motif" class="form-control" rows="2" placeholder="Raison de l'annulation…"></textarea>
               </div>
-              <button type="submit" class="btn btn-outline-danger w-100 py-2 d-flex align-items-center justify-content-center gap-2 fw-bold" style="border-radius: 10px;" onclick="return confirm('Êtes-vous sûr de vouloir annuler définitivement cette réservation ?');">
+              <button type="submit" class="btn btn-outline-danger w-100 py-2 d-flex align-items-center justify-content-center gap-2" onclick="return confirm('Êtes-vous sûr de vouloir annuler définitivement cette réservation ?');">
                 <i class="bi bi-x-lg"></i>
                 <span>Confirmer l'annulation</span>
               </button>
             </form>
           {% else %}
-            <div class="alert alert-secondary mb-0 mt-auto py-2 d-flex align-items-center gap-2" style="font-size: 0.8rem; border-radius: 8px;">
+            <div class="alert alert-secondary rt-alert mb-0 mt-auto py-2 d-flex align-items-center gap-2">
               <i class="bi bi-lock-fill text-muted flex-shrink-0"></i>
               <span>{{ erreur_annuler }}</span>
             </div>
           {% endif %}
         </div>
-      </div>
+      </section>
     </div>
 
   </div>

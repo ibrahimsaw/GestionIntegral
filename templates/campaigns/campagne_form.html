@@ -238,6 +238,8 @@
   }
   .campagne-form-page .campagne-form-actions .btn { min-height: 2.8rem; border-radius: .7rem !important; }
   .campagne-form-page .campagne-form-submit { box-shadow: 0 .35rem .8rem rgba(147,46,43,.2); }
+  .campagne-form-page #campagneForm > .d-flex.flex-column { gap: 1.5rem !important; }
+  .campagne-form-divider { height: 1px; margin: 1.5rem 0; background: linear-gradient(90deg, transparent, #dce1e9 12%, #dce1e9 88%, transparent); }
   @media (max-width: 575.98px) {
     .campagne-form-page { padding: .55rem; border-radius: .85rem; }
     .campagne-form-hero { border-radius: .85rem; }
@@ -292,7 +294,7 @@
         <div class="d-flex flex-column gap-4">
 
           <!-- ══════════════════════════════════════════════════════════
-               CARTE 1 : INFORMATIONS GÉNÉRALES & CLIENT
+               CARTE 1 : INFORMATIONS GÉNÉRALES, CLIENT, SUPPORT & PÉRIODE
                ══════════════════════════════════════════════════════════ -->
           <div class="geoad-form-card">
             <div class="geoad-form-header">
@@ -301,8 +303,8 @@
                   <i class="bi bi-info-circle-fill fs-6"></i>
                 </div>
                 <div>
-                  <h6 class="mb-0 fw-bold text-dark" style="font-size: 0.95rem;">1. Informations Générales & Client</h6>
-                  <small class="text-muted" style="font-size: 0.74rem;">Rattachement client et hiérarchie de la campagne</small>
+                  <h6 class="mb-0 fw-bold text-dark" style="font-size: 0.95rem;">1. Informations Générales, Client, Support & Période</h6>
+                  <small class="text-muted" style="font-size: 0.74rem;">Informations de la campagne, supports et calendrier de diffusion</small>
                 </div>
               </div>
               <span class="badge bg-light text-muted border px-2 py-1" style="border-radius: 6px; font-size: 0.72rem;">Obligatoire *</span>
@@ -311,10 +313,10 @@
             <div class="card-body p-4">
               <div class="row g-3">
                 
-                <!-- Client -->
+                <!-- Agence -->
                 <div class="col-md-4">
                   <label class="form-label" for="id_client">
-                    Client Référent <span class="text-danger">*</span>
+                    Agence
                   </label>
                   <div class="input-group">
                     <span class="input-group-text">
@@ -322,6 +324,7 @@
                     </span>
                     {{ form.client }}
                   </div>
+                  <div class="form-text small text-muted">Agence responsable de la campagne.</div>
                   {% if form.client.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.client.errors }}</div>{% endif %}
                 </div>
 
@@ -353,69 +356,58 @@
                   {% if form.lieu.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.lieu.errors }}</div>{% endif %}
                 </div>
 
-                <!-- Campagne Mère switch -->
-                <div class="col-12">
-                  <div class="p-3 bg-light rounded-2 border d-flex align-items-center justify-content-between flex-wrap gap-2 mt-2" style="border-radius: 8px !important;">
-                    <div class="d-flex align-items-center gap-3">
-                      <div class="form-check form-switch fs-5 mb-0">
-                        {{ form.est_mere }}
-                      </div>
-                      <div>
-                        <label class="form-check-label fw-bold text-dark mb-0" for="id_est_mere" style="font-size: 0.88rem; cursor: pointer;">
-                          Campagne Mère (Conteneur de sous-campagnes)
-                        </label>
-                        <div class="small text-muted" style="font-size: 0.74rem;">
-                          Cochez pour regrouper plusieurs sous-campagnes avec des formats et supports distincts sous un même chapeau.
-                        </div>
-                      </div>
-                    </div>
-                    <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1" style="font-size: 0.72rem; border-radius: 6px;">Multi-supports</span>
-                  </div>
-                </div>
-
-                <!-- Campagne parente si sous-campagne -->
-                <div class="col-md-12" id="wrap-campagne-parente">
-                  <label class="form-label" for="id_campagne_parente">
-                    Rattacher à une Campagne Mère
-                  </label>
+                <!-- Client / annonceur -->
+                <div class="col-md-6">
+                  <label class="form-label" for="id_annonceur">Client / Annonceur</label>
                   <div class="input-group">
                     <span class="input-group-text">
-                      <i class="bi bi-diagram-3"></i>
+                      <i class="bi bi-person-badge"></i>
                     </span>
-                    {{ form.campagne_parente }}
+                    {{ form.annonceur }}
                   </div>
-                  <div class="form-text small text-muted">Laissez vide pour créer une campagne autonome.</div>
-                  {% if form.campagne_parente.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.campagne_parente.errors }}</div>{% endif %}
+                  <datalist id="annonceurs-existants">
+                    {% for annonceur in form.annonceurs_existants %}
+                      <option value="{{ annonceur }}">
+                    {% endfor %}
+                  </datalist>
+                  <div class="form-text small text-muted">Facultatif : choisissez un client existant ou saisissez un nouveau nom.</div>
+                  {% if form.annonceur.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.annonceur.errors }}</div>{% endif %}
+                </div>
+
+                <!-- Import des faces depuis une réservation de l'agence -->
+                <div class="col-md-6">
+                  <label class="form-label" for="id_reservation_reference">Référence de réservation (facultatif)</label>
+                  <div class="input-group">
+                    <span class="input-group-text">
+                      <i class="bi bi-bookmark-check"></i>
+                    </span>
+                    {{ form.reservation_reference }}
+                  </div>
+                  <datalist id="reservations-agence">
+                    {% for reservation in form.reservations_existantes %}
+                      <option
+                        value="{{ reservation.reference }}"
+                        label="{{ reservation.nom }} — {{ reservation.client.nom }}"
+                        data-agence="{{ reservation.client_id }}"
+                        data-date-debut="{{ reservation.date_debut|date:'Y-m-d' }}"
+                        data-date-fin="{{ reservation.date_fin|date:'Y-m-d' }}"
+                        data-categories="{{ reservation.categories_json }}">
+                    {% endfor %}
+                  </datalist>
+                  <div class="form-text small text-muted">{{ form.reservation_reference.help_text }}</div>
+                  {% if form.reservation_reference.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.reservation_reference.errors }}</div>{% endif %}
                 </div>
 
               </div>
-            </div>
-          </div>
 
-          <!-- ══════════════════════════════════════════════════════════
-               CARTE 2 : SUPPORT & PÉRIODE DE DIFFUSION
-               ══════════════════════════════════════════════════════════ -->
-          <div class="geoad-form-card">
-            <div class="geoad-form-header">
-              <div class="d-flex align-items-center gap-2">
-                <div class="d-flex align-items-center justify-content-center rounded-2 text-primary" style="width: 34px; height: 34px; background: rgba(147,46,43,0.08); border-radius: 8px !important;">
-                  <i class="bi bi-calendar-range-fill fs-6"></i>
-                </div>
-                <div>
-                  <h6 class="mb-0 fw-bold text-dark" style="font-size: 0.95rem;">2. Type de Support & Période de Diffusion</h6>
-                  <small class="text-muted" style="font-size: 0.74rem;">Format du réseau et calendrier d'affichage</small>
-                </div>
-              </div>
-              <span class="badge bg-light text-muted border px-2 py-1" style="border-radius: 6px; font-size: 0.72rem;">Planning</span>
-            </div>
+              <div class="campagne-form-divider" role="separator"></div>
 
-            <div class="card-body p-4">
               <div class="row g-3">
                 
                 <!-- Catégorie -->
                 <div class="col-md-12" id="col-categorie">
                   <label class="form-label" for="id_categorie_support">
-                    Catégorie de Support
+                    Catégorie des faces à importer
                   </label>
                   <div class="input-group">
                     <span class="input-group-text">
@@ -429,7 +421,7 @@
                       {% endfor %}
                     </select>
                   </div>
-                  <div class="form-text small text-muted">La catégorie choisie définira les supports proposés à la réservation.</div>
+                  <div class="form-text small text-muted">Avec une réservation, seules les faces de cette catégorie seront importées dans la campagne.</div>
                   <div style="display:none">{{ form.type_support }}</div>
                   {% if form.type_support.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.type_support.errors }}</div>{% endif %}
                 </div>
@@ -487,7 +479,7 @@
           </div>
 
           <!-- ══════════════════════════════════════════════════════════
-               CARTE 3 : TARIFICATION & PRIX (OPTIONNEL)
+               CARTE 2 : TARIFICATION & PRIX (OPTIONNEL)
                ══════════════════════════════════════════════════════════ -->
           <div class="geoad-form-card">
             <div class="geoad-form-header">
@@ -496,7 +488,7 @@
                   <i class="bi bi-cash-stack fs-6"></i>
                 </div>
                 <div>
-                  <h6 class="mb-0 fw-bold text-dark" style="font-size: 0.95rem;">3. Tarification Unitaire (FCFA)</h6>
+                  <h6 class="mb-0 fw-bold text-dark" style="font-size: 0.95rem;">2. Tarification Unitaire (FCFA)</h6>
                   <small class="text-muted" style="font-size: 0.74rem;">Barèmes de facturation pour spots et impressions</small>
                 </div>
               </div>
@@ -553,7 +545,7 @@
           </div>
 
           <!-- ══════════════════════════════════════════════════════════
-               CARTE 4 : PARAMÈTRES SPÉCIFIQUES ÉCRAN NUMÉRIQUE LED
+               CARTE 3 : PARAMÈTRES SPÉCIFIQUES ÉCRAN NUMÉRIQUE LED
                ══════════════════════════════════════════════════════════ -->
           <div class="geoad-form-card ecran-fields d-none" style="border-color: #bae6fd !important;">
             <div class="geoad-form-header" style="background: #f0f9ff; border-color: #bae6fd;">
@@ -562,7 +554,7 @@
                   <i class="bi bi-display fs-6"></i>
                 </div>
                 <div>
-                  <h6 class="mb-0 fw-bold" style="color: #0369a1; font-size: 0.95rem;">4. Paramètres de Diffusion LED Dynamique</h6>
+                  <h6 class="mb-0 fw-bold" style="color: #0369a1; font-size: 0.95rem;">3. Paramètres de Diffusion LED Dynamique</h6>
                   <small class="text-muted" style="font-size: 0.74rem;">Règles de passage et contrats d'écrans</small>
                 </div>
               </div>
@@ -658,7 +650,7 @@
           </div>
 
           <!-- ══════════════════════════════════════════════════════════
-               CARTE 5 : VISUELS & MÉDIAS
+               CARTE 4 : VISUELS & MÉDIAS
                ══════════════════════════════════════════════════════════ -->
           <div class="geoad-form-card">
             <div class="geoad-form-header">
@@ -667,7 +659,7 @@
                   <i class="bi bi-images fs-6"></i>
                 </div>
                 <div>
-                  <h6 class="mb-0 fw-bold text-dark" style="font-size: 0.95rem;">5. Médias & Visuels Publicitaires</h6>
+                  <h6 class="mb-0 fw-bold text-dark" style="font-size: 0.95rem;">4. Médias & Visuels Publicitaires</h6>
                   <small class="text-muted" style="font-size: 0.74rem;">Fichiers graphiques et vidéos de diffusion</small>
                 </div>
               </div>
@@ -721,7 +713,7 @@
           </div>
 
           <!-- ══════════════════════════════════════════════════════════
-               CARTE 6 : NOTES & REMARQUES
+               CARTE 5 : NOTES & REMARQUES
                ══════════════════════════════════════════════════════════ -->
           <div class="geoad-form-card">
             <div class="geoad-form-header">
@@ -730,7 +722,7 @@
                   <i class="bi bi-journal-text fs-6"></i>
                 </div>
                 <div>
-                  <h6 class="mb-0 fw-bold text-dark" style="font-size: 0.95rem;">6. Notes & Remarques de Campagne</h6>
+                  <h6 class="mb-0 fw-bold text-dark" style="font-size: 0.95rem;">5. Notes & Remarques de Campagne</h6>
                   <small class="text-muted" style="font-size: 0.74rem;">Instructions spéciales pour les équipes de pose</small>
                 </div>
               </div>
@@ -743,6 +735,60 @@
               </label>
               <textarea name="notes" id="id_notes" rows="3" class="form-control" placeholder="Renseignez ici toute consigne utile pour la pose des affiches ou la programmation...">{{ form.notes.value|default:'' }}</textarea>
               {% if form.notes.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.notes.errors }}</div>{% endif %}
+            </div>
+          </div>
+
+          <!-- ══════════════════════════════════════════════════════════
+               CARTE 6 : HIÉRARCHIE DE LA CAMPAGNE
+               ══════════════════════════════════════════════════════════ -->
+          <div class="geoad-form-card">
+            <div class="geoad-form-header">
+              <div class="d-flex align-items-center gap-2">
+                <div class="d-flex align-items-center justify-content-center rounded-2 text-primary" style="width: 34px; height: 34px; background: rgba(147,46,43,0.08); border-radius: 8px !important;">
+                  <i class="bi bi-diagram-3-fill fs-6"></i>
+                </div>
+                <div>
+                  <h6 class="mb-0 fw-bold text-dark" style="font-size: 0.95rem;">6. Hiérarchie de la campagne</h6>
+                  <small class="text-muted" style="font-size: 0.74rem;">Campagne mère ou rattachement à une campagne existante</small>
+                </div>
+              </div>
+              <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1" style="font-size: 0.72rem; border-radius: 6px;">Multi-supports</span>
+            </div>
+
+            <div class="card-body p-4">
+              <div class="row g-3">
+                <div class="col-12">
+                  <div class="p-3 bg-light rounded-2 border d-flex align-items-center justify-content-between flex-wrap gap-2" style="border-radius: 8px !important;">
+                    <div class="d-flex align-items-center gap-3">
+                      <div class="form-check form-switch fs-5 mb-0">
+                        {{ form.est_mere }}
+                      </div>
+                      <div>
+                        <label class="form-check-label fw-bold text-dark mb-0" for="id_est_mere" style="font-size: 0.88rem; cursor: pointer;">
+                          Campagne Mère (Conteneur de sous-campagnes)
+                        </label>
+                        <div class="small text-muted" style="font-size: 0.74rem;">
+                          Cochez pour regrouper plusieurs sous-campagnes avec des formats et supports distincts sous un même chapeau.
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="col-12" id="wrap-campagne-parente">
+                  <label class="form-label" for="id_campagne_parente">
+                    Rattacher à une Campagne Mère
+                  </label>
+                  <div class="input-group">
+                    <span class="input-group-text">
+                      <i class="bi bi-diagram-3"></i>
+                    </span>
+                    {{ form.campagne_parente }}
+                  </div>
+                  <div class="form-text small text-muted">Laissez vide pour créer une campagne autonome.</div>
+                  {% if form.campagne_parente.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.campagne_parente.errors }}</div>{% endif %}
+                </div>
+              </div>
             </div>
           </div>
 
@@ -814,6 +860,8 @@ document.addEventListener('DOMContentLoaded', function () {
     })();
 
     const clientSelect = document.getElementById('id_client');
+    const reservationReferenceInput = document.getElementById('id_reservation_reference');
+    const reservationsDatalist = document.getElementById('reservations-agence');
     const prix = document.getElementById('id_prix');
     const prixAffichage = document.getElementById('id_prix_affichage');
     const prixImpression = document.getElementById('id_prix_impression');
@@ -824,6 +872,165 @@ document.addEventListener('DOMContentLoaded', function () {
     const ecranFields = document.querySelectorAll('.ecran-fields');
     const campagneId = '{{ obj.pk|default_if_none:"" }}';
     const aDejaVisuelsPropres = {{ obj.visuels.all|length|default:0 }} > 0;
+
+    if (clientSelect && reservationReferenceInput && reservationsDatalist) {
+        const reservationsOptions = Array.from(reservationsDatalist.options)
+            .map(option => option.cloneNode(true));
+        const dateDebutInput = document.getElementById('id_date_debut');
+        const dateFinInput = document.getElementById('id_date_fin');
+        const dureeInput = document.getElementById('id_duree_jours');
+        const categoriesOriginales = categorieSelect
+            ? Array.from(categorieSelect.options).map(option => option.cloneNode(true))
+            : [];
+
+        function filtrerReservationsParAgence(agenceId) {
+            reservationsDatalist.replaceChildren();
+            if (!agenceId) return;
+
+            reservationsOptions
+                .filter(option => option.dataset.agence === agenceId)
+                .forEach(option => reservationsDatalist.appendChild(option.cloneNode(true)));
+        }
+
+        function appliquerPeriodeReservation() {
+            const reference = reservationReferenceInput.value.trim().toLowerCase();
+            const reservation = reservationsOptions.find(option =>
+                option.value.toLowerCase() === reference
+                && option.dataset.agence === clientSelect.value
+            );
+
+            if (!dateDebutInput || !dateFinInput) return;
+            if (!reservation) {
+                if (dateDebutInput.min === dateDebutInput.dataset.reservationMin) {
+                    dateDebutInput.removeAttribute('min');
+                }
+                if (dateDebutInput.max === dateDebutInput.dataset.reservationMax) {
+                    dateDebutInput.removeAttribute('max');
+                }
+                if (dateFinInput.min === dateFinInput.dataset.reservationMin) {
+                    dateFinInput.removeAttribute('min');
+                }
+                if (dateFinInput.max === dateFinInput.dataset.reservationMax) {
+                    dateFinInput.removeAttribute('max');
+                }
+                dateDebutInput.removeAttribute('data-reservation-min');
+                dateDebutInput.removeAttribute('data-reservation-max');
+                dateFinInput.removeAttribute('data-reservation-min');
+                dateFinInput.removeAttribute('data-reservation-max');
+                dateDebutInput.setCustomValidity('');
+                dateFinInput.setCustomValidity('');
+                return;
+            }
+
+            const minDate = reservation.dataset.dateDebut;
+            const maxDate = reservation.dataset.dateFin;
+            dateDebutInput.dataset.reservationMin = minDate;
+            dateDebutInput.dataset.reservationMax = maxDate;
+            dateFinInput.dataset.reservationMin = minDate;
+            dateFinInput.dataset.reservationMax = maxDate;
+            dateDebutInput.min = minDate;
+            dateDebutInput.max = maxDate;
+            dateFinInput.min = minDate;
+            dateFinInput.max = maxDate;
+
+            if (dateDebutInput.value && dateDebutInput.value < minDate) {
+                dateDebutInput.value = minDate;
+            } else if (dateDebutInput.value && dateDebutInput.value > maxDate) {
+                dateDebutInput.value = maxDate;
+            }
+            if (dateFinInput.value && dateFinInput.value > maxDate) {
+                dateFinInput.value = maxDate;
+            } else if (dateFinInput.value && dateFinInput.value < minDate) {
+                dateFinInput.value = minDate;
+            }
+            if (dateDebutInput.value && dateFinInput.value
+                && dateFinInput.value < dateDebutInput.value) {
+                dateFinInput.value = dateDebutInput.value;
+            }
+            if (dureeInput && dateDebutInput.value && dateFinInput.value) {
+                const debut = new Date(`${dateDebutInput.value}T00:00:00`);
+                const fin = new Date(`${dateFinInput.value}T00:00:00`);
+                dureeInput.value = Math.round((fin - debut) / 86400000) + 1;
+            }
+            dateDebutInput.setCustomValidity('');
+            dateFinInput.setCustomValidity('');
+        }
+
+        function appliquerCategoriesReservation() {
+            if (!categorieSelect || !typeSupport) return;
+            const reference = reservationReferenceInput.value.trim().toLowerCase();
+            const reservation = reservationsOptions.find(option =>
+                option.value.toLowerCase() === reference
+                && option.dataset.agence === clientSelect.value
+            );
+            const categorieActuelle = categorieSelect.value;
+            let categoriesAutorisees = [];
+
+            if (reservation) {
+                try {
+                    categoriesAutorisees = JSON.parse(reservation.dataset.categories || '[]');
+                } catch (error) {
+                    console.error('Impossible de lire les catégories de la réservation.', error);
+                    return;
+                }
+            }
+
+            categorieSelect.replaceChildren();
+            const optionsAffichees = reservation
+                ? categoriesOriginales.filter(option =>
+                    !option.value || categoriesAutorisees.some(
+                        categorie => categorie.nom === option.value
+                    )
+                )
+                : categoriesOriginales;
+            optionsAffichees.forEach(option => categorieSelect.appendChild(option.cloneNode(true)));
+
+            if (!reservation) {
+                if (categoriesOriginales.some(option => option.value === categorieActuelle)) {
+                    categorieSelect.value = categorieActuelle;
+                }
+                return;
+            }
+
+            const choixConserve = categoriesAutorisees.some(
+                categorie => categorie.nom === categorieActuelle
+            );
+            if (choixConserve) {
+                categorieSelect.value = categorieActuelle;
+            } else if (categoriesAutorisees.length === 1) {
+                categorieSelect.value = categoriesAutorisees[0].nom;
+            } else {
+                categorieSelect.value = '';
+                typeSupport.value = '';
+            }
+
+            if (categorieSelect.value) {
+                categorieSelect.dispatchEvent(new Event('change'));
+            } else {
+                typeSupport.dispatchEvent(new Event('change'));
+            }
+        }
+
+        filtrerReservationsParAgence(clientSelect.value);
+        appliquerPeriodeReservation();
+        appliquerCategoriesReservation();
+        reservationReferenceInput.addEventListener('input', appliquerPeriodeReservation);
+        reservationReferenceInput.addEventListener('change', appliquerPeriodeReservation);
+        reservationReferenceInput.addEventListener('input', appliquerCategoriesReservation);
+        reservationReferenceInput.addEventListener('change', appliquerCategoriesReservation);
+        if (dateDebutInput) {
+            dateDebutInput.addEventListener('change', appliquerPeriodeReservation);
+        }
+        if (dateFinInput) {
+            dateFinInput.addEventListener('change', appliquerPeriodeReservation);
+        }
+        clientSelect.addEventListener('change', function() {
+            reservationReferenceInput.value = '';
+            filtrerReservationsParAgence(this.value);
+            appliquerPeriodeReservation();
+            appliquerCategoriesReservation();
+        });
+    }
 
     /* =========================
        TOGGLE CHAMPS ECRAN
@@ -969,7 +1176,14 @@ document.addEventListener('DOMContentLoaded', function () {
         const fin = new Date(debut);
         fin.setDate(fin.getDate() + (duree - 1));
 
-        dateFinInput.value = formatDateISO(fin);
+        let dateFinCalculee = formatDateISO(fin);
+        const dateFinMax = dateFinInput.dataset.reservationMax;
+        if (dateFinMax && dateFinCalculee > dateFinMax) {
+            dateFinCalculee = dateFinMax;
+            const finMax = new Date(`${dateFinMax}T00:00:00`);
+            dureeInput.value = Math.round((finMax - debut) / 86400000) + 1;
+        }
+        dateFinInput.value = dateFinCalculee;
     }
 
     (function initDureeDepuisDates() {

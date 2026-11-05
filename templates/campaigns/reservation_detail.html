@@ -4,352 +4,269 @@
 
 {% block topbar_title %}
   <i class="bi bi-calendar-check me-2" style="color:var(--color-primary)"></i>
-  {{ reservation.nom }}
+  {{ reservation.reference }}
 {% endblock %}
 
 {% block topbar_actions %}
-  <div class="d-flex align-items-center gap-2">
-    {% if can_edit %}
-      {% if reservation.statut == 'en_attente' or reservation.statut == 'confirmee' %}
-      <a href="{% url 'reservation_update' reservation.client.pk reservation.pk %}" class="btn btn-outline-secondary btn-sm d-flex align-items-center gap-1 shadow-sm" style="border-radius: 8px;">
-        <i class="bi bi-pencil"></i>
-        <span>Modifier</span>
+  <div class="d-flex flex-wrap align-items-center gap-2">
+    <a href="{% url 'reservation_list' %}" class="btn btn-outline-secondary btn-sm shadow-sm px-3">
+      <i class="bi bi-arrow-left me-1"></i>Retour
+    </a>
+    {% if can_edit and reservation.statut == 'en_attente' or can_edit and reservation.statut == 'confirmee' %}
+      <a href="{% url 'reservation_update' reservation.client.pk reservation.pk %}" class="btn btn-outline-secondary btn-sm shadow-sm px-3">
+        <i class="bi bi-pencil-square me-1"></i>Modifier
       </a>
-      {% endif %}
-      <a href="{% url 'reservation_delete' reservation.client.pk reservation.pk %}" class="btn btn-outline-danger btn-sm d-flex align-items-center gap-1 shadow-sm" style="border-radius: 8px;">
-        <i class="bi bi-trash3"></i>
-        <span>Supprimer</span>
+    {% endif %}
+    {% if can_delete %}
+      <a href="{% url 'reservation_delete' reservation.client.pk reservation.pk %}" class="btn btn-outline-danger btn-sm shadow-sm px-3">
+        <i class="bi bi-trash3 me-1"></i>Supprimer
       </a>
     {% endif %}
   </div>
 {% endblock %}
 
+{% block extra_head %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&display=swap" rel="stylesheet">
+<style>
+  .rd {
+    --ink: #161a22;
+    --muted: #667085;
+    --line: #e4e7ec;
+    --paper: #fff;
+    --sunk: #f5f6f8;
+    --brand: var(--color-primary, #932e2b);
+    --brand-deep: #6f201e;
+    --display: 'Bricolage Grotesque', var(--bs-body-font-family, system-ui), sans-serif;
+    color: var(--ink);
+  }
+  .rd-band {
+    background: var(--brand); color: #fff; border-radius: 8px;
+    padding: 26px 30px 0; margin-bottom: 22px; position: relative; overflow: hidden;
+  }
+  .rd-band::after {
+    content: "\F1C5"; font-family: "bootstrap-icons"; position: absolute;
+    right: -10px; top: -30px; font-size: 11rem; line-height: 1;
+    color: rgba(255,255,255,.07); pointer-events: none;
+  }
+  .rd-band-top { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:flex-start; gap:14px; position:relative; z-index:1; }
+  .rd-ref { font-family:var(--display); font-size:2.1rem; font-weight:800; letter-spacing:-.02em; line-height:1.05; margin:0; }
+  .rd-who { margin:8px 0 0; font-size:1rem; opacity:.92; }
+  .rd-chip { display:inline-flex; align-items:center; gap:7px; background:#fff; color:var(--rd-status,#475569); border-radius:999px; padding:7px 15px; font-weight:700; font-size:.85rem; }
+  .rd-st-en_attente { --rd-status:#92400e; --rd-bg:#fef3c7; }
+  .rd-st-confirmee { --rd-status:#15803d; --rd-bg:#dcfce7; }
+  .rd-st-annulee { --rd-status:#b91c1c; --rd-bg:#fee2e2; }
+  .rd-st-expiree { --rd-status:#475569; --rd-bg:#e2e8f0; }
+  .rd-facts { display:flex; flex-wrap:wrap; margin:24px -30px 0; border-top:1px solid rgba(255,255,255,.18); position:relative; z-index:1; background:var(--brand-deep); }
+  .rd-fact { flex:1 1 180px; padding:15px 30px; border-right:1px solid rgba(255,255,255,.14); min-width:0; }
+  .rd-fact:last-child { border-right:0; }
+  .rd-fact span { display:block; font-size:.8rem; opacity:.72; margin-bottom:2px; }
+  .rd-fact strong { font-family:var(--display); font-size:1.12rem; font-weight:700; font-variant-numeric:tabular-nums; }
+  .rd-grid { display:grid; grid-template-columns:minmax(0, 1.65fr) minmax(280px, 1fr); gap:22px; }
+  .rd-panel { background:var(--paper); border:1px solid var(--line); border-radius:8px; margin-bottom:22px; overflow:hidden; }
+  .rd-panel-head { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; padding:16px 22px; border-bottom:1px solid var(--line); }
+  .rd-panel-title { font-family:var(--display); font-size:1.1rem; font-weight:700; margin:0; letter-spacing:-.01em; }
+  .rd-panel-title i { color:var(--brand); margin-right:9px; }
+  .rd-panel-body { padding:18px 22px 22px; }
+  .rd-facts-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; }
+  .rd-date { padding:14px; border:1px solid var(--line); border-radius:8px; background:var(--sunk); }
+  .rd-label { display:block; color:var(--muted); font-size:.75rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; margin-bottom:5px; }
+  .rd-date-value { font-family:var(--display); font-weight:700; font-size:1rem; }
+  .rd-summary { display:flex; flex-wrap:wrap; justify-content:space-between; gap:10px; margin-top:12px; padding:13px 15px; background:var(--sunk); border-radius:8px; }
+  .rd-summary-item { display:flex; align-items:center; gap:8px; color:var(--muted); font-size:.88rem; }
+  .rd-summary-item i { color:var(--brand); }
+  .rd-count { color:var(--brand); background:rgba(147,46,43,.09); border-radius:999px; padding:4px 12px; font-weight:700; font-size:.8rem; }
+  .rd-table { margin:0; }
+  .rd-table thead th { background:#f5f6f8; color:var(--muted); font-size:.73rem; font-weight:700; letter-spacing:.04em; text-transform:uppercase; border-bottom:1px solid var(--line); white-space:nowrap; }
+  .rd-table td, .rd-table th { padding:12px 14px; vertical-align:middle; }
+  .rd-table tbody tr:last-child td { border-bottom:0; }
+  .rd-support-code { color:var(--brand); font-weight:700; text-decoration:none; }
+  .rd-support-code:hover { text-decoration:underline; }
+  .rd-face { display:inline-flex; align-items:center; gap:5px; padding:5px 10px; border-radius:999px; color:#0369a1; background:#e0f2fe; font-size:.8rem; font-weight:700; }
+  .rd-row { display:flex; align-items:flex-start; gap:10px; padding:11px 0; border-top:1px solid var(--line); font-size:.9rem; }
+  .rd-row:first-child { border-top:0; padding-top:0; }
+  .rd-row:last-child { padding-bottom:0; }
+  .rd-row i { width:18px; margin-top:2px; color:var(--brand); text-align:center; }
+  .rd-row-label { color:var(--muted); }
+  .rd-row-value { margin-left:auto; text-align:right; font-weight:600; overflow-wrap:anywhere; }
+  .rd-row-value a { color:var(--brand); text-decoration:none; }
+  .rd-row-value a:hover { text-decoration:underline; }
+  .rd-note { padding:14px 16px; background:#fffbeb; border:1px solid #fde68a; border-left:4px solid #f59e0b; border-radius:0 8px 8px 0; white-space:pre-line; line-height:1.65; }
+  .rd-actions { display:flex; flex-direction:column; gap:9px; }
+  .rd-actions .btn { border-radius:8px; }
+  .rd :focus-visible { outline:2px solid var(--brand); outline-offset:2px; }
+  @media (max-width:767.98px) {
+    .rd-band { padding:20px 18px 0; }
+    .rd-ref { font-size:1.6rem; }
+    .rd-facts { margin-left:-18px; margin-right:-18px; }
+    .rd-fact { flex-basis:50%; padding:12px 18px; }
+    .rd-grid { grid-template-columns:1fr; gap:0; }
+  }
+  @media (max-width:575.98px) {
+    .rd-facts-grid { grid-template-columns:1fr; }
+    .rd-panel-head, .rd-panel-body { padding-left:16px; padding-right:16px; }
+  }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="mb-4">
-
-  <!-- Header & Navigation -->
-  <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-4">
-    <div class="d-flex align-items-center gap-3">
-      <a href="{% url 'reservation_list' %}" class="btn btn-light border btn-sm d-flex align-items-center justify-content-center shadow-sm" style="width: 38px; height: 38px; border-radius: 20px;" title="Retour à la liste">
-        <i class="bi bi-arrow-left fs-6"></i>
-      </a>
+<div class="rd rd-st-{{ reservation.statut }}">
+  <header class="rd-band">
+    <div class="rd-band-top">
       <div>
-        <div class="d-flex align-items-center gap-2 flex-wrap">
-          <h1 class="h4 fw-bold mb-0" style="color: #0f172a;">{{ reservation.nom }}</h1>
-          <span class="badge font-monospace text-muted px-2 py-1" style="background: #f1f5f9; border: 1px solid #e2e8f0; font-size: 0.78rem;">
-            {{ reservation.reference }}
-          </span>
-          {% if reservation.statut == 'en_attente' %}
-            <span class="badge px-3 py-1" style="background: #fef3c7; color: #92400e; border: 1px solid #fde68a; font-weight: 700; font-size: 0.75rem; border-radius: 8px;">
-              <i class="bi bi-clock-history me-1"></i>En attente de validation
-            </span>
-          {% elif reservation.statut == 'confirmee' %}
-            <span class="badge px-3 py-1" style="background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; font-weight: 700; font-size: 0.75rem; border-radius: 8px;">
-              <i class="bi bi-check-circle-fill me-1"></i>Confirmée
-            </span>
-          {% elif reservation.statut == 'annulee' %}
-            <span class="badge px-3 py-1" style="background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; font-weight: 700; font-size: 0.75rem; border-radius: 8px;">
-              <i class="bi bi-x-circle-fill me-1"></i>Annulée
-            </span>
-          {% elif reservation.statut == 'expiree' %}
-            <span class="badge px-3 py-1" style="background: #f1f5f9; color: #475569; border: 1px solid #cbd5e1; font-weight: 700; font-size: 0.75rem; border-radius: 8px;">
-              <i class="bi bi-hourglass-bottom me-1"></i>Expirée
-            </span>
-          {% endif %}
-        </div>
-        <div class="small text-muted mt-1">
-          Client associé : <strong class="text-dark">{{ reservation.client.nom }}</strong>
-        </div>
+        <h1 class="rd-ref">{{ reservation.reference }}</h1>
+        <p class="rd-who"><strong>{{ reservation.nom }}</strong> · {{ reservation.client.nom }}</p>
       </div>
-    </div>
-
-    <!-- Actions rapides en haut -->
-    <div class="d-flex align-items-center gap-2">
-      {% if reservation.statut == 'en_attente' and user.is_staff_regie_role %}
-        {% if reservation.created_by_id != user.id %}
-        <a href="{% url 'reservation_traiter' reservation.client.pk reservation.pk %}" class="btn btn-success btn-sm d-flex align-items-center gap-2 shadow-sm px-3 py-2 fw-semibold" style="border-radius: 8px;">
-          <i class="bi bi-clipboard-check-fill"></i>
-          <span>Traiter la réservation</span>
-        </a>
+      <span class="rd-chip">
+        {% if reservation.statut == 'en_attente' %}
+          <i class="bi bi-clock-history"></i>En attente de validation
+        {% elif reservation.statut == 'confirmee' %}
+          <i class="bi bi-check-circle-fill"></i>Confirmée
+        {% elif reservation.statut == 'annulee' %}
+          <i class="bi bi-x-circle-fill"></i>Annulée
+        {% elif reservation.statut == 'expiree' %}
+          <i class="bi bi-hourglass-bottom"></i>Expirée
         {% else %}
-        <span class="badge bg-light text-muted border p-2" title="Double contrôle requis">
-          <i class="bi bi-info-circle me-1"></i>En attente de validation par un collègue
-        </span>
+          <i class="bi bi-question-circle"></i>{{ reservation.get_statut_display }}
         {% endif %}
-      {% endif %}
+      </span>
     </div>
-  </div>
+    <div class="rd-facts">
+      <div class="rd-fact"><span>Période</span><strong>{{ reservation.date_debut|date:"d/m/Y" }} → {{ reservation.date_fin|date:"d/m/Y" }}</strong></div>
+      <div class="rd-fact"><span>Durée</span><strong>{{ reservation.duree_jours }} jour{{ reservation.duree_jours|pluralize }}</strong></div>
+      <div class="rd-fact"><span>Faces réservées</span><strong>{{ reservation.lignes.count }}</strong></div>
+      <div class="rd-fact"><span>Créée le</span><strong>{{ reservation.created_at|date:"d/m/Y à H:i" }}</strong></div>
+    </div>
+  </header>
 
-  <div class="row g-4">
-    <!-- COLONNE GAUCHE (Détails, Période, Faces) -->
-    <div class="col-lg-8">
-
-      <!-- Période & Synthèse -->
-      <div class="card border-0 shadow-sm mb-4" style="border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden;">
-        <div class="card-header bg-white py-3 px-4 border-bottom" style="border-color: #e2e8f0;">
-          <h6 class="mb-0 fw-bold d-flex align-items-center gap-2" style="color: #1e293b;">
-            <i class="bi bi-calendar-range text-primary"></i>Période de réservation
-          </h6>
+  <div class="rd-grid">
+    <main>
+      <section class="rd-panel">
+        <div class="rd-panel-head">
+          <h2 class="rd-panel-title"><i class="bi bi-calendar-range"></i>Période de réservation</h2>
         </div>
-        <div class="card-body p-4">
-          <div class="row g-3">
-            <div class="col-sm-6">
-              <div class="p-3 rounded-3" style="background: #f8fafc; border: 1px solid #e2e8f0;">
-                <div class="text-uppercase text-muted fw-bold mb-1" style="font-size: 0.72rem; letter-spacing: 0.05em;">Date de début</div>
-                <div class="d-flex align-items-center gap-2">
-                  <i class="bi bi-calendar-check text-success fs-5"></i>
-                  <div>
-                    <div class="fw-bold font-monospace" style="color: #0f172a; font-size: 1rem;">{{ reservation.date_debut|date:"d/m/Y" }}</div>
-                    <small class="text-muted">{{ reservation.date_debut|date:"H:i" }}</small>
-                  </div>
-                </div>
+        <div class="rd-panel-body">
+          <div class="rd-facts-grid">
+            <div class="rd-date">
+              <span class="rd-label">Date de début</span>
+              <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-calendar-check text-success fs-5"></i>
+                <div><div class="rd-date-value">{{ reservation.date_debut|date:"d/m/Y" }}</div><small class="text-muted">{{ reservation.date_debut|date:"H:i" }}</small></div>
               </div>
             </div>
-
-            <div class="col-sm-6">
-              <div class="p-3 rounded-3" style="background: #f8fafc; border: 1px solid #e2e8f0;">
-                <div class="text-uppercase text-muted fw-bold mb-1" style="font-size: 0.72rem; letter-spacing: 0.05em;">Date de fin</div>
-                <div class="d-flex align-items-center gap-2">
-                  <i class="bi bi-calendar-x text-danger fs-5"></i>
-                  <div>
-                    <div class="fw-bold font-monospace" style="color: #0f172a; font-size: 1rem;">{{ reservation.date_fin|date:"d/m/Y" }}</div>
-                    <small class="text-muted">{{ reservation.date_fin|date:"H:i" }}</small>
-                  </div>
-                </div>
+            <div class="rd-date">
+              <span class="rd-label">Date de fin</span>
+              <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-calendar-x text-danger fs-5"></i>
+                <div><div class="rd-date-value">{{ reservation.date_fin|date:"d/m/Y" }}</div><small class="text-muted">{{ reservation.date_fin|date:"H:i" }}</small></div>
               </div>
             </div>
           </div>
-
-          <div class="mt-3 p-3 rounded-3 d-flex align-items-center justify-content-between flex-wrap gap-2" style="background: #f1f5f9;">
-            <div class="d-flex align-items-center gap-2">
-              <i class="bi bi-hourglass-split text-primary fs-5"></i>
-              <span class="text-muted small">Durée totale réservée :</span>
-              <strong class="text-dark">{{ reservation.duree_jours }} jour{{ reservation.duree_jours|pluralize }}</strong>
-            </div>
-            <div class="d-flex align-items-center gap-2">
-              <i class="bi bi-layers-fill text-secondary fs-5"></i>
-              <span class="text-muted small">Total faces bloquées :</span>
-              <strong class="text-dark">{{ reservation.lignes.count }} face{{ reservation.lignes.count|pluralize }}</strong>
-            </div>
+          <div class="rd-summary">
+            <div class="rd-summary-item"><i class="bi bi-hourglass-split"></i>Durée totale : <strong class="text-dark">{{ reservation.duree_jours }} jour{{ reservation.duree_jours|pluralize }}</strong></div>
+            <div class="rd-summary-item"><i class="bi bi-layers-fill"></i>Faces bloquées : <strong class="text-dark">{{ reservation.lignes.count }}</strong></div>
           </div>
         </div>
-      </div>
+      </section>
 
-      <!-- Faces réservées -->
-      <div class="card border-0 shadow-sm mb-4" style="border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden;">
-        <div class="card-header bg-white py-3 px-4 d-flex align-items-center justify-content-between border-bottom" style="border-color: #e2e8f0;">
-          <h6 class="mb-0 fw-bold d-flex align-items-center gap-2" style="color: #1e293b;">
-            <i class="bi bi-grid-3x3-gap-fill text-primary"></i>Faces et panneaux réservés
-          </h6>
-          <span class="badge px-3 py-2" style="background: #f8fafc; color: #475569; border: 1px solid #cbd5e1; font-weight: 700; border-radius: 8px;">
-            {{ reservation.lignes.count }} face{{ reservation.lignes.count|pluralize }}
-          </span>
+      <section class="rd-panel">
+        <div class="rd-panel-head">
+          <h2 class="rd-panel-title"><i class="bi bi-grid-3x3-gap-fill"></i>Faces et panneaux réservés</h2>
+          <span class="rd-count">{{ reservation.lignes.count }} face{{ reservation.lignes.count|pluralize }}</span>
         </div>
-        <div class="card-body p-0 table-responsive">
-          <table class="table table-hover align-middle mb-0" style="border-collapse: separate; border-spacing: 0;">
+        <div class="table-responsive">
+          <table class="table table-hover align-middle rd-table">
             <thead>
-              <tr style="background-color: #1e293b; color: #ffffff;">
-                <th class="py-3 px-3" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: #f8fafc; border: none;">Support & Code</th>
-                <th class="py-3 px-3" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: #f8fafc; border: none;">Face</th>
-                <th class="py-3 px-3" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: #f8fafc; border: none;">Localisation</th>
-                <th class="py-3 px-3" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: #f8fafc; border: none;">Format</th>
-                <th class="py-3 px-3 text-end" style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 700; color: #f8fafc; border: none;">Action</th>
-              </tr>
+              <tr><th>Support</th><th>Face</th><th>Localisation</th><th>Format</th><th class="text-end">Action</th></tr>
             </thead>
             <tbody>
               {% for ligne in reservation.lignes.all %}
-              <tr style="border-bottom: 1px solid #f1f5f9;">
-                <td class="py-3 px-3">
-                  <div class="d-flex align-items-center gap-2">
-                    <div class="d-flex align-items-center justify-content-center rounded-2 bg-light border text-primary fw-bold" style="width: 32px; height: 32px; font-size: 0.75rem;">
-                      🪧
-                    </div>
-                    <div>
-                      <a href="{% url 'support_detail' ligne.support.uuid %}" class="fw-bold font-monospace text-decoration-none" style="color: var(--color-primary);">
-                        {{ ligne.support.code }}
-                      </a>
-                      <div class="small text-muted text-truncate" style="max-width: 200px;">
-                        {{ ligne.support.nom|default:ligne.support.code }}
-                      </div>
-                    </div>
-                  </div>
+              <tr>
+                <td>
+                  <a href="{% url 'support_detail' ligne.support.uuid %}" class="rd-support-code">{{ ligne.support.code }}</a>
+                  <small class="d-block text-muted">{{ ligne.support.nom|default:ligne.support.code }}</small>
                 </td>
-                <td class="py-3 px-3">
-                  <span class="badge px-3 py-2 fw-bold" style="background: #e0f2fe; color: #0369a1; border: 1px solid #bae6fd; border-radius: 8px;">
-                    <i class="bi bi-aspect-ratio me-1"></i>
-                    {% if ligne.face %}Face {{ ligne.face.label }}{% else %}Support complet{% endif %}
-                  </span>
-                </td>
-                <td class="py-3 px-3">
-                  <div class="text-dark fw-semibold" style="font-size: 0.85rem;">{{ ligne.support.ville|default:"—" }}</div>
-                  <small class="text-muted"><i class="bi bi-geo-alt me-1"></i>{{ ligne.support.quartier|default:ligne.support.adresse|default:"—" }}</small>
-                </td>
-                <td class="py-3 px-3">
-                  <span class="badge bg-light text-dark border" style="font-size: 0.75rem;">
-                    {{ ligne.support.get_format_display|default:ligne.support.format|default:"Standard" }}
-                  </span>
-                </td>
-                <td class="py-3 px-3 text-end">
-                  <a href="{% url 'support_detail' ligne.support.uuid %}" class="btn btn-sm btn-outline-secondary" style="border-radius: 8px;" title="Voir le panneau">
-                    <i class="bi bi-box-arrow-up-right"></i>
-                  </a>
-                </td>
+                <td><span class="rd-face"><i class="bi bi-aspect-ratio"></i>{% if ligne.face %}Face {{ ligne.face.label }}{% else %}Support complet{% endif %}</span></td>
+                <td><strong>{{ ligne.support.ville|default:"—" }}</strong><small class="d-block text-muted"><i class="bi bi-geo-alt me-1"></i>{{ ligne.support.quartier|default:ligne.support.adresse|default:"—" }}</small></td>
+                <td><span class="badge bg-light text-dark border">{{ ligne.support.get_format_display|default:ligne.support.format|default:"Standard" }}</span></td>
+                <td class="text-end"><a href="{% url 'support_detail' ligne.support.uuid %}" class="btn btn-sm btn-outline-secondary" style="border-radius:8px" title="Voir le panneau"><i class="bi bi-box-arrow-up-right"></i></a></td>
               </tr>
               {% empty %}
-              <tr>
-                <td colspan="5" class="text-center py-4 text-muted">
-                  <i class="bi bi-inbox d-block mb-1 fs-3 opacity-50"></i>
-                  Aucune face n'est associée à cette réservation.
-                </td>
-              </tr>
+              <tr><td colspan="5" class="text-center py-4 text-muted"><i class="bi bi-inbox d-block mb-1 fs-3 opacity-50"></i>Aucune face n'est associée à cette réservation.</td></tr>
               {% endfor %}
             </tbody>
           </table>
         </div>
-      </div>
+      </section>
 
-      <!-- Notes internes -->
-      <div class="card border-0 shadow-sm" style="border-radius: 8px; border: 1px solid #e2e8f0;">
-        <div class="card-header bg-white py-3 px-4 border-bottom" style="border-color: #e2e8f0;">
-          <h6 class="mb-0 fw-bold d-flex align-items-center gap-2" style="color: #1e293b;">
-            <i class="bi bi-journal-text text-primary"></i>Notes et observations
-          </h6>
-        </div>
-        <div class="card-body p-4">
+      <section class="rd-panel">
+        <div class="rd-panel-head"><h2 class="rd-panel-title"><i class="bi bi-journal-text"></i>Notes et observations</h2></div>
+        <div class="rd-panel-body">
           {% if reservation.notes %}
-          <div class="p-3 rounded-3" style="background: #f8fafc; border-left: 4px solid var(--color-primary); border-top: 1px solid #e2e8f0; border-right: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0;">
-            <p class="mb-0 text-dark" style="font-size: 0.9rem; white-space: pre-line;">{{ reservation.notes }}</p>
-          </div>
+            <div class="rd-note">{{ reservation.notes }}</div>
           {% else %}
-          <p class="text-muted small mb-0 fst-italic">
-            <i class="bi bi-info-circle me-1"></i>Aucune note interne renseignée pour cette réservation.
-          </p>
+            <p class="text-muted small mb-0"><i class="bi bi-info-circle me-1"></i>Aucune note interne renseignée pour cette réservation.</p>
           {% endif %}
         </div>
-      </div>
+      </section>
+    </main>
 
-    </div>
-
-    <!-- COLONNE DROITE (Client, Création, Actions) -->
-    <div class="col-lg-4">
-      
-      <!-- Fiche Client -->
-      <div class="card border-0 shadow-sm mb-4" style="border-radius: 8px; border: 1px solid #e2e8f0; overflow: hidden;">
-        <div class="card-header bg-white py-3 px-4 border-bottom" style="border-color: #e2e8f0;">
-          <h6 class="mb-0 fw-bold d-flex align-items-center gap-2" style="color: #1e293b;">
-            <i class="bi bi-building text-primary"></i>Client associé
-          </h6>
-        </div>
-        <div class="card-body p-4">
+    <aside>
+      <section class="rd-panel">
+        <div class="rd-panel-head"><h2 class="rd-panel-title"><i class="bi bi-building"></i>Client associé</h2></div>
+        <div class="rd-panel-body">
           <div class="d-flex align-items-center gap-3 mb-3">
-            <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold shadow-sm flex-shrink-0" style="width: 48px; height: 48px; background: linear-gradient(135deg, var(--color-primary) 0%, #b91c1c 100%); font-size: 1.1rem;">
+            <div class="rounded-circle d-flex align-items-center justify-content-center text-white fw-bold flex-shrink-0" style="width:48px;height:48px;background:var(--brand);font-size:1.1rem;">
               {{ reservation.client.nom|slice:":2"|upper }}
             </div>
-            <div class="min-width-0">
-              <h6 class="fw-bold mb-0 text-dark text-truncate">{{ reservation.client.nom }}</h6>
-              <small class="text-muted">Client référencé</small>
-            </div>
+            <div class="min-width-0"><h3 class="h6 fw-bold mb-0 text-dark text-truncate">{{ reservation.client.nom }}</h3><small class="text-muted">Client référencé</small></div>
           </div>
-
-          <div class="d-flex flex-column gap-2 mb-3 pt-2 border-top">
-            {% if reservation.client.telephone %}
-            <div class="d-flex align-items-center gap-2 small text-muted">
-              <i class="bi bi-telephone text-primary"></i>
-              <span class="text-dark">{{ reservation.client.telephone }}</span>
-            </div>
-            {% endif %}
-
-            {% if reservation.client.email %}
-            <div class="d-flex align-items-center gap-2 small text-muted">
-              <i class="bi bi-envelope text-primary"></i>
-              <a href="mailto:{{ reservation.client.email }}" class="text-decoration-none text-dark">{{ reservation.client.email }}</a>
-            </div>
-            {% endif %}
-          </div>
-
-          <a href="{% url 'client_detail' reservation.client.pk %}" class="btn btn-outline-secondary w-100 btn-sm d-flex align-items-center justify-content-center gap-1" style="border-radius: 8px;">
-            <i class="bi bi-person-lines-fill"></i>
-            <span>Voir la fiche client</span>
+          {% if reservation.client.telephone %}
+          <div class="rd-row"><i class="bi bi-telephone"></i><span class="rd-row-label">Téléphone</span><span class="rd-row-value">{{ reservation.client.telephone }}</span></div>
+          {% endif %}
+          {% if reservation.client.email %}
+          <div class="rd-row"><i class="bi bi-envelope"></i><span class="rd-row-label">E-mail</span><span class="rd-row-value"><a href="mailto:{{ reservation.client.email }}">{{ reservation.client.email }}</a></span></div>
+          {% endif %}
+          <a href="{% url 'client_detail' reservation.client.pk %}" class="btn btn-outline-secondary btn-sm w-100 mt-3">
+            <i class="bi bi-person-lines-fill me-1"></i>Voir la fiche client
           </a>
         </div>
-      </div>
+      </section>
 
-      <!-- Informations d'audit -->
-      <div class="card border-0 shadow-sm mb-4" style="border-radius: 8px; border: 1px solid #e2e8f0;">
-        <div class="card-header bg-white py-3 px-4 border-bottom" style="border-color: #e2e8f0;">
-          <h6 class="mb-0 fw-bold d-flex align-items-center gap-2" style="color: #1e293b;">
-            <i class="bi bi-shield-check text-primary"></i>Traçabilité
-          </h6>
+      <section class="rd-panel">
+        <div class="rd-panel-head"><h2 class="rd-panel-title"><i class="bi bi-shield-check"></i>Traçabilité</h2></div>
+        <div class="rd-panel-body">
+          <div class="rd-row"><i class="bi bi-person-badge"></i><span class="rd-row-label">Créée par</span><span class="rd-row-value">{{ reservation.created_by|default:"Système" }}</span></div>
+          <div class="rd-row"><i class="bi bi-calendar-plus"></i><span class="rd-row-label">Créée le</span><span class="rd-row-value">{{ reservation.created_at|date:"d/m/Y à H:i" }}</span></div>
+          {% if reservation.updated_at %}
+          <div class="rd-row"><i class="bi bi-clock-history"></i><span class="rd-row-label">Modifiée le</span><span class="rd-row-value">{{ reservation.updated_at|date:"d/m/Y à H:i" }}</span></div>
+          {% endif %}
         </div>
-        <div class="card-body p-4">
-          <div class="d-flex flex-column gap-3">
-            <div>
-              <div class="text-uppercase text-muted fw-bold" style="font-size: 0.72rem; letter-spacing: 0.05em;">Créé par</div>
-              <div class="d-flex align-items-center gap-2 mt-1">
-                <i class="bi bi-person-badge text-secondary"></i>
-                <span class="fw-semibold text-dark" style="font-size: 0.88rem;">{{ reservation.created_by|default:"Système" }}</span>
-              </div>
-              <small class="text-muted d-block mt-1" style="font-size: 0.75rem;">
-                Le {{ reservation.created_at|date:"d/m/Y à H:i" }}
-              </small>
-            </div>
+      </section>
 
-            {% if reservation.updated_at %}
-            <div class="pt-2 border-top">
-              <div class="text-uppercase text-muted fw-bold" style="font-size: 0.72rem; letter-spacing: 0.05em;">Dernière modification</div>
-              <small class="text-muted d-block mt-1" style="font-size: 0.75rem;">
-                Le {{ reservation.updated_at|date:"d/m/Y à H:i" }}
-              </small>
-            </div>
-            {% endif %}
-          </div>
-        </div>
-      </div>
-
-      <!-- Actions de gestion -->
-      <div class="card border-0 shadow-sm" style="border-radius: 8px; border: 1px solid #e2e8f0;">
-        <div class="card-header bg-white py-3 px-4 border-bottom" style="border-color: #e2e8f0;">
-          <h6 class="mb-0 fw-bold d-flex align-items-center gap-2" style="color: #1e293b;">
-            <i class="bi bi-gear-wide-connected text-primary"></i>Actions
-          </h6>
-        </div>
-        <div class="card-body p-4 d-flex flex-column gap-2">
+      <section class="rd-panel">
+        <div class="rd-panel-head"><h2 class="rd-panel-title"><i class="bi bi-gear-wide-connected"></i>Actions</h2></div>
+        <div class="rd-panel-body rd-actions">
           {% if reservation.statut == 'en_attente' and user.is_staff_regie_role %}
             {% if reservation.created_by_id != user.id %}
-            <a href="{% url 'reservation_traiter' reservation.client.pk reservation.pk %}" class="btn btn-success w-100 d-flex align-items-center justify-content-center gap-2 shadow-sm fw-semibold" style="border-radius: 8px;">
-              <i class="bi bi-clipboard-check-fill"></i>
-              <span>Valider / Annuler la réservation</span>
-            </a>
+              <a href="{% url 'reservation_traiter' reservation.client.pk reservation.pk %}" class="btn btn-success fw-semibold">
+                <i class="bi bi-clipboard-check-fill me-1"></i>Valider / Annuler la réservation
+              </a>
             {% else %}
-            <div class="alert alert-warning py-2 small mb-0" style="border-radius: 8px;">
-              <i class="bi bi-lock-fill me-1"></i>Vous êtes le créateur. Double contrôle obligatoire.
-            </div>
+              <div class="alert alert-warning py-2 small mb-0"><i class="bi bi-lock-fill me-1"></i>Vous êtes le créateur. Double contrôle obligatoire.</div>
             {% endif %}
           {% endif %}
-
-          {% if can_edit and reservation.statut == 'en_attente' or reservation.statut == 'confirmee' %}
-          <a href="{% url 'reservation_update' reservation.client.pk reservation.pk %}" class="btn btn-outline-secondary w-100 d-flex align-items-center justify-content-center gap-2" style="border-radius: 8px;">
-            <i class="bi bi-pencil-square"></i>
-            <span>Modifier la réservation</span>
-          </a>
+          {% if can_edit and reservation.statut == 'en_attente' or can_edit and reservation.statut == 'confirmee' %}
+            <a href="{% url 'reservation_update' reservation.client.pk reservation.pk %}" class="btn btn-outline-secondary"><i class="bi bi-pencil-square me-1"></i>Modifier la réservation</a>
           {% endif %}
-
           {% if can_delete %}
-          <a href="{% url 'reservation_delete' reservation.client.pk reservation.pk %}" class="btn btn-outline-danger w-100 d-flex align-items-center justify-content-center gap-2" style="border-radius: 8px;">
-            <i class="bi bi-trash3"></i>
-            <span>Supprimer la réservation</span>
-          </a>
+            <a href="{% url 'reservation_delete' reservation.client.pk reservation.pk %}" class="btn btn-outline-danger"><i class="bi bi-trash3 me-1"></i>Supprimer la réservation</a>
           {% endif %}
-
-          <a href="{% url 'reservation_list' %}" class="btn btn-light border w-100 mt-2 d-flex align-items-center justify-content-center gap-2" style="border-radius: 8px;">
-            <i class="bi bi-arrow-left"></i>
-            <span>Retour aux réservations</span>
-          </a>
+          <a href="{% url 'reservation_list' %}" class="btn btn-light border"><i class="bi bi-arrow-left me-1"></i>Retour aux réservations</a>
         </div>
-      </div>
-
-    </div>
+      </section>
+    </aside>
   </div>
-
 </div>
 {% endblock %}

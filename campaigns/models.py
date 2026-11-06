@@ -690,7 +690,7 @@ class DemandeReservation(models.Model):
         (STATUT_BROUILLON, 'En attente de confirmation du client'),
         (STATUT_NOUVELLE,  'Nouvelle'),
         (STATUT_EN_COURS,  'En cours de traitement'),
-        (STATUT_VALIDEE,   'Validée — Réservation créée'),
+        (STATUT_VALIDEE,   'Validée'),
         (STATUT_REFUSEE,   'Refusée'),
     ]
 
@@ -1012,20 +1012,22 @@ class DemandeReservation(models.Model):
             self.traite_par = user
         self.save(update_fields=['statut', 'traite_par', 'updated_at'])
 
-    def marquer_validee(self, client, reservation, user):
+    def marquer_validee(self, client, user, reservation=None, campagne=None):
         """
-        Marque la demande comme validée et associe le client et la réservation.
-        À appeler APRÈS la création atomique de Client + Reservation.
+        Marque la demande comme validée et l'associe à la réservation ou campagne créée.
         """
         self.statut      = self.STATUT_VALIDEE
         self.client      = client
         self.reservation = reservation
         self.traite_par  = user
         self.traite_le   = timezone.now()
-        self.save(update_fields=[
-            'statut', 'client', 'reservation',
-            'traite_par', 'traite_le', 'updated_at',
-        ])
+        update_fields = [
+            'statut', 'client', 'reservation', 'traite_par', 'traite_le', 'updated_at',
+        ]
+        if campagne is not None:
+            self.campagne = campagne
+            update_fields.append('campagne')
+        self.save(update_fields=update_fields)
 
     def marquer_refusee(self, user, notes: str = ''):
         """Marque la demande comme refusée."""

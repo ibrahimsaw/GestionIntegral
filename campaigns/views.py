@@ -4204,21 +4204,92 @@ def _importer_faces_reservation(campagne, reservation, formats_autorises):
     return len(lignes_a_importer)
 
 
+def _importer_faces_demande(campagne, demande, formats_autorises):
+    faces = demande.faces_souhaitees.filter(
+        support__format__in=formats_autorises,
+    ).select_related('support')
+    face_ids_existants = set(
+        campagne.lignes.filter(face__isnull=False).values_list('face_id', flat=True)
+    )
+    lignes_a_importer = [
+        LigneCampagne(campagne=campagne, support=face.support, face=face)
+        for face in faces
+        if face.pk not in face_ids_existants
+    ]
+    if lignes_a_importer:
+        LigneCampagne.objects.bulk_create(lignes_a_importer)
+    return len(lignes_a_importer)
+
+
 class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
     model = Campagne
     form_class = CampagneForm
     template_name = 'campaigns/campagne_form.html'
+
+    def get_source_demande(self):
+        if not hasattr(self, '_source_demande'):
+            demande_uuid = (
+                self.request.GET.get('demande')
+                or self.request.POST.get('demande_uuid')
+            )
+            self._source_demande = None
+            if demande_uuid and not self.kwargs.get('pk'):
+                self._source_demande = get_object_or_404(
+                    DemandeReservation.objects.filter(
+                        statut__in=(
+                            DemandeReservation.STATUT_NOUVELLE,
+                            DemandeReservation.STATUT_EN_COURS,
+                        ),
+                    ),
+                    uuid=demande_uuid,
+                )
+            elif not self.kwargs.get('pk'):
+                reference = self.request.POST.get('reservation_reference', '').strip()
+                if reference:
+                    self._source_demande = DemandeReservation.objects.filter(
+                        statut__in=(
+                            DemandeReservation.STATUT_NOUVELLE,
+                            DemandeReservation.STATUT_EN_COURS,
+                        ),
+                        reference__iexact=reference,
+                    ).first()
+        return self._source_demande
 
     def get_object(self, queryset=None):
         # Si 'pk' est présent dans l'URL, c'est une modification, sinon une création
         pk = self.kwargs.get('pk')
         return get_object_or_404(Campagne, pk=pk) if pk else None
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        demande = self.get_source_demande()
+        if demande:
+            kwargs['demande'] = demande
+        return kwargs
+
     def get_initial(self):
         initial = super().get_initial()
+        demande = self.get_source_demande()
+        if demande:
+            client = demande.client or (
+                Client.objects.filter(email__iexact=demande.email)
+                .order_by('pk')
+                .first()
+            )
+            initial.update({
+                'client': client.pk if client else '',
+                'annonceur': demande.societe or demande.nom_contact,
+                'nom': demande.nom_campagne or f"Campagne {demande.reference}",
+                'date_debut': demande.date_debut_souhaitee,
+                'date_fin': demande.date_fin_souhaitee,
+                'lieu': self._demande_lieu(demande),
+                'reservation_reference': demande.reference,
+                'type_support': self._demande_categorie(demande),
+            })
         # Utilisation de .get() pour éviter les erreurs si la clé n'existe pas
         if client_id := self.request.GET.get('client'):
-            initial['client'] = client_id
+            if not demande:
+                initial['client'] = client_id
         if campagne_parente_id := self.request.GET.get('campagne_parente'):
             initial['campagne_parente'] = campagne_parente_id
             if not initial.get('client'):
@@ -4244,9 +4315,31 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
                 initial[field] = value
         return initial
 
+    @staticmethod
+    def _demande_lieu(demande):
+        villes = list(
+            demande.faces_souhaitees
+            .exclude(support__ville='')
+            .values_list('support__ville', flat=True)
+            .distinct()
+        )
+        return villes[0] if len(villes) == 1 else ''
+
+    @staticmethod
+    def _demande_categorie(demande):
+        formats = FormatSupport.objects.in_bulk(field_name='code')
+        categories = {
+            normaliser_categorie_format(formats[face.support.format].categorie)
+            for face in demande.faces_souhaitees.select_related('support')
+            if face.support.format in formats
+            and formats[face.support.format].categorie
+        }
+        return next(iter(categories)) if len(categories) == 1 else ''
+
     @transaction.atomic
     def form_valid(self, form):
         is_create = self.object is None
+        demande = self.get_source_demande()
         previous_values = {}
         if not is_create:
             previous_values = {
@@ -4259,6 +4352,18 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
         
         if is_create:
             form.instance.created_by = self.request.user
+
+        if demande:
+            client = form.demande_client
+            if client is None:
+                client = Client.objects.create(
+                    email=demande.email,
+                    nom=demande.societe or demande.nom_contact,
+                    contact_nom=demande.nom_contact,
+                    telephone=demande.telephone,
+                )
+            form.cleaned_data['client'] = client
+            form.instance.client = client
         
         if form.cleaned_data.get('statut') == Campagne.STATUT_BROUILLON:
             form.instance.actif = False
@@ -4267,11 +4372,25 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
         transaction.on_commit(lambda: cache.delete('dashboard_alertes'))
 
         faces_importees = 0
-        if form.reservation_source:
+        if form.demande_reference_selected and demande:
+            faces_importees = _importer_faces_demande(
+                self.object,
+                demande,
+                form.demande_formats,
+            )
+        elif form.reservation_source:
             faces_importees = _importer_faces_reservation(
                 self.object,
                 form.reservation_source,
                 form.reservation_formats,
+            )
+
+        if demande:
+            demande.marquer_validee(
+                client=self.object.client,
+                reservation=None,
+                campagne=self.object,
+                user=self.request.user,
             )
 
         if not is_create:
@@ -4368,7 +4487,20 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
         action = AuditLog.ACTION_CREATE if is_create else AuditLog.ACTION_UPDATE
         msg_text = f"Campagne {'créée' if is_create else 'mise à jour'} avec succès."
         if faces_importees:
-            msg_text += f" {faces_importees} face(s) importée(s) depuis la réservation {form.reservation_source.reference}."
+            source_reference = (
+                form.reservation_source.reference
+                if form.reservation_source
+                else demande.reference
+            )
+            msg_text += (
+                f" {faces_importees} face(s) importée(s) depuis la référence "
+                f"{source_reference}."
+            )
+        if demande:
+            msg_text += (
+                f" La demande {demande.reference} est validée comme campagne; "
+                "les réservations existantes sont conservées."
+            )
         
         log_action(
             self.request,
@@ -4386,6 +4518,7 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        context['demande_source'] = self.get_source_demande()
         # Utilisation d'une logique ternaire pour plus de clarté
         context['title'] = f"Modifier — {self.object.nom}" if self.object else "Nouvelle Campagne"
         if self.object:
@@ -6724,6 +6857,22 @@ class DemandeDetailView(LoginRequiredMixin, View):
             'demande': demande,
             'campagne_form': DemandeCampagneForm(demande=demande),
         }
+        client_reservations = demande.client or (
+            Client.objects.filter(email__iexact=demande.email)
+            .order_by('pk')
+            .first()
+        )
+        context['reservations_client_periode'] = (
+            Reservation.objects.filter(
+                client=client_reservations,
+                statut__in=[STATUT_EN_ATTENTE, STATUT_CONFIRMEE],
+                date_debut__date__lte=demande.date_fin_souhaitee,
+                date_fin__date__gte=demande.date_debut_souhaitee,
+            )
+            .prefetch_related('lignes__support', 'lignes__face')
+            .order_by('date_debut', 'pk')
+            if client_reservations else Reservation.objects.none()
+        )
         context['peut_modifier_demande'] = (
             request.user.is_staff_regie_role
             and demande.statut in (

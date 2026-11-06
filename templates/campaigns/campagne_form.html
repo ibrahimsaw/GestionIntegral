@@ -290,6 +290,18 @@
 
       <form method="post" enctype="multipart/form-data" novalidate id="campagneForm">
         {% csrf_token %}
+        {% if demande_source %}
+          <input type="hidden" name="demande_uuid" value="{{ demande_source.uuid }}">
+          <div class="alert alert-info">
+            <strong>Campagne créée depuis la demande {{ demande_source.reference }}</strong>
+            — le client, le lieu, la catégorie et la période sont repris automatiquement. Les faces souhaitées seront ajoutées à la campagne, sans modifier les réservations existantes.
+            {% if form.reservations_existantes %}
+              Pour importer les faces d’une réservation existante, remplacez la référence de demande par celle de la réservation.
+            {% else %}
+              Aucune réservation avec des faces n’a été trouvée pour ce client sur cette période.
+            {% endif %}
+          </div>
+        {% endif %}
 
         <div class="d-flex flex-column gap-4">
 
@@ -376,7 +388,7 @@
 
                 <!-- Import des faces depuis une réservation de l'agence -->
                 <div class="col-md-6">
-                  <label class="form-label" for="id_reservation_reference">Référence de réservation (facultatif)</label>
+                  <label class="form-label" for="id_reservation_reference">Référence de réservation ou de demande (facultatif)</label>
                   <div class="input-group">
                     <span class="input-group-text">
                       <i class="bi bi-bookmark-check"></i>
@@ -388,10 +400,24 @@
                       <option
                         value="{{ reservation.reference }}"
                         label="{{ reservation.nom }} — {{ reservation.client.nom }}"
+                        data-type="reservation"
                         data-agence="{{ reservation.client_id }}"
                         data-date-debut="{{ reservation.date_debut|date:'Y-m-d' }}"
                         data-date-fin="{{ reservation.date_fin|date:'Y-m-d' }}"
                         data-categories="{{ reservation.categories_json }}">
+                    {% endfor %}
+                    {% for demande in form.demandes_existantes %}
+                      <option
+                        value="{{ demande.reference }}"
+                        label="Demande — {{ demande.societe|default:demande.nom_contact }}"
+                        data-type="demande"
+                        data-agence="{{ demande.client_formulaire.pk|default:'' }}"
+                        data-date-debut="{{ demande.date_debut_souhaitee|date:'Y-m-d' }}"
+                        data-date-fin="{{ demande.date_fin_souhaitee|date:'Y-m-d' }}"
+                        data-annonceur="{{ demande.societe|default:demande.nom_contact }}"
+                        data-lieu="{{ demande.lieu_formulaire }}"
+                        data-categorie="{{ demande.categorie_formulaire }}"
+                        data-categories="{{ demande.categories_json }}">
                     {% endfor %}
                   </datalist>
                   <div class="form-text small text-muted">{{ form.reservation_reference.help_text }}</div>
@@ -885,17 +911,57 @@ document.addEventListener('DOMContentLoaded', function () {
 
         function filtrerReservationsParAgence(agenceId) {
             reservationsDatalist.replaceChildren();
-            if (!agenceId) return;
-
             reservationsOptions
-                .filter(option => option.dataset.agence === agenceId)
+                .filter(option => (
+                    option.dataset.type === 'demande'
+                    ? (!option.dataset.agence || option.dataset.agence === agenceId)
+                    : option.dataset.agence === agenceId
+                ))
                 .forEach(option => reservationsDatalist.appendChild(option.cloneNode(true)));
+        }
+
+        function appliquerDemandeReference() {
+            const reference = reservationReferenceInput.value.trim().toLowerCase();
+            const demande = reservationsOptions.find(option =>
+                option.dataset.type === 'demande'
+                && option.value.toLowerCase() === reference
+            );
+            if (!demande) return;
+
+            if (demande.dataset.agence) {
+                clientSelect.value = demande.dataset.agence;
+                filtrerReservationsParAgence(clientSelect.value);
+            }
+            const annonceurInput = document.getElementById('id_annonceur');
+            if (annonceurInput) {
+                annonceurInput.value = demande.dataset.annonceur || '';
+            }
+            if (lieuSelect && demande.dataset.lieu) {
+                lieuSelect.value = demande.dataset.lieu;
+            }
+            if (dateDebutInput && demande.dataset.dateDebut) {
+                dateDebutInput.value = demande.dataset.dateDebut;
+            }
+            if (dateFinInput && demande.dataset.dateFin) {
+                dateFinInput.value = demande.dataset.dateFin;
+            }
+            if (dureeInput && dateDebutInput && dateFinInput
+                && dateDebutInput.value && dateFinInput.value) {
+                const debut = new Date(`${dateDebutInput.value}T00:00:00`);
+                const fin = new Date(`${dateFinInput.value}T00:00:00`);
+                dureeInput.value = Math.round((fin - debut) / 86400000) + 1;
+            }
+            if (categorieSelect && demande.dataset.categorie) {
+                categorieSelect.value = demande.dataset.categorie;
+                categorieSelect.dispatchEvent(new Event('change'));
+            }
         }
 
         function appliquerPeriodeReservation() {
             const reference = reservationReferenceInput.value.trim().toLowerCase();
             const reservation = reservationsOptions.find(option =>
-                option.value.toLowerCase() === reference
+                option.dataset.type === 'reservation'
+                && option.value.toLowerCase() === reference
                 && option.dataset.agence === clientSelect.value
             );
 
@@ -960,7 +1026,8 @@ document.addEventListener('DOMContentLoaded', function () {
             if (!categorieSelect || !typeSupport) return;
             const reference = reservationReferenceInput.value.trim().toLowerCase();
             const reservation = reservationsOptions.find(option =>
-                option.value.toLowerCase() === reference
+                option.dataset.type === 'reservation'
+                && option.value.toLowerCase() === reference
                 && option.dataset.agence === clientSelect.value
             );
             const categorieActuelle = categorieSelect.value;
@@ -1011,13 +1078,16 @@ document.addEventListener('DOMContentLoaded', function () {
             }
         }
 
+        function traiterReference() {
+            appliquerDemandeReference();
+            appliquerPeriodeReservation();
+            appliquerCategoriesReservation();
+        }
+
         filtrerReservationsParAgence(clientSelect.value);
-        appliquerPeriodeReservation();
-        appliquerCategoriesReservation();
-        reservationReferenceInput.addEventListener('input', appliquerPeriodeReservation);
-        reservationReferenceInput.addEventListener('change', appliquerPeriodeReservation);
-        reservationReferenceInput.addEventListener('input', appliquerCategoriesReservation);
-        reservationReferenceInput.addEventListener('change', appliquerCategoriesReservation);
+        traiterReference();
+        reservationReferenceInput.addEventListener('input', traiterReference);
+        reservationReferenceInput.addEventListener('change', traiterReference);
         if (dateDebutInput) {
             dateDebutInput.addEventListener('change', appliquerPeriodeReservation);
         }

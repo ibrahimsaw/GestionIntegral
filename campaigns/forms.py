@@ -170,14 +170,17 @@ from .models import (
 class CampagneForm(forms.ModelForm):
     reservation_reference = forms.CharField(
         required=False,
-        label="Référence de réservation",
+        label="Référence de réservation ou de demande",
         widget=forms.TextInput(attrs={
             **W,
             'list': 'reservations-agence',
-            'placeholder': 'Ex. RES-2026-ABC123',
+            'placeholder': 'Ex. RES-2026-ABC123 ou DEM-2026-ABC123',
             'autocomplete': 'off',
         }),
-        help_text="Importe automatiquement les faces de cette réservation si elle appartient à l’agence sélectionnée.",
+        help_text=(
+            "Une réservation importe ses faces par catégorie. Une demande remplit "
+            "automatiquement l’agence, le lieu, la catégorie et les dates."
+        ),
     )
 
     # Champ de choix dynamique pour le type / format de campagne
@@ -245,6 +248,7 @@ class CampagneForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        self.demande_source = kwargs.pop('demande', None)
         submitted_data = kwargs.get('data')
         data_in_args = bool(args) and args[0] is not None
         if submitted_data is not None or data_in_args:
@@ -258,6 +262,13 @@ class CampagneForm(forms.ModelForm):
                 args = (data, *args[1:])
 
         super().__init__(*args, **kwargs)
+        self.demande_client = None
+        if self.demande_source:
+            self.demande_client = self.demande_source.client or (
+                Client.objects.filter(email__iexact=self.demande_source.email)
+                .order_by('pk')
+                .first()
+            )
         self.annonceurs_existants = (
             Client.objects.filter(actif=True)
             .exclude(nom='')
@@ -265,7 +276,7 @@ class CampagneForm(forms.ModelForm):
             .values_list('nom', flat=True)
             .distinct()
         )
-        reservations = list(
+        reservations_qs = (
             Reservation.objects
             .filter(
                 statut__in=[STATUT_EN_ATTENTE, STATUT_CONFIRMEE],
@@ -275,6 +286,16 @@ class CampagneForm(forms.ModelForm):
             .distinct()
             .order_by('client__nom', '-created_at')
         )
+        if self.demande_source:
+            if self.demande_client:
+                reservations_qs = reservations_qs.filter(
+                    client=self.demande_client,
+                    date_debut__date__lte=self.demande_source.date_fin_souhaitee,
+                    date_fin__date__gte=self.demande_source.date_debut_souhaitee,
+                )
+            else:
+                reservations_qs = reservations_qs.none()
+        reservations = list(reservations_qs)
         categories_par_format = dict(FormatSupport.objects.values_list('code', 'categorie'))
         for reservation in reservations:
             categories = {}
@@ -295,6 +316,46 @@ class CampagneForm(forms.ModelForm):
             ]
             reservation.categories_json = json.dumps(reservation.categories_pour_formulaire)
         self.reservations_existantes = reservations
+        demandes_qs = DemandeReservation.objects.filter(
+            statut__in=(
+                DemandeReservation.STATUT_NOUVELLE,
+                DemandeReservation.STATUT_EN_COURS,
+            ),
+        ).select_related('client').prefetch_related(
+            'faces_souhaitees__support',
+            'supports_souhaites',
+        ).order_by('-created_at')
+        self.demandes_existantes = list(demandes_qs)
+        for demande in self.demandes_existantes:
+            demande.client_formulaire = demande.client or (
+                Client.objects.filter(email__iexact=demande.email)
+                .order_by('pk')
+                .first()
+            )
+            villes = sorted({
+                face.support.ville
+                for face in demande.faces_souhaitees.select_related('support')
+                if face.support.ville
+            })
+            demande.lieu_formulaire = villes[0] if len(villes) == 1 else ''
+            formats_par_categorie = {}
+            for face in demande.faces_souhaitees.select_related('support'):
+                format_code = face.support.format
+                categorie = normaliser_categorie_format(
+                    categories_par_format.get(format_code, '')
+                )
+                if categorie:
+                    formats_par_categorie.setdefault(categorie, set()).add(format_code)
+            demande.categories_pour_formulaire = [
+                {'nom': categorie, 'formats': sorted(codes)}
+                for categorie, codes in sorted(formats_par_categorie.items())
+            ]
+            demande.categories_json = json.dumps(demande.categories_pour_formulaire)
+            demande.categorie_formulaire = (
+                demande.categories_pour_formulaire[0]['nom']
+                if len(demande.categories_pour_formulaire) == 1
+                else ''
+            )
         self.categories_par_format = {
             code: normaliser_categorie_format(categorie)
             for code, categorie in categories_par_format.items()
@@ -311,10 +372,18 @@ class CampagneForm(forms.ModelForm):
                 if choice[0] not in statuts_geres_par_actions
             ]
         self.fields['client'].required = False
-        self.fields['client'].help_text = "Laissez vide pour une campagne propre à INTEGRAL."
+        if self.demande_source:
+            self.fields['client'].disabled = True
+            self.fields['client'].help_text = (
+                "Le client est repris depuis la demande et ne peut pas être remplacé."
+            )
+        else:
+            self.fields['client'].help_text = "Laissez vide pour une campagne propre à INTEGRAL."
         self.reservation_source = None
         self.reservation_categorie = None
         self.reservation_formats = set()
+        self.demande_reference_selected = False
+        self.demande_formats = set()
 
         # 1. Déterminer le client à utiliser pour filtrer contrat / campagne_parente
         #    Ordre de priorité :
@@ -379,8 +448,74 @@ class CampagneForm(forms.ModelForm):
         parent = cleaned.get('campagne_parente')
         reservation_reference = cleaned.get('reservation_reference', '').strip()
         client = cleaned.get('client')
+        demande_reference_selected = bool(
+            self.demande_source
+            and reservation_reference.casefold() == self.demande_source.reference.casefold()
+        )
+        self.demande_reference_selected = demande_reference_selected
 
-        if reservation_reference:
+        if self.demande_source:
+            if self.demande_client and client != self.demande_client:
+                self.add_error(
+                    'client',
+                    "La campagne doit rester rattachée au client de la demande.",
+                )
+            elif not self.demande_client and client:
+                self.add_error(
+                    'client',
+                    "Le client de cette demande sera créé automatiquement.",
+                )
+
+            if d1 and d1 < self.demande_source.date_debut_souhaitee:
+                self.add_error(
+                    'date_debut',
+                    "La campagne ne peut pas commencer avant la période demandée.",
+                )
+            if d2 and d2 > self.demande_source.date_fin_souhaitee:
+                self.add_error(
+                    'date_fin',
+                    "La campagne ne peut pas finir après la période demandée.",
+                )
+            if (
+                self.reservations_existantes
+                and not reservation_reference
+                and not demande_reference_selected
+            ):
+                self.add_error(
+                    'reservation_reference',
+                    "Choisissez une réservation du client pour reprendre ses faces réservées.",
+                )
+
+        if demande_reference_selected:
+            faces_demande = list(
+                self.demande_source.faces_souhaitees.select_related('support')
+            )
+            categories_demande = {}
+            for face in faces_demande:
+                format_code = face.support.format
+                categorie = self.categories_par_format.get(format_code, '')
+                if categorie:
+                    categories_demande.setdefault(categorie, set()).add(format_code)
+
+            categorie_selectionnee = self.categories_par_format.get(
+                type_support,
+                normaliser_categorie_format(type_support),
+            )
+            if not faces_demande:
+                self.add_error(
+                    'reservation_reference',
+                    "Cette demande ne contient aucune face à importer dans la campagne.",
+                )
+            elif categorie_selectionnee not in categories_demande:
+                self.add_error(
+                    'type_support',
+                    "Choisissez une catégorie présente parmi les faces de cette demande.",
+                )
+            else:
+                self.demande_formats = categories_demande[categorie_selectionnee]
+            cleaned['reservation_reference'] = ''
+
+        elif reservation_reference:
             if not client:
                 self.add_error(
                     'reservation_reference',
@@ -407,6 +542,16 @@ class CampagneForm(forms.ModelForm):
                     .prefetch_related('lignes__face')
                     .first()
                 )
+                if (
+                    reservation
+                    and self.demande_source
+                    and not Reservation.objects.filter(
+                        pk=reservation.pk,
+                        date_debut__date__lte=self.demande_source.date_fin_souhaitee,
+                        date_fin__date__gte=self.demande_source.date_debut_souhaitee,
+                    ).exists()
+                ):
+                    reservation = None
                 if not reservation:
                     self.add_error(
                         'reservation_reference',

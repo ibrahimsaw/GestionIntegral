@@ -225,8 +225,7 @@
             <div class="fd-plate-key" title="Face {{ face.label }}">{{ face.label }}</div>
             <div class="fd-plate-main">
               <div class="fd-plate-code">{{ face.support.code }}</div>
-              <div class="fd-plate-kind">Face {{ face.label }}</div>
-              <div class="fd-plate-loc"><i class="bi bi-geo-alt"></i>{{ face.support.ville }}{% if face.support.quartier %} · {{ face.support.quartier }}{% endif %}</div>
+              <div class="fd-plate-loc"><i class="bi bi-geo-alt"></i>{{ face.support.ville }}{% if face.support.quartier %} · {{ face.support.nom }}{% endif %}</div>
             </div>
           </div>
           {% endfor %}
@@ -280,14 +279,18 @@
           {% if demande.peut_etre_traitee %}
             <div class="d-grid gap-2">
               <form method="post" action="{% url 'demande_valider' demande.uuid %}"
-                    onsubmit="return confirm('Confirmer la validation ? Cela va créer le client et la réservation.');">
+                    onsubmit="return confirm('Confirmer la création d’une réservation pour cette demande ?');">
                 {% csrf_token %}
                 {% if demande.supports_souhaites.exists %}
                   <div class="fd-warn"><i class="bi bi-exclamation-triangle-fill"></i><span>Cette demande comprend un écran numérique. Son traitement doit être fait manuellement.</span></div>
                 {% else %}
                   <button type="submit" class="btn btn-disponible w-100 py-2 fw-semibold">
-                    <i class="bi bi-check-circle-fill me-1"></i>Valider la demande
+                    <i class="bi bi-calendar-check me-1"></i>Créer une réservation
                   </button>
+                  <a href="{% url 'campagne_create' %}?demande={{ demande.uuid }}" class="btn btn-outline-primary w-100 py-2 fw-semibold">
+                    <i class="bi bi-megaphone me-1"></i>Créer une campagne
+                  </a>
+                  <p class="fd-hint mb-0">Les réservations existantes restent inchangées. Pour une campagne, vous pourrez choisir une réservation du même client et reprendre les faces réservées.</p>
                 {% endif %}
               </form>
               <button type="button" class="btn btn-panne w-100 py-2 fw-semibold" data-bs-toggle="modal" data-bs-target="#modalRefus">
@@ -311,9 +314,39 @@
               <i class="bi bi-arrow-up-right-square me-1"></i>Voir la réservation {{ demande.reservation.reference }}
             </a>
             {% endif %}
+            {% if demande.campagne %}
+            <a href="{% url 'campagne_detail' pk=demande.campagne.pk %}" class="btn btn-sm btn-outline-primary mt-3">
+              <i class="bi bi-arrow-up-right-square me-1"></i>Voir la campagne {{ demande.campagne.reference }}
+            </a>
+            {% endif %}
           {% endif %}
         </div>
       </section>
+
+      {% if reservations_client_periode %}
+      <section class="fd-panel">
+        <div class="fd-panel-head"><h2 class="fd-panel-title"><i class="bi bi-calendar2-range"></i>Réservations du client sur cette période</h2></div>
+        <div class="fd-panel-body">
+          <p class="fd-hint">Consultation uniquement : ces réservations ne seront pas modifiées par le traitement de cette demande.</p>
+          {% for reservation in reservations_client_periode %}
+            <div class="border rounded-3 p-3 mb-2">
+              <div class="d-flex justify-content-between gap-2">
+                <strong>{{ reservation.reference }}</strong>
+                <span class="badge text-bg-light">{{ reservation.get_statut_display }}</span>
+              </div>
+              <div class="small text-muted mt-1">{{ reservation.date_debut|date:"d/m/Y" }} – {{ reservation.date_fin|date:"d/m/Y" }}</div>
+              <ul class="small mb-0 mt-2 ps-3">
+                {% for ligne in reservation.lignes.all %}
+                  <li>{{ ligne.support.code }}{% if ligne.face %} — Face {{ ligne.face.label }}{% endif %}</li>
+                {% empty %}
+                  <li>Aucun emplacement associé.</li>
+                {% endfor %}
+              </ul>
+            </div>
+          {% endfor %}
+        </div>
+      </section>
+      {% endif %}
 
       {% if share_url %}
       <section class="fd-panel fd-share">

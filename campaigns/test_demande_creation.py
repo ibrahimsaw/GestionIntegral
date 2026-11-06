@@ -5,9 +5,18 @@ import uuid
 from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
-from campaigns.models import Client, DemandeReservation, Reservation
-from inventory.models import FacePanneau, Support
+from campaigns.models import (
+    Campagne,
+    Client,
+    DemandeReservation,
+    LigneCampagne,
+    Reservation,
+    ReservationLigne,
+    STATUT_CONFIRMEE,
+)
+from inventory.models import FacePanneau, FormatSupport, Support
 
 
 class DemandeCreationViewTests(TestCase):
@@ -98,7 +107,7 @@ class DemandeCreationViewTests(TestCase):
         )
         self.assertContains(detail_response, 'Autoriser la modification client')
         self.assertContains(detail_response, 'Autoriser la modification client')
-        self.assertContains(detail_response, 'Valider la demande')
+        self.assertContains(detail_response, 'Créer une réservation')
         self.assertContains(detail_response, 'Refuser la demande')
         self.assertNotContains(detail_response, 'id="demande-share-url"')
         self.assertRedirects(
@@ -122,7 +131,7 @@ class DemandeCreationViewTests(TestCase):
         self.assertContains(detail_response, 'id="demande-share-url"')
         self.assertContains(detail_response, 'Désactiver la modification client')
         self.assertNotContains(detail_response, 'Modification gestionnaire')
-        self.assertNotContains(detail_response, 'Valider la demande')
+        self.assertNotContains(detail_response, 'Créer une réservation')
         self.assertNotContains(detail_response, 'Refuser la demande')
         self.assertRedirects(
             self.client.get(
@@ -236,7 +245,7 @@ class DemandeCreationViewTests(TestCase):
         detail_response = self.client.get(
             reverse('demande_detail', kwargs={'uuid': demande.uuid})
         )
-        self.assertContains(detail_response, 'Valider la demande')
+        self.assertContains(detail_response, 'Créer une réservation')
         self.assertContains(detail_response, 'Refuser la demande')
         self.assertContains(detail_response, 'Autoriser la modification client')
         self.assertNotContains(detail_response, 'id="demande-share-url"')
@@ -355,7 +364,7 @@ class DemandeCreationViewTests(TestCase):
         detail_response = self.client.get(
             reverse('demande_detail', kwargs={'uuid': demande.uuid})
         )
-        self.assertContains(detail_response, 'Valider la demande')
+        self.assertContains(detail_response, 'Créer une réservation')
         self.assertContains(detail_response, 'Refuser la demande')
         self.assertFalse(Reservation.objects.exists())
 
@@ -521,7 +530,7 @@ class DemandeCreationViewTests(TestCase):
             detail_response,
             'Cette demande comprend un écran numérique',
         )
-        self.assertNotContains(detail_response, 'Valider la demande')
+        self.assertNotContains(detail_response, 'Créer une réservation')
 
         response = self.client.post(
             reverse('demande_valider', kwargs={'uuid': demande.uuid}),
@@ -531,3 +540,229 @@ class DemandeCreationViewTests(TestCase):
         demande.refresh_from_db()
         self.assertEqual(demande.statut, DemandeReservation.STATUT_EN_COURS)
         self.assertFalse(Reservation.objects.exists())
+
+    def test_request_can_create_campaign_from_same_client_reservation_without_changing_it(self):
+        agency = Client.objects.create(
+            nom='Agence de la demande',
+            contact_nom='Awa Contact',
+            telephone='70000000',
+            email='agency@example.com',
+        )
+        other_agency = Client.objects.create(
+            nom='Autre agence',
+            telephone='70000001',
+            email='other-agency@example.com',
+        )
+        format_support = FormatSupport.objects.create(
+            code='DEMANDE-CAMPAGNE-FORMAT',
+            categorie='Standard',
+            dimensions='4m x 3m',
+        )
+        self.panel.format = format_support.code
+        self.panel.save(update_fields=['format'])
+        other_panel = Support.objects.create(
+            code='DEMANDE-OTHER-PANEL',
+            nom='Panneau autre agence',
+            type_support=Support.TYPE_PANNEAU,
+            format=format_support.code,
+            latitude=12.35,
+            longitude=-1.53,
+            ville='Ouagadougou',
+        )
+        other_face = FacePanneau.objects.create(
+            support=other_panel,
+            label=FacePanneau.LABEL_A,
+        )
+        reservation_start = timezone.make_aware(
+            datetime.datetime.combine(
+                self.start - datetime.timedelta(days=1),
+                datetime.time.min,
+            )
+        )
+        reservation_end = timezone.make_aware(
+            datetime.datetime.combine(
+                self.end + datetime.timedelta(days=1),
+                datetime.time.max,
+            )
+        )
+        reservation = Reservation.objects.create(
+            nom='Réservation existante agence',
+            client=agency,
+            date_debut=reservation_start,
+            date_fin=reservation_end,
+            statut=STATUT_CONFIRMEE,
+        )
+        ReservationLigne.objects.create(
+            reservation=reservation,
+            support=self.panel,
+            face=self.face,
+        )
+        other_reservation = Reservation.objects.create(
+            nom='Réservation autre agence',
+            client=other_agency,
+            date_debut=reservation_start,
+            date_fin=reservation_end,
+            statut=STATUT_CONFIRMEE,
+        )
+        ReservationLigne.objects.create(
+            reservation=other_reservation,
+            support=other_panel,
+            face=other_face,
+        )
+        demande = DemandeReservation.objects.create(
+            type_client=DemandeReservation.TYPE_CLIENT_EXISTANT,
+            client=agency,
+            nom_contact='Awa Contact',
+            societe=agency.nom,
+            email=agency.email,
+            telephone=agency.telephone,
+            nom_campagne='Campagne depuis demande',
+            date_debut_souhaitee=self.start,
+            date_fin_souhaitee=self.end,
+            statut=DemandeReservation.STATUT_EN_COURS,
+        )
+        demande.faces_souhaitees.add(self.face)
+
+        detail_response = self.client.get(
+            reverse('demande_detail', kwargs={'uuid': demande.uuid})
+        )
+        self.assertContains(detail_response, 'Réservations du client sur cette période')
+        self.assertContains(detail_response, reservation.reference)
+        self.assertContains(detail_response, 'Face A')
+        self.assertContains(detail_response, 'Créer une campagne')
+
+        campaign_url = f"{reverse('campagne_create')}?demande={demande.uuid}"
+        form_response = self.client.get(campaign_url)
+        self.assertEqual(form_response.status_code, 200)
+        form_reservations = form_response.context['form'].reservations_existantes
+        self.assertEqual([item.pk for item in form_reservations], [reservation.pk])
+
+        invalid_response = self.client.post(
+            campaign_url,
+            {
+                'demande_uuid': str(demande.uuid),
+                'client': str(other_agency.pk),
+                'nom': 'Campagne depuis demande',
+                'date_debut': self.start.isoformat(),
+                'date_fin': self.end.isoformat(),
+                'type_support': format_support.code,
+                'nombre_visuels': '1',
+                'reservation_reference': other_reservation.reference,
+            },
+        )
+        self.assertEqual(invalid_response.status_code, 200)
+        self.assertIn('reservation_reference', invalid_response.context['form'].errors)
+        self.assertFalse(Campagne.objects.exists())
+
+        response = self.client.post(
+            campaign_url,
+            {
+                'demande_uuid': str(demande.uuid),
+                'client': str(agency.pk),
+                'annonceur': agency.nom,
+                'nom': 'Campagne depuis demande',
+                'date_debut': self.start.isoformat(),
+                'date_fin': self.end.isoformat(),
+                'type_support': 'Standard',
+                'nombre_visuels': '1',
+                'reservation_reference': reservation.reference,
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+
+        campagne = Campagne.objects.get(nom='Campagne depuis demande')
+        self.assertRedirects(
+            response,
+            reverse('campagne_detail', kwargs={'pk': campagne.pk}),
+        )
+        demande.refresh_from_db()
+        reservation.refresh_from_db()
+        self.assertEqual(demande.statut, DemandeReservation.STATUT_VALIDEE)
+        self.assertEqual(demande.campagne, campagne)
+        self.assertIsNone(demande.reservation)
+        self.assertEqual(campagne.client, agency)
+        self.assertTrue(LigneCampagne.objects.filter(campagne=campagne, face=self.face).exists())
+        self.assertEqual(reservation.lignes.count(), 1)
+        self.assertEqual(Reservation.objects.count(), 2)
+        self.assertContains(
+            self.client.get(reverse('demande_detail', kwargs={'uuid': demande.uuid})),
+            f'Voir la campagne {campagne.reference}',
+        )
+
+    def test_demand_reference_in_reservation_field_prefills_campaign(self):
+        agency = Client.objects.create(
+            nom='Agence demande saisie',
+            contact_nom='Mariam Contact',
+            telephone='70000002',
+            email='mariam@example.com',
+        )
+        format_support = FormatSupport.objects.create(
+            code='DREF-4X3',
+            categorie='Standard',
+            dimensions='4m x 3m',
+        )
+        support = Support.objects.create(
+            code='DEMANDE-REFERENCE-PANEL',
+            nom='Panneau demande référence',
+            type_support=Support.TYPE_PANNEAU,
+            format=format_support.code,
+            latitude=12.34,
+            longitude=-1.52,
+            ville='Bobo-Dioulasso',
+        )
+        face = FacePanneau.objects.create(
+            support=support,
+            label=FacePanneau.LABEL_A,
+        )
+        demande = DemandeReservation.objects.create(
+            type_client=DemandeReservation.TYPE_CLIENT_EXISTANT,
+            client=agency,
+            nom_contact='Mariam Contact',
+            societe=agency.nom,
+            email=agency.email,
+            telephone=agency.telephone,
+            nom_campagne='Campagne demande référence',
+            date_debut_souhaitee=self.start,
+            date_fin_souhaitee=self.end,
+            statut=DemandeReservation.STATUT_EN_COURS,
+        )
+        demande.faces_souhaitees.add(face)
+
+        campaign_url = reverse('campagne_create')
+        form_response = self.client.get(campaign_url)
+        self.assertContains(form_response, demande.reference)
+        self.assertContains(form_response, 'data-lieu="Bobo-Dioulasso"')
+        self.assertContains(form_response, 'data-categorie="Standard"')
+
+        response = self.client.post(
+            campaign_url,
+            {
+                'reservation_reference': demande.reference,
+                'client': str(agency.pk),
+                'annonceur': agency.nom,
+                'nom': demande.nom_campagne,
+                'lieu': 'Bobo-Dioulasso',
+                'date_debut': self.start.isoformat(),
+                'date_fin': self.end.isoformat(),
+                'type_support': format_support.code,
+                'nombre_visuels': '1',
+            },
+        )
+
+        self.assertEqual(
+            response.status_code,
+            302,
+            response.context['form'].errors if response.status_code == 200 else '',
+        )
+        campagne = Campagne.objects.get(nom=demande.nom_campagne)
+        demande.refresh_from_db()
+        self.assertEqual(campagne.client, agency)
+        self.assertEqual(campagne.lieu, 'Bobo-Dioulasso')
+        self.assertEqual(campagne.date_debut, self.start)
+        self.assertEqual(campagne.date_fin, self.end)
+        self.assertEqual(campagne.type_support, format_support.code)
+        self.assertEqual(demande.campagne, campagne)
+        self.assertEqual(demande.statut, DemandeReservation.STATUT_VALIDEE)
+        self.assertTrue(
+            LigneCampagne.objects.filter(campagne=campagne, face=face).exists()
+        )

@@ -1,7 +1,7 @@
 import json
 
 from django import forms
-from django.db.models import Q
+from django.db.models import Exists, OuterRef, Q
 from django.utils import timezone
 from datetime import datetime
 from .models import (
@@ -163,11 +163,23 @@ from .models import (
     ReservationLigne,
     STATUT_CONFIRMEE,
     STATUT_EN_ATTENTE,
+    STATUT_EXPIREE,
 )
 # adaptez les imports ci-dessus selon vos vrais chemins (MultipleFileField, MultipleFileInput, S, W, D)
 
 
 class CampagneForm(forms.ModelForm):
+    nombre_faces_temporaire = forms.IntegerField(
+        required=False,
+        min_value=1,
+        label="Nombre de faces à sélectionner automatiquement",
+        widget=forms.NumberInput(attrs={**W, 'min': 1, 'step': 1}),
+        help_text=(
+            "Les faces seront choisies au hasard parmi celles disponibles pour "
+            "la catégorie, la ville et la période. Ce nombre n’est pas enregistré."
+        ),
+    )
+
     reservation_reference = forms.CharField(
         required=False,
         label="Référence de réservation ou de demande",
@@ -216,7 +228,8 @@ class CampagneForm(forms.ModelForm):
         fields = [
             'client', 'annonceur', 'nom', 'prix', 'prix_affichage', 'prix_impression', 'campagne_parente', 'est_mere',
             'date_debut', 'date_fin', 'statut', 'lieu',
-            'type_support', 'duree_passage', 'frequence', 'nombre_visuels',
+            'type_support', 'nombre_faces_temporaire',
+            'duree_passage', 'frequence', 'nombre_visuels',
             'tranches_horaires', 'notes', 'contrat', 'bon_commande_en_attente'
         ]
         widgets = {
@@ -438,6 +451,72 @@ class CampagneForm(forms.ModelForm):
     def clean_visuels_multiples(self):
         return self.cleaned_data.get('visuels_multiples', [])
 
+    def faces_disponibles_pour_selection(self, type_support, lieu, date_debut, date_fin):
+        categorie = self.categories_par_format.get(
+            type_support,
+            normaliser_categorie_format(type_support),
+        )
+        formats = [
+            code
+            for code, format_categorie in self.categories_par_format.items()
+            if format_categorie == categorie
+        ]
+        formats_hors_ecran = set(
+            FormatSupport.hors_ecran().values_list('code', flat=True)
+        )
+        formats = [code for code in formats if code in formats_hors_ecran]
+        if not formats:
+            return FacePanneau.objects.none()
+
+        campagnes_en_conflit = LigneCampagne.objects.filter(
+            face_id=OuterRef('pk'),
+        ).filter(
+            Q(
+                campagne__statut__in=(
+                    Campagne.STATUT_EN_COURS,
+                    Campagne.STATUT_A_VENIR,
+                    Campagne.STATUT_TERMINEE,
+                ),
+                campagne__date_debut__lte=date_fin,
+                campagne__date_fin__gte=date_debut,
+            )
+            | Q(
+                campagne__statut=Campagne.STATUT_EN_PAUSE,
+                campagne__date_debut__lte=date_fin,
+                campagne__date_mise_en_pause__lte=date_fin,
+            )
+        )
+        reservations_en_conflit = ReservationLigne.objects.filter(
+            face_id=OuterRef('pk'),
+            reservation__statut__in=(
+                STATUT_EN_ATTENTE,
+                STATUT_CONFIRMEE,
+                STATUT_EXPIREE,
+            ),
+            reservation__date_debut__date__lte=date_fin,
+            reservation__date_fin__date__gte=date_debut,
+        )
+        return (
+            FacePanneau.objects
+            .filter(
+                support__type_support=Support.TYPE_PANNEAU,
+                support__format__in=formats,
+                support__ville__iexact=lieu,
+                support__actif=True,
+                support__etat__in=Support.ETATS_OPERATIONNELS,
+                etat__in=Support.ETATS_OPERATIONNELS,
+            )
+            .annotate(
+                _campagne_en_conflit=Exists(campagnes_en_conflit),
+                _reservation_en_conflit=Exists(reservations_en_conflit),
+            )
+            .filter(
+                _campagne_en_conflit=False,
+                _reservation_en_conflit=False,
+            )
+            .select_related('support')
+        )
+
     def clean(self):
         cleaned = super().clean()
         d1 = cleaned.get('date_debut')
@@ -448,6 +527,7 @@ class CampagneForm(forms.ModelForm):
         parent = cleaned.get('campagne_parente')
         reservation_reference = cleaned.get('reservation_reference', '').strip()
         client = cleaned.get('client')
+        nombre_faces_temporaire = cleaned.get('nombre_faces_temporaire')
         demande_reference_selected = bool(
             self.demande_source
             and reservation_reference.casefold() == self.demande_source.reference.casefold()
@@ -607,6 +687,61 @@ class CampagneForm(forms.ModelForm):
                 'contrat',
                 "Retirez le contrat associé si le bon de commande est encore en attente.",
             )
+
+        if nombre_faces_temporaire:
+            categorie = self.categories_par_format.get(
+                type_support,
+                normaliser_categorie_format(type_support),
+            )
+            if self.instance.pk:
+                self.add_error(
+                    'nombre_faces_temporaire',
+                    "La sélection automatique est disponible uniquement à la création.",
+                )
+            elif cleaned.get('est_mere'):
+                self.add_error(
+                    'nombre_faces_temporaire',
+                    "Une campagne mère ne peut pas recevoir directement des faces.",
+                )
+            elif type_support == 'ecran' or categorie == normaliser_categorie_format('Marché'):
+                self.add_error(
+                    'nombre_faces_temporaire',
+                    "La sélection automatique concerne les faces de panneaux, pas les écrans ni les emplacements de marché.",
+                )
+            elif reservation_reference or demande_reference_selected:
+                self.add_error(
+                    'nombre_faces_temporaire',
+                    "La sélection automatique ne peut pas être combinée avec l’import d’une réservation ou d’une demande.",
+                )
+            elif not type_support:
+                self.add_error(
+                    'type_support',
+                    "Choisissez une catégorie de panneaux pour sélectionner automatiquement des faces.",
+                )
+            elif not cleaned.get('lieu'):
+                self.add_error(
+                    'lieu',
+                    "Choisissez une ville pour limiter la sélection automatique.",
+                )
+            elif not d1 or not d2:
+                self.add_error(
+                    'nombre_faces_temporaire',
+                    "Renseignez les dates de début et de fin avant de sélectionner des faces.",
+                )
+            elif d1 <= d2:
+                faces_disponibles = self.faces_disponibles_pour_selection(
+                    type_support,
+                    cleaned['lieu'],
+                    d1,
+                    d2,
+                )
+                nombre_disponible = faces_disponibles.count()
+                if nombre_disponible < nombre_faces_temporaire:
+                    self.add_error(
+                        'nombre_faces_temporaire',
+                        f"Seulement {nombre_disponible} face(s) sont disponibles "
+                        "pour cette catégorie, cette ville et cette période.",
+                    )
 
         # 1. Validation des dates de campagne
         if d1 and d2 and d1 > d2:

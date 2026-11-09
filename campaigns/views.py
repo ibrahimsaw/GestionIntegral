@@ -4358,6 +4358,7 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
     def form_valid(self, form):
         is_create = self.object is None
         demande = self.get_source_demande()
+        faces_auto_selectionnees = []
         previous_values = {}
         if not is_create:
             previous_values = {
@@ -4367,6 +4368,25 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
                     'frequence', 'tranches_horaires',
                 )
             }
+
+        nombre_faces_temporaire = form.cleaned_data.get('nombre_faces_temporaire')
+        if nombre_faces_temporaire:
+            faces_auto_selectionnees = list(
+                form.faces_disponibles_pour_selection(
+                    form.cleaned_data['type_support'],
+                    form.cleaned_data['lieu'],
+                    form.cleaned_data['date_debut'],
+                    form.cleaned_data['date_fin'],
+                )
+                .select_for_update()
+                .order_by('?')[:nombre_faces_temporaire]
+            )
+            if len(faces_auto_selectionnees) < nombre_faces_temporaire:
+                form.add_error(
+                    'nombre_faces_temporaire',
+                    "Le nombre de faces disponibles a changé. Réduisez le nombre demandé ou modifiez les critères.",
+                )
+                return self.form_invalid(form)
         
         if is_create:
             form.instance.created_by = self.request.user
@@ -4402,6 +4422,15 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
                 form.reservation_source,
                 form.reservation_formats,
             )
+        if faces_auto_selectionnees:
+            LigneCampagne.objects.bulk_create([
+                LigneCampagne(
+                    campagne=self.object,
+                    support=face.support,
+                    face=face,
+                )
+                for face in faces_auto_selectionnees
+            ])
 
         if demande:
             demande.marquer_validee(
@@ -4513,6 +4542,11 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
             msg_text += (
                 f" {faces_importees} face(s) importée(s) depuis la référence "
                 f"{source_reference}."
+            )
+        if faces_auto_selectionnees:
+            msg_text += (
+                f" {len(faces_auto_selectionnees)} face(s) sélectionnée(s) automatiquement "
+                "selon la disponibilité, la catégorie, la ville et la période."
             )
         if demande:
             msg_text += (

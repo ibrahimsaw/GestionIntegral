@@ -452,6 +452,17 @@
                   {% if form.type_support.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.type_support.errors }}</div>{% endif %}
                 </div>
 
+                {% if not obj %}
+                <div class="col-md-6" id="auto-face-count-group">
+                  <label class="form-label" for="{{ form.nombre_faces_temporaire.id_for_label }}">
+                    {{ form.nombre_faces_temporaire.label }}
+                  </label>
+                  {{ form.nombre_faces_temporaire }}
+                  <div class="form-text small text-muted">{{ form.nombre_faces_temporaire.help_text }}</div>
+                  {% if form.nombre_faces_temporaire.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.nombre_faces_temporaire.errors }}</div>{% endif %}
+                </div>
+                {% endif %}
+
                 <!-- Date Début -->
                 <div class="col-md-4">
                   <label class="form-label" for="id_date_debut">
@@ -896,8 +907,36 @@ document.addEventListener('DOMContentLoaded', function () {
     const parentSelect = document.getElementById('id_campagne_parente');
     const estMereCheckbox = document.getElementById('id_est_mere');
     const ecranFields = document.querySelectorAll('.ecran-fields');
+    const autoFaceCountGroup = document.getElementById('auto-face-count-group');
     const campagneId = '{{ obj.pk|default_if_none:"" }}';
     const aDejaVisuelsPropres = {{ obj.visuels.all|length|default:0 }} > 0;
+
+    function updateAutoFaceCountVisibility() {
+        if (!autoFaceCountGroup || !categorieSelect) return;
+        const category = categorieSelect.value
+            .normalize('NFD')
+            .replace(/[\u0300-\u036f]/g, '')
+            .trim()
+            .toLowerCase();
+        const isSupportedCategory = (
+            !category || (category !== 'ecran' && category !== 'marche')
+        );
+        const hasReference = reservationReferenceInput
+            && reservationReferenceInput.value.trim();
+        autoFaceCountGroup.style.display = (
+            isSupportedCategory
+            && !(estMereCheckbox && estMereCheckbox.checked)
+            && !hasReference
+        ) ? '' : 'none';
+    }
+
+    updateAutoFaceCountVisibility();
+    if (estMereCheckbox) {
+        estMereCheckbox.addEventListener('change', updateAutoFaceCountVisibility);
+    }
+    if (categorieSelect) {
+        categorieSelect.addEventListener('change', updateAutoFaceCountVisibility);
+    }
 
     if (clientSelect && reservationReferenceInput && reservationsDatalist) {
         const reservationsOptions = Array.from(reservationsDatalist.options)
@@ -1082,6 +1121,7 @@ document.addEventListener('DOMContentLoaded', function () {
             appliquerDemandeReference();
             appliquerPeriodeReservation();
             appliquerCategoriesReservation();
+            updateAutoFaceCountVisibility();
         }
 
         filtrerReservationsParAgence(clientSelect.value);
@@ -1099,6 +1139,7 @@ document.addEventListener('DOMContentLoaded', function () {
             filtrerReservationsParAgence(this.value);
             appliquerPeriodeReservation();
             appliquerCategoriesReservation();
+            updateAutoFaceCountVisibility();
         });
     }
 

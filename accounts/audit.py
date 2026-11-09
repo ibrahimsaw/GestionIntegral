@@ -76,7 +76,10 @@ def _get_object_url(obj):
 
 # ── Fonctions principales ─────────────────────────────────────────────────────
 
-def log_action(request, action, module, obj=None, detail='', changes=None, level=None):
+def log_action(
+    request, action, module, obj=None, detail='', changes=None, level=None,
+    object_repr=None,
+):
     """
     Enregistre une action dans le journal d'audit.
 
@@ -106,7 +109,11 @@ def log_action(request, action, module, obj=None, detail='', changes=None, level
         module      = module,
         level       = level or _get_level(action),
         object_id   = object_id,
-        object_repr = str(obj) if obj else '',
+        object_repr=(
+            object_repr
+            if object_repr is not None
+            else (str(obj) if obj else '')
+        ),
         object_url  = _get_object_url(obj),
         detail      = detail,
         changes     = changes,

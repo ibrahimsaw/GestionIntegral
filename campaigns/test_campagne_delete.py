@@ -2,13 +2,15 @@ import datetime
 
 from django.contrib.auth import get_user_model
 from django.contrib.messages import get_messages
-from django.test import TestCase
+from django.test import TransactionTestCase
 from django.urls import reverse
 
-from campaigns.models import Campagne, Client
+from accounts.models import AuditLog
+from campaigns.models import Campagne, Client, LigneCampagne
+from inventory.models import Support
 
 
-class CampagneDeleteTests(TestCase):
+class CampagneDeleteTests(TransactionTestCase):
     def setUp(self):
         staff = get_user_model().objects.create_user(
             username="campaign-delete-staff",
@@ -48,3 +50,24 @@ class CampagneDeleteTests(TestCase):
 
         self.assertRedirects(response, reverse("campagne_list"))
         self.assertFalse(Campagne.objects.filter(pk=campagne.pk).exists())
+
+    def test_post_deletes_campaign_with_lines_and_audits_without_error(self):
+        campagne = self.create_campaign()
+        support = Support.objects.create(
+            code="DELETE-CAMPAIGN-SUPPORT",
+            nom="Support lié à la campagne",
+            type_support=Support.TYPE_PANNEAU,
+            latitude=12.34,
+            longitude=-1.52,
+            ville="Ouagadougou",
+        )
+        LigneCampagne.objects.create(campagne=campagne, support=support)
+
+        response = self.client.post(reverse("campagne_delete", args=[campagne.pk]))
+
+        self.assertRedirects(response, reverse("campagne_list"))
+        self.assertFalse(Campagne.objects.filter(pk=campagne.pk).exists())
+        self.assertTrue(AuditLog.objects.filter(
+            action=AuditLog.ACTION_DELETE,
+            object_repr="Campagne à supprimer -> DELETE-CAMPAIGN-SUPPORT",
+        ).exists())

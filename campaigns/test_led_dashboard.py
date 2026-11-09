@@ -2,6 +2,7 @@ import calendar
 import datetime
 from decimal import Decimal
 
+from django.core.cache import cache
 from django.test import TestCase
 from django.utils import timezone
 from django.contrib.auth import get_user_model
@@ -17,11 +18,76 @@ from campaigns.models import (
     PackageEcran,
 )
 from campaigns.views import DashboardView
-from inventory.models import EcranNumerique, Support
+from inventory.models import EcranNumerique, FacePanneau, FormatSupport, Support
 from planning.models import LogDiffusion
 
 
 class LedDashboardDataTests(TestCase):
+    def test_dashboard_counts_distinct_supports_for_total_and_occupied_faces(self):
+        today = timezone.localdate()
+        client = Client.objects.create(
+            nom='Client face-count test',
+            telephone='00000000',
+            email='face-count-test@example.com',
+        )
+        format_support = FormatSupport.objects.create(
+            code='FACE-COUNT-12',
+            categorie='12m²',
+            dimensions='4m × 3m',
+        )
+        support = Support.objects.create(
+            code='FACE-COUNT-A',
+            nom='Support FACE-COUNT-A',
+            type_support=Support.TYPE_PANNEAU,
+            format=format_support.code,
+            latitude=12.34,
+            longitude=-1.52,
+            ville='Ouagadougou',
+        )
+        other_support = Support.objects.create(
+            code='FACE-COUNT-B',
+            nom='Support FACE-COUNT-B',
+            type_support=Support.TYPE_PANNEAU,
+            format=format_support.code,
+            latitude=12.35,
+            longitude=-1.53,
+            ville='Ouagadougou',
+        )
+        face_a = FacePanneau.objects.create(support=support, label='A')
+        face_b = FacePanneau.objects.create(support=support, label='B')
+        FacePanneau.objects.create(support=other_support, label='A')
+        campaign = Campagne.objects.create(
+            client=client,
+            nom='Campagne des faces du jour',
+            date_debut=today,
+            date_fin=today,
+            statut=Campagne.STATUT_EN_COURS,
+        )
+        LigneCampagne.objects.create(campagne=campaign, face=face_a)
+        LigneCampagne.objects.create(campagne=campaign, face=face_b)
+        user = get_user_model().objects.create_user(
+            username='face-count-dashboard-admin',
+            password='test-password',
+            role='admin',
+        )
+        self.client.force_login(user)
+        cache.clear()
+
+        response = self.client.get(reverse('dashboard'), {'ville': 'Ouagadougou'})
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['total_faces'], 3)
+        self.assertEqual(response.context['total_supports'], 2)
+        self.assertEqual(response.context['total_faces_occupe'], 2)
+        self.assertEqual(response.context['total_supports_occupe'], 1)
+        category = response.context['parc_categories'][0]
+        self.assertEqual(category['nb_faces'], 3)
+        self.assertEqual(category['nb_supports'], 2)
+        self.assertEqual(category['nb_occupe'], 2)
+        self.assertEqual(category['nb_supports_occupe'], 1)
+        self.assertContains(response, '3 <small>faces</small> / 2 <small>supports</small>')
+        self.assertContains(response, '2 <small>faces</small> / 1 <small>supports</small>')
+
     def test_led_views_remain_visible_without_screens(self):
         user = get_user_model().objects.create_user(
             username='led-empty-dashboard-admin',

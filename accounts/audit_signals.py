@@ -63,4 +63,9 @@ def capture_post_save(sender, instance, created, raw=False, **kwargs):
 def capture_pre_delete(sender, instance, **kwargs):
     if _is_audited_model(sender):
         instance._audit_deleted_pk = instance.pk
-        record_model_write(instance, AuditLog.ACTION_DELETE, before=_snapshot(instance))
+        record_model_write(
+            instance,
+            AuditLog.ACTION_DELETE,
+            before=_snapshot(instance),
+            object_repr=str(instance),
+        )

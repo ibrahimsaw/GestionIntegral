@@ -55,6 +55,7 @@ def _flush_events(state):
                 obj=event['obj'],
                 changes=_changes(event),
                 detail=f"{event['action'].capitalize()} via l’application.",
+                object_repr=event.get('object_repr'),
             )
     finally:
         state.flushing = False

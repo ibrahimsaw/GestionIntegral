@@ -29,7 +29,7 @@ def object_key(obj):
     return meta.label_lower, pk
 
 
-def record_model_write(obj, action, before=None, after=None):
+def record_model_write(obj, action, before=None, after=None, object_repr=None):
     """Keep the first and last values for repeated writes in one request."""
     state = current_audit_state.get()
     if state is None or state.flushing:
@@ -52,11 +52,14 @@ def record_model_write(obj, action, before=None, after=None):
             'obj': frozen_obj,
             'before': before,
             'after': after,
+            'object_repr': object_repr,
         })
     else:
         event = state.events[index]
         event['obj'] = frozen_obj
         event['after'] = after
+        if object_repr is not None:
+            event['object_repr'] = object_repr
 
 
 def suppress_object_events(obj, action):

@@ -665,6 +665,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             )
             row = {
                 'id': fid,
+                'support_id': support.pk,
                 'code': support.code,
                 'label': face.label,
                 'nom': support.nom,
@@ -713,6 +714,12 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             nb_res = sum(1 for r, _ in cat_rows if r['statut'] == 'reservee')
             nb_lib = sum(1 for r, _ in cat_rows if r['statut'] == 'libre')
             nb_pan = sum(1 for r, _ in cat_rows if r['statut'] == 'panne')
+            support_ids = {r['support_id'] for r, _ in cat_rows}
+            support_ids_occupe = {
+                r['support_id']
+                for r, _ in cat_rows
+                if r['statut'] == 'occupee'
+            }
             jours_realises = sum(r['jours'] for r, _ in cat_rows)
             jours_secures = sum(r['jours_secures'] for r, _ in cat_rows)
             capacite = n * year_days
@@ -732,7 +739,9 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             result.append({
                 **stat,
                 'nb_faces': n,
+                'nb_supports': len(support_ids),
                 'nb_occupe': nb_occ,
+                'nb_supports_occupe': len(support_ids_occupe),
                 'nb_reserve': nb_res,
                 'nb_libre': nb_lib,
                 'nb_panne': nb_pan,
@@ -2010,6 +2019,13 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         total_faces_occupe = sum(
             face['statut'] == 'occupee' for face in parc_global_faces
         )
+        total_supports = len({
+            face['support_id'] for face in parc_global_faces
+        })
+        total_supports_occupe = len({
+            face['support_id'] for face in parc_global_faces
+            if face['statut'] == 'occupee'
+        })
         total_faces_reserve = sum(
             face['statut'] == 'reservee' for face in parc_global_faces
         )
@@ -2286,7 +2302,9 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             'parc_meta': parc_meta,
             'annee_taux_occupation': today.year,
             'total_faces': total_faces,
+            'total_supports': total_supports,
             'total_faces_occupe': total_faces_occupe,
+            'total_supports_occupe': total_supports_occupe,
             'total_faces_reserve': total_faces_reserve,
             'total_faces_libre': total_faces_libre,
             'total_faces_panne': total_faces_panne,

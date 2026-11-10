@@ -1080,9 +1080,9 @@ class Campagne(models.Model):
     )
     nom          = models.CharField(max_length=200, verbose_name="Nom de la campagne")
     # les champs ne sont pas obligatoir
-    prix         = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="Prix unitaire face",blank=True)
-    prix_affichage = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="Prix unitaire affichage",blank=True)
-    prix_impression = models.DecimalField(max_digits=12, decimal_places=2, default=0, verbose_name="Prix unitaire impression",blank=True)
+    prix         = models.DecimalField(max_digits=14, decimal_places=2, default=0, verbose_name="Prix unitaire face",blank=True)
+    prix_affichage = models.DecimalField(max_digits=14, decimal_places=2, default=0, verbose_name="Prix unitaire affichage",blank=True)
+    prix_impression = models.DecimalField(max_digits=14, decimal_places=2, default=0, verbose_name="Prix unitaire impression",blank=True)
     # lieu de la campagne donne des chois des ville des support
     lieu = models.CharField(max_length=200, blank=True, verbose_name="Lieu de la campagne", help_text="Ville ou zone géographique de la campagne.")
     reference    = models.CharField(max_length=50, unique=True, blank=True)

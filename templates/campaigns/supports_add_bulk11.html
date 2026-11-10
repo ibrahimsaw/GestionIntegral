@@ -1,0 +1,1107 @@
+{% extends 'base.html' %}
+{% load l10n %}
+
+{% block title %}{{ mode_title }} — Integral{% endblock %}
+
+{% block topbar_title %}
+  <i class="bi bi-megaphone me-2" style="color:var(--color-primary)"></i>
+  {{ mode_title }} — {{ campagne.nom }}
+{% endblock %}
+
+{% block content %}
+<style>
+  .bulk-page {
+    --bulk-radius: 18px;
+    --bulk-shadow: 0 12px 32px rgba(15, 23, 42, .055);
+    max-width: 1800px;
+    margin-inline: auto;
+    color: #1e293b;
+  }
+  .bulk-page .card { border-radius: var(--bulk-radius); }
+  .campaign-info-card, .bulk-filter-card, .bulk-selection-card {
+    overflow: hidden;
+    box-shadow: var(--bulk-shadow);
+  }
+  .campaign-info-card {
+    position: relative;
+    border: 0 !important;
+    background:
+      radial-gradient(ellipse at 92% 10%, rgba(253, 221, 72, .16), transparent 30%),
+      linear-gradient(118deg, #541d1b 0%, #812925 54%, #932e2b 100%);
+    color: #fff;
+  }
+  .campaign-info-card::after {
+    position: absolute;
+    right: -3rem;
+    bottom: -6rem;
+    width: 18rem;
+    height: 18rem;
+    border: 1px solid rgba(255, 255, 255, .09);
+    border-radius: 50%;
+    content: "";
+    pointer-events: none;
+  }
+  .campaign-info-card > * { position: relative; z-index: 1; }
+  .campaign-info-card .card-header { border-color: rgba(255, 255, 255, .16) !important; }
+  .campaign-info-heading {
+    display: flex;
+    align-items: center;
+    gap: .65rem;
+    color: rgba(255, 255, 255, .78);
+    font-size: .76rem;
+    font-weight: 700;
+    letter-spacing: .08em;
+    text-transform: uppercase;
+  }
+  .campaign-info-heading i {
+    display: grid;
+    width: 2rem;
+    height: 2rem;
+    place-items: center;
+    border-radius: .7rem;
+    background: var(--color-secondary);
+    color: #541d1b;
+  }
+  .campaign-identity { min-width: 0; }
+  .campaign-client-logo {
+    display: grid;
+    width: 68px;
+    height: 68px;
+    flex: 0 0 68px;
+    place-items: center;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, .5);
+    border-radius: 17px;
+    background: #fff;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, .12);
+  }
+  .campaign-client-logo img { width: 100%; height: 100%; object-fit: contain; }
+  .campaign-info-card .campaign-identity h4 { color: #fff !important; font-size: clamp(1.25rem, 2vw, 1.8rem); letter-spacing: -.025em; }
+  .campaign-info-card .campaign-identity a { color: var(--color-secondary) !important; }
+  .campaign-info-card .campaign-identity .badge {
+    border-color: rgba(255, 255, 255, .26) !important;
+    background: rgba(255, 255, 255, .1) !important;
+    color: #fff !important;
+  }
+  .campaign-status { border: 1px solid rgba(255, 255, 255, .28); background: rgba(255, 255, 255, .13) !important; color: #fff; }
+  .campaign-info-card hr { border-color: rgba(255, 255, 255, .2); }
+  .campaign-stat {
+    height: 100%;
+    padding: 1rem;
+    border: 1px solid rgba(255, 255, 255, .17);
+    border-radius: 14px;
+    background: rgba(255, 255, 255, .09);
+    color: #fff;
+    backdrop-filter: blur(8px);
+  }
+  .campaign-info-card .campaign-stat.border-primary-subtle { border-color: rgba(253, 221, 72, .38) !important; background: rgba(253, 221, 72, .12) !important; }
+  .campaign-info-card .campaign-stat .text-primary { color: var(--color-secondary) !important; }
+  .campaign-stat-label {
+    display: block;
+    margin-bottom: .4rem;
+    color: rgba(255, 255, 255, .66);
+    font-size: .66rem;
+    font-weight: 700;
+    letter-spacing: .07em;
+    text-transform: uppercase;
+  }
+  .campaign-stat .fw-bold { color: #fff; }
+  .campaign-notes { border-color: var(--color-secondary) !important; background: rgba(255, 255, 255, .09) !important; }
+  .campaign-notes, .campaign-notes p, .campaign-notes i { color: rgba(255, 255, 255, .88) !important; }
+  .bulk-filter-card .card-body { padding: 1rem 1.35rem; }
+  .bulk-filter-card .form-select { min-width: 230px; min-height: 42px; border-color: #e2e8f0; border-radius: 11px; }
+  .bulk-selection-card { border: 1px solid #e6eaf0 !important; background: #fff; }
+  .bulk-selection-card > .card-header {
+    display: grid !important;
+    grid-template-columns: minmax(220px, 1fr) auto;
+    gap: 1rem 1.5rem;
+    align-items: center;
+    padding: 1.25rem 1.5rem !important;
+    background: linear-gradient(180deg, #fff 0%, #fcfcfd 100%);
+  }
+  .bulk-selection-heading {
+    display: flex;
+    align-items: center;
+    gap: .7rem;
+    color: #1e293b;
+    font-weight: 700;
+  }
+  .bulk-selection-title { display: grid; gap: .2rem; }
+  .bulk-selection-title > span { font-size: 1rem; letter-spacing: -.01em; }
+  .bulk-selection-subtitle { color: #94a3b8; font-size: .76rem; font-weight: 500; }
+  .bulk-selection-available {
+    align-self: center;
+    padding: .42rem .65rem;
+    border: 1px solid #e2e8f0 !important;
+    border-radius: 999px;
+    background: #f8fafc !important;
+    color: #64748b !important;
+    font-size: .72rem;
+  }
+  .selected-face-counter {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    padding: .5rem .7rem;
+    border: 1px solid rgba(147, 46, 43, .14) !important;
+    border-radius: 999px;
+    background: rgba(147, 46, 43, .055) !important;
+    color: var(--color-primary) !important;
+    font-weight: 650;
+  }
+  .bulk-selection-heading-icon {
+    display: grid;
+    width: 2.4rem;
+    height: 2.4rem;
+    place-items: center;
+    border-radius: 12px;
+    background: rgba(147, 46, 43, .08);
+    color: var(--color-primary);
+    font-size: 1.15rem;
+  }
+  .bulk-selection-tools {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between !important;
+    gap: .85rem;
+    padding-top: .9rem;
+    border-top: 1px solid #eef1f5;
+  }
+  .bulk-selection-actions { display: flex; align-items: center; gap: .7rem; }
+  .bulk-selection-tools .input-group { width: min(100%, 290px); }
+  .bulk-selection-tools .input-group-text,
+  .bulk-selection-tools .form-control { border-color: #e2e8f0; background: #f8fafc; }
+  .bulk-selection-tools .input-group-text { border-radius: 10px 0 0 10px; }
+  .bulk-selection-tools .form-control { border-radius: 0 10px 10px 0; }
+  .panel-view-toggle { gap: .25rem; padding: .25rem; border: 1px solid #e2e8f0; border-radius: 11px; background: #f8fafc; }
+  .panel-view-toggle .btn { border: 0; border-radius: 8px !important; color: #64748b; }
+  .panel-view-toggle .btn.active { background: var(--color-primary); color: #fff; box-shadow: 0 2px 6px rgba(147, 46, 43, .22); }
+  .bulk-selection-card > .card-body { padding: 1.5rem; }
+  .bulk-selection-card > .panel-selection-content { background: linear-gradient(180deg, #fff 0%, #fbfcfe 100%); }
+  .bulk-submit-bar { position: sticky; bottom: 0; z-index: 4; background: rgba(248, 250, 252, .96); backdrop-filter: blur(12px); }
+  .bulk-submit-bar .btn { min-height: 42px; border-radius: 10px; font-weight: 650; }
+  .ville-section { padding: 1.35rem; border: 1px solid #e8edf3; border-radius: 18px; background: #f8fafc; }
+  .ville-heading {
+    display: flex;
+    align-items: center;
+    gap: .65rem;
+    padding-bottom: .85rem;
+    border-bottom: 1px solid #e2e8f0;
+    color: #1e293b;
+    font-size: .92rem;
+    font-weight: 800;
+    letter-spacing: .035em;
+    text-transform: uppercase;
+  }
+  .ville-heading i { color: var(--color-primary); }
+  .format-section { margin: 1rem 0 1.25rem; padding: 1.1rem; border: 1px solid rgba(147, 46, 43, .14); border-radius: 15px; background: #fff; box-shadow: 0 4px 14px rgba(15, 23, 42, .035); }
+  .format-heading {
+    display: flex;
+    align-items: center;
+    gap: .55rem;
+    margin: 0 0 .9rem;
+    color: var(--color-primary);
+    font-size: .86rem;
+    font-weight: 750;
+  }
+  .format-heading i { display: grid; width: 1.8rem; height: 1.8rem; place-items: center; border-radius: 8px; background: rgba(147, 46, 43, .08); }
+  .quartier-section { margin: .75rem 0 1rem; }
+  .quartier-heading {
+    display: flex;
+    align-items: center;
+    gap: .5rem;
+    margin-bottom: .75rem;
+    color: #64748b;
+    font-size: .75rem;
+    font-weight: 700;
+    letter-spacing: .04em;
+    text-transform: uppercase;
+  }
+  .format-section .quartier-section { padding-left: .85rem; border-left: 2px solid #f1e4e3; }
+  .panel-selection-item .panel-title,
+  .panel-selection-item .panel-name { white-space: normal; overflow-wrap: anywhere; }
+  .panel-selection-item > .card {
+    border: 1px solid #e5eaf0 !important;
+    border-radius: 14px !important;
+    background: #fff;
+    box-shadow: 0 3px 12px rgba(15, 23, 42, .035) !important;
+    transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease;
+  }
+  .panel-selection-item > .card:hover { transform: translateY(-2px); border-color: rgba(147, 46, 43, .35) !important; box-shadow: 0 10px 24px rgba(15, 23, 42, .08) !important; }
+  .panel-selection-item .card-header { background: #fff !important; }
+  .panel-selection-item .panel-card-header { display: block; }
+  .panel-selection-item .panel-title { margin-bottom: .6rem !important; }
+  .panel-selection-item .panel-code {
+    display: inline-flex;
+    align-items: center;
+    gap: .4rem;
+    margin-bottom: .35rem;
+    padding: .27rem .5rem;
+    border-radius: 7px;
+    background: rgba(147, 46, 43, .07);
+    color: var(--color-primary);
+    font-size: .76rem;
+    font-weight: 800;
+    letter-spacing: .035em;
+  }
+  .panel-selection-item .panel-name { display: block; margin-top: .2rem; color: #64748b !important; line-height: 1.45; }
+  .panel-selection-item .panel-location {
+    display: inline-flex;
+    align-items: center;
+    gap: .3rem;
+    padding: .35rem .55rem;
+    border: 1px solid #e2e8f0;
+    border-radius: 999px;
+    background: #fff;
+    color: #64748b;
+    font-size: .72rem;
+  }
+  .panel-selection-item .card-body { padding: 1rem !important; }
+  .panel-selection-item .card-body > p { color: #64748b !important; letter-spacing: .06em; font-size: .67rem !important; }
+  .panel-selection-item .face-label-element {
+    min-height: 50px;
+    padding: .55rem .65rem !important;
+    border: 1px solid rgba(22, 163, 74, .15) !important;
+    border-radius: 11px !important;
+    transition: box-shadow .15s ease, transform .15s ease, border-color .15s ease;
+  }
+  .panel-selection-item .face-checkbox:checked + .face-label-element {
+    border-color: rgba(147, 46, 43, .4) !important;
+    box-shadow: 0 0 0 3px rgba(147, 46, 43, .09);
+  }
+  .panel-selection-item .face-label-element:hover { filter: brightness(.98); }
+  .panel-selection-list .panel-selection-item { flex: 0 0 100%; width: 100%; max-width: 100%; }
+  .panel-selection-list .panel-selection-item > .card {
+    display: grid;
+    grid-template-columns: minmax(240px, .82fr) minmax(0, 1.18fr);
+    align-items: center;
+    overflow: hidden !important;
+  }
+  .panel-selection-list .panel-selection-item .card-header {
+    display: grid !important;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: center;
+    gap: .45rem;
+    min-width: 0;
+    height: 100%;
+    padding: .85rem 1rem !important;
+    border: 0 !important;
+    border-right: 1px solid #edf0f4 !important;
+  }
+  .panel-selection-list .panel-selection-item .card-header h6 { min-width: 0; margin: 0 !important; }
+  .panel-selection-list .panel-selection-item .panel-location { justify-content: flex-start; text-align: left !important; overflow-wrap: anywhere; }
+  .panel-selection-list .panel-selection-item .card-body { min-width: 0; padding: .7rem .9rem !important; }
+  .panel-selection-list .panel-selection-item .card-body > p { display: none; }
+  .panel-selection-list .panel-selection-item .card-body .row { display: flex; align-items: center; justify-content: flex-start; flex-wrap: wrap; gap: .45rem; margin: 0; }
+  .panel-selection-list .panel-selection-item .card-body .row > .col-12 { flex: 0 0 auto; width: auto; padding: 0; }
+  .panel-selection-list .panel-selection-item .face-label-element { min-height: 0; gap: .4rem; padding: .45rem .6rem !important; font-size: .76rem; white-space: nowrap; }
+  .panel-selection-list .panel-selection-item .face-label-element .check-icon { font-size: .9rem !important; }
+  .panel-selection-list .panel-selection-item .face-label-element strong { display: inline !important; }
+  .panel-selection-list .panel-selection-item .face-label-element small,
+  .panel-selection-list .panel-selection-item .card-body .row > .col-12 > .d-flex small { display: none; }
+  .panel-selection-list .panel-selection-item .face-label-element .badge,
+  .panel-selection-list .panel-selection-item .card-body .row > .col-12 > .d-flex .badge { font-size: .62rem; }
+  .panel-selection-list .panel-selection-item .card-body .row > .col-12 > .d-flex { padding: .4rem .6rem !important; gap: .4rem; font-size: .74rem; }
+  .panel-selection-list .panel-selection-item .occupied-campaign-name { display: block !important; white-space: normal; font-size: .65rem; }
+  #panel-selection-map { height: min(65vh, 620px); min-height: 360px; border-radius: 12px; z-index: 0; }
+  .panel-map-popup .btn { white-space: normal; text-align: left; }
+  .panel-map-legend { display: flex; flex-wrap: wrap; gap: .75rem; font-size: .8rem; }
+  .panel-map-legend span { display: inline-flex; align-items: center; gap: .35rem; }
+  .panel-map-legend i { width: .7rem; height: .7rem; border-radius: 50%; display: inline-block; }
+  @media (max-width: 767.98px) {
+    .bulk-selection-card > .card-header { grid-template-columns: 1fr; align-items: flex-start !important; gap: 1rem; padding: 1rem !important; }
+    .bulk-selection-card > .card-body { padding: 1rem; }
+    .bulk-selection-tools { width: 100%; justify-content: flex-start !important; }
+    .bulk-selection-actions { width: 100%; justify-content: space-between; flex-wrap: wrap; }
+    .bulk-selection-tools .input-group { width: 100%; }
+    .panel-selection-list .panel-selection-item > .card { grid-template-columns: 1fr; }
+    .panel-selection-list .panel-selection-item .card-header { border-right: 0 !important; border-bottom: 1px solid #edf0f4 !important; }
+    .panel-selection-list .panel-selection-item .card-body .row { justify-content: flex-start; }
+    .ville-section { padding: .9rem; }
+    .format-section { padding: .75rem; }
+    .format-section .quartier-section { padding-left: .55rem; }
+  }
+  @media (max-width: 575.98px) {
+    .campaign-info-card .card-body { padding: 1rem !important; }
+    .campaign-client-logo { width: 54px; height: 54px; flex-basis: 54px; }
+    .campaign-status { align-self: flex-start; }
+    .bulk-filter-card .card-body { align-items: flex-start !important; flex-direction: column; }
+    .bulk-filter-card .form-select { width: 100% !important; }
+    .panel-view-toggle .btn { padding-inline: .5rem; font-size: .75rem; }
+  }
+
+
+/* ===== Refonte structurelle : tableau de bord en deux colonnes ===== */
+.bulk-page { max-width: 1880px; padding-inline: clamp(12px,2vw,30px); }
+.bulk-page > .row { margin: 0; }
+.bulk-page > .row > .col-12 {
+  display: grid;
+  grid-template-columns: minmax(275px, 330px) minmax(0, 1fr);
+  grid-template-areas: "campaign filters" "campaign selection";
+  align-items: start;
+  gap: 20px;
+}
+.bulk-page .campaign-info-card { grid-area: campaign; position: sticky; top: 1rem; margin: 0 !important; border-radius: 22px !important; }
+.bulk-page .bulk-filter-card { grid-area: filters; margin: 0 !important; border: 1px solid #e8edf4 !important; border-radius: 18px !important; }
+.bulk-page .bulk-selection-card { grid-area: selection; min-width: 0; border-radius: 22px !important; }
+.campaign-info-card > .card-header { padding: 1.25rem 1.4rem !important; }
+.campaign-info-card > .card-body { padding: 1.4rem !important; }
+.campaign-info-card .d-flex.align-items-center.gap-3.mb-4 { align-items: flex-start !important; flex-direction: column; gap: 1rem !important; }
+.campaign-info-card .campaign-client-logo { width: 76px; height: 76px; flex-basis: 76px; border-radius: 20px; }
+.campaign-info-card .campaign-identity h4 { white-space: normal !important; overflow-wrap: anywhere; line-height: 1.25; }
+.campaign-info-card .row.g-3.mb-4 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px !important; margin: 0 0 1rem !important; }
+.campaign-info-card .row.g-3.mb-4 > [class*="col-"] { width: auto; padding: 0; }
+.campaign-info-card .campaign-stat { min-height: 94px; padding: .85rem; border-radius: 14px; }
+.campaign-info-card hr { margin: 1.2rem 0 !important; }
+.bulk-filter-card .card-body { display: grid !important; grid-template-columns: auto minmax(180px,1fr) auto; align-items: center; gap: 12px !important; padding: 1rem 1.25rem !important; }
+.bulk-filter-card .form-select { width: 100%; }
+.bulk-selection-card > .card-header { grid-template-columns: 1fr; gap: 1rem; padding: 1.35rem 1.5rem !important; }
+.bulk-selection-heading { flex-wrap: wrap; }
+.bulk-selection-tools { width: 100%; grid-column: 1; padding-top: 1rem; }
+.bulk-selection-tools .input-group { flex: 1 1 280px; width: auto; }
+.bulk-selection-actions { flex-wrap: wrap; }
+.bulk-selection-card > .card-body { padding: clamp(14px,2vw,26px) !important; }
+.ville-section { padding: clamp(14px,1.8vw,24px); border-radius: 20px; background: #f4f7fb; }
+.ville-heading { justify-content: space-between; padding-bottom: 1rem; font-size: 1rem; }
+.format-section { padding: 1.25rem; border-radius: 18px; }
+.quartier-section { margin-top: 1rem; }
+.panel-selection-item > .card, .ecran-card { height: 100%; border-radius: 17px !important; overflow: hidden; }
+.panel-selection-item .card-body, .ecran-card .card-body { padding: 1.1rem !important; }
+.panel-selection-item .card-header, .ecran-card .card-header { padding: 1rem 1.1rem !important; }
+.bulk-submit-bar { margin-top: 0; padding: 1rem 1.4rem !important; border-top: 1px solid #e7ecf3 !important; border-radius: 0 0 20px 20px; }
+.bulk-submit-bar .btn-primary { min-width: 220px; }
+#panel-selection-map-wrap { padding: .5rem; border-radius: 18px; background: #f4f7fb; }
+#panel-selection-map { min-height: 430px; border: 1px solid #dce4ee; border-radius: 15px; }
+@media (min-width: 1500px) {
+  .bulk-page > .row > .col-12 { grid-template-columns: minmax(300px,360px) minmax(0,1fr); gap: 24px; }
+}
+@media (max-width: 991.98px) {
+  .bulk-page > .row > .col-12 { grid-template-columns: minmax(0,1fr); grid-template-areas: "campaign" "filters" "selection"; }
+  .bulk-page .campaign-info-card { position: static; }
+  .campaign-info-card .d-flex.align-items-center.gap-3.mb-4 { flex-direction: row; align-items: center !important; }
+  .campaign-info-card .row.g-3.mb-4 { grid-template-columns: repeat(3,minmax(0,1fr)); }
+}
+@media (max-width: 575.98px) {
+  .bulk-page { padding: 12px !important; }
+  .bulk-page > .row > .col-12 { gap: 13px; }
+  .bulk-filter-card .card-body { grid-template-columns: 1fr; }
+  .campaign-info-card .row.g-3.mb-4 { grid-template-columns: repeat(2,minmax(0,1fr)); }
+  .campaign-info-card .d-flex.align-items-center.gap-3.mb-4 { flex-direction: column; align-items: flex-start !important; }
+  .bulk-selection-card > .card-header { padding: 1rem !important; }
+  .bulk-selection-tools { align-items: stretch; flex-direction: column; }
+  .bulk-selection-actions { align-items: flex-start; flex-direction: column; }
+  .bulk-submit-bar { flex-direction: column-reverse; }
+  .bulk-submit-bar .btn { width: 100%; }
+}
+
+</style>
+<div class="container-fluid py-4 bulk-page">
+  <div class="row justify-content-center">
+    <div class="col-12">
+
+      {# ── Infos campagne ── #}
+      <div class="card shadow-sm border-0 mb-4 campaign-info-card">
+        <div class="card-header bg-transparent border-bottom py-3">
+          <div class="campaign-info-heading"><i class="bi bi-info-circle"></i>Informations de la campagne</div>
+        </div>
+        <div class="card-body p-4">
+          <div class="d-flex align-items-center gap-3 mb-4 flex-wrap">
+            <div class="campaign-client-logo">
+              {% if campagne.client.logo %}
+                <img src="{{ campagne.client.logo.url }}" alt="Logo de {{ campagne.client.nom }}">
+              {% else %}
+                <i class="bi bi-building fs-3 text-secondary"></i>
+              {% endif %}
+            </div>
+            <div class="flex-grow-1 campaign-identity">
+              <h4 class="fw-bold mb-1 text-truncate text-dark">{{ campagne.nom }}</h4>
+              <div class="d-flex align-items-center gap-2 flex-wrap small">
+                <a href="{% url 'client_detail' campagne.client.pk %}" class="text-primary text-decoration-none fw-bold">
+                  <i class="bi bi-person-fill me-1"></i>{{ campagne.client.nom }}
+                </a>
+                <span class="text-muted">•</span>
+                <span class="badge bg-light text-dark border font-monospace px-2 py-1">{{ campagne.reference }}</span>
+              </div>
+            </div>
+            <span class="badge rounded-pill bg-{{ campagne.statut }} px-3 py-2 campaign-status">
+              {{ campagne.get_statut_display }}
+            </span>
+          </div>
+
+          <hr class="opacity-10 mb-4">
+
+          <div class="row g-3 mb-4">
+            <div class="col-6 col-sm-4 col-md-3">
+              <div class="campaign-stat">
+                <small class="campaign-stat-label">Dates</small>
+                <div class="fw-bold small">{{ campagne.date_debut|date:"d/m/Y" }}</div>
+                <div class="fw-bold small text-primary">{{ campagne.date_fin|date:"d/m/Y" }}</div>
+              </div>
+            </div>
+            <div class="col-6 col-sm-4 col-md-3">
+              <div class="campaign-stat">
+                <small class="campaign-stat-label">Support</small>
+                <div class="fw-bold small">
+                  {% if campagne.type_support == 'ecran' %}
+                    <i class="bi bi-display text-primary me-1"></i>Écrans
+                  {% elif mode_marche %}
+                    <i class="bi bi-shop text-warning me-1"></i>Marché
+                  {% else %}
+                    <i class="bi bi-sign-merge-right text-warning me-1"></i>{{campagne.type_support}}
+                  {% endif %}
+                </div>
+              </div>
+            </div>
+            {% if campagne.type_support == 'ecran' %}
+            <div class="col-6 col-sm-4 col-md-3">
+              <div class="campaign-stat border-primary-subtle bg-primary-subtle text-primary">
+                <small class="campaign-stat-label opacity-75">Fréquence (défaut)</small>
+                <div class="fw-bold small">{{ campagne.get_frequence_display }}</div>
+              </div>
+            </div>
+            <div class="col-6 col-sm-4 col-md-3">
+              <div class="campaign-stat border-primary-subtle bg-primary-subtle text-primary">
+                <small class="campaign-stat-label opacity-75">Durée spot (défaut)</small>
+                <div class="fw-bold small">{{ campagne.get_duree_passage_display }}</div>
+              </div>
+            </div>
+            <div class="col-6 col-sm-4 col-md-3">
+              <div class="campaign-stat border-primary-subtle bg-primary-subtle text-primary">
+                <small class="campaign-stat-label opacity-75">Horaires (défaut)</small>
+                <div class="fw-bold small">{{ campagne.tranches_horaires|truncatechars:30 }}</div>
+              </div>
+            </div>
+            {% endif %}
+          </div>
+
+          {% if campagne.notes %}
+          <div class="p-3 rounded-3 border-start border-4 campaign-notes">
+            <div class="d-flex gap-2">
+              <i class="bi bi-chat-left-dots text-primary"></i>
+              <p class="mb-0 small text-muted lh-sm">{{ campagne.notes }}</p>
+            </div>
+          </div>
+          {% endif %}
+        </div>
+      </div>
+
+      {# ── Filtre ville ── #}
+      <form method="get" class="card shadow-sm border-0 mb-3 bulk-filter-card">
+        <input type="hidden" name="type_support" value="{{ campagne.type_support }}">
+        <input type="hidden" name="q" id="panel-search-state" value="{{ panel_search_query }}">
+        <input type="hidden" name="view" id="panel-view-state" value="{{ panel_view }}">
+        {% for face_id in selectionnes %}
+          <input type="hidden" name="pending_faces" value="{{ face_id }}">
+        {% endfor %}
+        <div class="card-body py-3 d-flex align-items-center gap-3 flex-wrap">
+          <label class="form-label mb-0 fw-bold small text-muted">
+            <i class="bi bi-geo-alt-fill me-1"></i>Filtrer par ville :
+          </label>
+          <select name="ville" class="form-select form-select-sm" onchange="this.form.submit()">
+            <option value="">Toutes les villes</option>
+            {% for v in villes_disponibles %}
+              <option value="{{ v }}" {% if v == ville_filtree %}selected{% endif %}>{{ v }}</option>
+            {% endfor %}
+          </select>
+          {% if ville_filtree %}
+            <a href="?type_support={{ campagne.type_support|urlencode }}&amp;q={{ panel_search_query|urlencode }}&amp;view={{ panel_view|urlencode }}" class="btn btn-sm btn-outline-secondary">
+              <i class="bi bi-x-lg me-1"></i>Réinitialiser
+            </a>
+          {% endif %}
+        </div>
+      </form>
+
+      {# ── Formulaire supports ── #}
+      <form method="post" class="card shadow-sm border-0 bulk-selection-card">
+        {% csrf_token %}
+        {% for face_id in selectionnes %}
+          <input type="hidden" name="pending_faces" value="{{ face_id }}">
+        {% endfor %}
+        <div class="card-header border-bottom py-3 px-4 d-flex justify-content-between align-items-center">
+          <div class="bulk-selection-heading">
+            <span class="bulk-selection-heading-icon"><i class="bi bi-check2-square"></i></span>
+            <span class="bulk-selection-title">
+              <span>{% if mode_marche %}Sélectionner les emplacements{% else %}Sélectionner les supports{% endif %}</span>
+              <small class="bulk-selection-subtitle">
+                {% if mode_marche %}Choisissez les emplacements de la campagne{% else %}Choisissez les faces correspondant à votre campagne{% endif %}
+              </small>
+            </span>
+            <span class="badge bulk-selection-available">
+              {% if mode_marche %}{{ emplacements_enrichis|length }}{% else %}{{ supports|length }}{% endif %} disponible(s)
+            </span>
+          </div>
+          {% if not mode_marche and campagne.type_support != 'ecran' %}
+          <div class="d-flex align-items-center flex-wrap justify-content-end bulk-selection-tools">
+            <div class="input-group input-group-sm">
+              <span class="input-group-text"><i class="bi bi-search"></i></span>
+              <input type="search" class="form-control" id="panel-search" value="{{ panel_search_query }}" placeholder="Rechercher panneau, face ou campagne..." aria-label="Rechercher panneau, face ou campagne">
+            </div>
+            <div class="bulk-selection-actions">
+              <span class="badge selected-face-counter" aria-live="polite">
+                <i class="bi bi-check2-circle"></i>
+                <span id="selected-face-count">{{ selectionnes|length }}</span> face(s) sélectionnée(s)
+              </span>
+              <div class="btn-group btn-group-sm panel-view-toggle" role="group" aria-label="Mode d'affichage des panneaux">
+                <button type="button" class="btn btn-outline-secondary{% if panel_view == 'grid' %} active{% endif %}" id="panel-grid-view" aria-pressed="{% if panel_view == 'grid' %}true{% else %}false{% endif %}">
+                  <i class="bi bi-grid-3x3-gap-fill me-1"></i>Grille
+                </button>
+                <button type="button" class="btn btn-outline-secondary{% if panel_view == 'list' %} active{% endif %}" id="panel-list-view" aria-pressed="{% if panel_view == 'list' %}true{% else %}false{% endif %}">
+                  <i class="bi bi-list-ul me-1"></i>Liste
+                </button>
+                <button type="button" class="btn btn-outline-secondary{% if panel_view == 'map' %} active{% endif %}" id="panel-map-view" aria-pressed="{% if panel_view == 'map' %}true{% else %}false{% endif %}">
+                  <i class="bi bi-map me-1"></i>Carte
+                </button>
+              </div>
+            </div>
+          </div>
+          {% endif %}
+        </div>
+
+        <div class="card-body{% if not mode_marche and campagne.type_support != 'ecran' %} panel-selection-content{% endif %}" id="panel-selection-content">
+          {% if mode_marche %}
+            {% if emplacements_enrichis %}
+
+              {# 1. Regroupement par VILLE (via le marché) #}
+              {% regroup emplacements_enrichis by marche.ville as ville_list %}
+
+              {% for ville in ville_list %}
+                <div class="ville-section mb-4">
+                  <h2 class="ville-heading mb-4">
+                    <i class="bi bi-geo-alt-fill me-2"></i>{{ ville.grouper|default:"Ville non spécifiée" }}
+                  </h2>
+
+                  {# 2. Regroupement par MARCHÉ (au sein de cette ville) #}
+                  {% regroup ville.list by marche as marche_group_list %}
+
+                  {% for marche_group in marche_group_list %}
+                    {% with marche=marche_group.grouper %}
+                    <div class="quartier-section">
+                      <h3 class="h6 fw-bold text-muted mb-3 text-uppercase">
+                        <i class="bi bi-shop me-2"></i>{{ marche.nom }}
+                        <span class="badge bg-light text-dark border fw-normal ms-2">{{ marche.quartier|default:"Général" }}</span>
+                      </h3>
+
+                      <div class="row g-2">
+                        {% for item in marche_group.list %}
+                          {% with emplacement=item.emplacement %}
+                            <div class="col-md-6 col-xl-4">
+                              {% if item.jours_dispo >= campagne.duree_jours or emplacement.pk in selectionnes %}
+                                {# ── Emplacement libre (ou déjà sélectionné dans cette campagne) : cliquable ── #}
+                                <div class="position-relative">
+                                  <input type="checkbox" name="emplacements" value="{{ emplacement.pk }}" id="emp_{{ emplacement.pk }}"
+                                        class="btn-check emplacement-checkbox" autocomplete="off"
+                                        {% if emplacement.pk in selectionnes %}checked{% endif %}>
+                                  <label class="btn w-100 text-start p-3 d-flex justify-content-between align-items-center rounded-3 bs-disponible"
+                                        for="emp_{{ emplacement.pk }}">
+                                    <span class="d-flex align-items-center">
+                                      <i class="bi {% if emplacement.pk in selectionnes %}bi-check-circle-fill{% else %}bi-circle{% endif %} fs-5 me-2 check-icon"></i>
+                                      <span>
+                                        <strong class="d-block">{{ emplacement.code }}</strong>
+                                        <small class="opacity-75">{{ emplacement.notes|default:"—"|truncatechars:40 }}</small>
+                                      </span>
+                                    </span>
+                                    <span class="d-flex flex-column align-items-end gap-1">
+                                      {% if item.a_un_panneau %}
+                                        <span class="badge bg-primary-subtle text-primary border border-primary-subtle" style="font-size:.65rem;" title="Panneau installé : {{ emplacement.support_installe.code }}">
+                                          <i class="bi bi-sign-merge-right me-1"></i>{{ emplacement.support_installe.code }}
+                                        </span>
+                                      {% else %}
+                                        <span class="badge bg-secondary-subtle text-secondary border" style="font-size:.65rem;">
+                                          <i class="bi bi-dash-circle me-1"></i>Sans panneau
+                                        </span>
+                                      {% endif %}
+                                      <span class="badge border bs-disponible" style="font-size:.62rem;">Disponible</span>
+                                    </span>
+                                  </label>
+                                </div>
+                              {% elif item.jours_dispo == 0 %}
+                                {# ── Bloqué : intégralement réservé par une autre campagne ── #}
+                                <div class="d-flex justify-content-between align-items-center p-1 border rounded-3 bs-occupe opacity-50" style="cursor: not-allowed;">
+                                  <span class="small fw-bold text-danger-emphasis">
+                                    <i class="bi bi-lock-fill me-2"></i>{{ emplacement.code }}
+                                    <small class="d-block fw-normal opacity-75">{{ emplacement.notes|default:"—"|truncatechars:40 }}</small>
+                                  </span>
+                                  <span class="badge border bs-occupe" style="font-size:.62rem;">Déjà réservé</span>
+                                </div>
+                              {% else %}
+                                {# ── Bloqué : partiellement réservé (dispo < durée totale de la campagne) ── #}
+                                <div class="d-flex justify-content-between align-items-center p-3 border bs-reserve rounded-3 opacity-75" style="cursor: not-allowed;">
+                                  <span class="small fw-bold">
+                                    <i class="bi bi-clock-history me-2"></i>{{ emplacement.code }}
+                                    <small class="d-block fw-normal opacity-75">{{ emplacement.notes|default:"—"|truncatechars:40 }}</small>
+                                  </span>
+                                  <span class="badge border bs-reserve" style="font-size:.62rem;">{{ item.jours_dispo }}/{{ campagne.duree_jours }}j</span>
+                                </div>
+                              {% endif %}
+                            </div>
+                          {% endwith %}
+                        {% endfor %}
+                      </div>
+                    </div>
+                    {% endwith %}
+                  {% endfor %}
+                </div>
+              {% endfor %}
+
+            {% else %}
+              <div class="text-center py-5">
+                <i class="bi bi-shop text-muted" style="font-size: 3rem; opacity: 0.3;"></i>
+                <h5 class="mt-3 fw-bold text-muted">Aucun emplacement disponible</h5>
+                <p class="text-muted small">Créez d'abord des marchés et leurs emplacements dans la section Marchés de l'inventaire.</p>
+              </div>
+            {% endif %}
+
+          {% elif supports_enrichis or supports %}
+            
+            <div id="panel-selection-map-wrap" class="mb-4 d-none">
+              <div class="panel-map-legend mb-2" aria-label="Légende de la carte">
+                <span><i style="background:#16a34a"></i>Faces disponibles</span>
+                <span><i style="background:#ea580c"></i>Partiellement occupé</span>
+                <span><i style="background:#dc2626"></i>Occupé</span>
+                <span><i style="background:#7c3aed"></i>Réservé</span>
+                <span><i style="background:#64748b"></i>En panne</span>
+              </div>
+              <div id="panel-selection-map" role="region" aria-label="Carte de sélection des panneaux"></div>
+            </div>
+            <div id="panel-search-empty" class="alert alert-light border d-none" role="status">
+              Aucun panneau ne correspond à cette recherche.
+            </div>
+
+            {# 1. Premier niveau : Regroupement par VILLE #}
+            {% regroup supports_enrichis by support.ville as ville_list %}
+
+            {% for ville in ville_list %}
+              <div class="ville-section mb-4">
+                <h2 class="ville-heading mb-4">
+                  <i class="bi bi-geo-alt-fill me-2"></i>{{ ville.grouper|default:"Ville non spécifiée" }}
+                </h2>
+
+                {% if campagne_categorie_geant %}
+                  {% regroup ville.list by support.format_display as format_list %}
+                  {% for format_group in format_list %}
+                    <section class="format-section">
+                      <h3 class="format-heading">
+                        <i class="bi bi-rulers me-2"></i>Format : {{ format_group.grouper }}
+                      </h3>
+                    {% regroup format_group.list by support.quartier as quartier_list %}
+                    {% for quartier in quartier_list %}
+                      <div class="quartier-section">
+                        <h4 class="quartier-heading">
+                          <i class="bi bi-signpost-split me-2"></i>Quartier : {{ quartier.grouper|default:"Général / Non spécifié" }}
+                        </h4>
+                        <div class="row g-4" style="margin-top: 0px !important;">
+                          {% for item in quartier.list %}
+                            {% include 'campaigns/partials/_support_face_card.html' %}
+                          {% endfor %}
+                        </div>
+                      </div>
+                    {% endfor %}
+                    </section>
+                  {% endfor %}
+                {% else %}
+                  {% regroup ville.list by support.quartier as quartier_list %}
+                  {% for quartier in quartier_list %}
+                  <div class="quartier-section mb-4 ms-md-3">
+                    <h3 class="quartier-heading">
+                      <i class="bi bi-signpost-split me-2"></i>Quartier : {{ quartier.grouper|default:"Général / Non spécifié" }}
+                    </h3>
+
+                    <div class="row g-4" style="margin-top: 0px !important;">
+
+                      {# ═══════════════ ÉCRANS ═══════════════ #}
+                      {% if campagne.type_support == 'ecran' %}
+                        {% for item in quartier.list %}
+                          {% with support=item.support ligne=item.ligne %}
+                            <div class="col-md-6 col-xl-4">
+                              <div class="card h-100 border rounded-3 overflow-hidden shadow-sm ecran-card" id="card_{{ support.pk }}">
+                                <div class="card-header bg-light border-bottom p-3">
+                                  <div class="d-flex justify-content-between align-items-start">
+                                    <div class="text-truncate">
+                                      <h6 class="fw-bold mb-1 text-truncate">
+                                        {{ support.code }} — {{ support.nom }}
+                                        {% if support.ancien_nom %}<span class="small text-muted">(Ancien nom : {{ support.ancien_nom }})</span>{% endif %}
+                                      </h6>
+                                      <div class="small text-muted"><i class="bi bi-geo-alt me-1"></i>{{ support.adresse|default:support.quartier }}</div>
+                                    </div>
+                                    {% if support.pk in selectionnes %}
+                                      <span class="badge bg-primary">Actif</span>
+                                    {% endif %}
+                                  </div>
+                                </div>
+
+                                <div class="card-body p-3">
+                                  <div class="mb-3">
+                                    <input type="checkbox" name="supports" value="{{ support.pk }}" id="support_{{ support.pk }}"
+                                          class="btn-check ecran-checkbox" autocomplete="off"
+                                          {% if support.pk in selectionnes %}checked{% endif %}>
+                                    <label class="btn btn-outline-primary w-100 py-3 rounded-3 text-start shadow-sm"
+                                          for="support_{{ support.pk }}">
+                                      <i class="bi {% if support.pk in selectionnes %}bi-check-square-fill{% else %}bi-square{% endif %} me-2"></i>
+                                      <span class="fw-bold">{% if support.pk in selectionnes %}Écran sélectionné{% else %}Sélectionner cet écran{% endif %}</span>
+                                    </label>
+                                  </div>
+
+                                  <div class="row g-2 mb-3">
+                                    <div class="col-6">
+                                      <div class="p-2 border rounded text-center bg-light">
+                                        <small class="d-block text-muted text-uppercase" style="font-size: .6rem;">Résolution</small>
+                                        <div class="fw-bold small text-truncate">{{ support.ecran_info.get_resolution_display|default:"HD" }}</div>
+                                      </div>
+                                    </div>
+                                    <div class="col-6">
+                                      <div class="p-2 border rounded text-center bg-light">
+                                        <small class="d-block text-muted text-uppercase" style="font-size: .6rem;">Taille</small>
+                                        <div class="fw-bold small">{{ support.taille_pouces|default:"55" }}"</div>
+                                      </div>
+                                    </div>
+                                    <div class="col-12 text-center py-1">
+                                      <span class="badge bg-primary-subtle text-primary border border-primary-subtle rounded-pill">
+                                        <i class="bi bi-clock me-1"></i>{{ support.ecran_info.horaires_actifs_display }}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  <div class="ecran-params mt-3 {% if support.pk not in selectionnes %}d-none{% endif %}" id="params_{{ support.pk }}">
+                                    <hr class="opacity-25">
+                                    <p class="text-uppercase text-muted fw-bold mb-3" style="font-size: .65rem;">
+                                      <i class="bi bi-sliders me-1"></i>Paramètres spécifiques
+                                      <span class="text-primary">(optionnel)</span>
+                                    </p>
+
+                                    <div class="row g-2 mb-2">
+                                      <div class="col-6">
+                                        <label class="form-label small text-muted mb-1">Date début >= {{ campagne.date_debut|date:'Y-m-d' }}</label>
+                                        <input type="date" class="form-control form-control-sm"
+                                              name="date_debut_{{ support.pk }}"
+                                              value="{{ ligne.date_debut|date:'Y-m-d'|default:'' }}"
+                                              min="{{ campagne.date_debut|date:'Y-m-d' }}"
+                                              max="{{ campagne.date_fin|date:'Y-m-d' }}">
+                                      </div>
+                                      <div class="col-6">
+                                        <label class="form-label small text-muted mb-1">Date fin <= {{ campagne.date_fin|date:'Y-m-d' }}</label>
+                                        <input type="date" class="form-control form-control-sm"
+                                              name="date_fin_{{ support.pk }}"
+                                              value="{{ ligne.date_fin|date:'Y-m-d'|default:'' }}"
+                                              min="{{ campagne.date_debut|date:'Y-m-d' }}"
+                                              max="{{ campagne.date_fin|date:'Y-m-d' }}">
+                                      </div>
+                                    </div>
+
+                                    <div class="row g-2 mb-2">
+                                      <div class="col-6">
+                                        <label class="form-label small text-muted mb-1">Durée spot</label>
+                                        <select class="form-select form-select-sm" name="duree_passage_{{ support.pk }}">
+                                          <option value="">— Campagne ({{ campagne.get_duree_passage_display }}) —</option>
+                                          {% for val, label in duree_choices %}
+                                            <option value="{{ val }}" {% if ligne.duree_passage == val %}selected{% endif %}>{{ label }}</option>
+                                          {% endfor %}
+                                        </select>
+                                      </div>
+                                      <div class="col-6">
+                                        <label class="form-label small text-muted mb-1">Fréquence</label>
+                                        <select class="form-select form-select-sm" name="frequence_{{ support.pk }}">
+                                          <option value="">— Campagne ({{ campagne.get_frequence_display }}) —</option>
+                                          {% for val, label in frequence_choices %}
+                                            <option value="{{ val }}" {% if ligne.frequence == val %}selected{% endif %}>{{ label }}</option>
+                                          {% endfor %}
+                                        </select>
+                                      </div>
+                                    </div>
+
+                                    <div class="mb-2">
+                                      <label class="form-label small text-muted mb-1">Tranches horaires</label>
+                                      <input type="text" class="form-control form-control-sm"
+                                            name="tranches_horaires_{{ support.pk }}"
+                                            value="{{ ligne.tranches_horaires|default:'' }}"
+                                            placeholder="Défaut : {{ campagne.tranches_horaires|default:'non défini' }}">
+                                    </div>
+                                  </div>
+
+                                </div>
+                              </div>
+                            </div>
+                          {% endwith %}
+                        {% endfor %}
+                      {# ═══════════════ PANNEAUX ═══════════════ #}
+                      {% else %}
+                        {% for item in quartier.list %}
+                          {% include 'campaigns/partials/_support_face_card.html' %}
+                        {% endfor %}
+                      {% endif %}
+
+                    </div>
+                  </div>
+                {% endfor %}
+                {% endif %}
+              </div>
+            {% endfor %}
+
+          {% else %}
+            <div class="text-center py-5">
+              <i class="bi bi-inbox text-muted" style="font-size: 3rem; opacity: 0.3;"></i>
+              <h5 class="mt-3 fw-bold text-muted">Aucun panneau disponible</h5>
+              <p class="text-muted small">Aucun panneau ne correspond au format et à la ville sélectionnés, ou les faces sont déjà réservées sur cette période.</p>
+            </div>
+          {% endif %}
+        </div>
+
+        {% if supports %}
+          <div class="card-footer bulk-submit-bar p-3 d-flex justify-content-end gap-2">
+            <a href="{% url 'campagne_detail' campagne.pk %}" class="btn btn-light border px-4">Annuler</a>
+            <button type="submit" class="btn btn-primary px-4 shadow-sm">
+              <i class="bi bi-check-lg me-1"></i>
+              {% if is_modification %}Enregistrer les modifications{% else %}Confirmer la sélection{% endif %}
+            </button>
+          </div>
+        {% endif %}
+      </form>
+
+    </div>
+  </div>
+</div>
+
+{# ✅ JS — afficher/masquer les paramètres quand on coche/décoche un écran #}
+<script>
+function syncPendingFaces() {
+  const forms = [
+    document.querySelector('form[method="get"]'),
+    document.querySelector('form[method="post"]'),
+  ].filter(Boolean);
+  const selected = new Set(
+    Array.from(document.querySelectorAll('input[name="pending_faces"]'), input => input.value)
+  );
+
+  document.querySelectorAll('.face-checkbox').forEach(function(checkbox) {
+    selected.delete(checkbox.value);
+    if (checkbox.checked) selected.add(checkbox.value);
+  });
+
+  forms.forEach(function(form) {
+    form.querySelectorAll('input[name="pending_faces"]').forEach(input => input.remove());
+    selected.forEach(function(faceId) {
+      const input = document.createElement('input');
+      input.type = 'hidden';
+      input.name = 'pending_faces';
+      input.value = faceId;
+      form.appendChild(input);
+    });
+  });
+
+  const count = document.getElementById('selected-face-count');
+  if (count) count.textContent = selected.size;
+}
+
+document.querySelectorAll('.face-checkbox').forEach(function(checkbox) {
+  checkbox.addEventListener('change', function() {
+    const label = this.nextElementSibling;
+    if (label) {
+      const icon = label.querySelector('.check-icon');
+      const badge = label.querySelector('.status-badge, .bs-disponible');
+      if (icon) icon.className = `bi ${this.checked ? 'bi-check-circle-fill' : 'bi-circle'} fs-5 me-2 check-icon`;
+      if (badge) {
+        badge.textContent = this.checked ? 'Sélectionnée' : 'Libre';
+        badge.className = this.checked
+          ? 'badge bg-primary-subtle text-primary border border-primary-subtle status-badge'
+          : 'badge border bs-disponible';
+      }
+    }
+    syncPendingFaces();
+  });
+});
+
+document.querySelectorAll('form[method="get"], form[method="post"]').forEach(function(form) {
+  form.addEventListener('submit', syncPendingFaces);
+});
+syncPendingFaces();
+
+const panelSelectionContent = document.getElementById('panel-selection-content');
+const panelGridViewButton = document.getElementById('panel-grid-view');
+const panelListViewButton = document.getElementById('panel-list-view');
+const panelMapViewButton = document.getElementById('panel-map-view');
+const panelSearchInput = document.getElementById('panel-search');
+const panelSearchState = document.getElementById('panel-search-state');
+const panelViewState = document.getElementById('panel-view-state');
+const panelMapElement = document.getElementById('panel-selection-map');
+const panelMapWrap = document.getElementById('panel-selection-map-wrap');
+const panelSearchEmpty = document.getElementById('panel-search-empty');
+const panelItems = Array.from(document.querySelectorAll('.panel-selection-item'));
+let panelMap;
+let panelMarkers = [];
+let currentPanelView = panelViewState?.value || 'grid';
+
+function setPanelView(view) {
+  if (!panelSelectionContent) return;
+  const isList = view === 'list';
+  const isMap = view === 'map';
+  currentPanelView = view;
+  if (panelViewState) panelViewState.value = view;
+  panelSelectionContent.classList.toggle('panel-selection-list', isList);
+  if (panelMapWrap) panelMapWrap.classList.toggle('d-none', !isMap);
+  applyPanelSearch();
+  [[panelGridViewButton, view === 'grid'], [panelListViewButton, isList], [panelMapViewButton, isMap]]
+    .forEach(function([button, active]) {
+      if (!button) return;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-pressed', String(active));
+    });
+  if (isMap) {
+    initializePanelMap();
+    window.setTimeout(function() {
+      panelMap.invalidateSize();
+      refreshPanelMarkers();
+    }, 0);
+  }
+}
+
+if (panelGridViewButton && panelListViewButton && panelMapViewButton) {
+  panelGridViewButton.addEventListener('click', function() { setPanelView('grid'); });
+  panelListViewButton.addEventListener('click', function() { setPanelView('list'); });
+  panelMapViewButton.addEventListener('click', function() { setPanelView('map'); });
+}
+
+function createPanelPopup(item) {
+  const popup = document.createElement('div');
+  popup.className = 'panel-map-popup';
+  const title = document.createElement('strong');
+  title.textContent = item.querySelector('.card-header h6')?.innerText.trim() || 'Panneau';
+  popup.appendChild(title);
+
+  const location = document.createElement('div');
+  location.className = 'small text-muted mb-2';
+  location.textContent = item.querySelector('.card-header > div')?.innerText.trim() || '';
+  popup.appendChild(location);
+
+  item.querySelectorAll('.card-body .row > .col-12').forEach(function(faceItem) {
+    const faceName = faceItem.querySelector('strong')?.innerText.trim() || faceItem.innerText.trim().split('\n')[0];
+    const checkbox = faceItem.querySelector('.face-checkbox');
+    if (!checkbox) {
+      const blocked = document.createElement('div');
+      blocked.className = 'small border rounded p-2 mb-1';
+      blocked.textContent = faceItem.innerText.trim();
+      popup.appendChild(blocked);
+      return;
+    }
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `btn btn-sm w-100 mb-1 ${checkbox.checked ? 'btn-primary' : 'btn-outline-primary'}`;
+    button.textContent = `${checkbox.checked ? 'Retirer' : 'Sélectionner'} — ${faceName}`;
+    button.addEventListener('click', function() {
+      checkbox.checked = !checkbox.checked;
+      checkbox.dispatchEvent(new Event('change', { bubbles: true }));
+      button.className = `btn btn-sm w-100 mb-1 ${checkbox.checked ? 'btn-primary' : 'btn-outline-primary'}`;
+      button.textContent = `${checkbox.checked ? 'Retirer' : 'Sélectionner'} — ${faceName}`;
+    });
+    popup.appendChild(button);
+  });
+  return popup;
+}
+
+function refreshPanelMarkers() {
+  if (!panelMap) return;
+  const query = (panelSearchInput?.value || '').trim().toLocaleLowerCase();
+  const shownMarkers = [];
+  panelMarkers.forEach(function(entry) {
+    const visible = !entry.item.classList.contains('d-none') && (!query || entry.item.textContent.toLocaleLowerCase().includes(query));
+    if (visible) {
+      entry.marker.addTo(panelMap);
+      shownMarkers.push(entry.marker);
+    } else {
+      entry.marker.remove();
+    }
+  });
+  if (shownMarkers.length) {
+    const bounds = L.featureGroup(shownMarkers).getBounds();
+    if (bounds.isValid()) panelMap.fitBounds(bounds, { padding: [24, 24], maxZoom: 15 });
+  }
+}
+
+function initializePanelMap() {
+  if (!panelMapElement || panelMap) return;
+  if (typeof L === 'undefined') {
+    throw new Error('Leaflet est nécessaire pour afficher la carte de sélection.');
+  }
+  panelMap = L.map(panelMapElement, { scrollWheelZoom: false }).setView([12.3714, -1.5197], 12);
+  if (typeof window.buildSafeLeafletTiles === 'function') {
+    window.buildSafeLeafletTiles(panelMap, { attribution: '&copy; OpenStreetMap contributors', maxZoom: 19 });
+  } else {
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '&copy; OpenStreetMap contributors',
+      maxZoom: 19
+    }).addTo(panelMap);
+  }
+
+  panelItems.forEach(function(item) {
+    const lat = Number(item.dataset.lat);
+    const lng = Number(item.dataset.lng);
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return;
+    const faceItems = Array.from(item.querySelectorAll('.card-body .row > .col-12'));
+    const hasAvailable = faceItems.some(function(faceItem) { return Boolean(faceItem.querySelector('.face-checkbox')); });
+    const hasOccupied = faceItems.some(function(faceItem) { return faceItem.querySelector('.bs-occupe'); });
+    const hasReserved = faceItems.some(function(faceItem) { return faceItem.querySelector('.bs-reserve'); });
+    const hasBroken = faceItems.some(function(faceItem) { return faceItem.querySelector('.bs-panne'); });
+    const fillColor = hasOccupied
+      ? (hasAvailable ? '#ea580c' : '#dc2626')
+      : hasReserved
+        ? '#7c3aed'
+        : hasBroken && !hasAvailable
+          ? '#64748b'
+          : '#16a34a';
+    const marker = L.circleMarker([lat, lng], {
+      radius: 9,
+      color: '#fff',
+      weight: 2,
+      fillColor: fillColor,
+      fillOpacity: 0.9
+    }).bindPopup(function() { return createPanelPopup(item); });
+    panelMarkers.push({ item: item, marker: marker });
+  });
+  refreshPanelMarkers();
+}
+
+function applyPanelSearch() {
+  const query = (panelSearchInput?.value || '').trim().toLocaleLowerCase();
+  if (panelSearchState) panelSearchState.value = panelSearchInput?.value.trim() || '';
+  let visibleCount = 0;
+  panelItems.forEach(function(item) {
+    const visible = !query || item.textContent.toLocaleLowerCase().includes(query);
+    item.classList.toggle('d-none', !visible);
+    if (visible) visibleCount += 1;
+  });
+  if (panelSearchEmpty) panelSearchEmpty.classList.toggle('d-none', !query || visibleCount > 0);
+  if (panelItems.length) {
+    panelSelectionContent.querySelectorAll('.quartier-section, .format-section, .ville-section').forEach(function(section) {
+      const hasVisibleItems = section.querySelector('.panel-selection-item:not(.d-none)');
+      section.classList.toggle('d-none', currentPanelView === 'map' || !hasVisibleItems);
+    });
+  }
+  refreshPanelMarkers();
+}
+
+if (panelSearchInput) {
+  panelSearchInput.addEventListener('input', applyPanelSearch);
+}
+setPanelView(currentPanelView);
+
+document.querySelectorAll('.ecran-checkbox').forEach(function(checkbox) {
+  checkbox.addEventListener('change', function() {
+    const supportId = this.value;
+    const params = document.getElementById('params_' + supportId);
+    const label = this.nextElementSibling;
+    const icon = label.querySelector('i');
+    const text = label.querySelector('span');
+
+    if (this.checked) {
+      params.classList.remove('d-none');
+      icon.className = 'bi bi-check-square-fill me-2';
+      text.textContent = 'Écran sélectionné';
+    } else {
+      params.classList.add('d-none');
+      icon.className = 'bi bi-square me-2';
+      text.textContent = 'Sélectionner cet écran';
+    }
+  });
+});
+</script>
+{% endblock %}

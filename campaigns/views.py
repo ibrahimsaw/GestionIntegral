@@ -44,7 +44,7 @@ from .forms import (
 )
 from piges.models import PigeFichier
 from planning.models import LogDiffusion
-from portail.forms import Etape1Form, Etape2Form
+from portail.forms import Etape1Form
 # from .mixins import *
 from datetime import datetime, date, timedelta
 today = timezone.now().date()
@@ -4835,12 +4835,16 @@ class SupportBulkActionView(StaffRequiredMixin, View):
         type_support = request.GET.get('type_support', campagne.type_support or '').strip()
         ville = request.GET.get('ville', campagne.lieu or '').strip()
         panel_search_query = request.GET.get('q', '').strip()
-        panel_view = request.GET.get('view', 'grid')
+        panel_view = request.GET.get('view', 'list')
         if panel_view not in {'grid', 'list', 'map'}:
-            panel_view = 'grid'
+            panel_view = 'list'
 
         is_modification = campagne.lignes.exists()
         mode_title = "Modifier la sélection" if is_modification else "Ajouter des supports"
+        campagne_categorie_geant = FormatSupport.hors_ecran().filter(
+            Q(code=type_support) | Q(categorie__iexact=type_support),
+            categorie__iexact='Géant',
+        ).exists()
         supports_enrichis = []
 
         # Liste des villes disponibles, pour le select de filtre dans le template
@@ -4959,7 +4963,18 @@ class SupportBulkActionView(StaffRequiredMixin, View):
             )
             if ville:
                 supports_qs = supports_qs.filter(ville=ville)
-            supports_qs = supports_qs.prefetch_related('faces').order_by('ville', 'quartier')
+            order_by = (
+                ('ville', 'format', 'quartier', 'code')
+                if campagne_categorie_geant
+                else ('ville', 'quartier', 'format', 'code')
+            )
+            supports_qs = supports_qs.prefetch_related('faces').order_by(*order_by)
+            formats_par_code = {
+                format_support.code: format_support
+                for format_support in FormatSupport.hors_ecran().filter(
+                    code__in=supports_qs.values_list('format', flat=True)
+                )
+            }
 
             selectionnes = set(
                 campagne.lignes.filter(face__isnull=False).values_list('face_id', flat=True)
@@ -4972,6 +4987,12 @@ class SupportBulkActionView(StaffRequiredMixin, View):
                 )
 
             for support in supports_qs:
+                format_support = formats_par_code.get(support.format)
+                support.format_display = (
+                    f"{format_support.dimensions} — {format_support.code}"
+                    if format_support and format_support.dimensions
+                    else support.format
+                )
                 faces_enrichies = []
                 for face in support.faces.all():
                     statut = face.get_statut(
@@ -5016,6 +5037,7 @@ class SupportBulkActionView(StaffRequiredMixin, View):
             'villes_disponibles': villes_disponibles,
             'panel_search_query': panel_search_query,
             'panel_view': panel_view,
+            'campagne_categorie_geant': campagne_categorie_geant,
         })
 
     def post(self, request, campagne_pk):
@@ -6683,12 +6705,32 @@ class StaffDemandeWizardBase(StaffRequiredMixin, View):
 
 
 class DemandeCreationView(StaffDemandeWizardBase):
-    """Étape 1 du formulaire de demande, avec la même carte que le portail."""
+    """Étape 1 : coordonnées, projet, période et emplacements."""
     template_name = 'portail/reserver_etape1.html'
 
+    def _render_step(self, request, selection_form, contact_form):
+        for field_name in ('client', 'nom_contact', 'societe', 'email', 'telephone'):
+            contact_form.fields[field_name].widget.attrs.update({
+                'form': 'form-etape1',
+                'class': 'form-control-e3 staff-field-control',
+            })
+        return render(request, self.template_name, self.step_context(
+            request,
+            form=selection_form,
+            contact_form=contact_form,
+            panier=self.get_selections(request)[0],
+            filtres={
+                'ville': request.GET.get('ville', '').strip(),
+                'categorie': request.GET.get('categorie', '').strip(),
+                'format': request.GET.get('format', '').strip(),
+            },
+        ))
+
     def get(self, request):
+        if request.session.get(self.session_edit_key) and request.GET.get('edit') != '1':
+            self.clear_wizard_session(request)
         periode = request.session.get(self.session_period_key, {})
-        form = Etape1Form(initial={
+        selection_form = Etape1Form(initial={
             'faces_selectionnees': json.dumps(
                 request.session.get(self.session_faces_key, [])
             ),
@@ -6698,134 +6740,103 @@ class DemandeCreationView(StaffDemandeWizardBase):
             'date_debut': periode.get('date_debut'),
             'date_fin': periode.get('date_fin'),
         })
-        return render(request, self.template_name, self.step_context(
+        return self._render_step(
             request,
-            form=form,
-            panier=self.get_selections(request)[0],
-            filtres={
-                'ville': request.GET.get('ville', '').strip(),
-                'categorie': request.GET.get('categorie', '').strip(),
-                'format': request.GET.get('format', '').strip(),
-            },
-        ))
+            selection_form,
+            DemandeGestionContactForm(
+                initial=request.session.get(self.session_contact_key, {})
+            ),
+        )
 
     def post(self, request):
-        form = Etape1Form(request.POST)
-        if not form.is_valid():
-            return render(request, self.template_name, self.step_context(
-                request,
-                form=form,
-                panier=self.get_selections(request)[0],
-                filtres={},
-            ))
+        selection_form = Etape1Form(request.POST)
+        contact_form = DemandeGestionContactForm(request.POST)
+        selection_valid = selection_form.is_valid()
+        contact_valid = contact_form.is_valid()
+        forms_valid = selection_valid and contact_valid
+        if selection_valid:
+            selection = selection_form.cleaned_data
+            request.session[self.session_faces_key] = selection['faces_uuids']
+            request.session[self.session_supports_key] = selection['supports_uuids']
+            request.session[self.session_period_key] = {
+                'date_debut': str(selection['date_debut']),
+                'date_fin': str(selection['date_fin']),
+            }
+        if not forms_valid:
+            return self._render_step(
+                request, selection_form, contact_form
+            )
 
-        data = form.cleaned_data
-        request.session[self.session_faces_key] = data['faces_uuids']
-        request.session[self.session_supports_key] = data['supports_uuids']
-        request.session[self.session_period_key] = {
-            'date_debut': str(data['date_debut']),
-            'date_fin': str(data['date_fin']),
+        contact = contact_form.cleaned_data
+        request.session[self.session_contact_key] = {
+            'type_client': contact['type_client'],
+            'client': str(contact['client'].pk) if contact['client'] else '',
+            'nom_contact': contact['nom_contact'],
+            'societe': contact['societe'],
+            'email': contact['email'],
+            'telephone': contact['telephone'],
+            'accepte_contact': contact['accepte_contact'],
         }
         if not request.session.get(self.session_edit_key):
-            request.session.pop(self.session_project_key, None)
+            request.session[self.session_project_key] = {
+                'nom_campagne': '',
+                'message': '',
+            }
         return redirect('demande_creation_etape2')
 
 
 class DemandeCreationEtape2View(StaffDemandeWizardBase):
-    """Étape 2 du formulaire de demande : nom et précisions du projet."""
-    template_name = 'portail/reserver_etape2.html'
+    """Étape 2 : récapitulatif et validation de la demande."""
+    template_name = 'campaigns/demande_creation_recap.html'
 
-    def _context(self, request, form):
+    def _context(self, request):
         faces, supports = self.get_selections(request)
         periode = request.session.get(self.session_period_key, {})
         date_debut = periode.get('date_debut')
         date_fin = periode.get('date_fin')
         if not date_debut or not date_fin or (not faces and not supports):
-            messages.warning(request, "Veuillez compléter la sélection des emplacements et des dates.")
+            messages.warning(request, "Veuillez compléter l'étape de sélection.")
             return None
-        days = (
-            date.fromisoformat(date_fin) - date.fromisoformat(date_debut)
-        ).days + 1
+        contact_data = request.session.get(self.session_contact_key)
+        if not contact_data:
+            messages.warning(request, "Veuillez renseigner les coordonnées du demandeur.")
+            return None
+        contact_payload = dict(contact_data)
+        contact_payload['client'] = contact_payload.get('client') or ''
+        contact_payload['accepte_contact'] = (
+            'on' if contact_payload.get('accepte_contact') else ''
+        )
+        contact_form = DemandeGestionContactForm(contact_payload)
+        if not contact_form.is_valid():
+            messages.warning(
+                request,
+                "Les coordonnées du demandeur ne sont plus valides. Veuillez les vérifier.",
+            )
+            return None
+        days = (date.fromisoformat(date_fin) - date.fromisoformat(date_debut)).days + 1
+        project = request.session.get(self.session_project_key, {})
         return self.step_context(
             request,
-            form=form,
             faces=faces,
             supports=supports,
             periode=periode,
+            contact=contact_form.cleaned_data,
+            project=project,
+            nombre_emplacements=len(faces) + len(supports),
             duree_jours=days,
         )
 
     def get(self, request):
-        context = self._context(
-            request,
-            Etape2Form(initial=request.session.get(self.session_project_key, {})),
-        )
+        context = self._context(request)
         if context is None:
             return redirect('demande_creation')
         return render(request, self.template_name, context)
 
     def post(self, request):
-        context = self._context(request, Etape2Form(request.POST))
+        context = self._context(request)
         if context is None:
             return redirect('demande_creation')
-        form = context['form']
-        if not form.is_valid():
-            return render(request, self.template_name, context)
-        request.session[self.session_project_key] = {
-            'nom_campagne': form.cleaned_data.get('nom_campagne', ''),
-            'message': form.cleaned_data.get('message', ''),
-        }
-        return redirect('demande_creation_etape3')
-
-
-class DemandeCreationEtape3View(StaffDemandeWizardBase):
-    """Étape 3 : rattachement au client ou saisie d'un prospect."""
-    template_name = 'portail/reserver_etape3.html'
-
-    def _context(self, request, form):
-        faces, supports = self.get_selections(request)
-        periode = request.session.get(self.session_period_key, {})
-        if not periode.get('date_debut') or not periode.get('date_fin') or (
-            not faces and not supports
-        ):
-            messages.warning(request, "Veuillez compléter les étapes précédentes.")
-            return None
-        project = request.session.get(self.session_project_key, {})
-        date_debut = date.fromisoformat(periode['date_debut'])
-        date_fin = date.fromisoformat(periode['date_fin'])
-        etape2 = {
-            'date_debut': periode['date_debut'],
-            'date_fin': periode['date_fin'],
-            'nom_campagne': project.get('nom_campagne', ''),
-            'message': project.get('message', ''),
-        }
-        return self.step_context(
-            request,
-            form=form,
-            faces=faces,
-            supports=supports,
-            etape2=etape2,
-            duree_jours=(date_fin - date_debut).days + 1,
-        )
-
-    def get(self, request):
-        form = DemandeGestionContactForm(
-            initial=request.session.get(self.session_contact_key, {})
-        )
-        context = self._context(request, form)
-        if context is None:
-            return redirect('demande_creation')
-        return render(request, self.template_name, context)
-
-    def post(self, request):
-        form = DemandeGestionContactForm(request.POST)
-        context = self._context(request, form)
-        if context is None:
-            return redirect('demande_creation')
-        if not form.is_valid():
-            return render(request, self.template_name, context)
-
-        data = form.cleaned_data
+        data = context['contact']
         client = (
             data['client']
             if data['type_client'] == DemandeReservation.TYPE_CLIENT_EXISTANT
@@ -6858,10 +6869,10 @@ class DemandeCreationEtape3View(StaffDemandeWizardBase):
                 demande.email = client.email if client else data['email']
                 demande.telephone = client.telephone if client else data['telephone']
                 demande.accepte_contact = data['accepte_contact']
-                demande.date_debut_souhaitee = date.fromisoformat(context['etape2']['date_debut'])
-                demande.date_fin_souhaitee = date.fromisoformat(context['etape2']['date_fin'])
-                demande.nom_campagne = context['etape2']['nom_campagne']
-                demande.message = context['etape2']['message']
+                demande.date_debut_souhaitee = date.fromisoformat(context['periode']['date_debut'])
+                demande.date_fin_souhaitee = date.fromisoformat(context['periode']['date_fin'])
+                demande.nom_campagne = context['project'].get('nom_campagne', '')
+                demande.message = context['project'].get('message', '')
                 demande.full_clean(exclude=['reference'])
                 demande.save()
                 demande.faces_souhaitees.set(context['faces'])
@@ -6874,7 +6885,7 @@ class DemandeCreationEtape3View(StaffDemandeWizardBase):
             )
             return redirect('demande_detail', uuid=demande_uuid)
         except ValidationError as exc:
-            form.add_error(None, "; ".join(exc.messages))
+            messages.error(request, "; ".join(exc.messages))
             return render(request, self.template_name, context)
 
         self.clear_wizard_session(request)
@@ -6886,6 +6897,16 @@ class DemandeCreationEtape3View(StaffDemandeWizardBase):
             f"La demande {demande.reference} est prête à être partagée avec le client.",
         )
         return redirect('demande_detail', uuid=demande.uuid)
+
+
+class DemandeCreationEtape3View(StaffDemandeWizardBase):
+    """Redirige l'ancienne troisième étape vers le récapitulatif."""
+
+    def get(self, request):
+        return redirect('demande_creation_etape2')
+
+    def post(self, request):
+        return redirect('demande_creation_etape2')
 
 
 class DemandeDetailView(LoginRequiredMixin, View):
@@ -7020,7 +7041,7 @@ class DemandeModifierView(StaffRequiredMixin, View):
             'telephone': demande.telephone,
             'accepte_contact': demande.accepte_contact,
         }
-        return redirect('demande_creation')
+        return redirect(f"{reverse('demande_creation')}?edit=1")
 
 
 class DemandeAssocierCampagneView(StaffRequiredMixin, View):
@@ -7256,8 +7277,8 @@ class DemandeRefuserView(LoginRequiredMixin, View):
 
 
 # ══════════════════════════════════════════════════════════════════════════════
-# WIZARD STAFF — Création de réservation en 3 étapes
-# (Étape 1 : Client · Étape 2 : Faces · Étape 3 : Vérification & Validation)
+# WIZARD STAFF — Création de réservation en 2 étapes
+# (Étape 1 : Client, période et faces · Étape 2 : Vérification & validation)
 #
 # À COLLER DANS campaigns/views.py, à la suite des vues Reservation existantes.
 # Réutilise : StaffRequiredMixin, Client, Support, FacePanneau, FormatSupport,
@@ -7280,39 +7301,21 @@ def _wizard_reset(request):
         request.session.pop(key, None)
 
 
-# ── Étape 1 — Client ─────────────────────────────────────────────────────────
+# ── Première étape — Client, période et faces ─────────────────────────────────
 
 class ReservationWizardEtape1View(StaffRequiredMixin, View):
     """
-    Étape 1 — Sélectionner un client existant OU en créer un nouveau.
+    Début de l'étape 1 — Sélectionner un client existant OU en créer un nouveau.
 
     URL  : /reservations/nouvelle/etape1/
-           /clients/<client_pk>/reservations/nouvelle/etape1/  (client déjà connu → saute à l'étape 2)
+           /clients/<client_pk>/reservations/nouvelle/etape1/  (client connu → ouvre le choix des faces)
     Name : reservation_wizard_etape1
     """
-    template_name = 'campaigns/reservation_wizard_etape1_client.html'
-
     def get(self, request, client_pk=None):
-        # Client déjà connu (venant de la fiche client) → on pré-remplit la
-        # session et on saute directement à l'étape 2.
         if client_pk is not None:
             client = get_object_or_404(Client, pk=client_pk)
             request.session[SESSION_CLIENT] = client.pk
-            return redirect('reservation_wizard_etape2')
-
-        q = request.GET.get('q', '').strip()
-        clients = Client.objects.all().order_by('nom')
-        if q:
-            clients = clients.filter(Q(nom__icontains=q) | Q(email__icontains=q))
-
-        client_pk_session = request.session.get(SESSION_CLIENT)
-
-        return render(request, self.template_name, {
-            'clients':      clients,
-            'q':            q,
-            'selected_pk':  client_pk_session,
-            'mode_title':   'Nouvelle réservation — Étape 1/3',
-        })
+        return redirect('reservation_wizard_etape2')
 
     def post(self, request, client_pk=None):
         action = request.POST.get('action')
@@ -7345,7 +7348,7 @@ class ReservationWizardEtape1View(StaffRequiredMixin, View):
         return redirect('reservation_wizard_etape1')
 
 
-# ── Étape 2 — Sélection des faces ────────────────────────────────────────────
+# ── Première étape — Sélection de la période et des faces ─────────────────────
 
 class ReservationWizardEtape2View(StaffRequiredMixin, View):
     """
@@ -7365,12 +7368,13 @@ class ReservationWizardEtape2View(StaffRequiredMixin, View):
 
     def get(self, request):
         client = self._get_client(request)
-        if not client:
-            messages.warning(request, "Veuillez d'abord sélectionner un client.")
-            return redirect('reservation_wizard_etape1')
 
         dates        = request.session.get(SESSION_DATES, {})
         selectionnes = request.session.get(SESSION_FACES, [])
+        q = request.GET.get('q', '').strip()
+        clients = Client.objects.all().order_by('nom')
+        if q:
+            clients = clients.filter(Q(nom__icontains=q) | Q(email__icontains=q))
 
         # Pré-remplissage du panier JS à partir des faces déjà en session.
         panier_faces = (
@@ -7381,16 +7385,39 @@ class ReservationWizardEtape2View(StaffRequiredMixin, View):
         return render(request, self.template_name, {
             'client':          client,
             'panier_faces':    panier_faces,
-            'mode_title':      'Nouvelle réservation — Étape 2/3',
+            'mode_title':      'Nouvelle réservation — Étape 1/2',
             'date_debut':      dates.get('date_debut', ''),
             'date_fin':        dates.get('date_fin', ''),
             'nom_reservation': request.session.get(SESSION_NOM, ''),
+            'clients': clients,
+            'client_search': q,
         })
 
     def post(self, request):
+        action = request.POST.get('action')
+        if action == 'selectionner':
+            client = get_object_or_404(Client, pk=request.POST.get('client_pk'))
+            request.session[SESSION_CLIENT] = client.pk
+            return redirect('reservation_wizard_etape2')
+
+        if action == 'creer':
+            nom = request.POST.get('nom', '').strip()
+            if not nom:
+                messages.error(request, "Le nom du client est obligatoire.")
+                return redirect('reservation_wizard_etape2')
+            client = Client.objects.create(
+                nom=nom,
+                email=request.POST.get('email', '').strip(),
+                telephone=request.POST.get('telephone', '').strip(),
+            )
+            request.session[SESSION_CLIENT] = client.pk
+            messages.success(request, f"Client « {client.nom} » créé.")
+            return redirect('reservation_wizard_etape2')
+
         client = self._get_client(request)
         if not client:
-            return redirect('reservation_wizard_etape1')
+            messages.warning(request, "Veuillez d'abord sélectionner un client.")
+            return redirect('reservation_wizard_etape2')
 
         try:
             face_ids = [int(fid) for fid in json.loads(request.POST.get('faces_selectionnees', '[]'))]
@@ -7421,11 +7448,11 @@ class ReservationWizardEtape2View(StaffRequiredMixin, View):
         return redirect('reservation_wizard_etape3')
 
 
-# ── Étape 3 — Vérification & validation ──────────────────────────────────────
+# ── Deuxième étape — Vérification & validation ────────────────────────────────
 
 class ReservationWizardEtape3View(StaffRequiredMixin, View):
     """
-    Étape 3 — Récapitulatif complet, détection des conflits, et création
+    Étape 2 — Récapitulatif complet, détection des conflits, et création
     atomique de la Reservation + ses ReservationLigne.
 
     URL  : /reservations/nouvelle/etape3/
@@ -7461,7 +7488,7 @@ class ReservationWizardEtape3View(StaffRequiredMixin, View):
             'date_fin':    date_fin,
             'duree_jours': duree_jours,
             'nom_reservation': nom,
-            'mode_title':  'Nouvelle réservation — Étape 3/3',
+            'mode_title':  'Nouvelle réservation — Étape 2/2',
         }
 
     def get(self, request):

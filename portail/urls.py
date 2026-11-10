@@ -80,10 +80,10 @@ urlpatterns = [
          views.ContactConfirmationView.as_view(),
          name='contact_confirmation'),
 
-    # ── Wizard réservation (3 étapes) ─────────────────────────────────────────
+    # Parcours public de réservation (3 étapes).
     path('reserver/',
-         views.ReserverEtape1View.as_view(),
-         name='reserver_etape1'),
+         views.ReserverView.as_view(),
+         name='reserver_etape1'),  # garde le même name pour backward compat
 
     path('reserver/etape2/',
          views.ReserverEtape2View.as_view(),
@@ -96,6 +96,7 @@ urlpatterns = [
     path('demande-partage/<uuid:token>/',
          views.DemandePartageEtape1View.as_view(),
          name='demande_partage'),
+    # Parcours client de modification : sélection/coordonnées, puis récapitulatif.
     path('demande-partage/<uuid:token>/etape2/',
          views.DemandePartageEtape2View.as_view(),
          name='demande_partage_etape2'),

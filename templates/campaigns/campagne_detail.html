@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load duree_filters %}
 
 {% block title %}{{ campagne.nom }} — Integral{% endblock %}
 
@@ -879,7 +880,7 @@
             <div class="col-6 col-md-3">
               <div class="cpd-stat cpd-stat-accent">
                 <div class="cpd-stat-label">{% if campagne.type_support == 'ecran' %}Spots{% elif campagne.type_support == 'marche' %}Emplacements{% else %}Faces{% endif %}</div>
-                <div class="cpd-stat-value">{{ total_spots }}</div>
+                <div class="cpd-stat-value">{{ total_spots|format_number_fr }}</div>
               </div>
             </div>
             {% endif %}
@@ -915,11 +916,11 @@
           <div class="cpd-card-header"><i class="bi bi-cash-coin"></i>Résumé financier consolidé — {{ nombre_sous_campagnes }} sous-campagne{{ nombre_sous_campagnes|pluralize }}</div>
           <div class="cpd-card-body">
             <div class="row g-3">
-              {% if total_campagne.prix %}<div class="col-4"><div class="cpd-stat"><div class="cpd-stat-label">Total faces/spots</div><div class="cpd-stat-value">{{ total_campagne.prix|floatformat:2 }}</div></div></div>{% endif %}
-              {% if total_campagne.affichage %}<div class="col-4"><div class="cpd-stat"><div class="cpd-stat-label">Total affichage</div><div class="cpd-stat-value">{{ total_campagne.affichage|floatformat:2 }}</div></div></div>{% endif %}
-              {% if total_campagne.impression %}<div class="col-4"><div class="cpd-stat"><div class="cpd-stat-label">Total impression</div><div class="cpd-stat-value">{{ total_campagne.impression|floatformat:2 }}</div></div></div>{% endif %}
+              {% if total_campagne.prix %}<div class="col-4"><div class="cpd-stat"><div class="cpd-stat-label">Total faces/spots</div><div class="cpd-stat-value">{{ total_campagne.prix|format_number_fr }}</div></div></div>{% endif %}
+              {% if total_campagne.affichage %}<div class="col-4"><div class="cpd-stat"><div class="cpd-stat-label">Total affichage</div><div class="cpd-stat-value">{{ total_campagne.affichage|format_number_fr }}</div></div></div>{% endif %}
+              {% if total_campagne.impression %}<div class="col-4"><div class="cpd-stat"><div class="cpd-stat-label">Total impression</div><div class="cpd-stat-value">{{ total_campagne.impression|format_number_fr }}</div></div></div>{% endif %}
             </div>
-            {% if total_campagne.total %}<div class="cpd-total-box"><div class="cpd-total-label">Total général de la campagne mère</div><div class="cpd-total-value">{{ total_campagne.total|floatformat:2 }} FCFA</div></div>{% endif %}
+            {% if total_campagne.total %}<div class="cpd-total-box"><div class="cpd-total-label">Total général de la campagne mère</div><div class="cpd-total-value">{{ total_campagne.total|format_number_fr }} FCFA</div></div>{% endif %}
           </div>
         </div>
         {% endif %}
@@ -928,14 +929,26 @@
           <div class="cpd-card-header"><i class="bi bi-cash-coin"></i>Résumé financier</div>
           <div class="cpd-card-body">
             <div class="row g-3">
-              {% if campagne.prix %}<div class="col-6 col-md-4"><div class="cpd-stat"><div class="cpd-stat-label">Prix unit. {% if campagne.type_support == 'ecran' %}spot{% elif campagne.type_support == 'marche' %}emplacement{% else %}face{% endif %}</div><div class="cpd-stat-value" style="font-size:0.88rem;">{{ campagne.prix|floatformat:2 }}</div></div></div>{% endif %}
-              {% if campagne.prix_affichage %}<div class="col-6 col-md-4"><div class="cpd-stat"><div class="cpd-stat-label">Prix unit. affichage</div><div class="cpd-stat-value" style="font-size:0.88rem;">{{ campagne.prix_affichage|floatformat:2 }}</div></div></div>{% endif %}
-              {% if campagne.prix_impression %}<div class="col-6 col-md-4"><div class="cpd-stat"><div class="cpd-stat-label">Prix unit. impression</div><div class="cpd-stat-value" style="font-size:0.88rem;">{{ campagne.prix_impression|floatformat:2 }}</div></div></div>{% endif %}
-              {% if totaux_campagne.prix %}<div class="col-6 col-md-4"><div class="cpd-stat cpd-stat-accent"><div class="cpd-stat-label">Prix total</div><div class="cpd-stat-value">{{ totaux_campagne.prix|floatformat:2 }}</div></div></div>{% endif %}
-              {% if totaux_campagne.affichage %}<div class="col-6 col-md-4"><div class="cpd-stat cpd-stat-accent"><div class="cpd-stat-label">Prix total affichage</div><div class="cpd-stat-value">{{ totaux_campagne.affichage|floatformat:2 }}</div></div></div>{% endif %}
-              {% if totaux_campagne.impression %}<div class="col-6 col-md-4"><div class="cpd-stat cpd-stat-accent"><div class="cpd-stat-label">Prix total impression</div><div class="cpd-stat-value">{{ totaux_campagne.impression|floatformat:2 }}</div></div></div>{% endif %}
+              {% if campagne.prix or totaux_campagne.prix %}
+              <div class="col-6 col-md-4 d-grid align-content-start gap-2">
+                {% if campagne.prix %}<div class="cpd-stat"><div class="cpd-stat-label">Prix unit. {% if campagne.type_support == 'ecran' %}spot{% elif campagne.type_support == 'marche' %}emplacement{% else %}face{% endif %}</div><div class="cpd-stat-value" style="font-size:0.88rem;">{{ campagne.prix|format_number_fr }}</div></div>{% endif %}
+                {% if totaux_campagne.prix %}<div class="cpd-stat cpd-stat-accent"><div class="cpd-stat-label">Prix total des faces</div><div class="cpd-stat-value">{{ totaux_campagne.prix|format_number_fr }}</div></div>{% endif %}
+              </div>
+              {% endif %}
+              {% if campagne.prix_affichage or totaux_campagne.affichage %}
+              <div class="col-6 col-md-4 d-grid align-content-start gap-2">
+                {% if campagne.prix_affichage %}<div class="cpd-stat"><div class="cpd-stat-label">Prix unit. affichage</div><div class="cpd-stat-value" style="font-size:0.88rem;">{{ campagne.prix_affichage|format_number_fr }}</div></div>{% endif %}
+                {% if totaux_campagne.affichage %}<div class="cpd-stat cpd-stat-accent"><div class="cpd-stat-label">Prix total affichage</div><div class="cpd-stat-value">{{ totaux_campagne.affichage|format_number_fr }}</div></div>{% endif %}
+              </div>
+              {% endif %}
+              {% if campagne.prix_impression or totaux_campagne.impression %}
+              <div class="col-6 col-md-4 d-grid align-content-start gap-2">
+                {% if campagne.prix_impression %}<div class="cpd-stat"><div class="cpd-stat-label">Prix unit. impression</div><div class="cpd-stat-value" style="font-size:0.88rem;">{{ campagne.prix_impression|format_number_fr }}</div></div>{% endif %}
+                {% if totaux_campagne.impression %}<div class="cpd-stat cpd-stat-accent"><div class="cpd-stat-label">Prix total impression</div><div class="cpd-stat-value">{{ totaux_campagne.impression|format_number_fr }}</div></div>{% endif %}
+              </div>
+              {% endif %}
             </div>
-            {% if totaux_campagne.total %}<div class="cpd-total-box"><div class="cpd-total-label">Total général de la campagne</div><div class="cpd-total-value">{{ totaux_campagne.total|floatformat:2 }} FCFA</div></div>{% endif %}
+            {% if totaux_campagne.total %}<div class="cpd-total-box"><div class="cpd-total-label">Total général de la campagne</div><div class="cpd-total-value">{{ totaux_campagne.total|format_number_fr }} FCFA</div></div>{% endif %}
           </div>
         </div>
       {% endif %}
@@ -1395,13 +1408,13 @@
                   {% endfor %}
                 {% endif %}
               </td>
-              <td class="text-end cpd-mono">{{ row.prix_unitaire|floatformat:2 }}</td>
-              <td class="text-end cpd-mono" style="font-weight:700;">{{ row.prix_total|floatformat:2 }}</td>
-              <td class="text-end cpd-mono">{{ row.affichage_unitaire|floatformat:2 }}</td>
-              <td class="text-end cpd-mono" style="font-weight:700;">{{ row.affichage_total|floatformat:2 }}</td>
-              <td class="text-end cpd-mono">{{ row.impression_unitaire|floatformat:2 }}</td>
-              <td class="text-end cpd-mono" style="font-weight:700;">{{ row.impression_total|floatformat:2 }}</td>
-              <td class="text-end cpd-mono" style="font-weight:700; color:#932e2b;">{{ row.total_support|floatformat:2 }}</td>
+              <td class="text-end cpd-mono">{{ row.prix_unitaire|format_number_fr }}</td>
+              <td class="text-end cpd-mono" style="font-weight:700;">{{ row.prix_total|format_number_fr }}</td>
+              <td class="text-end cpd-mono">{{ row.affichage_unitaire|format_number_fr }}</td>
+              <td class="text-end cpd-mono" style="font-weight:700;">{{ row.affichage_total|format_number_fr }}</td>
+              <td class="text-end cpd-mono">{{ row.impression_unitaire|format_number_fr }}</td>
+              <td class="text-end cpd-mono" style="font-weight:700;">{{ row.impression_total|format_number_fr }}</td>
+              <td class="text-end cpd-mono" style="font-weight:700; color:#932e2b;">{{ row.total_support|format_number_fr }}</td>
             </tr>
             {% empty %}
             <tr><td colspan="9" class="text-center cpd-muted py-3">Aucun support</td></tr>
@@ -1411,12 +1424,12 @@
             <tr>
               <td colspan="2" class="text-end">Sous-total</td>
               <td></td>
-              <td class="text-end cpd-mono">{{ ed.totaux.prix|floatformat:2 }}</td>
+              <td class="text-end cpd-mono">{{ ed.totaux.prix|format_number_fr }}</td>
               <td></td>
-              <td class="text-end cpd-mono">{{ ed.totaux.affichage|floatformat:2 }}</td>
+              <td class="text-end cpd-mono">{{ ed.totaux.affichage|format_number_fr }}</td>
               <td></td>
-              <td class="text-end cpd-mono">{{ ed.totaux.impression|floatformat:2 }}</td>
-              <td class="text-end cpd-mono" style="color:#932e2b;">{{ ed.totaux.total|floatformat:2 }}</td>
+              <td class="text-end cpd-mono">{{ ed.totaux.impression|format_number_fr }}</td>
+              <td class="text-end cpd-mono" style="color:#932e2b;">{{ ed.totaux.total|format_number_fr }}</td>
             </tr>
           </tfoot>
         </table>
@@ -1469,13 +1482,13 @@
                   {% endfor %}
                 {% endif %}
               </td>
-              <td class="text-end cpd-mono">{{ row.prix_unitaire|floatformat:2 }}</td>
-              <td class="text-end cpd-mono" style="font-weight:700;">{{ row.prix_total|floatformat:2 }}</td>
-              <td class="text-end cpd-mono">{{ row.affichage_unitaire|floatformat:2 }}</td>
-              <td class="text-end cpd-mono" style="font-weight:700;">{{ row.affichage_total|floatformat:2 }}</td>
-              <td class="text-end cpd-mono">{{ row.impression_unitaire|floatformat:2 }}</td>
-              <td class="text-end cpd-mono" style="font-weight:700;">{{ row.impression_total|floatformat:2 }}</td>
-              <td class="text-end cpd-mono" style="font-weight:700; color:#932e2b;">{{ row.total_support|floatformat:2 }}</td>
+              <td class="text-end cpd-mono">{{ row.prix_unitaire|format_number_fr }}</td>
+              <td class="text-end cpd-mono" style="font-weight:700;">{{ row.prix_total|format_number_fr }}</td>
+              <td class="text-end cpd-mono">{{ row.affichage_unitaire|format_number_fr }}</td>
+              <td class="text-end cpd-mono" style="font-weight:700;">{{ row.affichage_total|format_number_fr }}</td>
+              <td class="text-end cpd-mono">{{ row.impression_unitaire|format_number_fr }}</td>
+              <td class="text-end cpd-mono" style="font-weight:700;">{{ row.impression_total|format_number_fr }}</td>
+              <td class="text-end cpd-mono" style="font-weight:700; color:#932e2b;">{{ row.total_support|format_number_fr }}</td>
             </tr>
             {% empty %}
             <tr><td colspan="9" class="text-center cpd-muted py-4">Aucun support</td></tr>
@@ -1485,12 +1498,12 @@
             <tr>
               <td colspan="2" class="text-end">TOTAUX</td>
               <td></td>
-              <td class="text-end cpd-mono">{{ totaux_campagne.prix|floatformat:2 }}</td>
+              <td class="text-end cpd-mono">{{ totaux_campagne.prix|format_number_fr }}</td>
               <td></td>
-              <td class="text-end cpd-mono">{{ totaux_campagne.affichage|floatformat:2 }}</td>
+              <td class="text-end cpd-mono">{{ totaux_campagne.affichage|format_number_fr }}</td>
               <td></td>
-              <td class="text-end cpd-mono">{{ totaux_campagne.impression|floatformat:2 }}</td>
-              <td class="text-end cpd-mono" style="color:#932e2b;">{{ totaux_campagne.total|floatformat:2 }}</td>
+              <td class="text-end cpd-mono">{{ totaux_campagne.impression|format_number_fr }}</td>
+              <td class="text-end cpd-mono" style="color:#932e2b;">{{ totaux_campagne.total|format_number_fr }}</td>
             </tr>
           </tfoot>
         </table>

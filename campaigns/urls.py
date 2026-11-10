@@ -13,7 +13,7 @@ urlpatterns = [
 
     path('reservations/nouvelle/etape1/', views.ReservationWizardEtape1View.as_view(), name='reservation_wizard_etape1'),
     # Variante utilisée depuis client_detail.html : {% url 'reservation_wizard_etape1' client.pk %}
-    # → pré-sélectionne le client et saute directement à l'étape 2.
+    # → pré-sélectionne le client et ouvre la sélection période/faces de l'étape 1.
     path('clients/<int:client_pk>/reservations/nouvelle/etape1/', views.ReservationWizardEtape1View.as_view(), name='reservation_wizard_etape1'),
     path('reservations/nouvelle/etape2/', views.ReservationWizardEtape2View.as_view(), name='reservation_wizard_etape2'),
     path('reservations/nouvelle/etape3/', views.ReservationWizardEtape3View.as_view(), name='reservation_wizard_etape3'),

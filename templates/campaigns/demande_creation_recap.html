@@ -1,0 +1,553 @@
+{% extends base_template|default:'base.html' %}
+
+{% block title %}Récapitulatif de la demande{% endblock %}
+{% block topbar_title %}
+  <i class="bi bi-clipboard-check me-2" style="color:var(--color-primary)"></i>
+  Vérification de la demande
+{% endblock %}
+
+{% block extra_head %}
+<style>
+  .demande-recap {
+    --dr-brand: var(--color-primary, #932e2b);
+    --dr-ink: #242a27;
+    --dr-muted: #727a75;
+    --dr-line: #e7e9e5;
+    --dr-soft: #f7f8f6;
+    color: var(--dr-ink);
+  }
+  .dr-intro {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 20px;
+    padding: 20px 24px;
+    border: 1px solid var(--dr-line);
+    border-radius: 8px;
+    background: linear-gradient(110deg, #fff 0%, #fbfaf8 100%);
+    box-shadow: 0 6px 22px rgba(34, 42, 37, .045);
+  }
+  .dr-intro-icon {
+    display: grid;
+    place-items: center;
+    width: 48px;
+    height: 48px;
+    flex: 0 0 48px;
+    border-radius: 13px;
+    background: rgba(147, 46, 43, .09);
+    color: var(--dr-brand);
+    font-size: 1.25rem;
+  }
+  .dr-kicker {
+    margin: 0 0 3px;
+    color: var(--dr-brand);
+    font-size: .68rem;
+    font-weight: 800;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+  }
+  .dr-title {
+    margin: 0;
+    color: var(--dr-ink);
+    font-size: 1.35rem;
+    font-weight: 800;
+    letter-spacing: -.025em;
+  }
+  .dr-subtitle {
+    margin: 5px 0 0;
+    color: var(--dr-muted);
+    font-size: .84rem;
+  }
+  .dr-steps {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    margin-bottom: 20px;
+    overflow: hidden;
+    border: 1px solid var(--dr-line);
+    border-radius: 12px;
+    background: #fff;
+  }
+  .dr-step {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    min-width: 0;
+    padding: 13px 18px;
+    color: var(--dr-muted);
+  }
+  .dr-step + .dr-step { border-left: 1px solid var(--dr-line); }
+  .dr-step.is-done { background: #f7faf7; }
+  .dr-step.is-current { background: #fbf5f4; }
+  .dr-step-number {
+    display: grid;
+    place-items: center;
+    width: 30px;
+    height: 30px;
+    flex: 0 0 30px;
+    border: 1px solid #dfe4de;
+    border-radius: 50%;
+    background: #fff;
+    color: var(--dr-muted);
+    font-size: .76rem;
+    font-weight: 800;
+  }
+  .dr-step.is-done .dr-step-number {
+    border-color: #198754;
+    background: #198754;
+    color: #fff;
+  }
+  .dr-step.is-current .dr-step-number {
+    border-color: var(--dr-brand);
+    background: var(--dr-brand);
+    color: #fff;
+  }
+  .dr-step-label { font-size: .8rem; font-weight: 750; }
+  .dr-step.is-done .dr-step-label { color: #287348; }
+  .dr-step.is-current .dr-step-label { color: var(--dr-brand); }
+  .dr-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 340px;
+    align-items: start;
+    gap: 18px;
+  }
+  .dr-panel {
+    margin-bottom: 16px;
+    overflow: hidden;
+    border: 1px solid var(--dr-line);
+    border-radius: 12px;
+    background: #fff;
+    box-shadow: 0 5px 18px rgba(34, 42, 37, .04);
+  }
+  .dr-panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 15px 19px;
+    border-bottom: 1px solid var(--dr-line);
+    background: #fcfcfb;
+  }
+  .dr-panel-heading {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+  .dr-panel-icon {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    flex: 0 0 34px;
+    border-radius: 9px;
+    background: rgba(147, 46, 43, .08);
+    color: var(--dr-brand);
+    font-size: .95rem;
+  }
+  .dr-panel-title {
+    margin: 0;
+    color: var(--dr-ink);
+    font-size: .9rem;
+    font-weight: 800;
+  }
+  .dr-panel-caption {
+    margin: 2px 0 0;
+    color: var(--dr-muted);
+    font-size: .72rem;
+  }
+  .dr-panel-body { padding: 18px 20px; }
+  .dr-client-type {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 14px;
+    padding: 5px 10px;
+    border-radius: 20px;
+    background: #f5f6f4;
+    color: #515a54;
+    font-size: .72rem;
+    font-weight: 750;
+  }
+  .dr-client-type.is-prospect {
+    background: #fbf1e8;
+    color: #96561b;
+  }
+  .dr-facts {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px 20px;
+  }
+  .dr-fact-label {
+    display: block;
+    margin-bottom: 3px;
+    color: var(--dr-muted);
+    font-size: .68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .045em;
+  }
+  .dr-fact-value {
+    overflow-wrap: anywhere;
+    color: #2e3531;
+    font-size: .83rem;
+    font-weight: 650;
+  }
+  .dr-place-list { display: grid; gap: 8px; }
+  .dr-place {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    padding: 10px 12px;
+    border: 1px solid #eceeea;
+    border-radius: 9px;
+    background: #fff;
+  }
+  .dr-place-icon {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    flex: 0 0 32px;
+    border-radius: 9px;
+    background: #f4f5f2;
+    color: #59645d;
+  }
+  .dr-place-main { min-width: 0; }
+  .dr-place-code { color: #303833; font-size: .8rem; font-weight: 800; }
+  .dr-place-name {
+    margin-top: 2px;
+    overflow-wrap: anywhere;
+    color: var(--dr-muted);
+    font-size: .73rem;
+  }
+  .dr-place-type {
+    margin-left: auto;
+    padding: 4px 8px;
+    border-radius: 20px;
+    background: #f4f5f2;
+    color: #606963;
+    font-size: .66rem;
+    font-weight: 750;
+    white-space: nowrap;
+  }
+  .dr-period {
+    background: linear-gradient(145deg, #fff 0%, #fbfaf8 100%);
+  }
+  .dr-dates {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+  .dr-date {
+    padding: 12px;
+    border: 1px solid var(--dr-line);
+    border-radius: 9px;
+    background: #fff;
+  }
+  .dr-date-label {
+    display: block;
+    margin-bottom: 4px;
+    color: var(--dr-muted);
+    font-size: .67rem;
+    font-weight: 750;
+    text-transform: uppercase;
+    letter-spacing: .05em;
+  }
+  .dr-date-value {
+    color: #303833;
+    font-size: .83rem;
+    font-weight: 800;
+    font-variant-numeric: tabular-nums;
+  }
+  .dr-duration {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 11px;
+    color: #465149;
+    font-size: .76rem;
+    font-weight: 700;
+  }
+  .dr-duration i { color: var(--dr-brand); }
+  .dr-actions {
+    position: sticky;
+    top: 16px;
+  }
+  .dr-action-card {
+    padding: 18px;
+    border: 1px solid var(--dr-line);
+    border-radius: 12px;
+    background: #fff;
+    box-shadow: 0 5px 18px rgba(34, 42, 37, .05);
+  }
+  .dr-action-title {
+    margin: 0;
+    color: var(--dr-ink);
+    font-size: .95rem;
+    font-weight: 800;
+  }
+  .dr-action-copy {
+    margin: 6px 0 16px;
+    color: var(--dr-muted);
+    font-size: .76rem;
+    line-height: 1.55;
+  }
+  .dr-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    min-height: 43px;
+    border-radius: 8px;
+    font-size: .8rem;
+    font-weight: 750;
+    text-decoration: none;
+    transition: transform .15s, box-shadow .15s, background .15s;
+  }
+  .dr-btn:hover { transform: translateY(-1px); }
+  .dr-btn-back {
+    margin-bottom: 9px;
+    border: 1px solid #dfe3dd;
+    background: #fff;
+    color: #465149;
+  }
+  .dr-btn-back:hover { border-color: #b7c0b9; background: #f8f9f7; color: #303833; }
+  .dr-btn-submit {
+    gap: 8px;
+    border: 1px solid var(--dr-brand);
+    background: var(--dr-brand);
+    color: #fff;
+    box-shadow: 0 4px 10px rgba(147, 46, 43, .16);
+  }
+  .dr-btn-submit:hover { background: #762421; color: #fff; }
+  .dr-action-note {
+    display: flex;
+    gap: 8px;
+    margin-top: 14px;
+    padding-top: 12px;
+    border-top: 1px solid var(--dr-line);
+    color: var(--dr-muted);
+    font-size: .7rem;
+    line-height: 1.5;
+  }
+  .dr-action-note i { flex: 0 0 auto; color: #198754; }
+  @media (max-width: 991.98px) {
+    .demande-recap { padding: 14px 16px 28px; }
+    .dr-grid { grid-template-columns: minmax(0, 1fr) 300px; }
+    .dr-actions { position: static; }
+  }
+  @media (max-width: 767.98px) {
+    .demande-recap { padding: 10px 12px 24px; }
+    .dr-intro { padding: 15px; }
+    .dr-title { font-size: 1.1rem; }
+    .dr-subtitle { font-size: .76rem; }
+    .dr-grid { grid-template-columns: 1fr; gap: 2px; }
+    .dr-steps { margin-bottom: 14px; }
+    .dr-step { gap: 8px; padding: 11px 10px; }
+    .dr-step-label { font-size: .7rem; }
+    .dr-panel-body { padding: 15px; }
+    .dr-panel-head { padding: 13px 15px; }
+  }
+  @media (max-width: 420px) {
+    .dr-facts { grid-template-columns: 1fr; gap: 11px; }
+    .dr-place { align-items: flex-start; }
+    .dr-place-type { font-size: .6rem; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="demande-recap">
+  <header class="dr-intro">
+    <div class="dr-intro-icon"><i class="bi bi-clipboard2-check"></i></div>
+    <div>
+      <p class="dr-kicker">{% if editing_request %}Modification{% else %}Nouvelle demande{% endif %}</p>
+      <h1 class="dr-title">Récapitulatif de la demande</h1>
+      <p class="dr-subtitle">Vérifiez les informations avant de valider l’envoi.</p>
+    </div>
+  </header>
+
+  <nav class="dr-steps" aria-label="Étapes de création de la demande">
+    <div class="dr-step is-done">
+      <span class="dr-step-number"><i class="bi bi-check-lg"></i></span>
+      <span class="dr-step-label">Client, période &amp; emplacements</span>
+    </div>
+    <div class="dr-step is-current" aria-current="step">
+      <span class="dr-step-number">2</span>
+      <span class="dr-step-label">Récapitulatif &amp; validation</span>
+    </div>
+  </nav>
+
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags|default:'info' }}">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+
+  <div class="dr-grid">
+    <div>
+      <section class="dr-panel">
+        <div class="dr-panel-head">
+          <div class="dr-panel-heading">
+            <span class="dr-panel-icon"><i class="bi bi-person-vcard"></i></span>
+            <div>
+              <h2 class="dr-panel-title">Client et coordonnées</h2>
+              <p class="dr-panel-caption">Informations du demandeur</p>
+            </div>
+          </div>
+          <span class="dr-client-type{% if contact.type_client == 'nouveau' %} is-prospect{% endif %}">
+            <i class="bi {% if contact.type_client == 'existant' %}bi-person-check{% else %}bi-person-plus{% endif %}"></i>
+            {% if contact.type_client == 'existant' %}Client enregistré{% else %}Nouveau prospect{% endif %}
+          </span>
+        </div>
+        <div class="dr-panel-body">
+          <div class="dr-facts">
+            {% if contact.type_client == 'existant' %}
+              <div class="dr-fact">
+                <span class="dr-fact-label">Client</span>
+                <div class="dr-fact-value">{{ contact.client.reference }} · {{ contact.client.nom }}</div>
+              </div>
+            {% else %}
+              <div class="dr-fact">
+                <span class="dr-fact-label">Société / organisation</span>
+                <div class="dr-fact-value">{{ contact.societe }}</div>
+              </div>
+            {% endif %}
+            <div class="dr-fact">
+              <span class="dr-fact-label">Nom du contact</span>
+              <div class="dr-fact-value">
+                {% if contact.type_client == 'existant' %}
+                  {{ contact.nom_contact|default:contact.client.contact_nom|default:contact.client.nom }}
+                {% else %}
+                  {{ contact.nom_contact }}
+                {% endif %}
+              </div>
+            </div>
+            <div class="dr-fact">
+              <span class="dr-fact-label">Téléphone</span>
+              <div class="dr-fact-value">
+                {% if contact.type_client == 'existant' %}
+                  {{ contact.telephone|default:contact.client.telephone }}
+                {% else %}
+                  {{ contact.telephone }}
+                {% endif %}
+              </div>
+            </div>
+            <div class="dr-fact">
+              <span class="dr-fact-label">E-mail</span>
+              <div class="dr-fact-value">
+                {% if contact.type_client == 'existant' %}
+                  {{ contact.email|default:contact.client.email }}
+                {% else %}
+                  {{ contact.email }}
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="dr-panel">
+        <div class="dr-panel-head">
+          <div class="dr-panel-heading">
+            <span class="dr-panel-icon"><i class="bi bi-geo-alt"></i></span>
+            <div>
+              <h2 class="dr-panel-title">Emplacements souhaités</h2>
+              <p class="dr-panel-caption">Supports inclus dans la demande</p>
+            </div>
+          </div>
+          <span class="dr-client-type">{{ nombre_emplacements }} emplacement{{ nombre_emplacements|pluralize }}</span>
+        </div>
+        <div class="dr-panel-body">
+          <div class="dr-place-list">
+            {% for face in faces %}
+              <div class="dr-place">
+                <span class="dr-place-icon"><i class="bi bi-signpost-2"></i></span>
+                <div class="dr-place-main">
+                  <div class="dr-place-code">{{ face.support.code }} · Face {{ face.label }}</div>
+                  <div class="dr-place-name">{{ face.support.nom }}</div>
+                </div>
+                <span class="dr-place-type">Panneau</span>
+              </div>
+            {% endfor %}
+            {% for support in supports %}
+              <div class="dr-place">
+                <span class="dr-place-icon"><i class="bi bi-display"></i></span>
+                <div class="dr-place-main">
+                  <div class="dr-place-code">{{ support.code }}</div>
+                  <div class="dr-place-name">{{ support.nom }}</div>
+                </div>
+                <span class="dr-place-type">Écran</span>
+              </div>
+            {% endfor %}
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <aside class="dr-actions">
+      <section class="dr-panel dr-period">
+        <div class="dr-panel-head">
+          <div class="dr-panel-heading">
+            <span class="dr-panel-icon"><i class="bi bi-calendar-range"></i></span>
+            <div>
+              <h2 class="dr-panel-title">Période de diffusion</h2>
+              <p class="dr-panel-caption">Dates souhaitées</p>
+            </div>
+          </div>
+        </div>
+        <div class="dr-panel-body">
+          <div class="dr-dates">
+            <div class="dr-date">
+              <span class="dr-date-label">Début</span>
+              <span class="dr-date-value">{{ periode.date_debut }}</span>
+            </div>
+            <div class="dr-date">
+              <span class="dr-date-label">Fin</span>
+              <span class="dr-date-value">{{ periode.date_fin }}</span>
+            </div>
+          </div>
+          <div class="dr-duration">
+            <i class="bi bi-hourglass-split"></i>
+            {{ duree_jours }} jour{{ duree_jours|pluralize }}
+          </div>
+        </div>
+      </section>
+
+      {% if project.nom_campagne or project.message %}
+      <section class="dr-panel">
+        <div class="dr-panel-head">
+          <div class="dr-panel-heading">
+            <span class="dr-panel-icon"><i class="bi bi-megaphone"></i></span>
+            <div><h2 class="dr-panel-title">Projet</h2></div>
+          </div>
+        </div>
+        <div class="dr-panel-body">
+          {% if project.nom_campagne %}<div class="dr-fact-value">{{ project.nom_campagne }}</div>{% endif %}
+          {% if project.message %}<div class="dr-place-name mt-2">{{ project.message|linebreaksbr }}</div>{% endif %}
+        </div>
+      </section>
+      {% endif %}
+
+      <section class="dr-action-card">
+        <h2 class="dr-action-title">{% if editing_request %}Enregistrer les changements ?{% else %}Prêt à envoyer ?{% endif %}</h2>
+        <p class="dr-action-copy">Vous pouvez encore revenir à l’étape précédente pour corriger les informations.</p>
+        <a class="dr-btn dr-btn-back" href="{{ step1_url }}">
+          <i class="bi bi-arrow-left me-2"></i>Modifier les informations
+        </a>
+        <form method="post">
+          {% csrf_token %}
+          <button type="submit" class="dr-btn dr-btn-submit">
+            <i class="bi bi-check-circle"></i>
+            {% if editing_request %}Enregistrer les modifications{% else %}Valider et envoyer la demande{% endif %}
+          </button>
+        </form>
+        <div class="dr-action-note">
+          <i class="bi bi-info-circle-fill"></i>
+          <span>La demande sera ajoutée à la liste des demandes à traiter et pourra ensuite être partagée avec le client.</span>
+        </div>
+      </section>
+    </aside>
+  </div>
+</div>
+{% endblock %}

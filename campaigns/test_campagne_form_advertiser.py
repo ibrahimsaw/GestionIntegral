@@ -1,4 +1,5 @@
 from datetime import timedelta
+from decimal import Decimal
 
 from django.test import TestCase
 from django.utils import timezone
@@ -17,6 +18,33 @@ from inventory.models import FacePanneau, FormatSupport, Support
 
 
 class CampagneFormAdvertiserTests(TestCase):
+    def test_prices_accept_grouped_large_amounts_and_decimal_commas(self):
+        form = CampagneForm(data={
+            "nom": "Campagne avec grands tarifs",
+            "date_debut": "2026-01-01",
+            "date_fin": "2026-01-02",
+            "type_support": "ecran",
+            "duree_passage": "5",
+            "frequence": "120",
+            "tranches_horaires": "08:00-12:00",
+            "nombre_visuels": "1",
+            "prix": "154 824 205 451",
+            "prix_affichage": "154824205451",
+            "prix_impression": "1,25",
+        })
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data["prix"], Decimal("154824205451"))
+        self.assertEqual(form.cleaned_data["prix_affichage"], Decimal("154824205451"))
+        self.assertEqual(form.cleaned_data["prix_impression"], Decimal("1.25"))
+
+    def test_default_zero_prices_are_blank(self):
+        form = CampagneForm()
+
+        for field_name in ("prix", "prix_affichage", "prix_impression"):
+            self.assertIsNone(form[field_name].value())
+            self.assertEqual(form.fields[field_name].widget.input_type, "text")
+
     def test_advertiser_is_optional_and_supports_existing_or_free_text_names(self):
         annonceur = Client.objects.create(
             nom="Annonceur de test",
@@ -33,12 +61,18 @@ class CampagneFormAdvertiserTests(TestCase):
             "tranches_horaires": "08:00-12:00",
             "nombre_visuels": "1",
             "annonceur": "Client saisi librement",
+            "prix": "",
+            "prix_affichage": "",
+            "prix_impression": "",
         })
 
         self.assertFalse(form.fields["annonceur"].required)
         self.assertTrue(form.is_valid(), form.errors)
         campagne = form.save()
         self.assertEqual(campagne.annonceur, "Client saisi librement")
+        self.assertEqual(campagne.prix, Decimal("0"))
+        self.assertEqual(campagne.prix_affichage, Decimal("0"))
+        self.assertEqual(campagne.prix_impression, Decimal("0"))
         self.assertIn(annonceur.nom, form.annonceurs_existants)
         self.assertEqual(form.fields["annonceur"].widget.attrs["list"], "annonceurs-existants")
 

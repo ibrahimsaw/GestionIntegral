@@ -1,0 +1,193 @@
+{% extends 'portail/base_portail.html' %}
+
+{% block title %}Vérification de la demande{% endblock %}
+{% block topbar_title %}<i class="bi bi-clipboard-check me-1" style="color:var(--color-primary)"></i> Vérifier ma demande{% endblock %}
+{% block page_toolbar %}{% endblock %}
+
+{% block extra_head %}
+<style>
+  .partage-recap {
+    max-width: 1080px;
+    margin: 0 auto;
+    padding: 18px 14px 32px;
+    color: #242a27;
+  }
+  .pr-intro, .pr-card, .pr-actions {
+    border: 1px solid #e6e2d8;
+    border-radius: 12px;
+    background: #fff;
+    box-shadow: 0 4px 16px rgba(31,46,40,.06);
+  }
+  .pr-intro { margin-bottom: 16px; padding: 20px 22px; }
+  .pr-intro h1 { margin: 0; font-size: 1.25rem; font-weight: 800; }
+  .pr-intro p { margin: 6px 0 0; color: #6a6a6a; font-size: .86rem; }
+  .pr-steps { display: flex; gap: 12px; margin-bottom: 16px; }
+  .pr-step {
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 14px;
+    border: 1px solid #e6e2d8;
+    border-radius: 10px;
+    background: #fff;
+    color: #6a6a6a;
+    font-size: .8rem;
+    font-weight: 700;
+  }
+  .pr-step-number {
+    display: grid;
+    width: 28px;
+    height: 28px;
+    place-items: center;
+    flex: 0 0 28px;
+    border-radius: 50%;
+    background: #10b981;
+    color: #fff;
+    font-weight: 800;
+  }
+  .pr-step.active { border-color: var(--color-primary); color: var(--color-primary); }
+  .pr-step.active .pr-step-number { background: var(--color-primary); }
+  .pr-grid { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 16px; }
+  .pr-card { overflow: hidden; margin-bottom: 14px; }
+  .pr-card h2 {
+    margin: 0;
+    padding: 13px 17px;
+    border-bottom: 1px solid #eeeae2;
+    background: #faf9f6;
+    font-size: .9rem;
+    font-weight: 800;
+  }
+  .pr-card-body { padding: 16px 18px; }
+  .pr-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px 18px; }
+  .pr-label { display: block; margin-bottom: 3px; color: #777e79; font-size: .67rem; font-weight: 800; text-transform: uppercase; }
+  .pr-value { overflow-wrap: anywhere; color: #303733; font-size: .86rem; font-weight: 650; }
+  .pr-list { display: grid; gap: 8px; }
+  .pr-place { padding: 10px 12px; border: 1px solid #e8ebe6; border-radius: 8px; background: #fbfcfa; }
+  .pr-date-row { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid #eeece6; }
+  .pr-date-row:last-child { border-bottom: 0; }
+  .pr-actions { position: sticky; top: 16px; padding: 16px; }
+  .pr-actions button, .pr-actions a {
+    display: flex;
+    width: 100%;
+    min-height: 44px;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    border-radius: 8px;
+    font-size: .84rem;
+    font-weight: 800;
+    text-decoration: none;
+  }
+  .pr-actions button { border: 0; background: var(--color-primary); color: #fff; }
+  .pr-actions a { margin-top: 9px; border: 1px solid #dedbd2; background: #fff; color: #414944; }
+  @media (max-width: 800px) {
+    .pr-grid { grid-template-columns: 1fr; }
+    .pr-actions { position: static; }
+  }
+  @media (max-width: 520px) {
+    .pr-steps { gap: 7px; }
+    .pr-step { padding: 10px 8px; font-size: .7rem; }
+    .pr-facts { grid-template-columns: 1fr; gap: 11px; }
+    .pr-intro { padding: 17px; }
+    .pr-intro h1 { font-size: 1.08rem; }
+  }
+</style>
+{% endblock %}
+
+{% block content %}
+<main class="partage-recap">
+  {% if messages %}
+    {% for message in messages %}
+      <div class="alert alert-{{ message.tags|default:'info' }}">{{ message }}</div>
+    {% endfor %}
+  {% endif %}
+
+  <header class="pr-intro">
+    <h1>Vérifiez le récapitulatif de votre demande</h1>
+    <p>Vérifiez les coordonnées, les emplacements et la période avant d’envoyer vos modifications.</p>
+  </header>
+
+  <div class="pr-steps" aria-label="Étapes de modification">
+    <div class="pr-step">
+      <span class="pr-step-number"><i class="bi bi-check-lg"></i></span>
+      <span>Coordonnées, période et emplacements</span>
+    </div>
+    <div class="pr-step active" aria-current="step">
+      <span class="pr-step-number">2</span>
+      <span>Vérification et envoi</span>
+    </div>
+  </div>
+
+  <div class="pr-grid">
+    <div>
+      <section class="pr-card">
+        <h2><i class="bi bi-person-vcard me-2" style="color:var(--color-primary)"></i>Client et coordonnées</h2>
+        <div class="pr-card-body">
+          <div class="pr-facts">
+            <div>
+              <span class="pr-label">Type de client</span>
+              <div class="pr-value">{% if state.type_client == 'existant' %}Client enregistré{% else %}Nouveau prospect{% endif %}</div>
+            </div>
+            {% if state.type_client == 'existant' %}
+            <div>
+              <span class="pr-label">Référence client</span>
+              <div class="pr-value">{{ state.reference_client_saisie|default:'—' }}</div>
+            </div>
+            {% else %}
+            <div>
+              <span class="pr-label">Société / organisation</span>
+              <div class="pr-value">{{ state.societe|default:'—' }}</div>
+            </div>
+            {% endif %}
+            <div>
+              <span class="pr-label">Nom du contact</span>
+              <div class="pr-value">{{ state.nom_contact|default:'—' }}</div>
+            </div>
+            <div>
+              <span class="pr-label">Téléphone</span>
+              <div class="pr-value">{{ state.telephone|default:'—' }}</div>
+            </div>
+            <div>
+              <span class="pr-label">E-mail</span>
+              <div class="pr-value">{{ state.email|default:'—' }}</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section class="pr-card">
+        <h2><i class="bi bi-geo-alt me-2" style="color:var(--color-primary)"></i>Emplacements souhaités ({{ nombre_emplacements }})</h2>
+        <div class="pr-card-body">
+          <div class="pr-list">
+            {% for face in faces %}
+              <div class="pr-place"><strong>{{ face.support.code }} · Face {{ face.label }}</strong>{% if face.support.nom %}<span> — {{ face.support.nom }}</span>{% endif %}</div>
+            {% endfor %}
+            {% for support in supports %}
+              <div class="pr-place"><strong>{{ support.code }}</strong>{% if support.nom %}<span> — {{ support.nom }}</span>{% endif %}</div>
+            {% endfor %}
+          </div>
+        </div>
+      </section>
+
+      <section class="pr-card">
+        <h2><i class="bi bi-calendar3 me-2" style="color:var(--color-primary)"></i>Période de diffusion</h2>
+        <div class="pr-card-body">
+          <div class="pr-date-row"><span class="pr-label">Début</span><strong>{{ periode.date_debut }}</strong></div>
+          <div class="pr-date-row"><span class="pr-label">Fin</span><strong>{{ periode.date_fin }}</strong></div>
+          <div class="pr-date-row"><span class="pr-label">Durée</span><strong>{{ duree_jours }} jour{{ duree_jours|pluralize }}</strong></div>
+        </div>
+      </section>
+    </div>
+
+    <aside class="pr-actions">
+      <form method="post" action="{{ step2_url }}">
+        {% csrf_token %}
+        <button type="submit"><i class="bi bi-send-fill"></i>Valider et envoyer</button>
+      </form>
+      <a href="{{ step1_url }}"><i class="bi bi-arrow-left"></i>Modifier les informations</a>
+      <p class="small text-muted text-center mt-3 mb-0">Votre demande sera transmise à notre équipe pour vérification.</p>
+    </aside>
+  </div>
+</main>
+{% endblock %}

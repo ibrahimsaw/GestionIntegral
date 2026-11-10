@@ -1,0 +1,1617 @@
+{% extends base_template|default:'portail/base_portail.html' %}
+{% load static %}
+
+{% block title %}Réservation en ligne — Régie INTEGRAL{% endblock %}
+{% block topbar_title %}<i class="bi bi-send-fill me-1" style="color:var(--color-primary)"></i>Faites votre demande de réservation{% endblock %}
+
+{% block extra_head %}
+<style>
+  /* ════════════════════════════════════════════════════════════════
+     Identité "Furni" — vert profond + jaune, Inter, formes arrondies.
+     ════════════════════════════════════════════════════════════════ */
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+  .reservation-page {
+    --color-primary:   {{ DESIGN.COLOR_PRIMARY }};
+    --color-secondary: {{ DESIGN.COLOR_SECONDARY }};
+    --text:             #000000;
+    --text-muted:        #6a6a6a;
+    --border:             #e6e2d8;
+    --bg-card:              #ffffff;
+    --bg-card2:              #f8f6f1;
+
+    --step-active:   var(--color-primary);
+    --step-done:     #10b981;
+    --step-inactive: #cbd5e1;
+    --radius-sm:  6px;
+    --radius-md:  6px;
+    --radius-lg:  8px;
+    --shadow-sm:  0 1px 3px rgba(31,46,40,.07);
+    --shadow-md:  0 8px 22px rgba(31,46,40,.10);
+    --c-libre:    #10b981;
+    --c-partiel:  #f59e0b;
+    --c-occupe:   #ef4444;
+    --c-panne:    #94a3b8;
+    --c-reserve:  #7c3aed;
+    font-family: 'Inter', sans-serif;
+  }
+
+  /* ── BARRE DATES ─────────────────────────────────────────── */
+  .dates-bar {
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 10px 16px;
+    margin-bottom: 12px; box-shadow: var(--shadow-sm);
+  }
+  .dates-bar-label {
+    font-size: .75rem; font-weight: 800; color: var(--text-muted);
+    text-transform: uppercase; letter-spacing: .08em; white-space: nowrap;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .dates-bar-sep { color: var(--text-muted); font-size: .8rem; }
+  .date-input-wrap {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--bg-card2); border: 1.5px solid var(--border);
+    border-radius: var(--radius-sm); padding: 5px 10px; transition: border-color .15s;
+  }
+  .date-input-wrap:focus-within {
+    border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(59,93,80,.10);
+  }
+  .date-input-wrap i { color: var(--text-muted); font-size: .8rem; flex-shrink: 0; }
+  .date-input-wrap input {
+    border: none; background: transparent; color: var(--text);
+    font-size: .8rem; font-weight: 600; outline: none; width: 150px;
+  }
+  #dates-status {
+    display: flex; align-items: center; gap: 6px;
+    font-size: .74rem; font-weight: 700; padding: 5px 12px;
+    border-radius: 20px; transition: all .2s; margin-left: auto;
+  }
+  #dates-status.waiting { background: var(--bg-card2); color: var(--text-muted); border: 1px solid var(--border); }
+  #dates-status.loading { background: #eef4f0; color: var(--color-primary); border: 1px solid #cfe0d8; }
+  #dates-status.ok      { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+  #dates-status.error   { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+  #dates-status .spin {
+    width: 12px; height: 12px; border: 2px solid currentColor;
+    border-top-color: transparent; border-radius: 50%;
+    animation: spin .6s linear infinite; flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── TOGGLE ──────────────────────────────────────────────── */
+  .view-toggle {
+    display: inline-flex; gap: 3px;
+    background: var(--bg-card2); border: 1px solid var(--border);
+    border-radius: var(--radius-md); padding: 3px;
+    flex-direction:column;
+  }
+  #btn-vue-carte { display: none !important; }
+  .vt-btn {
+    display: flex; align-items: center; gap: 6px;
+    padding: 6px 14px; border-radius: 8px;
+    border: none; background: transparent;
+    font-size: .78rem; font-weight: 700; color: var(--text-muted);
+    cursor: pointer; transition: all .18s;
+  }
+  .vt-btn.active {
+    background: var(--bg-card); color: var(--color-primary);
+    box-shadow: var(--shadow-sm); border: 1px solid var(--border);
+  }
+  .vt-btn:not(.active):hover { color: var(--text); }
+
+  /* ── LAYOUT PRINCIPAL : 2 colonnes ──────────────────────── */
+  .reserver-grid {
+    display: grid;
+    grid-template-columns: 1fr 360px;
+    gap: 14px;
+    align-items: start;
+  }
+  @media (max-width: 992px) { .reserver-grid { grid-template-columns: 1fr; } }
+
+  /* ── COLONNE GAUCHE : carte + sections formulaire ─────────── */
+  .col-left { display: flex; flex-direction: column; gap: 14px; }
+
+  /* ── SECTION CARTE ──────────────────────────────────────── */
+  .main-section {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); overflow: hidden;
+    display: flex; flex-direction: column; box-shadow: var(--shadow-sm);
+    min-height: 480px;
+  }
+  .section-header {
+    padding: 8px 12px; border-bottom: 1px solid var(--border);
+    background: var(--bg-card2);
+    display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex-shrink: 0;
+  }
+
+  /* ── FILTRES ─────────────────────────────────────────────── */
+  .mf-select, .list-search {
+    padding: 6px 12px; border-radius: 8px;
+    border: 1.5px solid var(--border);
+    background: var(--bg-card); color: var(--text);
+    font-size: .74rem; font-weight: 600; cursor: pointer; transition: all .15s;
+  }
+  .list-search {
+    padding-left: 28px; min-width: 170px;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' fill='%2394a3b8' viewBox='0 0 16 16'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398l3.85 3.85a1 1 0 0 0 1.415-1.415l-3.868-3.833zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat; background-position: 9px center;
+  }
+  .mf-select:focus, .list-search:focus {
+    outline: none; border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(59,93,80,.10);
+  }
+
+  /* ── CARTE ───────────────────────────────────────────────── */
+  #map-resa { flex: 1; min-height: 360px; }
+  .map-legend {
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    padding: 6px 12px; border-top: 1px solid var(--border);
+    background: var(--bg-card2); font-size: .68rem; flex-shrink: 0;
+  }
+  .leg-item { display: flex; align-items: center; gap: 4px; color: var(--text-muted); font-weight: 600; }
+  .leg-dot  { width: 8px; height: 8px; border-radius: 50%; }
+
+  /* ── VUE LISTE ───────────────────────────────────────────── */
+  #view-liste { display: none; flex: 1; overflow-y: auto; max-height: 480px; }
+  #view-liste::-webkit-scrollbar { width: 4px; }
+  #view-liste::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  .liste-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px; padding: 10px;
+  }
+  .liste-empty {
+    grid-column: 1/-1; padding: 50px 20px;
+    text-align: center; color: var(--text-muted);
+  }
+  .liste-empty i { font-size: 2.2rem; opacity: .25; display: block; margin-bottom: 8px; }
+  .liste-empty p { font-size: .8rem; }
+
+  /* ── CARD SUPPORT ────────────────────────────────────────── */
+  .support-card {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(220px, 34%);
+    grid-template-rows: minmax(0, 1fr) auto;
+    grid-template-areas: "header faces" "map faces";
+    align-items: stretch;
+    background: var(--bg-card2); border: 1px solid var(--border);
+    border-radius: var(--radius-md); overflow: hidden; transition: all .15s;
+  }
+  .support-card:hover { box-shadow: var(--shadow-md); }
+  .support-card.has-selected { border-color: var(--color-primary); box-shadow: 0 0 0 2px rgba(59,93,80,.12); }
+  .sc-header {
+    grid-area: header; min-width: 0; padding: 12px 14px; background: var(--bg-card);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: flex-start; gap: 10px;
+  }
+  .sc-icon {
+    width: 30px; height: 30px; border-radius: 50%;
+    background: var(--color-primary); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .7rem; font-weight: 800; flex-shrink: 0;
+  }
+  .sc-info { flex: 1; min-width: 0; }
+  .sc-code { font-size: .68rem; font-weight: 800; color: var(--color-primary); letter-spacing: .05em; }
+  .sc-nom  { font-size: .9rem; font-weight: 700; color: var(--text); white-space: normal; overflow-wrap: anywhere; line-height: 1.4; }
+  .sc-addr { font-size: .72rem; color: var(--text-muted); white-space: normal; overflow-wrap: anywhere; line-height: 1.4; }
+  .sc-format {
+    font-size: .62rem; font-weight: 700; padding: 2px 7px; border-radius: 20px;
+    background: var(--bg-card2); border: 1px solid var(--border);
+    color: var(--text-muted); white-space: nowrap; flex-shrink: 0;
+  }
+  .sc-faces { grid-area: faces; align-self: center; padding: 10px; display: flex; flex-direction: column; gap: 7px; }
+
+  /* ── BOUTON FACE ─────────────────────────────────────────── */
+  .face-btn {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 7px 12px; border-radius: 8px;
+    border: 1.5px solid; font-size: .74rem; font-weight: 700;
+    cursor: pointer; transition: all .15s; background: transparent; width: 100%;
+  }
+  .face-btn .fb-left { display: flex; align-items: center; gap: 6px; }
+  .face-btn .fb-badge { font-size: .6rem; font-weight: 800; padding: 2px 7px; border-radius: 20px; }
+  .face-btn.libre    { border-color: var(--c-libre);   color: var(--c-libre); }
+  .face-btn.libre:hover { background: #d1fae5; }
+  .face-btn.occupe   { border-color: var(--c-occupe);  color: var(--c-occupe);  cursor: not-allowed; opacity: .5; }
+  .face-btn.reserve  { border-color: var(--c-reserve); color: var(--c-reserve); cursor: not-allowed; opacity: .5; }
+  .face-btn.panne    { border-color: var(--c-panne);   color: var(--c-panne);   cursor: not-allowed; opacity: .5; }
+  .face-btn.selected { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+  .face-btn.selected:hover { filter: brightness(1.1); }
+  .face-btn.libre    .fb-badge { background: #d1fae5; color: #065f46; }
+  .face-btn.occupe   .fb-badge { background: #fee2e2; color: #991b1b; }
+  .face-btn.reserve  .fb-badge { background: #ede9fe; color: #5b21b6; }
+  .face-btn.panne    .fb-badge { background: #f1f5f9; color: #475569; }
+  .face-btn.selected .fb-badge { background: rgba(255,255,255,.2); color: #fff; }
+  .face-btn.need-dates { border-color: var(--border); color: var(--text-muted); opacity: .65; }
+  .face-btn.need-dates .fb-badge { background: var(--bg-card2); color: var(--text-muted); }
+
+  /* ── POPUP LEAFLET ───────────────────────────────────────── */
+  .rl-popup { min-width: 210px; padding: 12px 14px; font-family: inherit; }
+  .rl-popup-code { font-size: .58rem; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; color: var(--color-primary, #3b5d50); margin-bottom: 2px; }
+  .rl-popup-nom  { font-size: .82rem; font-weight: 700; margin-bottom: 3px; }
+  .rl-popup-addr { font-size: .7rem; color: #64748b; margin-bottom: 9px; display: flex; align-items: center; gap: 4px; }
+  .rl-popup-faces { display: flex; flex-direction: column; gap: 5px; }
+  .rl-face-btn {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 6px 10px; border-radius: 6px; border: 1.5px solid;
+    font-size: .74rem; font-weight: 700; cursor: pointer;
+    transition: all .15s; background: transparent; width: 100%;
+  }
+  .rl-face-btn.libre    { border-color: #10b981; color: #10b981; }
+  .rl-face-btn.libre:hover { background: #d1fae5; }
+  .rl-face-btn.occupe   { border-color: #ef4444; color: #ef4444; cursor: not-allowed; opacity: .55; }
+  .rl-face-btn.reserve  { border-color: #7c3aed; color: #7c3aed; cursor: not-allowed; opacity: .55; }
+  .rl-face-btn.panne    { border-color: #94a3b8; color: #94a3b8; cursor: not-allowed; opacity: .55; }
+  .rl-face-btn.selected { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+  .rl-face-btn.need-dates { border-color: #cbd5e1; color: #94a3b8; cursor: not-allowed; opacity: .7; }
+
+  /* ── GROUPES VILLE / FORMAT / QUARTIER ─────────────────── */
+  .liste-group-ville {
+    grid-column: 1 / -1;
+    display: flex; align-items: center; gap: 10px;
+    padding: 14px 4px 6px;
+    font-size: .85rem; font-weight: 800; color: var(--text);
+    border-bottom: 2px solid var(--color-primary);
+    margin-bottom: 4px;
+    position: sticky; top: 0; z-index: 3;
+    background: var(--bg-card);
+  }
+  .liste-group-ville:first-child { padding-top: 4px; }
+  .liste-group-ville i { color: var(--color-primary); }
+  .liste-group-ville .count-badge {
+    margin-left: auto; font-size: .68rem; font-weight: 700;
+    color: var(--text-muted); background: var(--bg-card2);
+    padding: 2px 9px; border-radius: 20px; border: 1px solid var(--border);
+  }
+  .liste-group-format {
+    grid-column: 1 / -1;
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 4px 6px 10px; margin: 2px 0 2px;
+    font-size: .76rem; font-weight: 700; color: var(--text-muted);
+    border-bottom: 1px dashed var(--border);
+    position: sticky; top: 42px; z-index: 2; background: var(--bg-card);
+  }
+  .liste-group-format i { color: var(--color-primary); opacity: .8; }
+  .liste-group-format .count-badge {
+    margin-left: auto; font-size: .66rem; font-weight: 600;
+    color: var(--text-muted); background: var(--bg-card2);
+    padding: 2px 8px; border-radius: 20px; border: 1px solid var(--border);
+  }
+  .liste-group-quartier {
+    grid-column: 1 / -1;
+    display: flex; align-items: center; gap: 7px;
+    padding: 4px 4px 2px 14px;
+    font-size: .72rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: .05em; color: var(--text-muted);
+    position: sticky; top: 72px; z-index: 1; background: var(--bg-card);
+  }
+  .sc-map-btn { display: none !important; }
+
+  /* ── PHOTO PREVIEW ───────────────────────────────────────── */
+  .rl-face-row, .face-row {
+    display: flex; align-items: center; gap: 8px; width: 100%;
+  }
+  .rl-face-row .rl-face-btn, .face-row .face-btn { flex: 1 1 auto; min-width: 0; }
+  .photo-trigger {
+    flex-shrink: 0; width: 32px; height: 32px; border-radius: 8px;
+    background: #f1f5f9; color: #475569;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer; transition: background .15s, color .15s;
+  }
+  .photo-trigger:hover { background: #e0e7ff; color: #4338ca; }
+  .photo-trigger i { font-size: .85rem; pointer-events: none; }
+  .photo-hover-preview {
+    position: fixed; z-index: 9999; display: none; width: 260px;
+    background: #fff; border-radius: 14px; overflow: hidden;
+    box-shadow: 0 12px 32px rgba(0,0,0,.22), 0 2px 8px rgba(0,0,0,.12);
+    border: 1px solid rgba(0,0,0,.06);
+    animation: photoPreviewIn .15s ease-out;
+  }
+  @keyframes photoPreviewIn {
+    from { opacity: 0; transform: translateY(4px) scale(.98); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  .photo-hover-preview .php-img-wrap { position: relative; width: 100%; height: 160px; background: #e2e8f0; }
+  .photo-hover-preview img { display: block; width: 100%; height: 100%; object-fit: contain; }
+  .photo-hover-preview .php-badge {
+    position: absolute; top: 8px; left: 8px;
+    background: rgba(0,0,0,.55); color: #fff; font-size: .68rem; font-weight: 600;
+    padding: 3px 9px; border-radius: 20px; backdrop-filter: blur(2px);
+  }
+  .photo-hover-preview .php-body { padding: 10px 12px 12px; }
+  .photo-hover-preview .php-code { font-weight: 700; font-size: .85rem; color: #1e293b; margin-bottom: 2px; }
+  .photo-hover-preview .php-nom { font-size: .74rem; color: #475569; margin-bottom: 6px; }
+  .photo-hover-preview .php-meta { display: flex; flex-wrap: wrap; gap: 5px; }
+  .photo-hover-preview .php-tag {
+    font-size: .66rem; color: #334155; background: #f1f5f9;
+    padding: 3px 8px; border-radius: 20px;
+    display: inline-flex; align-items: center; gap: 4px;
+  }
+  .photo-hover-preview .php-close {
+    position: absolute; top: 8px; right: 8px; width: 26px; height: 26px;
+    border-radius: 50%; background: rgba(0,0,0,.5); color: #fff;
+    border: none; display: none; align-items: center; justify-content: center;
+    font-size: 1rem; cursor: pointer;
+  }
+  .rl-popup-photo-wrap { width: 100%; height: 120px; border-radius: 8px; overflow: hidden; margin-bottom: 8px; }
+  .rl-popup-photo-wrap img { width: 100%; height: 100%; object-fit: contain; }
+  @media (hover: none), (pointer: coarse) {
+    .photo-hover-preview { left: 50% !important; top: 50% !important; transform: translate(-50%, -50%) !important; width: min(90vw, 340px); }
+    .photo-hover-preview .php-img-wrap { height: 200px; }
+    .photo-hover-preview .php-close { display: flex; }
+    .photo-preview-overlay { position: fixed; inset: 0; background: rgba(15,23,42,.45); z-index: 9998; display: none; }
+  }
+
+  /* ── COLONNE DROITE : panier + récap + formulaire ────────── */
+  .col-right { display: flex; flex-direction: column; gap: 14px; }
+
+  /* ── PANIER ──────────────────────────────────────────────── */
+  .panier-section {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); display: flex; flex-direction: column;
+    box-shadow: var(--shadow-sm); overflow: hidden;
+  }
+  .panier-header {
+    padding: 11px 14px; border-bottom: 1px solid var(--border);
+    background: var(--bg-card2);
+    display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+  }
+  .panier-title {
+    font-size: .82rem; font-weight: 800; color: var(--text);
+    display: flex; align-items: center; gap: 6px;
+  }
+  .panier-count {
+    background: var(--color-primary); color: #fff;
+    font-size: .63rem; font-weight: 800;
+    padding: 2px 8px; border-radius: 8px; min-width: 22px; text-align: center;
+  }
+  .panier-body { flex: 1; overflow-y: auto; padding: 9px; max-height: 220px; }
+  .panier-body::-webkit-scrollbar { width: 4px; }
+  .panier-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  .panier-item {
+    display: flex; align-items: center; gap: 7px;
+    padding: 7px 9px; border-radius: var(--radius-sm);
+    border: 1px solid var(--border); background: var(--bg-card2);
+    margin-bottom: 5px; transition: all .15s;
+  }
+  .panier-item:hover { border-color: var(--color-primary); background: #eef4f0; }
+  .pi-icon {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--color-primary); color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .65rem; font-weight: 800; flex-shrink: 0;
+  }
+  .pi-info { flex: 1; overflow: hidden; }
+  .pi-code { font-size: .74rem; font-weight: 800; color: var(--text); }
+  .pi-addr { font-size: .66rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pi-remove {
+    width: 20px; height: 20px; border-radius: 4px;
+    background: transparent; border: 1px solid var(--border);
+    color: var(--text-muted); cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    font-size: .68rem; transition: all .15s; flex-shrink: 0;
+  }
+  .pi-remove:hover { background: #fee2e2; border-color: #ef4444; color: #ef4444; }
+  .panier-empty {
+    padding: 28px 14px; text-align: center; color: var(--text-muted);
+  }
+  .panier-empty i { font-size: 1.8rem; opacity: .3; display: block; margin-bottom: 7px; }
+  .panier-empty p { font-size: .75rem; line-height: 1.5; }
+
+  /* ── CARDS FORMULAIRE ────────────────────────────────────── */
+  .form-card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); box-shadow: var(--shadow-sm);
+    overflow: hidden;
+  }
+  .form-card-header {
+    padding: 11px 16px; background: var(--bg-card2);
+    border-bottom: 1px solid var(--border);
+    font-size: .82rem; font-weight: 800; color: var(--text);
+    display: flex; align-items: center; gap: 7px;
+  }
+  .form-card-body { padding: 16px; }
+  .form-row { margin-bottom: 14px; }
+  .form-label {
+    display: block; font-size: .77rem; font-weight: 700;
+    color: var(--text-muted); margin-bottom: 5px;
+  }
+  .form-control {
+    width: 100%; padding: 8px 12px; border-radius: var(--radius-sm);
+    border: 1.5px solid var(--border); background: var(--bg-card2);
+    font-size: .82rem; color: var(--text); transition: border-color .15s;
+  }
+  .form-control:focus {
+    outline: none; border-color: var(--color-primary);
+    box-shadow: 0 0 0 3px rgba(59,93,80,.10); background: #fff;
+  }
+  textarea.form-control { resize: vertical; }
+
+  /* ── TYPE CLIENT RADIO ───────────────────────────────────── */
+  .type-client-opts { display: flex; gap: 10px; flex-wrap: wrap; }
+  .tc-opt {
+    flex: 1; min-width: 120px;
+    padding: 10px 14px; border-radius: var(--radius-md);
+    border: 1.5px solid var(--border); background: var(--bg-card2);
+    cursor: pointer; transition: all .15s;
+    display: flex; align-items: center; gap: 8px;
+  }
+  .tc-opt input[type="radio"] { accent-color: var(--color-primary); }
+  .tc-opt:has(input:checked) {
+    border-color: var(--color-primary);
+    background: #eef4f0; font-weight: 700;
+  }
+  .tc-opt-label { font-size: .8rem; font-weight: 600; }
+
+  /* ── FIELD ERRORS ────────────────────────────────────────── */
+  .field-error { font-size: .74rem; color: #dc2626; margin-top: 4px; }
+  .field-error i { margin-right: 3px; }
+  .has-error .form-control { border-color: #ef4444; background: #fff5f5; }
+
+  /* ── ENGAGEMENTS ─────────────────────────────────────────── */
+  .engagements {
+    background: var(--bg-card2); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 14px 16px;
+    font-size: .74rem; color: var(--text-muted);
+  }
+  .engagements li { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+  .engagements li:last-child { margin-bottom: 0; }
+  .engagements i { color: var(--color-primary); flex-shrink: 0; }
+
+  /* ── BOUTON SUBMIT ───────────────────────────────────────── */
+  .btn-envoyer {
+    width: 100%; padding: 14px;
+    background: var(--color-primary); color: #fff;
+    border: none; border-radius: 8px;
+    font-weight: 800; font-size: .9rem;
+    cursor: pointer; transition: all .2s;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+  }
+  .btn-envoyer:hover:not(:disabled) { background: #2f4a40; box-shadow: var(--shadow-md); }
+  .btn-envoyer:disabled { opacity: .45; cursor: not-allowed; background: var(--text-muted); }
+
+  /* ── ALERT ERREURS GLOBALES ──────────────────────────────── */
+  .global-errors {
+    padding: 12px 14px; border-radius: 8px; margin-bottom: 14px;
+    font-size: .82rem; background: #fee2e2; border: 1px solid #fca5a5;
+    color: #991b1b; display: flex; align-items: flex-start; gap: 8px;
+  }
+
+  @media (max-width: 768px) {
+    .section-header { flex-direction: column; }
+    .view-toggle { flex-direction: row !important; }
+    .type-client-opts { flex-direction: column; }
+  }
+  @media (max-width: 640px) {
+    .support-card {
+      grid-template-columns: minmax(0, 1fr);
+      grid-template-rows: auto auto auto;
+      grid-template-areas: "header" "faces" "map";
+    }
+    .sc-faces { padding-top: 8px; }
+  }
+</style>
+{% endblock %}
+
+{% block full_page %} {% endblock %}
+{% block page_toolbar %}{% endblock %}
+
+{% block content %}
+<div class="reservation-page">
+
+  {% if form.non_field_errors %}
+  <div class="global-errors">
+    <i class="bi bi-exclamation-triangle-fill" style="margin-top:1px"></i>
+    <div>
+      {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- ── BARRE DATES ────────────────────────────────────────── -->
+  <div class="dates-bar">
+    <span class="dates-bar-label">
+      <i class="bi bi-calendar3" style="color:var(--color-primary)"></i>
+      Période souhaitée
+    </span>
+
+    <div class="date-input-wrap">
+      <i class="bi bi-calendar-plus" style="color:#10b981"></i>
+      <input type="date" id="date-debut"
+             value="{{ form.date_debut.value|default:'' }}"
+             min="{% now 'Y-m-d' %}" required>
+    </div>
+
+    <span class="dates-bar-sep">→</span>
+
+    <div class="date-input-wrap" id="wrap-date-fin">
+      <i class="bi bi-calendar-minus" style="color:#ef4444"></i>
+      <input type="date" id="date-fin"
+             value="{{ form.date_fin.value|default:'' }}"
+             min="{% now 'Y-m-d' %}" required>
+    </div>
+
+    <span class="dates-bar-sep">ou</span>
+
+    <div class="date-input-wrap" id="wrap-duree-jours">
+      <i class="bi bi-hourglass-split" style="color:#f59e0b"></i>
+      <input type="number" id="duree-jours" min="1" step="1" placeholder="Nombre" style="width:80px">
+      <span style="font-size:.72rem;color:var(--text-muted);white-space:nowrap;">jour(s)</span>
+    </div>
+
+    <div id="dates-status" class="waiting">
+      <i class="bi bi-info-circle"></i>
+      Saisissez les dates pour voir les disponibilités
+    </div>
+  </div>
+
+  <!-- ── GRILLE PRINCIPALE ─────────────────────────────────── -->
+  <div class="reserver-grid">
+
+    <!-- ── COLONNE GAUCHE ──────────────────────────────────── -->
+    <div class="col-left">
+
+      <!-- Carte + liste panneaux -->
+      <div class="main-section">
+        <div class="section-header">
+          <div class="view-toggle">
+            <button class="vt-btn active" id="btn-vue-liste" onclick="switchView('liste')">
+              <i class="bi bi-list-ul"></i> Liste
+            </button>
+            <button class="vt-btn" id="btn-vue-carte" onclick="switchView('carte')">
+              <i class="bi bi-map-fill"></i> Carte
+            </button>
+          </div>
+
+          <div id="filtres-carte" style="display:none;gap:6px;flex-wrap:wrap;flex:1">
+            <select class="mf-select" id="filter-ville">
+              <option value="">Toutes les villes</option>
+            </select>
+            <select class="mf-select" id="filter-categorie">
+              <option value="">Toutes catégories</option>
+            </select>
+            <select class="mf-select" id="filter-format">
+              <option value="">Tous formats</option>
+            </select>
+            <select class="mf-select" id="filter-quartier">
+              <option value="">Tous les quartiers</option>
+            </select>
+            <select class="mf-select" id="filter-dispo">
+              <option value="">Tous états</option>
+              <option value="libre">Disponibles uniquement</option>
+            </select>
+          </div>
+
+          <div id="filtres-liste" style="display:flex;gap:6px;flex-wrap:wrap;flex:1;align-items:center">
+            <input type="search" class="list-search" id="list-search" placeholder="Code ou nom du panneau…">
+            <select class="mf-select" id="list-filter-ville">
+              <option value="">Toutes les villes</option>
+            </select>
+            <select class="mf-select" id="list-filter-categorie">
+              <option value="">Toutes catégories</option>
+            </select>
+            <select class="mf-select" id="list-filter-quartier">
+              <option value="">Tous les quartiers</option>
+            </select>
+            <select class="mf-select" id="list-filter-dispo">
+              <option value="">Tous états</option>
+              <option value="libre">Disponibles uniquement</option>
+            </select>
+            <select class="mf-select" id="list-filter-format">
+              <option value="">Tous formats</option>
+            </select>
+          </div>
+        </div>
+
+        <div id="view-carte" style="flex:1;display:none;flex-direction:column;">
+          <div id="map-resa" style="flex:1;min-height:360px;"></div>
+          <div class="map-legend">
+            <span class="leg-item"><span class="leg-dot" style="background:#10b981"></span>Disponible</span>
+            <span class="leg-item"><span class="leg-dot" style="background:#f59e0b"></span>Partiel</span>
+            <span class="leg-item"><span class="leg-dot" style="background:#ef4444"></span>Occupé</span>
+            <span class="leg-item"><span class="leg-dot" style="background:var(--color-primary)"></span>Sélectionné</span>
+          </div>
+        </div>
+
+        <div id="view-liste" style="display:block">
+          <div class="liste-grid" id="liste-grid">
+            <div class="liste-empty">
+              <i class="bi bi-hourglass-split"></i>
+              <p>Chargement des panneaux…</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Section Projet (campagne) -->
+      <div class="form-card">
+        <div class="form-card-header">
+          <i class="bi bi-megaphone-fill" style="color:var(--color-primary)"></i>
+          Votre projet <span style="font-weight:400;font-size:.74rem;color:var(--text-muted)">(facultatif)</span>
+        </div>
+        <div class="form-card-body">
+          <div class="form-row {% if form.nom_campagne.errors %}has-error{% endif %}">
+            <label class="form-label" for="{{ form.nom_campagne.id_for_label }}">{{ form.nom_campagne.label }}</label>
+            {{ form.nom_campagne }}
+            {% if form.nom_campagne.errors %}
+              <div class="field-error"><i class="bi bi-exclamation-circle"></i>{{ form.nom_campagne.errors.0 }}</div>
+            {% endif %}
+          </div>
+          <div class="form-row mb-0 {% if form.message.errors %}has-error{% endif %}">
+            <label class="form-label" for="{{ form.message.id_for_label }}">{{ form.message.label }}</label>
+            {{ form.message }}
+            {% if form.message.errors %}
+              <div class="field-error"><i class="bi bi-exclamation-circle"></i>{{ form.message.errors.0 }}</div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+
+      <!-- Section Coordonnées -->
+      <div class="form-card">
+        <div class="form-card-header">
+          <i class="bi bi-person-fill" style="color:var(--color-primary)"></i>
+          Vos coordonnées
+        </div>
+        <div class="form-card-body">
+          <!-- Type client -->
+          <div class="form-row">
+            <label class="form-label">{{ form.type_client.label }}</label>
+            <div class="type-client-opts" id="type-client-opts">
+              {% for radio in form.type_client %}
+              <label class="tc-opt">
+                {{ radio.tag }}
+                <span class="tc-opt-label">{{ radio.choice_label }}</span>
+              </label>
+              {% endfor %}
+            </div>
+          </div>
+
+          <!-- Référence client existant -->
+          <div id="ref-client-wrap" style="display:none">
+            <div class="form-row {% if form.reference_client_saisie.errors %}has-error{% endif %}">
+              <label class="form-label" for="{{ form.reference_client_saisie.id_for_label }}">{{ form.reference_client_saisie.label }}</label>
+              {{ form.reference_client_saisie }}
+              {% if form.reference_client_saisie.errors %}
+                <div class="field-error"><i class="bi bi-exclamation-circle"></i>{{ form.reference_client_saisie.errors.0 }}</div>
+              {% endif %}
+              <div style="font-size:.72rem;color:var(--text-muted);margin-top:4px;">
+                <i class="bi bi-info-circle me-1"></i>Ex : CLI-2026-A3F9K2 — retrouvez-la dans l'email de confirmation de votre première demande.
+              </div>
+            </div>
+          </div>
+
+          <!-- Coordonnées nouveau client -->
+          <div id="new-client-wrap">
+            <div class="form-row {% if form.nom_contact.errors %}has-error{% endif %}">
+              <label class="form-label" for="{{ form.nom_contact.id_for_label }}">{{ form.nom_contact.label }} *</label>
+              {{ form.nom_contact }}
+              {% if form.nom_contact.errors %}
+                <div class="field-error"><i class="bi bi-exclamation-circle"></i>{{ form.nom_contact.errors.0 }}</div>
+              {% endif %}
+            </div>
+            <div class="form-row {% if form.societe.errors %}has-error{% endif %}">
+              <label class="form-label" for="{{ form.societe.id_for_label }}">{{ form.societe.label }} *</label>
+              {{ form.societe }}
+              {% if form.societe.errors %}
+                <div class="field-error"><i class="bi bi-exclamation-circle"></i>{{ form.societe.errors.0 }}</div>
+              {% endif %}
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+              <div class="form-row mb-0 {% if form.email.errors %}has-error{% endif %}">
+                <label class="form-label" for="{{ form.email.id_for_label }}">{{ form.email.label }} *</label>
+                {{ form.email }}
+                {% if form.email.errors %}
+                  <div class="field-error"><i class="bi bi-exclamation-circle"></i>{{ form.email.errors.0 }}</div>
+                {% endif %}
+              </div>
+              <div class="form-row mb-0 {% if form.telephone.errors %}has-error{% endif %}">
+                <label class="form-label" for="{{ form.telephone.id_for_label }}">{{ form.telephone.label }} *</label>
+                {{ form.telephone }}
+                {% if form.telephone.errors %}
+                  <div class="field-error"><i class="bi bi-exclamation-circle"></i>{{ form.telephone.errors.0 }}</div>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div><!-- /.col-left -->
+
+    <!-- ── COLONNE DROITE ───────────────────────────────────── -->
+    <div class="col-right">
+
+      <!-- Panier live -->
+      <div class="panier-section">
+        <div class="panier-header">
+          <div class="panier-title">
+            <i class="bi bi-bag-check-fill" style="color:var(--color-primary)"></i>
+            Sélection
+            <span class="panier-count" id="panier-count">0</span>
+          </div>
+          <button class="pi-remove" id="btn-vider-panier" title="Vider" style="display:none">
+            <i class="bi bi-trash3"></i>
+          </button>
+        </div>
+        <div class="panier-body" id="panier-body">
+          <div class="panier-empty" id="panier-empty">
+            <i class="bi bi-map"></i>
+            <p>Cliquez sur une face libre pour l'ajouter.</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Formulaire principal (hidden inputs + submit) -->
+      <form method="post" id="form-reserver">
+        {% csrf_token %}
+        <input type="hidden" name="faces_selectionnees"    id="faces-input"    value="">
+        <input type="hidden" name="supports_selectionnees" id="supports-input" value="[]">
+        <input type="hidden" name="date_debut" id="hidden-date-debut" value="{{ form.date_debut.value|default:'' }}">
+        <input type="hidden" name="date_fin"   id="hidden-date-fin"   value="{{ form.date_fin.value|default:'' }}">
+        <!-- Les champs visibles du formulaire sont dans la colonne gauche, on les duplique via JS au submit -->
+      </form>
+
+      <!-- Engagements -->
+      <div class="engagements">
+        <ul style="list-style:none;padding:0;margin:0">
+          <li><i class="bi bi-shield-check"></i>Demande sans engagement — aucun paiement maintenant</li>
+          <li><i class="bi bi-clock"></i>Notre équipe vous recontacte sous 24h ouvrables</li>
+          <li><i class="bi bi-lock"></i>Vos données sont protégées et confidentielles</li>
+        </ul>
+      </div>
+
+      <!-- Bouton envoi -->
+      <button type="submit" form="form-reserver" class="btn-envoyer" id="btn-envoyer" disabled>
+        <i class="bi bi-send-fill"></i>
+        Envoyer ma demande — <span id="btn-count">0</span> face(s)
+      </button>
+
+      <div style="font-size:.68rem;color:var(--text-muted);text-align:center;margin-top:-8px;">
+        <i class="bi bi-shield-check me-1"></i>Aucun engagement — demande sans frais
+      </div>
+
+    </div><!-- /.col-right -->
+  </div><!-- /.reserver-grid -->
+
+</div><!-- /.reservation-page -->
+
+<!-- Photo preview overlay (mobile tap) -->
+<div class="photo-preview-overlay" id="photo-overlay"></div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+  "use strict";
+
+  // ── FILTRES INITIAUX (depuis la vitrine) ───────────────────────────────────
+  const initialFiltres = {
+    ville: "{{ filtres.ville|escapejs }}",
+    categorie: "{{ filtres.categorie|escapejs }}",
+    format: "{{ filtres.format|escapejs }}",
+  };
+
+  // ── ÉTAT GLOBAL ───────────────────────────────────────────────────────────
+  let allFeatures    = [];
+  let facesOccupees  = new Set();
+  let facesInfo      = {};
+  let markersMap     = {};
+  let panier         = {};
+  let currentView    = 'liste';
+  let currentPopup   = null;
+  let datesOk        = false;
+  let checkDispoTimer = null;
+
+  const COLORS = {
+    libre:   '#10b981',
+    partiel: '#f59e0b',
+    occupe:  '#ef4444',
+    panne:   '#94a3b8',
+    reserve: '#7c3aed',
+  };
+
+  // ── PHOTO PREVIEW ──────────────────────────────────────────────────────────
+  const IS_TOUCH = window.matchMedia('(hover: none), (pointer: coarse)').matches;
+  const photoOverlay = document.getElementById('photo-overlay');
+
+  const photoPreview = document.createElement('div');
+  photoPreview.className = 'photo-hover-preview';
+  photoPreview.innerHTML = `
+    <button class="php-close" aria-label="Fermer">&times;</button>
+    <div class="php-img-wrap">
+      <img src="" alt="Photo emplacement">
+      <span class="php-badge"></span>
+    </div>
+    <div class="php-body">
+      <div class="php-code"></div>
+      <div class="php-nom"></div>
+      <div class="php-meta"></div>
+    </div>`;
+  document.body.appendChild(photoPreview);
+
+  const photoPreviewImg   = photoPreview.querySelector('img');
+  const photoPreviewBadge = photoPreview.querySelector('.php-badge');
+  const photoPreviewCode  = photoPreview.querySelector('.php-code');
+  const photoPreviewNom   = photoPreview.querySelector('.php-nom');
+  const photoPreviewMeta  = photoPreview.querySelector('.php-meta');
+  const photoPreviewClose = photoPreview.querySelector('.php-close');
+
+  function showPhotoPreview(info, evt) {
+    if (!info || !info.url) return;
+    photoPreviewImg.src = info.url;
+    photoPreviewBadge.textContent = info.label ? `Face ${info.label}` : '';
+    photoPreviewBadge.style.display = info.label ? 'inline-flex' : 'none';
+    photoPreviewCode.textContent = info.code || '';
+    photoPreviewNom.textContent = info.nom || '';
+    let tags = '';
+    if (info.quartier) tags += `<span class="php-tag"><i class="bi bi-geo-alt"></i>${info.quartier}</span>`;
+    if (info.format_display) tags += `<span class="php-tag"><i class="bi bi-aspect-ratio"></i>${info.format_display}</span>`;
+    photoPreviewMeta.innerHTML = tags;
+    photoPreview.style.display = 'block';
+    if (IS_TOUCH) {
+      photoOverlay.style.display = 'block';
+    } else {
+      movePhotoPreview(evt);
+    }
+  }
+
+  function movePhotoPreview(evt) {
+    if (IS_TOUCH || !evt) return;
+    const w = 260, h = 300, offset = 16;
+    let x = evt.clientX + offset, y = evt.clientY + offset;
+    if (x + w > window.innerWidth)  x = evt.clientX - w - offset;
+    if (y + h > window.innerHeight) y = window.innerHeight - h - offset;
+    photoPreview.style.left = x + 'px';
+    photoPreview.style.top  = y + 'px';
+  }
+
+  function hidePhotoPreview() {
+    photoPreview.style.display = 'none';
+    photoOverlay.style.display = 'none';
+  }
+
+  photoPreviewClose.addEventListener('click', hidePhotoPreview);
+  photoOverlay.addEventListener('click', hidePhotoPreview);
+  photoPreview.addEventListener('click', (e) => e.stopPropagation());
+
+  document.addEventListener('mouseover', (e) => {
+    if (IS_TOUCH) return;
+    const trigger = e.target.closest('.photo-trigger');
+    if (trigger) showPhotoPreview(JSON.parse(trigger.dataset.photoInfo), e);
+  });
+  document.addEventListener('mousemove', (e) => {
+    if (IS_TOUCH) return;
+    if (photoPreview.style.display === 'block' && e.target.closest('.photo-trigger')) movePhotoPreview(e);
+  });
+  document.addEventListener('mouseout', (e) => {
+    if (IS_TOUCH) return;
+    if (e.target.closest('.photo-trigger')) hidePhotoPreview();
+  });
+  document.addEventListener('click', (e) => {
+    if (!IS_TOUCH) return;
+    const trigger = e.target.closest('.photo-trigger');
+    if (trigger) {
+      e.preventDefault(); e.stopPropagation();
+      showPhotoPreview(JSON.parse(trigger.dataset.photoInfo), e);
+    }
+  });
+
+  function buildPhotoTrigger(p, face) {
+    const url = (face && face.photo_url) || p.photo_url;
+    if (!url) return '';
+    const info = JSON.stringify({
+      url, code: p.code, nom: p.nom,
+      quartier: p.quartier || p.ville,
+      format_display: p.format_display,
+      label: face ? face.label : null,
+    }).replace(/"/g, '&quot;');
+    return `<span class="photo-trigger" data-photo-info="${info}" title="Voir la photo">
+              <i class="bi bi-camera-fill"></i>
+            </span>`;
+  }
+
+  // ── CARTE ─────────────────────────────────────────────────────────────────
+  const map = L.map('map-resa', { zoomControl: true }).setView([12.3714, -1.5197], 12);
+  window.buildSafeLeafletTiles(map, {
+    attribution: '&copy; OpenStreetMap contributors',
+    maxZoom: 19
+  });
+
+  function makeIcon(color, type, selected) {
+    const fillColor = selected ? '#dde7e2' : '#ffffff';
+    const inner = `<rect x="8" y="5" width="14" height="10" rx="2" fill="${fillColor}" stroke="${color}" stroke-width="1.8"/>
+                   <line x1="15" y1="15" x2="15" y2="20" stroke="${color}" stroke-width="1.5"/>`;
+    const id = 'shpanneau' + (selected ? 's' : '');
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 30 38">
+      <defs><filter id="${id}"><feDropShadow dx="0" dy="2" stdDeviation="2.5" flood-opacity=".28"/></filter></defs>
+      <path d="M15 2C9.477 2 5 6.477 5 12c0 7.5 10 24 10 24s10-16.5 10-24C25 6.477 20.523 2 15 2z"
+            fill="${color}" filter="url(#${id})"/>
+      ${inner}
+    </svg>`;
+    return L.divIcon({ html: svg, iconSize: [32,40], iconAnchor: [16,40], popupAnchor: [0,-42], className: '' });
+  }
+
+  function getColor(p) {
+    if (p.etat === 'panne') return COLORS.panne;
+    const faces = p.faces || [];
+    if (!faces.length) return COLORS.panne;
+    const pannes = faces.filter(f => f.etat === 'panne').length;
+    if (pannes === faces.length) return COLORS.panne;
+    const libres = faces.filter(f => getFaceStatut(f) === 'libre').length;
+    if (libres === 0) return COLORS.occupe;
+    if (libres === faces.length) return COLORS.libre;
+    return COLORS.partiel;
+  }
+
+  function getFaceStatut(face) {
+    if (face.etat === 'panne') return 'panne';
+    if (datesOk) return facesOccupees.has(face.id) ? 'occupe' : 'libre';
+    if (face.dispo === false) return 'occupe';
+    if (face.disponibles === false && face.dispo === true) return 'occupe';
+    return 'libre';
+  }
+
+  function renderMarkers(features) {
+    Object.values(markersMap).forEach(m => map.removeLayer(m));
+    markersMap = {};
+    features.forEach(f => {
+      const p = f.properties;
+      const isSelected = isPanierContainsSupport(p.id);
+      const color = isSelected ? '#932E2B' : getColor(p);
+      const marker = L.marker(
+        [f.geometry.coordinates[1], f.geometry.coordinates[0]],
+        { icon: makeIcon(color, p.type, isSelected) }
+      );
+      marker.on('click', () => openPopupById(p.id, marker));
+      marker.addTo(map);
+      markersMap[String(p.id)] = marker;
+    });
+  }
+
+  function isPanierContainsSupport(supportId) {
+    return Object.values(panier).some(item => item.support_id === String(supportId));
+  }
+
+  // ── POPUP PANNEAU ──────────────────────────────────────────────────────────
+  function openPopupById(supportId, marker) {
+    if (currentPopup) currentPopup.remove();
+    const feat = allFeatures.find(f => f.properties.id === supportId);
+    if (!feat) return;
+    const p = feat.properties;
+    const faces = (p.faces || []).filter(face => getFaceStatut(face) !== 'panne');
+
+    let facesHtml = '';
+    faces.forEach(face => {
+      const key = String(face.id);
+      const inPanier = !!panier[key];
+      const statut = getFaceStatut(face);
+      const canToggle = statut === 'libre' || inPanier;
+      const icon = inPanier ? 'bi-dash-circle' : (canToggle ? 'bi-plus-circle' : 'bi-lock-fill');
+      const labelMap = { occupe:'Occupée' };
+      const txt = inPanier ? `${face.label} — Retirer`
+                : canToggle ? `${face.label} — Ajouter`
+                : `${face.label} — ${labelMap[statut] || statut}`;
+      const disabled = !canToggle ? 'disabled' : '';
+      const cls = inPanier ? 'selected' : (!datesOk && !inPanier && statut === 'libre' ? 'libre' : statut);
+      const photoTrigger = buildPhotoTrigger(p, face);
+      facesHtml += `
+        <div class="rl-face-row">
+          <button class="rl-face-btn ${cls}" ${disabled}
+            onclick="toggleFace('${key}','${escQ(p.code)}','${face.label}','${escQ(p.quartier||p.ville||'')}','${p.id}')">
+            <span><i class="bi ${icon} me-1"></i>${txt}</span>
+          </button>
+          ${photoTrigger}
+        </div>`;
+    });
+
+    const noteDate = !datesOk
+      ? `<div style="margin-top:8px;padding:5px 8px;background:#fef9c3;border-radius:5px;
+                    font-size:.68rem;color:#854d0e;display:flex;align-items:center;gap:5px;">
+          <i class="bi bi-calendar-event"></i>Saisissez la période pour valider la disponibilité.
+        </div>` : '';
+
+    const photoHtml = p.photo_url
+      ? `<div class="rl-popup-photo-wrap"><img src="${p.photo_url}" alt="Photo ${escQ(p.code)}"></div>`
+      : '';
+
+    currentPopup = L.popup({ maxWidth: 280, closeButton: true })
+      .setLatLng(marker.getLatLng())
+      .setContent(`
+        <div class="rl-popup">
+          ${photoHtml}
+          <div class="rl-popup-code">${p.code}</div>
+          <div class="rl-popup-nom">${p.nom}</div>
+          <div class="rl-popup-addr"><i class="bi bi-geo-alt"></i>${p.quartier || p.ville || ''}</div>
+          <div class="rl-popup-faces">
+            ${facesHtml || '<span style="font-size:.74rem;color:#94a3b8">Aucune face disponible</span>'}
+          </div>
+          ${noteDate}
+        </div>`)
+      .openOn(map);
+  }
+
+  function escQ(s) { return String(s).replace(/\\/g,'\\\\').replace(/'/g,"\\'"); }
+
+  // ── FILTRES ────────────────────────────────────────────────────────────────
+  function getFilteredFeatures(isListeView = false) {
+    const prefix = isListeView ? 'list-filter-' : 'filter-';
+    const ville    = document.getElementById(prefix + 'ville').value;
+    const categorie= document.getElementById(prefix + 'categorie').value;
+    const quartier = document.getElementById(prefix + 'quartier').value;
+    const dispo    = document.getElementById(prefix + 'dispo').value;
+    const fmt      = document.getElementById(prefix + 'format').value;
+    let q = '';
+    if (isListeView) q = (document.getElementById('list-search').value || '').toLowerCase().trim();
+
+    return allFeatures.filter(f => {
+      const p = f.properties;
+      if (p.type !== 'panneau') return false;
+      if (ville && p.ville !== ville) return false;
+      if (categorie && p.categorie !== categorie) return false;
+      if (quartier && p.quartier !== quartier) return false;
+      if (fmt && p.format !== fmt) return false;
+      if (q && !String(p.code||'').toLowerCase().includes(q)
+            && !(p.quartier||'').toLowerCase().includes(q)
+            && !(p.nom||'').toLowerCase().includes(q)) return false;
+      if (dispo === 'libre') {
+        const faces = p.faces || [];
+        if (!faces.some(face => getFaceStatut(face) === 'libre')) return false;
+      }
+      return true;
+    });
+  }
+
+  function applyCarteFilters(fitCamera = false) {
+    const filtered = getFilteredFeatures(false);
+    renderMarkers(filtered);
+    if (fitCamera) fitMapToFeatures(filtered);
+  }
+
+  function fitMapToFeatures(features) {
+    if (!features.length) return;
+    if (features.length === 1) {
+      const [lng, lat] = features[0].geometry.coordinates;
+      map.setView([lat, lng], 15);
+      return;
+    }
+    const bounds = L.latLngBounds(features.map(f => [f.geometry.coordinates[1], f.geometry.coordinates[0]]));
+    map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
+  }
+
+  function getPanneaux() { return allFeatures.filter(f => f.properties.type === 'panneau'); }
+
+  function matchesFacet(p, filters, skip) {
+    if (skip !== 'ville'     && filters.ville     && p.ville     !== filters.ville)     return false;
+    if (skip !== 'categorie' && filters.categorie && p.categorie !== filters.categorie) return false;
+    if (skip !== 'quartier'  && filters.quartier  && p.quartier  !== filters.quartier)  return false;
+    if (skip !== 'format'    && filters.format    && p.format    !== filters.format)    return false;
+    return true;
+  }
+
+  function formatMeasure(label) {
+    const text = String(label || '');
+    const displayedMeasure = text.match(/\(([\d.,]+)\s*(?:m²|cellules?)/i);
+    if (displayedMeasure) return Number(displayedMeasure[1].replace(',', '.'));
+    const dimensions = text.match(/(\d+(?:[.,]\d+)?)\s*m?\s*[x×*]\s*(\d+(?:[.,]\d+)?)/i);
+    if (!dimensions) return null;
+    return Number(dimensions[1].replace(',', '.')) * Number(dimensions[2].replace(',', '.'));
+  }
+
+  function compareFormatLabels(first, second) {
+    const fm1 = formatMeasure(first), fm2 = formatMeasure(second);
+    if (fm1 === null && fm2 !== null) return 1;
+    if (fm1 !== null && fm2 === null) return -1;
+    if (fm1 !== null && fm2 !== null && fm1 !== fm2) return fm1 - fm2;
+    return String(first).localeCompare(String(second), undefined, { numeric: true, sensitivity: 'base' });
+  }
+
+  function refreshFacetSelects(prefix) {
+    const elVille     = document.getElementById(prefix + 'ville');
+    const elCategorie = document.getElementById(prefix + 'categorie');
+    const elQuartier  = document.getElementById(prefix + 'quartier');
+    const elFormat    = document.getElementById(prefix + 'format');
+    const current = {
+      ville:     elVille     ? elVille.value     : '',
+      categorie: elCategorie ? elCategorie.value : '',
+      quartier:  elQuartier  ? elQuartier.value  : '',
+      format:    elFormat    ? elFormat.value    : '',
+    };
+    const panneaux = getPanneaux();
+
+    function rebuild(el, field, skipKey, labelFn) {
+      if (!el) return;
+      const values = new Map();
+      panneaux.forEach(f => {
+        const p = f.properties;
+        if (!matchesFacet(p, current, skipKey)) return;
+        const val = p[field];
+        if (!val) return;
+        if (!values.has(val)) values.set(val, labelFn ? labelFn(p) : val);
+      });
+      const placeholder = el.options[0];
+      el.innerHTML = '';
+      el.appendChild(placeholder);
+      Array.from(values.entries())
+        .sort((a, b) => field === 'format'
+          ? compareFormatLabels(a[1], b[1])
+          : String(a[1]).localeCompare(String(b[1])))
+        .forEach(([val, lbl]) => {
+          const opt = document.createElement('option');
+          opt.value = val; opt.textContent = lbl;
+          el.appendChild(opt);
+        });
+      el.value = (current[skipKey] && values.has(current[skipKey])) ? current[skipKey] : '';
+    }
+
+    rebuild(elVille,     'ville',     'ville');
+    rebuild(elCategorie, 'categorie', 'categorie');
+    rebuild(elQuartier,  'quartier',  'quartier');
+    rebuild(elFormat,    'format',    'format', p => p.format_display || p.format);
+  }
+
+  function goToOnMap(supportId) {
+    ['filter-ville', 'filter-categorie', 'filter-quartier', 'filter-format', 'filter-dispo'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.value = '';
+    });
+    refreshFacetSelects('filter-');
+    applyCarteFilters(false);
+    switchView('carte');
+    setTimeout(() => {
+      map.invalidateSize();
+      const marker = markersMap[String(supportId)];
+      if (marker) {
+        map.setView(marker.getLatLng(), 16);
+        openPopupById(parseInt(supportId, 10), marker);
+      }
+    }, 80);
+  }
+
+  function switchView(vue) {
+    currentView = vue;
+    document.getElementById('btn-vue-carte').classList.toggle('active', vue === 'carte');
+    document.getElementById('btn-vue-liste').classList.toggle('active', vue === 'liste');
+    document.getElementById('view-carte').style.display    = vue === 'carte' ? 'flex' : 'none';
+    document.getElementById('view-liste').style.display    = vue === 'liste' ? 'block' : 'none';
+    document.getElementById('filtres-carte').style.display = vue === 'carte' ? 'flex' : 'none';
+    document.getElementById('filtres-liste').style.display = vue === 'liste' ? 'flex' : 'none';
+    if (vue === 'carte') setTimeout(() => map && map.invalidateSize(), 50);
+    else renderListe();
+  }
+
+  function renderListe() {
+    const grid = document.getElementById('liste-grid');
+    const filtered = getFilteredFeatures(true);
+    if (!filtered.length) {
+      grid.innerHTML = `<div class="liste-empty"><i class="bi bi-inbox"></i><p>Aucun panneau ne correspond aux filtres.</p></div>`;
+      return;
+    }
+
+    const villes = new Map();
+    filtered.forEach(f => {
+      const p = f.properties;
+      const ville   = p.ville || 'Ville non renseignée';
+      const format  = p.format_display || p.format || 'Format non renseigné';
+      const quartier= p.quartier || 'Quartier non renseigné';
+      if (!villes.has(ville)) villes.set(ville, new Map());
+      const formats = villes.get(ville);
+      if (!formats.has(format)) formats.set(format, new Map());
+      const quartiers = formats.get(format);
+      if (!quartiers.has(quartier)) quartiers.set(quartier, []);
+      quartiers.get(quartier).push(f);
+    });
+
+    let html = '';
+    Array.from(villes.keys()).sort().forEach(ville => {
+      const formats = villes.get(ville);
+      const totalVille = Array.from(formats.values())
+        .reduce((acc, qMap) => acc + Array.from(qMap.values()).reduce((a, arr) => a + arr.length, 0), 0);
+      html += `<div class="liste-group-ville">
+        <i class="bi bi-geo-alt-fill"></i> ${ville}
+        <span class="count-badge">${totalVille} panneau${totalVille > 1 ? 'x' : ''}</span>
+      </div>`;
+      Array.from(formats.keys()).sort(compareFormatLabels).forEach(format => {
+        const quartiers = formats.get(format);
+        const totalFormat = Array.from(quartiers.values()).reduce((acc, arr) => acc + arr.length, 0);
+        html += `<div class="liste-group-format">
+          <i class="bi bi-aspect-ratio-fill"></i> ${format}
+          <span class="count-badge">${totalFormat} panneau${totalFormat > 1 ? 'x' : ''}</span>
+        </div>`;
+        Array.from(quartiers.keys()).sort().forEach(quartier => {
+          html += `<div class="liste-group-quartier"><i class="bi bi-signpost-split-fill"></i> ${quartier}</div>`;
+          html += quartiers.get(quartier).map(f => buildSupportCard(f.properties)).join('');
+        });
+      });
+    });
+    grid.innerHTML = html;
+  }
+
+  function buildSupportCard(p) {
+    const hasSelected = isPanierContainsSupport(p.id);
+    const faces = (p.faces || []).filter(face => getFaceStatut(face) !== 'panne');
+    const facesHtml = faces.map(face => {
+      const key = String(face.id);
+      const inPanier = !!panier[key];
+      const statut = getFaceStatut(face);
+      const canToggle = statut === 'libre' || inPanier;
+      const cls = inPanier ? 'selected' : statut;
+      const icon = inPanier ? 'bi-dash-circle-fill' : (canToggle ? 'bi-plus-circle' : 'bi-lock-fill');
+      const badgeLabels = { libre:'Disponible', occupe:'Occupée' };
+      const badge = inPanier ? 'Sélectionnée' : (badgeLabels[statut] || statut);
+      const disabled = (!canToggle && !inPanier) ? 'disabled' : '';
+      const onclick = (canToggle || inPanier)
+        ? `onclick="toggleFace('${key}','${escQ(p.code)}','${face.label}','${escQ(p.quartier||p.ville||'')}','${p.id}');renderListe()"`
+        : '';
+      const photoTrigger = buildPhotoTrigger(p, face);
+      return `<div class="face-row">
+        <button class="face-btn ${cls}" ${disabled} ${onclick}>
+          <span class="fb-left"><i class="bi ${icon}"></i> ${face.label}</span>
+          <span class="fb-badge">${badge}</span>
+        </button>
+        ${photoTrigger}
+      </div>`;
+    }).join('');
+    const formatBadge = p.format_display ? `<span class="sc-format">${p.format_display}</span>` : '';
+    return `<div class="support-card ${hasSelected ? 'has-selected' : ''}" id="sc-${p.id}">
+      <div class="sc-header">
+        <div class="sc-icon">🪧</div>
+        <div class="sc-info">
+          <div class="sc-code" style='text-align:center'>${p.code}</div>
+          <div class="sc-nom">${p.nom}</div>
+        </div>
+        ${formatBadge}
+      </div>
+      <div class="sc-faces">
+        ${facesHtml || '<span style="font-size:.7rem;color:#94a3b8;padding:4px">Aucune face disponible</span>'}
+      </div>
+      <button type="button" class="sc-map-btn" onclick="goToOnMap('${p.id}')">
+        <i class="bi bi-map"></i> Voir sur la carte
+      </button>
+    </div>`;
+  }
+
+  function populateAllSelects() {
+    refreshFacetSelects('filter-');
+    refreshFacetSelects('list-filter-');
+    applyInitialFiltres();
+  }
+
+  function applyInitialFiltres() {
+    const { ville, categorie, format } = initialFiltres;
+    if (!ville && !categorie && !format) return;
+    const setSelectValue = (id, value) => {
+      const el = document.getElementById(id);
+      if (el && value) {
+        const optionExists = Array.from(el.options).some(o => o.value === value);
+        if (optionExists) el.value = value;
+      }
+    };
+    ['filter-', 'list-filter-'].forEach(prefix => {
+      setSelectValue(prefix + 'ville', ville);
+      setSelectValue(prefix + 'categorie', categorie);
+      setSelectValue(prefix + 'format', format);
+      refreshFacetSelects(prefix);
+    });
+    applyCarteFilters(true);
+    if (currentView === 'liste') renderListe();
+  }
+
+  // Triggers carte
+  function onCarteFilterChange() { refreshFacetSelects('filter-'); applyCarteFilters(true); }
+  document.getElementById('filter-ville').addEventListener('change', onCarteFilterChange);
+  document.getElementById('filter-categorie').addEventListener('change', onCarteFilterChange);
+  document.getElementById('filter-quartier').addEventListener('change', onCarteFilterChange);
+  document.getElementById('filter-format').addEventListener('change', onCarteFilterChange);
+  document.getElementById('filter-dispo').addEventListener('change', () => applyCarteFilters(true));
+
+  // Triggers liste
+  function onListeFilterChange() { refreshFacetSelects('list-filter-'); renderListe(); }
+  document.getElementById('list-filter-ville').addEventListener('change', onListeFilterChange);
+  document.getElementById('list-filter-categorie').addEventListener('change', onListeFilterChange);
+  document.getElementById('list-filter-quartier').addEventListener('change', onListeFilterChange);
+  document.getElementById('list-filter-format').addEventListener('change', onListeFilterChange);
+  document.getElementById('list-filter-dispo').addEventListener('change', renderListe);
+  document.getElementById('list-search').addEventListener('input', renderListe);
+
+  // ── DATES ─────────────────────────────────────────────────────────────────
+  const elDateDebut  = document.getElementById('date-debut');
+  const elDateFin    = document.getElementById('date-fin');
+  const elStatus     = document.getElementById('dates-status');
+  const elDureeJours = document.getElementById('duree-jours');
+
+  function addDaysToDateStr(dateStr, days) {
+    const d = new Date(dateStr + 'T00:00:00');
+    d.setDate(d.getDate() + days);
+    return d.toISOString().slice(0, 10);
+  }
+
+  function diffDaysInclusive(d1Str, d2Str) {
+    const d1 = new Date(d1Str + 'T00:00:00'), d2 = new Date(d2Str + 'T00:00:00');
+    return Math.round((d2 - d1) / 86400000) + 1;
+  }
+
+  function recalcDateFinFromDuree() {
+    const d1 = elDateDebut ? elDateDebut.value : '';
+    const duree = elDureeJours ? parseInt(elDureeJours.value, 10) : NaN;
+    if (!d1) { datesOk = false; facesOccupees = new Set(); facesInfo = {}; setDatesStatus('waiting', 'Saisissez la date de début'); return; }
+    if (!duree || duree < 1) return;
+    elDateFin.value = addDaysToDateStr(d1, duree - 1);
+    onDatesChange();
+  }
+
+  function recalcDureeFromDateFin() {
+    const d1 = elDateDebut ? elDateDebut.value : '', d2 = elDateFin ? elDateFin.value : '';
+    if (!d1 || !d2 || d1 >= d2) { if (elDureeJours) elDureeJours.value = ''; return; }
+    if (elDureeJours) elDureeJours.value = diffDaysInclusive(d1, d2);
+  }
+
+  function onDateDebutChange() {
+    if (elDureeJours && elDureeJours.value) { recalcDateFinFromDuree(); }
+    else { recalcDureeFromDateFin(); onDatesChange(); }
+  }
+  function onDateFinChange() { recalcDureeFromDateFin(); onDatesChange(); }
+  function onDureeChange()   { recalcDateFinFromDuree(); }
+
+  function syncHiddenDates() {
+    const hd = document.getElementById('hidden-date-debut');
+    const hf = document.getElementById('hidden-date-fin');
+    if (hd) hd.value = elDateDebut ? elDateDebut.value : '';
+    if (hf) hf.value = elDateFin   ? elDateFin.value   : '';
+  }
+
+  function setDatesStatus(state, text) {
+    if (!elStatus) return;
+    elStatus.className = state;
+    const icons = {
+      waiting: '<i class="bi bi-info-circle"></i>',
+      loading: '<div class="spin"></div>',
+      ok:      '<i class="bi bi-check-circle-fill"></i>',
+      error:   '<i class="bi bi-exclamation-triangle-fill"></i>',
+    };
+    elStatus.innerHTML = `${icons[state] || ''} ${text}`;
+  }
+
+  function resetPanier() {
+    if (Object.keys(panier).length === 0) return;
+    panier = {};
+    updatePanier();
+    if (currentView === 'liste') renderListe();
+  }
+
+  function onDatesChange() {
+    resetPanier();
+    syncHiddenDates();
+    const d1 = elDateDebut ? elDateDebut.value : '', d2 = elDateFin ? elDateFin.value : '';
+    if (d1 && elDateFin) elDateFin.min = d1;
+    if (!d1 || !d2) {
+      datesOk = false; facesOccupees = new Set(); facesInfo = {};
+      setDatesStatus('waiting', 'Saisissez les dates pour voir les disponibilités');
+      refreshAll(); return;
+    }
+    if (d1 >= d2) {
+      datesOk = false; facesOccupees = new Set(); facesInfo = {};
+      setDatesStatus('error', 'La date de fin doit être après la date de début');
+      refreshAll(); return;
+    }
+    clearTimeout(checkDispoTimer);
+    setDatesStatus('loading', 'Vérification en cours…');
+    checkDispoTimer = setTimeout(() => checkDispo(d1, d2), 400);
+  }
+
+  function initDatesFromServer() {
+    const d1 = elDateDebut ? elDateDebut.value : '', d2 = elDateFin ? elDateFin.value : '';
+    if (!d1 || !d2 || d1 >= d2) return;
+    recalcDureeFromDateFin();
+    if (elDateFin) elDateFin.min = d1;
+    clearTimeout(checkDispoTimer);
+    setDatesStatus('loading', 'Vérification en cours…');
+    checkDispo(d1, d2);
+  }
+
+  function checkDispo(d1, d2) {
+    const url = `/gestion/campaigns/api/check-dispo/0/?date_debut=${encodeURIComponent(d1)}&date_fin=${encodeURIComponent(d2)}`;
+    fetch(url)
+      .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
+      .then(data => {
+        const facesData = data.faces || {};
+        facesOccupees = new Set(
+          Object.entries(facesData)
+            .filter(([, info]) => info && info.statut !== 'libre' && info.statut !== 'panne')
+            .map(([id]) => Number(id))
+        );
+        facesInfo = facesData;
+        datesOk = true;
+        const nbTotal  = allFeatures.filter(f => f.properties.type === 'panneau').reduce((acc, f) => acc + (f.properties.faces || []).length, 0);
+        const nbLibres = nbTotal - facesOccupees.size;
+        setDatesStatus('ok', `${nbLibres} face${nbLibres > 1 ? 's' : ''} disponible${nbLibres > 1 ? 's' : ''} sur cette période`);
+        refreshAll();
+      })
+      .catch(err => {
+        console.warn('check-dispo:', err);
+        datesOk = false; facesOccupees = new Set(); facesInfo = {};
+        setDatesStatus('error', 'Vérification impossible — statuts instantanés affichés');
+        refreshAll();
+      });
+  }
+
+  function refreshAll() {
+    applyCarteFilters();
+    if (currentView === 'liste') renderListe();
+    updatePanier();
+  }
+
+  if (elDateDebut)  elDateDebut.addEventListener('change', onDateDebutChange);
+  if (elDateFin)    elDateFin.addEventListener('change', onDateFinChange);
+  if (elDureeJours) elDureeJours.addEventListener('input', onDureeChange);
+
+  // ── PANIER ────────────────────────────────────────────────────────────────
+  function toggleFace(faceId, code, label, quartier, supportId) {
+    const key = String(faceId);
+    if (panier[key]) delete panier[key];
+    else panier[key] = { code, label, quartier, support_id: String(supportId) };
+    updatePanier();
+    if (currentView === 'carte') {
+      const marker = markersMap[String(supportId)];
+      if (marker) openPopupById(parseInt(supportId), marker);
+    }
+    if (currentView === 'liste') renderListe();
+  }
+
+  function updatePanier() {
+    const items   = Object.entries(panier);
+    const count   = items.length;
+    const bodyEl  = document.getElementById('panier-body');
+    const emptyEl = document.getElementById('panier-empty');
+    if (!bodyEl) return;
+
+    bodyEl.querySelectorAll('.panier-item').forEach(el => el.remove());
+
+    const countEl    = document.getElementById('panier-count');
+    const btnCount   = document.getElementById('btn-count');
+    const btnEnvoyer = document.getElementById('btn-envoyer');
+    const btnVider   = document.getElementById('btn-vider-panier');
+    const facesInput = document.getElementById('faces-input');
+
+    if (countEl)    countEl.textContent  = count;
+    if (btnCount)   btnCount.textContent = count;
+    if (facesInput) facesInput.value     = JSON.stringify(Object.keys(panier));
+
+    // Activer le bouton uniquement si panier non vide ET dates ok
+    const canSubmit = count > 0 && datesOk;
+    if (btnEnvoyer) btnEnvoyer.disabled = !canSubmit;
+    if (btnVider)   btnVider.style.display = count > 0 ? 'flex' : 'none';
+
+    if (count === 0) {
+      if (emptyEl) emptyEl.style.display = '';
+    } else {
+      if (emptyEl) emptyEl.style.display = 'none';
+      items.forEach(([uuid, item]) => {
+        const el = document.createElement('div');
+        el.className = 'panier-item';
+        el.innerHTML = `
+          <div class="pi-icon">🪧</div>
+          <div class="pi-info">
+            <div class="pi-code">${item.code} · Face ${item.label}</div>
+            <div class="pi-addr">${item.quartier || ''}</div>
+          </div>
+          <button class="pi-remove" onclick="removePanierItem('${uuid}')" title="Retirer">
+            <i class="bi bi-x"></i>
+          </button>`;
+        if (emptyEl) bodyEl.insertBefore(el, emptyEl);
+        else bodyEl.appendChild(el);
+      });
+    }
+
+    allFeatures.forEach(f => {
+      const p = f.properties;
+      if (p.type !== 'panneau') return;
+      const marker = markersMap[String(p.id)];
+      if (!marker) return;
+      const isSel = isPanierContainsSupport(p.id);
+      marker.setIcon(makeIcon(isSel ? '#932E2B' : getColor(p), 'panneau', isSel));
+    });
+  }
+
+  function removePanierItem(faceId) {
+    const item = panier[faceId];
+    delete panier[faceId];
+    updatePanier();
+    if (currentView === 'liste') renderListe();
+    if (currentView === 'carte' && item) {
+      const marker = markersMap[item.support_id];
+      if (marker) openPopupById(parseInt(item.support_id), marker);
+    }
+  }
+
+  document.getElementById('btn-vider-panier').addEventListener('click', () => {
+    panier = {}; updatePanier();
+    if (currentView === 'liste') renderListe();
+  });
+
+  // ── TYPE CLIENT JS (afficher/masquer champs) ───────────────────────────────
+  function updateTypeClientUI() {
+    const radios = document.querySelectorAll('input[name="type_client"]');
+    let selected = '';
+    radios.forEach(r => { if (r.checked) selected = r.value; });
+    const refWrap     = document.getElementById('ref-client-wrap');
+    const newClientWrap = document.getElementById('new-client-wrap');
+    if (refWrap)     refWrap.style.display     = selected === 'existant' ? '' : 'none';
+    if (newClientWrap) newClientWrap.style.display = selected === 'existant' ? 'none' : '';
+  }
+
+  document.querySelectorAll('input[name="type_client"]').forEach(r => {
+    r.addEventListener('change', updateTypeClientUI);
+  });
+  // Init
+  updateTypeClientUI();
+
+  // ── SUBMIT : copier les champs visibles dans le form principal ─────────────
+  document.getElementById('form-reserver').addEventListener('submit', function(e) {
+    // Sync dates
+    syncHiddenDates();
+
+    // Copier nom_campagne, message, type_client, reference_client_saisie,
+    // nom_contact, societe, email, telephone dans le form
+    const fields = [
+      'nom_campagne', 'message', 'reference_client_saisie',
+      'nom_contact', 'societe', 'email', 'telephone',
+    ];
+    fields.forEach(name => {
+      const src = document.querySelector(`[name="${name}"]`);
+      if (src) {
+        let hidden = this.querySelector(`input[name="${name}"]`);
+        if (!hidden) {
+          hidden = document.createElement('input');
+          hidden.type = 'hidden'; hidden.name = name;
+          this.appendChild(hidden);
+        }
+        hidden.value = src.value;
+      }
+    });
+
+    // type_client (radio)
+    const tcChecked = document.querySelector('input[name="type_client"]:checked');
+    if (tcChecked) {
+      let hidden = this.querySelector('input[name="type_client"]');
+      if (!hidden) {
+        hidden = document.createElement('input');
+        hidden.type = 'hidden'; hidden.name = 'type_client';
+        this.appendChild(hidden);
+      }
+      hidden.value = tcChecked.value;
+    }
+  });
+
+  // ── CHARGEMENT GEOJSON ────────────────────────────────────────────────────
+  fetch('/gestion/inventory/api/geojson/')
+    .then(r => r.json())
+    .then(data => {
+      allFeatures = (data.features || []).filter(f => f.properties.type === 'panneau');
+      renderMarkers(allFeatures);
+      populateAllSelects();
+
+      {% if panier %}
+        {% for face in panier %}
+        (function() {
+          const fid  = '{{ face.pk }}';
+          const feat = allFeatures.find(f => (f.properties.faces || []).some(fc => String(fc.id) === fid));
+          if (feat) {
+            const p = feat.properties;
+            const fd = (p.faces || []).find(fc => String(fc.id) === fid);
+            if (fd) panier[fid] = { code: p.code, label: fd.label, quartier: p.quartier || p.ville, support_id: String(p.id) };
+          }
+        })();
+        {% endfor %}
+        updatePanier();
+      {% endif %}
+
+      initDatesFromServer();
+    })
+    .catch(err => {
+      console.error('GeoJSON error:', err);
+      const grid = document.getElementById('liste-grid');
+      if (grid) grid.innerHTML = '<div class="liste-empty"><i class="bi bi-exclamation-triangle"></i><p>Erreur de chargement.</p></div>';
+    });
+</script>
+{% endblock %}

@@ -1,8 +1,8 @@
 {% extends base_template|default:'portail/base_portail.html' %}
 {% load static %}
 
-{% block title %}{% if editing_request %}Modifier la demande — {% elif staff_mode %}Demande client — {% elif shared_request_mode %}Confirmer la demande — {% endif %}Sélectionnez votre emplacement — Étape 1{% endblock %}
-{% block topbar_title %}<i class="bi bi-plus-circle-fill me-1" style="color:var(--color-primary)"></i>{% if editing_request %}Modifier les emplacements de la demande{% elif staff_mode %}Sélectionnez les emplacements du client{% elif shared_request_mode %}Vérifiez votre demande{% else %}Sélectionnez votre emplacement{% endif %}{% endblock %}
+{% block title %}{% if editing_request or shared_edit_mode %}Modifier la demande — {% elif staff_mode %}Demande client — {% elif shared_request_mode %}Confirmer la demande — {% endif %}Sélectionnez votre emplacement — Étape 1{% endblock %}
+{% block topbar_title %}<i class="bi bi-plus-circle-fill me-1" style="color:var(--color-primary)"></i>{% if editing_request or shared_edit_mode %}Modifier la demande{% elif staff_mode %}Informations client, période et emplacements{% elif shared_request_mode %}Vérifiez votre demande{% else %}Sélectionnez votre emplacement{% endif %}{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -37,6 +37,379 @@
     --c-panne:    #94a3b8;
     --c-reserve:  #7c3aed;
     font-family: 'Inter', sans-serif;
+  }
+
+  .staff-demande-page {
+    max-width: 1680px;
+    margin: 0 auto;
+    padding: 8px 12px 24px;
+    color: #242a27;
+  }
+  .staff-demande-page .staff-request-heading {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin: 0 0 16px;
+    padding: 18px 22px;
+    border: 1px solid #e8e4dc;
+    border-radius: 8px;
+    background: linear-gradient(110deg, #fff 0%, #fbfaf6 100%);
+    box-shadow: 0 5px 18px rgba(37, 46, 41, .05);
+  }
+  .staff-request-heading-icon {
+    width: 48px;
+    height: 48px;
+    flex: 0 0 48px;
+    display: grid;
+    place-items: center;
+    border-radius: 8px;
+    background: #f7e9e7;
+    color: var(--color-primary);
+    font-size: 1.25rem;
+  }
+  .staff-request-eyebrow {
+    margin: 0 0 3px;
+    color: var(--color-primary);
+    font-size: .67rem;
+    font-weight: 800;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+  }
+  .staff-request-heading h1 {
+    margin: 0;
+    color: #262c29;
+    font-size: 1.2rem;
+    font-weight: 800;
+  }
+  .staff-request-heading p {
+    margin: 4px 0 0;
+    color: #727975;
+    font-size: .8rem;
+  }
+  .staff-demande-page .staff-client-card {
+    overflow: hidden;
+    margin-bottom: 14px;
+    border: 1px solid #e4e6e1;
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: 0 5px 18px rgba(37, 46, 41, .05);
+  }
+  .staff-client-card-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 15px 20px;
+    border-bottom: 1px solid #eceee9;
+    background: #fbfcfa;
+  }
+  .staff-section-number {
+    width: 30px;
+    height: 30px;
+    display: grid;
+    place-items: center;
+    flex: 0 0 30px;
+    border-radius: 9px;
+    background: var(--color-primary);
+    color: #fff;
+    font-size: .8rem;
+    font-weight: 800;
+  }
+  .staff-section-title {
+    margin: 0;
+    color: #2b312e;
+    font-size: .96rem;
+    font-weight: 800;
+  }
+  .staff-section-help {
+    margin: 2px 0 0;
+    color: #7a817d;
+    font-size: .75rem;
+  }
+  .staff-client-card-body { padding: 20px; }
+  .staff-demande-page .staff-field-label {
+    display: block;
+    margin-bottom: 6px;
+    color: #414944;
+    font-size: .76rem;
+    font-weight: 700;
+  }
+  .staff-demande-page .staff-field-control {
+    width: 100%;
+    min-height: 42px;
+    padding: 9px 12px;
+    border: 1px solid #dfe3dd;
+    border-radius: 8px;
+    background-color: #fff;
+    color: #2c332f;
+    font-size: .83rem;
+    transition: border-color .15s, box-shadow .15s;
+  }
+  .staff-demande-page .staff-field-control:focus {
+    border-color: var(--color-primary);
+    outline: 0;
+    box-shadow: 0 0 0 3px rgba(147, 46, 43, .11);
+  }
+  .staff-demande-page textarea.staff-field-control {
+    min-height: 78px;
+    resize: vertical;
+  }
+  .staff-client-type-label {
+    margin: 0 0 8px;
+    color: #414944;
+    font-size: .76rem;
+    font-weight: 700;
+  }
+  .staff-client-type-options {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 9px;
+  }
+  .staff-client-layout {
+    display: grid;
+    grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
+    gap: 26px;
+    align-items: start;
+  }
+  .staff-client-type-panel {
+    padding-right: 22px;
+    border-right: 1px solid #eceee9;
+  }
+  .staff-contact-fields {
+    min-width: 0;
+    padding-top: 2px;
+  }
+  .staff-contact-fields .staff-contact-option-title {
+    margin-bottom: 12px;
+    color: #333a36;
+    font-size: .9rem;
+    font-weight: 800;
+  }
+  .staff-contact-fields .staff-consent {
+    margin-top: 18px;
+    padding: 12px 14px;
+    border: 1px solid #e8ebe6;
+    border-radius: 9px;
+    background: #f9faf8;
+  }
+  .shared-edit-contact {
+    margin-bottom: 14px;
+    padding: 18px 20px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    background: var(--bg-card);
+    box-shadow: var(--shadow-sm);
+  }
+  .shared-edit-contact h2 { margin: 0 0 14px; font-size: .95rem; font-weight: 800; }
+  .shared-edit-contact .form-row { margin-bottom: 12px; }
+  .shared-edit-contact .client-type-toggle { display: flex; gap: 10px; }
+  .shared-edit-contact .client-type-option {
+    position: relative;
+    display: flex;
+    flex: 1;
+    align-items: center;
+    gap: 9px;
+    padding: 11px 13px;
+    border: 1px solid #dfe3dd;
+    border-radius: 8px;
+    background: #fff;
+    cursor: pointer;
+    font-size: .8rem;
+    font-weight: 700;
+  }
+  .shared-edit-contact .client-type-option input {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--color-primary);
+  }
+  .shared-edit-contact .form-grid-2 {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+  }
+  .shared-edit-contact [hidden] { display: none !important; }
+  .shared-edit-contact .form-control-e3 {
+    width: 100%;
+    min-height: 42px;
+    padding: 9px 12px;
+    border: 1px solid #dfe3dd;
+    border-radius: 8px;
+    background: #fff;
+    box-sizing: border-box;
+  }
+  @media (max-width: 600px) {
+    .shared-edit-contact .form-grid-2 { grid-template-columns: 1fr; gap: 0; }
+  }
+  @media (max-width: 768px) {
+    .staff-client-layout { grid-template-columns: 1fr; gap: 18px; }
+    .staff-client-type-panel {
+      padding: 0 0 16px;
+      border-right: 0;
+      border-bottom: 1px solid #eceee9;
+    }
+    .staff-client-type-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  .staff-client-type-option {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-height: 48px;
+    padding: 10px 13px;
+    border: 1px solid #e0e4de;
+    border-radius: 9px;
+    background: #fff;
+    color: #48504b;
+    font-size: .8rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all .15s ease;
+  }
+  .staff-client-type-option:hover {
+    border-color: #c9aaa7;
+    background: #fdf9f8;
+  }
+  .staff-client-type-option:has(input:checked) {
+    border-color: var(--color-primary);
+    background: #fcf4f3;
+    color: var(--color-primary);
+    box-shadow: 0 0 0 2px rgba(147, 46, 43, .07);
+  }
+  .staff-client-type-option input { margin: 0; accent-color: var(--color-primary); }
+  .staff-client-type-option i { font-size: 1rem; }
+  .staff-demande-page .dates-bar {
+    display: flex;
+    flex-wrap: nowrap;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 14px;
+    padding: 14px 18px;
+    border: 1px solid #e4e6e1;
+    border-radius: 8px;
+    background: #fff;
+    box-shadow: 0 5px 18px rgba(37, 46, 41, .05);
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+  .staff-demande-page .staff-format-filter { display: contents; }
+  .category-required-hint {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 14px;
+    border-bottom: 1px solid #e8ebe6;
+    background: #fbfcfa;
+    color: #68716b;
+    font-size: .78rem;
+    font-weight: 600;
+  }
+  .category-required-hint i { color: var(--color-primary); }
+  .staff-selection-heading {
+    display: flex;
+    align-items: center;
+    gap: 11px;
+    margin: 18px 2px 10px;
+  }
+  .staff-selection-heading .staff-section-number {
+    background: #f7e9e7;
+    color: var(--color-primary);
+  }
+  .staff-demande-page .dates-bar-label {
+    display: flex;
+    align-items: center;
+    color: #2e3531;
+    font-size: .84rem;
+    font-weight: 800;
+    letter-spacing: 0;
+    text-transform: none;
+    white-space: nowrap;
+    flex: 0 0 300px;
+  }
+  .staff-demande-page .dates-bar-label::before {
+    content: "2";
+    width: 25px;
+    height: 25px;
+    display: inline-grid;
+    place-items: center;
+    flex: 0 0 25px;
+    margin-right: 8px;
+    border-radius: 8px;
+    background: #f7e9e7;
+    color: var(--color-primary);
+    font-size: .73rem;
+    font-weight: 800;
+  }
+  .staff-demande-page .dates-bar-label i { display: none; }
+  .staff-period-hint {
+    display: inline;
+    margin-left: 5px;
+    color: #7a817d;
+    font-size: .66rem;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+  .staff-demande-page .date-input-wrap {
+    flex: 0 0 165px;
+    min-height: 43px;
+    gap: 8px;
+    padding: 6px 10px;
+    border: 1px solid #dfe3dd;
+    border-radius: 8px;
+    background: #fff;
+  }
+  .staff-demande-page .dates-bar-sep {
+    display: block;
+    flex: 0 0 auto;
+    white-space: nowrap;
+  }
+  .staff-demande-page #wrap-duree-jours { flex-basis: 145px; }
+  .staff-demande-page #wrap-duree-jours input { width: 65px !important; }
+  .staff-demande-page .dates-bar-label { flex: 0 0 300px; }
+  .staff-demande-page .date-input-wrap input { width: 100%; min-width: 0; }
+  .staff-demande-page #dates-status {
+    justify-content: center;
+    flex: 0 0 auto;
+    min-height: 36px;
+    margin-left: 0;
+    font-size: .69rem;
+    line-height: 1.3;
+    white-space: nowrap;
+  }
+  .staff-demande-page .main-section,
+  .staff-demande-page .panier-section {
+    border-color: #e4e6e1;
+    border-radius: 8px;
+    box-shadow: 0 5px 18px rgba(37, 46, 41, .05);
+  }
+  .staff-demande-page .section-header,
+  .staff-demande-page .panier-header {
+    min-height: 58px;
+    padding: 11px 14px;
+    border-color: #eceee9;
+    background: #fbfcfa;
+  }
+  .staff-demande-page .panier-title {
+    font-size: .88rem;
+  }
+  .staff-demande-page .resa-grid {
+    grid-template-columns: minmax(0, 1fr) 360px;
+    height: max(620px, calc(100vh - 500px));
+    min-height: 620px;
+  }
+  @media (max-width: 1200px) {
+    .staff-demande-page .dates-bar { justify-content: flex-start; }
+  }
+  @media (max-width: 992px) {
+    .staff-demande-page .resa-grid { height: auto; }
+  }
+  @media (max-width: 640px) {
+    .staff-demande-page { padding: 4px 0 18px; }
+    .staff-demande-page .staff-request-heading { padding: 14px; }
+    .staff-request-heading-icon { width: 42px; height: 42px; flex-basis: 42px; }
+    .staff-request-heading h1 { font-size: 1rem; }
+    .staff-client-card-header { padding: 13px 14px; }
+    .staff-client-card-body { padding: 15px; }
+    .staff-client-type-options { grid-template-columns: 1fr; }
+    .staff-demande-page .dates-bar { padding: 14px; }
+    .staff-demande-page .resa-grid { min-height: 0; }
   }
 
   /* ── WIZARD ──────────────────────────────────────────────── */
@@ -219,15 +592,12 @@
   .sc-header {
     grid-area: header; min-width: 0; padding: 12px 14px; background: var(--bg-card);
     border-bottom: 1px solid var(--border);
-    display: flex; align-items: flex-start; gap: 10px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: 12px;
   }
-  .sc-icon {
-    width: 30px; height: 30px; border-radius: 50%;
-    background: var(--color-primary); color: #fff;
-    display: flex; align-items: center; justify-content: center;
-    font-size: .7rem; font-weight: 800; flex-shrink: 0;
-  }
-  .sc-info { flex: 1; min-width: 0; }
+  .sc-info { min-width: 0; }
   .sc-code { font-size: .68rem; font-weight: 800; color: var(--color-primary); letter-spacing: .05em; }
   .sc-nom  { font-size: .9rem; font-weight: 700; color: var(--text); white-space: normal; overflow-wrap: anywhere; line-height: 1.4; }
   .sc-addr { font-size: .72rem; color: var(--text-muted); white-space: normal; overflow-wrap: anywhere; line-height: 1.4; }
@@ -478,7 +848,7 @@
     display: none;
     width: 260px;
     background: #fff;
-    border-radius: 14px;
+    border-radius: 8px;
     overflow: hidden;
     box-shadow: 0 12px 32px rgba(0,0,0,.22), 0 2px 8px rgba(0,0,0,.12);
     border: 1px solid rgba(0,0,0,.06);
@@ -597,10 +967,10 @@
 {% block page_toolbar %}{% endblock %}
 
 {% block content %}
-  <div class="reservation-page">
+  <div class="reservation-page{% if staff_mode %} staff-demande-page{% endif %}">
     {% if shared_request_mode %}
     <div class="alert alert-info">
-      Vérifiez les emplacements et les dates préparés par notre équipe. Vous pourrez les modifier avant d’envoyer la demande.
+      Modifiez vos coordonnées, la période ou les emplacements, puis vérifiez le récapitulatif avant l’envoi.
     </div>
     {% endif %}
 
@@ -620,22 +990,178 @@
     <div class="wizard-steps">
       <div class="step-item active">
         <div class="step-circle">1</div>
-        <span class="step-label">Sélection des emplacements & Période</span>
+        <span class="step-label">{% if staff_mode or shared_edit_mode %}Client, période & emplacements{% else %}Sélection des emplacements & Période{% endif %}</span>
       </div>
       <div class="step-item">
         <div class="step-circle">2</div>
-        <span class="step-label d-none d-md-inline ms-1">Informations sur votre campagne</span>
+        <span class="step-label d-none d-md-inline ms-1">{% if staff_mode or shared_edit_mode %}Récapitulatif & validation{% else %}Informations sur votre campagne{% endif %}</span>
       </div>
+      {% if not staff_mode and not shared_edit_mode %}
       <div class="step-item">
         <div class="step-circle">3</div>
         <span class="step-label d-none d-md-inline ms-1">Coordonnées</span>
       </div>
+      {% endif %}
     </div>
+
+    {% if staff_mode %}
+    <header class="staff-request-heading">
+      <div class="staff-request-heading-icon"><i class="bi bi-clipboard2-plus"></i></div>
+      <div>
+        <div class="staff-request-eyebrow">{% if editing_request %}Modification de demande{% else %}Nouvelle demande{% endif %}</div>
+        <h1>Client, période &amp; emplacements</h1>
+        <p>Renseignez le demandeur, définissez la période, puis sélectionnez les supports.</p>
+      </div>
+    </header>
+
+    <section class="staff-client-card">
+      <div class="staff-client-card-header">
+        <span class="staff-section-number">1</span>
+        <div>
+          <h2 class="staff-section-title">Client et coordonnées</h2>
+          <p class="staff-section-help">Indiquez à qui est destinée cette demande.</p>
+        </div>
+      </div>
+      <div class="staff-client-card-body">
+
+        <div class="staff-client-layout">
+          <div class="staff-client-type-panel">
+            <div class="staff-client-type-label">Demande faite pour</div>
+            <div class="staff-client-type-options">
+              <label class="staff-client-type-option" for="type_client_nouveau">
+                <input class="form-check-input me-1" type="radio" name="type_client"
+                      id="type_client_nouveau" value="nouveau" form="form-etape1"
+                      {% if contact_form.type_client.value != 'existant' %}checked{% endif %}>
+                <i class="bi bi-person-plus"></i>
+                <span>Nouveau prospect</span>
+              </label>
+              <label class="staff-client-type-option" for="type_client_existant">
+                <input class="form-check-input me-1" type="radio" name="type_client"
+                      id="type_client_existant" value="existant" form="form-etape1"
+                      {% if contact_form.type_client.value == 'existant' %}checked{% endif %}>
+                <i class="bi bi-person-check"></i>
+                <span>Client enregistré</span>
+              </label>
+            </div>
+            {% for error in contact_form.type_client.errors %}
+              <div class="text-danger small">{{ error }}</div>
+            {% endfor %}
+          </div>
+
+          <div class="staff-contact-fields">
+            {% if contact_form.non_field_errors %}
+              <div class="alert alert-danger py-2">{{ contact_form.non_field_errors }}</div>
+            {% endif %}
+            <div id="bloc-client-existant" style="display:none">
+              <div class="staff-contact-option-title">Sélectionner un client</div>
+              <label class="staff-field-label" for="{{ contact_form.client.id_for_label }}">Client enregistré</label>
+              {{ contact_form.client }}
+              {% for error in contact_form.client.errors %}
+                <div class="text-danger small">{{ error }}</div>
+              {% endfor %}
+            </div>
+
+            <div id="bloc-coordonnees-nouveau">
+              <div class="staff-contact-option-title">Coordonnées du nouveau prospect</div>
+              <div class="row g-3">
+                <div class="col-md-6">
+                  <label class="staff-field-label" for="{{ contact_form.nom_contact.id_for_label }}">Nom du contact</label>
+                  {{ contact_form.nom_contact }}
+                  {% for error in contact_form.nom_contact.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="col-md-6">
+                  <label class="staff-field-label" for="{{ contact_form.societe.id_for_label }}">Société / organisation</label>
+                  {{ contact_form.societe }}
+                  {% for error in contact_form.societe.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="col-md-6">
+                  <label class="staff-field-label" for="{{ contact_form.email.id_for_label }}">E-mail</label>
+                  {{ contact_form.email }}
+                  {% for error in contact_form.email.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                </div>
+                <div class="col-md-6">
+                  <label class="staff-field-label" for="{{ contact_form.telephone.id_for_label }}">Téléphone</label>
+                  {{ contact_form.telephone }}
+                  {% for error in contact_form.telephone.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+                </div>
+              </div>
+            </div>
+            <div class="form-check staff-consent">
+              {{ contact_form.accepte_contact }}
+              <label class="form-check-label" for="{{ contact_form.accepte_contact.id_for_label }}">
+                Le demandeur accepte d’être recontacté au sujet de cette demande.
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+    {% elif shared_edit_mode %}
+    <section class="shared-edit-contact">
+      <h2><i class="bi bi-person-vcard me-2" style="color:var(--color-primary)"></i>Vos coordonnées</h2>
+      {% if contact_form.non_field_errors %}
+        <div class="alert alert-danger py-2">{{ contact_form.non_field_errors }}</div>
+      {% endif %}
+      <div class="mb-3">
+        <div class="form-label-e3">Type de client</div>
+        <div class="client-type-toggle">
+          <label class="client-type-option" for="shared-type-nouveau">
+            <input id="shared-type-nouveau" type="radio" name="type_client" value="nouveau"
+                   form="form-etape1" {% if contact_form.type_client.value != 'existant' %}checked{% endif %}>
+            <i class="bi bi-person-plus"></i> Nouveau prospect
+          </label>
+          <label class="client-type-option" for="shared-type-existant">
+            <input id="shared-type-existant" type="radio" name="type_client" value="existant"
+                   form="form-etape1" {% if contact_form.type_client.value == 'existant' %}checked{% endif %}>
+            <i class="bi bi-person-check"></i> Client enregistré
+          </label>
+        </div>
+        {% for error in contact_form.type_client.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+      </div>
+      <div class="form-row" id="shared-reference-wrap" {% if contact_form.type_client.value != 'existant' %}hidden{% endif %}>
+        <label class="form-label-e3" for="{{ contact_form.reference_client_saisie.id_for_label }}">Votre référence client</label>
+        {{ contact_form.reference_client_saisie }}
+        {% for error in contact_form.reference_client_saisie.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+      </div>
+      <div id="shared-prospect-fields" {% if contact_form.type_client.value == 'existant' %}hidden{% endif %}>
+        <div class="form-grid-2">
+          <div class="form-row">
+            <label class="form-label-e3" for="{{ contact_form.nom_contact.id_for_label }}">Nom du contact</label>
+            {{ contact_form.nom_contact }}
+            {% for error in contact_form.nom_contact.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+          </div>
+          <div class="form-row">
+            <label class="form-label-e3" for="{{ contact_form.societe.id_for_label }}">Société / organisation</label>
+            {{ contact_form.societe }}
+            {% for error in contact_form.societe.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+          </div>
+          <div class="form-row">
+            <label class="form-label-e3" for="{{ contact_form.email.id_for_label }}">E-mail</label>
+            {{ contact_form.email }}
+            {% for error in contact_form.email.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+          </div>
+          <div class="form-row">
+            <label class="form-label-e3" for="{{ contact_form.telephone.id_for_label }}">Téléphone</label>
+            {{ contact_form.telephone }}
+            {% for error in contact_form.telephone.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+          </div>
+        </div>
+      </div>
+      {{ contact_form.accepte_contact }}
+    </section>
+    {% endif %}
 
     <div class="dates-bar">
       <span class="dates-bar-label">
         <i class="bi bi-calendar3" style="color:var(--color-primary)"></i>
-        Période souhaitée
+        {% if staff_mode %}
+          <span>
+            Période de diffusion
+            <small class="staff-period-hint">Choisissez les dates à vérifier</small>
+          </span>
+        {% else %}
+          Période souhaitée
+        {% endif %}
       </span>
  
       <div class="date-input-wrap">
@@ -686,19 +1212,14 @@
             <select class="mf-select" id="filter-ville">
               <option value="">Toutes les villes</option>
             </select>
-            <select class="mf-select" id="filter-categorie">
-              <option value="">Toutes catégories</option>
+            <select class="mf-select" id="filter-categorie" {% if staff_mode %}aria-required="true"{% endif %}>
+              <option value="">{% if staff_mode %}Choisir une catégorie{% else %}Toutes catégories{% endif %}</option>
             </select>
-            <select class="mf-select" id="filter-format">
+            <div id="filter-format-wrap" class="{% if staff_mode %}staff-format-filter{% endif %}" style="{% if staff_mode %}display:none{% endif %}">
+              <select class="mf-select" id="filter-format">
               <option value="">Tous formats</option>
-            </select>
-            <select class="mf-select" id="filter-quartier">
-              <option value="">Tous les quartiers</option>
-            </select>
-            <select class="mf-select" id="filter-dispo">
-              <option value="">Tous états</option>
-              <option value="libre">Disponibles uniquement</option>
-            </select>
+              </select>
+            </div>
           </div>
 
           <div id="filtres-liste" style="display:flex;gap:6px;flex-wrap:wrap;flex:1;align-items:center">
@@ -706,24 +1227,22 @@
             <select class="mf-select" id="list-filter-ville">
               <option value="">Toutes les villes</option>
             </select>
-            <select class="mf-select" id="list-filter-categorie">
-              <option value="">Toutes catégories</option>
+            <select class="mf-select" id="list-filter-categorie" {% if staff_mode %}aria-required="true"{% endif %}>
+              <option value="">{% if staff_mode %}Choisir une catégorie{% else %}Toutes catégories{% endif %}</option>
             </select>
-            <select class="mf-select" id="list-filter-quartier">
-              <option value="">Tous les quartiers</option>
-            </select>
-            <select class="mf-select" id="list-filter-dispo">
-              <option value="">Tous états</option>
-              <option value="libre">Disponibles uniquement</option>
-            </select>
-            <select class="mf-select" id="list-filter-format">
+            <div id="list-filter-format-wrap" class="{% if staff_mode %}staff-format-filter{% endif %}" style="{% if staff_mode %}display:none{% endif %}">
+              <select class="mf-select" id="list-filter-format">
               <option value="">Tous formats</option>
-            </select>
+              </select>
+            </div>
           </div>
 
         </div>
 
         <div id="view-carte" style="flex:1;display:none;flex-direction:column;">
+          <div id="map-category-hint" class="category-required-hint" style="display:none">
+            <i class="bi bi-funnel"></i>Choisissez une catégorie pour afficher les supports.
+          </div>
           <div id="map-resa" style="flex:1;min-height:360px;"></div>
           <div class="map-legend">
             <span class="leg-item"><span class="leg-dot" style="background:#10b981"></span>Disponible</span>
@@ -796,7 +1315,29 @@
 <script>
   "use strict";
 
+    {% if staff_mode %}
+    function toggleStaffDemandeType() {
+      const estExistant = document.getElementById('type_client_existant').checked;
+      document.getElementById('bloc-client-existant').style.display = estExistant ? 'block' : 'none';
+      document.getElementById('bloc-coordonnees-nouveau').style.display = estExistant ? 'none' : 'block';
+    }
+    document.getElementById('type_client_nouveau').addEventListener('change', toggleStaffDemandeType);
+    document.getElementById('type_client_existant').addEventListener('change', toggleStaffDemandeType);
+    toggleStaffDemandeType();
+    {% endif %}
+    {% if shared_edit_mode %}
+    function toggleSharedClientType() {
+      const existing = document.getElementById('shared-type-existant').checked;
+      document.getElementById('shared-reference-wrap').hidden = !existing;
+      document.getElementById('shared-prospect-fields').hidden = existing;
+    }
+    document.getElementById('shared-type-nouveau').addEventListener('change', toggleSharedClientType);
+    document.getElementById('shared-type-existant').addEventListener('change', toggleSharedClientType);
+    toggleSharedClientType();
+    {% endif %}
+
     // ── FILTRES INITIAUX (depuis la vitrine) ───────────────────────────────────
+    const REQUIRE_CATEGORY = {{ staff_mode|yesno:"true,false" }};
     const initialFiltres = {
       ville: "{{ filtres.ville|escapejs }}",
       categorie: "{{ filtres.categorie|escapejs }}",
@@ -1067,9 +1608,8 @@
 
       const ville = document.getElementById(prefix + 'ville').value;
       const categorie = document.getElementById(prefix + 'categorie').value;
-      const quartier = document.getElementById(prefix + 'quartier').value;
-      const dispo = document.getElementById(prefix + 'dispo').value;
       const fmt = document.getElementById(prefix + 'format').value;
+      if (REQUIRE_CATEGORY && !categorie) return [];
 
       let q = '';
       if (isListeView) {
@@ -1083,15 +1623,10 @@
 
         if (ville && p.ville !== ville) return false;
         if (categorie && p.categorie !== categorie) return false;
-        if (quartier && p.quartier !== quartier) return false;
         if (fmt && p.format !== fmt) return false;
         if (q && !String(p.code||'').toLowerCase().includes(q)
               && !(p.quartier||'').toLowerCase().includes(q)
               && !(p.nom||'').toLowerCase().includes(q)) return false;
-        if (dispo === 'libre') {
-          const faces = p.faces || [];
-          if (!faces.some(face => getFaceStatut(face) === 'libre')) return false;
-        }
         return true;
       });
     }
@@ -1116,7 +1651,7 @@
       map.fitBounds(bounds, { padding: [40, 40], maxZoom: 16 });
     }
 
-    // ── FACETTES CROISÉES (ville / catégorie / quartier / format) ─────────────
+    // ── FACETTES CROISÉES (ville / catégorie / format) ─────────────────────────
     function getPanneaux() {
       return allFeatures.filter(f => f.properties.type === 'panneau');
     }
@@ -1124,7 +1659,6 @@
     function matchesFacet(p, filters, skip) {
       if (skip !== 'ville'     && filters.ville     && p.ville     !== filters.ville)     return false;
       if (skip !== 'categorie' && filters.categorie && p.categorie !== filters.categorie) return false;
-      if (skip !== 'quartier'  && filters.quartier  && p.quartier  !== filters.quartier)  return false;
       if (skip !== 'format'    && filters.format    && p.format    !== filters.format)    return false;
       return true;
     }
@@ -1156,13 +1690,11 @@
     function refreshFacetSelects(prefix) {
       const elVille     = document.getElementById(prefix + 'ville');
       const elCategorie = document.getElementById(prefix + 'categorie');
-      const elQuartier  = document.getElementById(prefix + 'quartier');
       const elFormat    = document.getElementById(prefix + 'format');
 
       const current = {
         ville:     elVille     ? elVille.value     : '',
         categorie: elCategorie ? elCategorie.value : '',
-        quartier:  elQuartier  ? elQuartier.value  : '',
         format:    elFormat    ? elFormat.value    : '',
       };
 
@@ -1199,13 +1731,37 @@
 
       rebuild(elVille,     'ville',     'ville');
       rebuild(elCategorie, 'categorie', 'categorie');
-      rebuild(elQuartier,  'quartier',  'quartier');
       rebuild(elFormat,    'format',    'format', p => p.format_display || p.format);
+
+      const formatWrap = document.getElementById(prefix + 'format-wrap');
+      if (formatWrap && REQUIRE_CATEGORY) {
+        const categoryFormats = new Set(
+          panneaux
+            .filter(feature => {
+              const p = feature.properties;
+              return p.categorie === current.categorie
+                && (!current.ville || p.ville === current.ville);
+            })
+            .map(feature => feature.properties.format)
+            .filter(Boolean)
+        );
+        formatWrap.style.display = current.categorie && categoryFormats.size > 1
+          ? ''
+          : 'none';
+        if (categoryFormats.size <= 1 && elFormat) elFormat.value = '';
+      }
+      if (prefix === 'filter-') {
+        const categoryHint = document.getElementById('map-category-hint');
+        if (categoryHint) {
+          categoryHint.style.display = REQUIRE_CATEGORY && !current.categorie ? 'flex' : 'none';
+        }
+      }
+      if (formatWrap && !REQUIRE_CATEGORY) formatWrap.style.display = '';
     }
 
     // ── NAVIGUER VERS UN SUPPORT SUR LA CARTE (depuis la vue Liste) ────────────
     function goToOnMap(supportId) {
-      ['filter-ville', 'filter-categorie', 'filter-quartier', 'filter-format', 'filter-dispo'].forEach(id => {
+      ['filter-ville', 'filter-categorie', 'filter-format'].forEach(id => {
         const el = document.getElementById(id);
         if (el) el.value = '';
       });
@@ -1239,6 +1795,10 @@
 
     function renderListe() {
       const grid = document.getElementById('liste-grid');
+      if (REQUIRE_CATEGORY && !document.getElementById('list-filter-categorie').value) {
+        grid.innerHTML = `<div class="liste-empty"><i class="bi bi-funnel"></i><p>Choisissez une catégorie pour afficher les supports.</p></div>`;
+        return;
+      }
       const filtered = getFilteredFeatures(true);
       if (!filtered.length) {
         grid.innerHTML = `<div class="liste-empty"><i class="bi bi-inbox"></i><p>Aucun panneau ne correspond aux filtres.</p></div>`;
@@ -1325,9 +1885,8 @@
 
       return `<div class="support-card ${hasSelected ? 'has-selected' : ''}" id="sc-${p.id}">
         <div class="sc-header">
-          <div class="sc-icon">🪧</div>
           <div class="sc-info">
-            <div class="sc-code" style='text-align: center;'>${p.code}</div>
+            <div class="sc-code">${p.code}</div>
             <div class="sc-nom">${p.nom}</div>
           </div>
           ${formatBadge}
@@ -1377,9 +1936,7 @@
     }
     document.getElementById('filter-ville').addEventListener('change', onCarteFilterChange);
     document.getElementById('filter-categorie').addEventListener('change', onCarteFilterChange);
-    document.getElementById('filter-quartier').addEventListener('change', onCarteFilterChange);
     document.getElementById('filter-format').addEventListener('change', onCarteFilterChange);
-    document.getElementById('filter-dispo').addEventListener('change', () => applyCarteFilters(true));
 
     // ── Triggers : vue Liste ─────────────────────────────────────────────────
     function onListeFilterChange() {
@@ -1388,9 +1945,7 @@
     }
     document.getElementById('list-filter-ville').addEventListener('change', onListeFilterChange);
     document.getElementById('list-filter-categorie').addEventListener('change', onListeFilterChange);
-    document.getElementById('list-filter-quartier').addEventListener('change', onListeFilterChange);
     document.getElementById('list-filter-format').addEventListener('change', onListeFilterChange);
-    document.getElementById('list-filter-dispo').addEventListener('change', renderListe);
     document.getElementById('list-search').addEventListener('input', renderListe);
 
 

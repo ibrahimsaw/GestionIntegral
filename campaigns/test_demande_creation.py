@@ -42,25 +42,24 @@ class DemandeCreationViewTests(TestCase):
         self.start = datetime.date.today() + datetime.timedelta(days=10)
         self.end = self.start + datetime.timedelta(days=5)
 
-    def complete_step_one(self):
-        return self.client.post(
-            reverse('demande_creation'),
-            {
-                'faces_selectionnees': json.dumps([self.face.pk]),
-                'supports_selectionnees': '[]',
-                'date_debut': self.start.isoformat(),
-                'date_fin': self.end.isoformat(),
-            },
-        )
+    def complete_step_one(self, **overrides):
+        data = {
+            'faces_selectionnees': json.dumps([self.face.pk]),
+            'supports_selectionnees': '[]',
+            'date_debut': self.start.isoformat(),
+            'date_fin': self.end.isoformat(),
+            'type_client': DemandeReservation.TYPE_CLIENT_NOUVEAU,
+            'nom_contact': 'Moussa Prospect',
+            'societe': 'Nouvelle société',
+            'email': 'moussa@example.com',
+            'telephone': '71000000',
+            'accepte_contact': 'on',
+        }
+        data.update(overrides)
+        return self.client.post(reverse('demande_creation'), data)
 
     def complete_step_two(self):
-        return self.client.post(
-            reverse('demande_creation_etape2'),
-            {
-                'nom_campagne': 'Campagne saisie par le staff',
-                'message': 'Informations du projet',
-            },
-        )
+        return self.client.post(reverse('demande_creation_etape2'), {})
 
     def test_client_can_update_and_confirm_shared_request_before_staff_approval(self):
         client_obj = Client.objects.create(
@@ -71,21 +70,23 @@ class DemandeCreationViewTests(TestCase):
         )
 
         self.assertRedirects(
-            self.complete_step_one(),
+            self.complete_step_one(
+                type_client=DemandeReservation.TYPE_CLIENT_EXISTANT,
+                client=client_obj.pk,
+                nom_contact='',
+                societe='',
+                email='',
+                telephone='',
+                accepte_contact='on',
+            ),
             reverse('demande_creation_etape2'),
         )
-        self.assertRedirects(
-            self.complete_step_two(),
-            reverse('demande_creation_etape3'),
-        )
-        response = self.client.post(
-            reverse('demande_creation_etape3'),
-            {
-                'type_client': DemandeReservation.TYPE_CLIENT_EXISTANT,
-                'client': client_obj.pk,
-                'accepte_contact': 'on',
-            },
-        )
+        recap_response = self.client.get(reverse('demande_creation_etape2'))
+        self.assertContains(recap_response, 'Awa Contact')
+        self.assertContains(recap_response, '70000000')
+        self.assertContains(recap_response, 'awa@example.com')
+
+        response = self.complete_step_two()
 
         self.assertRedirects(
             response,
@@ -97,8 +98,8 @@ class DemandeCreationViewTests(TestCase):
         self.assertEqual(demande.reference_client_saisie, client_obj.reference)
         self.assertEqual(demande.nom_contact, 'Awa Contact')
         self.assertEqual(demande.societe, 'Annonceur existant')
-        self.assertEqual(demande.nom_campagne, 'Campagne saisie par le staff')
-        self.assertEqual(demande.message, 'Informations du projet')
+        self.assertEqual(demande.nom_campagne, '')
+        self.assertEqual(demande.message, '')
         self.assertTrue(demande.accepte_contact)
         self.assertEqual(list(demande.faces_souhaitees.all()), [self.face])
 
@@ -182,8 +183,30 @@ class DemandeCreationViewTests(TestCase):
             reverse('portail:demande_partage', kwargs={'token': token})
         )
         self.assertEqual(shared_page.status_code, 200)
+        self.assertTrue(shared_page.context['shared_edit_mode'])
+        self.assertContains(shared_page, 'Client, période & emplacements')
+        self.assertContains(shared_page, 'Vos coordonnées')
+        self.assertContains(shared_page, 'Nom du contact')
+        self.assertNotContains(shared_page, 'step-circle">3')
         self.assertNotContains(shared_page, '<aside class="sidebar"')
         self.assertNotContains(shared_page, '<header class="topbar">')
+        invalid_contact_response = self.client.post(
+            reverse('portail:demande_partage', kwargs={'token': token}),
+            {
+                'faces_selectionnees': json.dumps([other_face.pk]),
+                'supports_selectionnees': '[]',
+                'date_debut': updated_start.isoformat(),
+                'date_fin': updated_end.isoformat(),
+                'type_client': DemandeReservation.TYPE_CLIENT_NOUVEAU,
+                'nom_contact': 'Awa mise à jour',
+                'societe': 'Nouvelle société',
+                'email': 'adresse-invalide',
+                'telephone': '71111111',
+            },
+        )
+        self.assertEqual(invalid_contact_response.status_code, 200)
+        self.assertTrue(invalid_contact_response.context['contact_form'].errors['email'])
+
         response = self.client.post(
             reverse('portail:demande_partage', kwargs={'token': token}),
             {
@@ -191,33 +214,28 @@ class DemandeCreationViewTests(TestCase):
                 'supports_selectionnees': '[]',
                 'date_debut': updated_start.isoformat(),
                 'date_fin': updated_end.isoformat(),
-            },
-        )
-        self.assertRedirects(
-            response,
-            reverse('portail:demande_partage_etape2', kwargs={'token': token}),
-        )
-        response = self.client.post(
-            reverse('portail:demande_partage_etape2', kwargs={'token': token}),
-            {
-                'nom_campagne': 'Projet modifié par le client',
-                'message': 'Nouvelle précision du client',
-            },
-        )
-        self.assertRedirects(
-            response,
-            reverse('portail:demande_partage_etape3', kwargs={'token': token}),
-        )
-        response = self.client.post(
-            reverse('portail:demande_partage_etape3', kwargs={'token': token}),
-            {
                 'type_client': DemandeReservation.TYPE_CLIENT_NOUVEAU,
                 'nom_contact': 'Awa mise à jour',
                 'societe': 'Nouvelle société',
                 'email': 'awa.updated@example.com',
                 'telephone': '71111111',
-                'accepte_contact': 'on',
             },
+        )
+        self.assertRedirects(
+            response,
+            reverse('portail:demande_partage_etape2', kwargs={'token': token}),
+        )
+        recap_response = self.client.get(
+            reverse('portail:demande_partage_etape2', kwargs={'token': token})
+        )
+        self.assertTemplateUsed(recap_response, 'portail/demande_partage_recap.html')
+        self.assertContains(recap_response, 'Vérifiez le récapitulatif de votre demande')
+        self.assertContains(recap_response, 'Awa mise à jour')
+        self.assertContains(recap_response, 'Nouvelle société')
+        self.assertNotContains(recap_response, 'Informations sur votre campagne')
+        response = self.client.post(
+            reverse('portail:demande_partage_etape2', kwargs={'token': token}),
+            {},
         )
         self.assertRedirects(
             response,
@@ -229,7 +247,7 @@ class DemandeCreationViewTests(TestCase):
         self.assertIsNone(demande.client)
         self.assertEqual(demande.date_debut_souhaitee, updated_start)
         self.assertEqual(demande.date_fin_souhaitee, updated_end)
-        self.assertEqual(demande.nom_campagne, 'Projet modifié par le client')
+        self.assertEqual(demande.nom_campagne, '')
         self.assertEqual(demande.nom_contact, 'Awa mise à jour')
         self.assertEqual(demande.email, 'awa.updated@example.com')
         self.assertEqual(list(demande.faces_souhaitees.all()), [other_face])
@@ -289,33 +307,20 @@ class DemandeCreationViewTests(TestCase):
                 'supports_selectionnees': '[]',
                 'date_debut': second_start.isoformat(),
                 'date_fin': second_end.isoformat(),
-            },
-        )
-        self.assertRedirects(
-            response,
-            reverse('portail:demande_partage_etape2', kwargs={'token': token}),
-        )
-        response = self.client.post(
-            reverse('portail:demande_partage_etape2', kwargs={'token': token}),
-            {
-                'nom_campagne': 'Projet modifié une seconde fois',
-                'message': 'Nouvelle demande après réactivation',
-            },
-        )
-        self.assertRedirects(
-            response,
-            reverse('portail:demande_partage_etape3', kwargs={'token': token}),
-        )
-        response = self.client.post(
-            reverse('portail:demande_partage_etape3', kwargs={'token': token}),
-            {
                 'type_client': DemandeReservation.TYPE_CLIENT_NOUVEAU,
                 'nom_contact': 'Awa mise à jour',
                 'societe': 'Nouvelle société',
                 'email': 'awa.updated@example.com',
                 'telephone': '71111111',
-                'accepte_contact': 'on',
             },
+        )
+        self.assertRedirects(
+            response,
+            reverse('portail:demande_partage_etape2', kwargs={'token': token}),
+        )
+        response = self.client.post(
+            reverse('portail:demande_partage_etape2', kwargs={'token': token}),
+            {},
         )
         self.assertRedirects(
             response,
@@ -337,18 +342,11 @@ class DemandeCreationViewTests(TestCase):
         self.assertTrue(Reservation.objects.filter(pk=demande.reservation_id).exists())
 
     def test_staff_creates_prospect_request_in_progress_until_shared(self):
-        self.complete_step_one()
-        self.complete_step_two()
-        response = self.client.post(
-            reverse('demande_creation_etape3'),
-            {
-                'type_client': DemandeReservation.TYPE_CLIENT_NOUVEAU,
-                'nom_contact': 'Moussa Prospect',
-                'societe': 'Nouvelle société',
-                'email': 'moussa@example.com',
-                'telephone': '71000000',
-            },
+        self.assertRedirects(
+            self.complete_step_one(),
+            reverse('demande_creation_etape2'),
         )
+        response = self.complete_step_two()
 
         demande = DemandeReservation.objects.get()
         self.assertRedirects(
@@ -359,7 +357,7 @@ class DemandeCreationViewTests(TestCase):
         self.assertIsNone(demande.client)
         self.assertEqual(demande.type_client, DemandeReservation.TYPE_CLIENT_NOUVEAU)
         self.assertEqual(demande.nom_contact, 'Moussa Prospect')
-        self.assertEqual(demande.nom_campagne, 'Campagne saisie par le staff')
+        self.assertEqual(demande.nom_campagne, '')
         self.assertEqual(list(demande.faces_souhaitees.all()), [self.face])
         detail_response = self.client.get(
             reverse('demande_detail', kwargs={'uuid': demande.uuid})
@@ -377,6 +375,8 @@ class DemandeCreationViewTests(TestCase):
             telephone='70000000',
             date_debut_souhaitee=self.start,
             date_fin_souhaitee=self.end,
+            nom_campagne='Campagne initiale',
+            message='Informations déjà enregistrées',
             statut=DemandeReservation.STATUT_NOUVELLE,
             token_partage=uuid.uuid4(),
         )
@@ -391,10 +391,10 @@ class DemandeCreationViewTests(TestCase):
         )
         self.assertRedirects(
             self.client.get(reverse('demande_modifier', kwargs={'uuid': demande.uuid})),
-            reverse('demande_creation'),
+            f"{reverse('demande_creation')}?edit=1",
         )
-        response = self.client.get(reverse('demande_creation'))
-        self.assertContains(response, 'Modifier les emplacements de la demande')
+        response = self.client.get(reverse('demande_creation') + '?edit=1')
+        self.assertContains(response, 'Modifier la demande')
         response = self.client.post(
             reverse('demande_creation'),
             {
@@ -402,38 +402,25 @@ class DemandeCreationViewTests(TestCase):
                 'supports_selectionnees': '[]',
                 'date_debut': (self.start + datetime.timedelta(days=1)).isoformat(),
                 'date_fin': (self.end + datetime.timedelta(days=1)).isoformat(),
-            },
-        )
-        self.assertRedirects(response, reverse('demande_creation_etape2'))
-        response = self.client.post(
-            reverse('demande_creation_etape2'),
-            {
-                'nom_campagne': 'Projet corrigé',
-                'message': 'Correction interne par le gestionnaire',
-            },
-        )
-        self.assertRedirects(response, reverse('demande_creation_etape3'))
-        self.assertContains(
-            self.client.get(reverse('demande_creation_etape3')),
-            'Modifier les informations du demandeur',
-        )
-        response = self.client.post(
-            reverse('demande_creation_etape3'),
-            {
                 'type_client': DemandeReservation.TYPE_CLIENT_NOUVEAU,
                 'nom_contact': 'Nom corrigé par le gestionnaire',
                 'societe': 'Société corrigée',
                 'email': 'corrige@example.com',
                 'telephone': '71111111',
+                'accepte_contact': 'on',
             },
         )
+        self.assertRedirects(response, reverse('demande_creation_etape2'))
+        self.assertContains(self.client.get(reverse('demande_creation_etape2')), 'Modifier les informations')
+        response = self.complete_step_two()
 
         self.assertRedirects(response, detail_url)
         demande.refresh_from_db()
         self.assertEqual(demande.nom_contact, 'Nom corrigé par le gestionnaire')
         self.assertEqual(demande.societe, 'Société corrigée')
         self.assertEqual(demande.email, 'corrige@example.com')
-        self.assertEqual(demande.nom_campagne, 'Projet corrigé')
+        self.assertEqual(demande.nom_campagne, 'Campagne initiale')
+        self.assertEqual(demande.message, 'Informations déjà enregistrées')
         self.assertEqual(
             demande.date_debut_souhaitee,
             self.start + datetime.timedelta(days=1),
@@ -444,30 +431,83 @@ class DemandeCreationViewTests(TestCase):
             reverse('portail:confirmation', kwargs={'uuid': demande.uuid}),
         )
 
+    def test_create_new_request_clears_a_previous_edit_session(self):
+        existing = DemandeReservation.objects.create(
+            type_client=DemandeReservation.TYPE_CLIENT_NOUVEAU,
+            nom_contact='Prospect existant',
+            societe='Société existante',
+            email='existant@example.com',
+            telephone='70000000',
+            date_debut_souhaitee=self.start,
+            date_fin_souhaitee=self.end,
+            statut=DemandeReservation.STATUT_NOUVELLE,
+            token_partage=uuid.uuid4(),
+        )
+        existing.faces_souhaitees.add(self.face)
+        self.client.get(reverse('demande_modifier', kwargs={'uuid': existing.uuid}))
+        edit_page = self.client.get(reverse('demande_creation') + '?edit=1')
+        self.assertTrue(edit_page.context['editing_request'])
+
+        new_page = self.client.get(reverse('demande_creation'))
+        self.assertFalse(new_page.context['editing_request'])
+        self.assertFalse(self.client.session.get('gestion_demande_edit_uuid'))
+
+        self.assertRedirects(
+            self.complete_step_one(),
+            reverse('demande_creation_etape2'),
+        )
+        response = self.complete_step_two()
+        created = DemandeReservation.objects.exclude(pk=existing.pk).get()
+
+        self.assertRedirects(
+            response,
+            reverse('demande_detail', kwargs={'uuid': created.uuid}),
+        )
+        existing.refresh_from_db()
+        self.assertEqual(existing.nom_contact, 'Prospect existant')
+        self.assertEqual(existing.statut, DemandeReservation.STATUT_NOUVELLE)
+
     def test_steps_render_the_portal_wizard_for_staff(self):
         response = self.client.get(reverse('demande_creation'))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Sélectionnez les emplacements du client')
+        self.assertContains(response, 'Informations client, période et emplacements')
+        self.assertContains(response, 'Client et coordonnées')
+        self.assertContains(response, 'name="type_client"')
+        self.assertNotContains(response, 'name="nom_campagne"')
+        self.assertNotContains(response, 'Message / précisions')
+        self.assertNotContains(response, 'Tous les quartiers')
+        self.assertNotContains(response, 'Tous états')
+        self.assertContains(response, 'Choisir une catégorie')
+        self.assertContains(response, 'aria-required="true"')
+        self.assertContains(response, 'id="filter-format-wrap"')
+        self.assertContains(response, 'id="list-filter-format-wrap"')
+        self.assertTrue(response.context['contact_form']['accepte_contact'].value())
         self.assertContains(response, 'Carte Interactive')
         self.assertNotContains(response, 'Nos Supports')
 
-        self.complete_step_one()
+        self.assertRedirects(self.complete_step_one(), reverse('demande_creation_etape2'))
         response = self.client.get(reverse('demande_creation_etape2'))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Demande de réservation client')
-        self.assertContains(response, 'Carte Interactive')
-        self.assertNotContains(response, 'Nos Supports')
-
-        self.complete_step_two()
-        response = self.client.get(reverse('demande_creation_etape3'))
-        self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Client enregistré')
-        self.assertContains(response, 'Créer la demande')
-        self.assertContains(response, 'Carte Interactive')
-        self.assertNotContains(response, 'Nos Supports')
+        self.assertContains(response, 'Récapitulatif de la demande')
+        self.assertContains(response, 'Nouveau prospect')
+        self.assertContains(response, 'Valider et envoyer la demande')
+        self.assertNotContains(response, 'Modifier les informations du demandeur')
 
         list_response = self.client.get(reverse('demandes_liste'))
         self.assertContains(list_response, 'Créer une demande')
+
+    def test_invalid_contact_keeps_the_user_on_the_combined_first_step(self):
+        response = self.complete_step_one(email='adresse-invalide')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'adresse-invalide')
+        self.assertTrue(response.context['contact_form'].errors['email'])
+        self.assertFalse(DemandeReservation.objects.exists())
+        session = self.client.session
+        self.assertEqual(session['gestion_demande_faces'], [self.face.pk])
+        self.assertEqual(
+            session['gestion_demande_periode']['date_debut'],
+            self.start.isoformat(),
+        )
 
     def test_public_step_three_keeps_its_reference_based_client_flow(self):
         session = self.client.session
@@ -485,6 +525,13 @@ class DemandeCreationViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'name="reference_client_saisie"')
         self.assertNotContains(response, 'Client enregistré')
+
+    def test_public_reservation_keeps_optional_category_filter(self):
+        response = self.client.get(reverse('portail:reserver_etape1'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Toutes catégories')
+        self.assertNotContains(response, 'aria-required="true"')
 
     def test_non_staff_cannot_access_any_creation_step(self):
         self.client.logout()

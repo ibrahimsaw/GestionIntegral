@@ -94,18 +94,21 @@ def format_number_fr(valeur):
          None     -> ""
     """
     try:
-        v = float(valeur)
-    except (TypeError, ValueError):
+        nombre = Decimal(str(valeur))
+        entier, _, decimales = format(nombre, "f").partition(".")
+    except (InvalidOperation, TypeError, ValueError):
         return valeur if valeur is not None else ""
 
-    if v == int(v):
-        # Nombre entier — pas de décimale
-        return f"{int(v):,}".replace(",", " ")
-    else:
-        # Nombre décimal — virgule française
-        entier = int(v)
-        decimal = str(round(v - entier, 6)).lstrip("0").lstrip(".")
-        return f"{entier:,}".replace(",", " ") + "," + decimal
+    decimales = decimales.rstrip("0")
+    try:
+        entier_chiffres = entier.lstrip("-+")
+        entier_formate = f"{int(entier_chiffres):,}".replace(",", " ")
+    except (OverflowError, ValueError):
+        return valeur
+    if entier.startswith("-") and (entier_chiffres.strip("0") or decimales):
+        entier_formate = "-" + entier_formate
+
+    return entier_formate + ("," + decimales if decimales else "")
 
 
 @register.filter

@@ -543,8 +543,8 @@
                     <span class="input-group-text">
                       <i class="bi bi-tag"></i>
                     </span>
-                    <input type="number" step="0.01" min="0" class="form-control" name="prix" id="id_prix" 
-                           value="{{ form.prix.value|default_if_none:''|unlocalize }}" placeholder="0" autocomplete="off">
+                    <input type="text" inputmode="decimal" class="form-control" name="prix" id="id_prix"
+                           data-currency-input="true" value="{{ form.prix.value|default_if_none:''|unlocalize }}" placeholder="" autocomplete="off">
                   </div>
                   {% if form.prix.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.prix.errors }}</div>{% endif %}
                 </div>
@@ -557,8 +557,8 @@
                     <span class="input-group-text">
                       <i class="bi bi-signpost-2"></i>
                     </span>
-                    <input type="number" step="0.01" min="0" class="form-control" name="prix_affichage" id="id_prix_affichage" 
-                           value="{{ form.prix_affichage.value|default_if_none:''|unlocalize }}" placeholder="0" autocomplete="off">
+                    <input type="text" inputmode="decimal" class="form-control" name="prix_affichage" id="id_prix_affichage"
+                           data-currency-input="true" value="{{ form.prix_affichage.value|default_if_none:''|unlocalize }}" placeholder="" autocomplete="off">
                   </div>
                   {% if form.prix_affichage.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.prix_affichage.errors }}</div>{% endif %}
                 </div>
@@ -571,8 +571,8 @@
                     <span class="input-group-text">
                       <i class="bi bi-printer"></i>
                     </span>
-                    <input type="number" step="0.01" min="0" class="form-control" name="prix_impression" id="id_prix_impression" 
-                           value="{{ form.prix_impression.value|default_if_none:''|unlocalize }}" placeholder="0" autocomplete="off">
+                    <input type="text" inputmode="decimal" class="form-control" name="prix_impression" id="id_prix_impression"
+                           data-currency-input="true" value="{{ form.prix_impression.value|default_if_none:''|unlocalize }}" placeholder="" autocomplete="off">
                   </div>
                   {% if form.prix_impression.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.prix_impression.errors }}</div>{% endif %}
                 </div>
@@ -902,6 +902,45 @@ document.addEventListener('DOMContentLoaded', function () {
     const prix = document.getElementById('id_prix');
     const prixAffichage = document.getElementById('id_prix_affichage');
     const prixImpression = document.getElementById('id_prix_impression');
+    const currencyInputs = document.querySelectorAll('[data-currency-input="true"]');
+
+    function formatCurrencyInput(input, preserveCaret = false) {
+        const rawValue = input.value;
+        const cursor = preserveCaret ? input.selectionStart : null;
+        const digitsBeforeCursor = cursor === null
+            ? 0
+            : (rawValue.slice(0, cursor).match(/\d/g) || []).length;
+        const normalized = rawValue.replace(/\s/g, '');
+        const decimalIndex = Math.max(normalized.lastIndexOf('.'), normalized.lastIndexOf(','));
+        const hasDecimal = decimalIndex !== -1;
+        const integerPart = (hasDecimal ? normalized.slice(0, decimalIndex) : normalized)
+            .replace(/\D/g, '');
+        const decimalPart = hasDecimal
+            ? normalized.slice(decimalIndex + 1).replace(/\D/g, '')
+            : '';
+        const separator = hasDecimal ? normalized[decimalIndex] : '';
+        const groupedInteger = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+        input.value = groupedInteger + (hasDecimal ? separator + decimalPart : '');
+
+        if (preserveCaret && cursor !== null) {
+            let position = 0;
+            let digitsSeen = 0;
+            while (position < input.value.length && digitsSeen < digitsBeforeCursor) {
+                if (/\d/.test(input.value[position])) digitsSeen += 1;
+                position += 1;
+            }
+            input.setSelectionRange(position, position);
+        }
+    }
+
+    currencyInputs.forEach(input => {
+        if (/^0+(?:[.,]0+)?$/.test(input.value.trim())) {
+            input.value = '';
+        } else {
+            formatCurrencyInput(input);
+        }
+        input.addEventListener('input', () => formatCurrencyInput(input, true));
+    });
     const lieuSelect = document.getElementById('id_lieu');
     const contratSelect = document.getElementById('id_contrat');
     const parentSelect = document.getElementById('id_campagne_parente');

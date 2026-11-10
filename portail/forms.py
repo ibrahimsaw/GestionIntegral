@@ -209,6 +209,145 @@ class Etape3Form(forms.Form):
         cleaned_data['accepte_contact'] = True
 
         return cleaned_data
+
+
+# ── Formulaire unique fusionnant les 3 étapes de réservation ─────────────────
+# Les imports suivants sont déjà présents en haut du fichier ; on les répète
+# ici pour s'assurer qu'ils sont disponibles quand la classe est définie.
+from campaigns.models import DemandeReservation  # noqa: F811
+from inventory.models import FacePanneau, Support  # noqa: F811
+
+
+class ReserverUniquForm(forms.Form):
+    """Formulaire unique fusionnant les 3 étapes de réservation."""
+
+    # ── Étape 1 : sélection + période ─────────────────────────────────────
+    faces_selectionnees = forms.CharField(widget=forms.HiddenInput(), required=False)
+    supports_selectionnees = forms.CharField(widget=forms.HiddenInput(), required=False)
+    date_debut = forms.DateField(
+        label="Date de début",
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+    )
+    date_fin = forms.DateField(
+        label="Date de fin",
+        widget=forms.DateInput(attrs={'type': 'date', 'class': 'form-control'}),
+    )
+
+    # ── Étape 2 : projet (facultatif) ────────────────────────────────────
+    nom_campagne = forms.CharField(
+        label="Nom de la campagne / projet", max_length=200, required=False,
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Ex : Lancement produit été 2026'}),
+    )
+    message = forms.CharField(
+        label="Message / précisions", required=False,
+        widget=forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Précisez vos besoins…'}),
+    )
+
+    # ── Étape 3 : coordonnées ────────────────────────────────────────────
+    type_client = forms.ChoiceField(
+        choices=DemandeReservation.TYPE_CLIENT_CHOICES,
+        initial=DemandeReservation.TYPE_CLIENT_NOUVEAU,
+        widget=forms.RadioSelect,
+        label="Vous êtes",
+    )
+    reference_client_saisie = forms.CharField(
+        max_length=20, required=False, label="Votre référence client",
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'CLI-2026-A3F9K2'}),
+    )
+    nom_contact = forms.CharField(
+        max_length=200, required=False, label="Nom complet",
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Votre nom et prénom', 'autocomplete': 'name'}),
+    )
+    societe = forms.CharField(
+        max_length=200, required=False, label="Société / Organisation",
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nom de votre société', 'autocomplete': 'organization'}),
+    )
+    email = forms.EmailField(
+        required=False, label="Email",
+        widget=forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'votre@email.com', 'autocomplete': 'email'}),
+    )
+    telephone = forms.CharField(
+        max_length=30, required=False, label="Téléphone",
+        widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': '+226 XX XX XX XX', 'autocomplete': 'tel'}),
+    )
+
+    # ── Parsing JSON ids ─────────────────────────────────────────────────
+    def _parse_ids(self, raw, field_name):
+        if not raw:
+            return []
+        try:
+            ids = json.loads(raw)
+        except (json.JSONDecodeError, TypeError):
+            raise forms.ValidationError("Sélection invalide.")
+        if not isinstance(ids, list):
+            raise forms.ValidationError("Sélection invalide.")
+        return ids
+
+    def clean_faces_selectionnees(self):
+        return self._parse_ids(self.cleaned_data.get('faces_selectionnees'), 'faces_selectionnees')
+
+    def clean_supports_selectionnees(self):
+        return self._parse_ids(self.cleaned_data.get('supports_selectionnees'), 'supports_selectionnees')
+
+    def clean(self):
+        cleaned = super().clean()
+        faces_ids    = cleaned.get('faces_selectionnees') or []
+        supports_ids = cleaned.get('supports_selectionnees') or []
+        type_client  = cleaned.get('type_client', DemandeReservation.TYPE_CLIENT_NOUVEAU)
+        reference    = (cleaned.get('reference_client_saisie') or '').strip()
+
+        # ── Sélection obligatoire ──────────────────────────────────────
+        if not faces_ids and not supports_ids:
+            raise forms.ValidationError("Veuillez sélectionner au moins un emplacement sur la carte.")
+
+        # ── Dates ─────────────────────────────────────────────────────
+        date_debut = cleaned.get('date_debut')
+        date_fin   = cleaned.get('date_fin')
+        if date_debut and date_fin:
+            if date_fin <= date_debut:
+                self.add_error('date_fin', "La date de fin doit être postérieure à la date de début.")
+            if date_debut < timezone.now().date():
+                self.add_error('date_debut', "La date de début ne peut pas être dans le passé.")
+
+        # ── Vérification existence + disponibilité ─────────────────────
+        faces = list(FacePanneau.objects.filter(pk__in=faces_ids).select_related('support'))
+        if len(faces) != len(set(faces_ids)):
+            raise forms.ValidationError("Une ou plusieurs faces sélectionnées sont introuvables.")
+        supports = list(Support.objects.filter(pk__in=supports_ids))
+        if len(supports) != len(set(supports_ids)):
+            raise forms.ValidationError("Un ou plusieurs écrans sélectionnés sont introuvables.")
+        if date_debut and date_fin and not self.errors:
+            indisponibles = [
+                f"{face.support.code} Face {face.label}"
+                for face in faces
+                if not face.is_disponibles(date_debut, date_fin)
+            ]
+            if indisponibles:
+                raise forms.ValidationError(
+                    "Les emplacements suivants ne sont plus disponibles sur cette période : "
+                    + ", ".join(indisponibles)
+                )
+
+        # ── Coordonnées selon type_client ─────────────────────────────
+        if type_client == DemandeReservation.TYPE_CLIENT_EXISTANT:
+            if not reference:
+                self.add_error('reference_client_saisie', "Merci de renseigner votre référence client (ex: CLI-2026-A3F9K2).")
+        else:
+            for field, msg in [
+                ('nom_contact', "Ce champ est obligatoire."),
+                ('societe', "Ce champ est obligatoire."),
+                ('email', "Ce champ est obligatoire."),
+                ('telephone', "Ce champ est obligatoire."),
+            ]:
+                if not cleaned.get(field):
+                    self.add_error(field, msg)
+
+        cleaned['faces_uuids']    = faces_ids
+        cleaned['supports_uuids'] = supports_ids
+        cleaned['accepte_contact'] = True
+        return cleaned
+
+
 class SuiviDemandeForm(forms.Form):
     reference = forms.CharField(
         max_length=50,

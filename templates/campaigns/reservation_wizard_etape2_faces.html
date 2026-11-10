@@ -5,13 +5,13 @@
 
 {% block topbar_title %}
   <i class="bi bi-map-fill me-2" style="color:var(--color-primary)"></i>
-  {{ mode_title }} — {{ client.nom }}
+  {{ mode_title }}{% if client %} — {{ client.nom }}{% endif %}
 {% endblock %}
 
 {% block page_toolbar_title %}
   <div>
-    <h1 class="h4 fw-bold mb-0" style="color: #0f172a;">Sélection des faces & période</h1>
-    <p class="text-muted small mb-0">Étape 2 sur 3 — Client : <strong class="text-dark">{{ client.nom }}</strong></p>
+    <h1 class="h4 fw-bold mb-0" style="color: #0f172a;">Client, période & faces</h1>
+    <p class="text-muted small mb-0">Étape 1 sur 2 — Choisissez le client, la période et les faces{% if client %} pour <strong class="text-dark">{{ client.nom }}</strong>{% endif %}</p>
   </div>
 {% endblock %}
 
@@ -35,6 +35,53 @@
     --c-occupe:   #ef4444;
     --c-panne:    #94a3b8;
     --c-reserve:  #7c3aed;
+  }
+  .reservation-client-choice {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px 24px;
+    flex-wrap: wrap;
+    padding: 14px 18px;
+    background: #fff;
+    border: 1px solid #e2e8f0;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+  }
+  .reservation-client-choice-main {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px 20px;
+    flex: 1 1 560px;
+    flex-wrap: wrap;
+  }
+  .reservation-client-choice-main > div {
+    display: grid;
+    gap: 3px;
+  }
+  .reservation-client-choice-main strong { color: #0f172a; font-size: .9rem; }
+  .reservation-client-choice-form,
+  .reservation-create-client-form {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex: 1 1 360px;
+  }
+  .reservation-client-choice-form .form-select { min-width: 220px; }
+  .reservation-create-client { flex: 1 1 100%; }
+  .reservation-create-client summary {
+    width: fit-content;
+    color: var(--color-primary, #932e2b);
+    cursor: pointer;
+    font-size: .8rem;
+    font-weight: 700;
+  }
+  .reservation-create-client-form { margin-top: 12px; }
+  @media (max-width: 700px) {
+    .reservation-client-choice-form,
+    .reservation-create-client-form { align-items: stretch; flex-direction: column; }
+    .reservation-client-choice-form .form-select { min-width: 0; }
   }
 
   .dates-bar {
@@ -267,7 +314,46 @@
   </div>
   {% endfor %}
 
-  {% include 'campaigns/_wizard_steps.html' with step=2 client=client %}
+  {% include 'campaigns/_wizard_steps.html' with step=1 client=client %}
+
+  <section class="reservation-client-choice mb-3" aria-label="Choisir le client">
+    <div class="reservation-client-choice-main">
+      <div>
+        <span class="reservation-eyebrow">1. Client</span>
+        <strong>{% if client %}{{ client.nom }}{% else %}Sélectionnez le client de la réservation{% endif %}</strong>
+      </div>
+      <form method="post" class="reservation-client-choice-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="selectionner">
+        <select name="client_pk" class="form-select" aria-label="Client de la réservation" required>
+          <option value="">Choisir un client…</option>
+          {% for item in clients %}
+          <option value="{{ item.pk }}" {% if client and item.pk == client.pk %}selected{% endif %}>{{ item.nom }}</option>
+          {% endfor %}
+        </select>
+        <button type="submit" class="btn btn-primary" style="background:var(--color-primary,#932e2b);border-color:var(--color-primary,#932e2b);">
+          {% if client %}Changer{% else %}Choisir{% endif %}
+        </button>
+      </form>
+    </div>
+    <details class="reservation-create-client">
+      <summary><i class="bi bi-person-plus me-1"></i>Créer un nouveau client</summary>
+      <form method="post" class="reservation-create-client-form">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="creer">
+        <input type="text" name="nom" class="form-control" placeholder="Nom du client / raison sociale" aria-label="Nom du nouveau client" required>
+        <input type="email" name="email" class="form-control" placeholder="Adresse e-mail (facultatif)" aria-label="Adresse e-mail du nouveau client">
+        <input type="tel" name="telephone" class="form-control" placeholder="Téléphone (facultatif)" aria-label="Téléphone du nouveau client">
+        <button type="submit" class="btn btn-outline-primary">Créer et sélectionner</button>
+      </form>
+    </details>
+  </section>
+
+  {% if not client %}
+  <div class="alert alert-info py-2 mb-3" role="status">
+    Choisissez un client ci-dessus ; la sélection de période et de faces est sur cette même page.
+  </div>
+  {% endif %}
 
   <div class="dates-bar">
     <span class="dates-bar-label">
@@ -851,7 +937,15 @@
     }
 
     function checkDispo(d1, d2) {
-      const url = `/gestion/campaigns/api/check-dispo/{{ client.pk }}/?date_debut=${encodeURIComponent(d1)}&date_fin=${encodeURIComponent(d2)}`;
+      const clientId = '{{ client.pk|default:"" }}';
+      if (!clientId) {
+        datesOk = false;
+        facesOccupees = new Set();
+        setDatesStatus('waiting', 'Choisissez d’abord un client');
+        refreshAll();
+        return;
+      }
+      const url = `/gestion/campaigns/api/check-dispo/${clientId}/?date_debut=${encodeURIComponent(d1)}&date_fin=${encodeURIComponent(d2)}`;
       fetch(url)
         .then(r => { if (!r.ok) throw new Error(r.status); return r.json(); })
         .then(data => {
@@ -884,6 +978,7 @@
     if (elDureeJours) elDureeJours.addEventListener('input', recalcDateFinFromDuree);
 
     function toggleFace(faceId, code, label, quartier, supportId) {
+      if (!{{ client.pk|default:'0' }}) return;
       const key = String(faceId);
       if (panier[key]) delete panier[key];
       else panier[key] = { code, label, quartier, support_id: String(supportId) };

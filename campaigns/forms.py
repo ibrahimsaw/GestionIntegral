@@ -1,4 +1,5 @@
 import json
+from decimal import Decimal
 
 from django import forms
 from django.db.models import Exists, OuterRef, Q
@@ -241,9 +242,9 @@ class CampagneForm(forms.ModelForm):
                 'autocomplete': 'off',
             }),
             'nom': forms.TextInput(attrs=W),
-            'prix': forms.NumberInput(attrs={**W, 'step': '0.01', 'min': '0'}),
-            'prix_affichage': forms.NumberInput(attrs={**W, 'step': '0.01', 'min': '0'}),
-            'prix_impression': forms.NumberInput(attrs={**W, 'step': '0.01', 'min': '0'}),
+            'prix': forms.TextInput(attrs={**W, 'inputmode': 'decimal', 'data-currency-input': 'true'}),
+            'prix_affichage': forms.TextInput(attrs={**W, 'inputmode': 'decimal', 'data-currency-input': 'true'}),
+            'prix_impression': forms.TextInput(attrs={**W, 'inputmode': 'decimal', 'data-currency-input': 'true'}),
             'campagne_parente': forms.Select(attrs=S),
             # 'lieu' géré par le ChoiceField explicite ci-dessus
             'est_mere': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
@@ -269,12 +270,28 @@ class CampagneForm(forms.ModelForm):
             value = data.get('type_support')
             if value:
                 data['type_support'] = normaliser_categorie_format(value)
+            for field_name in ('prix', 'prix_affichage', 'prix_impression'):
+                price = data.get(field_name)
+                if isinstance(price, str):
+                    price = ''.join(price.split())
+                    if ',' in price and '.' not in price:
+                        price = price.replace(',', '.')
+                    data[field_name] = price
             if submitted_data is not None:
                 kwargs['data'] = data
             else:
                 args = (data, *args[1:])
 
         super().__init__(*args, **kwargs)
+        if not self.is_bound:
+            for field_name in ('prix', 'prix_affichage', 'prix_impression'):
+                initial_price = self.initial.get(
+                    field_name,
+                    self.fields[field_name].initial,
+                )
+                if initial_price in (None, 0):
+                    self.initial[field_name] = None
+                    self.fields[field_name].initial = None
         self.demande_client = None
         if self.demande_source:
             self.demande_client = self.demande_source.client or (
@@ -519,6 +536,9 @@ class CampagneForm(forms.ModelForm):
 
     def clean(self):
         cleaned = super().clean()
+        for field_name in ('prix', 'prix_affichage', 'prix_impression'):
+            if field_name in cleaned and cleaned[field_name] is None:
+                cleaned[field_name] = Decimal('0')
         d1 = cleaned.get('date_debut')
         d2 = cleaned.get('date_fin')
         type_support = cleaned.get('type_support')
@@ -1084,6 +1104,7 @@ class DemandeGestionContactForm(forms.Form):
     )
     accepte_contact = forms.BooleanField(
         required=False,
+        initial=True,
         widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
     )
 

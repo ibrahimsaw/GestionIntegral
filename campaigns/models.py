@@ -132,15 +132,28 @@ que Support.save() dans inventory/models.py.
 class Client(models.Model):
     """Client de la régie publicitaire."""
 
+    TYPE_CLIENT = 'client'
+    TYPE_AGENCE = 'agence'
+    TYPE_ENTITE_CHOICES = [
+        (TYPE_CLIENT, 'Client'),
+        (TYPE_AGENCE, 'Agence'),
+    ]
+
+    type_entite = models.CharField(
+        max_length=10,
+        choices=TYPE_ENTITE_CHOICES,
+        default=TYPE_CLIENT,
+        verbose_name="Type de compte",
+    )
+
     # ── NOUVEAU CHAMP ────────────────────────────────────────────────────────
     reference = models.CharField(
         max_length=20,
         unique=True,
         blank=True,
         editable=False,
-        verbose_name="Code client",
-        help_text="Généré automatiquement. Ex: CLI-00001. À communiquer au client "
-                   "pour qu'il puisse s'identifier lors d'une future demande.",
+        verbose_name="Code de compte",
+        help_text="Généré automatiquement : CLI pour un client, AGE pour une agence.",
     )
 
     nom           = models.CharField(max_length=200, verbose_name="Raison sociale / Nom")
@@ -168,7 +181,8 @@ class Client(models.Model):
             import string
             from django.utils import timezone
             suffixe = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
-            self.reference = f"CLI-{timezone.now().year}-{suffixe}"
+            prefixe = 'AGE' if self.type_entite == self.TYPE_AGENCE else 'CLI'
+            self.reference = f"{prefixe}-{timezone.now().year}-{suffixe}"
         super().save(*args, **kwargs)
 
     def get_contrat_actif(self):
@@ -733,7 +747,7 @@ class DemandeReservation(models.Model):
     societe = models.CharField(
         max_length=200,
         blank=True,
-        verbose_name="Société / Organisation",
+        verbose_name="Nom de la société",
     )
     email = models.EmailField(
         verbose_name="Email",
@@ -892,7 +906,8 @@ class DemandeReservation(models.Model):
             and not self.client_id
         ):
             match = Client.objects.filter(
-                reference__iexact=self.reference_client_saisie.strip()
+                reference__iexact=self.reference_client_saisie.strip(),
+                type_entite=Client.TYPE_CLIENT,
             ).first()
             if match:
                 self.client = match
@@ -1072,6 +1087,15 @@ class Campagne(models.Model):
     STATUT_CHOICES   = STATUT_CHOICES
     
     client       = models.ForeignKey(Client, on_delete=models.PROTECT, related_name='campagnes')
+    agence       = models.ForeignKey(
+        Client,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='campagnes_agence',
+        limit_choices_to={'type_entite': Client.TYPE_AGENCE},
+        verbose_name="Agence",
+    )
     annonceur    = models.CharField(
         max_length=200,
         blank=True,

@@ -17,11 +17,15 @@ class ClientProfileFormMixin:
             "Lors de l’association, les coordonnées du compte sont reprises de la fiche client. "
             "Un profil client ne peut être associé qu'à un seul compte."
         )
-        clients = Client.objects.filter(user_account__isnull=True)
+        clients = Client.objects.filter(
+            type_entite=Client.TYPE_CLIENT,
+            user_account__isnull=True,
+        )
         if self.instance.pk and self.instance.client_profile_id:
             clients = Client.objects.filter(
                 Q(user_account__isnull=True)
-                | Q(user_account__pk=self.instance.pk)
+                | Q(user_account__pk=self.instance.pk),
+                type_entite=Client.TYPE_CLIENT,
             )
         self.fields['client_profile'].queryset = clients.order_by('nom')
         self.fields['client_profile'].initial = self.instance.client_profile_id

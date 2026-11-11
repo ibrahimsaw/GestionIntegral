@@ -355,7 +355,9 @@ def _build_context_panneaux(filters: dict) -> dict:
     villes    = sorted({v.strip() for v in all_supports.values_list("ville",    flat=True) if v and v.strip()})
     quartiers = sorted({q.strip() for q in all_supports.values_list("quartier", flat=True) if q and q.strip()})
     statuts   = sorted({s.strip() for s in all_supports.values_list("etat",     flat=True) if s and s.strip()})
-    clients   = Client.objects.order_by("nom")
+    clients   = Client.objects.filter(
+        type_entite=Client.TYPE_CLIENT,
+    ).order_by("nom")
     marches_list = Marche.objects.filter(actif=True).order_by("nom")
 
     return {

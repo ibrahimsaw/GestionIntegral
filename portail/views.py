@@ -1633,7 +1633,7 @@ class DemandePartageWizardBase(View):
 
     def get_draft(self, token):
         return get_object_or_404(
-            DemandeReservation.objects.prefetch_related(
+            DemandeReservation.objects.select_related('client').prefetch_related(
                 'faces_souhaitees__support',
                 'supports_souhaites',
             ),
@@ -1646,6 +1646,21 @@ class DemandePartageWizardBase(View):
     def get_state(self, request, demande, token):
         key = self.session_key(token)
         state = request.session.get(key)
+        initial_formats = list(
+            demande.faces_souhaitees.values_list(
+                'support__format',
+                flat=True,
+            )
+        )
+        categories_initiales = dict(
+            FormatSupport.objects.filter(
+                code__in=[code for code in initial_formats if code]
+            ).values_list('code', 'categorie')
+        )
+        allowed_categories = sorted({
+            categories_initiales.get(code) or 'Autres'
+            for code in initial_formats
+        })
         if state is None:
             state = {
                 'faces': list(demande.faces_souhaitees.values_list('pk', flat=True)),
@@ -1659,9 +1674,20 @@ class DemandePartageWizardBase(View):
                 'email': demande.email,
                 'telephone': demande.telephone,
                 'type_client': demande.type_client,
-                'reference_client_saisie': demande.reference_client_saisie,
+                'reference_client_saisie': (
+                    demande.reference_client_saisie
+                    or (demande.client.reference if demande.client else '')
+                ),
+                'client_name': demande.client.nom if demande.client else '',
+                'allowed_categories': allowed_categories,
             }
             request.session[key] = state
+        else:
+            state.setdefault(
+                'client_name',
+                demande.client.nom if demande.client else '',
+            )
+            state.setdefault('allowed_categories', allowed_categories)
         return state
 
     def get_selections(self, request, demande, token):
@@ -1689,18 +1715,26 @@ class DemandePartageWizardBase(View):
 
 
 class DemandePartageEtape1View(DemandePartageWizardBase):
-    """Le client modifie les coordonnées, emplacements et dates."""
+    """Le client peut modifier uniquement les faces demandées."""
     template_name = 'portail/reserver_etape1.html'
 
-    def render_step(self, request, token, form, contact_form, faces):
-        for field in contact_form.fields.values():
-            field.widget.attrs['form'] = 'form-etape1'
-        for field_name in ('nom_contact', 'societe', 'email', 'telephone', 'reference_client_saisie'):
-            contact_form.fields[field_name].widget.attrs['class'] = 'form-control-e3'
+    def render_step(self, request, token, form, state, faces):
+        initial_selected_faces = [
+            {
+                'id': str(face.pk),
+                'code': face.support.code,
+                'label': face.get_label_display(),
+                'quartier': face.support.quartier or face.support.ville,
+                'support_id': str(face.support_id),
+            }
+            for face in faces
+        ]
         return render(request, self.template_name, self.step_context(
             token,
             form=form,
-            contact_form=contact_form,
+            state=state,
+            allowed_categories=state['allowed_categories'],
+            initial_selected_faces=initial_selected_faces,
             panier=faces,
             filtres={
                 'ville': request.GET.get('ville', '').strip(),
@@ -1716,41 +1750,60 @@ class DemandePartageEtape1View(DemandePartageWizardBase):
         if response:
             return response
         state, faces, _ = self.get_selections(request, demande, token)
+        state['supports'] = []
+        request.session[self.session_key(token)] = state
         form = Etape1Form(initial={
             'faces_selectionnees': json.dumps(state['faces']),
-            'supports_selectionnees': json.dumps(state['supports']),
+            'supports_selectionnees': '[]',
             'date_debut': state['date_debut'],
             'date_fin': state['date_fin'],
         })
-        contact_form = Etape3Form(initial=state)
-        return self.render_step(request, token, form, contact_form, faces)
+        return self.render_step(request, token, form, state, faces)
 
     def post(self, request, token):
         demande = self.get_draft(token)
         response = self.redirect_if_submitted(demande)
         if response:
             return response
-        form = Etape1Form(request.POST)
-        contact_form = Etape3Form(request.POST)
         state, faces, _ = self.get_selections(request, demande, token)
-        selection_valid = form.is_valid()
-        contact_valid = contact_form.is_valid()
-        if not selection_valid or not contact_valid:
-            return self.render_step(request, token, form, contact_form, faces)
+        state['supports'] = []
+        request.session[self.session_key(token)] = state
+        post_data = request.POST.copy()
+        post_data['date_debut'] = state['date_debut']
+        post_data['date_fin'] = state['date_fin']
+        post_data['supports_selectionnees'] = '[]'
+        form = Etape1Form(post_data)
+        if not form.is_valid():
+            return self.render_step(request, token, form, state, faces)
 
         data = form.cleaned_data
-        contact = contact_form.cleaned_data
+        selected_faces = FacePanneau.objects.filter(
+            pk__in=data['faces_uuids']
+        ).select_related('support')
+        selected_formats = {
+            face.support.format
+            for face in selected_faces
+        }
+        selected_categories_by_format = dict(
+            FormatSupport.objects.filter(
+                code__in=[code for code in selected_formats if code]
+            ).values_list('code', 'categorie')
+        )
+        selected_categories = {
+            selected_categories_by_format.get(code) or 'Autres'
+            for code in selected_formats
+        }
+        if not selected_categories.issubset(set(state['allowed_categories'])):
+            form.add_error(
+                None,
+                "Vous ne pouvez sélectionner que des faces de la catégorie "
+                "initialement demandée.",
+            )
+            return self.render_step(request, token, form, state, faces)
+
         state.update({
             'faces': data['faces_uuids'],
-            'supports': data['supports_uuids'],
-            'date_debut': data['date_debut'].isoformat(),
-            'date_fin': data['date_fin'].isoformat(),
-            'nom_contact': contact['nom_contact'],
-            'societe': contact['societe'],
-            'email': contact['email'],
-            'telephone': contact['telephone'],
-            'type_client': contact['type_client'],
-            'reference_client_saisie': contact['reference_client_saisie'],
+            'supports': [],
         })
         request.session[self.session_key(token)] = state
         return redirect('portail:demande_partage_etape2', token=token)
@@ -1830,7 +1883,10 @@ class DemandePartageEtape2View(DemandePartageWizardBase):
                 reference = data.get('reference_client_saisie', '').strip()
                 client = None
                 if data['type_client'] == DemandeReservation.TYPE_CLIENT_EXISTANT:
-                    client = Client.objects.filter(reference__iexact=reference).first()
+                    client = Client.objects.filter(
+                        reference__iexact=reference,
+                        type_entite=Client.TYPE_CLIENT,
+                    ).first()
 
                 demande.type_client = data['type_client']
                 demande.reference_client_saisie = reference
@@ -1886,7 +1942,10 @@ class ConfirmationView(View):
             DemandeReservation.objects.select_related('campagne'),
             uuid=uuid,
         )
-        return render(request, self.template_name, {'demande': demande})
+        return render(request, self.template_name, {
+            'demande': demande,
+            'hide_portal_navigation': True,
+        })
 
 
 class SuiviDemandeView(View):

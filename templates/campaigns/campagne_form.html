@@ -325,19 +325,32 @@
             <div class="card-body p-4">
               <div class="row g-3">
                 
-                <!-- Agence -->
+                <!-- Client -->
                 <div class="col-md-4">
                   <label class="form-label" for="id_client">
-                    Agence
+                    Client <span class="text-danger">*</span>
                   </label>
+                  <div class="input-group">
+                    <span class="input-group-text">
+                      <i class="bi bi-person"></i>
+                    </span>
+                    {{ form.client }}
+                  </div>
+                  {% if form.client.help_text %}<div class="form-text small text-muted">{{ form.client.help_text }}</div>{% endif %}
+                  {% if form.client.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.client.errors }}</div>{% endif %}
+                </div>
+
+                <!-- Agence facultative -->
+                <div class="col-md-4">
+                  <label class="form-label" for="id_agence">Agence (facultative)</label>
                   <div class="input-group">
                     <span class="input-group-text">
                       <i class="bi bi-building"></i>
                     </span>
-                    {{ form.client }}
+                    {{ form.agence }}
                   </div>
-                  <div class="form-text small text-muted">Agence responsable de la campagne.</div>
-                  {% if form.client.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.client.errors }}</div>{% endif %}
+                  <div class="form-text small text-muted">L’agence peut être différente pour chaque campagne.</div>
+                  {% if form.agence.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.agence.errors }}</div>{% endif %}
                 </div>
 
                 <!-- Nom de la campagne -->
@@ -368,24 +381,6 @@
                   {% if form.lieu.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.lieu.errors }}</div>{% endif %}
                 </div>
 
-                <!-- Client / annonceur -->
-                <div class="col-md-6">
-                  <label class="form-label" for="id_annonceur">Client / Annonceur</label>
-                  <div class="input-group">
-                    <span class="input-group-text">
-                      <i class="bi bi-person-badge"></i>
-                    </span>
-                    {{ form.annonceur }}
-                  </div>
-                  <datalist id="annonceurs-existants">
-                    {% for annonceur in form.annonceurs_existants %}
-                      <option value="{{ annonceur }}">
-                    {% endfor %}
-                  </datalist>
-                  <div class="form-text small text-muted">Facultatif : choisissez un client existant ou saisissez un nouveau nom.</div>
-                  {% if form.annonceur.errors %}<div class="text-danger small mt-1 fw-semibold">{{ form.annonceur.errors }}</div>{% endif %}
-                </div>
-
                 <!-- Import des faces depuis une réservation de l'agence -->
                 <div class="col-md-6">
                   <label class="form-label" for="id_reservation_reference">Référence de réservation ou de demande (facultatif)</label>
@@ -401,7 +396,7 @@
                         value="{{ reservation.reference }}"
                         label="{{ reservation.nom }} — {{ reservation.client.nom }}"
                         data-type="reservation"
-                        data-agence="{{ reservation.client_id }}"
+                        data-client="{{ reservation.client_id }}"
                         data-date-debut="{{ reservation.date_debut|date:'Y-m-d' }}"
                         data-date-fin="{{ reservation.date_fin|date:'Y-m-d' }}"
                         data-categories="{{ reservation.categories_json }}">
@@ -411,10 +406,9 @@
                         value="{{ demande.reference }}"
                         label="Demande — {{ demande.societe|default:demande.nom_contact }}"
                         data-type="demande"
-                        data-agence="{{ demande.client_formulaire.pk|default:'' }}"
+                        data-client="{{ demande.client_formulaire.pk|default:'' }}"
                         data-date-debut="{{ demande.date_debut_souhaitee|date:'Y-m-d' }}"
                         data-date-fin="{{ demande.date_fin_souhaitee|date:'Y-m-d' }}"
-                        data-annonceur="{{ demande.societe|default:demande.nom_contact }}"
                         data-lieu="{{ demande.lieu_formulaire }}"
                         data-categorie="{{ demande.categorie_formulaire }}"
                         data-categories="{{ demande.categories_json }}">
@@ -987,14 +981,11 @@ document.addEventListener('DOMContentLoaded', function () {
             ? Array.from(categorieSelect.options).map(option => option.cloneNode(true))
             : [];
 
-        function filtrerReservationsParAgence(agenceId) {
+        function filtrerReservationsParClient(clientId) {
             reservationsDatalist.replaceChildren();
+            if (!clientId) return;
             reservationsOptions
-                .filter(option => (
-                    option.dataset.type === 'demande'
-                    ? (!option.dataset.agence || option.dataset.agence === agenceId)
-                    : option.dataset.agence === agenceId
-                ))
+                .filter(option => option.dataset.client === clientId)
                 .forEach(option => reservationsDatalist.appendChild(option.cloneNode(true)));
         }
 
@@ -1003,17 +994,10 @@ document.addEventListener('DOMContentLoaded', function () {
             const demande = reservationsOptions.find(option =>
                 option.dataset.type === 'demande'
                 && option.value.toLowerCase() === reference
+                && option.dataset.client === clientSelect.value
             );
             if (!demande) return;
 
-            if (demande.dataset.agence) {
-                clientSelect.value = demande.dataset.agence;
-                filtrerReservationsParAgence(clientSelect.value);
-            }
-            const annonceurInput = document.getElementById('id_annonceur');
-            if (annonceurInput) {
-                annonceurInput.value = demande.dataset.annonceur || '';
-            }
             if (lieuSelect && demande.dataset.lieu) {
                 lieuSelect.value = demande.dataset.lieu;
             }
@@ -1040,7 +1024,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const reservation = reservationsOptions.find(option =>
                 option.dataset.type === 'reservation'
                 && option.value.toLowerCase() === reference
-                && option.dataset.agence === clientSelect.value
+                && option.dataset.client === clientSelect.value
             );
 
             if (!dateDebutInput || !dateFinInput) return;
@@ -1106,7 +1090,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const reservation = reservationsOptions.find(option =>
                 option.dataset.type === 'reservation'
                 && option.value.toLowerCase() === reference
-                && option.dataset.agence === clientSelect.value
+                && option.dataset.client === clientSelect.value
             );
             const categorieActuelle = categorieSelect.value;
             let categoriesAutorisees = [];
@@ -1163,7 +1147,7 @@ document.addEventListener('DOMContentLoaded', function () {
             updateAutoFaceCountVisibility();
         }
 
-        filtrerReservationsParAgence(clientSelect.value);
+        filtrerReservationsParClient(clientSelect.value);
         traiterReference();
         reservationReferenceInput.addEventListener('input', traiterReference);
         reservationReferenceInput.addEventListener('change', traiterReference);
@@ -1175,7 +1159,7 @@ document.addEventListener('DOMContentLoaded', function () {
         }
         clientSelect.addEventListener('change', function() {
             reservationReferenceInput.value = '';
-            filtrerReservationsParAgence(this.value);
+            filtrerReservationsParClient(this.value);
             appliquerPeriodeReservation();
             appliquerCategoriesReservation();
             updateAutoFaceCountVisibility();

@@ -19,7 +19,13 @@ from inventory.models import FacePanneau, FormatSupport, Support
 
 class CampagneFormAdvertiserTests(TestCase):
     def test_prices_accept_grouped_large_amounts_and_decimal_commas(self):
+        client = Client.objects.create(
+            nom="Client pour test de prix",
+            telephone="00000000",
+            email="client-prix@example.com",
+        )
         form = CampagneForm(data={
+            "client": str(client.pk),
             "nom": "Campagne avec grands tarifs",
             "date_debut": "2026-01-01",
             "date_fin": "2026-01-02",
@@ -45,13 +51,14 @@ class CampagneFormAdvertiserTests(TestCase):
             self.assertIsNone(form[field_name].value())
             self.assertEqual(form.fields[field_name].widget.input_type, "text")
 
-    def test_advertiser_is_optional_and_supports_existing_or_free_text_names(self):
-        annonceur = Client.objects.create(
-            nom="Annonceur de test",
-            telephone="00000000",
-            email="annonceur-test@example.com",
+    def test_campaign_form_uses_selected_client_instead_of_separate_advertiser(self):
+        client = Client.objects.create(
+            nom="Client de test annonceur",
+            telephone="00000001",
+            email="client-annonceur-test@example.com",
         )
         form = CampagneForm(data={
+            "client": str(client.pk),
             "nom": "Campagne de test",
             "date_debut": "2026-01-01",
             "date_fin": "2026-01-02",
@@ -60,21 +67,18 @@ class CampagneFormAdvertiserTests(TestCase):
             "frequence": "120",
             "tranches_horaires": "08:00-12:00",
             "nombre_visuels": "1",
-            "annonceur": "Client saisi librement",
             "prix": "",
             "prix_affichage": "",
             "prix_impression": "",
         })
 
-        self.assertFalse(form.fields["annonceur"].required)
+        self.assertNotIn("annonceur", form.fields)
         self.assertTrue(form.is_valid(), form.errors)
         campagne = form.save()
-        self.assertEqual(campagne.annonceur, "Client saisi librement")
+        self.assertEqual(campagne.client, client)
         self.assertEqual(campagne.prix, Decimal("0"))
         self.assertEqual(campagne.prix_affichage, Decimal("0"))
         self.assertEqual(campagne.prix_impression, Decimal("0"))
-        self.assertIn(annonceur.nom, form.annonceurs_existants)
-        self.assertEqual(form.fields["annonceur"].widget.attrs["list"], "annonceurs-existants")
 
 
 class CampagneReservationImportTests(TestCase):

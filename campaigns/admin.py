@@ -94,7 +94,8 @@ class LigneCampagneAdmin(admin.ModelAdmin):
 
 @admin.register(Client)
 class ClientAdmin(admin.ModelAdmin):
-    list_display = ['nom', 'contact_nom', 'telephone', 'actif']
+    list_display = ['nom', 'type_entite', 'contact_nom', 'telephone', 'actif']
+    list_filter = ['type_entite', 'actif']
     search_fields = ['nom']
 
 
@@ -127,7 +128,7 @@ class EcranBilanMensuelAdmin(admin.ModelAdmin):
 
 @admin.register(Campagne)
 class CampagneAdmin(admin.ModelAdmin):
-    list_display = ['reference', 'nom', 'client', 'date_debut', 'date_fin', 'statut', 'type_support', 'contrat', 'actif']
+    list_display = ['reference', 'nom', 'client', 'agence', 'date_debut', 'date_fin', 'statut', 'type_support', 'contrat', 'actif']
     list_filter = ['statut', 'type_support']
     search_fields = ['nom', 'reference', 'client__nom']
     inlines = [CampagneVisuelInline, LigneCampagneInline]

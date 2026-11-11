@@ -61,7 +61,45 @@ class DemandeCreationViewTests(TestCase):
     def complete_step_two(self):
         return self.client.post(reverse('demande_creation_etape2'), {})
 
+    def test_confirmation_page_renders_the_styled_status_header(self):
+        demande = DemandeReservation.objects.create(
+            type_client=DemandeReservation.TYPE_CLIENT_NOUVEAU,
+            nom_contact='Prospect confirmation',
+            societe='Société confirmation',
+            email='confirmation@example.com',
+            telephone='70000000',
+            date_debut_souhaitee=self.start,
+            date_fin_souhaitee=self.end,
+            statut=DemandeReservation.STATUT_NOUVELLE,
+            token_partage=uuid.uuid4(),
+        )
+        demande.faces_souhaitees.add(self.face)
+
+        response = self.client.get(
+            reverse('portail:confirmation', kwargs={'uuid': demande.uuid})
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'portail/confirmation.html')
+        self.assertTrue(response.context['hide_portal_navigation'])
+        self.assertContains(response, 'class="confirmation confirmation-header"')
+        self.assertContains(response, 'Demande envoyée avec succès !')
+        self.assertContains(response, 'Référence de demande')
+        self.assertNotContains(response, 'alt="Logo"')
+        self.assertNotContains(response, 'class="nav-label">Menu')
+        self.assertNotContains(response, 'Suivre une autre demande')
+        self.assertNotContains(response, 'Obtenir un devis gratuit')
+        self.assertNotContains(response, 'class="cta-final"')
+        self.assertContains(response, 'class="main-wrap no-sidebar"')
+
     def test_client_can_update_and_confirm_shared_request_before_staff_approval(self):
+        standard_format = FormatSupport.objects.create(
+            code='DEMANDE-CLIENT-STANDARD',
+            categorie='Standard',
+            dimensions='4m x 3m',
+        )
+        self.panel.format = standard_format.code
+        self.panel.save(update_fields=['format'])
         client_obj = Client.objects.create(
             nom='Annonceur existant',
             contact_nom='Awa Contact',
@@ -166,12 +204,31 @@ class DemandeCreationViewTests(TestCase):
             code='DEMANDE-CLIENT-EDIT-PANEL',
             nom='Panneau modifié par le client',
             type_support=Support.TYPE_PANNEAU,
+            format=standard_format.code,
             latitude=12.35,
             longitude=-1.53,
             ville='Ouagadougou',
         )
         other_face = FacePanneau.objects.create(
             support=other_panel,
+            label=FacePanneau.LABEL_A,
+        )
+        other_category_format = FormatSupport.objects.create(
+            code='DEMANDE-CLIENT-SUCETTE',
+            categorie='Sucette',
+            dimensions='1m x 2m',
+        )
+        other_category_panel = Support.objects.create(
+            code='DEMANDE-CLIENT-OTHER-CATEGORY',
+            nom='Panneau autre catégorie',
+            type_support=Support.TYPE_PANNEAU,
+            format=other_category_format.code,
+            latitude=12.36,
+            longitude=-1.54,
+            ville='Ouagadougou',
+        )
+        other_category_face = FacePanneau.objects.create(
+            support=other_category_panel,
             label=FacePanneau.LABEL_A,
         )
         updated_start = self.start + datetime.timedelta(days=2)
@@ -184,40 +241,60 @@ class DemandeCreationViewTests(TestCase):
         )
         self.assertEqual(shared_page.status_code, 200)
         self.assertTrue(shared_page.context['shared_edit_mode'])
-        self.assertContains(shared_page, 'Client, période & emplacements')
+        self.assertNotContains(shared_page, 'Modification de la demande')
+        self.assertNotContains(shared_page, 'Vos coordonnées et la période sont affichées sans modification possible.')
+        self.assertNotContains(shared_page, '<div class="cta-final">')
         self.assertContains(shared_page, 'Vos coordonnées')
         self.assertContains(shared_page, 'Nom du contact')
+        self.assertContains(shared_page, 'Catégorie fixe')
+        self.assertContains(shared_page, 'Standard')
+        self.assertContains(shared_page, 'id="initial-selected-faces"')
+        self.assertContains(shared_page, f'"id": "{self.face.pk}"')
+        self.assertLess(
+            shared_page.content.index(b'id="initial-selected-faces"'),
+            shared_page.content.index(b'<script>\n  "use strict";'),
+        )
+        self.assertNotContains(shared_page, 'id="filter-categorie"')
+        self.assertNotContains(shared_page, 'id="list-filter-categorie"')
         self.assertNotContains(shared_page, 'step-circle">3')
+        self.assertNotContains(shared_page, 'name="nom_contact"')
+        self.assertNotContains(shared_page, 'name="type_client"')
+        self.assertContains(shared_page, 'id="date-debut"')
+        self.assertContains(shared_page, 'disabled aria-label="Date de début non modifiable"')
+        self.assertNotContains(shared_page, 'Choisir une catégorie')
         self.assertNotContains(shared_page, '<aside class="sidebar"')
         self.assertNotContains(shared_page, '<header class="topbar">')
-        invalid_contact_response = self.client.post(
+        category_change_response = self.client.post(
             reverse('portail:demande_partage', kwargs={'token': token}),
             {
-                'faces_selectionnees': json.dumps([other_face.pk]),
-                'supports_selectionnees': '[]',
+                'faces_selectionnees': json.dumps([other_category_face.pk]),
+                'supports_selectionnees': '[999999]',
                 'date_debut': updated_start.isoformat(),
                 'date_fin': updated_end.isoformat(),
                 'type_client': DemandeReservation.TYPE_CLIENT_NOUVEAU,
-                'nom_contact': 'Awa mise à jour',
+                'nom_contact': 'Coordonnée interdite',
                 'societe': 'Nouvelle société',
                 'email': 'adresse-invalide',
                 'telephone': '71111111',
             },
         )
-        self.assertEqual(invalid_contact_response.status_code, 200)
-        self.assertTrue(invalid_contact_response.context['contact_form'].errors['email'])
+        self.assertEqual(category_change_response.status_code, 200)
+        self.assertContains(
+            category_change_response,
+            'Vous ne pouvez sélectionner que des faces de la catégorie',
+        )
 
         response = self.client.post(
             reverse('portail:demande_partage', kwargs={'token': token}),
             {
                 'faces_selectionnees': json.dumps([other_face.pk]),
-                'supports_selectionnees': '[]',
+                'supports_selectionnees': '[999999]',
                 'date_debut': updated_start.isoformat(),
                 'date_fin': updated_end.isoformat(),
                 'type_client': DemandeReservation.TYPE_CLIENT_NOUVEAU,
-                'nom_contact': 'Awa mise à jour',
+                'nom_contact': 'Coordonnée interdite',
                 'societe': 'Nouvelle société',
-                'email': 'awa.updated@example.com',
+                'email': 'adresse-invalide',
                 'telephone': '71111111',
             },
         )
@@ -230,8 +307,16 @@ class DemandeCreationViewTests(TestCase):
         )
         self.assertTemplateUsed(recap_response, 'portail/demande_partage_recap.html')
         self.assertContains(recap_response, 'Vérifiez le récapitulatif de votre demande')
-        self.assertContains(recap_response, 'Awa mise à jour')
-        self.assertContains(recap_response, 'Nouvelle société')
+        self.assertNotContains(recap_response, '<div class="cta-final">')
+        self.assertContains(recap_response, 'aria-label="Étapes de création de la demande"')
+        self.assertContains(recap_response, 'Client, période &amp; emplacements')
+        self.assertContains(recap_response, 'Récapitulatif &amp; validation')
+        self.assertContains(recap_response, 'aria-current="step"')
+        self.assertContains(recap_response, 'Awa Contact')
+        self.assertNotContains(recap_response, 'Coordonnée interdite')
+        self.assertNotContains(recap_response, 'Nouvelle société')
+        self.assertContains(recap_response, self.start.isoformat())
+        self.assertNotContains(recap_response, updated_start.isoformat())
         self.assertNotContains(recap_response, 'Informations sur votre campagne')
         response = self.client.post(
             reverse('portail:demande_partage_etape2', kwargs={'token': token}),
@@ -244,12 +329,18 @@ class DemandeCreationViewTests(TestCase):
 
         demande.refresh_from_db()
         self.assertEqual(demande.statut, DemandeReservation.STATUT_NOUVELLE)
-        self.assertIsNone(demande.client)
-        self.assertEqual(demande.date_debut_souhaitee, updated_start)
-        self.assertEqual(demande.date_fin_souhaitee, updated_end)
+        self.assertEqual(demande.client, client_obj)
+        self.assertEqual(
+            demande.type_client,
+            DemandeReservation.TYPE_CLIENT_EXISTANT,
+        )
+        self.assertEqual(demande.date_debut_souhaitee, self.start)
+        self.assertEqual(demande.date_fin_souhaitee, self.end)
         self.assertEqual(demande.nom_campagne, '')
-        self.assertEqual(demande.nom_contact, 'Awa mise à jour')
-        self.assertEqual(demande.email, 'awa.updated@example.com')
+        self.assertEqual(demande.nom_contact, 'Awa Contact')
+        self.assertEqual(demande.email, 'awa@example.com')
+        self.assertEqual(demande.telephone, '70000000')
+        self.assertFalse(demande.supports_souhaites.exists())
         self.assertEqual(list(demande.faces_souhaitees.all()), [other_face])
         self.assertFalse(Reservation.objects.exists())
         self.assertRedirects(
@@ -328,7 +419,7 @@ class DemandeCreationViewTests(TestCase):
         )
         demande.refresh_from_db()
         self.assertEqual(demande.statut, DemandeReservation.STATUT_NOUVELLE)
-        self.assertEqual(demande.date_debut_souhaitee, second_start)
+        self.assertEqual(demande.date_debut_souhaitee, self.start)
 
         response = self.client.post(
             reverse('demande_valider', kwargs={'uuid': demande.uuid}),
@@ -380,6 +471,13 @@ class DemandeCreationViewTests(TestCase):
             statut=DemandeReservation.STATUT_NOUVELLE,
             token_partage=uuid.uuid4(),
         )
+        standard_format = FormatSupport.objects.create(
+            code='DEMANDE-GESTIONNAIRE-STANDARD',
+            categorie='Standard',
+            dimensions='4m x 3m',
+        )
+        self.panel.format = standard_format.code
+        self.panel.save(update_fields=['format'])
         demande.faces_souhaitees.add(self.face)
         detail_url = reverse('demande_detail', kwargs={'uuid': demande.uuid})
         token = demande.token_partage
@@ -395,6 +493,14 @@ class DemandeCreationViewTests(TestCase):
         )
         response = self.client.get(reverse('demande_creation') + '?edit=1')
         self.assertContains(response, 'Modifier la demande')
+        self.assertContains(response, 'aria-label="Étapes de création de la demande"')
+        self.assertContains(response, 'aria-current="step"')
+        self.assertContains(response, 'Client, période & emplacements')
+        self.assertContains(response, 'Récapitulatif & validation')
+        self.assertContains(response, 'id="initial-selected-faces"')
+        self.assertContains(response, f'"id": "{self.face.pk}"')
+        self.assertEqual(response.context['filtres']['categorie'], 'Standard')
+        self.assertEqual(response.context['filtres']['format'], standard_format.code)
         response = self.client.post(
             reverse('demande_creation'),
             {

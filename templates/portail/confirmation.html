@@ -1,815 +1,922 @@
 {% extends 'portail/base_portail.html' %}
+
 {% load static %}
 
 {% block title %}Confirmation — Demande {{ demande.reference }}{% endblock %}
 
-{% block topbar_title %}<i class="bi bi-check-circle-fill me-1" style="color:#10b981"></i> Demande confirmée{% endblock %}
+{% block topbar_title %}<i class="bi bi-check-circle-fill me-1" style="color:#287348"></i> Demande confirmée{% endblock %}
+
+{% block footer_cta %}{% endblock %}
 
 {% block extra_head %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+
 <style>
-  /* ════════════════════════════════════════════════════════════════
-     Identité "Furni" — vert profond + jaune, Inter, formes arrondies,
-     puces icônes rondes, décor à points. Variables surchargées
-     localement sur .confirmation pour ne pas affecter le reste du site.
-     ════════════════════════════════════════════════════════════════ */
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  /* ==========================================================
+     BASE & TOKENS
+     ========================================================== */
+  .cf {
+    --ink: #121a17;
+    --ink-2: #3c4843;
+    --muted: #7a847f;
+    --line: #e6e4dd;
+    --line-strong: #d3d0c6;
+    --paper: #ffffff;
+    --wash: #f8f7f3;
+    --brand: #1d5a47;
+    --brand-ink: #0f3a2d;
 
-  .confirmation {
-    --color-primary:   {{ DESIGN.COLOR_PRIMARY }};
-    --color-secondary: {{ DESIGN.COLOR_SECONDARY }};
-    --success:          #10b981;
-    --success-soft:      #d1fae5;
-    --text:               #000000;
-    --text-muted:          #6a6a6a;
-    --border:               #e6e2d8;
-    --bg-card:                #ffffff;
-    --bg-card2:                #f8f6f1;
-    --radius-sm:  10px;
-    --radius-md:  0px;
-    --radius-lg:  8x;
-    --shadow-sm:  0 1px 3px rgba(31,46,40,.07), 0 1px 2px rgba(31,46,40,.05);
-    --shadow-md:  0 10px 28px rgba(31,46,40,.10), 0 2px 6px rgba(31,46,40,.06);
-    font-family: 'Inter', sans-serif;
+    /* tone (changes with status) */
+    --tone: #1d5a47;
+    --tone-wash: #e8f1ec;
+
+    --radius: 8px;
+    --serif: 'Fraunces', Georgia, serif;
+    --sans: 'Inter', system-ui, -apple-system, sans-serif;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 0 22px;
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
   }
+  .cf *, .cf *::before, .cf *::after { box-sizing: border-box; }
+  .cf a { text-decoration: none; }
 
-  .dots-deco {
-    position: absolute;
-    width: 120px; height: 120px;
-    background-image: radial-gradient(currentColor 2.5px, transparent 2.5px);
-    background-size: 15px 15px;
-    opacity: .3;
-    pointer-events: none;
-    z-index: 0;
+  .cf.tone-info { --tone: #2f5f86; --tone-wash: #e8f0f7; }
+  .cf.tone-bad  { --tone: #a4392e; --tone-wash: #faeceb; }
+  .cf.tone-off  { --tone: #5d6964; --tone-wash: #eef0ee; }
+
+  /* ==========================================================
+     HERO (bloc header)
+     ========================================================== */
+  .cf-hero { padding-top: 34px; padding-bottom: 8px; }
+
+  .cf-hero-top {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 32px;
+    flex-wrap: wrap;
+    padding-bottom: 30px;
+    border-bottom: 1px solid var(--line-strong);
   }
+  .cf-hero-main { flex: 1 1 460px; min-width: 0; }
 
-  /* ── BREADCRUMB ──────────────────────────────────────────────── */
-  .breadcrumb-custom {
-    background: var(--bg-card2); padding: 12px 20px;
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    margin: 0 0 24px;
+  .cf-pill {
     display: inline-flex;
+    align-items: center;
+    gap: 9px;
+    padding: 6px 14px 6px 11px;
+    margin-bottom: 20px;
+    border-radius: 999px;
+    background: var(--tone-wash);
+    color: var(--tone);
+    font-size: .76rem;
+    font-weight: 700;
+    letter-spacing: .02em;
   }
-  .breadcrumb-custom .breadcrumb { margin: 0; font-size: .82rem; }
-  .breadcrumb-custom a {
-    color: var(--color-primary); text-decoration: none; font-weight: 700; transition: all .15s;
-  }
-  .breadcrumb-custom a:hover { text-decoration: underline; }
-  .breadcrumb-custom .active { color: var(--text-muted); }
-
-  /* ── SUCCESS BANNER ──────────────────────────────────────────── */
-  .success-banner {
-    position: relative;
-    overflow: hidden;
-    
-    background: linear-gradient(135deg, #10b981 0%, #ecfdf5 100%);
-    border: 1.5px solid #10b981;
-    border-radius: var(--radius-lg);
-    padding: 40px 24px;
-    text-align: center;
-    /* margin-bottom: 28px; */
-    box-shadow: var(--shadow-sm);
-  }
-  .success-banner .dots-deco { top: -20px; right: 10px; color: var(--success); opacity: .25; }
-  .success-banner::before {
-    content: '';
-    position: absolute;
-    bottom: -60px; left: -40px;
-    width: 200px; height: 200px;
-    background: rgba(16,185,129,.08);
-    border-radius: 42% 58% 65% 35% / 45% 45% 55% 55%;
-    pointer-events: none;
-  }
-
-  .success-icon {
-    position: relative; z-index: 1;
-    width: 76px; height: 76px;
-    margin: 0 auto 18px;
+  .cf-pill::before {
+    content: "";
+    width: 8px;
+    height: 8px;
     border-radius: 50%;
-    background: #10b981;
-    color: #fff;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 2.1rem;
-    box-shadow: 0 12px 26px rgba(16,185,129,.32);
-    animation: popIn .5s cubic-bezier(.36,.07,.19,.97);
-  }
-  @keyframes popIn {
-    0%   { transform: scale(0) rotate(-180deg); opacity: 0; }
-    50%  { transform: scale(1.15) rotate(0deg); }
-    100% { transform: scale(1) rotate(0deg); opacity: 1; }
+    background: var(--tone);
+    box-shadow: 0 0 0 0 var(--tone);
+    animation: cf-ping 2.2s ease-out infinite;
   }
 
-  .success-title {
-    position: relative; z-index: 1;
-    font-size: 1.35rem; font-weight: 800;
-    color: #065f46; margin-bottom: 8px;
+  .cf-title {
+    margin: 0 0 14px;
+    font-family: var(--serif);
+    font-size: clamp(2rem, 5vw, 3.1rem);
+    font-weight: 500;
+    line-height: 1.08;
+    letter-spacing: -.025em;
+    color: var(--ink);
   }
-  .success-text {
-    position: relative; z-index: 1;
-    font-size: .95rem; color: #065f46; opacity: .85;
-  }
-
-  /* ── SUCCESS BANNER — VARIANTES STATUT (NOUVEAU) ─────────────── */
-  .success-banner.status-info {
-    background: linear-gradient(135deg, #3b82f6 0%, #eff6ff 100%);
-    border-color: #3b82f6;
-  }
-  .success-banner.status-info .success-icon { background: #3b82f6; box-shadow: 0 12px 26px rgba(59,130,246,.32); }
-  .success-banner.status-info .success-title,
-  .success-banner.status-info .success-text { color: #1e3a8a; }
-
-  .success-banner.status-danger {
-    background: linear-gradient(135deg, #ef4444 0%, #fef2f2 100%);
-    border-color: #ef4444;
-  }
-  .success-banner.status-danger .success-icon { background: #ef4444; box-shadow: 0 12px 26px rgba(239,68,68,.32); }
-  .success-banner.status-danger .success-title,
-  .success-banner.status-danger .success-text { color: #7f1d1d; }
-
-  .success-banner.status-secondary {
-    background: linear-gradient(135deg, #6b7280 0%, #f3f4f6 100%);
-    border-color: #9ca3af;
-  }
-  .success-banner.status-secondary .success-icon { background: #6b7280; box-shadow: 0 12px 26px rgba(107,114,128,.28); }
-  .success-banner.status-secondary .success-title,
-  .success-banner.status-secondary .success-text { color: #374151; }
-
-  /* ── BADGE STATUT (NOUVEAU) ──────────────────────────────────── */
-  .badge-statut {
-    display: inline-flex; align-items: center;
-    padding: 6px 14px; border-radius: 20px;
-    font-size: .82rem; font-weight: 800;
-  }
-  .badge-statut-warning   { background: #fef3c7; color: #92400e; }
-  .badge-statut-info      { background: #dbeafe; color: #1e40af; }
-  .badge-statut-success   { background: #d1fae5; color: #065f46; }
-  .badge-statut-danger    { background: #fee2e2; color: #991b1b; }
-  .badge-statut-secondary { background: #e5e7eb; color: #374151; }
-
-  /* ── REFERENCE CARD ──────────────────────────────────────────── */
-  .ref-card {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    padding: 10px 22px;
-    box-shadow: var(--shadow-sm);
-    margin-bottom: 24px;
-  }
-  .ref-row {
-    display: flex; justify-content: space-between; align-items: center;
-    padding: 14px 0; border-bottom: 1px solid var(--border);
-  }
-  .ref-row:last-child { border-bottom: none; }
-  .ref-label {
-    display: flex; align-items: center; gap: 7px;
-    font-size: .68rem; font-weight: 800; text-transform: uppercase;
-    letter-spacing: .08em; color: var(--text-muted); margin-bottom: 5px;
-  }
-  .ref-label i { color: var(--color-primary); font-size: .85rem; }
-  .ref-value {
-    font-size: 1.05rem; font-weight: 800; color: var(--text);
-    font-family: 'Monaco', 'Courier New', monospace; letter-spacing: 0.5px;
-  }
-
-  /* ── SECTION RECAP ───────────────────────────────────────────── */
-  .section-recap { margin-bottom: 24px; }
-  .section-title {
-    font-size: .95rem; font-weight: 800;
-    color: var(--text); margin-bottom: 12px;
-    display: flex; align-items: center; gap: 10px;
-  }
-  .section-title-icon {
-    width: 30px; height: 30px; border-radius: 50%;
-    background: var(--color-primary); color: #fff;
-    display: flex; align-items: center; justify-content: center;
-    font-size: .82rem; flex-shrink: 0;
-  }
-
-  /* ── CARD LIST ───────────────────────────────────────────────── */
-  .card-list { display: grid; gap: 10px; }
-  .card-item {
-    background: var(--bg-card); border: 1px solid var(--border);
-    border-radius: var(--radius-md); padding: 13px 15px;
-    box-shadow: var(--shadow-sm);
-    display: flex; align-items: center; gap: 12px;
-    transition: all .18s ease;
-  }
-  .card-item:hover {
-    border-color: var(--color-primary); box-shadow: var(--shadow-md);
-    transform: translateY(-2px);
-  }
-  .card-item-icon {
-    width: 38px; height: 38px; border-radius: 50%; flex-shrink: 0;
-    background: var(--color-primary); color: #fff;
-    display: flex; align-items: center; justify-content: center;
-    font-size: .9rem;
-  }
-  .item-code { font-weight: 800; color: var(--text); font-size: .9rem; }
-  .item-meta { font-size: .8rem; color: var(--text-muted); margin-top: 1px; }
-
-  /* ── GRID RECAP ──────────────────────────────────────────────– */
-  .recap-grid {
-    display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 16px; margin-bottom: 24px;
-  }
-  .recap-box {
-    position: relative;
-    background: var(--bg-card); border: 1px solid var(--border);
-    border-radius: var(--radius-lg); padding: 20px 18px 18px;
-    box-shadow: var(--shadow-sm);
-    transition: all .18s ease;
-  }
-  .recap-box:hover {
-    border-color: var(--color-primary); box-shadow: var(--shadow-md);
-    transform: translateY(-3px);
-  }
-  .recap-icon {
-    width: 40px; height: 40px; border-radius: 50%;
-    background: var(--color-secondary); color: var(--text);
-    display: flex; align-items: center; justify-content: center;
-    font-size: 1.05rem; margin-bottom: 12px;
-  }
-  .recap-label {
-    font-size: .68rem; font-weight: 800; text-transform: uppercase;
-    letter-spacing: .08em; color: var(--text-muted); margin-bottom: 6px;
-  }
-  .recap-value {
-    font-size: 1rem; font-weight: 800; color: var(--text);
-    line-height: 1.5; word-break: break-word;
-  }
-
-  /* ── NEXT STEPS ──────────────────────────────────────────────– */
-  .next-steps {
-    position: relative;
-    overflow: hidden;
-    background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary) 100%);
-    color: #fff;
-    border-radius: var(--radius-lg); padding: 26px 24px;
-    margin-bottom: 24px;
-  }
-  .next-steps .dots-deco { bottom: -20px; right: -10px; color: var(--color-secondary); opacity: .6; }
-  .next-steps-title {
-    position: relative; z-index: 1;
-    font-weight: 800; margin-bottom: 16px;
-    display: flex; align-items: center; gap: 10px;
+  .cf-lead {
+    max-width: 560px;
+    margin: 0;
+    color: var(--ink-2);
     font-size: 1.02rem;
-  }
-  .steps-list {
-    list-style: none; padding: 0; margin: 0;
-    position: relative; z-index: 1;
-  }
-  .steps-item {
-    display: flex; gap: 14px; padding: 12px 0;
-    font-size: .9rem; opacity: .95;
-    border-bottom: 1px solid rgba(255,255,255,.12);
-  }
-  .steps-item:last-child { border-bottom: none; }
-  .steps-num {
-    display: flex; align-items: center; justify-content: center;
-    width: 30px; height: 30px;
-    background: var(--color-secondary); color: var(--text);
-    border-radius: 50%; font-weight: 800; font-size: .8rem;
-    flex-shrink: 0;
+    line-height: 1.7;
   }
 
-  /* ── CONTACT BAR ──────────────────────────────────────────────– */
-  .contact-bar {
-    background: var(--bg-card); border: 1.5px solid var(--border);
-    border-radius: var(--radius-lg); padding: 20px 22px;
-    margin-bottom: 24px; display: flex; gap: 18px; align-items: center;
-    box-shadow: var(--shadow-sm);
-    transition: all .18s ease;
+  /* référence "ticket" */
+  .cf-ticket {
+    position: relative;
+    flex: 0 0 auto;
+    min-width: 250px;
+    padding: 18px 22px;
+    background: var(--paper);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
   }
-  .contact-bar:hover {
-    border-color: var(--color-primary); box-shadow: var(--shadow-md);
+  .cf-ticket::before,
+  .cf-ticket::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    width: 14px;
+    height: 14px;
+    margin-top: -7px;
+    border-radius: 50%;
+    background: var(--cf-bg, #fff);
+    border: 1px solid var(--line-strong);
   }
-  .contact-bar-icon {
-    width: 52px; height: 52px; border-radius: 50%; flex-shrink: 0;
-    background: var(--color-secondary); color: var(--text);
-    display: flex; align-items: center; justify-content: center;
+  .cf-ticket::before { left: -8px; clip-path: inset(0 0 0 50%); }
+  .cf-ticket::after  { right: -8px; clip-path: inset(0 50% 0 0); }
+  .cf-ticket-label {
+    margin-bottom: 4px;
+    color: var(--muted);
+    font-size: .68rem;
+    font-weight: 700;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+  }
+  .cf-ticket-ref {
+    font-family: var(--mono);
+    font-size: 1.15rem;
+    font-weight: 600;
+    letter-spacing: .01em;
+    color: var(--brand-ink);
+    overflow-wrap: anywhere;
+  }
+
+  /* ---------- tracker ---------- */
+  .cf-track {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    margin: 0;
+    padding: 26px 0 6px;
+    list-style: none;
+  }
+  .cf-track li {
+    position: relative;
+    padding-top: 22px;
+    color: var(--muted);
+    font-size: .78rem;
+    font-weight: 600;
+  }
+  .cf-track li::before {            /* ligne */
+    content: "";
+    position: absolute;
+    top: 5px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--line-strong);
+  }
+  .cf-track li::after {             /* point */
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: var(--paper);
+    border: 2px solid var(--line-strong);
+  }
+  .cf-track li small {
+    display: block;
+    margin-top: 1px;
+    color: var(--muted);
+    font-size: .7rem;
+    font-weight: 500;
+  }
+  .cf-track li.done { color: var(--ink); }
+  .cf-track li.done::before { background: var(--brand); }
+  .cf-track li.done::after  { background: var(--brand); border-color: var(--brand); }
+  .cf-track li.current { color: var(--ink); }
+  .cf-track li.current::before { background: linear-gradient(90deg, var(--brand) 0 40%, var(--line-strong) 40%); }
+  .cf-track li.current::after  { border-color: var(--brand); box-shadow: 0 0 0 4px rgba(29,90,71,.16); }
+  .cf-track li.error { color: #a4392e; }
+  .cf-track li.error::before { background: #a4392e; }
+  .cf-track li.error::after  { background: #a4392e; border-color: #a4392e; }
+
+  /* ==========================================================
+     LAYOUT 2 COLONNES
+     ========================================================== */
+  .cf-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 330px;
+    gap: 48px;
+    padding-top: 34px;
+    padding-bottom: 64px;
+  }
+  .cf-main { min-width: 0; }
+  .cf-aside { min-width: 0; }
+  .cf-aside-inner { position: sticky; top: 24px; display: grid; gap: 18px; }
+
+  /* ---------- section titles ---------- */
+  .cf-h {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    margin: 0 0 6px;
+    font-family: var(--serif);
     font-size: 1.35rem;
+    font-weight: 500;
+    letter-spacing: -.015em;
+    color: var(--ink);
   }
-  .contact-bar-content { flex: 1; }
-  .contact-bar-title {
-    font-weight: 800; color: var(--text); margin-bottom: 4px; font-size: .9rem;
+  .cf-h .n {
+    margin-left: auto;
+    padding: 2px 10px;
+    border-radius: 999px;
+    background: var(--wash);
+    border: 1px solid var(--line);
+    color: var(--ink-2);
+    font-family: var(--sans);
+    font-size: .74rem;
+    font-weight: 700;
   }
-  .contact-bar-text {
-    font-size: .85rem; color: var(--text-muted); line-height: 1.6;
-  }
-  .contact-bar-text a {
-    color: var(--color-primary); font-weight: 700; text-decoration: none;
-    transition: all .15s;
-  }
-  .contact-bar-text a:hover { text-decoration: underline; opacity: .8; }
+  .cf-sec { margin-bottom: 42px; }
+  .cf-sub { margin: 0 0 16px; color: var(--muted); font-size: .86rem; }
 
-  /* ── BUTTONS ──────────────────────────────────────────────────– */
-  .btn-group { display: flex; gap: 12px; flex-wrap: wrap; margin-top: 28px; }
-  .btn-nav {
-    display: inline-flex; align-items: center; gap: 8px;
-    padding: 12px 22px; border: none; border-radius: 9px;
-    font-weight: 700; cursor: pointer; font-size: .88rem;
-    transition: all .2s; text-decoration: none;
+  /* ==========================================================
+     CHIFFRES CLÉS
+     ========================================================== */
+  .cf-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    margin-bottom: 44px;
+    background: var(--wash);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
   }
-  .btn-primary { background: var(--color-primary); color: #fff; box-shadow: var(--shadow-sm); }
-  .btn-primary:hover { background: #2f4a40; color: #fff; box-shadow: var(--shadow-md); transform: translateY(-2px); }
-  .btn-primary:active { transform: translateY(0); }
-
-  .btn-secondary {
-    background: var(--bg-card2); border: 1.5px solid var(--border); color: var(--text);
+  .cf-stat { padding: 22px 22px 20px; min-width: 0; }
+  .cf-stat + .cf-stat { border-left: 1px solid var(--line); }
+  .cf-stat-label {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-bottom: 10px;
+    color: var(--muted);
+    font-size: .68rem;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
   }
-  .btn-secondary:hover {
-    background: var(--bg-card); border-color: var(--color-primary);
-    color: var(--color-primary); box-shadow: var(--shadow-md);
+  .cf-stat-label i { color: var(--brand); font-size: .85rem; }
+  .cf-stat-value {
+    font-family: var(--serif);
+    font-size: 1.5rem;
+    font-weight: 500;
+    line-height: 1.2;
+    letter-spacing: -.02em;
+    overflow-wrap: anywhere;
+  }
+  .cf-stat-value small {
+    display: block;
+    margin-top: 4px;
+    color: var(--muted);
+    font-family: var(--sans);
+    font-size: .82rem;
+    font-weight: 500;
+    letter-spacing: 0;
   }
 
-  /* ── DIVIDER ───────────────────────────────────────────────────– */
-  .divider { height: 1px; background: var(--border); margin: 24px 0; }
+  /* ==========================================================
+     LISTES EN LIGNES
+     ========================================================== */
+  .cf-rows { margin: 0; padding: 0; list-style: none; border-top: 1px solid var(--line-strong); }
+  .cf-row {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 15px 4px;
+    border-bottom: 1px solid var(--line);
+    transition: background .15s ease, padding .15s ease;
+  }
+  .cf-row:hover { background: var(--wash); padding-left: 12px; padding-right: 12px; }
+  .cf-row-idx {
+    flex: 0 0 32px;
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: .78rem;
+    font-weight: 600;
+  }
+  .cf-row-ico {
+    flex: 0 0 auto;
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    background: var(--tone-wash);
+    color: var(--brand);
+    font-size: .95rem;
+  }
+  .cf-row-txt { min-width: 0; flex: 1; }
+  .cf-row-t { font-weight: 650; font-size: .94rem; overflow-wrap: anywhere; }
+  .cf-row-m { color: var(--muted); font-size: .82rem; overflow-wrap: anywhere; }
+  .cf-row-m i { margin-right: 4px; }
+  .cf-row-end { flex: 0 0 auto; color: var(--ink-2); font-size: .82rem; font-weight: 600; text-align: right; }
 
-  /* ── RESPONSIVE ────────────────────────────────────────────────– */
-  @media (max-width: 768px) {
-    .ref-row { flex-direction: column; align-items: flex-start; gap: 8px; }
-    .recap-grid { grid-template-columns: 1fr; }
-    .contact-bar { flex-direction: column; align-items: flex-start; }
-    .btn-group { flex-direction: column; }
-    .btn-nav { width: 100%; justify-content: center; }
-    .success-banner { padding: 30px 20px; }
-    .success-icon { width: 62px; height: 62px; font-size: 1.7rem; }
-    .success-title { font-size: 1.15rem; }
+  /* ---------- citation ---------- */
+  .cf-quote {
+    position: relative;
+    margin: 0;
+    padding: 22px 26px 22px 30px;
+    background: var(--wash);
+    border-radius: var(--radius);
+    color: var(--ink-2);
+    font-size: .95rem;
+    line-height: 1.8;
+    overflow-wrap: anywhere;
+  }
+  .cf-quote::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 18px;
+    bottom: 18px;
+    width: 3px;
+    border-radius: 3px;
+    background: var(--brand);
+  }
+  .cf-quote p:last-child { margin: 0; }
+
+  /* ==========================================================
+     PROCHAINES ÉTAPES (timeline verticale)
+     ========================================================== */
+  .cf-steps-box {
+    padding: 28px 30px 12px;
+    background: var(--paper);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+  }
+  .cf-steps-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 0 20px;
+    font-family: var(--serif);
+    font-size: 1.3rem;
+    font-weight: 500;
+    letter-spacing: -.015em;
+  }
+  .cf-steps-title i { color: var(--tone); }
+  .cf-steps { margin: 0; padding: 0; list-style: none; }
+  .cf-step { position: relative; display: flex; gap: 18px; padding-bottom: 22px; }
+  .cf-step:not(:last-child)::before {
+    content: "";
+    position: absolute;
+    left: 15px;
+    top: 34px;
+    bottom: 2px;
+    width: 1px;
+    background: var(--line-strong);
+  }
+  .cf-step-n {
+    flex: 0 0 31px;
+    width: 31px;
+    height: 31px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: var(--tone);
+    color: #fff;
+    font-size: .78rem;
+    font-weight: 700;
+  }
+  .cf-step-t { padding-top: 4px; color: var(--ink-2); font-size: .93rem; line-height: 1.6; }
+
+  /* ==========================================================
+     ASIDE
+     ========================================================== */
+  .cf-box {
+    padding: 22px;
+    background: var(--paper);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+  }
+  .cf-box-h {
+    margin: 0 0 14px;
+    color: var(--muted);
+    font-size: .68rem;
+    font-weight: 700;
+    letter-spacing: .12em;
+    text-transform: uppercase;
+  }
+  .cf-kv { padding: 11px 0; border-bottom: 1px solid var(--line); }
+  .cf-kv:first-of-type { padding-top: 0; }
+  .cf-kv:last-child { padding-bottom: 0; border-bottom: 0; }
+  .cf-kv dt {
+    margin: 0 0 3px;
+    color: var(--muted);
+    font-size: .72rem;
+    font-weight: 600;
+  }
+  .cf-kv dd { margin: 0; font-size: .92rem; font-weight: 600; overflow-wrap: anywhere; }
+  .cf-kv dd .sub { display: block; color: var(--muted); font-size: .8rem; font-weight: 500; }
+
+  .cf-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 11px;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    font-size: .76rem;
+    font-weight: 700;
+  }
+  .badge-statut-warning   { background: #fbf3df; color: #7f5f1e; border-color: #ecdcb0; }
+  .badge-statut-info      { background: #e8f0f7; color: #2f5578; border-color: #d1e1ee; }
+  .badge-statut-success   { background: #e8f1ec; color: #22573f; border-color: #cde2d4; }
+  .badge-statut-danger    { background: #faeceb; color: #8d3a31; border-color: #efd3cf; }
+  .badge-statut-secondary { background: #eef0ee; color: #52605a; border-color: #dce1de; }
+
+  .cf-help {
+    padding: 24px 22px;
+    border-radius: var(--radius);
+    background: var(--brand-ink);
+    color: #fff;
+  }
+  .cf-help-t { margin: 0 0 4px; font-family: var(--serif); font-size: 1.2rem; font-weight: 500; }
+  .cf-help-h { margin: 0 0 16px; color: rgba(255,255,255,.65); font-size: .82rem; }
+  .cf-help-links { display: grid; gap: 8px; }
+  .cf-help-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 14px;
+    border: 1px solid rgba(255,255,255,.16);
+    border-radius: 10px;
+    background: rgba(255,255,255,.06);
+    color: #fff;
+    font-size: .85rem;
+    font-weight: 600;
+    overflow-wrap: anywhere;
+    transition: background .15s ease, border-color .15s ease;
+  }
+  .cf-help-link i { color: #9fd6bf; }
+  .cf-help-link:hover { background: rgba(255,255,255,.14); border-color: rgba(255,255,255,.35); color: #fff; }
+
+  .cf-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    width: 100%;
+    min-height: 46px;
+    padding: 11px 20px;
+    border-radius: 10px;
+    background: var(--brand);
+    color: #fff;
+    font-size: .88rem;
+    font-weight: 650;
+    transition: background .15s ease, transform .15s ease;
+  }
+  .cf-btn:hover { background: var(--brand-ink); color: #fff; transform: translateY(-1px); }
+
+  .cf a:focus-visible { outline: 3px solid rgba(29,90,71,.35); outline-offset: 3px; }
+
+  /* ==========================================================
+     ANIMATIONS
+     ========================================================== */
+  @keyframes cf-ping {
+    0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--tone) 45%, transparent); }
+    80%, 100% { box-shadow: 0 0 0 9px transparent; }
+  }
+  @keyframes cf-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  .cf-hero-main, .cf-ticket, .cf-track, .cf-main > *, .cf-aside-inner > * { animation: cf-in .5s ease both; }
+  .cf-ticket { animation-delay: .08s; }
+  .cf-track  { animation-delay: .14s; }
+  .cf-aside-inner > :nth-child(2) { animation-delay: .08s; }
+  .cf-aside-inner > :nth-child(3) { animation-delay: .16s; }
+
+  /* ==========================================================
+     RESPONSIVE
+     ========================================================== */
+  @media (max-width: 960px) {
+    .cf-body { grid-template-columns: 1fr; gap: 12px; }
+    .cf-aside-inner { position: static; }
+  }
+  @media (max-width: 640px) {
+    .cf { padding: 0 16px; font-size: 14.5px; }
+    .cf-hero { padding-top: 24px; }
+    .cf-hero-top { gap: 22px; padding-bottom: 24px; }
+    .cf-ticket { width: 100%; }
+    .cf-ticket::before, .cf-ticket::after { display: none; }
+    .cf-track li { font-size: .7rem; padding-right: 4px; }
+    .cf-track li small { display: none; }
+    .cf-stats { grid-template-columns: 1fr 1fr; }
+    .cf-stat + .cf-stat { border-left: 0; }
+    .cf-stat:nth-child(even) { border-left: 1px solid var(--line); }
+    .cf-stat:nth-child(n+3) { border-top: 1px solid var(--line); }
+    .cf-steps-box { padding: 22px 18px 6px; }
+    .cf-row-idx { display: none; }
+    .cf-row-end { display: none; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .cf *, .cf *::before, .cf *::after { animation: none !important; transition-duration: .01ms !important; }
+  }
+
+  @media print {
+    .cf { max-width: none; padding: 0; }
+    .cf-body { grid-template-columns: 1fr; }
+    .cf-aside-inner { position: static; }
+    .cf-help { background: #fff; color: var(--ink); border: 1px solid var(--line-strong); }
+    .cf-help-h { color: var(--muted); }
+    .cf-help-link { color: var(--ink); background: none; border-color: var(--line); }
+    .cf-help-link i { color: var(--brand); }
+    .cf-btn { display: none; }
+    .cf-row, .cf-box, .cf-stats, .cf-steps-box { break-inside: avoid; }
   }
 </style>
 {% endblock %}
 
+
 {% block header %}
-  {% if demande.est_refusee %}
-    <div class="success-banner status-danger">
-      <div class="dots-deco"></div>
-      <div class="success-icon"><i class="bi bi-x-lg"></i></div>
-      <div class="success-title">Demande refusée</div>
-      <div class="success-text">
-        Nous sommes désolés, votre demande n'a pas pu être retenue en l'état.
-        Contactez notre équipe pour en connaître les raisons ou explorer d'autres options.
-      </div>
-    </div>
+{# Ton visuel (couleur) selon le statut #}
+<div class="cf cf-hero
+  {% if demande.est_refusee %}tone-bad
+  {% elif demande.est_validee and demande.reservation %}{% if demande.reservation.statut == 'annulee' %}tone-bad{% elif demande.reservation.statut == 'expiree' %}tone-off{% elif demande.reservation.statut == 'en_attente' %}tone-info{% endif %}
+  {% elif demande.est_en_cours %}tone-info
+  {% endif %}">
 
-  {% elif demande.est_validee %}
-    {% if demande.reservation %}
-      {% if demande.reservation.statut == 'annulee' %}
-        <div class="success-banner status-danger">
-          <div class="dots-deco"></div>
-          <div class="success-icon"><i class="bi bi-x-lg"></i></div>
-          <div class="success-title">Réservation annulée</div>
-          <div class="success-text">
-            Votre demande avait été validée, mais la réservation associée a
-            depuis été annulée. Contactez notre équipe pour plus de détails.
-          </div>
-        </div>
-      {% elif demande.reservation.statut == 'expiree' %}
-        <div class="success-banner status-secondary">
-          <div class="dots-deco"></div>
-          <div class="success-icon"><i class="bi bi-calendar-x"></i></div>
-          <div class="success-title">Réservation expirée</div>
-          <div class="success-text">
-            La période de cette réservation est désormais terminée. Contactez
-            notre équipe si vous souhaitez reconduire ou renouveler votre campagne.
-          </div>
-        </div>
-      {% elif demande.reservation.statut == 'confirmee' %}
-        <div class="success-banner">
-          <div class="dots-deco"></div>
-          <div class="success-icon"><i class="bi bi-check-lg"></i></div>
-          <div class="success-title">Réservation confirmée !</div>
-          <div class="success-text">
-            Votre réservation est confirmée et active. Notre équipe reste à
-            votre disposition pour la suite.
-          </div>
-        </div>
+  <div class="cf-hero-top">
+    <div class="cf-hero-main">
+
+      {% if demande.est_refusee %}
+        <span class="cf-pill">Demande refusée</span>
+        <h1 class="cf-title">Votre demande n'a pas pu être retenue.</h1>
+        <p class="cf-lead">
+          Nous sommes désolés, votre demande n'a pas pu être retenue en l'état.
+          Contactez notre équipe pour en connaître les raisons ou explorer d'autres options.
+        </p>
+
+      {% elif demande.est_validee %}
+        {% if demande.reservation %}
+          {% if demande.reservation.statut == 'annulee' %}
+            <span class="cf-pill">Réservation annulée</span>
+            <h1 class="cf-title">Cette réservation a été annulée.</h1>
+            <p class="cf-lead">
+              Votre demande avait été validée, mais la réservation associée a
+              depuis été annulée. Contactez notre équipe pour plus de détails.
+            </p>
+          {% elif demande.reservation.statut == 'expiree' %}
+            <span class="cf-pill">Réservation expirée</span>
+            <h1 class="cf-title">Cette campagne est terminée.</h1>
+            <p class="cf-lead">
+              La période de cette réservation est désormais terminée. Contactez
+              notre équipe si vous souhaitez reconduire ou renouveler votre campagne.
+            </p>
+          {% elif demande.reservation.statut == 'confirmee' %}
+            <span class="cf-pill">Réservation active</span>
+            <h1 class="cf-title">Réservation confirmée.</h1>
+            <p class="cf-lead">
+              Votre réservation est confirmée et active. Notre équipe reste à
+              votre disposition pour la suite.
+            </p>
+          {% else %}
+            {# en_attente #}
+            <span class="cf-pill">En attente de confirmation</span>
+            <h1 class="cf-title">Votre réservation est presque prête.</h1>
+            <p class="cf-lead">
+              Votre demande a été validée et une réservation a été créée. Elle
+              est en attente de confirmation finale par notre équipe.
+            </p>
+          {% endif %}
+        {% else %}
+          <span class="cf-pill">Demande validée</span>
+          <h1 class="cf-title">Votre demande est validée.</h1>
+          <p class="cf-lead">
+            Votre demande a été validée. Notre équipe finalise la création de
+            votre réservation.
+          </p>
+        {% endif %}
+
+      {% elif demande.est_en_cours %}
+        <span class="cf-pill">En cours de traitement</span>
+        <h1 class="cf-title">Nous examinons votre demande.</h1>
+        <p class="cf-lead">
+          Notre équipe examine actuellement votre demande. Vous recevrez une réponse sous peu.
+        </p>
+
       {% else %}
-        {# en_attente #}
-        <div class="success-banner status-info">
-          <div class="dots-deco"></div>
-          <div class="success-icon"><i class="bi bi-hourglass-split"></i></div>
-          <div class="success-title">Réservation en attente de confirmation</div>
-          <div class="success-text">
-            Votre demande a été validée et une réservation a été créée. Elle
-            est en attente de confirmation finale par notre équipe.
-          </div>
-        </div>
+        <span class="cf-pill">Demande reçue</span>
+        <h1 class="cf-title">Merci, votre demande est bien envoyée.</h1>
+        <p class="cf-lead">
+          Votre demande a bien été enregistrée. Notre équipe vous contactera sous 24 heures.
+        </p>
       {% endif %}
-    {% else %}
-      <div class="success-banner">
-        <div class="dots-deco"></div>
-        <div class="success-icon"><i class="bi bi-check-lg"></i></div>
-        <div class="success-title">Demande validée !</div>
-        <div class="success-text">
-          Votre demande a été validée. Notre équipe finalise la création de
-          votre réservation.
-        </div>
-      </div>
-    {% endif %}
 
-  {% elif demande.est_en_cours %}
-    <div class="success-banner status-info">
-      <div class="dots-deco"></div>
-      <div class="success-icon"><i class="bi bi-hourglass-split"></i></div>
-      <div class="success-title">Demande en cours de traitement</div>
-      <div class="success-text">
-        Notre équipe examine actuellement votre demande. Vous recevrez une réponse sous peu.
-      </div>
     </div>
-  {% else %}
-    <div class="success-banner">
-      <div class="dots-deco"></div>
-      <div class="success-icon"><i class="bi bi-check-lg"></i></div>
-      <div class="success-title">Demande envoyée avec succès !</div>
-      <div class="success-text">
-        Votre demande a bien été enregistrée. Notre équipe vous contactera sous 24 heures.
-      </div>
+
+    <div class="cf-ticket">
+      <div class="cf-ticket-label">Référence</div>
+      <div class="cf-ticket-ref">{{ demande.reference }}</div>
     </div>
-  {% endif %}
+  </div>
+
+  <!-- SUIVI D'AVANCEMENT -->
+  <ol class="cf-track" aria-label="Avancement de votre demande">
+    <li class="done">Envoyée<small>Demande enregistrée</small></li>
+
+    <li class="{% if demande.est_refusee or demande.est_validee %}done{% elif demande.est_en_cours %}current{% endif %}">
+      Examen<small>Vérification des disponibilités</small>
+    </li>
+
+    <li class="{% if demande.est_refusee %}error{% elif demande.est_validee %}done{% endif %}">
+      {% if demande.est_refusee %}Refusée{% else %}Validée{% endif %}<small>Décision de l'équipe</small>
+    </li>
+
+    <li class="{% if demande.est_refusee %}{% elif demande.est_validee and demande.reservation %}{% if demande.reservation.statut == 'annulee' %}error{% elif demande.reservation.statut == 'confirmee' or demande.reservation.statut == 'expiree' %}done{% else %}current{% endif %}{% elif demande.est_validee %}current{% endif %}">
+      {% if demande.est_validee and demande.reservation %}{% if demande.reservation.statut == 'annulee' %}Annulée{% elif demande.reservation.statut == 'expiree' %}Terminée{% elif demande.reservation.statut == 'confirmee' %}Confirmée{% else %}Réservation{% endif %}{% else %}Réservation{% endif %}<small>Mise en place de la campagne</small>
+    </li>
+  </ol>
+</div>
 {% endblock %}
 
+
 {% block content %}
-<div class="confirmation">
-  <!-- RÉFÉRENCE, STATUT & EMAIL -->
-  <div class="ref-card">
-    <div class="ref-row">
-      <div>
-        <div class="ref-label"><i class="bi bi-clipboard-check-fill"></i> Référence de demande</div>
-        <div class="ref-value">{{ demande.reference }}</div>
-      </div>
-      <div style="text-align: right;">
-        <div class="ref-label" style="justify-content: flex-end;"><i class="bi bi-envelope-fill"></i> Email de confirmation</div>
-        <div class="ref-value" style="font-size: .9rem;">{{ demande.email }}</div>
-      </div>
-    </div>
-    <div class="ref-row">
-      <div>
-        <div class="ref-label"><i class="bi {{ demande.get_statut_icon }}"></i> Statut de la demande</div>
-        <div class="ref-value">
-          <span class="badge-statut badge-statut-{{ demande.get_statut_badge }}">
-            <i class="bi {{ demande.get_statut_icon }} me-1"></i>{{ demande.get_statut_display }}
-          </span>
+{% with faces=demande.faces_souhaitees.all supports=demande.supports_souhaites.all %}
+<div class="cf
+  {% if demande.est_refusee %}tone-bad
+  {% elif demande.est_validee and demande.reservation %}{% if demande.reservation.statut == 'annulee' %}tone-bad{% elif demande.reservation.statut == 'expiree' %}tone-off{% elif demande.reservation.statut == 'en_attente' %}tone-info{% endif %}
+  {% elif demande.est_en_cours %}tone-info
+  {% endif %}">
+  <div class="cf-body">
+
+    <!-- ================= COLONNE PRINCIPALE ================= -->
+    <div class="cf-main">
+
+      <!-- CHIFFRES CLÉS -->
+      <div class="cf-stats">
+        <div class="cf-stat">
+          <div class="cf-stat-label"><i class="bi bi-calendar-event"></i> Période</div>
+          <div class="cf-stat-value">
+            {{ demande.date_debut_souhaitee|date:"d/m/Y" }}
+            <small>au {{ demande.date_fin_souhaitee|date:"d/m/Y" }}</small>
+          </div>
         </div>
+
+        <div class="cf-stat">
+          <div class="cf-stat-label"><i class="bi bi-clock"></i> Durée</div>
+          <div class="cf-stat-value">{{ demande.duree_jours }} jour{{ demande.duree_jours|pluralize }}</div>
+        </div>
+
+        <div class="cf-stat">
+          <div class="cf-stat-label"><i class="bi bi-geo-alt"></i> Emplacements</div>
+          <div class="cf-stat-value">
+            {% if faces %}
+              {{ faces|length }} face{{ faces|length|pluralize }}
+            {% elif supports %}
+              {{ supports|length }} écran{{ supports|length|pluralize }}
+            {% else %}
+              —
+            {% endif %}
+          </div>
+        </div>
+
+        {% if demande.nom_campagne %}
+          <div class="cf-stat">
+            <div class="cf-stat-label"><i class="bi bi-bullseye"></i> Campagne</div>
+            <div class="cf-stat-value">{{ demande.nom_campagne }}</div>
+          </div>
+        {% endif %}
       </div>
 
+      <!-- DÉTAILS DE LA RÉSERVATION -->
       {% if demande.reservation %}
-        <div style="text-align: right;">
-          <div class="ref-label" style="justify-content: flex-end;"><i class="bi bi-bookmark-check-fill"></i> Statut de la réservation</div>
-          <div class="ref-value">
-            <span class="badge-statut badge-statut-{{ demande.reservation.get_statut_badge }}">
-              {{ demande.reservation.get_statut_display }}
-            </span>
+        <section class="cf-sec">
+          <h2 class="cf-h">Détails de la réservation</h2>
+          <p class="cf-sub">Informations liées à la réservation créée pour votre demande.</p>
+          <ul class="cf-rows">
+            <li class="cf-row">
+              <span class="cf-row-ico"><i class="bi bi-upc-scan"></i></span>
+              <div class="cf-row-txt">
+                <div class="cf-row-t">{{ demande.reservation.reference }}</div>
+                <div class="cf-row-m">Référence de réservation</div>
+              </div>
+            </li>
+            <li class="cf-row">
+              <span class="cf-row-ico"><i class="bi bi-calendar-range"></i></span>
+              <div class="cf-row-txt">
+                <div class="cf-row-t">{{ demande.reservation.date_debut|date:"d/m/Y" }} → {{ demande.reservation.date_fin|date:"d/m/Y" }}</div>
+                <div class="cf-row-m">{{ demande.reservation.duree_jours }} jour{{ demande.reservation.duree_jours|pluralize }} · {{ demande.reservation.nb_faces }} emplacement{{ demande.reservation.nb_faces|pluralize }}</div>
+              </div>
+            </li>
+          </ul>
+        </section>
+      {% endif %}
+
+      <!-- FACES SÉLECTIONNÉES -->
+      {% if faces %}
+        <section class="cf-sec">
+          <h2 class="cf-h">Faces de panneaux <span class="n">{{ faces|length }}</span></h2>
+          <p class="cf-sub">Les emplacements que vous avez sélectionnés.</p>
+          <ul class="cf-rows">
+            {% for face in faces %}
+              <li class="cf-row">
+                <span class="cf-row-idx">{{ forloop.counter|stringformat:"02d" }}</span>
+                <span class="cf-row-ico"><i class="bi bi-geo-alt"></i></span>
+                <div class="cf-row-txt">
+                  <div class="cf-row-t">{{ face.support.code }} · Face {{ face.label }}</div>
+                  <div class="cf-row-m">{{ face.support.nom }} · {{ face.support.quartier }}</div>
+                </div>
+              </li>
+            {% endfor %}
+          </ul>
+        </section>
+      {% endif %}
+
+      <!-- ÉCRANS SÉLECTIONNÉS -->
+      {% if supports %}
+        <section class="cf-sec">
+          <h2 class="cf-h">Écrans LED <span class="n">{{ supports|length }}</span></h2>
+          <p class="cf-sub">Les écrans que vous avez sélectionnés.</p>
+          <ul class="cf-rows">
+            {% for support in supports %}
+              <li class="cf-row">
+                <span class="cf-row-idx">{{ forloop.counter|stringformat:"02d" }}</span>
+                <span class="cf-row-ico"><i class="bi bi-tv"></i></span>
+                <div class="cf-row-txt">
+                  <div class="cf-row-t">{{ support.code }}</div>
+                  <div class="cf-row-m"><i class="bi bi-geo-alt"></i>{{ support.adresse }} · {{ support.quartier }}</div>
+                </div>
+              </li>
+            {% endfor %}
+          </ul>
+        </section>
+      {% endif %}
+
+      <!-- MESSAGE -->
+      {% if demande.message %}
+        <section class="cf-sec">
+          <h2 class="cf-h">Votre message</h2>
+          <blockquote class="cf-quote">{{ demande.message|linebreaks }}</blockquote>
+        </section>
+      {% endif %}
+
+      <!-- PROCHAINES ÉTAPES -->
+      {% if demande.est_refusee %}
+        <div class="cf-steps-box" style="--tone:#a4392e;--tone-wash:#faeceb;">
+          <h2 class="cf-steps-title"><i class="bi bi-info-circle-fill"></i> Que faire maintenant ?</h2>
+          <ol class="cf-steps">
+            <li class="cf-step"><span class="cf-step-n">1</span><span class="cf-step-t">Contactez notre équipe pour connaître les raisons du refus et explorer d'autres options</span></li>
+            <li class="cf-step"><span class="cf-step-n">2</span><span class="cf-step-t">Nous pouvons vous proposer des emplacements alternatifs disponibles</span></li>
+          </ol>
+        </div>
+
+      {% elif demande.est_validee and demande.reservation %}
+        {% if demande.reservation.statut == 'annulee' %}
+          <div class="cf-steps-box" style="--tone:#a4392e;--tone-wash:#faeceb;">
+            <h2 class="cf-steps-title"><i class="bi bi-info-circle-fill"></i> Que faire maintenant ?</h2>
+            <ol class="cf-steps">
+              <li class="cf-step"><span class="cf-step-n">1</span><span class="cf-step-t">Contactez notre équipe pour connaître les raisons de l'annulation</span></li>
+              <li class="cf-step"><span class="cf-step-n">2</span><span class="cf-step-t">Nous pouvons étudier une nouvelle demande selon vos disponibilités</span></li>
+            </ol>
           </div>
+        {% elif demande.reservation.statut == 'expiree' %}
+          <div class="cf-steps-box" style="--tone:#5d6964;--tone-wash:#eef0ee;">
+            <h2 class="cf-steps-title"><i class="bi bi-arrow-repeat"></i> Envie de reconduire votre campagne ?</h2>
+            <ol class="cf-steps">
+              <li class="cf-step"><span class="cf-step-n">1</span><span class="cf-step-t">Contactez notre équipe pour renouveler votre réservation sur une nouvelle période</span></li>
+            </ol>
+          </div>
+        {% elif demande.reservation.statut == 'confirmee' %}
+          <div class="cf-steps-box">
+            <h2 class="cf-steps-title"><i class="bi bi-check-circle-fill"></i> Votre réservation est active</h2>
+            <ol class="cf-steps">
+              <li class="cf-step"><span class="cf-step-n">1</span><span class="cf-step-t">Votre campagne est en cours de diffusion selon les modalités convenues</span></li>
+              <li class="cf-step"><span class="cf-step-n">2</span><span class="cf-step-t">Notre équipe reste disponible pour toute question durant la campagne</span></li>
+            </ol>
+          </div>
+        {% else %}
+          {# en_attente #}
+          <div class="cf-steps-box">
+            <h2 class="cf-steps-title"><i class="bi bi-hourglass-split"></i> Dernière étape avant confirmation</h2>
+            <ol class="cf-steps">
+              <li class="cf-step"><span class="cf-step-n">1</span><span class="cf-step-t">Notre équipe finalise les modalités administratives et le devis définitif</span></li>
+              <li class="cf-step"><span class="cf-step-n">2</span><span class="cf-step-t">Vous recevrez une confirmation dès validation finale de la réservation</span></li>
+            </ol>
+          </div>
+        {% endif %}
+
+      {% elif demande.est_validee %}
+        <div class="cf-steps-box">
+          <h2 class="cf-steps-title"><i class="bi bi-check-circle-fill"></i> Votre demande est validée</h2>
+          <ol class="cf-steps">
+            <li class="cf-step"><span class="cf-step-n">1</span><span class="cf-step-t">Notre équipe finalise la création de votre réservation</span></li>
+            <li class="cf-step"><span class="cf-step-n">2</span><span class="cf-step-t">Vous serez contacté(e) pour la suite</span></li>
+          </ol>
+        </div>
+
+      {% else %}
+        <div class="cf-steps-box">
+          <h2 class="cf-steps-title"><i class="bi bi-arrow-right-circle-fill"></i> Prochaines étapes</h2>
+          <ol class="cf-steps">
+            <li class="cf-step"><span class="cf-step-n">1</span><span class="cf-step-t">Notre équipe examine votre demande et vérifie les disponibilités réelles</span></li>
+            <li class="cf-step"><span class="cf-step-n">2</span><span class="cf-step-t">Vous recevrez un email de confirmation avec les détails et un devis personnalisé</span></li>
+            <li class="cf-step"><span class="cf-step-n">3</span><span class="cf-step-t">Mise en place de votre campagne selon les modalités convenues</span></li>
+          </ol>
         </div>
       {% endif %}
-    </div>
-  </div>
 
-  <!-- RÉCAPITULATIF RAPIDE -->
-  <div class="recap-grid">
-    <div class="recap-box">
-      <div class="recap-icon"><i class="bi bi-calendar-event-fill"></i></div>
-      <div class="recap-label">Période souhaitée</div>
-      <div class="recap-value">
-        {{ demande.date_debut_souhaitee|date:"d/m/Y" }}<br>
-        <span style="font-size: .85rem; color: var(--text-muted); display: block; margin-top: 3px;">→ {{ demande.date_fin_souhaitee|date:"d/m/Y" }}</span>
-      </div>
     </div>
 
-    <div class="recap-box">
-      <div class="recap-icon"><i class="bi bi-geo-alt-fill"></i></div>
-      <div class="recap-label">Emplacements</div>
-      <div class="recap-value">
-        {% if demande.faces_souhaitees.all %}
-          {{ demande.faces_souhaitees.all|length }} face{{ demande.faces_souhaitees.all|length|add:"-1"|yesno:",,s" }}
-        {% elif demande.supports_souhaites.all %}
-          {{ demande.supports_souhaites.all|length }} écran{{ demande.supports_souhaites.all|length|add:"-1"|yesno:",,s" }}
-        {% else %}
-          —
-        {% endif %}
-      </div>
-    </div>
+    <!-- ================= COLONNE LATÉRALE ================= -->
+    <aside class="cf-aside">
+      <div class="cf-aside-inner">
 
-    <div class="recap-box">
-      <div class="recap-icon"><i class="bi bi-clock-fill"></i></div>
-      <div class="recap-label">Durée</div>
-      <div class="recap-value">
-        {{ demande.duree_jours }} jour{{ demande.duree_jours|pluralize }}
-      </div>
-    </div>
-
-    {% if demande.nom_campagne %}
-      <div class="recap-box">
-        <div class="recap-icon"><i class="bi bi-bullseye"></i></div>
-        <div class="recap-label">Nom de campagne</div>
-        <div class="recap-value">{{ demande.nom_campagne }}</div>
-      </div>
-    {% endif %}
-  </div>
-
-  {% if demande.reservation %}
-    <div class="divider"></div>
-
-    <!-- DÉTAILS DE LA RÉSERVATION (NOUVEAU) -->
-    <div class="section-recap">
-      <div class="section-title">
-        <span class="section-title-icon"><i class="bi bi-bookmark-check-fill"></i></span> Détails de la réservation
-      </div>
-      <div class="card-list">
-        <div class="card-item">
-          <div class="card-item-icon"><i class="bi bi-upc-scan"></i></div>
-          <div>
-            <div class="item-code">{{ demande.reservation.reference }}</div>
-            <div class="item-meta">Référence de réservation</div>
-          </div>
-        </div>
-        <div class="card-item">
-          <div class="card-item-icon"><i class="bi bi-calendar-range"></i></div>
-          <div>
-            <div class="item-code">
-              {{ demande.reservation.date_debut|date:"d/m/Y" }} → {{ demande.reservation.date_fin|date:"d/m/Y" }}
+        <!-- STATUT -->
+        <div class="cf-box">
+          <h3 class="cf-box-h">Suivi</h3>
+          <dl class="m-0">
+            <div class="cf-kv">
+              <dt>Statut de la demande</dt>
+              <dd>
+                <span class="cf-badge badge-statut-{{ demande.get_statut_badge }}">
+                  <i class="bi {{ demande.get_statut_icon }}"></i>{{ demande.get_statut_display }}
+                </span>
+              </dd>
             </div>
-            <div class="item-meta">{{ demande.reservation.duree_jours }} jour{{ demande.reservation.duree_jours|pluralize }} · {{ demande.reservation.nb_faces }} emplacement{{ demande.reservation.nb_faces|pluralize }}</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  {% endif %}
-
-  {% if demande.campagne and demande.campagne.lien_piges %}
-    <div class="section-recap">
-      <a href="{{ demande.campagne.lien_piges }}" target="_blank" rel="noopener noreferrer"
-         class="btn-nav btn-primary">
-        <i class="bi bi-camera-fill"></i>Voir et télécharger les piges
-      </a>
-    </div>
-  {% endif %}
-
-  <div class="divider"></div>
-
-  <!-- DÉTAILS DE CONTACT -->
-  <div class="section-recap">
-    <div class="section-title">
-      <span class="section-title-icon"><i class="bi bi-person-vcard"></i></span> Vos coordonnées
-    </div>
-    <div class="card-list">
-      <div class="card-item">
-        <div class="card-item-icon"><i class="bi bi-person-fill"></i></div>
-        <div>
-          <div class="item-code">{{ demande.nom_contact }}</div>
-          {% if demande.societe %}
-            <div class="item-meta">{{ demande.societe }}</div>
-          {% endif %}
-        </div>
-      </div>
-
-      <div class="card-item">
-        <div class="card-item-icon"><i class="bi bi-envelope-fill"></i></div>
-        <div>
-          <div class="item-code">{{ demande.email }}</div>
-          <div class="item-meta">Email principal</div>
-        </div>
-      </div>
-
-      <div class="card-item">
-        <div class="card-item-icon"><i class="bi bi-telephone-fill"></i></div>
-        <div>
-          <div class="item-code">{{ demande.telephone }}</div>
-          <div class="item-meta">Numéro de contact</div>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- FACES SÉLECTIONNÉES -->
-  {% if demande.faces_souhaitees.all %}
-    <div class="section-recap">
-      <div class="section-title">
-        <span class="section-title-icon"><i class="bi bi-building"></i></span> Faces de panneaux sélectionnées
-      </div>
-      <div class="card-list">
-        {% for face in demande.faces_souhaitees.all %}
-          <div class="card-item">
-            <div class="card-item-icon"><i class="bi bi-square-fill" style="font-size:.7rem;"></i></div>
-            <div>
-              <div class="item-code">{{ face.support.code }} · Face {{ face.label }}</div>
-              <div class="item-meta">
-                <i class="bi bi-geo-alt me-1" style="font-size: .75rem;"></i>
-                {{ face.support.adresse }} · {{ face.support.quartier }}
+            {% if demande.reservation %}
+              <div class="cf-kv">
+                <dt>Statut de la réservation</dt>
+                <dd>
+                  <span class="cf-badge badge-statut-{{ demande.reservation.get_statut_badge }}">
+                    {{ demande.reservation.get_statut_display }}
+                  </span>
+                </dd>
               </div>
+            {% endif %}
+            <div class="cf-kv">
+              <dt>Email de confirmation</dt>
+              <dd>{{ demande.email }}</dd>
             </div>
-          </div>
-        {% endfor %}
-      </div>
-    </div>
-  {% endif %}
+          </dl>
+        </div>
 
-  <!-- ÉCRANS SÉLECTIONNÉS -->
-  {% if demande.supports_souhaites.all %}
-    <div class="section-recap">
-      <div class="section-title">
-        <span class="section-title-icon"><i class="bi bi-tv"></i></span> Écrans LED sélectionnés
-      </div>
-      <div class="card-list">
-        {% for support in demande.supports_souhaites.all %}
-          <div class="card-item">
-            <div class="card-item-icon"><i class="bi bi-play-circle-fill"></i></div>
-            <div>
-              <div class="item-code">{{ support.code }}</div>
-              <div class="item-meta">
-                <i class="bi bi-geo-alt me-1" style="font-size: .75rem;"></i>
-                {{ support.adresse }} · {{ support.quartier }}
-              </div>
+        <!-- COORDONNÉES -->
+        <div class="cf-box">
+          <h3 class="cf-box-h">Vos coordonnées</h3>
+          <dl class="m-0">
+            <div class="cf-kv">
+              <dt>Contact</dt>
+              <dd>
+                {{ demande.nom_contact }}
+                {% if demande.societe %}<span class="sub">{{ demande.societe }}</span>{% endif %}
+              </dd>
             </div>
+            <div class="cf-kv">
+              <dt>Email principal</dt>
+              <dd>{{ demande.email }}</dd>
+            </div>
+            <div class="cf-kv">
+              <dt>Téléphone</dt>
+              <dd>{{ demande.telephone }}</dd>
+            </div>
+          </dl>
+        </div>
+
+        {% if demande.campagne and demande.campagne.lien_piges %}
+          <a href="{{ demande.campagne.lien_piges }}" target="_blank" rel="noopener noreferrer" class="cf-btn">
+            <i class="bi bi-camera-fill"></i>Voir et télécharger les piges
+          </a>
+        {% endif %}
+
+        <!-- AIDE -->
+        <div class="cf-help">
+          <h3 class="cf-help-t">Besoin d'aide ?</h3>
+          <p class="cf-help-h">Du lundi au vendredi, 8h–17h</p>
+          <div class="cf-help-links">
+            <a href="tel:{{ CONTACT_TEL1 }}" class="cf-help-link"><i class="bi bi-telephone-fill"></i>{{ CONTACT_TEL1 }}</a>
+            {% if CONTACT_TEL2 %}
+              <a href="tel:{{ CONTACT_TEL2 }}" class="cf-help-link"><i class="bi bi-telephone-fill"></i>{{ CONTACT_TEL2 }}</a>
+            {% endif %}
+            {% if CONTACT_TEL3 %}
+              <a href="tel:{{ CONTACT_TEL3 }}" class="cf-help-link"><i class="bi bi-telephone-fill"></i>{{ CONTACT_TEL3 }}</a>
+            {% endif %}
+            <a href="mailto:{{ CONTACT_EMAIL }}" class="cf-help-link"><i class="bi bi-envelope-fill"></i>{{ CONTACT_EMAIL }}</a>
+            {% if CONTACT_EMAIL1 %}
+              <a href="mailto:{{ CONTACT_EMAIL1 }}" class="cf-help-link"><i class="bi bi-envelope-fill"></i>{{ CONTACT_EMAIL1 }}</a>
+            {% endif %}
+            {% if CONTACT_EMAIL2 %}
+              <a href="mailto:{{ CONTACT_EMAIL2 }}" class="cf-help-link"><i class="bi bi-envelope-fill"></i>{{ CONTACT_EMAIL2 }}</a>
+            {% endif %}
           </div>
-        {% endfor %}
-      </div>
-    </div>
-  {% endif %}
-
-  <!-- MESSAGE SUPPLÉMENTAIRE -->
-  {% if demande.message %}
-    <div class="section-recap">
-      <div class="section-title">
-        <span class="section-title-icon"><i class="bi bi-chat-dots"></i></span> Votre message
-      </div>
-      <div style="background: var(--bg-card); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 18px 20px; font-size: .9rem; color: var(--text); line-height: 1.8; box-shadow: var(--shadow-sm);">
-        {{ demande.message|linebreaks }}
-      </div>
-    </div>
-  {% endif %}
-
-  <div class="divider"></div>
-
-  <!-- PROCHAINES ÉTAPES (adapté selon le statut demande + réservation) -->
-  {% if demande.est_refusee %}
-    <div class="next-steps" style="background: linear-gradient(135deg, #ef4444 0%, #ef4444 100%);">
-      <div class="dots-deco"></div>
-      <div class="next-steps-title">
-        <i class="bi bi-info-circle-fill"></i> Que faire maintenant ?
-      </div>
-      <ul class="steps-list">
-        <li class="steps-item">
-          <span class="steps-num">1</span>
-          <span>Contactez notre équipe pour connaître les raisons du refus et explorer d'autres options</span>
-        </li>
-        <li class="steps-item">
-          <span class="steps-num">2</span>
-          <span>Nous pouvons vous proposer des emplacements alternatifs disponibles</span>
-        </li>
-      </ul>
-    </div>
-
-  {% elif demande.est_validee and demande.reservation %}
-    {% if demande.reservation.statut == 'annulee' %}
-      <div class="next-steps" style="background: linear-gradient(135deg, #ef4444 0%, #ef4444 100%);">
-        <div class="dots-deco"></div>
-        <div class="next-steps-title">
-          <i class="bi bi-info-circle-fill"></i> Que faire maintenant ?
         </div>
-        <ul class="steps-list">
-          <li class="steps-item">
-            <span class="steps-num">1</span>
-            <span>Contactez notre équipe pour connaître les raisons de l'annulation</span>
-          </li>
-          <li class="steps-item">
-            <span class="steps-num">2</span>
-            <span>Nous pouvons étudier une nouvelle demande selon vos disponibilités</span>
-          </li>
-        </ul>
-      </div>
-    {% elif demande.reservation.statut == 'expiree' %}
-      <div class="next-steps" style="background: linear-gradient(135deg, #6b7280 0%, #6b7280 100%);">
-        <div class="dots-deco"></div>
-        <div class="next-steps-title">
-          <i class="bi bi-arrow-repeat"></i> Envie de reconduire votre campagne ?
-        </div>
-        <ul class="steps-list">
-          <li class="steps-item">
-            <span class="steps-num">1</span>
-            <span>Contactez notre équipe pour renouveler votre réservation sur une nouvelle période</span>
-          </li>
-        </ul>
-      </div>
-    {% elif demande.reservation.statut == 'confirmee' %}
-      <div class="next-steps">
-        <div class="dots-deco"></div>
-        <div class="next-steps-title">
-          <i class="bi bi-check-circle-fill"></i> Votre réservation est active
-        </div>
-        <ul class="steps-list">
-          <li class="steps-item">
-            <span class="steps-num">1</span>
-            <span>Votre campagne est en cours de diffusion selon les modalités convenues</span>
-          </li>
-          <li class="steps-item">
-            <span class="steps-num">2</span>
-            <span>Notre équipe reste disponible pour toute question durant la campagne</span>
-          </li>
-        </ul>
-      </div>
-    {% else %}
-      {# en_attente #}
-      <div class="next-steps">
-        <div class="dots-deco"></div>
-        <div class="next-steps-title">
-          <i class="bi bi-hourglass-split"></i> Dernière étape avant confirmation
-        </div>
-        <ul class="steps-list">
-          <li class="steps-item">
-            <span class="steps-num">1</span>
-            <span>Notre équipe finalise les modalités administratives et le devis définitif</span>
-          </li>
-          <li class="steps-item">
-            <span class="steps-num">2</span>
-            <span>Vous recevrez une confirmation dès validation finale de la réservation</span>
-          </li>
-        </ul>
-      </div>
-    {% endif %}
 
-  {% elif demande.est_validee %}
-    <div class="next-steps">
-      <div class="dots-deco"></div>
-      <div class="next-steps-title">
-        <i class="bi bi-check-circle-fill"></i> Votre demande est validée
       </div>
-      <ul class="steps-list">
-        <li class="steps-item">
-          <span class="steps-num">1</span>
-          <span>Notre équipe finalise la création de votre réservation</span>
-        </li>
-        <li class="steps-item">
-          <span class="steps-num">2</span>
-          <span>Vous serez contacté(e) pour la suite</span>
-        </li>
-      </ul>
-    </div>
+    </aside>
 
-  {% else %}
-    <div class="next-steps">
-      <div class="dots-deco"></div>
-      <div class="next-steps-title">
-        <i class="bi bi-arrow-right-circle-fill"></i> Prochaines étapes
-      </div>
-      <ul class="steps-list">
-        <li class="steps-item">
-          <span class="steps-num">1</span>
-          <span>Notre équipe examine votre demande et vérifie les disponibilités réelles</span>
-        </li>
-        <li class="steps-item">
-          <span class="steps-num">2</span>
-          <span>Vous recevrez un email de confirmation avec les détails et un devis personnalisé</span>
-        </li>
-        <li class="steps-item">
-          <span class="steps-num">3</span>
-          <span>Mise en place de votre campagne selon les modalités convenues</span>
-        </li>
-      </ul>
-    </div>
-  {% endif %}
-
-  <!-- CONTACT -->
-  <div class="contact-bar">
-    <div class="contact-bar-icon"><i class="bi bi-telephone-fill"></i></div>
-    <div class="contact-bar-content">
-      <div class="contact-bar-title">Besoin d'aide ou de précisions ?</div>
-      <div class="contact-bar-text">
-        Notre équipe est disponible du lundi au vendredi, 8h-17h<br>
-        <a href="tel:{{ CONTACT_TEL1 }}" class="card-link"><i class="bi bi-telephone"></i>{{ CONTACT_TEL1 }}</a>
-        {% if CONTACT_TEL2 %}
-             <a href="tel:{{ CONTACT_TEL2 }}" class="card-link mt-2"><i class="bi bi-telephone"></i>{{ CONTACT_TEL2 }}</a>
-        {% endif %} 
-        {% if CONTACT_TEL3 %}
-          <a href="tel:{{ CONTACT_TEL3 }}" class="card-link mt-2"><i class="bi bi-telephone"></i>{{ CONTACT_TEL3 }}</a>
-        {% endif %} 
-        ou 
-          <a href="mailto:{{ CONTACT_EMAIL }}" class="card-link"><i class="bi bi-envelope"></i> {{ CONTACT_EMAIL }}</a>
-        {% if CONTACT_EMAIL1 %}
-          <a href="mailto:{{ CONTACT_EMAIL1 }}" class="card-link"><i class="bi bi-envelope"></i>{{ CONTACT_EMAIL1 }}</a>
-        {% endif %}
-        {% if CONTACT_EMAIL2 %}
-          <a href="mailto:{{ CONTACT_EMAIL2 }}" class="card-link"><i class="bi bi-envelope"></i>{{ CONTACT_EMAIL2 }}</a>
-        {% endif %}
-      </div>
-    </div>
   </div>
-
-  <!-- BOUTONS DE NAVIGATION -->
-  <div class="btn-group">
-    <a href="{% url 'portail:accueil' %}" class="btn-nav btn-secondary">
-      <i class="bi bi-house-fill"></i> Accueil
-    </a>
-    <a href="{% url 'portail:catalogue' %}" class="btn-nav btn-secondary">
-      <i class="bi bi-grid-3x3-gap-fill"></i> Catalogue
-    </a>
-    <a href="{% url 'portail:suivi_demande' %}" class="btn-nav btn-secondary">
-      <i class="bi bi-search"></i> Suivre une autre demande
-    </a>
-    <a href="{% url 'portail:contact' %}" class="btn-nav btn-primary">
-      <i class="bi bi-chat-dots-fill"></i> Nous contacter
-    </a>
-  </div>
-
 </div>
+{% endwith %}
 {% endblock %}

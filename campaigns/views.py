@@ -111,6 +111,7 @@ def api_dashboard_clients_actifs(request):
 
     clients_qs = Client.objects.filter(
         actif=False,
+        type_entite=Client.TYPE_CLIENT,
         campagnes__date_debut__lte=today,
         campagnes__date_fin__gte=today,
     ).exclude(
@@ -174,7 +175,11 @@ def api_dashboard_campagnes(request, statut):
 
 
 def api_dashboard_client_campagnes(request, client_id):
-    client = get_object_or_404(Client, pk=client_id)
+    client = get_object_or_404(
+        Client,
+        pk=client_id,
+        type_entite=Client.TYPE_CLIENT,
+    )
     campagnes_qs = client.campagnes.filter(
         statut__in=['en_cours', 'a_venir', 'en_pause']
     ).order_by('-date_debut')
@@ -1705,6 +1710,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         campagnes_qs = Campagne.objects.select_related('client').order_by('-created_at')
         clients_qs = Client.objects.filter(
             actif=False,
+            type_entite=Client.TYPE_CLIENT,
             campagnes__date_debut__lte=today,
             campagnes__date_fin__gte=today,
         ).exclude(
@@ -3038,7 +3044,7 @@ class ClientListView(StaffRequiredMixin, SortableListMixin, ListView):
             qs = qs.filter(actif=False)
 
         qs = self.apply_sort(qs)
-        return qs.prefetch_related('campagnes')
+        return qs.prefetch_related('campagnes', 'campagnes_agence')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -3050,11 +3056,25 @@ class ClientListView(StaffRequiredMixin, SortableListMixin, ListView):
         total_campagnes_actives = 0
 
         for client in clients_list:
-            campagnes_actives = [c for c in client.campagnes.all() if c.statut == 'en_cours' and c.actif]
+            campagnes_compte = (
+                client.campagnes_agence.all()
+                if client.type_entite == Client.TYPE_AGENCE
+                else client.campagnes.all()
+            )
+            campagnes_actives = [
+                c for c in campagnes_compte
+                if c.statut == 'en_cours' and c.actif
+            ]
             client.campagnes_stats = {
-                'panneau': client.cp_panneau,
-                'ecran': client.cp_ecran,
-                'total': client.cp_total,
+                'panneau': sum(
+                    1 for c in campagnes_actives
+                    if c.type_support and c.type_support != 'ecran'
+                ),
+                'ecran': sum(
+                    1 for c in campagnes_actives
+                    if c.type_support == 'ecran'
+                ),
+                'total': len(campagnes_actives),
             }
             # Spots LED pour écrans, et faces pour panneaux (unités distinctes non additionnables)
             client.spots_stats = {
@@ -3081,7 +3101,7 @@ class ClientListView(StaffRequiredMixin, SortableListMixin, ListView):
 
         context['q'] = self.request.GET.get('q', '').strip()
         context['status_filter'] = self.request.GET.get('status', '').strip()
-        context['title'] = 'Portefeuille Clients'
+        context['title'] = 'Portefeuille Clients et agences'
         return context
 
 
@@ -3092,8 +3112,12 @@ class ClientCreateView(StaffRequiredMixin, CreateView):
 
     def form_valid(self, form):
         response = super().form_valid(form)
-        log_action(self.request, AuditLog.ACTION_CREATE, 'commercial', obj=self.object, detail=f"Création client: {self.object.nom}")
-        messages.success(self.request, f'Client "{self.object.nom}" créé.')
+        type_compte = self.object.get_type_entite_display().lower()
+        log_action(self.request, AuditLog.ACTION_CREATE, 'commercial', obj=self.object, detail=f"Création {type_compte}: {self.object.nom}")
+        messages.success(
+            self.request,
+            f'Le compte « {self.object.nom} » ({self.object.get_type_entite_display().lower()}) a été créé.',
+        )
         return response
 
     def get_success_url(self):
@@ -3101,7 +3125,7 @@ class ClientCreateView(StaffRequiredMixin, CreateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = 'Nouveau client'
+        context['title'] = 'Nouveau client ou agence'
         return context
 
 
@@ -3118,15 +3142,30 @@ class ClientDetailView(ClientStaffRequiredMixin, DetailView):
         client = self.object
         today = timezone.now().date()
 
-        # Tous les contrats et campagnes du client
-        if self.request.user.is_admin:
+        # Une agence est rattachée aux campagnes, tandis que les contrats et
+        # les réservations restent rattachés au client.
+        if client.type_entite == Client.TYPE_AGENCE:
+            contrats_qs = Contrat.objects.none()
+            campagnes_all_qs = Campagne.objects.filter(
+                agence=client,
+            ).select_related(
+                'client', 'agence', 'contrat', 'campagne_parente',
+            ).order_by('-date_debut')
+            if not self.request.user.is_admin:
+                campagnes_all_qs = campagnes_all_qs.filter(actif=True)
+        elif self.request.user.is_admin:
             contrats_qs = client.contrats.all().order_by('-date_debut')
-            campagnes_all_qs = client.campagnes.all().select_related('contrat', 'campagne_parente').order_by('-date_debut')
+            campagnes_all_qs = client.campagnes.all().select_related('client', 'agence', 'contrat', 'campagne_parente').order_by('-date_debut')
         else:
             contrats_qs = client.contrats.filter(archive=False).order_by('-date_debut')
             if not contrats_qs.exists():
                 contrats_qs = client.contrats.all().order_by('-date_debut')
-            campagnes_all_qs = client.campagnes.filter(actif=True).select_related('contrat', 'campagne_parente').order_by('-date_debut')
+            campagnes_all_qs = client.campagnes.filter(actif=True).select_related('client', 'agence', 'contrat', 'campagne_parente').order_by('-date_debut')
+        campagnes_avec_agence = (
+            campagnes_all_qs.filter(agence__isnull=False).select_related('agence')
+            if client.type_entite == Client.TYPE_CLIENT
+            else Campagne.objects.none()
+        )
 
         # Calculer les métriques globales actives
         campagnes_actives = [c for c in campagnes_all_qs if c.statut == 'en_cours' and (self.request.user.is_admin or c.actif)]
@@ -3241,6 +3280,7 @@ class ClientDetailView(ClientStaffRequiredMixin, DetailView):
             'total_campagnes_all': campagnes_all_qs.count(),
             'contrats': contrats_qs,
             'contrats_enrichis': contrats_enrichis,
+            'campagnes_avec_agence': campagnes_avec_agence,
             'campagnes_sans_contrat_count': campagnes_sans_contrat_count,
             'reservations': reservations,
             'filters': {
@@ -3264,8 +3304,12 @@ class ClientUpdateView(StaffRequiredMixin, UpdateView):
 
     def form_valid(self, form):
         response = super().form_valid(form)
-        log_action(self.request, AuditLog.ACTION_UPDATE, 'commercial', obj=self.object, detail=f"Modification client: {self.object.nom}")
-        messages.success(self.request, 'Client mis à jour.')
+        type_compte = self.object.get_type_entite_display().lower()
+        log_action(self.request, AuditLog.ACTION_UPDATE, 'commercial', obj=self.object, detail=f"Modification {type_compte}: {self.object.nom}")
+        messages.success(
+            self.request,
+            f'Le compte « {self.object.nom} » ({self.object.get_type_entite_display().lower()}) a été mis à jour.',
+        )
         return response
 
     def get_success_url(self):
@@ -3273,7 +3317,7 @@ class ClientUpdateView(StaffRequiredMixin, UpdateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['title'] = f'Modifier — {self.object.nom}'
+        context['title'] = f'Modifier {self.object.get_type_entite_display().lower()} — {self.object.nom}'
         context['obj'] = self.object
         return context
 
@@ -3368,13 +3412,25 @@ class ContratCreateView(StaffRequiredMixin, CreateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         client_pk = self.kwargs.get('client_pk')
-        context['client'] = get_object_or_404(Client, pk=client_pk) if client_pk else None
+        context['client'] = (
+            get_object_or_404(
+                Client,
+                pk=client_pk,
+                type_entite=Client.TYPE_CLIENT,
+            )
+            if client_pk
+            else None
+        )
         context['title'] = 'Nouveau contrat / bon de commande'
         return context
 
     def form_valid(self, form):
         if client_pk := self.kwargs.get('client_pk'):
-            form.instance.client_id = client_pk
+            form.instance.client = get_object_or_404(
+                Client,
+                pk=client_pk,
+                type_entite=Client.TYPE_CLIENT,
+            )
         response = super().form_valid(form)
         transaction.on_commit(lambda: cache.delete('dashboard_alertes'))
         log_action(
@@ -3531,7 +3587,7 @@ class CampagneListView(ClientStaffRequiredMixin, SortableListMixin, ListView):
         return categories_existantes.get(type_support.casefold())
 
     def get_queryset(self):
-        qs = super().get_queryset().select_related('client')
+        qs = super().get_queryset().select_related('client', 'agence')
 
         if self.request.user.is_client:
             qs = qs.filter(client=self.request.user.client_profile)
@@ -4096,6 +4152,9 @@ class CampagneDetailView(ClientStaffRequiredMixin, DetailView):
     template_name = 'campaigns/campagne_detail.html'
     context_object_name = 'campagne'
 
+    def get_queryset(self):
+        return super().get_queryset().select_related('client', 'agence')
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         campagne = self.object
@@ -4289,8 +4348,16 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
         initial = super().get_initial()
         demande = self.get_source_demande()
         if demande:
-            client = demande.client or (
-                Client.objects.filter(email__iexact=demande.email)
+            client = (
+                demande.client
+                if demande.client
+                and demande.client.type_entite == Client.TYPE_CLIENT
+                else None
+            ) or (
+                Client.objects.filter(
+                    email__iexact=demande.email,
+                    type_entite=Client.TYPE_CLIENT,
+                )
                 .order_by('pk')
                 .first()
             )
@@ -5283,7 +5350,11 @@ class ReservationCreateView(StaffRequiredMixin, View):
     template_name = 'campaigns/reservations_add_bulk_final.html'
 
     def get_client(self, client_pk):
-        return get_object_or_404(Client, pk=client_pk)
+        return get_object_or_404(
+            Client,
+            pk=client_pk,
+            type_entite=Client.TYPE_CLIENT,
+        )
 
     def get(self, request, client_pk):
         client   = self.get_client(client_pk)
@@ -5470,7 +5541,11 @@ class ReservationUpdateView(StaffRequiredMixin, View):
     template_name = 'campaigns/reservations_add_bulk_final.html'
 
     def get_client(self, client_pk):
-        return get_object_or_404(Client, pk=client_pk)
+        return get_object_or_404(
+            Client,
+            pk=client_pk,
+            type_entite=Client.TYPE_CLIENT,
+        )
 
     def get_reservation(self, client, resa_pk):
         return get_object_or_404(
@@ -5518,6 +5593,7 @@ class ReservationUpdateView(StaffRequiredMixin, View):
 
         # Clients avec des faces qui chevauchent
         clt = Client.objects.filter(
+            type_entite=Client.TYPE_CLIENT,
             reservations_globales__lignes__face_id__in=selectionnes,
             reservations_globales__statut__in=[STATUT_EN_ATTENTE, STATUT_CONFIRMEE],
         ).exclude(pk=client.pk).distinct()
@@ -6060,6 +6136,7 @@ class ReservationListView(StaffRequiredMixin, SortableListMixin, ListView):
                 (STATUT_EXPIREE,    'Expirée'),
             ],
             'clients': Client.objects.filter(
+                type_entite=Client.TYPE_CLIENT,
                 reservations_globales__isnull=False
             ).distinct().order_by('nom'),
         })
@@ -6077,7 +6154,10 @@ class ReservationSelectClientView(StaffRequiredMixin, View):
     template_name = 'campaigns/reservation_select_client.html'
 
     def get(self, request):
-        clients = Client.objects.filter(actif=False).order_by('nom')
+        clients = Client.objects.filter(
+            actif=False,
+            type_entite=Client.TYPE_CLIENT,
+        ).order_by('nom')
         print(clients)
         return render(request, self.template_name, {'clients': clients})
 
@@ -6458,6 +6538,7 @@ class AjaxSearchClientView(StaffOnlyMixin, View):
             Q(email__icontains=q) |
             Q(telephone__icontains=q),
             actif=True,
+            type_entite=Client.TYPE_CLIENT,
         ).values('id', 'nom', 'email', 'telephone')[:10]
 
         return JsonResponse(list(clients), safe=False)
@@ -6714,16 +6795,53 @@ class DemandeCreationView(StaffDemandeWizardBase):
                 'form': 'form-etape1',
                 'class': 'form-control-e3 staff-field-control',
             })
+        faces, _ = self.get_selections(request)
+        initial_selected_faces = [
+            {
+                'id': str(face.pk),
+                'code': face.support.code,
+                'label': face.get_label_display(),
+                'quartier': face.support.quartier or face.support.ville,
+                'support_id': str(face.support_id),
+            }
+            for face in faces
+        ]
+        formats = {
+            code: category or 'Autres'
+            for code, category in FormatSupport.objects.filter(
+                code__in={face.support.format for face in faces if face.support.format}
+            ).values_list('code', 'categorie')
+        }
+        selected_categories = {
+            formats.get(face.support.format, 'Autres')
+            for face in faces
+        }
+        selected_cities = {face.support.ville for face in faces if face.support.ville}
+        selected_formats = {face.support.format for face in faces if face.support.format}
+        inferred_filters = {
+            'ville': next(iter(selected_cities)) if len(selected_cities) == 1 else '',
+            'categorie': (
+                next(iter(selected_categories))
+                if faces and len(selected_categories) == 1
+                else ''
+            ),
+            'format': (
+                next(iter(selected_formats))
+                if faces and len(selected_formats) == 1
+                else ''
+            ),
+        }
+        filtres = {
+            key: request.GET.get(key, '').strip() or inferred_filters[key]
+            for key in ('ville', 'categorie', 'format')
+        }
         return render(request, self.template_name, self.step_context(
             request,
             form=selection_form,
             contact_form=contact_form,
-            panier=self.get_selections(request)[0],
-            filtres={
-                'ville': request.GET.get('ville', '').strip(),
-                'categorie': request.GET.get('categorie', '').strip(),
-                'format': request.GET.get('format', '').strip(),
-            },
+            panier=faces,
+            initial_selected_faces=initial_selected_faces,
+            filtres=filtres,
         ))
 
     def get(self, request):
@@ -6930,8 +7048,16 @@ class DemandeDetailView(LoginRequiredMixin, View):
             'demande': demande,
             'campagne_form': DemandeCampagneForm(demande=demande),
         }
-        client_reservations = demande.client or (
-            Client.objects.filter(email__iexact=demande.email)
+        client_reservations = (
+            demande.client
+            if demande.client
+            and demande.client.type_entite == Client.TYPE_CLIENT
+            else None
+        ) or (
+            Client.objects.filter(
+                email__iexact=demande.email,
+                type_entite=Client.TYPE_CLIENT,
+            )
             .order_by('pk')
             .first()
         )
@@ -7313,7 +7439,11 @@ class ReservationWizardEtape1View(StaffRequiredMixin, View):
     """
     def get(self, request, client_pk=None):
         if client_pk is not None:
-            client = get_object_or_404(Client, pk=client_pk)
+            client = get_object_or_404(
+                Client,
+                pk=client_pk,
+                type_entite=Client.TYPE_CLIENT,
+            )
             request.session[SESSION_CLIENT] = client.pk
         return redirect('reservation_wizard_etape2')
 
@@ -7323,7 +7453,11 @@ class ReservationWizardEtape1View(StaffRequiredMixin, View):
         # ── Sélection d'un client existant ──────────────────────────────────
         if action == 'selectionner':
             client_pk = request.POST.get('client_pk')
-            client = get_object_or_404(Client, pk=client_pk)
+            client = get_object_or_404(
+                Client,
+                pk=client_pk,
+                type_entite=Client.TYPE_CLIENT,
+            )
             request.session[SESSION_CLIENT] = client.pk
             return redirect('reservation_wizard_etape2')
 
@@ -7364,7 +7498,10 @@ class ReservationWizardEtape2View(StaffRequiredMixin, View):
         client_pk = request.session.get(SESSION_CLIENT)
         if not client_pk:
             return None
-        return Client.objects.filter(pk=client_pk).first()
+        return Client.objects.filter(
+            pk=client_pk,
+            type_entite=Client.TYPE_CLIENT,
+        ).first()
 
     def get(self, request):
         client = self._get_client(request)
@@ -7372,7 +7509,9 @@ class ReservationWizardEtape2View(StaffRequiredMixin, View):
         dates        = request.session.get(SESSION_DATES, {})
         selectionnes = request.session.get(SESSION_FACES, [])
         q = request.GET.get('q', '').strip()
-        clients = Client.objects.all().order_by('nom')
+        clients = Client.objects.filter(
+            type_entite=Client.TYPE_CLIENT,
+        ).order_by('nom')
         if q:
             clients = clients.filter(Q(nom__icontains=q) | Q(email__icontains=q))
 
@@ -7396,7 +7535,11 @@ class ReservationWizardEtape2View(StaffRequiredMixin, View):
     def post(self, request):
         action = request.POST.get('action')
         if action == 'selectionner':
-            client = get_object_or_404(Client, pk=request.POST.get('client_pk'))
+            client = get_object_or_404(
+                Client,
+                pk=request.POST.get('client_pk'),
+                type_entite=Client.TYPE_CLIENT,
+            )
             request.session[SESSION_CLIENT] = client.pk
             return redirect('reservation_wizard_etape2')
 
@@ -7468,7 +7611,11 @@ class ReservationWizardEtape3View(StaffRequiredMixin, View):
         )
 
     def _get_context(self, request):
-        client      = get_object_or_404(Client, pk=request.session[SESSION_CLIENT])
+        client      = get_object_or_404(
+            Client,
+            pk=request.session[SESSION_CLIENT],
+            type_entite=Client.TYPE_CLIENT,
+        )
         dates       = request.session[SESSION_DATES]
         face_ids    = request.session[SESSION_FACES]
         nom         = request.session.get(SESSION_NOM, '') or f"Réservation {timezone.now():%d/%m/%Y}"

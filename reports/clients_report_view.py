@@ -39,7 +39,7 @@ def _build_context_clients(filters: dict) -> dict:
 
     # ── Base queryset ────────────────────────────────────────────
     qs = (
-        Client.objects
+        Client.objects.filter(type_entite=Client.TYPE_CLIENT)
         .prefetch_related(
             "campagnes",
             "campagnes__lignes__face__support",

@@ -32,8 +32,12 @@ D = {'class': 'form-control', 'type': 'date'}
 class ClientForm(forms.ModelForm):
     class Meta:
         model = Client
-        fields = ['nom', 'contact_nom', 'telephone', 'email', 'adresse', 'logo', 'notes', 'actif']
+        fields = [
+            'type_entite', 'nom', 'contact_nom', 'telephone', 'email',
+            'adresse', 'logo', 'notes', 'actif',
+        ]
         widgets = {
+            'type_entite': forms.RadioSelect(attrs={'class': 'form-check-input'}),
             'nom': forms.TextInput(attrs=W),
             'contact_nom': forms.TextInput(attrs=W),
             'telephone': forms.TextInput(attrs=W),
@@ -44,10 +48,24 @@ class ClientForm(forms.ModelForm):
             'actif': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['type_entite'].label = "Type de compte"
+        self.fields['type_entite'].help_text = (
+            "Choisissez un client ou une agence."
+            if not self.instance.pk
+            else "Le type de compte est fixé à la création."
+        )
+        if self.instance.pk:
+            self.fields['type_entite'].disabled = True
+
 
 class ContratForm(forms.ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields['client'].queryset = Client.objects.filter(
+            type_entite=Client.TYPE_CLIENT
+        )
         # Si client est déjà défini (édition ou création pour client spécifique), masquer le champ
         if self.instance and self.instance.pk and self.instance.client:
             self.fields['client'].widget = forms.HiddenInput()
@@ -227,7 +245,7 @@ class CampagneForm(forms.ModelForm):
     class Meta:
         model = Campagne
         fields = [
-            'client', 'annonceur', 'nom', 'prix', 'prix_affichage', 'prix_impression', 'campagne_parente', 'est_mere',
+            'client', 'agence', 'nom', 'prix', 'prix_affichage', 'prix_impression', 'campagne_parente', 'est_mere',
             'date_debut', 'date_fin', 'statut', 'lieu',
             'type_support', 'nombre_faces_temporaire',
             'duree_passage', 'frequence', 'nombre_visuels',
@@ -235,12 +253,7 @@ class CampagneForm(forms.ModelForm):
         ]
         widgets = {
             'client': forms.Select(attrs=S),
-            'annonceur': forms.TextInput(attrs={
-                **W,
-                'list': 'annonceurs-existants',
-                'placeholder': 'Sélectionner ou saisir un client',
-                'autocomplete': 'off',
-            }),
+            'agence': forms.Select(attrs=S),
             'nom': forms.TextInput(attrs=W),
             'prix': forms.TextInput(attrs={**W, 'inputmode': 'decimal', 'data-currency-input': 'true'}),
             'prix_affichage': forms.TextInput(attrs={**W, 'inputmode': 'decimal', 'data-currency-input': 'true'}),
@@ -283,6 +296,17 @@ class CampagneForm(forms.ModelForm):
                 args = (data, *args[1:])
 
         super().__init__(*args, **kwargs)
+        self.fields['client'].queryset = Client.objects.filter(
+            type_entite=Client.TYPE_CLIENT
+        )
+        agences = Client.objects.filter(type_entite=Client.TYPE_AGENCE)
+        if self.instance.agence_id:
+            agences = agences.filter(
+                Q(actif=True) | Q(pk=self.instance.agence_id)
+            )
+        else:
+            agences = agences.filter(actif=True)
+        self.fields['agence'].queryset = agences.order_by('nom')
         if not self.is_bound:
             for field_name in ('prix', 'prix_affichage', 'prix_impression'):
                 initial_price = self.initial.get(
@@ -294,18 +318,19 @@ class CampagneForm(forms.ModelForm):
                     self.fields[field_name].initial = None
         self.demande_client = None
         if self.demande_source:
-            self.demande_client = self.demande_source.client or (
-                Client.objects.filter(email__iexact=self.demande_source.email)
+            self.demande_client = (
+                self.demande_source.client
+                if self.demande_source.client
+                and self.demande_source.client.type_entite == Client.TYPE_CLIENT
+                else None
+            ) or (
+                Client.objects.filter(
+                    email__iexact=self.demande_source.email,
+                    type_entite=Client.TYPE_CLIENT,
+                )
                 .order_by('pk')
                 .first()
             )
-        self.annonceurs_existants = (
-            Client.objects.filter(actif=True)
-            .exclude(nom='')
-            .order_by('nom')
-            .values_list('nom', flat=True)
-            .distinct()
-        )
         reservations_qs = (
             Reservation.objects
             .filter(
@@ -357,8 +382,16 @@ class CampagneForm(forms.ModelForm):
         ).order_by('-created_at')
         self.demandes_existantes = list(demandes_qs)
         for demande in self.demandes_existantes:
-            demande.client_formulaire = demande.client or (
-                Client.objects.filter(email__iexact=demande.email)
+            demande.client_formulaire = (
+                demande.client
+                if demande.client
+                and demande.client.type_entite == Client.TYPE_CLIENT
+                else None
+            ) or (
+                Client.objects.filter(
+                    email__iexact=demande.email,
+                    type_entite=Client.TYPE_CLIENT,
+                )
                 .order_by('pk')
                 .first()
             )
@@ -401,14 +434,13 @@ class CampagneForm(forms.ModelForm):
                 choice for choice in self.fields['statut'].choices
                 if choice[0] not in statuts_geres_par_actions
             ]
-        self.fields['client'].required = False
         if self.demande_source:
             self.fields['client'].disabled = True
             self.fields['client'].help_text = (
                 "Le client est repris depuis la demande et ne peut pas être remplacé."
             )
         else:
-            self.fields['client'].help_text = "Laissez vide pour une campagne propre à INTEGRAL."
+            self.fields['client'].help_text = ""
         self.reservation_source = None
         self.reservation_categorie = None
         self.reservation_formats = set()
@@ -619,7 +651,7 @@ class CampagneForm(forms.ModelForm):
             if not client:
                 self.add_error(
                     'reservation_reference',
-                    "Sélectionnez d’abord l’agence propriétaire de la réservation.",
+                    "Sélectionnez d’abord le client propriétaire de la réservation.",
                 )
             elif cleaned.get('est_mere'):
                 self.add_error(
@@ -655,7 +687,7 @@ class CampagneForm(forms.ModelForm):
                 if not reservation:
                     self.add_error(
                         'reservation_reference',
-                        "Aucune réservation active ne correspond à cette référence pour l’agence sélectionnée.",
+                        "Aucune réservation active ne correspond à cette référence pour le client sélectionné.",
                     )
                 elif not reservation.lignes.filter(face__isnull=False).exists():
                     self.add_error(
@@ -1111,7 +1143,8 @@ class DemandeGestionContactForm(forms.Form):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['client'].queryset = Client.objects.filter(
-            actif=True
+            actif=True,
+            type_entite=Client.TYPE_CLIENT,
         ).order_by('nom')
         self.fields['client'].label_from_instance = (
             lambda client: f"{client.reference} · {client.nom}"

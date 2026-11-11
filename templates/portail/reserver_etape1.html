@@ -3,946 +3,920 @@
 
 {% block title %}{% if editing_request or shared_edit_mode %}Modifier la demande — {% elif staff_mode %}Demande client — {% elif shared_request_mode %}Confirmer la demande — {% endif %}Sélectionnez votre emplacement — Étape 1{% endblock %}
 {% block topbar_title %}<i class="bi bi-plus-circle-fill me-1" style="color:var(--color-primary)"></i>{% if editing_request or shared_edit_mode %}Modifier la demande{% elif staff_mode %}Informations client, période et emplacements{% elif shared_request_mode %}Vérifiez votre demande{% else %}Sélectionnez votre emplacement{% endif %}{% endblock %}
+{% block footer_cta %}{% if not shared_edit_mode %}{{ block.super }}{% endif %}{% endblock %}
 
 {% block extra_head %}
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+
 <style>
-  /* ════════════════════════════════════════════════════════════════
-     Identité "Furni" — vert profond + jaune, Inter, formes arrondies.
-     Variables surchargées localement sur .reservation-page pour ne
-     pas affecter le reste du site. Les couleurs de statut (libre /
-     occupé / panne / réservé) restent inchangées pour la lisibilité.
-     ════════════════════════════════════════════════════════════════ */
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+  /* ==========================================================
+     TOKENS (identiques aux pages de confirmation / vérification)
+     Les couleurs de statut (libre / occupé / panne / réservé)
+     restent inchangées pour la lisibilité.
+     ========================================================== */
+  .cf {
+    --ink: #121a17;
+    --ink-2: #3c4843;
+    --muted: #7a847f;
+    --line: #e6e4dd;
+    --line-strong: #d3d0c6;
+    --paper: #ffffff;
+    --wash: #f8f7f3;
+    --brand: #1d5a47;
+    --brand-ink: #0f3a2d;
+    --tone: #1d5a47;
+    --tone-wash: #e8f1ec;
 
-  .reservation-page {
-    --color-primary:   {{ DESIGN.COLOR_PRIMARY }};
+    /* Couleur primaire du portail : vert de la nouvelle charte.
+       Pour revenir à la couleur du site : 
+    */
+    --color-primary: {{ DESIGN.COLOR_PRIMARY }}; 
+    --brand-ink: {{ DESIGN.COLOR_PRIMARY }};
+    --brand: {{ DESIGN.COLOR_PRIMARY }};
+    --tone: {{ DESIGN.COLOR_PRIMARY }};
     --color-secondary: {{ DESIGN.COLOR_SECONDARY }};
-    --text:             #000000;
-    --text-muted:        #6a6a6a;
-    --border:             #e6e2d8;
-    --bg-card:              #ffffff;
-    --bg-card2:              #f8f6f1;
 
-    --step-active:   var(--color-primary);
-    --step-done:     #10b981;
-    --step-inactive: #cbd5e1;
-    --radius-sm:  6px;
-    --radius-md:  6px;
-    --radius-lg:  8px;
-    --shadow-sm:  0 1px 3px rgba(31,46,40,.07);
-    --shadow-md:  0 8px 22px rgba(31,46,40,.10);
+    /* alias pour le HTML / JS existant */
+    --text: var(--ink);
+    --text-muted: var(--muted);
+    --border: var(--line);
+    --bg-card: var(--paper);
+    --bg-card2: var(--wash);
+
     --c-libre:    #10b981;
     --c-partiel:  #f59e0b;
     --c-occupe:   #ef4444;
     --c-panne:    #94a3b8;
     --c-reserve:  #7c3aed;
-    font-family: 'Inter', sans-serif;
-  }
 
-  .staff-demande-page {
+    --radius: 8px;
+    --radius-sm: 6px;
+    --serif: 'Fraunces', Georgia, serif;
+    --sans: 'Inter', system-ui, -apple-system, sans-serif;
+    --mono: 'JetBrains Mono', ui-monospace, monospace;
+    
     max-width: 1680px;
+    
     margin: 0 auto;
-    padding: 8px 12px 24px;
-    color: #242a27;
+    padding: 0 22px 56px;
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
   }
-  .staff-demande-page .staff-request-heading {
+  .cf *, .cf *::before, .cf *::after { box-sizing: border-box; }
+  .cf a { text-decoration: none; }
+
+  /* ==========================================================
+     HERO
+     ========================================================== */
+  .cf-hero { padding-top: 34px; padding-bottom: 8px; margin-bottom: 30px; }
+
+  .cf-hero-top {
     display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 32px;
+    flex-wrap: wrap;
+    padding-bottom: 30px;
+    border-bottom: 1px solid var(--line-strong);
+  }
+  .cf-hero-main { flex: 1 1 460px; min-width: 0; }
+
+  .cf-pill {
+    display: inline-flex;
     align-items: center;
-    gap: 16px;
-    margin: 0 0 16px;
+    gap: 9px;
+    padding: 6px 14px 6px 11px;
+    margin-bottom: 20px;
+    border-radius: 999px;
+    background: var(--tone-wash);
+    color: var(--tone);
+    font-size: .76rem;
+    font-weight: 700;
+    letter-spacing: .02em;
+  }
+  .cf-pill::before {
+    content: "";
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: var(--tone);
+    animation: cf-ping 2.2s ease-out infinite;
+  }
+  .cf-title {
+    margin: 0 0 14px;
+    font-family: var(--serif);
+    font-size: clamp(2rem, 5vw, 3.1rem);
+    font-weight: 500;
+    line-height: 1.08;
+    letter-spacing: -.025em;
+    color: var(--ink);
+  }
+  .cf-lead { max-width: 580px; margin: 0; color: var(--ink-2); font-size: 1.02rem; line-height: 1.7; }
+
+  .cf-ticket {
+    flex: 0 0 auto;
+    min-width: 200px;
     padding: 18px 22px;
-    border: 1px solid #e8e4dc;
-    border-radius: 8px;
-    background: linear-gradient(110deg, #fff 0%, #fbfaf6 100%);
-    box-shadow: 0 5px 18px rgba(37, 46, 41, .05);
+    background: var(--paper);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
   }
-  .staff-request-heading-icon {
-    width: 48px;
-    height: 48px;
-    flex: 0 0 48px;
-    display: grid;
-    place-items: center;
-    border-radius: 8px;
-    background: #f7e9e7;
-    color: var(--color-primary);
-    font-size: 1.25rem;
-  }
-  .staff-request-eyebrow {
-    margin: 0 0 3px;
-    color: var(--color-primary);
-    font-size: .67rem;
-    font-weight: 800;
+  .cf-ticket-label {
+    margin-bottom: 4px;
+    color: var(--muted);
+    font-size: .68rem;
+    font-weight: 700;
     letter-spacing: .12em;
     text-transform: uppercase;
   }
-  .staff-request-heading h1 {
+  .cf-ticket-ref { font-family: var(--mono); font-size: 1.15rem; font-weight: 600; color: var(--brand-ink); }
+
+  /* ---------- tracker ---------- */
+  .cf-track {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
     margin: 0;
-    color: #262c29;
-    font-size: 1.2rem;
-    font-weight: 800;
+    padding: 26px 0 6px;
+    list-style: none;
   }
-  .staff-request-heading p {
-    margin: 4px 0 0;
-    color: #727975;
-    font-size: .8rem;
+  .cf-track.is-3 { grid-template-columns: repeat(3, 1fr); }
+  .cf-track li {
+    position: relative;
+    padding-top: 22px;
+    color: var(--muted);
+    font-size: .78rem;
+    font-weight: 600;
   }
-  .staff-demande-page .staff-client-card {
-    overflow: hidden;
-    margin-bottom: 14px;
-    border: 1px solid #e4e6e1;
-    border-radius: 8px;
-    background: #fff;
-    box-shadow: 0 5px 18px rgba(37, 46, 41, .05);
+  .cf-track li::before {
+    content: "";
+    position: absolute;
+    top: 5px; left: 0; right: 0;
+    height: 2px;
+    background: var(--line-strong);
   }
-  .staff-client-card-header {
+  .cf-track li::after {
+    content: "";
+    position: absolute;
+    top: 0; left: 0;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--paper);
+    border: 2px solid var(--line-strong);
+  }
+  .cf-track li small { display: block; margin-top: 1px; color: var(--muted); font-size: .7rem; font-weight: 500; }
+  .cf-track li.current { color: var(--ink); }
+  .cf-track li.current::before { background: linear-gradient(90deg, var(--brand) 0 35%, var(--line-strong) 35%); }
+  .cf-track li.current::after  { border-color: var(--brand); box-shadow: 0 0 0 4px rgba(29,90,71,.16); }
+
+  /* ==========================================================
+     SECTIONS & TITRES
+     ========================================================== */
+  .cf-h {
     display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 15px 20px;
-    border-bottom: 1px solid #eceee9;
-    background: #fbfcfa;
+    align-items: baseline;
+    gap: 10px;
+    margin: 0 0 6px;
+    font-family: var(--serif);
+    font-size: 1.35rem;
+    font-weight: 500;
+    letter-spacing: -.015em;
+    color: var(--ink);
   }
-  .staff-section-number {
-    width: 30px;
-    height: 30px;
-    display: grid;
-    place-items: center;
-    flex: 0 0 30px;
-    border-radius: 9px;
-    background: var(--color-primary);
-    color: #fff;
-    font-size: .8rem;
-    font-weight: 800;
+  .cf-sec { margin-bottom: 34px; }
+  .cf-sub { margin: 0 0 16px; color: var(--muted); font-size: .86rem; }
+
+  .cf-alert {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    margin-bottom: 22px;
+    padding: 13px 18px;
+    border: 1px solid #efd3cf;
+    border-left: 3px solid #a4392e;
+    border-radius: 10px;
+    background: #faeceb;
+    color: #7d3029;
+    font-size: .88rem;
   }
-  .staff-section-title {
-    margin: 0;
-    color: #2b312e;
-    font-size: .96rem;
-    font-weight: 800;
-  }
-  .staff-section-help {
-    margin: 2px 0 0;
-    color: #7a817d;
-    font-size: .75rem;
-  }
-  .staff-client-card-body { padding: 20px; }
-  .staff-demande-page .staff-field-label {
-    display: block;
-    margin-bottom: 6px;
-    color: #414944;
-    font-size: .76rem;
-    font-weight: 700;
-  }
-  .staff-demande-page .staff-field-control {
-    width: 100%;
-    min-height: 42px;
-    padding: 9px 12px;
-    border: 1px solid #dfe3dd;
-    border-radius: 8px;
-    background-color: #fff;
-    color: #2c332f;
-    font-size: .83rem;
-    transition: border-color .15s, box-shadow .15s;
-  }
-  .staff-demande-page .staff-field-control:focus {
-    border-color: var(--color-primary);
-    outline: 0;
-    box-shadow: 0 0 0 3px rgba(147, 46, 43, .11);
-  }
-  .staff-demande-page textarea.staff-field-control {
-    min-height: 78px;
-    resize: vertical;
-  }
-  .staff-client-type-label {
-    margin: 0 0 8px;
-    color: #414944;
-    font-size: .76rem;
-    font-weight: 700;
-  }
-  .staff-client-type-options {
-    display: grid;
-    grid-template-columns: 1fr;
-    gap: 9px;
+
+  /* ==========================================================
+     FORMULAIRE CLIENT (mode staff)
+     ========================================================== */
+  .cf-form {
+    padding: 26px;
+    background: var(--paper);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
   }
   .staff-client-layout {
     display: grid;
     grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
-    gap: 26px;
+    gap: 32px;
     align-items: start;
   }
-  .staff-client-type-panel {
-    padding-right: 22px;
-    border-right: 1px solid #eceee9;
-  }
-  .staff-contact-fields {
-    min-width: 0;
-    padding-top: 2px;
-  }
-  .staff-contact-fields .staff-contact-option-title {
-    margin-bottom: 12px;
-    color: #333a36;
-    font-size: .9rem;
-    font-weight: 800;
-  }
-  .staff-contact-fields .staff-consent {
-    margin-top: 18px;
-    padding: 12px 14px;
-    border: 1px solid #e8ebe6;
-    border-radius: 9px;
-    background: #f9faf8;
-  }
-  .shared-edit-contact {
-    margin-bottom: 14px;
-    padding: 18px 20px;
-    border: 1px solid var(--border);
-    border-radius: var(--radius-lg);
-    background: var(--bg-card);
-    box-shadow: var(--shadow-sm);
-  }
-  .shared-edit-contact h2 { margin: 0 0 14px; font-size: .95rem; font-weight: 800; }
-  .shared-edit-contact .form-row { margin-bottom: 12px; }
-  .shared-edit-contact .client-type-toggle { display: flex; gap: 10px; }
-  .shared-edit-contact .client-type-option {
-    position: relative;
-    display: flex;
-    flex: 1;
-    align-items: center;
-    gap: 9px;
-    padding: 11px 13px;
-    border: 1px solid #dfe3dd;
-    border-radius: 8px;
-    background: #fff;
-    cursor: pointer;
-    font-size: .8rem;
+  .staff-client-type-panel { padding-right: 28px; border-right: 1px solid var(--line); }
+  .staff-contact-fields { min-width: 0; }
+
+  .staff-client-type-label,
+  .staff-field-label {
+    display: block;
+    margin: 0 0 7px;
+    color: var(--muted);
+    font-size: .68rem;
     font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
   }
-  .shared-edit-contact .client-type-option input {
-    width: 16px;
-    height: 16px;
-    accent-color: var(--color-primary);
+  .staff-contact-option-title {
+    margin: 0 0 14px;
+    font-family: var(--serif);
+    font-size: 1.1rem;
+    font-weight: 500;
+    color: var(--ink);
   }
-  .shared-edit-contact .form-grid-2 {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px;
-  }
-  .shared-edit-contact [hidden] { display: none !important; }
-  .shared-edit-contact .form-control-e3 {
+  .staff-section-help { margin: 2px 0 0; color: var(--muted); font-size: .8rem; }
+
+  .staff-field-control {
     width: 100%;
-    min-height: 42px;
-    padding: 9px 12px;
-    border: 1px solid #dfe3dd;
-    border-radius: 8px;
-    background: #fff;
-    box-sizing: border-box;
+    min-height: 44px;
+    padding: 10px 14px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    background-color: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: .9rem;
+    transition: border-color .15s, box-shadow .15s;
   }
-  @media (max-width: 600px) {
-    .shared-edit-contact .form-grid-2 { grid-template-columns: 1fr; gap: 0; }
+  .staff-field-control:focus {
+    border-color: var(--brand);
+    outline: 0;
+    box-shadow: 0 0 0 3px rgba(29,90,71,.14);
   }
-  @media (max-width: 768px) {
-    .staff-client-layout { grid-template-columns: 1fr; gap: 18px; }
-    .staff-client-type-panel {
-      padding: 0 0 16px;
-      border-right: 0;
-      border-bottom: 1px solid #eceee9;
-    }
-    .staff-client-type-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  }
+  textarea.staff-field-control { min-height: 80px; resize: vertical; }
+  div.staff-field-control { display: flex; align-items: center; background: var(--wash); border-color: var(--line); font-weight: 600; }
+
+  .staff-client-type-options { display: grid; grid-template-columns: 1fr; gap: 10px; }
   .staff-client-type-option {
     display: flex;
     align-items: center;
     gap: 10px;
-    min-height: 48px;
-    padding: 10px 13px;
-    border: 1px solid #e0e4de;
-    border-radius: 9px;
-    background: #fff;
-    color: #48504b;
-    font-size: .8rem;
-    font-weight: 700;
+    min-height: 50px;
+    padding: 10px 14px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    background: var(--paper);
+    color: var(--ink-2);
+    font-size: .86rem;
+    font-weight: 650;
     cursor: pointer;
     transition: all .15s ease;
   }
-  .staff-client-type-option:hover {
-    border-color: #c9aaa7;
-    background: #fdf9f8;
-  }
+  .staff-client-type-option:hover { border-color: var(--brand); background: var(--wash); }
   .staff-client-type-option:has(input:checked) {
-    border-color: var(--color-primary);
-    background: #fcf4f3;
-    color: var(--color-primary);
-    box-shadow: 0 0 0 2px rgba(147, 46, 43, .07);
+    border-color: var(--brand);
+    background: var(--tone-wash);
+    color: var(--brand-ink);
+    box-shadow: 0 0 0 3px rgba(29,90,71,.1);
   }
-  .staff-client-type-option input { margin: 0; accent-color: var(--color-primary); }
-  .staff-client-type-option i { font-size: 1rem; }
-  .staff-demande-page .dates-bar {
-    display: flex;
-    flex-wrap: nowrap;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 14px;
-    padding: 14px 18px;
-    border: 1px solid #e4e6e1;
-    border-radius: 8px;
-    background: #fff;
-    box-shadow: 0 5px 18px rgba(37, 46, 41, .05);
-    overflow-x: auto;
-    scrollbar-width: thin;
+  .staff-client-type-option input { margin: 0; accent-color: var(--brand); }
+  .staff-client-type-option i { font-size: 1rem; color: var(--brand); }
+
+  .staff-consent {
+    margin-top: 20px;
+    padding: 13px 16px 13px 38px;
+    border: 1px solid var(--line);
+    border-radius: var(--radius-sm);
+    background: var(--wash);
+    color: var(--ink-2);
+    font-size: .86rem;
   }
-  .staff-demande-page .staff-format-filter { display: contents; }
-  .category-required-hint {
+  .staff-consent .form-check-input { accent-color: var(--brand); }
+
+  .shared-category-lock {
     display: flex;
     align-items: center;
     gap: 8px;
-    padding: 10px 14px;
-    border-bottom: 1px solid #e8ebe6;
-    background: #fbfcfa;
-    color: #68716b;
-    font-size: .78rem;
-    font-weight: 600;
+    padding: 6px 12px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--paper);
+    color: var(--ink-2);
+    font-size: .74rem;
   }
-  .category-required-hint i { color: var(--color-primary); }
-  .staff-selection-heading {
-    display: flex;
-    align-items: center;
-    gap: 11px;
-    margin: 18px 2px 10px;
-  }
-  .staff-selection-heading .staff-section-number {
-    background: #f7e9e7;
-    color: var(--color-primary);
-  }
-  .staff-demande-page .dates-bar-label {
-    display: flex;
-    align-items: center;
-    color: #2e3531;
-    font-size: .84rem;
-    font-weight: 800;
-    letter-spacing: 0;
-    text-transform: none;
-    white-space: nowrap;
-    flex: 0 0 300px;
-  }
-  .staff-demande-page .dates-bar-label::before {
-    content: "2";
-    width: 25px;
-    height: 25px;
-    display: inline-grid;
-    place-items: center;
-    flex: 0 0 25px;
-    margin-right: 8px;
-    border-radius: 8px;
-    background: #f7e9e7;
-    color: var(--color-primary);
-    font-size: .73rem;
-    font-weight: 800;
-  }
-  .staff-demande-page .dates-bar-label i { display: none; }
-  .staff-period-hint {
-    display: inline;
-    margin-left: 5px;
-    color: #7a817d;
-    font-size: .66rem;
-    font-weight: 500;
-    white-space: nowrap;
-  }
-  .staff-demande-page .date-input-wrap {
-    flex: 0 0 165px;
-    min-height: 43px;
-    gap: 8px;
-    padding: 6px 10px;
-    border: 1px solid #dfe3dd;
-    border-radius: 8px;
-    background: #fff;
-  }
-  .staff-demande-page .dates-bar-sep {
-    display: block;
-    flex: 0 0 auto;
-    white-space: nowrap;
-  }
-  .staff-demande-page #wrap-duree-jours { flex-basis: 145px; }
-  .staff-demande-page #wrap-duree-jours input { width: 65px !important; }
-  .staff-demande-page .dates-bar-label { flex: 0 0 300px; }
-  .staff-demande-page .date-input-wrap input { width: 100%; min-width: 0; }
-  .staff-demande-page #dates-status {
-    justify-content: center;
-    flex: 0 0 auto;
-    min-height: 36px;
-    margin-left: 0;
-    font-size: .69rem;
-    line-height: 1.3;
-    white-space: nowrap;
-  }
-  .staff-demande-page .main-section,
-  .staff-demande-page .panier-section {
-    border-color: #e4e6e1;
-    border-radius: 8px;
-    box-shadow: 0 5px 18px rgba(37, 46, 41, .05);
-  }
-  .staff-demande-page .section-header,
-  .staff-demande-page .panier-header {
-    min-height: 58px;
-    padding: 11px 14px;
-    border-color: #eceee9;
-    background: #fbfcfa;
-  }
-  .staff-demande-page .panier-title {
-    font-size: .88rem;
-  }
-  .staff-demande-page .resa-grid {
-    grid-template-columns: minmax(0, 1fr) 360px;
-    height: max(620px, calc(100vh - 500px));
-    min-height: 620px;
-  }
-  @media (max-width: 1200px) {
-    .staff-demande-page .dates-bar { justify-content: flex-start; }
-  }
-  @media (max-width: 992px) {
-    .staff-demande-page .resa-grid { height: auto; }
-  }
-  @media (max-width: 640px) {
-    .staff-demande-page { padding: 4px 0 18px; }
-    .staff-demande-page .staff-request-heading { padding: 14px; }
-    .staff-request-heading-icon { width: 42px; height: 42px; flex-basis: 42px; }
-    .staff-request-heading h1 { font-size: 1rem; }
-    .staff-client-card-header { padding: 13px 14px; }
-    .staff-client-card-body { padding: 15px; }
-    .staff-client-type-options { grid-template-columns: 1fr; }
-    .staff-demande-page .dates-bar { padding: 14px; }
-    .staff-demande-page .resa-grid { min-height: 0; }
-  }
+  .shared-category-lock strong { color: var(--ink); }
 
-  /* ── WIZARD ──────────────────────────────────────────────── */
-  .wizard-steps {
-    display: flex; align-items: center;
-    background: var(--bg-card); border: 1px solid var(--border);
-    border-radius: var(--radius-lg); padding: 14px 20px;
-    margin-bottom: 12px; box-shadow: var(--shadow-sm);
-  }
-  .step-item { display: flex; align-items: center; gap: 10px; flex: 1; }
-  .step-item:not(:last-child)::after {
-    content: ''; flex: 1; height: 2px; background: var(--border); margin: 0 8px;
-  }
-  .step-item.done::after { background: var(--step-done); }
-  .step-circle {
-    width: 30px; height: 30px; border-radius: 50%;
-    display: flex; align-items: center; justify-content: center;
-    font-size: .75rem; font-weight: 800; flex-shrink: 0;
-    border: 2px solid var(--step-inactive);
-    background: var(--bg-card); color: var(--step-inactive); transition: all .2s;
-  }
-  .step-item.active .step-circle { border-color: var(--step-active); background: var(--step-active); color: #fff; }
-  .step-item.done   .step-circle { border-color: var(--step-done);   background: var(--step-done);   color: #fff; }
-  .step-label { font-size: .78rem; font-weight: 700; color: var(--text-muted); white-space: nowrap; }
-  .step-item.active .step-label { color: var(--step-active); }
-  .step-item.done   .step-label { color: var(--step-done); }
-
-  /* ── WIZARD STEPS : masquer les étapes inactives sur petit écran ──── */
-  @media (max-width: 768px) {
-    .step-item:not(.active) .step-circle,
-    .step-item:not(.active) .step-label {
-      display: none;
-    }
-    .section-header{
-      flex-direction: column;
-    }
-    .view-toggle{
-      flex-direction: row !important;
-    }
-  }
-
-  /* ── BARRE DATES ─────────────────────────────────────────── */
+  /* ==========================================================
+     BARRE DE DATES
+     ========================================================== */
   .dates-bar {
-    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-    background: var(--bg-card); border: 1px solid var(--border);
-    border-radius: var(--radius-lg); padding: 10px 16px;
-    margin-bottom: 12px; box-shadow: var(--shadow-sm);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    padding: 16px 20px;
+    background: var(--wash);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
   }
-  .dates-bar-label {
-    font-size: .75rem; font-weight: 800; color: var(--text-muted);
-    text-transform: uppercase; letter-spacing: .08em; white-space: nowrap;
-    display: flex; align-items: center; gap: 6px;
-  }
-  .dates-bar-sep { color: var(--text-muted); font-size: .8rem; }
+  .dates-bar-sep { color: var(--muted); font-size: .82rem; font-weight: 600; white-space: nowrap; }
   .date-input-wrap {
-    display: flex; align-items: center; gap: 6px;
-    background: var(--bg-card2); border: 1.5px solid var(--border);
-    border-radius: var(--radius-sm); padding: 5px 10px; transition: border-color .15s;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 46px;
+    padding: 6px 14px;
+    background: var(--paper);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    transition: border-color .15s, box-shadow .15s;
   }
-  .date-input-wrap:focus-within {
-    border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px rgba(59,93,80,.10);
-  }
-  .date-input-wrap i { color: var(--text-muted); font-size: .8rem; flex-shrink: 0; }
+  .date-input-wrap:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(29,90,71,.14); }
+  .date-input-wrap i { flex-shrink: 0; font-size: .85rem; }
   .date-input-wrap input {
-    border: none; background: transparent; color: var(--text);
-    font-size: .8rem; font-weight: 600; outline: none; width: 150px;
+    width: 150px;
+    min-width: 0;
+    border: none;
+    background: transparent;
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: .88rem;
+    font-weight: 600;
+    outline: none;
   }
+  #wrap-duree-jours input { width: 80px; }
+  .date-input-wrap input:disabled { color: var(--muted); cursor: not-allowed; }
+
   #dates-status {
-    display: flex; align-items: center; gap: 6px;
-    font-size: .74rem; font-weight: 700; padding: 5px 12px;
-    border-radius: 20px; transition: all .2s; margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin-left: auto;
+    padding: 7px 14px;
+    border-radius: 999px;
+    font-size: .76rem;
+    font-weight: 700;
+    line-height: 1.3;
+    transition: all .2s;
   }
-  #dates-status.waiting { background: var(--bg-card2); color: var(--text-muted); border: 1px solid var(--border); }
-  #dates-status.loading { background: #eef4f0; color: var(--color-primary); border: 1px solid #cfe0d8; }
-  #dates-status.ok      { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
-  #dates-status.error   { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+  #dates-status.waiting { background: var(--paper); color: var(--muted); border: 1px solid var(--line-strong); }
+  #dates-status.loading { background: var(--tone-wash); color: var(--brand); border: 1px solid #cfe0d8; }
+  #dates-status.ok      { background: #d8f2e5; color: #0b5f3d; border: 1px solid #a8dcc2; }
+  #dates-status.error   { background: #faeceb; color: #8d3a31; border: 1px solid #efd3cf; }
   #dates-status .spin {
-    width: 12px; height: 12px; border: 2px solid currentColor;
-    border-top-color: transparent; border-radius: 50%;
-    animation: spin .6s linear infinite; flex-shrink: 0;
+    width: 12px; height: 12px;
+    border: 2px solid currentColor; border-top-color: transparent;
+    border-radius: 50%; animation: spin .6s linear infinite; flex-shrink: 0;
   }
   @keyframes spin { to { transform: rotate(360deg); } }
 
-  /* ── TOGGLE ──────────────────────────────────────────────── */
+  /* ==========================================================
+     GRILLE PRINCIPALE (liste/carte + sélection)
+     ========================================================== */
+  .resa-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 360px;
+    gap: 22px;
+    height: clamp(580px, 80vh, 860px);
+  }
+
+  .main-section,
+  .panier-section {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: var(--paper);
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius);
+  }
+
+  .section-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    flex-shrink: 0;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--line);
+    background: var(--wash);
+  }
+
+  /* ---------- toggle ---------- */
   .view-toggle {
-    display: inline-flex; gap: 3px;
-    background: var(--bg-card2); border: 1px solid var(--border);
-    border-radius: var(--radius-md); padding: 3px;
-    flex-direction:column;
+    display: inline-flex;
+    gap: 3px;
+    flex-direction: column;
+    padding: 3px;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 10px;
   }
   #btn-vue-carte { display: none !important; }
   .vt-btn {
-    display: flex; align-items: center; gap: 6px;
-    padding: 6px 14px; border-radius: 8px;
-    border: none; background: transparent;
-    font-size: .78rem; font-weight: 700; color: var(--text-muted);
-    cursor: pointer; transition: all .18s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 14px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--muted);
+    font-family: var(--sans);
+    font-size: .78rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all .18s;
   }
-  .vt-btn.active {
-    background: var(--bg-card); color: var(--color-primary);
-    box-shadow: var(--shadow-sm); border: 1px solid var(--border);
-  }
-  .vt-btn:not(.active):hover { color: var(--text); }
+  .vt-btn.active { background: var(--tone-wash); color: var(--brand-ink); }
+  .vt-btn:not(.active):hover { color: var(--ink); }
 
-  /* ── LAYOUT ──────────────────────────────────────────────── */
-  .resa-grid {
-    display: grid; grid-template-columns: 1fr 320px;
-    gap: 14px; height: calc(100vh - 230px); min-height: 480px;
-  }
-  @media (max-width: 992px) { .resa-grid { grid-template-columns: 1fr; height: auto; } }
-
-  /* ── SECTION PRINCIPALE ──────────────────────────────────── */
-  .main-section {
-    background: var(--bg-card); border: 1px solid var(--border);
-    border-radius: var(--radius-lg); overflow: hidden;
-    display: flex; flex-direction: column; box-shadow: var(--shadow-sm);
-  }
-  .section-header {
-    padding: 8px 12px; border-bottom: 1px solid var(--border);
-    background: var(--bg-card2);
-    display: flex; align-items: center; gap: 8px; flex-wrap: wrap; flex-shrink: 0;
-  }
-
-  /* ── FILTRES ─────────────────────────────────────────────── */
+  /* ---------- filtres ---------- */
   .mf-select, .list-search {
-    padding: 6px 12px; border-radius: 8px;
-    border: 1.5px solid var(--border);
-    background: var(--bg-card); color: var(--text);
-    font-size: .74rem; font-weight: 600; cursor: pointer; transition: all .15s;
+    padding: 8px 12px;
+    border: 1px solid var(--line-strong);
+    border-radius: 10px;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: .78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: border-color .15s, box-shadow .15s;
   }
   .list-search {
-    padding-left: 28px; min-width: 170px;
+    min-width: 190px;
+    padding-left: 32px;
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='13' height='13' fill='%2394a3b8' viewBox='0 0 16 16'%3E%3Cpath d='M11.742 10.344a6.5 6.5 0 1 0-1.397 1.398l3.85 3.85a1 1 0 0 0 1.415-1.415l-3.868-3.833zM12 6.5a5.5 5.5 0 1 1-11 0 5.5 5.5 0 0 1 11 0z'/%3E%3C/svg%3E");
-    background-repeat: no-repeat; background-position: 9px center;
+    background-repeat: no-repeat;
+    background-position: 11px center;
+    cursor: text;
   }
   .mf-select:focus, .list-search:focus {
-    outline: none; border-color: var(--color-primary);
-    box-shadow: 0 0 0 3px rgba(59,93,80,.10);
+    outline: none;
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px rgba(29,90,71,.14);
   }
 
-  /* ── CARTE ───────────────────────────────────────────────── */
+  /* ---------- carte ---------- */
   #map-resa { flex: 1; min-height: 360px; }
   .map-legend {
-    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
-    padding: 6px 12px; border-top: 1px solid var(--border);
-    background: var(--bg-card2); font-size: .68rem; flex-shrink: 0;
+    display: flex; gap: 14px; align-items: center; flex-wrap: wrap; flex-shrink: 0;
+    padding: 9px 16px;
+    border-top: 1px solid var(--line);
+    background: var(--wash);
+    font-size: .72rem;
   }
-  .leg-item { display: flex; align-items: center; gap: 4px; color: var(--text-muted); font-weight: 600; }
-  .leg-dot  { width: 8px; height: 8px; border-radius: 50%; }
+  .leg-item { display: flex; align-items: center; gap: 5px; color: var(--muted); font-weight: 600; }
+  .leg-dot  { width: 9px; height: 9px; border-radius: 50%; }
+  .category-required-hint {
+    display: flex; align-items: center; gap: 8px;
+    padding: 11px 16px;
+    border-bottom: 1px solid var(--line);
+    background: var(--wash);
+    color: var(--ink-2);
+    font-size: .8rem;
+    font-weight: 600;
+  }
+  .category-required-hint i { color: var(--brand); }
 
-  /* ── VUE LISTE ───────────────────────────────────────────── */
-  #view-liste { display: none; flex: 1; overflow-y: auto; }
-  #view-liste::-webkit-scrollbar { width: 4px; }
-  #view-liste::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  /* ---------- vue liste ---------- */
+  #view-liste { display: none; flex: 1; overflow-y: auto; background: var(--paper); }
+  #view-liste::-webkit-scrollbar { width: 6px; }
+  #view-liste::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 6px; }
   .liste-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
-    gap: 10px; padding: 10px;
+    gap: 10px;
+    padding: 6px 16px 18px;
   }
-  .liste-empty {
-    grid-column: 1/-1; padding: 50px 20px;
-    text-align: center; color: var(--text-muted);
-  }
-  .liste-empty i { font-size: 2.2rem; opacity: .25; display: block; margin-bottom: 8px; }
-  .liste-empty p { font-size: .8rem; }
+  .liste-empty { grid-column: 1/-1; padding: 70px 20px; text-align: center; color: var(--muted); }
+  .liste-empty i { display: block; margin-bottom: 10px; font-size: 2.2rem; opacity: .3; }
+  .liste-empty p { margin: 0; font-size: .86rem; }
 
-  /* ── CARD SUPPORT ────────────────────────────────────────── */
+  /* groupes ville / format / quartier (sticky empilés — hauteurs fixes) */
+  .liste-group-ville {
+    grid-column: 1 / -1;
+    position: sticky; top: 0; z-index: 3;
+    display: flex; align-items: center; gap: 10px;
+    height: 46px;
+    margin-bottom: 2px;
+    background: var(--paper);
+    border-bottom: 2px solid var(--brand);
+    font-family: var(--serif);
+    font-size: 1.1rem;
+    font-weight: 500;
+    letter-spacing: -.01em;
+    color: var(--ink);
+  }
+  .liste-group-ville i { color: var(--brand); font-size: .95rem; }
+
+  .liste-group-format {
+    grid-column: 1 / -1;
+    position: sticky; top: 46px; z-index: 2;
+    display: flex; align-items: center; gap: 8px;
+    height: 34px;
+    padding-left: 10px;
+    background: var(--paper);
+    border-bottom: 1px dashed var(--line-strong);
+    font-size: .78rem;
+    font-weight: 700;
+    color: var(--ink-2);
+  }
+  .liste-group-format i { color: var(--brand); opacity: .8; }
+
+  .liste-group-quartier {
+    grid-column: 1 / -1;
+    position: sticky; top: 80px; z-index: 1;
+    display: flex; align-items: center; gap: 7px;
+    height: 30px;
+    padding-left: 14px;
+    background: var(--paper);
+    font-size: .68rem;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+    color: var(--muted);
+  }
+  .liste-group-quartier i { font-size: .7rem; color: var(--brand); opacity: .7; }
+
+  .count-badge {
+    margin-left: auto;
+    padding: 2px 10px;
+    border-radius: 999px;
+    background: var(--wash);
+    border: 1px solid var(--line);
+    color: var(--ink-2);
+    font-family: var(--sans);
+    font-size: .7rem;
+    font-weight: 700;
+    letter-spacing: 0;
+  }
+
+  /* ---------- carte support ---------- */
   .support-card {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(220px, 34%);
+    grid-template-columns: minmax(0, 1fr) minmax(230px, 34%);
     grid-template-rows: minmax(0, 1fr) auto;
     grid-template-areas: "header faces" "map faces";
     align-items: stretch;
-    background: var(--bg-card2); border: 1px solid var(--border);
-    border-radius: var(--radius-md); overflow: hidden; transition: all .15s;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    overflow: hidden;
+    transition: border-color .18s, box-shadow .18s, transform .18s;
   }
-  .support-card:hover { box-shadow: var(--shadow-md); }
-  .support-card.has-selected { border-color: var(--color-primary); box-shadow: 0 0 0 2px rgba(59,93,80,.12); }
+  .support-card:hover { border-color: #cfc7ad; box-shadow: 0 10px 26px rgba(20,37,31,.08); transform: translateY(-1px); }
+  .support-card.has-selected { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(29,90,71,.12); background: #fbfdfb; }
+
   .sc-header {
-    grid-area: header; min-width: 0; padding: 12px 14px; background: var(--bg-card);
-    border-bottom: 1px solid var(--border);
+    grid-area: header;
+    min-width: 0;
+    padding: 14px 16px;
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: start;
     gap: 12px;
   }
   .sc-info { min-width: 0; }
-  .sc-code { font-size: .68rem; font-weight: 800; color: var(--color-primary); letter-spacing: .05em; }
-  .sc-nom  { font-size: .9rem; font-weight: 700; color: var(--text); white-space: normal; overflow-wrap: anywhere; line-height: 1.4; }
-  .sc-addr { font-size: .72rem; color: var(--text-muted); white-space: normal; overflow-wrap: anywhere; line-height: 1.4; }
+  .sc-code { font-family: var(--mono); font-size: .72rem; font-weight: 600; color: var(--brand); letter-spacing: .02em; }
+  .sc-nom  { font-size: .95rem; font-weight: 650; color: var(--ink); white-space: normal; overflow-wrap: anywhere; line-height: 1.4; }
+  .sc-addr { font-size: .76rem; color: var(--muted); white-space: normal; overflow-wrap: anywhere; line-height: 1.4; }
   .sc-format {
-    font-size: .62rem; font-weight: 700; padding: 2px 7px; border-radius: 20px;
-    background: var(--bg-card2); border: 1px solid var(--border);
-    color: var(--text-muted); white-space: nowrap; flex-shrink: 0;
+    flex-shrink: 0;
+    padding: 3px 10px;
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    background: var(--wash);
+    color: var(--ink-2);
+    font-size: .68rem;
+    font-weight: 700;
+    white-space: nowrap;
   }
-  .sc-faces { grid-area: faces; align-self: center; padding: 10px; display: flex; flex-direction: column; gap: 7px; }
+  .sc-faces {
+    grid-area: faces;
+    align-self: center;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
 
-  /* ── BOUTON FACE ─────────────────────────────────────────── */
+  .sc-map-btn {
+    display: none !important;
+    grid-area: map;
+    align-items: center; justify-content: center; justify-self: start; gap: 6px;
+    margin: 10px 16px;
+    padding: 7px 12px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--paper);
+    color: var(--brand);
+    font-size: .72rem;
+    font-weight: 700;
+    cursor: pointer;
+  }
+
+  /* ---------- bouton face ---------- */
+  .face-row, .rl-face-row { display: flex; align-items: center; gap: 8px; width: 100%; }
+  .face-row .face-btn, .rl-face-row .rl-face-btn { flex: 1 1 auto; min-width: 0; }
+
   .face-btn {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 7px 12px; border-radius: 8px;
-    border: 1.5px solid; font-size: .74rem; font-weight: 700;
-    cursor: pointer; transition: all .15s; background: transparent; width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: 8px 12px;
+    border: 1.5px solid;
+    border-radius: 10px;
+    background: transparent;
+    font-family: var(--sans);
+    font-size: .78rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all .15s;
   }
   .face-btn .fb-left { display: flex; align-items: center; gap: 6px; }
-  .face-btn .fb-badge { font-size: .6rem; font-weight: 800; padding: 2px 7px; border-radius: 20px; }
-  .face-btn.libre    { border-color: var(--c-libre);   color: var(--c-libre); }
-  .face-btn.libre:hover { background: #d1fae5; }
+  .face-btn .fb-badge { padding: 2px 8px; border-radius: 999px; font-size: .62rem; font-weight: 800; }
+  .face-btn.libre    { border-color: var(--c-libre);   color: #0b8a62; }
+  .face-btn.libre:hover { background: #e3f7ee; }
   .face-btn.occupe   { border-color: var(--c-occupe);  color: var(--c-occupe);  cursor: not-allowed; opacity: .5; }
   .face-btn.reserve  { border-color: var(--c-reserve); color: var(--c-reserve); cursor: not-allowed; opacity: .5; }
   .face-btn.panne    { border-color: var(--c-panne);   color: var(--c-panne);   cursor: not-allowed; opacity: .5; }
-  .face-btn.selected { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
-  .face-btn.selected:hover { filter: brightness(1.1); }
-  .face-btn.libre    .fb-badge { background: #d1fae5; color: #065f46; }
+  .face-btn.selected { background: var(--brand); border-color: var(--brand); color: #fff; }
+  .face-btn.selected:hover { background: var(--brand-ink); }
+  .face-btn.libre    .fb-badge { background: #d8f2e5; color: #0b5f3d; }
   .face-btn.occupe   .fb-badge { background: #fee2e2; color: #991b1b; }
   .face-btn.reserve  .fb-badge { background: #ede9fe; color: #5b21b6; }
   .face-btn.panne    .fb-badge { background: #f1f5f9; color: #475569; }
   .face-btn.selected .fb-badge { background: rgba(255,255,255,.2); color: #fff; }
-  .face-btn.need-dates { border-color: var(--border); color: var(--text-muted); opacity: .65; }
-  .face-btn.need-dates .fb-badge { background: var(--bg-card2); color: var(--text-muted); }
+  .face-btn.need-dates { border-color: var(--line-strong); color: var(--muted); opacity: .65; }
+  .face-btn.need-dates .fb-badge { background: var(--wash); color: var(--muted); }
 
-  /* ── PANIER ──────────────────────────────────────────────── */
-  .panier-section {
-    background: var(--bg-card); border: 1px solid var(--border);
-    border-radius: var(--radius-lg); display: flex; flex-direction: column;
-    box-shadow: var(--shadow-sm); overflow: hidden;
+  .photo-trigger {
+    flex-shrink: 0;
+    width: 34px; height: 34px;
+    display: flex; align-items: center; justify-content: center;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    background: var(--wash);
+    color: var(--ink-2);
+    cursor: pointer;
+    transition: background .15s, color .15s, border-color .15s;
   }
+  .photo-trigger:hover { background: var(--tone-wash); border-color: var(--brand); color: var(--brand); }
+  .photo-trigger i { font-size: .85rem; pointer-events: none; }
+
+  /* ==========================================================
+     PANIER (sélection)
+     ========================================================== */
   .panier-header {
-    padding: 11px 14px; border-bottom: 1px solid var(--border);
-    background: var(--bg-card2);
     display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--line);
+    background: var(--wash);
   }
   .panier-title {
-    font-size: .82rem; font-weight: 800; color: var(--text);
-    display: flex; align-items: center; gap: 6px;
+    display: flex; align-items: center; gap: 8px;
+    font-family: var(--serif);
+    font-size: 1.15rem;
+    font-weight: 500;
+    color: var(--ink);
   }
   .panier-count {
-    background: var(--color-primary); color: #fff;
-    font-size: .63rem; font-weight: 800;
-    padding: 2px 8px; border-radius: 8px; min-width: 22px; text-align: center;
+    min-width: 24px;
+    padding: 2px 9px;
+    border-radius: 999px;
+    background: var(--brand);
+    color: #fff;
+    font-family: var(--sans);
+    font-size: .7rem;
+    font-weight: 800;
+    text-align: center;
   }
-  .panier-body { flex: 1; overflow-y: auto; padding: 9px; }
-  .panier-body::-webkit-scrollbar { width: 4px; }
-  .panier-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+  .panier-body { flex: 1; overflow-y: auto; padding: 12px; }
+  .panier-body::-webkit-scrollbar { width: 6px; }
+  .panier-body::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 6px; }
+
   .panier-item {
-    display: flex; align-items: center; gap: 7px;
-    padding: 7px 9px; border-radius: var(--radius-sm);
-    border: 1px solid var(--border); background: var(--bg-card2);
-    margin-bottom: 5px; transition: all .15s;
+    display: flex; align-items: center; gap: 10px;
+    margin-bottom: 7px;
+    padding: 10px 12px;
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    background: var(--wash);
+    transition: all .15s;
   }
-  .panier-item:hover { border-color: var(--color-primary); background: #eef4f0; }
+  .panier-item:hover { border-color: var(--brand); background: var(--tone-wash); }
   .pi-icon {
-    width: 26px; height: 26px; border-radius: 50%;
-    background: var(--color-primary); color: #fff;
+    width: 30px; height: 30px; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
-    font-size: .65rem; font-weight: 800; flex-shrink: 0;
+    border-radius: 9px;
+    background: var(--paper);
+    border: 1px solid var(--line);
+    font-size: .8rem;
+    font-weight: 800;
+    color: var(--brand);
   }
   .pi-info { flex: 1; overflow: hidden; }
-  .pi-code { font-size: .74rem; font-weight: 800; color: var(--text); }
-  .pi-addr { font-size: .66rem; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .pi-code { font-size: .82rem; font-weight: 700; color: var(--ink); }
+  .pi-addr { font-size: .72rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .pi-remove {
-    width: 20px; height: 20px; border-radius: 4px;
-    background: transparent; border: 1px solid var(--border);
-    color: var(--text-muted); cursor: pointer;
+    width: 24px; height: 24px; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
-    font-size: .68rem; transition: all .15s; flex-shrink: 0;
+    border: 1px solid var(--line-strong);
+    border-radius: 7px;
+    background: var(--paper);
+    color: var(--muted);
+    font-size: .75rem;
+    cursor: pointer;
+    transition: all .15s;
   }
   .pi-remove:hover { background: #fee2e2; border-color: #ef4444; color: #ef4444; }
-  .panier-empty {
-    padding: 28px 14px; text-align: center; color: var(--text-muted);
-  }
-  .panier-empty i { font-size: 1.8rem; opacity: .3; display: block; margin-bottom: 7px; }
-  .panier-empty p { font-size: .75rem; line-height: 1.5; }
+  .panier-empty { padding: 44px 18px; text-align: center; color: var(--muted); }
+  .panier-empty i { display: block; margin-bottom: 10px; font-size: 2rem; opacity: .3; }
+  .panier-empty p { margin: 0; font-size: .82rem; line-height: 1.55; }
 
-  /* ── FOOTER PANIER ───────────────────────────────────────── */
   .panier-footer {
-    padding: 11px 12px; border-top: 1px solid var(--border);
-    background: var(--bg-card2); flex-shrink: 0;
+    flex-shrink: 0;
+    padding: 18px;
+    background: var(--brand-ink);
+    color: #fff;
   }
-  /* Hint dates manquantes dans le footer */
   .dates-hint {
-    display: none; margin-bottom: 8px;
-    padding: 6px 10px; border-radius: var(--radius-sm);
-    background: #fef9c3; border: 1px solid #fde68a;
-    font-size: .72rem; color: #854d0e;
-    align-items: center; gap: 6px;
+    display: none;
+    align-items: center; gap: 8px;
+    margin-bottom: 12px;
+    padding: 8px 12px;
+    border-radius: 10px;
+    background: rgba(255,255,255,.1);
+    border: 1px solid rgba(255,255,255,.2);
+    color: #f3e2b6;
+    font-size: .76rem;
+    font-weight: 600;
   }
   .dates-hint.show { display: flex; }
   .btn-continuer {
-    width: 100%; padding: 12px;
-    background: var(--color-primary); color: #fff;
-    border: none; border-radius: 8px;
-    font-weight: 800; font-size: .83rem;
-    cursor: pointer; transition: all .2s;
-    display: flex; align-items: center; justify-content: center; gap: 8px;
+    display: flex; align-items: center; justify-content: center; gap: 9px;
+    width: 100%;
+    min-height: 48px;
+    padding: 11px 18px;
+    border: 0;
+    border-radius: 10px;
+    background: #fff;
+    color: var(--brand-ink);
+    font-family: var(--sans);
+    font-size: .9rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background .15s, transform .15s;
   }
-  .btn-continuer:hover:not(:disabled) { background: #2f4a40; box-shadow: var(--shadow-md); }
-  .btn-continuer:disabled { opacity: .45; cursor: not-allowed; background: var(--text-muted); }
+  .btn-continuer:hover:not(:disabled) { background: #eaf3ed; transform: translateY(-1px); }
+  .btn-continuer:disabled { background: rgba(255,255,255,.14); color: rgba(255,255,255,.5); cursor: not-allowed; }
+  .cf-foot-note { margin-top: 12px; color: rgba(255,255,255,.62); font-size: .74rem; text-align: center; }
 
-  /* ── POPUP LEAFLET ───────────────────────────────────────── */
-  .rl-popup { min-width: 210px; padding: 12px 14px; font-family: inherit; }
-  .rl-popup-code { font-size: .58rem; font-weight: 800; letter-spacing: 2px; text-transform: uppercase; color: var(--color-primary, #3b5d50); margin-bottom: 2px; }
-  .rl-popup-nom  { font-size: .82rem; font-weight: 700; margin-bottom: 3px; }
-  .rl-popup-addr { font-size: .7rem; color: #64748b; margin-bottom: 9px; display: flex; align-items: center; gap: 4px; }
+  /* ==========================================================
+     POPUP LEAFLET
+     ========================================================== */
+  .rl-popup { min-width: 210px; padding: 12px 14px; font-family: var(--sans, inherit); }
+  .rl-popup-code { margin-bottom: 2px; color: #1d5a47; font-family: 'JetBrains Mono', monospace; font-size: .64rem; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
+  .rl-popup-nom  { margin-bottom: 3px; font-size: .86rem; font-weight: 700; }
+  .rl-popup-addr { display: flex; align-items: center; gap: 4px; margin-bottom: 9px; color: #64748b; font-size: .72rem; }
   .rl-popup-faces { display: flex; flex-direction: column; gap: 5px; }
   .rl-face-btn {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 6px 10px; border-radius: 6px; border: 1.5px solid;
-    font-size: .74rem; font-weight: 700; cursor: pointer;
-    transition: all .15s; background: transparent; width: 100%;
+    width: 100%;
+    padding: 7px 11px;
+    border: 1.5px solid;
+    border-radius: 9px;
+    background: transparent;
+    font-size: .76rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all .15s;
   }
-  .rl-face-btn.libre    { border-color: #10b981; color: #10b981; }
-  .rl-face-btn.libre:hover { background: #d1fae5; }
+  .rl-face-btn.libre    { border-color: #10b981; color: #0b8a62; }
+  .rl-face-btn.libre:hover { background: #e3f7ee; }
   .rl-face-btn.occupe   { border-color: #ef4444; color: #ef4444; cursor: not-allowed; opacity: .55; }
   .rl-face-btn.reserve  { border-color: #7c3aed; color: #7c3aed; cursor: not-allowed; opacity: .55; }
   .rl-face-btn.panne    { border-color: #94a3b8; color: #94a3b8; cursor: not-allowed; opacity: .55; }
-  .rl-face-btn.selected { background: var(--color-primary); border-color: var(--color-primary); color: #fff; }
+  .rl-face-btn.selected { background: #1d5a47; border-color: #1d5a47; color: #fff; }
   .rl-face-btn.need-dates { border-color: #cbd5e1; color: #94a3b8; cursor: not-allowed; opacity: .7; }
-  /* ── GROUPES VILLE / FORMAT / QUARTIER (vue Liste, sticky empilé) ─── */
-  .liste-group-ville {
-    grid-column: 1 / -1;
-    display: flex; align-items: center; gap: 10px;
-    padding: 14px 4px 6px;
-    font-size: .85rem; font-weight: 800; color: var(--text);
-    border-bottom: 2px solid var(--color-primary);
-    margin-bottom: 4px;
+  .rl-popup-photo-wrap { width: 100%; height: 120px; margin-bottom: 8px; border-radius: 8px; overflow: hidden; }
+  .rl-popup-photo-wrap img { width: 100%; height: 100%; object-fit: contain; }
 
-    position: sticky;
-    top: 0;
-    z-index: 3;
-    background: var(--bg-card); /* ⚠️ doit être le fond réel derrière #liste-grid */
-  }
-  .liste-group-ville:first-child { padding-top: 4px; }
-  .liste-group-ville i { color: var(--color-primary); }
-  .liste-group-ville .count-badge {
-    margin-left: auto; font-size: .68rem; font-weight: 700;
-    color: var(--text-muted); background: var(--bg-card2);
-    padding: 2px 9px; border-radius: 20px; border: 1px solid var(--border);
-  }
+  .cf a:focus-visible, .cf button:focus-visible { outline: 3px solid rgba(29,90,71,.4); outline-offset: 3px; }
 
-  .liste-group-format {
-    grid-column: 1 / -1;
-    display: flex; align-items: center; gap: 8px;
-    padding: 8px 4px 6px 10px;
-    margin: 2px 0 2px;
-    font-size: .76rem; font-weight: 700; color: var(--text-muted);
-    border-bottom: 1px dashed var(--border);
-
-    position: sticky;
-    top: 42px; /* ⚠️ hauteur réelle de .liste-group-ville — à ajuster */
-    z-index: 2;
-    background: var(--bg-card);
+  /* ==========================================================
+     ANIMATIONS
+     ========================================================== */
+  @keyframes cf-ping {
+    0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--tone) 45%, transparent); }
+    80%, 100% { box-shadow: 0 0 0 9px transparent; }
   }
-  .liste-group-format i { color: var(--color-primary); opacity: .8; }
-  .liste-group-format .count-badge {
-    margin-left: auto; font-size: .66rem; font-weight: 600;
-    color: var(--text-muted); background: var(--bg-card2);
-    padding: 2px 8px; border-radius: 20px; border: 1px solid var(--border);
-  }
+  @keyframes cf-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+  .cf-hero-main, .cf-ticket, .cf-track, .cf-sec, .resa-grid { animation: cf-in .5s ease both; }
+  .cf-ticket { animation-delay: .08s; }
+  .cf-track  { animation-delay: .14s; }
 
-  .liste-group-quartier {
-    grid-column: 1 / -1;
-    display: flex; align-items: center; gap: 7px;
-    padding: 4px 4px 2px 14px;
-    font-size: .72rem; font-weight: 700; text-transform: uppercase;
-    letter-spacing: .05em; color: var(--text-muted);
-
-    position: sticky;
-    top: 72px; /* ⚠️ hauteur de .liste-group-ville + .liste-group-format — à ajuster */
-    z-index: 1;
-    background: var(--bg-card);
+  /* ==========================================================
+     RESPONSIVE
+     ========================================================== */
+  @media (max-width: 992px) {
+    .resa-grid { grid-template-columns: 1fr; height: auto; }
+    .main-section { min-height: 560px; max-height: 80vh; }
+    .panier-section { min-height: 0; }
   }
-  .liste-group-quartier i { font-size: .7rem; color: var(--color-primary); opacity: .7; }
-
-  /* ── BOUTON "VOIR SUR LA CARTE" ──────────────────────────────── */
-  .sc-map-btn {
-    display: none !important;
-    grid-area: map; align-items: center; justify-content: center; justify-self: start; gap: 6px;
-    margin: 10px 14px; padding: 7px 11px;
-    border: 1px solid var(--border); border-radius: 8px;
-    background: var(--bg-card); color: var(--color-primary);
-    font-size: .72rem; font-weight: 700;
-    cursor: pointer; transition: background .15s ease;
+  @media (max-width: 768px) {
+    .staff-client-layout { grid-template-columns: 1fr; gap: 20px; }
+    .staff-client-type-panel { padding: 0 0 18px; border-right: 0; border-bottom: 1px solid var(--line); }
+    .staff-client-type-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .section-header { flex-direction: column; align-items: stretch; }
+    .view-toggle { flex-direction: row !important; align-self: flex-start; }
+    #dates-status { margin-left: 0; width: 100%; justify-content: center; }
   }
-  .sc-map-btn:hover { background: var(--bg-card2); }
   @media (max-width: 640px) {
+    .cf { padding: 0 16px 40px; font-size: 14.5px; }
+    .cf-hero { padding-top: 24px; margin-bottom: 24px; }
+    .cf-hero-top { gap: 22px; padding-bottom: 24px; }
+    .cf-ticket { width: 100%; }
+    .cf-track li { font-size: .7rem; padding-right: 4px; }
+    .cf-track li small { display: none; }
+    .cf-form { padding: 18px; }
+    .staff-client-type-options { grid-template-columns: 1fr; }
+    .dates-bar { padding: 14px; }
+    .date-input-wrap { width: 100%; }
+    .date-input-wrap input { width: 100%; }
+    .dates-bar-sep { width: 100%; text-align: center; }
     .support-card {
       grid-template-columns: minmax(0, 1fr);
       grid-template-rows: auto auto auto;
       grid-template-areas: "header" "faces" "map";
     }
-    .sc-faces { padding-top: 8px; }
-    .sc-map-btn { margin-top: 0; }
+    .liste-grid { padding: 6px 10px 14px; }
   }
-  /* ── Carte preview photo (desktop: hover / mobile: tap) ─────────────────── */
-  /* ── Ligne face-btn + icône photo à droite ────────────────────────────── */
-  .rl-face-row, .face-row {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    width: 100%;
+  @media (prefers-reduced-motion: reduce) {
+    .cf *, .cf *::before, .cf *::after { animation: none !important; transition-duration: .01ms !important; }
   }
-  .rl-face-row .rl-face-btn,
-  .face-row .face-btn {
-    flex: 1 1 auto;
-    min-width: 0; /* empêche le texte de pousser l'icône hors du flex */
-  }
+</style>
 
-  .photo-trigger {
-    flex-shrink: 0;
-    width: 32px;
-    height: 32px;
-    border-radius: 8px;
-    background: #f1f5f9;
-    color: #475569;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    transition: background .15s, color .15s;
-  }
-  .photo-trigger:hover {
-    background: #e0e7ff;
-    color: #4338ca;
-  }
-  .photo-trigger i {
-    font-size: .85rem;
-    pointer-events: none;
-  }
-
-  /* ── Carte preview photo (desktop: hover / mobile: tap) ──────────────────── */
+{# Aperçu photo : éléments injectés dans <body> par le JS, donc hors du scope .cf #}
+<style>
   .photo-hover-preview {
     position: fixed;
     z-index: 9999;
     display: none;
     width: 260px;
     background: #fff;
-    border-radius: 8px;
+    border-radius: 12px;
     overflow: hidden;
-    box-shadow: 0 12px 32px rgba(0,0,0,.22), 0 2px 8px rgba(0,0,0,.12);
-    border: 1px solid rgba(0,0,0,.06);
+    box-shadow: 0 18px 40px rgba(18,26,23,.24), 0 2px 8px rgba(18,26,23,.12);
+    border: 1px solid #e6e4dd;
+    font-family: 'Inter', system-ui, sans-serif;
     animation: photoPreviewIn .15s ease-out;
   }
   @keyframes photoPreviewIn {
     from { opacity: 0; transform: translateY(4px) scale(.98); }
     to   { opacity: 1; transform: translateY(0) scale(1); }
   }
-  .photo-hover-preview .php-img-wrap {
-    position: relative;
-    width: 100%;
-    height: 160px;
-    background: #e2e8f0;
-  }
-  .photo-hover-preview img {
-    display: block;
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-  }
+  .photo-hover-preview .php-img-wrap { position: relative; width: 100%; height: 160px; background: #eceae3; }
+  .photo-hover-preview img { display: block; width: 100%; height: 100%; object-fit: contain; }
   .photo-hover-preview .php-badge {
-    position: absolute;
-    top: 8px;
-    left: 8px;
-    background: rgba(0,0,0,.55);
+    position: absolute; top: 8px; left: 8px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: rgba(15,58,45,.82);
     color: #fff;
     font-size: .68rem;
     font-weight: 600;
-    padding: 3px 9px;
-    border-radius: 20px;
-    backdrop-filter: blur(2px);
   }
-  .photo-hover-preview .php-body {
-    padding: 10px 12px 12px;
-  }
-  .photo-hover-preview .php-code {
-    font-weight: 700;
-    font-size: .85rem;
-    color: #1e293b;
-    margin-bottom: 2px;
-  }
-  .photo-hover-preview .php-nom {
-    font-size: .74rem;
-    color: #475569;
-    margin-bottom: 6px;
-  }
-  .photo-hover-preview .php-meta {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 5px;
-  }
+  .photo-hover-preview .php-body { padding: 12px 14px 14px; }
+  .photo-hover-preview .php-code { margin-bottom: 2px; color: #0f3a2d; font-family: 'JetBrains Mono', monospace; font-size: .82rem; font-weight: 600; }
+  .photo-hover-preview .php-nom { margin-bottom: 8px; color: #3c4843; font-size: .78rem; }
+  .photo-hover-preview .php-meta { display: flex; flex-wrap: wrap; gap: 5px; }
   .photo-hover-preview .php-tag {
+    display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 9px;
+    border-radius: 999px;
+    background: #f8f7f3;
+    border: 1px solid #e6e4dd;
+    color: #3c4843;
     font-size: .66rem;
-    color: #334155;
-    background: #f1f5f9;
-    padding: 3px 8px;
-    border-radius: 20px;
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
   }
   .photo-hover-preview .php-close {
-    position: absolute;
-    top: 8px;
-    right: 8px;
-    width: 26px;
-    height: 26px;
-    border-radius: 50%;
-    background: rgba(0,0,0,.5);
+    position: absolute; top: 8px; right: 8px;
+    width: 28px; height: 28px;
+    display: none; align-items: center; justify-content: center;
+    border: none; border-radius: 50%;
+    background: rgba(15,58,45,.7);
     color: #fff;
-    border: none;
-    display: none;
-    align-items: center;
-    justify-content: center;
     font-size: 1rem;
     cursor: pointer;
   }
-
-  /* Photo dans le popup carte */
-  .rl-popup-photo-wrap {
-    width: 100%;
-    height: 120px;
-    border-radius: 8px;
-    overflow: hidden;
-    margin-bottom: 8px;
-  }
-  .rl-popup-photo-wrap img {
-    width: 100%;
-    height: 100%;
-    object-fit: contain;
-  }
-
-  /* ── MOBILE : carte preview centrée, tap pour fermer ──────────────────────── */
   @media (hover: none), (pointer: coarse) {
     .photo-hover-preview {
       left: 50% !important;
@@ -955,7 +929,7 @@
     .photo-preview-overlay {
       position: fixed;
       inset: 0;
-      background: rgba(15,23,42,.45);
+      background: rgba(15,26,23,.5);
       z-index: 9998;
       display: none;
     }
@@ -967,18 +941,57 @@
 {% block page_toolbar %}{% endblock %}
 
 {% block content %}
-  <div class="reservation-page{% if staff_mode %} staff-demande-page{% endif %}">
-    {% if shared_request_mode %}
-    <div class="alert alert-info">
-      Modifiez vos coordonnées, la période ou les emplacements, puis vérifiez le récapitulatif avant l’envoi.
-    </div>
-    {% endif %}
+  <div class="reservation-page cf{% if staff_mode or shared_edit_mode %} staff-demande-page{% endif %}">
+
+    <!-- ================= HERO ================= -->
+    <section class="cf-hero">
+      <div class="cf-hero-top">
+        <div class="cf-hero-main">
+          {% if editing_request or shared_edit_mode %}
+            <span class="cf-pill">Modification</span>
+            <h1 class="cf-title">Modifier la demande.</h1>
+            <p class="cf-lead">Ajustez les informations de votre demande avant de passer à la vérification.</p>
+          {% elif staff_mode %}
+            <span class="cf-pill">Demande client</span>
+            <h1 class="cf-title">Informations client, période et emplacements.</h1>
+            <p class="cf-lead">Renseignez le client, choisissez la période de diffusion puis sélectionnez les emplacements.</p>
+          {% elif shared_request_mode %}
+            <span class="cf-pill">Vérification</span>
+            <h1 class="cf-title">Vérifiez votre demande.</h1>
+            <p class="cf-lead">Contrôlez la période et les emplacements sélectionnés avant de continuer.</p>
+          {% else %}
+            <span class="cf-pill">Nouvelle demande</span>
+            <h1 class="cf-title">Sélectionnez votre emplacement.</h1>
+            <p class="cf-lead">Indiquez la période souhaitée, puis ajoutez les faces disponibles à votre sélection.</p>
+          {% endif %}
+        </div>
+        <div class="cf-ticket">
+          <div class="cf-ticket-label">Étape</div>
+          <div class="cf-ticket-ref">{% if staff_mode or shared_edit_mode %}1 / 2{% else %}1 / 3{% endif %}</div>
+        </div>
+      </div>
+
+      <ol class="cf-track{% if not staff_mode and not shared_edit_mode %} is-3{% endif %}" aria-label="Étapes de création de la demande">
+        <li class="current" aria-current="step">
+          {% if staff_mode or shared_edit_mode %}Client, période &amp; emplacements{% else %}Sélection des emplacements &amp; Période{% endif %}
+          <small>En cours</small>
+        </li>
+        <li>
+          {% if staff_mode or shared_edit_mode %}Récapitulatif &amp; validation{% else %}Informations sur votre campagne{% endif %}
+          <small>À venir</small>
+        </li>
+        {% if not staff_mode and not shared_edit_mode %}
+        <li>
+          Coordonnées
+          <small>À venir</small>
+        </li>
+        {% endif %}
+      </ol>
+    </section>
 
     {% if form.errors %}
-    <div style="padding:10px 14px;border-radius:8px;margin-bottom:12px;font-size:.82rem;
-                background:#fee2e2;border:1px solid #fca5a5;color:#991b1b;
-                display:flex;align-items:flex-start;gap:8px;">
-      <i class="bi bi-exclamation-triangle-fill" style="margin-top:1px"></i>
+    <div class="cf-alert">
+      <i class="bi bi-exclamation-triangle-fill" style="margin-top:2px"></i>
       <div>
         {% for error in form.non_field_errors %}<div>{{ error }}</div>{% endfor %}
         {% if form.date_debut.errors %}<div>{{ form.date_debut.errors.0 }}</div>{% endif %}
@@ -987,43 +1000,14 @@
     </div>
     {% endif %}
 
-    <div class="wizard-steps">
-      <div class="step-item active">
-        <div class="step-circle">1</div>
-        <span class="step-label">{% if staff_mode or shared_edit_mode %}Client, période & emplacements{% else %}Sélection des emplacements & Période{% endif %}</span>
-      </div>
-      <div class="step-item">
-        <div class="step-circle">2</div>
-        <span class="step-label d-none d-md-inline ms-1">{% if staff_mode or shared_edit_mode %}Récapitulatif & validation{% else %}Informations sur votre campagne{% endif %}</span>
-      </div>
-      {% if not staff_mode and not shared_edit_mode %}
-      <div class="step-item">
-        <div class="step-circle">3</div>
-        <span class="step-label d-none d-md-inline ms-1">Coordonnées</span>
-      </div>
-      {% endif %}
-    </div>
-
     {% if staff_mode %}
-    <header class="staff-request-heading">
-      <div class="staff-request-heading-icon"><i class="bi bi-clipboard2-plus"></i></div>
-      <div>
-        <div class="staff-request-eyebrow">{% if editing_request %}Modification de demande{% else %}Nouvelle demande{% endif %}</div>
-        <h1>Client, période &amp; emplacements</h1>
-        <p>Renseignez le demandeur, définissez la période, puis sélectionnez les supports.</p>
-      </div>
-    </header>
 
-    <section class="staff-client-card">
-      <div class="staff-client-card-header">
-        <span class="staff-section-number">1</span>
-        <div>
-          <h2 class="staff-section-title">Client et coordonnées</h2>
-          <p class="staff-section-help">Indiquez à qui est destinée cette demande.</p>
-        </div>
-      </div>
-      <div class="staff-client-card-body">
+    <!-- ================= CLIENT (staff) ================= -->
+    <section class="cf-sec">
+      <h2 class="cf-h">Client et coordonnées</h2>
+      <p class="cf-sub">Indiquez à qui est destinée cette demande.</p>
 
+      <div class="cf-form">
         <div class="staff-client-layout">
           <div class="staff-client-type-panel">
             <div class="staff-client-type-label">Demande faite pour</div>
@@ -1070,7 +1054,7 @@
                   {% for error in contact_form.nom_contact.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
                 </div>
                 <div class="col-md-6">
-                  <label class="staff-field-label" for="{{ contact_form.societe.id_for_label }}">Société / organisation</label>
+                  <label class="staff-field-label" for="{{ contact_form.societe.id_for_label }}">Nom de la société</label>
                   {{ contact_form.societe }}
                   {% for error in contact_form.societe.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
                 </div>
@@ -1096,219 +1080,234 @@
         </div>
       </div>
     </section>
+
     {% elif shared_edit_mode %}
-    <section class="shared-edit-contact">
-      <h2><i class="bi bi-person-vcard me-2" style="color:var(--color-primary)"></i>Vos coordonnées</h2>
-      {% if contact_form.non_field_errors %}
-        <div class="alert alert-danger py-2">{{ contact_form.non_field_errors }}</div>
-      {% endif %}
-      <div class="mb-3">
-        <div class="form-label-e3">Type de client</div>
-        <div class="client-type-toggle">
-          <label class="client-type-option" for="shared-type-nouveau">
-            <input id="shared-type-nouveau" type="radio" name="type_client" value="nouveau"
-                   form="form-etape1" {% if contact_form.type_client.value != 'existant' %}checked{% endif %}>
-            <i class="bi bi-person-plus"></i> Nouveau prospect
-          </label>
-          <label class="client-type-option" for="shared-type-existant">
-            <input id="shared-type-existant" type="radio" name="type_client" value="existant"
-                   form="form-etape1" {% if contact_form.type_client.value == 'existant' %}checked{% endif %}>
-            <i class="bi bi-person-check"></i> Client enregistré
-          </label>
-        </div>
-        {% for error in contact_form.type_client.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
-      </div>
-      <div class="form-row" id="shared-reference-wrap" {% if contact_form.type_client.value != 'existant' %}hidden{% endif %}>
-        <label class="form-label-e3" for="{{ contact_form.reference_client_saisie.id_for_label }}">Votre référence client</label>
-        {{ contact_form.reference_client_saisie }}
-        {% for error in contact_form.reference_client_saisie.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
-      </div>
-      <div id="shared-prospect-fields" {% if contact_form.type_client.value == 'existant' %}hidden{% endif %}>
-        <div class="form-grid-2">
-          <div class="form-row">
-            <label class="form-label-e3" for="{{ contact_form.nom_contact.id_for_label }}">Nom du contact</label>
-            {{ contact_form.nom_contact }}
-            {% for error in contact_form.nom_contact.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+
+    <!-- ================= COORDONNÉES (lecture seule) ================= -->
+    <section class="cf-sec">
+      <h2 class="cf-h">Vos coordonnées</h2>
+      <p class="cf-sub">Ces informations sont conservées telles quelles.</p>
+
+      <div class="cf-form">
+        <div class="staff-client-layout">
+          <div class="staff-client-type-panel">
+            <div class="staff-client-type-label">Demande faite pour</div>
+            <div class="staff-contact-option-title">
+              {% if state.type_client == 'existant' %}Client enregistré{% else %}Nouveau prospect{% endif %}
+            </div>
+            {% if state.type_client == 'existant' and state.reference_client_saisie %}
+              <div class="staff-section-help">{{ state.reference_client_saisie }}</div>
+            {% endif %}
           </div>
-          <div class="form-row">
-            <label class="form-label-e3" for="{{ contact_form.societe.id_for_label }}">Société / organisation</label>
-            {{ contact_form.societe }}
-            {% for error in contact_form.societe.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
-          </div>
-          <div class="form-row">
-            <label class="form-label-e3" for="{{ contact_form.email.id_for_label }}">E-mail</label>
-            {{ contact_form.email }}
-            {% for error in contact_form.email.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
-          </div>
-          <div class="form-row">
-            <label class="form-label-e3" for="{{ contact_form.telephone.id_for_label }}">Téléphone</label>
-            {{ contact_form.telephone }}
-            {% for error in contact_form.telephone.errors %}<div class="text-danger small">{{ error }}</div>{% endfor %}
+          <div class="staff-contact-fields">
+            <div class="row g-3">
+              <div class="col-md-6">
+                <span class="staff-field-label">Nom du contact</span>
+                <div class="staff-field-control">{{ state.nom_contact|default:'—' }}</div>
+              </div>
+              <div class="col-md-6">
+                <span class="staff-field-label">Nom de la société</span>
+                <div class="staff-field-control">
+                  {% if state.type_client == 'existant' %}{{ state.client_name|default:state.societe|default:'—' }}{% else %}{{ state.societe|default:'—' }}{% endif %}
+                </div>
+              </div>
+              <div class="col-md-6">
+                <span class="staff-field-label">E-mail</span>
+                <div class="staff-field-control">{{ state.email|default:'—' }}</div>
+              </div>
+              <div class="col-md-6">
+                <span class="staff-field-label">Téléphone</span>
+                <div class="staff-field-control">{{ state.telephone|default:'—' }}</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
-      {{ contact_form.accepte_contact }}
     </section>
     {% endif %}
 
-    <div class="dates-bar">
-      <span class="dates-bar-label">
-        <i class="bi bi-calendar3" style="color:var(--color-primary)"></i>
-        {% if staff_mode %}
-          <span>
-            Période de diffusion
-            <small class="staff-period-hint">Choisissez les dates à vérifier</small>
-          </span>
-        {% else %}
-          Période souhaitée
+    <!-- ================= PÉRIODE ================= -->
+    <section class="cf-sec">
+      <h2 class="cf-h">{% if staff_mode %}Période de diffusion{% else %}Période souhaitée{% endif %}</h2>
+      <p class="cf-sub">
+        {% if staff_mode %}Choisissez les dates à vérifier.
+        {% elif shared_edit_mode %}Période déjà enregistrée.
+        {% else %}Indiquez la période de diffusion souhaitée.{% endif %}
+      </p>
+
+      <div class="dates-bar">
+        <div class="date-input-wrap">
+          <i class="bi bi-calendar-plus" style="color:#10b981"></i>
+          <input type="date" id="date-debut"
+                value="{{ form.date_debut.value|default:'' }}"
+                min="{% now 'Y-m-d' %}" required {% if shared_edit_mode %}disabled aria-label="Date de début non modifiable"{% endif %}>
+        </div>
+
+        <span class="dates-bar-sep">→</span>
+
+        <div class="date-input-wrap" id="wrap-date-fin">
+          <i class="bi bi-calendar-minus" style="color:#ef4444"></i>
+          <input type="date" id="date-fin"
+                value="{{ form.date_fin.value|default:'' }}"
+                min="{% now 'Y-m-d' %}" required {% if shared_edit_mode %}disabled aria-label="Date de fin non modifiable"{% endif %}>
+        </div>
+
+        {% if not shared_edit_mode %}
+        <span class="dates-bar-sep">ou</span>
+
+        <div class="date-input-wrap" id="wrap-duree-jours">
+          <i class="bi bi-hourglass-split" style="color:#f59e0b"></i>
+          <input type="number" id="duree-jours" min="1" step="1" placeholder="Nombre">
+          <span style="font-size:.76rem;color:var(--muted);white-space:nowrap;">jour(s)</span>
+        </div>
         {% endif %}
-      </span>
- 
-      <div class="date-input-wrap">
-        <i class="bi bi-calendar-plus" style="color:#10b981"></i>
-        <input type="date" id="date-debut"
-              value="{{ form.date_debut.value|default:'' }}"
-              min="{% now 'Y-m-d' %}" required>
-      </div>
- 
-      <span class="dates-bar-sep">→</span>
- 
-      <div class="date-input-wrap" id="wrap-date-fin">
-        <i class="bi bi-calendar-minus" style="color:#ef4444"></i>
-        <input type="date" id="date-fin"
-              value="{{ form.date_fin.value|default:'' }}"
-              min="{% now 'Y-m-d' %}" required>
-      </div>
- 
-      <span class="dates-bar-sep">ou</span>
- 
-      <div class="date-input-wrap" id="wrap-duree-jours">
-        <i class="bi bi-hourglass-split" style="color:#f59e0b"></i>
-        <input type="number" id="duree-jours" min="1" step="1" placeholder="Nombre" style="width:80px">
-        <span style="font-size:.72rem;color:var(--text-muted);white-space:nowrap;">jour(s)</span>
-      </div>
- 
-      <div id="dates-status" class="waiting">
-        <i class="bi bi-info-circle"></i>
-        Saisissez les dates pour voir les disponibilités
-      </div>
-    </div>
 
-    <div class="resa-grid">
+        <div id="dates-status" class="waiting">
+          <i class="bi bi-info-circle"></i>
+          Saisissez les dates pour voir les disponibilités
+        </div>
+      </div>
+    </section>
 
-      <div class="main-section">
-        <div class="section-header">
+    <!-- ================= EMPLACEMENTS ================= -->
+    <section class="cf-sec" style="margin-bottom:0">
+      <h2 class="cf-h">Emplacements</h2>
+      <p class="cf-sub">Cliquez sur une face libre pour l'ajouter à votre sélection.</p>
 
-          <div class="view-toggle">
-            <button class="vt-btn active" id="btn-vue-liste" onclick="switchView('liste')">
-              <i class="bi bi-list-ul"></i> Liste
-            </button>
-            <button class="vt-btn" id="btn-vue-carte" onclick="switchView('carte')">
-              <i class="bi bi-map-fill"></i> Carte
-            </button>
-          </div>
+      <div class="resa-grid">
 
-          <div id="filtres-carte" style="display:none;gap:6px;flex-wrap:wrap;flex:1">
-            <select class="mf-select" id="filter-ville">
-              <option value="">Toutes les villes</option>
-            </select>
-            <select class="mf-select" id="filter-categorie" {% if staff_mode %}aria-required="true"{% endif %}>
-              <option value="">{% if staff_mode %}Choisir une catégorie{% else %}Toutes catégories{% endif %}</option>
-            </select>
-            <div id="filter-format-wrap" class="{% if staff_mode %}staff-format-filter{% endif %}" style="{% if staff_mode %}display:none{% endif %}">
-              <select class="mf-select" id="filter-format">
-              <option value="">Tous formats</option>
+        <div class="main-section">
+          <div class="section-header">
+
+            <div class="view-toggle">
+              <button class="vt-btn active" id="btn-vue-liste" onclick="switchView('liste')">
+                <i class="bi bi-list-ul"></i> Liste
+              </button>
+              <button class="vt-btn" id="btn-vue-carte" onclick="switchView('carte')">
+                <i class="bi bi-map-fill"></i> Carte
+              </button>
+            </div>
+
+            {% if shared_edit_mode %}
+            <div class="shared-category-lock" aria-label="Catégorie non modifiable">
+              <i class="bi bi-lock-fill" style="color:var(--color-primary)"></i>
+              <span>Catégorie fixe :</span>
+              <strong>{{ allowed_categories|join:", "|default:"Non définie" }}</strong>
+            </div>
+            {% endif %}
+
+            <div id="filtres-carte" style="display:none;gap:6px;flex-wrap:wrap;flex:1">
+              <select class="mf-select" id="filter-ville">
+                <option value="">Toutes les villes</option>
               </select>
-            </div>
-          </div>
-
-          <div id="filtres-liste" style="display:flex;gap:6px;flex-wrap:wrap;flex:1;align-items:center">
-            <input type="search" class="list-search" id="list-search" placeholder="Code ou nom du panneau…">
-            <select class="mf-select" id="list-filter-ville">
-              <option value="">Toutes les villes</option>
-            </select>
-            <select class="mf-select" id="list-filter-categorie" {% if staff_mode %}aria-required="true"{% endif %}>
-              <option value="">{% if staff_mode %}Choisir une catégorie{% else %}Toutes catégories{% endif %}</option>
-            </select>
-            <div id="list-filter-format-wrap" class="{% if staff_mode %}staff-format-filter{% endif %}" style="{% if staff_mode %}display:none{% endif %}">
-              <select class="mf-select" id="list-filter-format">
-              <option value="">Tous formats</option>
+              {% if not shared_edit_mode %}
+              <select class="mf-select" id="filter-categorie" {% if staff_mode or shared_edit_mode %}aria-required="true"{% endif %}>
+                <option value="">{% if staff_mode or shared_edit_mode %}Choisir une catégorie{% else %}Toutes catégories{% endif %}</option>
               </select>
+              {% endif %}
+              <div id="filter-format-wrap" class="{% if staff_mode or shared_edit_mode %}staff-format-filter{% endif %}" style="{% if staff_mode or shared_edit_mode %}display:none{% endif %}">
+                <select class="mf-select" id="filter-format">
+                <option value="">Tous formats</option>
+                </select>
+              </div>
+            </div>
+
+            <div id="filtres-liste" style="display:flex;gap:6px;flex-wrap:wrap;flex:1;align-items:center">
+              <input type="search" class="list-search" id="list-search" placeholder="Code ou nom du panneau…">
+              <select class="mf-select" id="list-filter-ville">
+                <option value="">Toutes les villes</option>
+              </select>
+              {% if not shared_edit_mode %}
+              <select class="mf-select" id="list-filter-categorie" {% if staff_mode or shared_edit_mode %}aria-required="true"{% endif %}>
+                <option value="">{% if staff_mode or shared_edit_mode %}Choisir une catégorie{% else %}Toutes catégories{% endif %}</option>
+              </select>
+              {% endif %}
+              <div id="list-filter-format-wrap" class="{% if staff_mode or shared_edit_mode %}staff-format-filter{% endif %}" style="{% if staff_mode or shared_edit_mode %}display:none{% endif %}">
+                <select class="mf-select" id="list-filter-format">
+                <option value="">Tous formats</option>
+                </select>
+              </div>
+            </div>
+
+          </div>
+
+          <div id="view-carte" style="flex:1;display:none;flex-direction:column;">
+            <div id="map-category-hint" class="category-required-hint" style="display:none">
+              <i class="bi bi-funnel"></i>Choisissez une catégorie pour afficher les supports.
+            </div>
+            <div id="map-resa" style="flex:1;min-height:360px;"></div>
+            <div class="map-legend">
+              <span class="leg-item"><span class="leg-dot" style="background:#10b981"></span>Disponible</span>
+              <span class="leg-item"><span class="leg-dot" style="background:#f59e0b"></span>Partiel</span>
+              <span class="leg-item"><span class="leg-dot" style="background:#ef4444"></span>Occupé</span>
+              <span class="leg-item"><span class="leg-dot" style="background:#0f3a2d"></span>Sélectionné</span>
+            </div>
+          </div>
+
+          <div id="view-liste" style="display:block">
+            <div class="liste-grid" id="liste-grid">
+              <div class="liste-empty">
+                <i class="bi bi-hourglass-split"></i>
+                <p>Chargement des panneaux…</p>
+              </div>
             </div>
           </div>
 
         </div>
 
-        <div id="view-carte" style="flex:1;display:none;flex-direction:column;">
-          <div id="map-category-hint" class="category-required-hint" style="display:none">
-            <i class="bi bi-funnel"></i>Choisissez une catégorie pour afficher les supports.
-          </div>
-          <div id="map-resa" style="flex:1;min-height:360px;"></div>
-          <div class="map-legend">
-            <span class="leg-item"><span class="leg-dot" style="background:#10b981"></span>Disponible</span>
-            <span class="leg-item"><span class="leg-dot" style="background:#f59e0b"></span>Partiel</span>
-            <span class="leg-item"><span class="leg-dot" style="background:#ef4444"></span>Occupé</span>
-            <span class="leg-item"><span class="leg-dot" style="background:var(--color-primary)"></span>Sélectionné</span>
-          </div>
-        </div>
-
-        <div id="view-liste" style="display:block">
-          <div class="liste-grid" id="liste-grid">
-            <div class="liste-empty">
-              <i class="bi bi-hourglass-split"></i>
-              <p>Chargement des panneaux…</p>
+        <div class="panier-section">
+          <div class="panier-header">
+            <div class="panier-title">
+              Sélection
+              <span class="panier-count" id="panier-count">0</span>
             </div>
-          </div>
-        </div>
-
-      </div>
-
-      <div class="panier-section">
-        <div class="panier-header">
-          <div class="panier-title">
-            <i class="bi bi-bag-check-fill" style="color:var(--color-primary)"></i>
-            Sélection
-            <span class="panier-count" id="panier-count">0</span>
-          </div>
-          <button class="pi-remove" id="btn-vider-panier" title="Vider" style="display:none">
-            <i class="bi bi-trash3"></i>
-          </button>
-        </div>
-
-        <div class="panier-body" id="panier-body">
-          <div class="panier-empty" id="panier-empty">
-            <i class="bi bi-map"></i>
-            <p>Cliquez sur une face libre pour l'ajouter.</p>
-          </div>
-        </div>
-
-        <div class="panier-footer">
-          <div class="dates-hint" id="dates-hint">
-            <i class="bi bi-calendar-event"></i>
-            Saisissez les dates pour continuer
-          </div>
-
-          <form method="post" id="form-etape1">
-            {% csrf_token %}
-            <input type="hidden" name="faces_selectionnees"    id="faces-input"    value="">
-            <input type="hidden" name="supports_selectionnees" id="supports-input" value="[]">
-            <input type="hidden" name="date_debut" id="hidden-date-debut" value="{{ form.date_debut.value|default:'' }}">
-            <input type="hidden" name="date_fin"   id="hidden-date-fin"   value="{{ form.date_fin.value|default:'' }}">
-
-            <button type="submit" class="btn-continuer" id="btn-continuer" disabled>
-              <i class="bi bi-arrow-right-circle-fill"></i>
-              Continuer — <span id="btn-count">0</span> face(s)
+            <button class="pi-remove" id="btn-vider-panier" title="Vider" style="display:none">
+              <i class="bi bi-trash3"></i>
             </button>
-          </form>
+          </div>
 
-          <div style="font-size:.68rem;color:var(--text-muted);text-align:center;margin-top:7px;">
-            <i class="bi bi-shield-check me-1"></i>Aucun engagement — demande sans frais
+          <div class="panier-body" id="panier-body">
+            <div class="panier-empty" id="panier-empty">
+              <i class="bi bi-map"></i>
+              <p>Cliquez sur une face libre pour l'ajouter.</p>
+            </div>
+          </div>
+
+          <div class="panier-footer">
+            <div class="dates-hint" id="dates-hint">
+              <i class="bi bi-calendar-event"></i>
+              Saisissez les dates pour continuer
+            </div>
+
+            <form method="post" id="form-etape1">
+              {% csrf_token %}
+              <input type="hidden" name="faces_selectionnees"    id="faces-input"    value="">
+              <input type="hidden" name="supports_selectionnees" id="supports-input" value="[]">
+              <input type="hidden" name="date_debut" id="hidden-date-debut" value="{{ form.date_debut.value|default:'' }}">
+              <input type="hidden" name="date_fin"   id="hidden-date-fin"   value="{{ form.date_fin.value|default:'' }}">
+
+              <button type="submit" class="btn-continuer" id="btn-continuer" disabled>
+                <i class="bi bi-arrow-right-circle-fill"></i>
+                Continuer — <span id="btn-count">0</span> face(s)
+              </button>
+            </form>
+
+            <div class="cf-foot-note">
+              <i class="bi bi-shield-check me-1"></i>Aucun engagement — demande sans frais
+            </div>
           </div>
         </div>
-      </div>
 
-    </div>
+      </div>
+    </section>
+
   </div>
+  {% if shared_edit_mode or editing_request %}
+  {% if shared_edit_mode %}
+  {{ allowed_categories|json_script:"shared-allowed-categories" }}
+  {% endif %}
+  {{ initial_selected_faces|json_script:"initial-selected-faces" }}
+  {% endif %}
 {% endblock %}
 
 {% block extra_js %}
@@ -1325,19 +1324,16 @@
     document.getElementById('type_client_existant').addEventListener('change', toggleStaffDemandeType);
     toggleStaffDemandeType();
     {% endif %}
-    {% if shared_edit_mode %}
-    function toggleSharedClientType() {
-      const existing = document.getElementById('shared-type-existant').checked;
-      document.getElementById('shared-reference-wrap').hidden = !existing;
-      document.getElementById('shared-prospect-fields').hidden = existing;
-    }
-    document.getElementById('shared-type-nouveau').addEventListener('change', toggleSharedClientType);
-    document.getElementById('shared-type-existant').addEventListener('change', toggleSharedClientType);
-    toggleSharedClientType();
-    {% endif %}
-
     // ── FILTRES INITIAUX (depuis la vitrine) ───────────────────────────────────
     const REQUIRE_CATEGORY = {{ staff_mode|yesno:"true,false" }};
+    const SHARED_EDIT_MODE = {{ shared_edit_mode|yesno:"true,false" }};
+    const STAFF_EDIT_MODE = {{ editing_request|yesno:"true,false" }};
+    const SHARED_ALLOWED_CATEGORIES = SHARED_EDIT_MODE
+      ? JSON.parse(document.getElementById('shared-allowed-categories').textContent)
+      : [];
+    const INITIAL_SELECTED_FACES = SHARED_EDIT_MODE || STAFF_EDIT_MODE
+      ? JSON.parse(document.getElementById('initial-selected-faces').textContent)
+      : [];
     const initialFiltres = {
       ville: "{{ filtres.ville|escapejs }}",
       categorie: "{{ filtres.categorie|escapejs }}",
@@ -1348,7 +1344,15 @@
     let facesOccupees  = new Set();
     let facesInfo      = {}; // { "<faceId>": {statut, info} } — infos occupant retournées par check-dispo
     let markersMap     = {};
-    let panier         = {};
+    let panier         = Object.fromEntries(INITIAL_SELECTED_FACES.map(face => [
+      String(face.id),
+      {
+        code: face.code,
+        label: face.label,
+        quartier: face.quartier,
+        support_id: face.support_id,
+      },
+    ]));
     let currentView    = 'liste';
     let currentPopup   = null;
     let datesOk        = false;
@@ -1523,7 +1527,7 @@
       features.forEach(f => {
         const p = f.properties;
         const isSelected = isPanierContainsSupport(p.id);
-        const color = isSelected ? '#932E2B' : getColor(p);
+        const color = isSelected ? '#0f3a2d' : getColor(p);
         const marker = L.marker(
           [f.geometry.coordinates[1], f.geometry.coordinates[0]],
           { icon: makeIcon(color, p.type, isSelected) }
@@ -1572,7 +1576,7 @@
           </div>`;
       });
 
-      const noteDate = !datesOk
+      const noteDate = !SHARED_EDIT_MODE && !datesOk
         ? `<div style="margin-top:8px;padding:5px 8px;background:#fef9c3;border-radius:5px;
                       font-size:.68rem;color:#854d0e;display:flex;align-items:center;gap:5px;">
             <i class="bi bi-calendar-event"></i>Saisissez la période pour valider la disponibilité.
@@ -1606,9 +1610,9 @@
     function getFilteredFeatures(isListeView = false) {
       const prefix = isListeView ? 'list-filter-' : 'filter-';
 
-      const ville = document.getElementById(prefix + 'ville').value;
-      const categorie = document.getElementById(prefix + 'categorie').value;
-      const fmt = document.getElementById(prefix + 'format').value;
+      const ville = document.getElementById(prefix + 'ville')?.value || '';
+      const categorie = document.getElementById(prefix + 'categorie')?.value || '';
+      const fmt = document.getElementById(prefix + 'format')?.value || '';
       if (REQUIRE_CATEGORY && !categorie) return [];
 
       let q = '';
@@ -1620,6 +1624,7 @@
         const p = f.properties;
 
         if (p.type !== 'panneau') return false;
+        if (SHARED_EDIT_MODE && !SHARED_ALLOWED_CATEGORIES.includes(p.categorie || 'Autres')) return false;
 
         if (ville && p.ville !== ville) return false;
         if (categorie && p.categorie !== categorie) return false;
@@ -1653,7 +1658,12 @@
 
     // ── FACETTES CROISÉES (ville / catégorie / format) ─────────────────────────
     function getPanneaux() {
-      return allFeatures.filter(f => f.properties.type === 'panneau');
+      return allFeatures.filter(f => {
+        const properties = f.properties;
+        return properties.type === 'panneau'
+          && (!SHARED_EDIT_MODE
+            || SHARED_ALLOWED_CATEGORIES.includes(properties.categorie || 'Autres'));
+      });
     }
 
     function matchesFacet(p, filters, skip) {
@@ -1739,13 +1749,16 @@
           panneaux
             .filter(feature => {
               const p = feature.properties;
-              return p.categorie === current.categorie
+              const categoryMatches = SHARED_EDIT_MODE
+                ? SHARED_ALLOWED_CATEGORIES.includes(p.categorie || 'Autres')
+                : p.categorie === current.categorie;
+              return categoryMatches
                 && (!current.ville || p.ville === current.ville);
             })
             .map(feature => feature.properties.format)
             .filter(Boolean)
         );
-        formatWrap.style.display = current.categorie && categoryFormats.size > 1
+        formatWrap.style.display = (SHARED_EDIT_MODE || current.categorie) && categoryFormats.size > 1
           ? ''
           : 'none';
         if (categoryFormats.size <= 1 && elFormat) elFormat.value = '';
@@ -1935,7 +1948,8 @@
       applyCarteFilters(true);
     }
     document.getElementById('filter-ville').addEventListener('change', onCarteFilterChange);
-    document.getElementById('filter-categorie').addEventListener('change', onCarteFilterChange);
+    const filterCategorie = document.getElementById('filter-categorie');
+    if (filterCategorie) filterCategorie.addEventListener('change', onCarteFilterChange);
     document.getElementById('filter-format').addEventListener('change', onCarteFilterChange);
 
     // ── Triggers : vue Liste ─────────────────────────────────────────────────
@@ -1944,7 +1958,8 @@
       renderListe();
     }
     document.getElementById('list-filter-ville').addEventListener('change', onListeFilterChange);
-    document.getElementById('list-filter-categorie').addEventListener('change', onListeFilterChange);
+    const listFilterCategorie = document.getElementById('list-filter-categorie');
+    if (listFilterCategorie) listFilterCategorie.addEventListener('change', onListeFilterChange);
     document.getElementById('list-filter-format').addEventListener('change', onListeFilterChange);
     document.getElementById('list-search').addEventListener('input', renderListe);
 
@@ -2170,10 +2185,11 @@
         items.forEach(([uuid, item]) => {
           const el = document.createElement('div');
           el.className = 'panier-item';
+          const faceLabel = item.label.replace(/^Face\s+/i, '');
           el.innerHTML = `
-            <div class="pi-icon">🪧</div>
+            <div class="pi-icon">${faceLabel}</div>
             <div class="pi-info">
-              <div class="pi-code">${item.code} · Face ${item.label}</div>
+              <div class="pi-code">${item.code} · ${item.label}</div>
               <div class="pi-addr">${item.quartier || ''}</div>
             </div>
             <button class="pi-remove" onclick="removePanierItem('${uuid}')" title="Retirer">
@@ -2190,7 +2206,7 @@
         const marker = markersMap[String(p.id)];
         if (!marker) return;
         const isSel = isPanierContainsSupport(p.id);
-        marker.setIcon(makeIcon(isSel ? '#932E2B' : getColor(p), 'panneau', isSel));
+        marker.setIcon(makeIcon(isSel ? '#0f3a2d' : getColor(p), 'panneau', isSel));
       });
     }
 
@@ -2210,6 +2226,8 @@
       if (currentView === 'liste') renderListe();
     });
 
+    if (SHARED_EDIT_MODE || STAFF_EDIT_MODE) updatePanier();
+
   // ── CHARGEMENT ────────────────────────────────────────────────────────────
     fetch('/gestion/inventory/api/geojson/')
   .then(r => r.json())
@@ -2218,21 +2236,6 @@
 
     renderMarkers(allFeatures);
     populateAllSelects();
-
-    {% if panier %}
-      {% for face in panier %}
-      (function() {
-        const fid  = '{{ face.pk }}';
-        const feat = allFeatures.find(f => (f.properties.faces || []).some(fc => String(fc.id) === fid));
-        if (feat) {
-          const p = feat.properties;
-          const fd = (p.faces || []).find(fc => String(fc.id) === fid);
-          if (fd) panier[fid] = { code: p.code, label: fd.label, quartier: p.quartier || p.ville, support_id: String(p.id) };
-        }
-      })();
-      {% endfor %}
-      updatePanier();
-    {% endif %}
 
     // ⭐ NOUVEAU : revalide les dates déjà présentes (retour arrière depuis étape 2/3)
     // sans vider le panier qu'on vient de recharger juste au-dessus.

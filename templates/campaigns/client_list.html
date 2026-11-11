@@ -1,17 +1,17 @@
 {% extends 'base.html' %}
 {% load sort_tags %}
 
-{% block title %}Portefeuille Clients — Integral{% endblock %}
+{% block title %}Portefeuille Clients et agences — Integral{% endblock %}
 
 {% block topbar_title %}
-  <i class="bi bi-people me-2" style="color:var(--color-primary)"></i>Clients & Annonceurs
+  <i class="bi bi-people me-2" style="color:var(--color-primary)"></i>Clients & Agences
 {% endblock %}
 
 {% block topbar_actions %}
   {% if user.is_staff_regie_role %}
   <a href="{% url 'client_create' %}" class="btn btn-primary btn-sm shadow-sm" style="border-radius: 8px; font-weight: 600;">
     <i class="bi bi-plus-lg me-1"></i>
-    <span>Nouveau Client</span>
+    <span>Nouveau compte</span>
   </a>
   {% endif %}
 {% endblock %}
@@ -128,16 +128,16 @@
       <div>
         <div class="cl-hero-title d-flex align-items-center gap-2">
           <i class="bi bi-people-fill" style="color:var(--color-secondary);"></i>
-          <span>Portefeuille Annonceurs & Clients</span>
+          <span>Portefeuille Clients & Agences</span>
         </div>
         <div class="cl-hero-sub mt-1">
-          Supervisez l'ensemble des comptes clients, contrats de régie, historiques de diffusion et actions commerciales.
+          Supervisez les clients, les agences, les contrats de régie, les historiques de diffusion et les actions commerciales.
         </div>
       </div>
       {% if user.is_staff_regie_role %}
       <div class="d-flex gap-2 flex-wrap align-items-center d-inline d-md-none me-1">
         <a href="{% url 'client_create' %}" class="btn btn-light shadow-sm d-inline d-md-none me-1" style="font-weight:700; color:#932e2b; border-radius:8px; padding:0.55rem 1.3rem;">
-          <i class="bi bi-plus-lg me-1"></i>Nouveau Client
+          <i class="bi bi-plus-lg me-1"></i>Nouveau compte
         </a>
       </div>
       {% endif %}
@@ -156,7 +156,7 @@
         </div>
         <div>
           <div class="cl-kpi-val">{{ kpi_total_clients|default:0 }}</div>
-          <div class="cl-kpi-lbl">Total Clients</div>
+          <div class="cl-kpi-lbl">Total comptes</div>
         </div>
       </div>
     </div>
@@ -169,7 +169,7 @@
         </div>
         <div>
           <div class="cl-kpi-val" style="color:#059669;">{{ kpi_actifs_count|default:0 }}</div>
-          <div class="cl-kpi-lbl">Clients Actifs</div>
+          <div class="cl-kpi-lbl">Comptes actifs</div>
         </div>
       </div>
     </div>
@@ -319,6 +319,7 @@
                 {{ c.nom }}
               </a>
             </h6>
+            <span class="badge rounded-pill bg-light text-dark border mt-1">{{ c.get_type_entite_display }}</span>
             {% if c.contact_nom %}
               <span class="text-muted text-truncate d-block" style="font-size:0.75rem; margin-top:2px;">
                 <i class="bi bi-person me-1"></i>{{ c.contact_nom }}
@@ -371,25 +372,27 @@
         {# Pied de carte #}
         <div class="cl-card-foot">
           <a href="{% url 'client_detail' c.pk %}" class="btn btn-sm" style="background:rgba(147,46,43,0.08); color:#932e2b; font-weight:700; font-size:0.75rem; border-radius:8px; border:1px solid rgba(147,46,43,0.15);">
-            <i class="bi bi-eye me-1"></i>Fiche Client
+            <i class="bi bi-eye me-1"></i>Fiche compte
           </a>
           
           <div class="d-flex gap-1 align-items-center">
             {% if user.is_staff_regie_role %}
+              {% if c.type_entite == 'client' %}
               <a href="{% url 'campagne_create' %}?client={{ c.pk }}" class="btn btn-sm btn-outline-primary py-1 px-2" style="font-size:0.74rem; border-radius:8px;" title="Créer une campagne">
                 <i class="bi bi-megaphone"></i>
               </a>
               <a href="{% url 'reservation_wizard_etape1' c.pk %}" class="btn btn-sm btn-outline-secondary py-1 px-2" style="font-size:0.74rem; border-radius:8px;" title="Nouvelle Réservation">
                 <i class="bi bi-calendar-plus"></i>
               </a>
+              <a href="{% url 'preview_client_pdf' c.pk %}" class="btn btn-sm btn-outline-view py-1 px-2" style="font-size: 0.74rem;" title="Aperçu du dossier client">
+                <i class="bi bi-download"></i>
+              </a>
+              {% endif %}
               <a href="{% url 'client_edit' c.pk %}" class="btn btn-sm btn-outline-secondary py-1 px-2" style="font-size:0.74rem; border-radius:8px;" title="Modifier le client">
                 <i class="bi bi-pencil"></i>
               </a>
               <a href="{% url 'client_delete' c.pk %}" class="btn btn-sm btn-outline-danger py-1 px-2" style="font-size:0.74rem; border-radius:8px;" title="Supprimer le client">
                 <i class="bi bi-trash"></i>
-              </a>
-              <a href="{% url 'preview_client_pdf' c.pk %}" class="btn btn-sm btn-outline-view py-1 px-2" style="font-size: 0.74rem;" title="Aperçu du dossier client">
-                <i class="bi bi-download"></i>
               </a>
             {% endif %}
           </div>
@@ -401,18 +404,18 @@
     <div class="col-12">
       <div class="card text-center p-5 border-0 shadow-sm" style="border-radius:8px;">
         <i class="bi bi-people text-muted" style="font-size:3rem;"></i>
-        <h5 class="fw-bold mt-3 text-dark">Aucun client trouvé</h5>
+        <h5 class="fw-bold mt-3 text-dark">        Aucun compte trouvé</h5>
         <p class="text-muted" style="max-width:420px; margin:0 auto 1.5rem; font-size:0.85rem;">
           {% if q or status_filter %}
             Aucun résultat ne correspond à vos critères de recherche.
           {% else %}
-            Vous n'avez pas encore enregistré de client dans votre portefeuille.
+            Vous n'avez pas encore enregistré de client ou d'agence dans votre portefeuille.
           {% endif %}
         </p>
         {% if user.is_staff_regie_role %}
         <div>
           <a href="{% url 'client_create' %}" class="btn btn-primary px-4 py-2" style="border-radius:8px; font-weight:600;">
-            <i class="bi bi-plus-lg me-1"></i>Créer le premier client
+            <i class="bi bi-plus-lg me-1"></i>Créer le premier compte
           </a>
         </div>
         {% endif %}
@@ -460,6 +463,7 @@
                   <a href="{% url 'client_detail' c.pk %}" class="text-dark fw-bold text-decoration-none" style="font-size:0.88rem;">
                     {{ c.nom }}
                   </a>
+                  <span class="badge rounded-pill bg-light text-dark border ms-1">{{ c.get_type_entite_display }}</span>
                   {% if c.adresse %}
                     <div class="text-muted text-truncate" style="font-size:0.72rem; max-width:220px;">
                       <i class="bi bi-geo-alt me-1"></i>{{ c.adresse }}
@@ -517,12 +521,14 @@
                   <i class="bi bi-eye"></i>
                 </a>
                 {% if user.is_staff_regie_role %}
+                  {% if c.type_entite == 'client' %}
                   <a href="{% url 'campagne_create' %}?client={{ c.pk }}" class="btn btn-sm btn-outline-secondary py-1 px-2" style="border-radius:8px; font-size:0.75rem;" title="Créer une campagne">
                     <i class="bi bi-megaphone"></i>
                   </a>
                   <a href="{% url 'reservation_wizard_etape1' c.pk %}" class="btn btn-sm btn-outline-secondary py-1 px-2" style="border-radius:8px; font-size:0.75rem;" title="Réserver">
                     <i class="bi bi-calendar-plus"></i>
                   </a>
+                  {% endif %}
                   <a href="{% url 'client_edit' c.pk %}" class="btn btn-sm btn-outline-secondary py-1 px-2" style="border-radius:8px; font-size:0.75rem;" title="Modifier">
                     <i class="bi bi-pencil"></i>
                   </a>
@@ -537,7 +543,7 @@
           <tr>
             <td colspan="8" class="text-center py-5 text-muted">
               <i class="bi bi-people fs-2 d-block mb-2"></i>
-              Aucun client trouvé dans le portefeuille.
+              Aucun compte trouvé dans le portefeuille.
             </td>
           </tr>
           {% endfor %}

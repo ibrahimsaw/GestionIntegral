@@ -86,7 +86,15 @@ def _build_context_campagnes(filters: dict) -> dict:
             | Q(client__nom__icontains=q)
         )
 
-    all_clients = sorted(list(Client.objects.filter(actif=True).values("id", "nom")), key=lambda x: x["nom"])
+    all_clients = sorted(
+        list(
+            Client.objects.filter(
+                actif=True,
+                type_entite=Client.TYPE_CLIENT,
+            ).values("id", "nom")
+        ),
+        key=lambda x: x["nom"],
+    )
 
     campagnes_data = []
     total_budget_global = 0

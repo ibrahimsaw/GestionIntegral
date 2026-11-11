@@ -60,6 +60,7 @@ class AutomaticCampaignFaceAssignmentTests(TestCase):
         return self.client.post(
             reverse('campagne_create'),
             {
+                'client': str(self.agency.pk),
                 'nom': 'Campagne historique',
                 'type_support': '12m²',
                 'lieu': 'Ouagadougou',
@@ -195,6 +196,7 @@ class AutomaticCampaignFaceAssignmentTests(TestCase):
         response = self.client.post(
             reverse('campagne_create'),
             {
+                'client': str(self.agency.pk),
                 'nom': 'Campagne historique ajoutée',
                 'type_support': '12m²',
                 'lieu': 'Ouagadougou',

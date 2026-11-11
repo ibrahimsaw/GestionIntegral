@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load sort_tags %}
 
-{% block title %}{{ client.nom }} — Fiche Client CRM{% endblock %}
+{% block title %}{{ client.nom }} — Fiche {{ client.get_type_entite_display }} CRM{% endblock %}
 
 {% block topbar_title %}
   <i class="bi bi-person-circle me-2" style="color:var(--color-primary)"></i>
@@ -11,6 +11,7 @@
 {% block topbar_actions %}
   <div class="d-flex gap-2 align-items-center flex-wrap">
     {% if user.is_staff_regie_role %}
+      {% if client.type_entite == 'client' %}
       <a href="{% url 'campagne_create' %}?client={{ client.pk }}" class="btn btn-primary btn-sm shadow-sm" style="border-radius: 8px; font-weight: 600;">
         <i class="bi bi-plus-lg me-1"></i>
         <span>Nouvelle Campagne</span>
@@ -23,6 +24,7 @@
         <i class="bi bi-file-earmark-plus me-1"></i>
         <span class="d-none d-md-inline ms-1">Nouveau contrat / bon de commande</span>
       </a>
+      {% endif %}
       <a href="{% url 'client_edit' client.pk %}" class="btn btn-outline-secondary btn-sm shadow-sm" style="border-radius: 8px;">
         <i class="bi bi-pencil me-1"></i>
         <span class="d-none d-md-inline ms-1">Modifier</span>
@@ -36,10 +38,12 @@
 {% endblock %}
 
 {% block contentbouton %}
+  {% if client.type_entite == 'client' %}
   <a href="{% url 'preview_client_pdf' client.pk %}" class="btn btn-sm btn-outline-view shadow-sm d-flex align-items-center gap-1" style="border-radius:8px; font-size:0.78rem; font-weight:600;">
     <i class="bi bi-download"></i>
     <span>Rapport de diffusion consolidé</span>
   </a>
+  {% endif %}
 {% endblock %}
 
 {% block content %}
@@ -199,6 +203,7 @@
           <div class="d-flex align-items-center gap-2 flex-wrap">
             <h1 class="cld-hero-title mb-0">{{ client.nom }}</h1>
             <span class="cld-hero-ref">{{ client.reference }}</span>
+            <span class="cld-hero-badge">{{ client.get_type_entite_display }}</span>
             {% if client.actif %}
               <span class="cld-hero-badge cld-badge-actif">
                 <span class="cld-status-dot-active" style="background:#22c55e;"></span> Compte Actif
@@ -238,6 +243,7 @@
 
       {# Boutons d'action mobile #}
       {% if user.is_staff_regie_role %}
+      {% if client.type_entite == 'client' %}
       <div class="d-flex gap-2 align-items-center flex-wrap d-inline d-md-none me-1 mt-2">
         <a href="{% url 'campagne_create' %}?client={{ client.pk }}" class="btn btn-light btn-sm shadow-sm d-inline d-md-none me-1" style="font-weight:700; color:#932e2b; border-radius: 8px;">
           <i class="bi bi-megaphone me-1"></i>Campagne
@@ -246,6 +252,7 @@
           <i class="bi bi-calendar-plus me-1"></i>Réserver
         </a>
       </div>
+      {% endif %}
       {% endif %}
 
     </div>
@@ -309,9 +316,11 @@
       </div>
       <div class="d-flex align-items-center gap-2 flex-wrap">
         {% if user.is_staff_regie_role %}
+          {% if client.type_entite == 'client' %}
           <a href="{% url 'contrat_create_for_client' client.pk %}" class="btn btn-sm btn-primary py-1 px-2.5 shadow-sm" style="font-size:0.75rem; border-radius: 8px; font-weight:600;">
             <i class="bi bi-plus-lg me-1"></i>Nouveau document
           </a>
+          {% endif %}
         {% endif %}
       </div>
     </div>
@@ -451,9 +460,11 @@
           <i class="bi bi-file-earmark-x text-muted" style="font-size:2.2rem;"></i>
           <p class="cld-muted mt-2 mb-2">Aucun contrat cadre enregistré pour ce client.</p>
           {% if user.is_staff_regie_role %}
+            {% if client.type_entite == 'client' %}
             <a href="{% url 'contrat_create_for_client' client.pk %}" class="btn btn-sm btn-outline-primary mt-1" style="border-radius:8px; font-weight:600;">
               <i class="bi bi-plus-lg me-1"></i>Souscrire un premier contrat
             </a>
+            {% endif %}
           {% endif %}
         </div>
       {% endif %}
@@ -544,9 +555,11 @@
             <span class="badge bg-light text-dark border ms-1" style="font-size:0.68rem; border-radius: 8px;">{{ reservations|length }}</span>
           </div>
           {% if user.is_staff_regie_role %}
+          {% if client.type_entite == 'client' %}
           <a href="{% url 'reservation_wizard_etape1' client.pk %}" class="btn btn-sm btn-primary py-1 px-2" style="font-size:0.72rem; border-radius: 8px; font-weight:600;">
             <i class="bi bi-plus-lg me-1"></i>Réserver
           </a>
+          {% endif %}
           {% endif %}
         </div>
 
@@ -734,10 +747,10 @@
               <tr>
                 <th class="text-center" style="width: 48px;">Type</th>
                 <th>Référence</th>
-                <th>Campagne & Contrat</th>
+                <th>Campagne</th>
                 <th>Période</th>
                 <th class="text-center">Supports</th>
-                <th class="text-center">Volume Spots</th>
+                <th class="text-center">Nb. Spots</th>
                 <th class="text-center">Statut</th>
                 <th class="text-end pe-3">Action</th>
               </tr>
@@ -764,6 +777,16 @@
                     {{ c.nom }}
                   </a>
                   <div class="d-flex align-items-center gap-1.5 flex-wrap mt-0.5">
+                    {% if client.type_entite == 'agence' %}
+                      <a href="{% url 'client_detail' c.client.pk %}" class="badge bg-primary-subtle text-primary border text-decoration-none mb-1" style="font-size:0.62rem; border-radius:8px;" title="Client de cette campagne">
+                        <i class="bi bi-person me-1"></i>{{ c.client.nom }}
+                      </a>
+                    {% endif %}
+                    {% if client.type_entite == 'client' and c.agence %}
+                      <a href="{% url 'client_detail' c.agence.pk %}" class="badge bg-secondary-subtle text-secondary border text-decoration-none mb-1" style="font-size:0.62rem; border-radius:8px;" title="Agence de cette campagne">
+                        <i class="bi bi-building me-1"></i>{{ c.agence.nom }}
+                      </a>
+                    {% endif %}
                     {% if c.contrat %}
                       <a href="{% url 'client_detail' client.pk %}?contrat={{ c.contrat.pk }}#section-campagnes" class="badge bg-light text-primary border text-decoration-none" style="font-size:0.62rem; border-radius:8px;" title="Filtrer ce contrat">
                         <i class="bi bi-file-earmark-text me-1"></i>{{ c.contrat.nom|default:c.contrat.get_type_contrat_display }}

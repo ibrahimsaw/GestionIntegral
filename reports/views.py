@@ -475,6 +475,7 @@ def _build_context_campagne(campagne):
     return {
         "campagne"             : campagne,
         "client"               : campagne.client,
+        "agence"               : campagne.agence,
         "today"                : datetime.date.today(),
         "infos"                : infos,
         "supports"             : supports,
@@ -494,7 +495,7 @@ class ExportCampagnePdfView(ClientStaffRequiredMixin, View):
     def get(self, request, pk):
         """Télécharge le détail d'une campagne en PDF."""
         campagne = get_object_or_404(
-            Campagne.objects.select_related("client", "contrat")
+            Campagne.objects.select_related("client", "agence", "contrat")
                             .prefetch_related(
                                 "lignes__support",
                                 "lignes__face",
@@ -546,7 +547,7 @@ class PreviewCampagnePdfView(ClientStaffRequiredMixin, View):
     def get(self, request, pk):
         """Prévisualise le détail d'une campagne dans le navigateur."""
         campagne = get_object_or_404(
-            Campagne.objects.select_related("client", "contrat")
+            Campagne.objects.select_related("client", "agence", "contrat")
                             .prefetch_related(
                                 "lignes__support",
                                 "lignes__face",
@@ -1162,7 +1163,11 @@ def _build_context(client, filters=None):
 class ExportClientPdfView(ClientStaffRequiredMixin, View):
     def get(self, request, pk):
         """Télécharge le planning de diffusion d'un client en PDF."""
-        client  = get_object_or_404(Client, pk=pk)
+        client  = get_object_or_404(
+            Client,
+            pk=pk,
+            type_entite=Client.TYPE_CLIENT,
+        )
         filters = _extract_client_filters(request)
 
         html_string = render_to_string(
@@ -1187,14 +1192,22 @@ class ExportClientPdfView(ClientStaffRequiredMixin, View):
 class PreviewClientPdfView(ClientStaffRequiredMixin, View):
     def get(self, request, pk):
         """Prévisualise le planning de diffusion dans le navigateur avec filtres."""
-        client  = get_object_or_404(Client, pk=pk)
+        client  = get_object_or_404(
+            Client,
+            pk=pk,
+            type_entite=Client.TYPE_CLIENT,
+        )
         filters = _extract_client_filters(request)
         return render(request, "reports/apercu_client.html", _build_context(client, filters))
 
 
 class ExportClientExcelView(ClientStaffRequiredMixin, View):
     def get(self, request, pk):
-        client  = get_object_or_404(Client, pk=pk)
+        client  = get_object_or_404(
+            Client,
+            pk=pk,
+            type_entite=Client.TYPE_CLIENT,
+        )
         filters = _extract_client_filters(request)
         ctx     = _build_context(client, filters)
 

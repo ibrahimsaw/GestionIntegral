@@ -145,7 +145,7 @@ class Etape3Form(forms.Form):
     societe = forms.CharField(
         max_length=200,
         required=False,
-        label="Société / Organisation",
+        label="Nom de la société",
         widget=forms.TextInput(attrs={'class': 'form-control'}),
     )
     email = forms.EmailField(
@@ -259,7 +259,7 @@ class ReserverUniquForm(forms.Form):
         widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Votre nom et prénom', 'autocomplete': 'name'}),
     )
     societe = forms.CharField(
-        max_length=200, required=False, label="Société / Organisation",
+        max_length=200, required=False, label="Nom de la société",
         widget=forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Nom de votre société', 'autocomplete': 'organization'}),
     )
     email = forms.EmailField(

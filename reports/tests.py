@@ -68,6 +68,35 @@ class PrepareVisuelsPdfTests(SimpleTestCase):
 
 
 class CampagnePdfPreuvesTests(TestCase):
+    def test_pdf_context_and_template_include_campaign_agency(self):
+        client = Client.objects.create(
+            nom="Client avec agence",
+            telephone="00000000",
+            email="client-avec-agence@example.com",
+        )
+        agency = Client.objects.create(
+            type_entite=Client.TYPE_AGENCE,
+            nom="Agence PDF",
+            telephone="00000001",
+            email="agence-pdf@example.com",
+        )
+        campagne = Campagne.objects.create(
+            client=client,
+            agence=agency,
+            nom="Campagne avec agence",
+            date_debut=datetime.date(2026, 10, 1),
+            date_fin=datetime.date(2026, 10, 31),
+        )
+
+        context = _build_context_campagne(campagne)
+        context["preuves_diffusion_pdf"] = []
+        context["piges_drive_pdf"] = []
+        html = render_to_string("reports/campagne_pdf.html", context)
+
+        self.assertEqual(context["agence"], agency)
+        self.assertIn(f"{client.nom} / {agency.nom}", html)
+        self.assertIn(agency.nom, html)
+
     def test_pdf_includes_download_link_to_campaign_drive_folder(self):
         client = Client.objects.create(
             nom="Client lien PDF",

@@ -1,5 +1,7 @@
-from datetime import timedelta
+from datetime import date, timedelta
 from decimal import Decimal
+from types import SimpleNamespace
+from unittest.mock import patch
 
 from django.test import TestCase
 from django.utils import timezone
@@ -13,7 +15,7 @@ from campaigns.models import (
     ReservationLigne,
     STATUT_CONFIRMEE,
 )
-from campaigns.views import _importer_faces_reservation
+from campaigns.views import _importer_faces_reservation, build_support_rows
 from inventory.models import FacePanneau, FormatSupport, Support
 
 
@@ -79,6 +81,89 @@ class CampagneFormAdvertiserTests(TestCase):
         self.assertEqual(campagne.prix, Decimal("0"))
         self.assertEqual(campagne.prix_affichage, Decimal("0"))
         self.assertEqual(campagne.prix_impression, Decimal("0"))
+
+
+class CampagnePricingTests(TestCase):
+    def test_face_tariff_is_monthly_but_display_and_print_are_one_time(self):
+        client = Client.objects.create(
+            nom="Client pour test tarif mensuel",
+            telephone="00000002",
+            email="client-tarif-mensuel@example.com",
+        )
+        support = Support.objects.create(
+            code="TARIF-MENSUEL",
+            nom="Panneau tarif mensuel",
+            type_support=Support.TYPE_PANNEAU,
+            format="4x3",
+            latitude=12.34,
+            longitude=-1.52,
+            ville="Ouagadougou",
+        )
+        face = FacePanneau.objects.create(support=support, label="A")
+        campagne = Campagne.objects.create(
+            client=client,
+            nom="Campagne tarif mensuel",
+            date_debut=date(2026, 1, 1),
+            date_fin=date(2026, 2, 15),
+            type_support="4x3",
+            prix=Decimal("1000"),
+            prix_affichage=Decimal("300"),
+            prix_impression=Decimal("200"),
+        )
+        ligne = LigneCampagne.objects.create(
+            campagne=campagne,
+            support=support,
+            face=face,
+        )
+
+        self.assertEqual(campagne.nombre_mois_factures(), 2)
+        self.assertEqual(campagne.montant_total(), Decimal("2000.00"))
+        self.assertEqual(campagne.montant_total_affichage(), Decimal("300.00"))
+        self.assertEqual(campagne.montant_total_impression(), Decimal("200.00"))
+
+        rows, totals = build_support_rows(campagne, [ligne])
+
+        self.assertEqual(rows[0]["prix_total"], Decimal("2000.00"))
+        self.assertEqual(rows[0]["affichage_total"], Decimal("300.00"))
+        self.assertEqual(rows[0]["impression_total"], Decimal("200.00"))
+        self.assertEqual(totals["total"], Decimal("2500.00"))
+
+    def test_screen_tariff_is_applied_to_campaign_spot_count_only(self):
+        screen = SimpleNamespace(pk=1)
+        campagne = Campagne(
+            type_support="ecran",
+            date_debut=date(2026, 1, 1),
+            date_fin=date(2026, 2, 15),
+            prix=Decimal("1000"),
+            prix_affichage=Decimal("300"),
+            prix_impression=Decimal("200"),
+        )
+        ligne = SimpleNamespace(
+            support=screen,
+            face=None,
+            emplacement_id=None,
+            spots_calcules=30,
+        )
+
+        rows, _ = build_support_rows(campagne, [ligne])
+
+        self.assertEqual(rows[0]["prix_total"], Decimal("30000.00"))
+        self.assertEqual(rows[0]["mois_factures"], 1)
+        with patch.object(campagne, "calculer_nombre_spots", return_value=30):
+            self.assertEqual(campagne.montant_total(), Decimal("30000.00"))
+
+    def test_month_count_rounds_up_by_campaign_anniversary(self):
+        one_month = Campagne(
+            date_debut=date(2026, 1, 31),
+            date_fin=date(2026, 2, 28),
+        )
+        partial_third_month = Campagne(
+            date_debut=date(2026, 1, 1),
+            date_fin=date(2026, 3, 2),
+        )
+
+        self.assertEqual(one_month.nombre_mois_factures(), 1)
+        self.assertEqual(partial_third_month.nombre_mois_factures(), 3)
 
 
 class CampagneReservationImportTests(TestCase):

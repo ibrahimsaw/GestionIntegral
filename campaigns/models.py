@@ -1,3 +1,4 @@
+import calendar
 import datetime
 import uuid
 from decimal import Decimal
@@ -35,6 +36,14 @@ def calculer_duree_tranches(tranches: str) -> float:
         except ValueError:
             continue
     return total_heures
+
+
+def _ajouter_mois(date_initiale, nombre_mois):
+    index_mois = date_initiale.month - 1 + nombre_mois
+    annee = date_initiale.year + index_mois // 12
+    mois = index_mois % 12 + 1
+    jour = min(date_initiale.day, calendar.monthrange(annee, mois)[1])
+    return datetime.date(annee, mois, jour)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1202,12 +1211,28 @@ class Campagne(models.Model):
             return 0
         return self.lignes.filter(face__isnull=False).values('face').distinct().count()
 
+    def nombre_mois_factures(self):
+        if not self.date_debut or not self.date_fin or self.date_fin < self.date_debut:
+            return 0
+
+        nombre_mois = (
+            (self.date_fin.year - self.date_debut.year) * 12
+            + self.date_fin.month
+            - self.date_debut.month
+        )
+        while nombre_mois > 0 and _ajouter_mois(self.date_debut, nombre_mois) > self.date_fin:
+            nombre_mois -= 1
+
+        if _ajouter_mois(self.date_debut, nombre_mois) < self.date_fin:
+            nombre_mois += 1
+        return max(nombre_mois, 1)
+
     def montant_total(self):
         """Montant total de la campagne.
 
         Pour une campagne mère, on somme les montants des sous-campagnes.
-        Pour une campagne simple, on multiplie le prix par le nombre de spots pour les écrans,
-        ou par le nombre de faces pour les formats de panneau.
+        Le tarif des faces et emplacements est mensuel; celui des spots écran
+        s'applique à chaque spot diffusé sur toute la période.
         """
         prix = self.prix or Decimal('0.00')
 
@@ -1222,10 +1247,10 @@ class Campagne(models.Model):
             return (prix * Decimal(str(spots))).quantize(Decimal('0.01'))
 
         if self.type_support == 'marche':
-            emplacements = self.nombre_emplacements()
+            emplacements = self.nombre_emplacements() * self.nombre_mois_factures()
             return (prix * Decimal(emplacements)).quantize(Decimal('0.01'))
 
-        faces = self.nombre_faces()
+        faces = self.nombre_faces() * self.nombre_mois_factures()
         return (prix * Decimal(faces)).quantize(Decimal('0.01'))
     
     def montant_total_affichage(self):

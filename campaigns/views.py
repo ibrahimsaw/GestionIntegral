@@ -4032,7 +4032,8 @@ def build_support_rows(campagne, lignes):
     Regroupe les lignes par support (ou par MARCHÉ si campagne.type_support == 'marche')
     et calcule, pour chaque groupe :
     - quantite (spots pour écran, nb de faces pour panneau, nb d'emplacements pour marché)
-    - prix / affichage / impression unitaires et totaux
+    - tarif mensuel pour les faces/emplacements, ou tarif par spot pour les écrans
+    - affichage et impression facturés une seule fois
     - total_support = prix_total + affichage_total + impression_total
     Retourne (rows, totaux_campagne)
     """
@@ -4061,6 +4062,7 @@ def build_support_rows(campagne, lignes):
     prix_u = campagne.prix or Decimal('0.00')
     aff_u = campagne.prix_affichage or Decimal('0.00')
     imp_u = campagne.prix_impression or Decimal('0.00')
+    mois_factures = 1 if campagne.type_support == 'ecran' else campagne.nombre_mois_factures()
 
     rows = []
     totaux = {
@@ -4082,7 +4084,7 @@ def build_support_rows(campagne, lignes):
             quantite = Decimal(len(group_lignes))
             faces_labels = [l.face.label for l in group_lignes if l.face]
 
-        prix_total = (prix_u * quantite).quantize(Decimal('0.01'))
+        prix_total = (prix_u * quantite * mois_factures).quantize(Decimal('0.01'))
         aff_total = (aff_u * quantite).quantize(Decimal('0.01'))
         imp_total = (imp_u * quantite).quantize(Decimal('0.01'))
         total_support = prix_total + aff_total + imp_total
@@ -4093,6 +4095,7 @@ def build_support_rows(campagne, lignes):
             'faces_labels': faces_labels,
             'prix_unitaire': prix_u,
             'prix_total': prix_total,
+            'mois_factures': mois_factures,
             'affichage_unitaire': aff_u,
             'affichage_total': aff_total,
             'impression_unitaire': imp_u,

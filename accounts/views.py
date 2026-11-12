@@ -4,13 +4,13 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib import messages
 from django.core.exceptions import PermissionDenied
 from django.db.models import Q
-from django.core.paginator import Paginator
 from django.urls import reverse_lazy
 from .decorators import *
 from .models import User, AuditLog
 from .forms import LoginForm, UserCreateForm, UserEditForm, AdminPasswordForm
 from .audit import log_action, log_changes
 from django.views.generic import ListView, CreateView, UpdateView, DeleteView, DetailView, View, TemplateView
+from core.mixins import ClientSidePaginationMixin
 
 
 # ══════════════════════════════════════════
@@ -74,11 +74,10 @@ class LogoutView(View):
 # USERS
 # ══════════════════════════════════════════
 
-class UserListView(AdminRequiredMixin, ListView):
+class UserListView(AdminRequiredMixin, ClientSidePaginationMixin, ListView):
     model = User
     template_name = 'accounts/user_list.html'
     context_object_name = 'users'
-    paginate_by = 20
     ordering = ['role', 'username']
 
     def get_queryset(self):
@@ -292,12 +291,10 @@ class ProfileView(LoginRequiredMixin, TemplateView):
 # AUDIT
 # ══════════════════════════════════════════
 
-class AuditLogView(AdminRequiredMixin, ListView):
+class AuditLogView(AdminRequiredMixin, ClientSidePaginationMixin, ListView):
     model = AuditLog
     template_name = 'accounts/audit_list.html'
     context_object_name = 'logs'
-    paginate_by = 50
-
     def get_queryset(self):
         qs = AuditLog.objects.select_related('user').order_by('-created_at')
 

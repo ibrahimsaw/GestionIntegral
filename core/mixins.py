@@ -1,3 +1,31 @@
+from django.core.paginator import Paginator
+
+
+def all_records_page(object_list):
+    records = list(object_list)
+    paginator = Paginator(records, max(len(records), 1))
+    return paginator.page(1)
+
+
+class ClientSidePaginationMixin:
+    paginate_by = None
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        object_list = context['object_list']
+        page_obj = all_records_page(object_list)
+        context.update({
+            'object_list': page_obj,
+            'page_obj': page_obj,
+            'paginator': page_obj.paginator,
+            'is_paginated': False,
+        })
+        context_name = self.get_context_object_name(object_list)
+        if context_name:
+            context[context_name] = page_obj
+        return context
+
+
 class SortableListMixin:
     """
     Mixin générique pour ajouter un tri "façon Excel" à n'importe quelle ListView.

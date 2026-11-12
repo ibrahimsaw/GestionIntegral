@@ -7,7 +7,6 @@ from typing import cast
 
 from django.conf import settings
 from django.contrib import messages
-from django.core.paginator import Paginator
 from django.core.cache import cache
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import Http404, HttpResponse, JsonResponse
@@ -21,7 +20,7 @@ from accounts.models import AuditLog
 from accounts.audit import log_action, log_changes
 from campaigns.mixins import StaffRequiredMixin
 from campaigns.models import *
-from core.mixins import SortableListMixin
+from core.mixins import ClientSidePaginationMixin, SortableListMixin, all_records_page
 from .forms import *
 from .models import *
 from accounts.models import User
@@ -126,11 +125,10 @@ def _initial_programme_horaire(ecran=None):
     return initial
 
 # 1. LISTER LES FORMATS
-class FormatSupportListView(LoginRequiredMixin, SortableListMixin, ListView):
+class FormatSupportListView(LoginRequiredMixin, ClientSidePaginationMixin, SortableListMixin, ListView):
     model = FormatSupport
     template_name = 'inventory/format_list.html'
     context_object_name = 'formats'
-    paginate_by = 20
     SORT_FIELDS = {
         'code': 'code',
         'categorie': 'categorie',
@@ -188,12 +186,8 @@ class FormatSupportDetailView(LoginRequiredMixin, DetailView):
     model = FormatSupport
     template_name = 'inventory/format_detail.html'
     context_object_name = 'format'
-    paginate_by = 20
-
     def get_context_data(self, **kwargs):
         from django.db.models import Count
-        from django.core.paginator import Paginator
-
         context = super().get_context_data(**kwargs)
         fmt = self.object
         est_ecran = fmt.categorie == 'Ecran'
@@ -242,14 +236,13 @@ class FormatSupportDetailView(LoginRequiredMixin, DetailView):
         if not est_ecran and fmt.superficie and support_count:
             surface_totale = round(fmt.superficie * support_count, 2)
 
-        paginator = Paginator(supports, self.paginate_by)
-        page_obj = paginator.get_page(self.request.GET.get('page'))
+        page_obj = all_records_page(supports)
 
         context.update({
             'supports': page_obj,
             'page_obj': page_obj,
-            'paginator': paginator,
-            'is_paginated': page_obj.has_other_pages(),
+            'paginator': page_obj.paginator,
+            'is_paginated': False,
             'support_count': support_count,
             'format_utilise_panneau': Support.objects.filter(
                 type_support=Support.TYPE_PANNEAU,
@@ -344,20 +337,15 @@ class MarcheDetailView(LoginRequiredMixin, DetailView):
     model = Marche
     template_name = 'inventory/marche_detail.html'
     context_object_name = 'marche'
-    paginate_by = 20
-
     def get_context_data(self, **kwargs):
-        from django.core.paginator import Paginator
-
         context = super().get_context_data(**kwargs)
         emplacements = self.object.emplacements.select_related('support_installe').order_by('code')
         context['emplacements'] = emplacements
-        paginator = Paginator(emplacements, self.paginate_by)
-        page_obj = paginator.get_page(self.request.GET.get('page'))
+        page_obj = all_records_page(emplacements)
         context['emplacements_page'] = page_obj
         context['page_obj'] = page_obj
-        context['paginator'] = paginator
-        context['is_paginated'] = page_obj.has_other_pages()
+        context['paginator'] = page_obj.paginator
+        context['is_paginated'] = False
         context['title'] = self.object.nom
         return context
 
@@ -1237,7 +1225,7 @@ def get_faces_support(request, support_id):
 #     def get_success_url(self):
 #         return reverse('support_detail', kwargs={'pk': self.support.pk})
 
-class SupportListView(TechnicienStaffRequiredMixin,SortableListMixin, ListView):
+class SupportListView(TechnicienStaffRequiredMixin, ClientSidePaginationMixin, SortableListMixin, ListView):
     model = Support
     template_name = 'inventory/support_list.html'
     context_object_name = 'supports'
@@ -2574,7 +2562,7 @@ from core.mixins import SortableListMixin
 from core.mixins import SortableListMixin
 
 
-class MaintenanceListView(LoginRequiredMixin, SortableListMixin, ListView):
+class MaintenanceListView(LoginRequiredMixin, ClientSidePaginationMixin, SortableListMixin, ListView):
     model               = Maintenance
     template_name       = 'inventory/maintenance_list.html'
     context_object_name = 'maintenances'
@@ -2588,7 +2576,6 @@ class MaintenanceListView(LoginRequiredMixin, SortableListMixin, ListView):
     }
     DEFAULT_SORT = 'date_intervention'
     DEFAULT_DIR  = 'desc'
-    paginate_by  = 20
 
     def get_queryset(self):
         qs = Maintenance.objects.select_related(
@@ -3161,7 +3148,7 @@ class SupportPeriodesVanneView(LoginRequiredMixin, View):
         duree_moyenne = (
             duree_totale / nb_total if nb_total > 0 else timedelta()
         )
-        page_obj = Paginator(periodes, 20).get_page(request.GET.get('page'))
+        page_obj = all_records_page(periodes)
 
         # ── Stats par face (panneaux uniquement) ──────────────────
         stats_par_face = {}
@@ -3186,7 +3173,7 @@ class SupportPeriodesVanneView(LoginRequiredMixin, View):
             'periodes'      : page_obj,
             'page_obj'      : page_obj,
             'paginator'     : page_obj.paginator,
-            'is_paginated'  : page_obj.has_other_pages(),
+            'is_paginated'  : False,
             'nb_total'      : nb_total,
             'nb_resolues'   : nb_resolues,
             'nb_en_cours'   : nb_en_cours,
@@ -3228,7 +3215,7 @@ class PeriodesParVueView(LoginRequiredMixin, View):
             timedelta()
         )
         duree_moyenne = duree_totale / nb_total if nb_total else timedelta()
-        page_obj = Paginator(periodes, 20).get_page(request.GET.get('page'))
+        page_obj = all_records_page(periodes)
 
         # ── Données pour les filtres ──────────────────────────────
         supports_liste = Support.objects.filter(
@@ -3245,7 +3232,7 @@ class PeriodesParVueView(LoginRequiredMixin, View):
             'periodes'      : page_obj,
             'page_obj'      : page_obj,
             'paginator'     : page_obj.paginator,
-            'is_paginated'  : page_obj.has_other_pages(),
+            'is_paginated'  : False,
             'nb_total'      : nb_total,
             'nb_resolues'   : nb_resolues,
             'nb_en_cours'  : nb_en_cours,

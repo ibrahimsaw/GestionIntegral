@@ -741,10 +741,40 @@
         </div>
 
         {# ── TABLE DES CAMPAGNES ── #}
+        <div data-client-pagination data-page-size="20">
+        {% if user.is_staff_regie_role %}
+        <form method="post" id="client-campaign-bulk-form">
+          {% csrf_token %}
+          <input type="hidden" name="action" id="client-campaign-action-input">
+          <div class="px-3 py-2 border-bottom d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div class="d-flex align-items-center gap-2">
+              <input type="checkbox" id="client-campaign-select-all" class="form-check-input mt-0" title="Tout sélectionner">
+              <span id="client-campaign-selection-count" class="small text-muted">
+                {{ campagnes|length }} campagne{{ campagnes|length|pluralize }}
+              </span>
+            </div>
+            <div id="client-campaign-actions-bar" class="d-flex align-items-center gap-2" style="display:none !important;">
+              <select id="client-campaign-action-select" class="form-select form-select-sm" style="width:auto;">
+                <option value="">Sélectionner une action</option>
+                <option value="archiver">Archiver</option>
+                <option value="desarchiver">Désarchiver</option>
+                <option value="mettre_en_pause">Mettre en pause</option>
+                <option value="annuler">Annuler définitivement</option>
+                <option value="reprendre_prolonger">Reprendre et prolonger la fin</option>
+                <option value="reprendre_garder">Reprendre sans prolonger la fin</option>
+                <option value="supprimer">Supprimer</option>
+              </select>
+              <button type="button" class="btn btn-sm btn-primary" onclick="confirmerActionCampagnesClient()">
+                <i class="bi bi-check-lg me-1"></i>Appliquer
+              </button>
+            </div>
+          </div>
+        {% endif %}
         <div class="table-responsive">
           <table class="table table-hover align-middle mb-0">
             <thead>
               <tr>
+                {% if user.is_staff_regie_role %}<th class="text-center" style="width: 42px;"></th>{% endif %}
                 <th class="text-center" style="width: 48px;">Type</th>
                 <th>Référence</th>
                 <th>Campagne</th>
@@ -755,9 +785,14 @@
                 <th class="text-end pe-3">Action</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody data-client-pagination-group>
               {% for c in campagnes %}
-              <tr>
+              <tr data-client-page-item>
+                {% if user.is_staff_regie_role %}
+                <td class="text-center">
+                  <input type="checkbox" name="selected_ids" value="{{ c.pk }}" class="form-check-input mt-0 client-campaign-row-checkbox">
+                </td>
+                {% endif %}
                 <td class="text-center">
                   {% if c.est_mere %}
                     <span class="cld-badge-sub cld-badge-mere" title="Campagne Mère"><i class="bi bi-diagram-3"></i></span>
@@ -842,7 +877,7 @@
               </tr>
               {% empty %}
               <tr>
-                <td colspan="8" class="text-center py-4 cld-muted">
+                <td colspan="{% if user.is_staff_regie_role %}9{% else %}8{% endif %}" class="text-center py-4 cld-muted">
                   <i class="bi bi-megaphone-fill d-block mb-1 fs-3 text-muted"></i>
                   {% if has_active_filters %}
                     Aucune campagne ne correspond aux critères de filtre sélectionnés.
@@ -860,9 +895,11 @@
             </tbody>
           </table>
         </div>
+        {% if user.is_staff_regie_role %}
+        </form>
+        {% endif %}
 
-        <div class="p-3 border-top">
-          {% pagination_nav %}
+        <div class="p-3 border-top" data-client-pagination-controls></div>
         </div>
       </div>
 
@@ -913,4 +950,66 @@
   </div>
 
 </div>
+{% if user.is_staff_regie_role %}
+<script>
+(() => {
+  function updateSelection() {
+    const checkboxes = Array.from(document.querySelectorAll('.client-campaign-row-checkbox'));
+    const visibleCheckboxes = checkboxes.filter((checkbox) => {
+      const row = checkbox.closest('[data-client-page-item]');
+      return !row || row.style.display !== 'none';
+    });
+    const selectAll = document.getElementById('client-campaign-select-all');
+    const actionsBar = document.getElementById('client-campaign-actions-bar');
+    const countLabel = document.getElementById('client-campaign-selection-count');
+    if (!selectAll || !actionsBar || !countLabel) return;
+    const total = checkboxes.length;
+    const checked = checkboxes.filter(checkbox => checkbox.checked).length;
+    actionsBar.style.display = checked ? 'flex' : 'none';
+    countLabel.textContent = checked
+      ? `${checked} sélectionné(s)`
+      : `${total} campagne(s)`;
+    const checkedVisible = visibleCheckboxes.filter((checkbox) => checkbox.checked).length;
+    selectAll.indeterminate = checkedVisible > 0 && checkedVisible < visibleCheckboxes.length;
+    selectAll.checked = visibleCheckboxes.length > 0 && checkedVisible === visibleCheckboxes.length;
+  }
+
+  document.addEventListener('change', (event) => {
+    if (event.target.matches('#client-campaign-select-all')) {
+      document.querySelectorAll('.client-campaign-row-checkbox').forEach((checkbox) => {
+        const row = checkbox.closest('[data-client-page-item]');
+        if (!row || row.style.display !== 'none') checkbox.checked = event.target.checked;
+      });
+      document.addEventListener('client-pagination-page-changed', updateSelection);
+      updateSelection();
+    } else if (event.target.matches('.client-campaign-row-checkbox')) {
+      updateSelection();
+    }
+  });
+  updateSelection();
+
+  window.confirmerActionCampagnesClient = function() {
+    const form = document.getElementById('client-campaign-bulk-form');
+    const actionSelect = document.getElementById('client-campaign-action-select');
+    const actionInput = document.getElementById('client-campaign-action-input');
+    if (!form || !actionSelect || !actionInput) return;
+    const checkboxes = Array.from(document.querySelectorAll('.client-campaign-row-checkbox'));
+    const checked = checkboxes.filter(checkbox => checkbox.checked).length;
+    if (!actionSelect.value) {
+      alert('Veuillez sélectionner une action.');
+      return;
+    }
+    if (!checked) {
+      alert('Veuillez sélectionner au moins une campagne.');
+      return;
+    }
+    if (!confirm(`Confirmer "${actionSelect.options[actionSelect.selectedIndex].text}" sur ${checked} campagne(s) ?`)) {
+      return;
+    }
+    actionInput.value = actionSelect.value;
+    form.submit();
+  };
+})();
+</script>
+{% endif %}
 {% endblock %}

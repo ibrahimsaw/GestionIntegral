@@ -52,7 +52,7 @@ class UserManagementTests(TestCase):
         self.assertEqual(response.context['active_users'], 3)
         self.assertEqual(response.context['inactive_users'], 1)
 
-    def test_user_list_is_paginated_and_preserves_filters(self):
+    def test_user_list_loads_all_filtered_users_for_client_side_pagination(self):
         for index in range(22):
             self.create_user(f'pagination-user-{index:02}')
 
@@ -62,10 +62,12 @@ class UserManagementTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.context['users']), 20)
-        self.assertContains(response, 'page=2')
-        self.assertContains(response, 'role=staff')
-        self.assertContains(response, 'statut=actif')
+        self.assertEqual(len(response.context['users']), 22)
+        self.assertEqual(response.context['page_obj'].number, 1)
+        self.assertContains(response, 'data-client-pagination')
+        self.assertContains(response, 'data-client-page-item', count=22)
+        self.assertEqual(response.context['selected_role'], 'staff')
+        self.assertEqual(response.context['selected_status'], 'actif')
 
     def test_admin_can_toggle_another_users_access_but_not_own(self):
         target = self.create_user('toggle-target')

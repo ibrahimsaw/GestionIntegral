@@ -1693,13 +1693,13 @@ class PreventiveMaintenanceStateTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context['nb_total'], 24)
-        self.assertEqual(response.context['page_obj'].paginator.num_pages, 2)
+        self.assertEqual(response.context['page_obj'].paginator.num_pages, 1)
         self.assertCountEqual(
-            [period['support'] for period in response.context['periodes'][:2]],
+            [period['support'] for period in response.context['periodes'] if period['support'] in panne_screens],
             panne_screens,
         )
-        self.assertContains(response, 'Page 1 / 2')
-        self.assertContains(response, 'statut=en_cours&amp;page=2')
+        self.assertContains(response, 'data-client-pagination')
+        self.assertContains(response, 'data-client-page-item', count=24)
 
     def test_period_report_filters_overlapping_periods_and_exports_pdf_excel(self):
         user = get_user_model().objects.create_user(
@@ -2033,6 +2033,7 @@ class FormatSupportDetailViewTests(TestCase):
         request = RequestFactory().get(reverse(
             'format_support_detail', args=[format_support.pk]
         ))
+        request.user = AnonymousUser()
         view = FormatSupportDetailView()
         view.setup(request, pk=format_support.pk)
         view.object = format_support
@@ -2117,7 +2118,7 @@ class FormatSupportDetailViewTests(TestCase):
         self.assertRedirects(response, reverse('format_list'))
         self.assertFalse(FormatSupport.objects.filter(pk=format_support.pk).exists())
 
-    def test_detail_supports_are_paginated(self):
+    def test_detail_supports_use_client_side_pagination(self):
         format_support = FormatSupport.objects.create(
             code='DETAIL-PAGED',
             dimensions='4m × 3m',
@@ -2138,6 +2139,7 @@ class FormatSupportDetailViewTests(TestCase):
             reverse('format_support_detail', args=[format_support.pk]),
             {'page': '2'},
         )
+        request.user = AnonymousUser()
         view = FormatSupportDetailView()
         view.setup(request, pk=format_support.pk)
         view.object = format_support
@@ -2145,12 +2147,12 @@ class FormatSupportDetailViewTests(TestCase):
         rendered = render_to_string(view.template_name, context, request=request)
 
         self.assertEqual(context['paginator'].count, 21)
-        self.assertEqual(context['page_obj'].number, 2)
-        self.assertEqual(len(context['supports']), 1)
-        self.assertIn('Page 2 / 2', rendered)
-        self.assertIn('?page=1', rendered)
+        self.assertEqual(context['page_obj'].number, 1)
+        self.assertEqual(len(context['supports']), 21)
+        self.assertIn('data-client-pagination', rendered)
+        self.assertIn('data-client-page-item', rendered)
 
-    def test_format_list_is_paginated_and_reports_total_count(self):
+    def test_format_list_uses_client_side_pagination_and_reports_total_count(self):
         for number in range(21):
             FormatSupport.objects.create(
                 code=f'LIST-PAGED-{number:02d}',
@@ -2159,6 +2161,7 @@ class FormatSupportDetailViewTests(TestCase):
             )
 
         request = RequestFactory().get(reverse('format_list'), {'page': '2'})
+        request.user = AnonymousUser()
         view = FormatSupportListView()
         view.setup(request)
         object_list = view.get_queryset()
@@ -2166,9 +2169,10 @@ class FormatSupportDetailViewTests(TestCase):
         rendered = render_to_string(view.template_name, context, request=request)
 
         self.assertEqual(context['paginator'].count, 21)
-        self.assertEqual(context['page_obj'].number, 2)
+        self.assertEqual(context['page_obj'].number, 1)
+        self.assertEqual(len(context['formats']), 21)
         self.assertIn('21 format', rendered)
-        self.assertIn('Page 2 / 2', rendered)
+        self.assertIn('data-client-pagination-controls', rendered)
 
     def test_format_list_is_sorted_by_category_then_measure_and_code(self):
         formats = [
@@ -2865,8 +2869,8 @@ class EmplacementBulkActionTests(TestCase):
 
         self.assertEqual(first_page.status_code, 200)
         self.assertEqual(first_page.context['paginator'].count, 21)
-        self.assertEqual(len(first_page.context['emplacements_page']), 20)
-        self.assertContains(first_page, 'Page 1 / 2')
+        self.assertEqual(len(first_page.context['emplacements_page']), 21)
+        self.assertContains(first_page, '<tr data-client-page-item>', count=21)
         self.assertContains(first_page, reverse('support_detail', args=[panel.uuid]))
         self.assertContains(first_page, 'title="Voir le panneau associé"')
 
@@ -2875,9 +2879,8 @@ class EmplacementBulkActionTests(TestCase):
             {'page': 2},
         )
         self.assertEqual(second_page.status_code, 200)
-        self.assertEqual(second_page.context['page_obj'].number, 2)
-        self.assertEqual(len(second_page.context['emplacements_page']), 1)
-        self.assertContains(second_page, 'Page 2 / 2')
+        self.assertEqual(second_page.context['page_obj'].number, 1)
+        self.assertEqual(len(second_page.context['emplacements_page']), 21)
 
     def test_bulk_delete_is_admin_only(self):
         self.client.raise_request_exception = False

@@ -202,6 +202,7 @@
 {# ═══════════════════════════════════════════ #}
 {# ── TABLEAU DES CAMPAGNES ── #}
 {# ═══════════════════════════════════════════ #}
+<div data-client-pagination data-page-size="20">
 <form method="post" id="form-actions">
   {% csrf_token %}
   <input type="hidden" name="action" id="action-input">
@@ -258,9 +259,9 @@
               <th class="text-end pe-4">Actions</th>
             </tr>
           </thead>
-          <tbody>
+          <tbody data-client-pagination-group>
             {% for c in campagnes %}
-              <tr class="support-row {% if user.is_admin and not c.actif %}opacity-75 bg-light{% endif %}">
+              <tr data-client-page-item class="support-row {% if user.is_admin and not c.actif %}opacity-75 bg-light{% endif %}">
               <td class="ps-3">
                 <input type="checkbox" name="selected_ids" value="{{ c.pk }}" class="form-check-input mt-0 row-checkbox">
               </td>
@@ -415,8 +416,7 @@
   </div>
 </form>
 
-<div class="mt-4">
-  {% pagination_nav %}
+<div data-client-pagination-controls></div>
 </div>
 
 {# ── BOUTONS D'EXPORT ET APERÇU RAPPORT (EN BAS) ── #}
@@ -432,13 +432,17 @@
 </div>
 
 <script>
-const selectAll  = document.getElementById('select-all');
-const actionsBar = document.getElementById('actions-bar');
-const countLabel = document.getElementById('selection-count');
-const checkboxes = document.querySelectorAll('.row-checkbox');
-const total      = {{ campagnes|length }};
-
 function majSelection() {
+  const checkboxes = document.querySelectorAll('.row-checkbox');
+  const visibleCheckboxes = Array.from(checkboxes).filter((checkbox) => {
+    const row = checkbox.closest('[data-client-page-item]');
+    return !row || row.style.display !== 'none';
+  });
+  const selectAll = document.getElementById('select-all');
+  const actionsBar = document.getElementById('actions-bar');
+  const countLabel = document.getElementById('selection-count');
+  if (!actionsBar || !countLabel) return;
+  const total = checkboxes.length;
   const checked = document.querySelectorAll('.row-checkbox:checked').length;
   if (checked > 0) {
     actionsBar.style.display = 'flex';
@@ -448,28 +452,38 @@ function majSelection() {
     countLabel.textContent = total + ' campagne(s)';
   }
   if (selectAll) {
-    selectAll.indeterminate = checked > 0 && checked < total;
-    selectAll.checked = checked === total && total > 0;
+    const checkedVisible = visibleCheckboxes.filter((checkbox) => checkbox.checked).length;
+    selectAll.indeterminate = checkedVisible > 0 && checkedVisible < visibleCheckboxes.length;
+    selectAll.checked = visibleCheckboxes.length > 0 && checkedVisible === visibleCheckboxes.length;
   }
 }
 
-if (selectAll) {
-  selectAll.addEventListener('change', () => {
-    checkboxes.forEach(cb => cb.checked = selectAll.checked);
+document.addEventListener('change', (event) => {
+  if (event.target.matches('#select-all')) {
+    document.querySelectorAll('.row-checkbox').forEach((checkbox) => {
+      const row = checkbox.closest('[data-client-page-item]');
+      if (!row || row.style.display !== 'none') checkbox.checked = event.target.checked;
+    });
     majSelection();
-  });
-}
-
-checkboxes.forEach(cb => cb.addEventListener('change', majSelection));
+  } else if (event.target.matches('.row-checkbox')) {
+    majSelection();
+  }
+});
+document.addEventListener('client-pagination-page-changed', majSelection);
+majSelection();
 
 function confirmerAction() {
-  const action  = document.getElementById('action-select').value;
+  const actionSelect = document.getElementById('action-select');
+  const actionInput = document.getElementById('action-input');
+  const form = document.getElementById('form-actions');
+  if (!actionSelect || !actionInput || !form) return;
+  const action  = actionSelect.value;
   const checked = document.querySelectorAll('.row-checkbox:checked').length;
   if (!action) { alert('Veuillez sélectionner une action.'); return; }
   if (checked === 0) { alert('Veuillez sélectionner au moins une campagne.'); return; }
   if (!confirm(`Confirmer "${action}" sur ${checked} campagne(s) ?`)) return;
-  document.getElementById('action-input').value = action;
-  document.getElementById('form-actions').submit();
+  actionInput.value = action;
+  form.submit();
 }
 </script>
 <script>

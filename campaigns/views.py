@@ -48,7 +48,7 @@ from portail.forms import Etape1Form
 # from .mixins import *
 from datetime import datetime, date, timedelta
 today = timezone.now().date()
-from core.mixins import SortableListMixin
+from core.mixins import ClientSidePaginationMixin, SortableListMixin, all_records_page
 from django.core.files.storage import default_storage
 
 class GetClientContratsView(StaffRequiredMixin, View):
@@ -2999,11 +2999,10 @@ def get_cached_alertes():
 
 # ── Clients ──────────────────────────────────────────────────────────────────
 
-class ClientListView(StaffRequiredMixin, SortableListMixin, ListView):
+class ClientListView(StaffRequiredMixin, ClientSidePaginationMixin, SortableListMixin, ListView):
     model = Client
     template_name = 'campaigns/client_list.html'
     context_object_name = 'clients'
-    paginate_by = 10
     SORT_FIELDS = {
         'reference': 'reference',
         'nom': 'nom',
@@ -3137,6 +3136,27 @@ class ClientDetailView(ClientStaffRequiredMixin, DetailView):
     def get_object(self, queryset=None):
         return super().get_object(queryset=queryset)
 
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        if not request.user.is_staff_regie_role:
+            messages.error(request, "Permission refusée.")
+            return redirect('client_detail', pk=self.object.pk)
+
+        if self.object.type_entite == Client.TYPE_CLIENT:
+            campagnes_qs = Campagne.objects.filter(client=self.object)
+        else:
+            campagnes_qs = Campagne.objects.filter(agence=self.object)
+        if not request.user.is_admin:
+            campagnes_qs = campagnes_qs.filter(actif=True)
+
+        redirect_url = f"{reverse('client_detail', kwargs={'pk': self.object.pk})}#section-campagnes"
+        return _apply_selected_campaign_action(
+            request,
+            campagnes_qs,
+            redirect_url,
+            client_pk=self.object.pk,
+        )
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         client = self.object
@@ -3261,21 +3281,15 @@ class ClientDetailView(ClientStaffRequiredMixin, DetailView):
             .order_by('date_debut')
         )
 
-        from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
-        page_num = self.request.GET.get('page', 1)
-        paginator = Paginator(campagnes_filtered, 10)
-        try:
-            campagnes_page = paginator.page(page_num)
-        except (EmptyPage, PageNotAnInteger):
-            campagnes_page = paginator.page(1)
+        campagnes_page = all_records_page(campagnes_filtered)
 
         has_active_filters = bool(contrat_filter or statut_filter or type_filter or search_query or d1_str or d2_str)
 
         context.update({
             'campagnes': campagnes_page,
             'page_obj': campagnes_page,
-            'paginator': paginator,
-            'is_paginated': campagnes_page.has_other_pages(),
+            'paginator': campagnes_page.paginator,
+            'is_paginated': False,
             'total_campagnes_count': campagnes_filtered.count(),
             'total_campagnes_all': campagnes_all_qs.count(),
             'contrats': contrats_qs,
@@ -3545,7 +3559,53 @@ class ContratDeleteView(StaffRequiredMixin, DeleteView):
 
 # Les Classe des vues de campagne : list, create, detail, edit, lancer, delete
 
-class CampagneListView(ClientStaffRequiredMixin, SortableListMixin, ListView):
+def _apply_selected_campaign_action(
+    request,
+    campaigns_queryset,
+    redirect_url,
+    client_pk=None,
+):
+    action = request.POST.get('action', '')
+    selected_ids = request.POST.getlist('selected_ids')
+    selected_campaigns = campaigns_queryset.filter(pk__in=selected_ids)
+    selected_ids = list(selected_campaigns.values_list('pk', flat=True))
+
+    if not selected_ids:
+        messages.warning(request, "Aucune campagne sélectionnée.")
+        return redirect(redirect_url)
+
+    if action == 'supprimer':
+        request.session['selected_campagne_ids'] = [str(pk) for pk in selected_ids]
+        request.session['selected_campagne_client_id'] = client_pk
+        return redirect('campagne_selected_delete')
+    if action == 'archiver':
+        count = selected_campaigns.filter(actif=True).update(actif=False)
+        messages.success(request, f"{count} campagne(s) archivée(s).")
+    elif action == 'desarchiver':
+        count = selected_campaigns.filter(actif=False).update(actif=True)
+        messages.success(request, f"{count} campagne(s) désarchivée(s).")
+    elif action in {
+        'mettre_en_pause',
+        'annuler',
+        'reprendre_prolonger',
+        'reprendre_garder',
+    }:
+        results = [
+            _transition_campagne(campagne, action)
+            for campagne in selected_campaigns
+        ]
+        success_count = sum(1 for success, _ in results if success)
+        details = [message for success, message in results if not success]
+        if success_count:
+            messages.success(request, f"{success_count} campagne(s) mise(s) à jour.")
+        if details:
+            messages.warning(request, " ".join(details[:3]))
+    else:
+        messages.error(request, f"Action inconnue : {action}")
+    return redirect(redirect_url)
+
+
+class CampagneListView(ClientStaffRequiredMixin, ClientSidePaginationMixin, SortableListMixin, ListView):
     model = Campagne
     template_name = 'campaigns/campagne_list.html'
     context_object_name = 'campagnes'
@@ -3751,44 +3811,12 @@ class CampagneListView(ClientStaffRequiredMixin, SortableListMixin, ListView):
         if not request.user.is_staff_regie_role:
             messages.error(request, "Permission refusée.")
             return redirect('campagne_list')
-
-        action       = request.POST.get('action', '')
-        selected_ids = request.POST.getlist('selected_ids')
-
-        if not selected_ids:
-            messages.warning(request, "Aucune campagne sélectionnée.")
-            return redirect('campagne_list')
-        qs = Campagne.objects.filter(pk__in=selected_ids)
-        if action == 'supprimer':
-            request.session['selected_campagne_ids'] = selected_ids
-            return redirect('campagne_selected_delete')
-        elif action == 'archiver':
-            count = qs.filter(actif=True).update(actif=False)
-            messages.success(request, f"{count} campagne(s) archivée(s).")
-        elif action == 'desarchiver':
-            count = qs.filter(actif=False).update(actif=True)
-            messages.success(request, f"{count} campagne(s) désarchivée(s).")
-        elif action in {
-            'mettre_en_pause',
-            'annuler',
-            'reprendre_prolonger',
-            'reprendre_garder',
-        }:
-            resultats = [
-                _transition_campagne(campagne, action)
-                for campagne in qs
-            ]
-            nombre_ok = sum(1 for succes, _ in resultats if succes)
-            details = [message for succes, message in resultats if not succes]
-            if nombre_ok:
-                messages.success(
-                    request, f"{nombre_ok} campagne(s) mise(s) à jour."
-                )
-            if details:
-                messages.warning(request, " ".join(details[:3]))
-        else:
-            messages.error(request, f"Action inconnue : {action}")
-        return redirect('campagne_list')
+        request.session['selected_campagne_client_id'] = None
+        return _apply_selected_campaign_action(
+            request,
+            Campagne.objects.all(),
+            reverse('campagne_list'),
+        )
 
 
 @transaction.atomic
@@ -3904,10 +3932,32 @@ class CampagneSelectedDeleteView(StaffRequiredMixin, TemplateView):
         self.selected_ids = request.session.get('selected_campagne_ids', [])
         if not self.selected_ids:
             messages.warning(request, "Aucune campagne sélectionnée pour la suppression.")
-            return redirect('campagne_list')
-            
+            return redirect(self.get_return_url(request))
+
+        self.client_pk = request.session.get('selected_campagne_client_id')
         self.campagnes_to_delete = Campagne.objects.filter(pk__in=self.selected_ids)
+        if self.client_pk:
+            client = get_object_or_404(Client, pk=self.client_pk)
+            if client.type_entite == Client.TYPE_AGENCE:
+                self.campagnes_to_delete = self.campagnes_to_delete.filter(
+                    agence=client,
+                )
+            else:
+                self.campagnes_to_delete = self.campagnes_to_delete.filter(
+                    client=client,
+                )
+        if not request.user.is_admin:
+            self.campagnes_to_delete = self.campagnes_to_delete.filter(actif=True)
+        if not self.campagnes_to_delete.exists():
+            messages.warning(request, "Aucune campagne sélectionnée pour la suppression.")
+            return redirect(self.get_return_url(request))
         return super().dispatch(request, *args, **kwargs)
+
+    def get_return_url(self, request):
+        client_pk = request.session.get('selected_campagne_client_id')
+        if client_pk:
+            return f"{reverse('client_detail', kwargs={'pk': client_pk})}#section-campagnes"
+        return reverse('campagne_list')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -3920,7 +3970,7 @@ class CampagneSelectedDeleteView(StaffRequiredMixin, TemplateView):
         context['message_body'] = "Vous êtes sur le point de supprimer de l'inventaire ces "
         context['obj'] = f"{count} campagne(s) sélectionnée(s)"
         context['hint'] = "Cette opération libérera immédiatement les supports réservés pour ces périodes."
-        context['cancel_url'] = reverse_lazy('campagne_list')
+        context['cancel_url'] = self.get_return_url(self.request)
         
         # Optionnel : si tu veux lister les noms des campagnes dans la zone de texte, 
         # on peut détourner proprement la variable associée
@@ -3932,6 +3982,7 @@ class CampagneSelectedDeleteView(StaffRequiredMixin, TemplateView):
 
     def post(self, request, *args, **kwargs):
         count = self.campagnes_to_delete.count()
+        return_url = self.get_return_url(request)
         
         # Suppression effective des éléments
         self.campagnes_to_delete.delete()
@@ -3939,9 +3990,11 @@ class CampagneSelectedDeleteView(StaffRequiredMixin, TemplateView):
         # Nettoyage de la session après traitement
         if 'selected_campagne_ids' in request.session:
             del request.session['selected_campagne_ids']
+        if 'selected_campagne_client_id' in request.session:
+            del request.session['selected_campagne_client_id']
             
         messages.success(request, f"{count} campagne(s) supprimée(s) avec succès.")
-        return redirect('campagne_list')
+        return redirect(return_url)
 
 
 # @login_required
@@ -6064,11 +6117,10 @@ class ReservationRedirectView(LoginRequiredMixin, View):
         reservation = get_object_or_404(Reservation, pk=pk)
         return redirect('reservation_detail', client_pk=reservation.client_id, resa_pk=reservation.pk)
     
-class ReservationListView(StaffRequiredMixin, SortableListMixin, ListView):
+class ReservationListView(StaffRequiredMixin, ClientSidePaginationMixin, SortableListMixin, ListView):
     model = Reservation
     template_name = 'campaigns/reservation_list.html'
     context_object_name = 'reservations'
-    paginate_by = 20
     SORT_FIELDS = {
         'nom': 'nom',
         'client': 'client__nom',
@@ -6405,7 +6457,6 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.core.mail import send_mail
-from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Count, Q, Prefetch
 from django.http import JsonResponse

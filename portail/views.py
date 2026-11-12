@@ -8,7 +8,6 @@ from django.contrib import messages
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.core.mail import send_mail
-from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Count, Prefetch, Q
 from django.http import JsonResponse
@@ -30,6 +29,7 @@ from campaigns.models import (
     STATUT_EN_ATTENTE,
     STATUT_CONFIRMEE,
 )
+from core.mixins import all_records_page
 from inventory.models import (
     EcranNumerique, FacePanneau, FormatSupport, Support, format_sort_key,
 )
@@ -764,8 +764,6 @@ class CatalogueView(View):
 
 class SupportsListeView(View):
     template_name = 'portail/supports_liste.html'
-    per_page = 20
-
     def get(self, request):
         fmt         = request.GET.get('format', '').strip()
         type_support= request.GET.get('type', '').strip()
@@ -829,10 +827,7 @@ class SupportsListeView(View):
 
             supports_enrichis.append(support)
 
-        # Pagination
-        paginator  = Paginator(supports_enrichis, self.per_page)
-        page_num   = request.GET.get('page', 1)
-        page_obj   = paginator.get_page(page_num)
+        page_obj = all_records_page(supports_enrichis)
 
         # Données pour les <select> de filtres
         filter_kwargs = {'actif': True}

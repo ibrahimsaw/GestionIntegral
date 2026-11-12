@@ -71,3 +71,76 @@ class CampagneDeleteTests(TransactionTestCase):
             action=AuditLog.ACTION_DELETE,
             object_repr="Campagne à supprimer -> DELETE-CAMPAIGN-SUPPORT",
         ).exists())
+
+    def test_client_detail_offers_bulk_actions_and_limits_them_to_its_campaigns(self):
+        campagne = self.create_campaign()
+        other_client = Client.objects.create(
+            nom="Autre client",
+            telephone="70000001",
+            email="autre-client-campagne@example.com",
+        )
+        other_campaign = Campagne.objects.create(
+            client=other_client,
+            nom="Campagne autre client",
+            date_debut=datetime.date(2026, 2, 1),
+            date_fin=datetime.date(2026, 2, 28),
+        )
+
+        detail_url = reverse("client_detail", args=[self.agency.pk])
+        detail_response = self.client.get(detail_url)
+        self.assertContains(detail_response, 'id="client-campaign-select-all"')
+        self.assertContains(detail_response, 'value="archiver"')
+
+        response = self.client.post(
+            detail_url,
+            {
+                "action": "archiver",
+                "selected_ids": [str(campagne.pk), str(other_campaign.pk)],
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        campagne.refresh_from_db()
+        other_campaign.refresh_from_db()
+        self.assertFalse(campagne.actif)
+        self.assertTrue(other_campaign.actif)
+
+    def test_bulk_delete_from_client_detail_only_deletes_its_campaigns(self):
+        campagne = self.create_campaign()
+        other_client = Client.objects.create(
+            nom="Client préservé",
+            telephone="70000002",
+            email="client-preserve-campagne@example.com",
+        )
+        other_campaign = Campagne.objects.create(
+            client=other_client,
+            nom="Campagne à préserver",
+            date_debut=datetime.date(2026, 3, 1),
+            date_fin=datetime.date(2026, 3, 31),
+        )
+        detail_url = reverse("client_detail", args=[self.agency.pk])
+
+        response = self.client.post(
+            detail_url,
+            {
+                "action": "supprimer",
+                "selected_ids": [str(campagne.pk), str(other_campaign.pk)],
+            },
+        )
+        self.assertRedirects(response, reverse("campagne_selected_delete"))
+
+        confirmation = self.client.get(reverse("campagne_selected_delete"))
+        self.assertEqual(confirmation.status_code, 200)
+        self.assertEqual(
+            list(confirmation.context["associated_campaigns"].values_list("pk", flat=True)),
+            [campagne.pk],
+        )
+
+        delete_response = self.client.post(reverse("campagne_selected_delete"))
+
+        self.assertEqual(
+            delete_response.url,
+            f"{detail_url}#section-campagnes",
+        )
+        self.assertFalse(Campagne.objects.filter(pk=campagne.pk).exists())
+        self.assertTrue(Campagne.objects.filter(pk=other_campaign.pk).exists())

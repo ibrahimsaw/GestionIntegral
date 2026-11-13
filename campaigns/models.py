@@ -1,5 +1,5 @@
-import calendar
 import datetime
+import math
 import uuid
 from decimal import Decimal
 from django.conf import settings
@@ -36,14 +36,6 @@ def calculer_duree_tranches(tranches: str) -> float:
         except ValueError:
             continue
     return total_heures
-
-
-def _ajouter_mois(date_initiale, nombre_mois):
-    index_mois = date_initiale.month - 1 + nombre_mois
-    annee = date_initiale.year + index_mois // 12
-    mois = index_mois % 12 + 1
-    jour = min(date_initiale.day, calendar.monthrange(annee, mois)[1])
-    return datetime.date(annee, mois, jour)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
@@ -523,6 +515,11 @@ class Reservation(models.Model):
         related_name='reservations',
         verbose_name="Contrat associé (optionnel)",
     )
+    prix_faces_par_format = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name="Tarifs mensuels par format",
+    )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -573,6 +570,20 @@ class Reservation(models.Model):
     def nb_faces(self) -> int:
         return self.lignes.count()
 
+    def nombre_mois_factures(self):
+        jours = self.duree_jours()
+        return math.ceil(jours / 30) if jours else 0
+
+    def montant_total(self):
+        mois = self.nombre_mois_factures()
+        total = Decimal('0.00')
+        for ligne in self.lignes.select_related('support'):
+            tarif = self.prix_faces_par_format.get(ligne.support.format)
+            if tarif in (None, ''):
+                continue
+            total += Decimal(str(tarif)) * mois
+        return total.quantize(Decimal('0.01'))
+
     def is_active(self) -> bool:
         now = timezone.now()
         return self.statut in (STATUT_EN_ATTENTE, STATUT_CONFIRMEE) and self.date_debut <= now <= self.date_fin
@@ -616,6 +627,19 @@ class ReservationLigne(models.Model):
     def __str__(self):
         face_label = f"Face {self.face.label}" if self.face else "—"
         return f"{self.reservation.reference} | {self.support.code} ({face_label})"
+
+    @property
+    def tarif_mensuel(self):
+        tarif = self.reservation.prix_faces_par_format.get(self.support.format)
+        return Decimal(str(tarif)) if tarif not in (None, '') else None
+
+    @property
+    def montant_total(self):
+        if self.tarif_mensuel is None:
+            return None
+        return (
+            self.tarif_mensuel * self.reservation.nombre_mois_factures()
+        ).quantize(Decimal('0.01'))
 
     def clean(self):
         super().clean()
@@ -766,9 +790,14 @@ class DemandeReservation(models.Model):
         verbose_name="Téléphone",
     )
     accepte_contact = models.BooleanField(
-        default=False,
+        default=True,
         verbose_name="Accepte d'être recontacté",
         help_text="Le visiteur a coché la case d'acceptation de contact commercial.",
+    )
+    prix_faces_par_format = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name="Tarifs mensuels par format",
     )
 
     # ── Type de client (NOUVEAU) ─────────────────────────────────────────────
@@ -844,17 +873,17 @@ class DemandeReservation(models.Model):
         verbose_name="Traité le",
     )
 
-    # ── Associations créées après validation ──────────────────────────────────
-    # Remplies par le staff depuis la vue de traitement (ou automatiquement
-    # au save() pour 'client', si la référence saisie matche — voir save()).
+    # ── Associations de la demande ────────────────────────────────────────────
+    # Le client est associé à l'envoi de la demande; la réservation officielle
+    # reste créée par le staff au moment de la validation.
     client = models.ForeignKey(
         Client,
         on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name='demandes_reservation',
         verbose_name="Client associé",
-        help_text="Renseigné automatiquement si la référence client saisie est "
-                   "valide, sinon par le staff après validation.",
+        help_text="Client sélectionné ou créé automatiquement lors de l'envoi "
+                   "de la demande.",
     )
     reservation = models.ForeignKey(
         Reservation,
@@ -1116,6 +1145,11 @@ class Campagne(models.Model):
     prix         = models.DecimalField(max_digits=14, decimal_places=2, default=0, verbose_name="Prix unitaire face",blank=True)
     prix_affichage = models.DecimalField(max_digits=14, decimal_places=2, default=0, verbose_name="Prix unitaire affichage",blank=True)
     prix_impression = models.DecimalField(max_digits=14, decimal_places=2, default=0, verbose_name="Prix unitaire impression",blank=True)
+    prix_faces_par_format = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name="Tarifs mensuels par format",
+    )
     # lieu de la campagne donne des chois des ville des support
     lieu = models.CharField(max_length=200, blank=True, verbose_name="Lieu de la campagne", help_text="Ville ou zone géographique de la campagne.")
     reference    = models.CharField(max_length=50, unique=True, blank=True)
@@ -1214,18 +1248,8 @@ class Campagne(models.Model):
     def nombre_mois_factures(self):
         if not self.date_debut or not self.date_fin or self.date_fin < self.date_debut:
             return 0
-
-        nombre_mois = (
-            (self.date_fin.year - self.date_debut.year) * 12
-            + self.date_fin.month
-            - self.date_debut.month
-        )
-        while nombre_mois > 0 and _ajouter_mois(self.date_debut, nombre_mois) > self.date_fin:
-            nombre_mois -= 1
-
-        if _ajouter_mois(self.date_debut, nombre_mois) < self.date_fin:
-            nombre_mois += 1
-        return max(nombre_mois, 1)
+        jours = (self.date_fin - self.date_debut).days + 1
+        return math.ceil(jours / 30)
 
     def montant_total(self):
         """Montant total de la campagne.
@@ -1234,8 +1258,6 @@ class Campagne(models.Model):
         Le tarif des faces et emplacements est mensuel; celui des spots écran
         s'applique à chaque spot diffusé sur toute la période.
         """
-        prix = self.prix or Decimal('0.00')
-
         if self.est_mere:
             total = Decimal('0.00')
             for enfant in self.sous_campagnes.all():
@@ -1243,13 +1265,33 @@ class Campagne(models.Model):
             return total
 
         if self.type_support == 'ecran':
+            prix = self.prix or Decimal('0.00')
             spots = self.calculer_nombre_spots()
             return (prix * Decimal(str(spots))).quantize(Decimal('0.01'))
 
         if self.type_support == 'marche':
+            prix = self.prix or Decimal('0.00')
             emplacements = self.nombre_emplacements() * self.nombre_mois_factures()
             return (prix * Decimal(emplacements)).quantize(Decimal('0.01'))
 
+        if self.prix_faces_par_format:
+            total = sum(
+                (
+                    Decimal(str(
+                        self.prix_faces_par_format.get(
+                            ligne.face.support.format,
+                            self.prix or 0,
+                        ) or 0
+                    ))
+                    for ligne in self.lignes.filter(face__isnull=False).select_related(
+                        'face__support'
+                    )
+                ),
+                Decimal('0.00'),
+            )
+            return (total * self.nombre_mois_factures()).quantize(Decimal('0.01'))
+
+        prix = self.prix or Decimal('0.00')
         faces = self.nombre_faces() * self.nombre_mois_factures()
         return (prix * Decimal(faces)).quantize(Decimal('0.01'))
     

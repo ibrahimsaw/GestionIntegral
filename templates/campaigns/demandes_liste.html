@@ -6,15 +6,16 @@
 {% block topbar_title %}
   <i class="bi bi-file-earmark-text-fill me-2" style="color:var(--color-primary)"></i>Demandes de réservation
 {% endblock %}
-
-
-{% block contentbouton %}
+{% block topbar_actions %}
   {% if user.is_staff_regie_role %}
-    <a href="{% url 'demande_creation' %}" class="btn btn-primary fw-semibold">
-      <i class="bi bi-plus-circle me-1"></i>Créer une demande
-    </a>
+  <a href="{% url 'demande_creation' %}" class="btn btn-primary btn-sm shadow-sm" style="border-radius: 8px; font-weight: 600;">
+    <i class="bi bi-plus-lg me-1"></i>
+    <span>Nouvelle demande</span>
+  </a>
   {% endif %}
-{% endblock contentbouton %}
+{% endblock %}
+
+
 
 
 {% block extra_head %}
@@ -197,7 +198,7 @@
   {# ═════════ Onglets de statut ═════════ #}
   <nav class="dl-tabs" aria-label="Filtrer par statut">
     <a href="?" class="dl-tab {% if not statut_actif %}is-active{% endif %}">
-      À suivre <span class="dl-tab-count">{{ compteurs.brouillon|add:compteurs.nouvelle|add:compteurs.en_cours }}</span>
+      Toutes <span class="dl-tab-count">{{ compteurs.total }}</span>
     </a>
     <a href="?statut=nouvelle" class="dl-tab {% if statut_actif == 'nouvelle' %}is-active{% endif %}">
       Nouvelles <span class="dl-tab-count">{{ compteurs.nouvelle }}</span>
@@ -224,84 +225,92 @@
     </div>
 
     {% if demandes %}
-    <div class="table-responsive">
-      <table id="tableDemandes" class="table dl-table align-middle">
-        <thead>
-          <tr>
-            <th class="ps-4">{% sortable_th sort_links sort_key sort_dir 'reference' 'Référence' %}</th>
-            <th>{% sortable_th sort_links sort_key sort_dir 'contact' 'Contact' %}</th>
-            <th>{% sortable_th sort_links sort_key sort_dir 'emplacements' 'Emplacements' %}</th>
-            <th>{% sortable_th sort_links sort_key sort_dir 'date_debut' 'Période souhaitée' %}</th>
-            <th>{% sortable_th sort_links sort_key sort_dir 'statut' 'Statut' %}</th>
-            <th>{% sortable_th sort_links sort_key sort_dir 'created_at' 'Reçue le' %}</th>
-            <th class="text-end pe-4">Actions</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for demande in demandes %}
-          <tr class="dl-row dl-st-{{ demande.statut }}">
-            <td>
-              <a href="{% url 'demande_detail' demande.uuid %}" class="dl-ref">{{ demande.reference }}</a>
-            </td>
-            <td>
-              <div class="dl-person">
-                <div class="dl-avatar" aria-hidden="true">{{ demande.nom_contact|slice:":2"|upper }}</div>
-                <div style="min-width:0">
-                  <div class="dl-person-name">{{ demande.nom_contact }}</div>
-                  {% if demande.societe %}<div class="dl-person-co">{{ demande.societe }}</div>{% endif %}
+    <div id="demandes-client-pagination" data-client-pagination data-page-size="20">
+      <div class="d-flex justify-content-end align-items-center gap-2 p-3">
+        <label class="form-label mb-0 small" for="demande-search">Rechercher</label>
+        <input id="demande-search" class="form-control form-control-sm" type="search"
+               placeholder="Référence, contact, statut…" autocomplete="off" style="max-width: 320px;">
+      </div>
+      <div class="table-responsive">
+        <table id="tableDemandes" class="table dl-table align-middle">
+          <thead>
+            <tr>
+              <th class="ps-4">{% sortable_th sort_links sort_key sort_dir 'reference' 'Référence' %}</th>
+              <th>{% sortable_th sort_links sort_key sort_dir 'contact' 'Contact' %}</th>
+              <th>{% sortable_th sort_links sort_key sort_dir 'emplacements' 'Emplacements' %}</th>
+              <th>{% sortable_th sort_links sort_key sort_dir 'date_debut' 'Période souhaitée' %}</th>
+              <th>{% sortable_th sort_links sort_key sort_dir 'statut' 'Statut' %}</th>
+              <th>{% sortable_th sort_links sort_key sort_dir 'created_at' 'Reçue le' %}</th>
+              <th class="text-end pe-4">Actions</th>
+            </tr>
+          </thead>
+          <tbody data-client-pagination-group>
+            {% for demande in demandes %}
+            <tr class="dl-row dl-st-{{ demande.statut }}" data-client-page-item>
+              <td>
+                <a href="{% url 'demande_detail' demande.uuid %}" class="dl-ref">{{ demande.reference }}</a>
+              </td>
+              <td>
+                <div class="dl-person">
+                  <div class="dl-avatar" aria-hidden="true">{{ demande.nom_contact|slice:":2"|upper }}</div>
+                  <div style="min-width:0">
+                    <div class="dl-person-name">{{ demande.nom_contact }}</div>
+                    {% if demande.societe %}<div class="dl-person-co">{{ demande.societe }}</div>{% endif %}
+                  </div>
                 </div>
-              </div>
-            </td>
-            <td>
-              <span class="dl-places">
-                <i class="bi bi-signpost-split"></i>{{ demande.nb_emplacements }}
-                <small>emplacement{{ demande.nb_emplacements|pluralize }}</small>
-              </span>
-            </td>
-            <td>
-              <div class="dl-period">{{ demande.date_debut_souhaitee|date:"d/m/Y" }} → {{ demande.date_fin_souhaitee|date:"d/m/Y" }}</div>
-              <div class="dl-sub">{{ demande.duree_jours }} jour{{ demande.duree_jours|pluralize }}</div>
-            </td>
-            <td>
-              {% if demande.statut == 'nouvelle' %}
-                <span class="dl-pill"><i class="bi bi-clock-history"></i>En attente</span>
-              {% elif demande.statut == 'brouillon' %}
-                <span class="dl-pill"><i class="bi bi-send"></i>En attente du client</span>
-              {% elif demande.statut == 'en_cours' %}
-                <span class="dl-pill"><i class="bi bi-hourglass-split"></i>En cours de traitement</span>
-              {% elif demande.statut == 'validee' %}
-                <span class="dl-pill"><i class="bi bi-check-circle"></i>Validée</span>
-              {% elif demande.statut == 'refusee' %}
-                <span class="dl-pill"><i class="bi bi-x-circle"></i>Refusée</span>
-              {% else %}
-                <span class="dl-pill">{{ demande.get_statut_display }}</span>
-              {% endif %}
-
-              {% if demande.traite_par %}
-                <div class="dl-sub dl-sub-by">
-                  par {{ demande.traite_par.get_short_name|default:demande.traite_par.username }}
-                </div>
-              {% endif %}
-            </td>
-            <td data-order="{{ demande.created_at|date:'U' }}">
-              <div class="dl-period" style="font-weight:500">{{ demande.created_at|date:"d/m/Y" }}</div>
-              <div class="dl-sub">{{ demande.created_at|date:"H:i" }}</div>
-            </td>
-            <td class="text-end pe-4">
-              <a href="{% url 'demande_detail' demande.uuid %}" class="dl-open"
-                 title="{% if demande.statut == 'validee' or demande.statut == 'refusee' %}Consulter{% else %}Traiter{% endif %} {{ demande.reference }}"
-                 aria-label="Ouvrir la demande {{ demande.reference }}">
-                {% if demande.statut == 'validee' or demande.statut == 'refusee' %}
-                  <i class="bi bi-eye"></i>
+              </td>
+              <td>
+                <span class="dl-places">
+                  <i class="bi bi-signpost-split"></i>{{ demande.nb_emplacements }}
+                  <small>emplacement{{ demande.nb_emplacements|pluralize }}</small>
+                </span>
+              </td>
+              <td>
+                <div class="dl-period">{{ demande.date_debut_souhaitee|date:"d/m/Y" }} → {{ demande.date_fin_souhaitee|date:"d/m/Y" }}</div>
+                <div class="dl-sub">{{ demande.duree_jours }} jour{{ demande.duree_jours|pluralize }}</div>
+              </td>
+              <td>
+                {% if demande.statut == 'nouvelle' %}
+                  <span class="dl-pill"><i class="bi bi-clock-history"></i>En attente</span>
+                {% elif demande.statut == 'brouillon' %}
+                  <span class="dl-pill"><i class="bi bi-send"></i>En attente du client</span>
+                {% elif demande.statut == 'en_cours' %}
+                  <span class="dl-pill"><i class="bi bi-hourglass-split"></i>En cours de traitement</span>
+                {% elif demande.statut == 'validee' %}
+                  <span class="dl-pill"><i class="bi bi-check-circle"></i>Validée</span>
+                {% elif demande.statut == 'refusee' %}
+                  <span class="dl-pill"><i class="bi bi-x-circle"></i>Refusée</span>
                 {% else %}
-                  <i class="bi bi-arrow-right"></i>
+                  <span class="dl-pill">{{ demande.get_statut_display }}</span>
                 {% endif %}
-              </a>
-            </td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+
+                {% if demande.traite_par %}
+                  <div class="dl-sub dl-sub-by">
+                    par {{ demande.traite_par.get_short_name|default:demande.traite_par.username }}
+                  </div>
+                {% endif %}
+              </td>
+              <td data-order="{{ demande.created_at|date:'U' }}">
+                <div class="dl-period" style="font-weight:500">{{ demande.created_at|date:"d/m/Y" }}</div>
+                <div class="dl-sub">{{ demande.created_at|date:"H:i" }}</div>
+              </td>
+              <td class="text-end pe-4">
+                <a href="{% url 'demande_detail' demande.uuid %}" class="dl-open"
+                   title="{% if demande.statut == 'validee' or demande.statut == 'refusee' %}Consulter{% else %}Traiter{% endif %} {{ demande.reference }}"
+                   aria-label="Ouvrir la demande {{ demande.reference }}">
+                  {% if demande.statut == 'validee' or demande.statut == 'refusee' %}
+                    <i class="bi bi-eye"></i>
+                  {% else %}
+                    <i class="bi bi-arrow-right"></i>
+                  {% endif %}
+                </a>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+      <div class="p-3 border-top" data-client-pagination-controls></div>
     </div>
     {% else %}
     <div class="dl-empty">
@@ -317,22 +326,23 @@
 
 {% block extra_js %}
 {% if demandes %}
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/datatables/1.13.6/css/dataTables.bootstrap5.min.css">
-<script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/datatables/1.13.6/js/jquery.dataTables.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/datatables/1.13.6/js/dataTables.bootstrap5.min.js"></script>
 <script>
-$(document).ready(function() {
-  $('#tableDemandes').DataTable({
-    pageLength: 20,
-    language: {
-      url: '//cdn.datatables.net/plug-ins/1.13.6/i18n/fr-FR.json'
-    },
-    ordering: false,
-    searching: true,
-    dom: '<"p-3 d-flex justify-content-between align-items-center flex-wrap gap-2"<"d-flex align-items-center gap-2"l><"d-flex align-items-center gap-2"f>>rt<"p-3 d-flex justify-content-between align-items-center flex-wrap gap-2"<"small text-muted"i><"pagination-sm"p>>'
+(() => {
+  const container = document.getElementById('demandes-client-pagination');
+  const search = document.getElementById('demande-search');
+  if (!container || !search) return;
+
+  const rows = Array.from(container.querySelectorAll('[data-client-page-item]'));
+  const normalize = (value) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+
+  search.addEventListener('input', () => {
+    const query = normalize(search.value.trim());
+    rows.forEach((row) => {
+      row.dataset.clientPageFiltered = normalize(row.textContent).includes(query) ? 'false' : 'true';
+    });
+    window.refreshClientPagination(container, true);
   });
-});
+})();
 </script>
 {% endif %}
 {% endblock %}

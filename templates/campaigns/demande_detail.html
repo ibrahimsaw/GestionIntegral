@@ -4,8 +4,18 @@
   <i class="bi bi-file-earmark-text-fill me-2" style="color:var(--color-primary)"></i>
   {{ demande.reference }}
 {% endblock %}
-{% block topbar_actions %}
 
+{% block topbar_actions %}
+  {% if user.is_staff_regie_role %}
+  <a href="{% url 'demande_creation' %}" class="btn btn-primary btn-sm shadow-sm" style="border-radius: 8px; font-weight: 600;">
+    <i class="bi bi-plus-lg me-1"></i>
+    <span>Nouvelle demande</span>
+  </a>
+  {% endif %}
+  <a href="{% url 'demandes_liste' %}" class="btn btn-outline-secondary btn-sm shadow-sm" style="border-radius: 8px; font-weight: 600;">
+    <i class="bi bi-list me-1"></i>
+    <span>Liste des demandes</span>
+  </a>
 {% endblock %}
 
 {% block contentbouton %}
@@ -284,12 +294,13 @@
                 {% if demande.supports_souhaites.exists %}
                   <div class="fd-warn"><i class="bi bi-exclamation-triangle-fill"></i><span>Cette demande comprend un écran numérique. Son traitement doit être fait manuellement.</span></div>
                 {% else %}
+                  <a href="{% url 'campagne_create' %}?demande={{ demande.uuid }}" class="btn btn-outline-primary w-100 py-2 fw-semibold mb-2">
+                    <i class="bi bi-megaphone me-1"></i>Créer une campagne
+                  </a>
                   <button type="submit" class="btn btn-disponible w-100 py-2 fw-semibold">
                     <i class="bi bi-calendar-check me-1"></i>Créer une réservation
                   </button>
-                  <a href="{% url 'campagne_create' %}?demande={{ demande.uuid }}" class="btn btn-outline-primary w-100 py-2 fw-semibold">
-                    <i class="bi bi-megaphone me-1"></i>Créer une campagne
-                  </a>
+
                   <p class="fd-hint mb-0">Les réservations existantes restent inchangées. Pour une campagne, vous pourrez choisir une réservation du même client et reprendre les faces réservées.</p>
                 {% endif %}
               </form>

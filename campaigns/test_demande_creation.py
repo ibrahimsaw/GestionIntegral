@@ -61,6 +61,205 @@ class DemandeCreationViewTests(TestCase):
     def complete_step_two(self):
         return self.client.post(reverse('demande_creation_etape2'), {})
 
+    def test_format_prices_are_saved_on_demand_and_copied_to_reservation(self):
+        standard = FormatSupport.objects.create(
+            code='DEMANDE-PRICE-STANDARD',
+            categorie='Standard',
+            dimensions='4m x 3m',
+        )
+        geant = FormatSupport.objects.create(
+            code='DEMANDE-PRICE-GEANT',
+            categorie='Géant',
+            dimensions='8m x 4m',
+        )
+        self.panel.format = standard.code
+        self.panel.save(update_fields=['format'])
+        other_panel = Support.objects.create(
+            code='DEMANDE-PRICE-PANEL-2',
+            nom='Panneau grand format',
+            type_support=Support.TYPE_PANNEAU,
+            format=geant.code,
+            latitude=12.35,
+            longitude=-1.53,
+            ville='Ouagadougou',
+        )
+        other_face = FacePanneau.objects.create(
+            support=other_panel,
+            label=FacePanneau.LABEL_A,
+        )
+        tarifs = {
+            standard.code: '12500',
+            geant.code: '21000',
+        }
+
+        response = self.complete_step_one(
+            faces_selectionnees=json.dumps([self.face.pk, other_face.pk]),
+            tarifs_faces_par_format=json.dumps(tarifs),
+        )
+        self.assertRedirects(response, reverse('demande_creation_etape2'))
+        self.assertRedirects(
+            self.complete_step_two(),
+            reverse(
+                'demande_detail',
+                kwargs={'uuid': DemandeReservation.objects.get().uuid},
+            ),
+        )
+        demande = DemandeReservation.objects.get()
+        self.assertEqual(demande.prix_faces_par_format, tarifs)
+
+        response = self.client.post(
+            reverse('demande_valider', kwargs={'uuid': demande.uuid}),
+        )
+        self.assertRedirects(
+            response,
+            reverse('demande_detail', kwargs={'uuid': demande.uuid}),
+        )
+        reservation = Reservation.objects.get()
+        self.assertEqual(reservation.prix_faces_par_format, tarifs)
+        self.assertEqual(reservation.nombre_mois_factures(), 1)
+        self.assertEqual(reservation.montant_total(), 33500)
+        detail_response = self.client.get(
+            reverse(
+                'reservation_detail',
+                kwargs={
+                    'client_pk': reservation.client_id,
+                    'resa_pk': reservation.pk,
+                },
+            )
+        )
+        self.assertEqual(detail_response.status_code, 200)
+        self.assertContains(detail_response, 'Tarif / mois')
+
+    def test_format_price_is_optional_and_retained_when_contact_is_invalid(self):
+        format_support = FormatSupport.objects.create(
+            code='DEMANDE-PRICE-REQUIRED',
+            categorie='Standard',
+            dimensions='4m x 3m',
+        )
+        self.panel.format = format_support.code
+        self.panel.save(update_fields=['format'])
+
+        response = self.complete_step_one()
+
+        self.assertRedirects(response, reverse('demande_creation_etape2'))
+
+        response = self.complete_step_one(
+            email='adresse-invalide',
+            tarifs_faces_par_format=json.dumps({format_support.code: '15000'}),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'montant mensuel valide')
+        self.assertContains(response, '15000')
+
+    def test_campaign_months_use_thirty_day_billing_periods(self):
+        debut = datetime.date(2026, 1, 1)
+        self.assertEqual(
+            Campagne(
+                date_debut=debut,
+                date_fin=debut + datetime.timedelta(days=14),
+            ).nombre_mois_factures(),
+            1,
+        )
+        self.assertEqual(
+            Campagne(
+                date_debut=debut,
+                date_fin=debut + datetime.timedelta(days=34),
+            ).nombre_mois_factures(),
+            2,
+        )
+        self.assertEqual(
+            Reservation(
+                date_debut=timezone.make_aware(
+                    datetime.datetime.combine(debut, datetime.time.min)
+                ),
+                date_fin=timezone.make_aware(
+                    datetime.datetime.combine(
+                        debut + datetime.timedelta(days=14),
+                        datetime.time.max,
+                    )
+                ),
+            ).nombre_mois_factures(),
+            1,
+        )
+        self.assertEqual(
+            Reservation(
+                date_debut=timezone.make_aware(
+                    datetime.datetime.combine(debut, datetime.time.min)
+                ),
+                date_fin=timezone.make_aware(
+                    datetime.datetime.combine(
+                        debut + datetime.timedelta(days=34),
+                        datetime.time.max,
+                    )
+                ),
+            ).nombre_mois_factures(),
+            2,
+        )
+
+    def test_staff_location_filters_are_before_broadcast_period(self):
+        response = self.client.get(reverse('demande_creation'))
+        content = response.content.decode()
+        self.assertLess(
+            content.index('Filtres des emplacements'),
+            content.index('Période de diffusion'),
+        )
+
+    def test_staff_tariff_controls_are_below_period_and_outside_selection_panel(self):
+        response = self.client.get(reverse('demande_creation'))
+        content = response.content.decode()
+        period_index = content.index('Période de diffusion')
+        tariff_index = content.index('id="tarification-faces"')
+        locations_index = content.index('>Emplacements</h2>')
+        selection_form_index = content.index('<form method="post" id="form-etape1">')
+
+        self.assertLess(period_index, tariff_index)
+        self.assertLess(tariff_index, locations_index)
+        self.assertLess(tariff_index, selection_form_index)
+
+    def test_default_demands_list_shows_every_status(self):
+        statuts = [statut for statut, _ in DemandeReservation.STATUT_CHOICES]
+        for index, statut in enumerate(statuts):
+            DemandeReservation.objects.create(
+                type_client=DemandeReservation.TYPE_CLIENT_NOUVEAU,
+                nom_contact=f'Prospect {index}',
+                email=f'prospect-{index}@example.com',
+                telephone=f'7100000{index}',
+                date_debut_souhaitee=self.start,
+                date_fin_souhaitee=self.end,
+                statut=statut,
+            )
+        for index in range(16):
+            DemandeReservation.objects.create(
+                type_client=DemandeReservation.TYPE_CLIENT_NOUVEAU,
+                nom_contact=f'Autre prospect {index}',
+                email=f'autre-prospect-{index}@example.com',
+                telephone=f'720000{index:02d}',
+                date_debut_souhaitee=self.start,
+                date_fin_souhaitee=self.end,
+                statut=DemandeReservation.STATUT_NOUVELLE,
+            )
+
+        response = self.client.get(reverse('demandes_liste'))
+        nombre_demandes = len(statuts) + 16
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['demandes'].count(), nombre_demandes)
+        self.assertEqual(response.context['compteurs']['total'], nombre_demandes)
+        self.assertContains(response, 'data-client-pagination data-page-size="20"')
+        self.assertContains(response, 'data-client-pagination-controls')
+        self.assertEqual(
+            response.content.decode().count('data-client-page-item>'),
+            nombre_demandes,
+        )
+        for statut in statuts:
+            self.assertContains(response, f'dl-row dl-st-{statut}')
+
+        filtered_response = self.client.get(
+            reverse('demandes_liste'),
+            {'statut': DemandeReservation.STATUT_VALIDEE},
+        )
+        self.assertEqual(filtered_response.context['demandes'].count(), 1)
+
     def test_confirmation_page_renders_the_styled_status_header(self):
         demande = DemandeReservation.objects.create(
             type_client=DemandeReservation.TYPE_CLIENT_NOUVEAU,
@@ -445,8 +644,14 @@ class DemandeCreationViewTests(TestCase):
             reverse('demande_detail', kwargs={'uuid': demande.uuid}),
         )
         self.assertEqual(demande.statut, DemandeReservation.STATUT_EN_COURS)
-        self.assertIsNone(demande.client)
+        self.assertIsNotNone(demande.client)
         self.assertEqual(demande.type_client, DemandeReservation.TYPE_CLIENT_NOUVEAU)
+        self.assertEqual(demande.client.type_entite, Client.TYPE_CLIENT)
+        self.assertEqual(demande.client.nom, 'Nouvelle société')
+        self.assertEqual(demande.client.contact_nom, 'Moussa Prospect')
+        self.assertEqual(demande.client.email, 'moussa@example.com')
+        self.assertEqual(demande.client.telephone, '71000000')
+        self.assertTrue(demande.accepte_contact)
         self.assertEqual(demande.nom_contact, 'Moussa Prospect')
         self.assertEqual(demande.nom_campagne, '')
         self.assertEqual(list(demande.faces_souhaitees.all()), [self.face])
@@ -456,6 +661,35 @@ class DemandeCreationViewTests(TestCase):
         self.assertContains(detail_response, 'Créer une réservation')
         self.assertContains(detail_response, 'Refuser la demande')
         self.assertFalse(Reservation.objects.exists())
+
+    def test_request_approval_reuses_automatically_created_client(self):
+        Client.objects.create(
+            nom='Ancien compte avec le même e-mail',
+            contact_nom='Autre contact',
+            telephone='70000001',
+            email='moussa@example.com',
+        )
+        self.assertRedirects(
+            self.complete_step_one(),
+            reverse('demande_creation_etape2'),
+        )
+        self.complete_step_two()
+        demande = DemandeReservation.objects.get()
+        client_cree = demande.client
+        self.assertIsNotNone(client_cree)
+
+        response = self.client.post(
+            reverse('demande_valider', kwargs={'uuid': demande.uuid}),
+        )
+
+        self.assertRedirects(
+            response,
+            reverse('demande_detail', kwargs={'uuid': demande.uuid}),
+        )
+        demande.refresh_from_db()
+        self.assertEqual(demande.client, client_cree)
+        self.assertEqual(demande.reservation.client, client_cree)
+        self.assertEqual(Client.objects.count(), 2)
 
     def test_staff_can_edit_confirmed_request_without_reenabling_client_link(self):
         demande = DemandeReservation.objects.create(
@@ -606,6 +840,8 @@ class DemandeCreationViewTests(TestCase):
         response = self.complete_step_one(email='adresse-invalide')
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'adresse-invalide')
+        self.assertContains(response, 'id="initial-selected-faces"')
+        self.assertContains(response, f'"id": "{self.face.pk}"')
         self.assertTrue(response.context['contact_form'].errors['email'])
         self.assertFalse(DemandeReservation.objects.exists())
         session = self.client.session
@@ -614,6 +850,19 @@ class DemandeCreationViewTests(TestCase):
             session['gestion_demande_periode']['date_debut'],
             self.start.isoformat(),
         )
+
+    def test_invalid_dates_keep_selected_faces_for_correction(self):
+        response = self.complete_step_one(date_fin=self.start.isoformat())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.context['form'].errors['date_fin'])
+        self.assertContains(response, 'id="initial-selected-faces"')
+        self.assertContains(response, f'"id": "{self.face.pk}"')
+        self.assertEqual(
+            self.client.session['gestion_demande_faces'],
+            [self.face.pk],
+        )
+        self.assertFalse(DemandeReservation.objects.exists())
 
     def test_public_step_three_keeps_its_reference_based_client_flow(self):
         session = self.client.session
@@ -773,6 +1022,7 @@ class DemandeCreationViewTests(TestCase):
             date_debut_souhaitee=self.start,
             date_fin_souhaitee=self.end,
             statut=DemandeReservation.STATUT_EN_COURS,
+            prix_faces_par_format={format_support.code: '12500'},
         )
         demande.faces_souhaitees.add(self.face)
 
@@ -834,6 +1084,11 @@ class DemandeCreationViewTests(TestCase):
         self.assertEqual(demande.campagne, campagne)
         self.assertIsNone(demande.reservation)
         self.assertEqual(campagne.client, agency)
+        self.assertEqual(
+            campagne.prix_faces_par_format,
+            {format_support.code: '12500'},
+        )
+        self.assertEqual(campagne.montant_total(), 12500)
         self.assertTrue(LigneCampagne.objects.filter(campagne=campagne, face=self.face).exists())
         self.assertEqual(reservation.lignes.count(), 1)
         self.assertEqual(Reservation.objects.count(), 2)

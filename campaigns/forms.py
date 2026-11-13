@@ -1116,7 +1116,7 @@ class DemandeGestionContactForm(forms.Form):
         widget=forms.Select(attrs={'class': 'form-control-e3'}),
     )
     nom_contact = forms.CharField(
-        max_length=200,
+        max_length=150,
         required=False,
         widget=forms.TextInput(attrs={'class': 'form-control-e3'}),
     )

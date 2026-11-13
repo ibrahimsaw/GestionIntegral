@@ -4059,7 +4059,7 @@ def build_support_rows(campagne, lignes):
                 order.append(support.pk)
             grouped[support.pk]['lignes'].append(ligne)
 
-    prix_u = campagne.prix or Decimal('0.00')
+    prix_u_defaut = campagne.prix or Decimal('0.00')
     aff_u = campagne.prix_affichage or Decimal('0.00')
     imp_u = campagne.prix_impression or Decimal('0.00')
     mois_factures = 1 if campagne.type_support == 'ecran' else campagne.nombre_mois_factures()
@@ -4083,6 +4083,12 @@ def build_support_rows(campagne, lignes):
         else:
             quantite = Decimal(len(group_lignes))
             faces_labels = [l.face.label for l in group_lignes if l.face]
+        support_format = getattr(support, 'format', None)
+        prix_u = (
+            Decimal(str(campagne.prix_faces_par_format[support_format]))
+            if support_format in campagne.prix_faces_par_format
+            else prix_u_defaut
+        )
 
         prix_total = (prix_u * quantite * mois_factures).quantize(Decimal('0.01'))
         aff_total = (aff_u * quantite).quantize(Decimal('0.01'))
@@ -4530,6 +4536,14 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
             form.instance.actif = False
         
         self.object = form.save()
+        if demande:
+            self.object.prix_faces_par_format = demande.prix_faces_par_format
+            self.object.save(update_fields=['prix_faces_par_format'])
+        elif form.reservation_source:
+            self.object.prix_faces_par_format = (
+                form.reservation_source.prix_faces_par_format
+            )
+            self.object.save(update_fields=['prix_faces_par_format'])
         transaction.on_commit(lambda: cache.delete('dashboard_alertes'))
 
         faces_importees = 0
@@ -6760,17 +6774,11 @@ class DemandesListView(LoginRequiredMixin, SortableListMixin, View):
 
         if statut:
             qs = qs.filter(statut=statut)
-        else:
-            # Par défaut : uniquement les demandes qui nécessitent une action
-            qs = qs.filter(statut__in=[
-                DemandeReservation.STATUT_BROUILLON,
-                DemandeReservation.STATUT_NOUVELLE,
-                DemandeReservation.STATUT_EN_COURS,
-            ])
 
         qs = self.apply_sort(qs)
 
         compteurs = {
+            'total': DemandeReservation.objects.count(),
             'brouillon': DemandeReservation.objects.filter(statut=DemandeReservation.STATUT_BROUILLON).count(),
             'nouvelle': DemandeReservation.objects.filter(statut=DemandeReservation.STATUT_NOUVELLE).count(),
             'en_cours': DemandeReservation.objects.filter(statut=DemandeReservation.STATUT_EN_COURS).count(),
@@ -6795,6 +6803,7 @@ class StaffDemandeWizardBase(StaffRequiredMixin, View):
     session_faces_key = 'gestion_demande_faces'
     session_supports_key = 'gestion_demande_supports'
     session_period_key = 'gestion_demande_periode'
+    session_prices_key = 'gestion_demande_prix_faces'
     session_project_key = 'gestion_demande_projet'
     session_contact_key = 'gestion_demande_contact'
     session_edit_key = 'gestion_demande_edit_uuid'
@@ -6814,6 +6823,7 @@ class StaffDemandeWizardBase(StaffRequiredMixin, View):
             self.session_faces_key,
             self.session_supports_key,
             self.session_period_key,
+            self.session_prices_key,
             self.session_project_key,
             self.session_contact_key,
             self.session_edit_key,
@@ -6850,6 +6860,12 @@ class DemandeCreationView(StaffDemandeWizardBase):
                 'class': 'form-control-e3 staff-field-control',
             })
         faces, _ = self.get_selections(request)
+        formats = {
+            item.code: item
+            for item in FormatSupport.objects.filter(
+                code__in={face.support.format for face in faces if face.support.format}
+            )
+        }
         initial_selected_faces = [
             {
                 'id': str(face.pk),
@@ -6857,17 +6873,22 @@ class DemandeCreationView(StaffDemandeWizardBase):
                 'label': face.get_label_display(),
                 'quartier': face.support.quartier or face.support.ville,
                 'support_id': str(face.support_id),
+                'format_code': face.support.format,
+                'format_display': (
+                    face.support.get_format_display()
+                    or face.support.format
+                ),
+                'categorie': (
+                    formats[face.support.format].categorie
+                    if face.support.format in formats
+                    else 'Autres'
+                ),
             }
             for face in faces
         ]
-        formats = {
-            code: category or 'Autres'
-            for code, category in FormatSupport.objects.filter(
-                code__in={face.support.format for face in faces if face.support.format}
-            ).values_list('code', 'categorie')
-        }
         selected_categories = {
-            formats.get(face.support.format, 'Autres')
+            formats[face.support.format].categorie or 'Autres'
+            if face.support.format in formats else 'Autres'
             for face in faces
         }
         selected_cities = {face.support.ville for face in faces if face.support.ville}
@@ -6895,6 +6916,7 @@ class DemandeCreationView(StaffDemandeWizardBase):
             contact_form=contact_form,
             panier=faces,
             initial_selected_faces=initial_selected_faces,
+            initial_tarifs_faces=request.session.get(self.session_prices_key, {}),
             filtres=filtres,
         ))
 
@@ -6926,14 +6948,57 @@ class DemandeCreationView(StaffDemandeWizardBase):
         selection_valid = selection_form.is_valid()
         contact_valid = contact_form.is_valid()
         forms_valid = selection_valid and contact_valid
-        if selection_valid:
-            selection = selection_form.cleaned_data
+        selection = selection_form.cleaned_data
+        if 'faces_uuids' in selection and 'supports_uuids' in selection:
             request.session[self.session_faces_key] = selection['faces_uuids']
             request.session[self.session_supports_key] = selection['supports_uuids']
+            selected_faces = FacePanneau.objects.filter(
+                pk__in=selection['faces_uuids']
+            ).select_related('support')
+            formats_attendus = {
+                face.support.format for face in selected_faces
+                if face.support.format
+            }
+            try:
+                posted_tarifs = json.loads(
+                    request.POST.get('tarifs_faces_par_format', '').strip() or '{}'
+                )
+            except (TypeError, ValueError):
+                posted_tarifs = {}
+            tarifs = {}
+            tarifs_valides = isinstance(posted_tarifs, dict)
+            for code in formats_attendus:
+                value = str(posted_tarifs.get(code, '')).strip() if tarifs_valides else ''
+                if not value:
+                    continue
+                tarifs[code] = value
+                try:
+                    tarif = Decimal(value.replace(',', '.'))
+                    if (
+                        not tarif.is_finite()
+                        or tarif < 0
+                        or tarif > Decimal('999999999999.99')
+                        or tarif.as_tuple().exponent < -2
+                    ):
+                        tarifs_valides = False
+                except (InvalidOperation, ValueError):
+                    tarifs_valides = False
+            request.session[self.session_prices_key] = tarifs
+            if not tarifs_valides:
+                selection_form.add_error(
+                    None,
+                    "Un tarif renseigné doit être un montant mensuel valide (positif ou nul).",
+                )
+                forms_valid = False
+
+        if 'date_debut' in selection and 'date_fin' in selection:
             request.session[self.session_period_key] = {
                 'date_debut': str(selection['date_debut']),
                 'date_fin': str(selection['date_fin']),
             }
+        elif not selection_valid:
+            request.session.pop(self.session_period_key, None)
+
         if not forms_valid:
             return self._render_step(
                 request, selection_form, contact_form
@@ -6987,6 +7052,42 @@ class DemandeCreationEtape2View(StaffDemandeWizardBase):
             return None
         days = (date.fromisoformat(date_fin) - date.fromisoformat(date_debut)).days + 1
         project = request.session.get(self.session_project_key, {})
+        tarifs = request.session.get(self.session_prices_key, {})
+        formats = {
+            item.code: item
+            for item in FormatSupport.objects.filter(
+                code__in={face.support.format for face in faces if face.support.format}
+            )
+        }
+        tarifs_lignes = []
+        total_faces = Decimal('0.00')
+        mois_factures = (days + 29) // 30
+        for code, prix in tarifs.items():
+            faces_format = [
+                face for face in faces if face.support.format == code
+            ]
+            if not faces_format:
+                continue
+            try:
+                montant = Decimal(str(prix)) * len(faces_format) * mois_factures
+            except (InvalidOperation, ValueError):
+                montant = Decimal('0.00')
+            total_faces += montant
+            format_support = formats.get(code)
+            tarifs_lignes.append({
+                'code': code,
+                'label': (
+                    format_support.dimensions
+                    if format_support and format_support.dimensions else code
+                ),
+                'categorie': (
+                    format_support.categorie
+                    if format_support and format_support.categorie else 'Autres'
+                ),
+                'prix': prix,
+                'quantite': len(faces_format),
+                'total': montant,
+            })
         return self.step_context(
             request,
             faces=faces,
@@ -6996,6 +7097,10 @@ class DemandeCreationEtape2View(StaffDemandeWizardBase):
             project=project,
             nombre_emplacements=len(faces) + len(supports),
             duree_jours=days,
+            tarifs_faces_par_format=tarifs,
+            tarifs_lignes=tarifs_lignes,
+            mois_factures=mois_factures,
+            total_faces=total_faces,
         )
 
     def get(self, request):
@@ -7031,20 +7136,68 @@ class DemandeCreationEtape2View(StaffDemandeWizardBase):
                         statut=DemandeReservation.STATUT_EN_COURS,
                         token_partage=uuid.uuid4(),
                     )
+                client_prospect_existant = (
+                    demande.client
+                    if demande.pk
+                    and demande.type_client == DemandeReservation.TYPE_CLIENT_NOUVEAU
+                    and demande.client_id
+                    and demande.client.type_entite == Client.TYPE_CLIENT
+                    else None
+                )
+                if data['type_client'] == DemandeReservation.TYPE_CLIENT_EXISTANT:
+                    client = data['client']
+                elif client_prospect_existant:
+                    client = client_prospect_existant
+                    client.nom = data['societe'] or data['nom_contact']
+                    client.contact_nom = data['nom_contact']
+                    client.email = data['email']
+                    client.telephone = data['telephone']
+                    client.save(update_fields=[
+                        'nom', 'contact_nom', 'email', 'telephone',
+                    ])
+                else:
+                    client = Client.objects.create(
+                        type_entite=Client.TYPE_CLIENT,
+                        nom=data['societe'] or data['nom_contact'],
+                        contact_nom=data['nom_contact'],
+                        email=data['email'],
+                        telephone=data['telephone'],
+                    )
                 demande.client = client
                 demande.type_client = data['type_client']
-                demande.reference_client_saisie = client.reference if client else ''
-                demande.nom_contact = (
-                    (client.contact_nom or client.nom) if client else data['nom_contact']
+                demande.reference_client_saisie = (
+                    client.reference
+                    if data['type_client'] == DemandeReservation.TYPE_CLIENT_EXISTANT
+                    else ''
                 )
-                demande.societe = client.nom if client else data['societe']
-                demande.email = client.email if client else data['email']
-                demande.telephone = client.telephone if client else data['telephone']
+                demande.nom_contact = (
+                    (client.contact_nom or client.nom)
+                    if data['type_client'] == DemandeReservation.TYPE_CLIENT_EXISTANT
+                    else data['nom_contact']
+                )
+                demande.societe = (
+                    client.nom
+                    if data['type_client'] == DemandeReservation.TYPE_CLIENT_EXISTANT
+                    else data['societe']
+                )
+                demande.email = (
+                    client.email
+                    if data['type_client'] == DemandeReservation.TYPE_CLIENT_EXISTANT
+                    else data['email']
+                )
+                demande.telephone = (
+                    client.telephone
+                    if data['type_client'] == DemandeReservation.TYPE_CLIENT_EXISTANT
+                    else data['telephone']
+                )
                 demande.accepte_contact = data['accepte_contact']
                 demande.date_debut_souhaitee = date.fromisoformat(context['periode']['date_debut'])
                 demande.date_fin_souhaitee = date.fromisoformat(context['periode']['date_fin'])
                 demande.nom_campagne = context['project'].get('nom_campagne', '')
                 demande.message = context['project'].get('message', '')
+                demande.prix_faces_par_format = request.session.get(
+                    self.session_prices_key, {}
+                )
                 demande.full_clean(exclude=['reference'])
                 demande.save()
                 demande.faces_souhaitees.set(context['faces'])
@@ -7208,6 +7361,9 @@ class DemandeModifierView(StaffRequiredMixin, View):
             'date_debut': demande.date_debut_souhaitee.isoformat(),
             'date_fin': demande.date_fin_souhaitee.isoformat(),
         }
+        request.session[StaffDemandeWizardBase.session_prices_key] = (
+            demande.prix_faces_par_format or {}
+        )
         request.session[StaffDemandeWizardBase.session_project_key] = {
             'nom_campagne': demande.nom_campagne,
             'message': demande.message,
@@ -7290,11 +7446,14 @@ class DemandeValiderView(LoginRequiredMixin, View):
                 # get_or_create(), qui échoue avec MultipleObjectsReturned
                 # dès que plusieurs lignes Client partagent le même email
                 # (le champ n'a probablement pas de contrainte unique=True).
-                client = None
-                if demande.email:
+                client = demande.client
+                if client is None and demande.email:
                     client = (
                         Client.objects
-                        .filter(email=demande.email)
+                        .filter(
+                            email=demande.email,
+                            type_entite=Client.TYPE_CLIENT,
+                        )
                         .order_by('pk')
                         .first()
                     )
@@ -7318,6 +7477,7 @@ class DemandeValiderView(LoginRequiredMixin, View):
                     client=client,
                     date_debut=date_debut_dt,
                     date_fin=date_fin_dt,
+                    prix_faces_par_format=demande.prix_faces_par_format,
                     created_by=request.user,
                     notes=(
                         f"Créée depuis la demande {demande.reference}.\n{demande.message}"

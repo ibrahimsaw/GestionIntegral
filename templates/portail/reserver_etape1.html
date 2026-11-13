@@ -1126,6 +1126,42 @@
     </section>
     {% endif %}
 
+    <section class="cf-sec" style="padding-bottom:14px">
+      <h2 class="cf-h">Filtres des emplacements</h2>
+      <p class="cf-sub">Choisissez une ville et une catégorie avant de sélectionner la période.</p>
+      <div id="filtres-carte" style="display:none;gap:6px;flex-wrap:wrap">
+        <select class="mf-select" id="filter-ville">
+          <option value="">Toutes les villes</option>
+        </select>
+        {% if not shared_edit_mode %}
+        <select class="mf-select" id="filter-categorie" {% if staff_mode %}aria-required="true"{% endif %}>
+          <option value="">{% if staff_mode %}Choisir une catégorie{% else %}Toutes catégories{% endif %}</option>
+        </select>
+        {% endif %}
+        <div id="filter-format-wrap" class="{% if staff_mode or shared_edit_mode %}staff-format-filter{% endif %}" style="{% if staff_mode or shared_edit_mode %}display:none{% endif %}">
+          <select class="mf-select" id="filter-format">
+            <option value="">Tous formats</option>
+          </select>
+        </div>
+      </div>
+      <div id="filtres-liste" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
+        <input type="search" class="list-search" id="list-search" placeholder="Code ou nom du panneau…">
+        <select class="mf-select" id="list-filter-ville">
+          <option value="">Toutes les villes</option>
+        </select>
+        {% if not shared_edit_mode %}
+        <select class="mf-select" id="list-filter-categorie" {% if staff_mode %}aria-required="true"{% endif %}>
+          <option value="">{% if staff_mode %}Choisir une catégorie{% else %}Toutes catégories{% endif %}</option>
+        </select>
+        {% endif %}
+        <div id="list-filter-format-wrap" class="{% if staff_mode or shared_edit_mode %}staff-format-filter{% endif %}" style="{% if staff_mode or shared_edit_mode %}display:none{% endif %}">
+          <select class="mf-select" id="list-filter-format">
+            <option value="">Tous formats</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
     <!-- ================= PÉRIODE ================= -->
     <section class="cf-sec">
       <h2 class="cf-h">{% if staff_mode %}Période de diffusion{% else %}Période souhaitée{% endif %}</h2>
@@ -1167,6 +1203,14 @@
           Saisissez les dates pour voir les disponibilités
         </div>
       </div>
+      {% if staff_mode %}
+      <div id="tarification-faces" style="display:none;margin-top:14px;padding:12px;border:1px solid var(--line);border-radius:10px">
+        <strong style="font-size:.84rem">Tarif unitaire par face et par mois (facultatif)</strong>
+        <div class="small text-muted mb-2">Un tarif est appliqué à toutes les faces du même format. Facturation par périodes de 30 jours commencées.</div>
+        <div id="tarifs-formats-champs"></div>
+        <div id="tarifs-estimation" class="small fw-semibold mt-2"></div>
+      </div>
+      {% endif %}
     </section>
 
     <!-- ================= EMPLACEMENTS ================= -->
@@ -1195,39 +1239,6 @@
               <strong>{{ allowed_categories|join:", "|default:"Non définie" }}</strong>
             </div>
             {% endif %}
-
-            <div id="filtres-carte" style="display:none;gap:6px;flex-wrap:wrap;flex:1">
-              <select class="mf-select" id="filter-ville">
-                <option value="">Toutes les villes</option>
-              </select>
-              {% if not shared_edit_mode %}
-              <select class="mf-select" id="filter-categorie" {% if staff_mode or shared_edit_mode %}aria-required="true"{% endif %}>
-                <option value="">{% if staff_mode or shared_edit_mode %}Choisir une catégorie{% else %}Toutes catégories{% endif %}</option>
-              </select>
-              {% endif %}
-              <div id="filter-format-wrap" class="{% if staff_mode or shared_edit_mode %}staff-format-filter{% endif %}" style="{% if staff_mode or shared_edit_mode %}display:none{% endif %}">
-                <select class="mf-select" id="filter-format">
-                <option value="">Tous formats</option>
-                </select>
-              </div>
-            </div>
-
-            <div id="filtres-liste" style="display:flex;gap:6px;flex-wrap:wrap;flex:1;align-items:center">
-              <input type="search" class="list-search" id="list-search" placeholder="Code ou nom du panneau…">
-              <select class="mf-select" id="list-filter-ville">
-                <option value="">Toutes les villes</option>
-              </select>
-              {% if not shared_edit_mode %}
-              <select class="mf-select" id="list-filter-categorie" {% if staff_mode or shared_edit_mode %}aria-required="true"{% endif %}>
-                <option value="">{% if staff_mode or shared_edit_mode %}Choisir une catégorie{% else %}Toutes catégories{% endif %}</option>
-              </select>
-              {% endif %}
-              <div id="list-filter-format-wrap" class="{% if staff_mode or shared_edit_mode %}staff-format-filter{% endif %}" style="{% if staff_mode or shared_edit_mode %}display:none{% endif %}">
-                <select class="mf-select" id="list-filter-format">
-                <option value="">Tous formats</option>
-                </select>
-              </div>
-            </div>
 
           </div>
 
@@ -1285,6 +1296,9 @@
               <input type="hidden" name="supports_selectionnees" id="supports-input" value="[]">
               <input type="hidden" name="date_debut" id="hidden-date-debut" value="{{ form.date_debut.value|default:'' }}">
               <input type="hidden" name="date_fin"   id="hidden-date-fin"   value="{{ form.date_fin.value|default:'' }}">
+              {% if staff_mode %}
+              <input type="hidden" name="tarifs_faces_par_format" id="tarifs-faces-input" value="">
+              {% endif %}
 
               <button type="submit" class="btn-continuer" id="btn-continuer" disabled>
                 <i class="bi bi-arrow-right-circle-fill"></i>
@@ -1302,11 +1316,12 @@
     </section>
 
   </div>
-  {% if shared_edit_mode or editing_request %}
+  {% if staff_mode or shared_edit_mode or editing_request %}
   {% if shared_edit_mode %}
   {{ allowed_categories|json_script:"shared-allowed-categories" }}
   {% endif %}
   {{ initial_selected_faces|json_script:"initial-selected-faces" }}
+  {{ initial_tarifs_faces|default_if_none:'{}'|json_script:"initial-tarifs-faces" }}
   {% endif %}
 {% endblock %}
 
@@ -1331,9 +1346,15 @@
     const SHARED_ALLOWED_CATEGORIES = SHARED_EDIT_MODE
       ? JSON.parse(document.getElementById('shared-allowed-categories').textContent)
       : [];
-    const INITIAL_SELECTED_FACES = SHARED_EDIT_MODE || STAFF_EDIT_MODE
+    const INITIAL_SELECTED_FACES = {{ staff_mode|yesno:"true,false" }} || SHARED_EDIT_MODE || STAFF_EDIT_MODE
       ? JSON.parse(document.getElementById('initial-selected-faces').textContent)
       : [];
+    const tarifsInitiaux = JSON.parse(
+      document.getElementById('initial-tarifs-faces').textContent
+    );
+    const INITIAL_TARIFS_FACES = tarifsInitiaux && typeof tarifsInitiaux === 'object'
+      ? tarifsInitiaux
+      : {};
     const initialFiltres = {
       ville: "{{ filtres.ville|escapejs }}",
       categorie: "{{ filtres.categorie|escapejs }}",
@@ -1351,8 +1372,12 @@
         label: face.label,
         quartier: face.quartier,
         support_id: face.support_id,
+        format_code: face.format_code,
+        format_display: face.format_display,
+        categorie: face.categorie,
       },
     ]));
+    let tarifsSaisis = { ...INITIAL_TARIFS_FACES };
     let currentView    = 'liste';
     let currentPopup   = null;
     let datesOk        = false;
@@ -1538,6 +1563,75 @@
       });
     }
 
+    function renderTarifsFaces() {
+      const section = document.getElementById('tarification-faces');
+      if (!section) return;
+      const formats = new Map();
+      Object.values(panier).forEach(item => {
+        if (!item.format_code) return;
+        const current = formats.get(item.format_code) || {
+          label: item.format_display || item.format_code,
+          categorie: item.categorie || 'Autres',
+          count: 0,
+        };
+        current.count += 1;
+        formats.set(item.format_code, current);
+      });
+
+      const fields = document.getElementById('tarifs-formats-champs');
+      fields.replaceChildren();
+      section.style.display = formats.size ? '' : 'none';
+      formats.forEach((format, code) => {
+        const wrapper = document.createElement('label');
+        wrapper.className = 'd-flex align-items-center justify-content-between gap-2 mb-2';
+        const title = document.createElement('span');
+        title.textContent = `${format.categorie} — ${format.label} (${format.count} face${format.count > 1 ? 's' : ''})`;
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.min = '0';
+        input.step = '1';
+        input.className = 'form-control form-control-sm';
+        input.style.maxWidth = '150px';
+        input.setAttribute('aria-label', `Tarif mensuel ${format.label}`);
+        input.value = tarifsSaisis[code] || '';
+        input.addEventListener('input', () => {
+          tarifsSaisis[code] = input.value;
+          const hidden = document.getElementById('tarifs-faces-input');
+          if (hidden) hidden.value = JSON.stringify(tarifsSaisis);
+          updateTarifsEstimation();
+        });
+        wrapper.append(title, input);
+        fields.appendChild(wrapper);
+      });
+
+      const hidden = document.getElementById('tarifs-faces-input');
+      if (hidden) hidden.value = JSON.stringify(tarifsSaisis);
+      updateTarifsEstimation();
+    }
+
+    function updateTarifsEstimation() {
+      const target = document.getElementById('tarifs-estimation');
+      if (!target) return;
+      const start = elDateDebut ? elDateDebut.value : '';
+      const end = elDateFin ? elDateFin.value : '';
+      const days = start && end && start <= end ? diffDaysInclusive(start, end) : 0;
+      const months = days ? Math.ceil(days / 30) : 0;
+      if (!months) {
+        target.textContent = 'Saisissez une période pour calculer le total estimé.';
+        return;
+      }
+      const totals = {};
+      Object.values(panier).forEach(item => {
+        if (!item.format_code) return;
+        const rawPrice = String(tarifsSaisis[item.format_code] || '').trim();
+        if (!rawPrice) return;
+        const price = Number(rawPrice.replace(',', '.'));
+        if (Number.isFinite(price)) totals[item.format_code] = (totals[item.format_code] || 0) + price * months;
+      });
+      const total = Object.values(totals).reduce((sum, value) => sum + value, 0);
+      target.textContent = `Durée facturée : ${months} mois — Total des tarifs saisis : ${new Intl.NumberFormat('fr-FR').format(total)} FCFA`;
+    }
+
     function isPanierContainsSupport(supportId) {
       return Object.values(panier).some(item => item.support_id === String(supportId));
     }
@@ -1569,7 +1663,7 @@
         facesHtml += `
           <div class="rl-face-row">
             <button class="rl-face-btn ${cls}" ${disabled}
-              onclick="toggleFace('${key}','${escQ(p.code)}','${face.label}','${escQ(p.quartier||p.ville||'')}','${p.id}')">
+              onclick="toggleFace('${key}','${escQ(p.code)}','${face.label}','${escQ(p.quartier||p.ville||'')}','${p.id}','${escQ(p.format||'')}','${escQ(p.format_display||p.format||'')}','${escQ(p.categorie||'Autres')}')">
               <span><i class="bi ${icon} me-1"></i>${txt}</span>
             </button>
             ${photoTrigger}
@@ -1881,7 +1975,7 @@
         const badge = inPanier ? 'Sélectionnée' : (badgeLabels[statut] || statut);
         const disabled = (!canToggle && !inPanier) ? 'disabled' : '';
         const onclick = (canToggle || inPanier)
-          ? `onclick="toggleFace('${key}','${escQ(p.code)}','${face.label}','${escQ(p.quartier||p.ville||'')}','${p.id}');renderListe()"`
+          ? `onclick="toggleFace('${key}','${escQ(p.code)}','${face.label}','${escQ(p.quartier||p.ville||'')}','${p.id}','${escQ(p.format||'')}','${escQ(p.format_display||p.format||'')}','${escQ(p.categorie||'Autres')}');renderListe()"`
           : '';
         const photoTrigger = buildPhotoTrigger(p, face);
 
@@ -2065,6 +2159,7 @@
     }
 
     function onDatesChange() {
+      updateTarifsEstimation();
       resetPanier();
       syncHiddenDates();
       const d1 = elDateDebut ? elDateDebut.value : '';
@@ -2141,10 +2236,13 @@
     if (elDureeJours) elDureeJours.addEventListener('input', onDureeChange);
 
   // ── PANIER ────────────────────────────────────────────────────────────────
-    function toggleFace(faceId, code, label, quartier, supportId) {
+    function toggleFace(faceId, code, label, quartier, supportId, formatCode, formatDisplay, categorie) {
       const key = String(faceId);
       if (panier[key]) delete panier[key];
-      else panier[key] = { code, label, quartier, support_id: String(supportId) };
+      else panier[key] = {
+        code, label, quartier, support_id: String(supportId),
+        format_code: formatCode, format_display: formatDisplay, categorie,
+      };
       updatePanier();
       if (currentView === 'carte') {
         const marker = markersMap[String(supportId)];
@@ -2168,6 +2266,7 @@
       const btnVider   = document.getElementById('btn-vider-panier');
       const facesInput = document.getElementById('faces-input');
       const datesHint  = document.getElementById('dates-hint');
+      renderTarifsFaces();
 
       if (countEl)    countEl.textContent  = count;
       if (btnCount)   btnCount.textContent = count;

@@ -136,6 +136,8 @@
       <div class="rd-fact"><span>Période</span><strong>{{ reservation.date_debut|date:"d/m/Y" }} → {{ reservation.date_fin|date:"d/m/Y" }}</strong></div>
       <div class="rd-fact"><span>Durée</span><strong>{{ reservation.duree_jours }} jour{{ reservation.duree_jours|pluralize }}</strong></div>
       <div class="rd-fact"><span>Faces réservées</span><strong>{{ reservation.lignes.count }}</strong></div>
+      <div class="rd-fact"><span>Durée facturée</span><strong>{{ reservation.nombre_mois_factures }} mois</strong></div>
+      {% if reservation.prix_faces_par_format %}<div class="rd-fact"><span>Total des faces</span><strong>{{ reservation.montant_total|floatformat:0 }} FCFA</strong></div>{% endif %}
       <div class="rd-fact"><span>Créée le</span><strong>{{ reservation.created_at|date:"d/m/Y à H:i" }}</strong></div>
     </div>
   </header>
@@ -178,7 +180,7 @@
         <div class="table-responsive">
           <table class="table table-hover align-middle rd-table">
             <thead>
-              <tr><th>Support</th><th>Face</th><th>Localisation</th><th>Format</th><th class="text-end">Action</th></tr>
+              <tr><th>Support</th><th>Face</th><th>Localisation</th><th>Format</th><th class="text-end">Tarif / mois</th><th class="text-end">Total face</th><th class="text-end">Action</th></tr>
             </thead>
             <tbody>
               {% for ligne in reservation.lignes.all %}
@@ -190,10 +192,12 @@
                 <td><span class="rd-face"><i class="bi bi-aspect-ratio"></i>{% if ligne.face %}Face {{ ligne.face.label }}{% else %}Support complet{% endif %}</span></td>
                 <td><strong>{{ ligne.support.ville|default:"—" }}</strong><small class="d-block text-muted"><i class="bi bi-geo-alt me-1"></i>{{ ligne.support.quartier|default:ligne.support.adresse|default:"—" }}</small></td>
                 <td><span class="badge bg-light text-dark border">{{ ligne.support.get_format_display|default:ligne.support.format|default:"Standard" }}</span></td>
+                <td class="text-end">{% if ligne.tarif_mensuel is not None %}{{ ligne.tarif_mensuel|floatformat:0 }} FCFA{% else %}—{% endif %}</td>
+                <td class="text-end">{% if ligne.montant_total is not None %}{{ ligne.montant_total|floatformat:0 }} FCFA{% else %}—{% endif %}</td>
                 <td class="text-end"><a href="{% url 'support_detail' ligne.support.uuid %}" class="btn btn-sm btn-outline-secondary" style="border-radius:8px" title="Voir le panneau"><i class="bi bi-box-arrow-up-right"></i></a></td>
               </tr>
               {% empty %}
-              <tr><td colspan="5" class="text-center py-4 text-muted"><i class="bi bi-inbox d-block mb-1 fs-3 opacity-50"></i>Aucune face n'est associée à cette réservation.</td></tr>
+              <tr><td colspan="7" class="text-center py-4 text-muted"><i class="bi bi-inbox d-block mb-1 fs-3 opacity-50"></i>Aucune face n'est associée à cette réservation.</td></tr>
               {% endfor %}
             </tbody>
           </table>

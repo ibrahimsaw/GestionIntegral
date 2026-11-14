@@ -88,6 +88,62 @@ class LedDashboardDataTests(TestCase):
         self.assertContains(response, '3 <small>faces</small> / 2 <small>supports</small>')
         self.assertContains(response, '2 <small>faces</small> / 1 <small>supports</small>')
 
+    def test_dashboard_month_details_expose_campaigns_and_face_status(self):
+        today = timezone.localdate()
+        client = Client.objects.create(
+            nom='Client mois détail',
+            telephone='00000000',
+            email='month-detail@example.com',
+        )
+        format_support = FormatSupport.objects.create(
+            code='MONTH-DETAIL-12',
+            categorie='12m²',
+            dimensions='4m × 3m',
+        )
+        support = Support.objects.create(
+            code='MONTH-DETAIL-A',
+            nom='Support mois détail',
+            type_support=Support.TYPE_PANNEAU,
+            format=format_support.code,
+            latitude=12.34,
+            longitude=-1.52,
+            ville='Ouagadougou',
+        )
+        occupied_face = FacePanneau.objects.create(support=support, label='A')
+        free_face = FacePanneau.objects.create(support=support, label='B')
+        campaign = Campagne.objects.create(
+            client=client,
+            nom='Campagne du mois',
+            date_debut=datetime.date(today.year, today.month, 1),
+            date_fin=datetime.date(today.year, today.month, 20),
+            statut=Campagne.STATUT_EN_COURS,
+        )
+        LigneCampagne.objects.create(campagne=campaign, face=occupied_face)
+
+        user = get_user_model().objects.create_user(
+            username='month-detail-dashboard-admin',
+            password='test-password',
+            role='admin',
+        )
+        self.client.force_login(user)
+        cache.clear()
+
+        response = self.client.get(reverse('dashboard'), {'ville': 'Ouagadougou'})
+
+        self.assertEqual(response.status_code, 200)
+        category = response.context['parc_categories'][0]
+        month_index = today.month - 1
+        self.assertIn('month_details', category)
+        month_detail = category['month_details'][month_index]
+        self.assertEqual(month_detail['campaigns'][0]['nom'], 'Campagne du mois')
+        self.assertTrue(month_detail['occupied_count'] == 1)
+        self.assertIn('url', month_detail['campaigns'][0])
+        self.assertIn('/campaigns/', month_detail['campaigns'][0]['url'])
+
+        other_month_index = 0 if month_index else 1
+        other_month_detail = category['month_details'][other_month_index]
+        self.assertEqual(other_month_detail['occupied_count'], 0)
+
     def test_led_views_remain_visible_without_screens(self):
         user = get_user_model().objects.create_user(
             username='led-empty-dashboard-admin',

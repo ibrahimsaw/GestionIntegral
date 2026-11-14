@@ -546,6 +546,87 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             current_start, current_end = start, end
         return occupied_days + (current_end - current_start).days + 1
 
+    @staticmethod
+    def _build_month_details(face_rows, month_ranges, month_labels, statuts_campagne):
+        """Retourne les campagnes et les faces occupées/libres pour chaque mois."""
+        if not face_rows:
+            return [
+                {
+                    'month_index': index,
+                    'month_label': month_labels[index],
+                    'campaigns': [],
+                    'occupied_faces': [],
+                    'free_faces': [],
+                    'occupied_count': 0,
+                }
+                for index in range(12)
+            ]
+
+        face_ids = [row['id'] for row in face_rows]
+        details = []
+        for month_index, (month_start, month_end) in enumerate(month_ranges):
+            ligne_qs = LigneCampagne.objects.filter(
+                face_id__in=face_ids,
+                campagne__statut__in=statuts_campagne,
+                campagne__date_debut__lte=month_end,
+                campagne__date_fin__gte=month_start,
+            ).select_related('campagne__client', 'face__support').order_by(
+                'campagne__date_debut',
+                'campagne__nom',
+                'face__support__code',
+                'face__label',
+            )
+            campaigns_by_id = {}
+            campaigns_by_face = {}
+            for ligne in ligne_qs:
+                campagne = ligne.campagne
+                campaign_key = campagne.pk
+                if campaign_key not in campaigns_by_id:
+                    campaigns_by_id[campaign_key] = {
+                        'id': campagne.pk,
+                        'nom': campagne.nom,
+                        'client': campagne.client.nom if campagne.client else 'Client non renseigné',
+                        'date_debut': campagne.date_debut.isoformat() if campagne.date_debut else None,
+                        'date_fin': campagne.date_fin.isoformat() if campagne.date_fin else None,
+                        'url': reverse('campagne_detail', args=[campagne.pk]),
+                        'faces': [],
+                    }
+                face_snapshot = {
+                    'id': ligne.face_id,
+                    'code': ligne.face.support.code,
+                    'label': ligne.face.label,
+                    'nom': ligne.face.support.nom,
+                }
+                campaigns_by_id[campaign_key]['faces'].append(face_snapshot)
+                campaigns_by_face.setdefault(ligne.face_id, []).append(campagne.nom)
+
+            occupied_face_ids = {ligne.face_id for ligne in ligne_qs}
+            occupied_faces = []
+            free_faces = []
+            for row in face_rows:
+                face_campaigns = campaigns_by_face.get(row['id'], [])
+                face_summary = {
+                    'id': row['id'],
+                    'code': row['code'],
+                    'label': row['label'],
+                    'nom': row['nom'],
+                    'campagnes': face_campaigns,
+                }
+                if row['id'] in occupied_face_ids:
+                    occupied_faces.append(face_summary)
+                elif row['statut'] in ('libre', 'reservee', 'panne'):
+                    free_faces.append(face_summary)
+
+            details.append({
+                'month_index': month_index,
+                'month_label': month_labels[month_index],
+                'campaigns': list(campaigns_by_id.values()),
+                'occupied_faces': occupied_faces,
+                'free_faces': free_faces,
+                'occupied_count': len(occupied_face_ids),
+            })
+        return details
+
     @classmethod
     def _build_parc_analytics(
         cls, format_category_stats, format_categories_codes, ville_active, today,
@@ -707,6 +788,11 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 for i in range(12)
             ]
 
+        month_labels = [
+            'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+            'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
+        ]
+
         result = []
         for stat in format_category_stats:
             codes = format_categories_codes.get(stat['categorie'], [])
@@ -741,6 +827,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                         'mensuel': monthly_pct(subset),
                     })
 
+            category_faces = [r for r, _ in cat_rows]
             result.append({
                 **stat,
                 'nb_faces': n,
@@ -761,7 +848,10 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 'libres_60': sum(1 for r, _ in cat_rows if r['libre_60']),
                 'mensuel': monthly_pct(cat_rows),
                 'formats': formats_cat,
-                'faces': [r for r, _ in cat_rows],
+                'faces': category_faces,
+                'month_details': cls._build_month_details(
+                    category_faces, month_ranges, month_labels, statuts_campagne,
+                ),
             })
         category_order = {
             '12m²': 0,
@@ -2075,6 +2165,23 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             ) if total_faces else 0,
             'libres_60': sum(face['libre_60'] for face in parc_global_faces),
             'faces': parc_global_faces,
+            'month_details': DashboardView._build_month_details(
+                parc_global_faces,
+                [
+                    (date(today.year, month, 1), date(today.year, month, calendar.monthrange(today.year, month)[1]))
+                    for month in range(1, 13)
+                ],
+                [
+                    'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin',
+                    'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre',
+                ],
+                [
+                    Campagne.STATUT_EN_COURS,
+                    Campagne.STATUT_A_VENIR,
+                    Campagne.STATUT_EN_PAUSE,
+                    Campagne.STATUT_TERMINEE,
+                ],
+            ),
             'mensuel': [
                 round(
                     sum(face['mois_jours'][index] for face in parc_global_faces)
@@ -2295,6 +2402,14 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             'clients_actifs_list': clients_qs.order_by('nom')[:8],
             'campagnes_en_cours_list': sorted(campagnes_actives_list, key=lambda c: c.date_debut, reverse=True)[:6],
             'campagnes_a_venir_list': sorted(campagnes_a_venir_list, key=lambda c: c.date_debut)[:6],
+            'demandes_en_cours_list': DemandeReservation.objects.filter(
+                statut=DemandeReservation.STATUT_EN_COURS
+            ).select_related('client').order_by('-created_at')[:5],
+            'reservations_en_cours_list': Reservation.objects.filter(
+                date_debut__lte=timezone.now(),
+                date_fin__gte=timezone.now(),
+                statut=STATUT_CONFIRMEE,
+            ).select_related('client').order_by('-date_debut')[:5],
 
             'nb_panneaux': parc['nb_panneaux'],
             'nb_panneaux_bon': parc['nb_panneaux_bon'],
@@ -6360,6 +6475,29 @@ def api_check_dispo(request, client_pk):
         .values_list('face_id', flat=True)
     )
 
+    # ── Faces bloquées par une demande de réservation en attente/traitement ─
+    faces_demandes = {}
+    for demande in (
+        DemandeReservation.objects
+        .filter(
+            statut__in=[
+                DemandeReservation.STATUT_BROUILLON,
+                DemandeReservation.STATUT_NOUVELLE,
+                DemandeReservation.STATUT_EN_COURS,
+            ],
+        )
+        .filter(
+            Q(date_debut_blocage__lte=date_fin.date(), date_fin_blocage__gte=date_debut.date())
+            | Q(date_debut_souhaitee__lte=date_fin.date(), date_fin_souhaitee__gte=date_debut.date())
+        )
+        .prefetch_related('faces_souhaitees')
+    ):
+        for face in demande.faces_souhaitees.all():
+            faces_demandes.setdefault(face.pk, {
+                'statut': 'occupe',
+                'info': f"Demande {demande.reference} · blocage temporaire",
+            })
+
     # ── Faces occupées par une campagne ────────────────────────────────────
     faces_campagne = {
         lc['face_id']: lc
@@ -6411,6 +6549,9 @@ def api_check_dispo(request, client_pk):
 
         elif fid in mes_faces:
             result[fid] = {'statut': 'moi', 'info': 'Déjà réservé par ce client'}
+
+        elif fid in faces_demandes:
+            result[fid] = faces_demandes[fid]
 
         elif fid in faces_campagne:
             lc = faces_campagne[fid]
@@ -7397,6 +7538,33 @@ class DemandeAssocierCampagneView(StaffRequiredMixin, View):
             messages.success(request, "La campagne a été associée à la page de suivi du client.")
         else:
             messages.success(request, "L'association de campagne a été retirée.")
+        return redirect('demande_detail', uuid=uuid)
+
+
+class DemandeProlongerBlocageView(StaffRequiredMixin, View):
+    """Prolonge le blocage temporaire de 3 à 7 jours pendant les échanges client."""
+
+    def post(self, request, uuid):
+        demande = get_object_or_404(DemandeReservation, uuid=uuid)
+
+        if demande.statut in (DemandeReservation.STATUT_VALIDEE, DemandeReservation.STATUT_REFUSEE):
+            messages.error(request, "Cette demande est déjà clôturée. Le blocage ne peut plus être prolongé.")
+            return redirect('demande_detail', uuid=uuid)
+
+        try:
+            jours = int(request.POST.get('jours', '3'))
+        except (TypeError, ValueError):
+            jours = 3
+
+        jours = max(1, min(int(jours), 14))
+        demande.prolonger_blocage(jours)
+        demande.save(update_fields=['date_debut_blocage', 'date_fin_blocage', 'updated_at'])
+
+        messages.success(
+            request,
+            f"Blocage temporaire prolongé de {jours} jour{'s' if jours > 1 else ''}. "
+            f"Il est désormais actif jusqu'au {demande.date_fin_blocage:%d/%m/%Y}."
+        )
         return redirect('demande_detail', uuid=uuid)
 
 

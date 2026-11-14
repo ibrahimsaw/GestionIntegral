@@ -11,17 +11,63 @@
 {% endblock %}
 
 {% block topbar_actions %}
-  <div class="d-flex align-items-center gap-2">
-    <a href="{% url 'carte' %}" class="btn btn-sm btn-outline-view">
-      <i class="bi bi-map me-1"></i>Voir la carte
-    </a>
-    <a href="{% url 'support_list' %}" class="btn btn-outline-secondary btn-sm">
-      <i class="bi bi-collection me-1"></i>Supports
-    </a>
+  <div class="d-flex align-items-center gap-2 position-relative">
     {% if not request.user.is_technicien %}
-      <a href="{% url 'demande_creation' %}" class="btn btn-primary btn-sm">
-        <i class="bi bi-plus-lg me-1"></i>Nouvelle Demande
-      </a>
+      <div class="quick-actions-inline">
+        <button type="button" class="btn btn-primary btn-sm action-quick-btn" data-panel="demandes" data-cta-label="Nouveau" data-cta-url="{% url 'demande_creation' %}">
+          <i class="bi bi-inboxes me-1"></i>Demandes
+        </button>
+        <button type="button" class="btn btn-success btn-sm action-quick-btn" data-panel="campagnes" data-cta-label="Nouveau" data-cta-url="{% url 'campagne_create' %}">
+          <i class="bi bi-broadcast me-1"></i>Campagnes
+        </button>
+        <button type="button" class="btn btn-secondary btn-sm text-dark action-quick-btn" data-panel="reservations" data-cta-label="Nouveau" data-cta-url="{% url 'reservation_wizard_etape1' %}">
+          <i class="bi bi-calendar2-check me-1"></i>Réservations
+        </button>
+      </div>
+
+      <div id="quick-panel" class="quick-panel" hidden>
+        <div class="quick-panel-header">
+          <span id="quick-panel-title">Éléments en cours</span>
+          <a id="quick-panel-cta" href="{% url 'demande_creation' %}" class="quick-panel-cta">
+            <i class="bi bi-plus-circle me-2"></i><span id="quick-panel-cta-label">Nouveau</span>
+          </a>
+          <button type="button" id="quick-panel-close" aria-label="Fermer">×</button>
+        </div>
+        <div id="quick-panel-body" class="quick-panel-body">
+          <div class="quick-panel-section" data-quick-section="demandes">
+            {% for demande in demandes_en_cours_list %}
+              <a href="{% url 'demandes_liste' %}?statut=en_cours" class="quick-panel-item">
+                <strong>{{ demande.nom|default:"Demande sans nom" }}</strong>
+                <small>{{ demande.client.nom|default:"Client" }} • {{ demande.created_at|date:"d/m/Y" }}</small>
+              </a>
+            {% empty %}
+              <p class="quick-panel-empty">Aucune demande en cours.</p>
+            {% endfor %}
+          </div>
+
+          <div class="quick-panel-section" data-quick-section="campagnes">
+            {% for campagne in campagnes_en_cours_list %}
+              <a href="{% url 'campagne_detail' campagne.pk %}" class="quick-panel-item">
+                <strong>{{ campagne.nom }}</strong>
+                <small>{{ campagne.client.nom|default:"Client" }} • {{ campagne.date_debut|date:"d/m/Y" }} → {{ campagne.date_fin|date:"d/m/Y" }}</small>
+              </a>
+            {% empty %}
+              <p class="quick-panel-empty">Aucune campagne en cours.</p>
+            {% endfor %}
+          </div>
+
+          <div class="quick-panel-section" data-quick-section="reservations">
+            {% for reservation in reservations_en_cours_list %}
+              <a href="{% url 'reservation_list' %}?statut=a_suivre" class="quick-panel-item">
+                <strong>{{ reservation.nom }}</strong>
+                <small>{{ reservation.client.nom|default:"Client" }} • {{ reservation.date_debut|date:"d/m/Y" }} → {{ reservation.date_fin|date:"d/m/Y" }}</small>
+              </a>
+            {% empty %}
+              <p class="quick-panel-empty">Aucune réservation en cours.</p>
+            {% endfor %}
+          </div>
+        </div>
+      </div>
     {% endif %}
   </div>
 {% endblock %}
@@ -30,6 +76,128 @@
 
 {% block content %}
 <style>
+  .quick-actions-inline {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .quick-panel {
+    position: absolute;
+    top: calc(100% + 12px);
+    right: 0;
+    width: min(390px, 86vw);
+    background: linear-gradient(180deg, #ffffff 0%, #f8faff 100%);
+    border: 1px solid #e2eaf7;
+    border-radius: 18px;
+    box-shadow: 0 20px 50px rgba(15, 23, 42, 0.16);
+    overflow: hidden;
+    z-index: 1200;
+  }
+
+  .quick-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.9rem 1rem;
+    border-bottom: 1px solid #edf1f7;
+    background: linear-gradient(180deg, #f5f8ff 0%, #ffffff 100%);
+    font-weight: 700;
+    color: #1f2d3d;
+  }
+
+  .quick-panel-header button {
+    border: 0;
+    background: transparent;
+    font-size: 1.4rem;
+    line-height: 1;
+    color: #6b7a90;
+    padding: 0;
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    cursor: pointer;
+  }
+
+  .quick-panel-header button:hover {
+    background: #f3f6fb;
+    color: #1f2d3d;
+  }
+
+  .quick-panel-body {
+    display: grid;
+    gap: 0.7rem;
+    padding: 0.9rem;
+    max-height: 410px;
+    overflow-y: auto;
+  }
+
+  .quick-panel-cta {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    padding: 0.3rem 0.5rem;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #2457d6, #1d4ed8);
+    color: #fff;
+    font-weight: 700;
+    text-decoration: none;
+    box-shadow: 0 10px 22px rgba(36, 87, 214, 0.20);
+  }
+
+  .quick-panel-cta:hover {
+    color: #fff;
+    text-decoration: none;
+    filter: brightness(1.02);
+  }
+
+  .quick-panel-section {
+    display: grid;
+    gap: 0.6rem;
+  }
+
+  .quick-panel-item {
+    display: block;
+    padding: 0.8rem 0.75rem;
+    border-radius: 12px;
+    text-decoration: none;
+    color: #1f2d3d;
+    background: linear-gradient(180deg, #ffffff 0%, #f7fafd 100%);
+    border: 1px solid #edf2fa;
+    transition: all 0.15s ease;
+  }
+
+  .quick-panel-item:hover {
+    background: #eef4ff;
+    border-color: #dfeaff;
+    color: #1f2d3d;
+    text-decoration: none;
+    transform: translateY(-1px);
+  }
+
+  .quick-panel-item strong {
+    display: block;
+    font-size: 0.92rem;
+    margin-bottom: 0.18rem;
+  }
+
+  .quick-panel-item small {
+    display: block;
+    color: #62738b;
+    font-size: 0.78rem;
+  }
+
+  .quick-panel-empty {
+    padding: 0.9rem 0.85rem;
+    margin: 0;
+    border-radius: 10px;
+    background: #f7f9fc;
+    color: #72809a;
+    font-size: 0.85rem;
+  }
+
   .pg {
     --navy: #101c32;
     --blue: #2457d6;
@@ -61,6 +229,23 @@
   .pg h1 { margin: 7px 0 5px; font-size: 29px; letter-spacing: -.8px; font-weight: 800; line-height: 1.15; }
   .pg-hint { color: var(--muted); margin: 0; }
   .pg-controls { display: flex; gap: 9px; align-items: center; flex-wrap: wrap; }
+  .pg-header-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 12px; }
+  .pg-sort-links { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .sort-link, .pg-sort-th {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 10px; border-radius: 999px;
+    background: #f3f6fb; color: #42516a; font-size: 12px; font-weight: 700;
+    text-decoration: none; border: 1px solid #dfe6f2;
+  }
+  .sort-link.active, .pg-sort-th.active {
+    background: #eaf1ff; color: #2349b8; border-color: #c7d8ff;
+  }
+  .sort-link:hover, .pg-sort-th:hover { text-decoration: none; color: #1f2d3d; }
+  .sort-link i, .pg-sort-th i { font-size: 11px; }
+  .pg-sort-th {
+    padding: 0; border: 0; background: transparent; border-radius: 0; font-size: 10px; letter-spacing: .075em; text-transform: uppercase; color: #75839a; font-weight: 750; width: 100%; justify-content: flex-start;
+  }
+  .pg-sort-th.active { background: transparent; color: #2349b8; border: 0; }
   .pg-select, .pg-input {
     font: inherit; background: #fff; border: 1px solid var(--line);
     border-radius: 8px; padding: 10px 12px; color: var(--text);
@@ -124,6 +309,26 @@
   .pg-bar.is-forecast { background: repeating-linear-gradient(45deg, #cbd8f5, #cbd8f5 5px, #e6edfc 5px, #e6edfc 10px); }
   .pg-grp label { font-size: 10px; color: #758398; text-align: center; max-width: 110px; line-height: 1.25; }
   .pg-chartfoot { margin-top: 14px; font-size: 11px; color: #7a879b; }
+  .pg-month-detail {
+    margin-top: 16px; border: 1px solid var(--line); border-radius: 12px; background: #f8faff;
+    padding: 16px; box-shadow: inset 0 1px 0 rgba(255,255,255,.7);
+  }
+  .pg-month-detail-head { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 10px; margin-bottom: 12px; }
+  .pg-month-detail-head h3 { margin: 4px 0 0; font-size: 18px; }
+  .pg-month-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
+  .pg-month-modal { width: min(900px, 100%); }
+  .pg-month-block { background: #fff; border: 1px solid var(--line); border-radius: 10px; padding: 12px; }
+  .pg-month-block h4 { margin: 0 0 10px; font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: #70809a; }
+  .pg-month-list { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+  .pg-month-list li { border: 1px solid #edf1f7; background: #f7f9fd; border-radius: 8px; padding: 10px 12px; }
+  .pg-month-list strong { display: block; font-size: 12.5px; color: #233653; }
+  .pg-month-list span { display: block; margin-top: 4px; font-size: 11px; color: var(--muted); }
+  .pg-campaign-link { display: block; text-decoration: none; color: inherit; }
+  .pg-campaign-meta { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .pg-campaign-meta .pg-mini-pill { display: inline-flex; align-items: center; padding: 4px 8px; border-radius: 999px; background: #edf3ff; border: 1px solid #dfeaff; color: #3555b8; font-size: 10px; font-weight: 700; }
+  .pg-campaign-badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+  .pg-face-badge { display: inline-flex; align-items: center; padding: 4px 7px; border-radius: 999px; background: #fff; border: 1px solid #e5eaf3; color: #42516a; font-size: 10px; font-weight: 700; }
+  .pg-face-badge.is-more { background: #f3f6fb; color: #586a83; }
   .pg-legend { display: flex; gap: 14px; align-items: center; margin-top: 12px; color: #7a879b; font-size: 11px; }
   .pg-swatch { width: 9px; height: 9px; background: #6d91ed; border-radius: 2px; display: inline-block; margin-right: 4px; }
   .pg-swatch.is-future { background: #d2dff7; }
@@ -293,6 +498,234 @@
   }
 </style>
 
+{# ═══════════════ Refonte visuelle (surcharge CSS — aucune logique modifiée) ═══════════════ #}
+<style>
+  .pg {
+    --navy: #0f1b33;
+    --navy-2: #1b2c4f;
+    --blue: #2f5bea;
+    --blue-soft: #eaf0ff;
+    --bg: #f3f5fa;
+    --surface: #ffffff;
+    --text: #16223a;
+    --muted: #6b7a93;
+    --line: #e3e8f1;
+    --green: #0f9d7a;
+    --amber: #d98a14;
+    --red: #d64550;
+    --radius: 16px;
+    --shadow-sm: 0 1px 2px rgba(16, 28, 50, .04), 0 2px 8px rgba(16, 28, 50, .04);
+    --shadow-md: 0 2px 4px rgba(16, 28, 50, .04), 0 12px 32px rgba(16, 28, 50, .08);
+    font-family: "Inter", "Segoe UI Variable", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    padding: clamp(.75rem, 2vw, 1.75rem);
+    background:
+      radial-gradient(1200px 400px at 85% -10%, rgba(47, 91, 234, .07), transparent 60%),
+      var(--bg);
+  }
+
+  /* ── En-tête en bandeau ── */
+  .pg-top {
+    position: relative;
+    overflow: hidden;
+    padding: 26px 30px;
+    border-radius: 20px;
+    background: linear-gradient(120deg, var(--navy) 0%, var(--navy-2) 55%, #27428a 100%);
+    color: #fff;
+    box-shadow: var(--shadow-md);
+    align-items: center;
+  }
+  .pg-top::after {
+    content: ""; position: absolute; right: -60px; top: -80px; width: 280px; height: 280px;
+    border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.14), transparent 70%);
+    pointer-events: none;
+  }
+  .pg-top > * { position: relative; z-index: 1; }
+  .pg-eyebrow { color: #9db6ff; letter-spacing: 2px; }
+  .pg-top h1 { font-size: clamp(22px, 2.6vw, 31px); letter-spacing: -.02em; color: #fff; }
+  .pg-top .pg-hint { color: #b4c2e0; }
+  .pg-top .btn { border-radius: 10px; font-weight: 600; }
+  .pg-top .btn-outline-view, .pg-top .btn-outline-secondary {
+    background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.25); color: #fff;
+    backdrop-filter: blur(6px);
+  }
+  .pg-top .btn-outline-view:hover, .pg-top .btn-outline-secondary:hover {
+    background: rgba(255,255,255,.2); color: #fff; border-color: rgba(255,255,255,.4);
+  }
+  .pg-top .pg-btn {
+    background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.22); color: #e6edff;
+    border-radius: 999px; padding: 8px 16px; font-weight: 600; font-size: 13px;
+  }
+  .pg-top .pg-btn:hover { background: rgba(255,255,255,.18); border-color: rgba(255,255,255,.4); }
+  .pg-top .pg-btn.is-active { background: #fff; color: var(--navy); border-color: #fff; }
+
+  /* ── Onglets catégories (style segmenté) ── */
+  .pg-tabs {
+    margin: 22px 0 18px; padding: 6px; gap: 4px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+    box-shadow: var(--shadow-sm); overflow-x: auto; flex-wrap: nowrap;
+    scrollbar-width: thin;
+  }
+  .pg-tab {
+    flex: 0 0 auto; border: 0; background: transparent; border-radius: 10px;
+    padding: 9px 15px; font-size: 13px; color: #546580; transition: background .18s, color .18s, box-shadow .18s;
+  }
+  .pg-tab:hover { background: #f1f4fb; color: var(--text); }
+  .pg-tab.is-active {
+    background: linear-gradient(135deg, var(--navy), var(--navy-2)); color: #fff;
+    box-shadow: 0 6px 16px rgba(15, 27, 51, .25);
+  }
+  .pg-tab.is-active .pg-dot { box-shadow: 0 0 0 3px rgba(255,255,255,.2); }
+  .pg-tab small { background: rgba(0,0,0,.06); padding: 1px 7px; border-radius: 999px; }
+  .pg-tab.is-active small { background: rgba(255,255,255,.18); color: #dbe5ff; }
+
+  /* ── Cartes indicateurs ── */
+  .pg-metrics { gap: 16px; }
+  .pg-metric {
+    position: relative; overflow: hidden; border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 20px 20px 17px; box-shadow: var(--shadow-sm);
+    transition: transform .18s ease, box-shadow .18s ease;
+  }
+  .pg-metric::before {
+    content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--blue);
+  }
+  .pg-metric.is-green::before { background: var(--green); }
+  .pg-metric.is-orange::before { background: var(--amber); }
+  .pg-metric.is-red::before { background: var(--red); }
+  .pg-metric:hover { transform: translateY(-2px); box-shadow: var(--shadow-md); }
+  .pg-metric .pg-label { font-size: 11px; letter-spacing: .08em; color: #75849b; }
+  .pg-metric .pg-num { font-size: 31px; letter-spacing: -.03em; }
+  .pg-metric .pg-foot { color: #8896ab; font-size: 11.5px; }
+  .pg-metric .pg-mdot { width: 10px; height: 10px; box-shadow: 0 0 0 4px rgba(47, 91, 234, .12); }
+  .pg-metric.is-green .pg-mdot { box-shadow: 0 0 0 4px rgba(15, 157, 122, .14); }
+  .pg-metric.is-orange .pg-mdot { box-shadow: 0 0 0 4px rgba(217, 138, 20, .16); }
+  .pg-metric.is-red .pg-mdot { box-shadow: 0 0 0 4px rgba(214, 69, 80, .14); }
+
+  /* ── Panneaux ── */
+  .pg-panel { border-radius: var(--radius); border-color: var(--line); box-shadow: var(--shadow-sm); padding: 22px 24px; }
+  .pg-panel h2 { font-size: 16.5px; letter-spacing: -.01em; }
+  .pg-desc { line-height: 1.45; }
+
+  /* ── Histogramme ── */
+  .pg-bars { background: repeating-linear-gradient(to top, transparent 0 46px, #eef1f7 46px 47px); }
+  .pg-bar {
+    width: 28px; border-radius: 8px 8px 0 0; background: linear-gradient(180deg, #7ea0f5, #3d68e6);
+    cursor: pointer; transition: filter .15s, transform .15s;
+  }
+  .pg-bar:hover { filter: brightness(1.08); transform: scaleY(1.02); transform-origin: bottom; }
+  .pg-bar.is-forecast {
+    background: repeating-linear-gradient(45deg, #c9d8fa, #c9d8fa 5px, #e8eefc 5px, #e8eefc 10px);
+  }
+  .pg-val { font-size: 10.5px; color: #3e4f6c; }
+  .pg-legend { padding-top: 12px; border-top: 1px dashed var(--line); }
+  .pg-swatch { border-radius: 3px; width: 10px; height: 10px; background: #4d77ea; }
+
+  /* ── Anneau ── */
+  .pg-donut {
+    height: 168px; width: 168px;
+    background: conic-gradient(var(--green) 0 var(--occ), #e8edf5 var(--occ) 100%);
+    box-shadow: 0 10px 28px rgba(15, 157, 122, .15);
+  }
+  .pg-donutinner { height: 128px; width: 128px; box-shadow: inset 0 2px 8px rgba(16, 28, 50, .06); }
+  .pg-donutinner strong { font-size: 30px; letter-spacing: -.03em; }
+  .pg-donutlegend { line-height: 2.3; }
+  .pg-chip { border-radius: 999px; background: #f0f3fa; border: 1px solid #e5eaf4; padding: 7px 13px; font-weight: 600; color: #52637c; }
+
+  /* ── Tableau des faces ── */
+  .pg-faces-panel { box-shadow: var(--shadow-md); border-radius: 18px; }
+  .pg-faces-panel .pg-tabletop { background: linear-gradient(115deg, #fff 0%, #f4f7ff 100%); padding: 22px 26px; }
+  .pg-input, .pg-select { border-radius: 10px; border-color: #dbe2ee; transition: border-color .15s, box-shadow .15s; }
+  .pg-input:focus, .pg-select:focus { outline: 0; border-color: #86a3f0; box-shadow: 0 0 0 3px rgba(47, 91, 234, .12); }
+  .pg-btn { border-radius: 10px; transition: all .15s; }
+  .pg-btn:hover { border-color: #aebfe6; background: #f7f9ff; }
+  .pg-btn.is-active, .pg-btn.is-active:hover { background: linear-gradient(135deg, var(--navy), var(--navy-2)); color: #fff; }
+  .pg-table th { background: #f3f6fc; padding: 13px 16px; }
+  .pg-table td { padding: 13px 16px; }
+  .pg-table tbody tr[data-i] { transition: background .15s; }
+  .pg-table tbody tr[data-i]:hover { background: #eef3ff; box-shadow: inset 3px 0 0 var(--blue); }
+  .pg-face-code { border-radius: 9px; background: #f7f9ff; border-color: #dfe6f5; }
+  .pg-progress { height: 8px; width: 72px; background: #e9eef6; }
+  .pg-progress i { background: linear-gradient(90deg, #7ea0f5, #2f5bea); }
+  .pg-pill { padding: 5px 11px; letter-spacing: .01em; }
+  .pg-pill.is-occupee, .pg-pill.is-occupe { background: #e2f6ef; color: #0c7f63; }
+  .pg-pill.is-libre { background: #ffeeea; color: #bd4f41; }
+  .pg-pill.is-reservee { background: #fff3da; color: #9c6209; }
+  .pg-pill.is-panne { background: #e9edf3; color: #566680; }
+  .pg-row-open { border-radius: 9px; }
+  .pg-tablefoot { background: #f9fbfe; padding: 14px 24px; }
+  .pg-pagination .pg-btn { min-width: 34px; border-radius: 9px; }
+
+  /* ── Modales ── */
+  .pg-modalback { background: rgba(10, 18, 36, .55); backdrop-filter: blur(5px); animation: pgFade .18s ease; }
+  .pg-modal { border-radius: 20px; box-shadow: 0 30px 90px rgba(10, 18, 36, .35); animation: pgPop .22s cubic-bezier(.2, .9, .3, 1.1); }
+  .pg-close { transition: background .15s, transform .15s; }
+  .pg-close:hover { background: #e4e9f3; transform: rotate(90deg); }
+  .pg-detail { border-radius: 12px; border: 1px solid #eaeef6; }
+  .pg-detail b { letter-spacing: -.01em; }
+  .pg-calendar div { border-radius: 5px; height: 30px; }
+  .pg-month-block, .pg-month-list li { border-radius: 12px; }
+  .pg-month-list li { transition: background .15s, border-color .15s; }
+  .pg-month-list li:hover { background: #eef3ff; border-color: #d3e0ff; }
+  .pg-campaign-link { display: block; text-decoration: none; color: inherit; }
+  @keyframes pgFade { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes pgPop { from { opacity: 0; transform: translateY(10px) scale(.97); } to { opacity: 1; transform: none; } }
+
+  /* ── Alertes / campagnes ── */
+  .pg-alert { border-radius: 12px; transition: transform .15s, box-shadow .15s; }
+  a.pg-alert:hover { transform: translateX(3px); box-shadow: var(--shadow-sm); text-decoration: none; }
+  .pg-ok { border-radius: 12px; }
+  .pg-type { border-radius: 14px; border: 1px solid #e8edf6; background: linear-gradient(180deg, #fafbff, #f3f6fc); }
+  .pg-type b { font-size: 22px; letter-spacing: -.02em; }
+  .pg-cat > summary, .pg-recent > summary { padding: .9rem .25rem; border-radius: 10px; transition: background .15s; }
+  .pg-cat > summary:hover, .pg-recent > summary:hover { background: #f5f8ff; }
+  .pg-lrow { padding: .65rem .25rem; }
+  .pg-tag { background: var(--blue-soft); color: #3a58b0; font-weight: 600; border-radius: 999px; padding: 2px 9px; }
+  .pg .badge { border-radius: 999px; padding: .4em .75em; font-weight: 600; }
+
+  /* ── Écrans LED ── */
+  .pg-led-tabs {
+    padding: 5px; gap: 4px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface);
+    overflow-x: auto; flex-wrap: nowrap; box-shadow: var(--shadow-sm);
+  }
+  .pg-led-tab { border: 0; border-radius: 9px; padding: 9px 14px; white-space: nowrap; transition: background .15s, color .15s; }
+  .pg-led-tab:hover { background: #f1f4fb; }
+  .pg-led-tab.is-active { background: var(--blue-soft); color: #2349b8; }
+  .pg-led-monthbar { background: linear-gradient(180deg, #7ea0f5, #3d68e6); border-radius: 7px 7px 0 0; }
+  .pg-led-profile > div { border-radius: 12px; border: 1px solid #eaeef6; }
+  .pg-led-note { border-radius: 12px; }
+  .pg-led-form p { margin: 0 0 12px; display: grid; gap: 4px; }
+  .pg-led-form label { font-size: 12px; font-weight: 650; color: #52637c; }
+  .pg-led-form input, .pg-led-form select, .pg-led-form textarea {
+    font: inherit; width: 100%; padding: 9px 12px; border: 1px solid #dbe2ee; border-radius: 10px; background: #fff;
+  }
+  .pg-led-form input:focus, .pg-led-form select:focus, .pg-led-form textarea:focus {
+    outline: 0; border-color: #86a3f0; box-shadow: 0 0 0 3px rgba(47, 91, 234, .12);
+  }
+  .pg-link { border: 0; background: none; padding: 0; margin-top: 4px; color: var(--blue); font-weight: 650; font-size: 11.5px; cursor: pointer; display: block; }
+  .pg-link:hover { text-decoration: underline; }
+
+  /* ── Panneau d'actions rapides (barre du haut) ── */
+  .quick-actions-inline .btn { border-radius: 10px; font-weight: 600; box-shadow: var(--shadow-sm); }
+  .quick-panel { border-radius: 20px; border-color: #dfe7f5; box-shadow: 0 24px 60px rgba(15, 23, 42, .2); animation: pgPop .2s ease; }
+  .quick-panel-header { gap: 10px; }
+  .quick-panel-cta { padding: .4rem .9rem; border-radius: 999px; font-size: 12.5px; margin-left: auto; }
+  .quick-panel-item { border-radius: 14px; }
+
+  /* ── Accessibilité & responsive ── */
+  .pg a:focus-visible, .pg button:focus-visible, .pg-tab:focus-visible {
+    outline: 2px solid #7899ed; outline-offset: 2px;
+  }
+  @media (max-width: 680px) {
+    .pg-top { padding: 20px 18px; border-radius: 16px; }
+    .pg-metric { padding: 15px 15px 13px; }
+    .pg-donut { height: 140px; width: 140px; }
+    .pg-donutinner { height: 104px; width: 104px; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .pg-modalback, .pg-modal, .quick-panel { animation: none !important; }
+  }
+</style>
+
 <main class="pg">
 
   {# ── En-tête ── #}
@@ -301,10 +734,16 @@
       <div class="pg-eyebrow">Pilotage commercial{% if ville_active %} / {{ ville_active }}{% endif %}</div>
       <h1>Réseau publicitaire — <span id="pg-cat-title"></span></h1>
       <p class="pg-hint">Vue générale du parc · Situation au {% now "d/m/Y" %}</p>
+      <div class="pg-header-actions">
+        <a href="{% url 'carte' %}" class="btn btn-sm btn-outline-view">
+          <i class="bi bi-map me-1"></i>Voir la carte
+        </a>
+        <a href="{% url 'support_list' %}" class="btn btn-outline-secondary btn-sm">
+          <i class="bi bi-collection me-1"></i>Supports
+        </a>
+      </div>
     </div>
     <div class="pg-controls">
-      <a href="{% url 'demande_creation' %}" class="btn btn-primary btn-sm">
-        <i class="fa-solid fa-plus"></i> 
       {% if villes %}
         <nav class="pg-control-group" aria-label="Choisir une ville">
           {% for ville in villes %}
@@ -438,25 +877,29 @@
             <option value="libre60">Libres +60 j</option>
             <option value="panne">En panne</option>
           </select>
-          <select class="pg-select" data-sort-by aria-label="Trier les faces">
-            <option value="id">N° de face</option>
-            <option value="rateDesc">Taux décroissant</option>
-            <option value="rateAsc">Taux croissant</option>
-            <option value="vacant">Inoccupation la plus longue</option>
-          </select>
+          <div class="pg-sort-links" aria-label="Trier les faces">
+            <a href="#" class="sort-link" data-sort-key="code" data-sort-dir="desc">
+              Code
+              <i class="bi bi-arrow-down-up"></i>
+            </a>
+            <a href="#" class="sort-link active" data-sort-key="numero" data-sort-dir="asc">
+              N° de face
+              <i class="bi bi-caret-up-fill"></i>
+            </a>
+          </div>
         </div>
       </div>
       <div class="pg-table-wrap">
         <table class="pg-table">
           <thead>
             <tr>
-              <th>Face</th>
-              <th>Emplacement</th>
-              <th>Statut aujourd'hui</th>
-              <th>Jours occupés</th>
-              <th>Taux cumulé</th>
-              <th>Annuel sécurisé</th>
-              <th>Libre depuis</th>
+              <th><a href="#" class="pg-sort-th active" data-sort-key="numero" data-sort-dir="asc">N° de face <i class="bi bi-caret-up-fill"></i></a></th>
+              <th><a href="#" class="pg-sort-th" data-sort-key="nom" data-sort-dir="asc">Emplacement <i class="bi bi-arrow-down-up"></i></a></th>
+              <th><a href="#" class="pg-sort-th" data-sort-key="statut" data-sort-dir="asc">Statut aujourd'hui <i class="bi bi-arrow-down-up"></i></a></th>
+              <th><a href="#" class="pg-sort-th" data-sort-key="jours" data-sort-dir="desc">Jours occupés <i class="bi bi-arrow-down-up"></i></a></th>
+              <th><a href="#" class="pg-sort-th" data-sort-key="taux" data-sort-dir="desc">Taux cumulé <i class="bi bi-arrow-down-up"></i></a></th>
+              <th><a href="#" class="pg-sort-th" data-sort-key="secure" data-sort-dir="desc">Annuel sécurisé <i class="bi bi-arrow-down-up"></i></a></th>
+              <th><a href="#" class="pg-sort-th" data-sort-key="vacancy" data-sort-dir="asc">Libre depuis <i class="bi bi-arrow-down-up"></i></a></th>
               <th></th>
             </tr>
           </thead>
@@ -596,13 +1039,13 @@
         <table class="pg-table">
           <thead>
             <tr>
-              <th>Face</th>
-              <th>Emplacement</th>
-              <th>Statut aujourd'hui</th>
-              <th>Jours occupés</th>
-              <th>Taux cumulé</th>
-              <th>Annuel sécurisé</th>
-              <th>Libre depuis</th>
+              <th><a href="#" class="pg-sort-th active" data-sort-key="numero" data-sort-dir="asc">N° de face <i class="bi bi-caret-up-fill"></i></a></th>
+              <th><a href="#" class="pg-sort-th" data-sort-key="nom" data-sort-dir="asc">Emplacement <i class="bi bi-arrow-down-up"></i></a></th>
+              <th><a href="#" class="pg-sort-th" data-sort-key="statut" data-sort-dir="asc">Statut aujourd'hui <i class="bi bi-arrow-down-up"></i></a></th>
+              <th><a href="#" class="pg-sort-th" data-sort-key="jours" data-sort-dir="desc">Jours occupés <i class="bi bi-arrow-down-up"></i></a></th>
+              <th><a href="#" class="pg-sort-th" data-sort-key="taux" data-sort-dir="desc">Taux cumulé <i class="bi bi-arrow-down-up"></i></a></th>
+              <th><a href="#" class="pg-sort-th" data-sort-key="secure" data-sort-dir="desc">Annuel sécurisé <i class="bi bi-arrow-down-up"></i></a></th>
+              <th><a href="#" class="pg-sort-th" data-sort-key="vacancy" data-sort-dir="asc">Libre depuis <i class="bi bi-arrow-down-up"></i></a></th>
               <th></th>
             </tr>
           </thead>
@@ -1038,6 +1481,19 @@
       <div class="pg-modalfoot" id="pg-mfoot"></div>
     </div>
   </div>
+
+  <div class="pg-modalback" id="pg-month-modal" hidden>
+    <div class="pg-modal pg-month-modal" role="dialog" aria-modal="true" aria-labelledby="pg-month-title">
+      <div class="pg-modalhead">
+        <div>
+          <div class="pg-eyebrow">Détail mensuel</div>
+          <h2 id="pg-month-title"></h2>
+        </div>
+        <button type="button" class="pg-close" id="pg-month-close" aria-label="Fermer">×</button>
+      </div>
+      <div id="pg-month-body"></div>
+    </div>
+  </div>
 </main>
 
 {{ parc_categories|json_script:"pg-data" }}
@@ -1046,6 +1502,59 @@
 {% endblock %}
 
 {% block extra_js %}
+<script>
+  (function () {
+    var quickPanel = document.getElementById('quick-panel');
+    var quickTitle = document.getElementById('quick-panel-title');
+    var quickCta = document.getElementById('quick-panel-cta');
+    var quickCtaLabel = document.getElementById('quick-panel-cta-label');
+    var quickSections = Array.prototype.slice.call(document.querySelectorAll('.quick-panel-section'));
+    var closeBtn = document.getElementById('quick-panel-close');
+    var quickButtons = document.querySelectorAll('.action-quick-btn');
+
+    function setQuickSection(type) {
+      if (!quickTitle) return;
+
+      var titleMap = {
+        demandes: 'Demandes en cours',
+        campagnes: 'Campagnes en cours',
+        reservations: 'Réservations en cours'
+      };
+
+      quickTitle.textContent = titleMap[type] || 'Éléments en cours';
+      quickSections.forEach(function (section) {
+        section.hidden = section.dataset.quickSection !== type;
+      });
+
+      var activeButton = document.querySelector('.action-quick-btn[data-panel="' + type + '"]');
+      if (quickCta && quickCtaLabel && activeButton) {
+        quickCta.setAttribute('href', activeButton.dataset.ctaUrl || quickCta.getAttribute('href'));
+        quickCtaLabel.textContent = activeButton.dataset.ctaLabel || quickCtaLabel.textContent;
+      }
+    }
+
+    quickButtons.forEach(function (button) {
+      button.addEventListener('click', function () {
+        setQuickSection(button.dataset.panel);
+        if (quickPanel) quickPanel.hidden = false;
+      });
+    });
+
+    if (closeBtn) {
+      closeBtn.addEventListener('click', function () {
+        if (quickPanel) quickPanel.hidden = true;
+      });
+    }
+
+    document.addEventListener('click', function (event) {
+      if (!quickPanel) return;
+      var clickedButton = event.target.closest('.action-quick-btn');
+      if (!clickedButton && !event.target.closest('#quick-panel')) {
+        quickPanel.hidden = true;
+      }
+    });
+  })();
+</script>
 <script>
   (function () {
     var MONTHS = ['JAN', 'FÉV', 'MAR', 'AVR', 'MAI', 'JUN', 'JUL', 'AOÛ', 'SEP', 'OCT', 'NOV', 'DÉC'];
@@ -1110,10 +1619,19 @@
 
     /* ── Fiche individuelle ── */
     var modal = document.getElementById('pg-modal');
+    var monthModal = document.getElementById('pg-month-modal');
     function closeModal() { modal.hidden = true; }
+    function closeMonthModal() { monthModal.hidden = true; }
     document.getElementById('pg-mclose').addEventListener('click', closeModal);
+    document.getElementById('pg-month-close').addEventListener('click', closeMonthModal);
     modal.addEventListener('click', function (e) { if (e.target === modal) closeModal(); });
-    document.addEventListener('keydown', function (e) { if (e.key === 'Escape') closeModal(); });
+    monthModal.addEventListener('click', function (e) { if (e.target === monthModal) closeMonthModal(); });
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') {
+        closeModal();
+        closeMonthModal();
+      }
+    });
 
     function openModal(f, cat) {
       document.getElementById('pg-mtitle').textContent = 'FACE ' + faceName(f) + ' — ' + f.nom;
@@ -1143,6 +1661,43 @@
       modal.hidden = false;
     }
 
+    function openMonthModal(monthInfo, cat) {
+      if (!monthInfo) return;
+      var campaignsHtml = (!monthInfo.campaigns || !monthInfo.campaigns.length)
+        ? '<li><span>Aucune campagne ce mois-ci.</span></li>'
+        : monthInfo.campaigns.map(function (campaign) {
+            var faces = campaign.faces || [];
+            var badgeFaces = faces.slice(0, 4).map(function (face) {
+              return '<span class="pg-face-badge">' + esc(face.code + (face.label ? '-' + face.label : '')) + '</span>';
+            }).join('');
+            var remaining = Math.max(0, faces.length - 4);
+            var extraBadge = remaining > 0 ? '<span class="pg-face-badge is-more">+' + remaining + '</span>' : '';
+            return '<li><a href="' + esc(campaign.url || '#') + '" class="pg-campaign-link"><strong>' + esc(campaign.nom) + '</strong><span>' + esc(campaign.client) + ' · ' + esc(campaign.date_debut || '—') + ' → ' + esc(campaign.date_fin || '—') + '</span><div class="pg-campaign-meta"><span class="pg-mini-pill">' + faces.length + ' face' + (faces.length > 1 ? 's' : '') + '</span><span class="pg-mini-pill">' + esc(campaign.client || 'Client') + '</span></div><div class="pg-campaign-badges">' + badgeFaces + extraBadge + '</div></a></li>';
+          }).join('');
+
+      function renderItemList(items, emptyText) {
+        if (!items || !items.length) {
+          return '<li><span>' + emptyText + '</span></li>';
+        }
+        return items.map(function (item) {
+          var campaignText = Array.isArray(item.campagnes) && item.campagnes.length
+            ? item.campagnes.join(', ')
+            : 'Aucune campagne connue';
+          return '<li><strong>' + esc(item.code || item.nom || item.label || 'Face') + '</strong><span>' + esc(campaignText) + '</span></li>';
+        }).join('');
+      }
+
+      document.getElementById('pg-month-title').textContent = monthInfo.month_label + ' · ' + (cat ? cat.categorie || 'Parc' : 'Parc');
+      document.getElementById('pg-month-body').innerHTML = '<div class="pg-month-detail-head">' +
+        '<div><div class="pg-eyebrow">Mois sélectionné</div><h3>' + esc(monthInfo.month_label) + '</h3></div>' +
+        '<span class="pg-chip">' + monthInfo.occupied_count + ' face' + (monthInfo.occupied_count > 1 ? 's' : '') + ' occupée' + (monthInfo.occupied_count > 1 ? 's' : '') + '</span>' +
+        '</div>' +
+        '<div class="pg-month-grid" style="grid-template-columns: 1fr;">' +
+        '<div class="pg-month-block"><h4>Campagnes</h4><ul class="pg-month-list">' + campaignsHtml + '</ul></div>' +
+        '</div>';
+      monthModal.hidden = false;
+    }
+
     /* ── Tableau de bord de chaque catégorie ── */
     panels.forEach(function (panel) {
       if (panel.dataset.index === undefined) return;
@@ -1155,7 +1710,7 @@
       var formatControls = panel.querySelector('[data-role=format-controls]');
       var search = panel.querySelector('[data-role=search]');
       var statusFilterSelect = panel.querySelector('[data-status-filter]');
-      var sortSelect = panel.querySelector('[data-sort-by]');
+      var sortLinks = panel.querySelectorAll('.sort-link');
       var tbody = panel.querySelector('[data-role=tbody]');
       var count = panel.querySelector('[data-role=count]');
       var pagination = panel.querySelector('[data-role=pagination]');
@@ -1187,15 +1742,32 @@
       });
       if (cat.formats.length < 2) formatControls.hidden = true;
 
+      function renderMonthDetail(index) {
+        var monthInfo = cat.month_details && cat.month_details[index];
+        if (monthInfo) {
+          openMonthModal(monthInfo, cat);
+        }
+      }
+
       function drawChart() {
         var values = selectedFormat === 'all' ? cat.mensuel : cat.formats[Number(selectedFormat)].mensuel;
         chart.innerHTML = values.map(function (v, i) {
           var forecast = i + 1 > meta.month;
           return '<div class="pg-grp"><div class="pg-bars"><div class="pg-bcol">' +
             '<span class="pg-val">' + Math.round(v) + '%</span>' +
-            '<div class="pg-bar' + (forecast ? ' is-forecast' : '') + '" style="height:' + Math.max(v * 1.65, 3) + 'px"></div>' +
+            '<div class="pg-bar' + (forecast ? ' is-forecast' : '') + '" data-month-index="' + i + '" style="height:' + Math.max(v * 1.65, 3) + 'px" title="' + esc(MONTHS[i]) + ' : ' + Math.round(v) + '%"></div>' +
             '</div></div><label>' + MONTHS[i] + '</label></div>';
         }).join('');
+        chart.querySelectorAll('.pg-bar').forEach(function (bar) {
+          bar.addEventListener('click', function () {
+            var idx = Number(bar.dataset.monthIndex);
+            chart.querySelectorAll('.pg-bar').forEach(function (item) {
+              item.style.outline = item === bar ? '2px solid #2457d6' : 'none';
+              item.style.outlineOffset = item === bar ? '2px' : '0';
+            });
+            renderMonthDetail(idx);
+          });
+        });
       }
       drawChart();
 
@@ -1203,7 +1775,14 @@
       var currentPage = 1;
       var shown = [];
       var statusFilter = 'all';
-      var sortBy = 'id';
+      var sortBy = 'numero';
+      var sortDir = 'asc';
+
+      function getFaceNumber(f) {
+        if (f.numero !== undefined && f.numero !== null && f.numero !== '') return Number(f.numero);
+        var match = String(f.code || '').match(/\d+/);
+        return match ? Number(match[0]) : 0;
+      }
 
       function matches(f, st) {
         if (st === 'all') return true;
@@ -1285,6 +1864,37 @@
           if (!q) return true;
           return (faceName(f) + ' ' + f.nom + ' ' + f.lieu + ' ' + f.format).toLowerCase().indexOf(q) !== -1;
         });
+        if (sortBy === 'code') {
+          rows.sort(function (a, b) {
+            var av = String(faceName(a)).toLowerCase();
+            var bv = String(faceName(b)).toLowerCase();
+            return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+          });
+        }
+        if (sortBy === 'numero') {
+          rows.sort(function (a, b) {
+            return sortDir === 'asc' ? getFaceNumber(a) - getFaceNumber(b) : getFaceNumber(b) - getFaceNumber(a);
+          });
+        }
+        if (sortBy === 'nom') {
+          rows.sort(function (a, b) {
+            var av = String(a.nom || '').toLowerCase();
+            var bv = String(b.nom || '').toLowerCase();
+            return sortDir === 'asc' ? av.localeCompare(bv) : bv.localeCompare(av);
+          });
+        }
+        if (sortBy === 'statut') {
+          rows.sort(function (a, b) {
+            var order = { occupee: 0, reservee: 1, libre: 2, panne: 3 };
+            var av = order[a.statut] ?? 99;
+            var bv = order[b.statut] ?? 99;
+            return sortDir === 'asc' ? av - bv : bv - av;
+          });
+        }
+        if (sortBy === 'jours') rows.sort(function (a, b) { return sortDir === 'asc' ? a.jours - b.jours : b.jours - a.jours; });
+        if (sortBy === 'taux') rows.sort(function (a, b) { return sortDir === 'asc' ? a.taux - b.taux : b.taux - a.taux; });
+        if (sortBy === 'secure') rows.sort(function (a, b) { return sortDir === 'asc' ? a.secure - b.secure : b.secure - a.secure; });
+        if (sortBy === 'vacancy') rows.sort(function (a, b) { return sortDir === 'asc' ? vacancy(a) - vacancy(b) : vacancy(b) - vacancy(a); });
         if (sortBy === 'rateDesc') rows.sort(function (a, b) { return b.taux - a.taux; });
         if (sortBy === 'rateAsc') rows.sort(function (a, b) { return a.taux - b.taux; });
         if (sortBy === 'vacant') rows.sort(function (a, b) { return vacancy(b) - vacancy(a); });
@@ -1317,11 +1927,43 @@
         currentPage = 1;
         renderTable();
       });
-      sortSelect.addEventListener('change', function () {
-        sortBy = sortSelect.value;
-        currentPage = 1;
-        renderTable();
-      });
+      function applySortState(activeLink) {
+        var allSortLinks = Array.prototype.slice.call(panel.querySelectorAll('.sort-link, .pg-sort-th'));
+        allSortLinks.forEach(function (item) {
+          var isActive = item === activeLink;
+          item.classList.toggle('active', isActive);
+          var icon = item.querySelector('i');
+          if (!icon) return;
+          var dir = item.dataset.sortDir || 'asc';
+          if (isActive) {
+            icon.className = dir === 'asc' ? 'bi bi-caret-up-fill' : 'bi bi-caret-down-fill';
+          } else {
+            icon.className = 'bi bi-arrow-down-up';
+          }
+        });
+      }
+
+      function bindSortLink(link) {
+        link.addEventListener('click', function (event) {
+          event.preventDefault();
+          var key = link.dataset.sortKey || 'numero';
+          var dir = link.dataset.sortDir || 'asc';
+          if (sortBy === key) {
+            dir = sortDir === 'asc' ? 'desc' : 'asc';
+            link.dataset.sortDir = dir;
+          } else {
+            link.dataset.sortDir = dir;
+          }
+          sortBy = key;
+          sortDir = dir;
+          applySortState(link);
+          currentPage = 1;
+          renderTable();
+        });
+      }
+
+      sortLinks.forEach(bindSortLink);
+      panel.querySelectorAll('.pg-sort-th').forEach(bindSortLink);
       tbody.addEventListener('click', function (e) {
         var tr = e.target.closest('tr[data-i]');
         if (tr) openModal(shown[Number(tr.dataset.i)], cat);

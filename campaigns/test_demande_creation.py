@@ -17,6 +17,135 @@ from campaigns.models import (
     STATUT_CONFIRMEE,
 )
 from inventory.models import FacePanneau, FormatSupport, Support
+from portail.forms import Etape1Form
+
+
+class DemandHoldTests(TestCase):
+    def setUp(self):
+        self.panel = Support.objects.create(
+            code='HOLD-FACE-PANEL',
+            nom='Panneau blocage test',
+            type_support=Support.TYPE_PANNEAU,
+            latitude=12.40,
+            longitude=-1.50,
+            ville='Ouagadougou',
+        )
+        self.face = FacePanneau.objects.create(
+            support=self.panel,
+            label=FacePanneau.LABEL_A,
+        )
+        self.start = datetime.date.today() + datetime.timedelta(days=12)
+        self.end = self.start + datetime.timedelta(days=6)
+
+    def test_active_demand_hold_blocks_face_for_other_requests(self):
+        demande = DemandeReservation.objects.create(
+            nom_contact='Prospect A',
+            societe='Société A',
+            email='a@example.com',
+            telephone='70000000',
+            date_debut_souhaitee=self.start,
+            date_fin_souhaitee=self.end,
+            statut=DemandeReservation.STATUT_EN_COURS,
+        )
+        demande.faces_souhaitees.add(self.face)
+
+        self.assertTrue(demande.is_hold_active_on(demande.date_debut_blocage))
+        self.assertFalse(self.face.is_disponibles(self.start, self.end))
+
+        form = Etape1Form(
+            data={
+                'faces_selectionnees': json.dumps([self.face.pk]),
+                'supports_selectionnees': '[]',
+                'date_debut': self.start.isoformat(),
+                'date_fin': self.end.isoformat(),
+            }
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn('plus disponibles', form.non_field_errors()[0])
+
+    def test_demand_hold_can_be_extended(self):
+        demande = DemandeReservation.objects.create(
+            nom_contact='Prospect B',
+            societe='Société B',
+            email='b@example.com',
+            telephone='70000001',
+            date_debut_souhaitee=self.start,
+            date_fin_souhaitee=self.end,
+            statut=DemandeReservation.STATUT_EN_COURS,
+        )
+        demande.faces_souhaitees.add(self.face)
+
+        original_end = demande.date_fin_blocage
+        demande.prolonger_blocage(4)
+
+        self.assertGreater(demande.date_fin_blocage, original_end)
+        self.assertTrue(demande.is_hold_active_on(original_end + datetime.timedelta(days=1)))
+
+    def test_staff_can_prolong_hold_from_demand_detail(self):
+        staff = get_user_model().objects.create_user(
+            username='hold-staff',
+            password='test-password',
+            role='staff',
+        )
+        self.client.force_login(staff)
+
+        demande = DemandeReservation.objects.create(
+            nom_contact='Prospect C',
+            societe='Société C',
+            email='c@example.com',
+            telephone='70000002',
+            date_debut_souhaitee=self.start,
+            date_fin_souhaitee=self.end,
+            statut=DemandeReservation.STATUT_EN_COURS,
+        )
+        demande.faces_souhaitees.add(self.face)
+        original_end = demande.date_fin_blocage
+
+        response = self.client.post(
+            reverse('demande_prolonger_blocage', kwargs={'uuid': demande.uuid}),
+            {'jours': '4'},
+            follow=True,
+        )
+
+        demande.refresh_from_db()
+        self.assertEqual(response.status_code, 200)
+        self.assertGreater(demande.date_fin_blocage, original_end)
+        self.assertTrue(demande.is_hold_active_on(original_end + datetime.timedelta(days=1)))
+
+    def test_pending_draft_request_also_blocks_the_face(self):
+        demande = DemandeReservation.objects.create(
+            nom_contact='Prospect D',
+            societe='Société D',
+            email='d@example.com',
+            telephone='70000003',
+            date_debut_souhaitee=self.start,
+            date_fin_souhaitee=self.end,
+            statut=DemandeReservation.STATUT_BROUILLON,
+        )
+        demande.faces_souhaitees.add(self.face)
+
+        self.assertFalse(self.face.is_disponibles(self.start, self.end))
+
+    def test_api_check_dispo_blocks_faces_with_active_pending_demand_overlap(self):
+        demande = DemandeReservation.objects.create(
+            nom_contact='Prospect E',
+            societe='Société E',
+            email='e@example.com',
+            telephone='70000004',
+            date_debut_souhaitee=self.start,
+            date_fin_souhaitee=self.end,
+            statut=DemandeReservation.STATUT_NOUVELLE,
+        )
+        demande.faces_souhaitees.add(self.face)
+
+        response = self.client.get(
+            reverse('api_check_dispo', args=[0]),
+            {'date_debut': self.start.isoformat(), 'date_fin': self.end.isoformat()},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        face_status = response.json()['faces'][str(self.face.pk)]['statut']
+        self.assertEqual(face_status, 'occupe')
 
 
 class DemandeCreationViewTests(TestCase):

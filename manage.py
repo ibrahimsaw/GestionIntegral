@@ -1,13 +1,22 @@
 #!/usr/bin/env python
-import os, sys
+import os
+
+if os.name == "nt":
+    os.add_dll_directory(r"C:\msys64\ucrt64\bin")
+
+import sys
+
 
 def main():
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'geoad.settings')
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:
-        raise ImportError("Couldn't import Django.") from exc
+        raise ImportError(
+            "Couldn't import Django."
+        ) from exc
     execute_from_command_line(sys.argv)
+
 
 if __name__ == '__main__':
     main()

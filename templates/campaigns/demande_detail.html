@@ -334,6 +334,29 @@
         </div>
       </section>
 
+      {% if demande.date_debut_blocage and demande.date_fin_blocage %}
+      <section class="fd-panel">
+        <div class="fd-panel-head"><h2 class="fd-panel-title"><i class="bi bi-shield-lock-fill"></i>Blocage temporaire</h2></div>
+        <div class="fd-panel-body">
+          <div class="fd-rows">
+            <div class="fd-row"><i class="bi bi-calendar-check"></i><span class="fd-row-label">Début</span><span class="fd-row-value">{{ demande.date_debut_blocage|date:"d/m/Y" }}</span></div>
+            <div class="fd-row"><i class="bi bi-calendar-x"></i><span class="fd-row-label">Fin</span><span class="fd-row-value">{{ demande.date_fin_blocage|date:"d/m/Y" }}</span></div>
+          </div>
+          {% if user.is_staff_regie_role and demande.statut != 'validee' and demande.statut != 'refusee' %}
+          <div class="mt-3">
+            <p class="fd-hint mb-2">Le blocage est actif tant que les échanges avec le client ne sont pas terminés.</p>
+            <form method="post" action="{% url 'demande_prolonger_blocage' demande.uuid %}" class="d-flex flex-wrap gap-2">
+              {% csrf_token %}
+              <button type="submit" name="jours" value="3" class="btn btn-outline-warning btn-sm">+3 jours</button>
+              <button type="submit" name="jours" value="5" class="btn btn-outline-warning btn-sm">+5 jours</button>
+              <button type="submit" name="jours" value="7" class="btn btn-outline-warning btn-sm">+7 jours</button>
+            </form>
+          </div>
+          {% endif %}
+        </div>
+      </section>
+      {% endif %}
+
       {% if reservations_client_periode %}
       <section class="fd-panel">
         <div class="fd-panel-head"><h2 class="fd-panel-title"><i class="bi bi-calendar2-range"></i>Réservations du client sur cette période</h2></div>

@@ -847,6 +847,18 @@ class DemandeReservation(models.Model):
         blank=True,
         verbose_name="Message libre",
     )
+    date_debut_blocage = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Début du blocage temporaire",
+        help_text="Date à partir de laquelle la demande bloque les faces sélectionnées.",
+    )
+    date_fin_blocage = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Fin du blocage temporaire",
+        help_text="Date jusqu'à laquelle les faces restent bloquées avant relance/validation.",
+    )
 
     # ── Traitement staff ──────────────────────────────────────────────────────
     statut = models.CharField(
@@ -931,6 +943,17 @@ class DemandeReservation(models.Model):
         if not self.reference:
             self.reference = f"DEM-{timezone.now().year}-{str(uuid.uuid4())[:6].upper()}"
 
+        if (
+            (self.pk is None or (not self.date_debut_blocage and not self.date_fin_blocage))
+            and self.date_debut_souhaitee
+            and self.date_fin_souhaitee
+        ):
+            self.date_debut_blocage = self.date_debut_souhaitee
+            self.date_fin_blocage = max(
+                self.date_fin_souhaitee,
+                self.date_debut_souhaitee + datetime.timedelta(days=7),
+            )
+
         # ── NOUVEAU : rapprochement automatique du Client existant ──────────
         # Si le visiteur se déclare "client existant" avec une référence, et
         # qu'aucun Client n'est encore rattaché, on tente un rapprochement
@@ -979,6 +1002,14 @@ class DemandeReservation(models.Model):
                 raise ValidationError(
                     _("La durée souhaitée ne peut pas dépasser 1 an.")
                 )
+
+        if self.date_debut_blocage and self.date_fin_blocage:
+            if self.date_fin_blocage < self.date_debut_blocage:
+                raise ValidationError({
+                    'date_fin_blocage': _(
+                        "La date de fin du blocage ne peut pas être avant la date de début."
+                    )
+                })
 
         # ── NOUVEAU : référence obligatoire si "client existant" ────────────
         if self.type_client == self.TYPE_CLIENT_EXISTANT and not self.reference_client_saisie.strip():
@@ -1093,6 +1124,36 @@ class DemandeReservation(models.Model):
             'statut', 'traite_par', 'traite_le',
             'notes_staff', 'updated_at',
         ])
+
+    def set_hold(self, jours=7):
+        """Bloque temporairement les faces sélectionnées pour la période demandée."""
+        if not self.date_debut_souhaitee or not self.date_fin_souhaitee:
+            return self.date_debut_blocage
+
+        start = self.date_debut_souhaitee
+        end = self.date_fin_souhaitee
+        self.date_debut_blocage = start
+        self.date_fin_blocage = max(
+            end,
+            start + datetime.timedelta(days=max(3, min(int(jours), 7))),
+        )
+        return self.date_fin_blocage
+
+    def prolonger_blocage(self, jours=3):
+        """Prolonge le blocage actuel pour poursuivre les échanges client."""
+        if not self.date_debut_blocage:
+            self.date_debut_blocage = timezone.localdate()
+        if not self.date_fin_blocage:
+            self.date_fin_blocage = self.date_debut_blocage
+        self.date_fin_blocage = self.date_fin_blocage + datetime.timedelta(days=max(1, int(jours)))
+        return self.date_fin_blocage
+
+    def is_hold_active_on(self, target_date=None):
+        """Vrai si les faces de cette demande sont encore bloquées à la date donnée."""
+        if not self.date_debut_blocage or not self.date_fin_blocage:
+            return False
+        target_date = target_date or timezone.localdate()
+        return self.date_debut_blocage <= target_date <= self.date_fin_blocage
 
     def get_resume_emplacements(self) -> str:
         """

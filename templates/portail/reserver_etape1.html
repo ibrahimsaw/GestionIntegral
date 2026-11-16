@@ -9,8 +9,36 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,500;9..144,600&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@500;600&display=swap" rel="stylesheet">
+<link href="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.css" rel="stylesheet">
 
 <style>
+.staff-client-select-wrap .ts-wrapper {
+    width: 100%;
+}
+
+.staff-client-select-wrap .ts-control {
+    min-height: 46px;
+    padding: 10px 14px;
+    font-size: .9rem;
+    border-radius: 8px;
+}
+
+.staff-client-select-wrap .ts-dropdown {
+    z-index: 1055;
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.staff-client-select-wrap .ts-dropdown .option {
+    padding: 11px 14px;
+}
+
+.staff-client-select-wrap .ts-dropdown .active {
+    background: var(--tone-wash);
+    color: var(--brand-ink);
+}
+
+
   /* ==========================================================
      TOKENS (identiques aux pages de confirmation / vérification)
      Les couleurs de statut (libre / occupé / panne / réservé)
@@ -286,6 +314,61 @@
   }
   .staff-client-type-option input { margin: 0; accent-color: var(--brand); }
   .staff-client-type-option i { font-size: 1rem; color: var(--brand); }
+
+  .staff-client-select-wrap {
+    margin-top: 8px;
+  }
+  .staff-client-select-wrap .ts-wrapper {
+    width: 100%;
+  }
+  .staff-client-select-wrap .ts-control,
+  .staff-client-select-wrap .ts-control input,
+  .staff-client-select-wrap .ts-dropdown {
+    font-family: var(--sans);
+  }
+  .staff-client-select-wrap .ts-control {
+    min-height: 42px;
+    padding: 6px 12px;
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    background: var(--paper);
+    color: var(--ink);
+    box-shadow: none;
+  }
+  .staff-client-select-wrap .ts-control:focus,
+  .staff-client-select-wrap .ts-wrapper.focus .ts-control {
+    border-color: var(--brand);
+    box-shadow: 0 0 0 3px rgba(29,90,71,.14);
+  }
+  .staff-client-select-wrap .ts-control .item {
+    padding: 2px 0;
+    font-size: .86rem;
+    font-weight: 600;
+  }
+  .staff-client-select-wrap .ts-dropdown {
+    border: 1px solid var(--line-strong);
+    border-radius: var(--radius-sm);
+    box-shadow: 0 12px 30px rgba(18, 26, 23, 0.12);
+    background: var(--paper);
+    color: var(--ink);
+  }
+  .staff-client-select-wrap .ts-dropdown .option {
+    padding: 10px 12px;
+    font-size: .85rem;
+  }
+  .staff-client-select-wrap .ts-dropdown .option.active,
+  .staff-client-select-wrap .ts-dropdown .option:hover {
+    background: var(--tone-wash);
+    color: var(--brand-ink);
+  }
+  .staff-client-select-wrap .ts-dropdown .no-results {
+    padding: 10px 12px;
+    color: var(--muted);
+    font-size: .82rem;
+  }
+  .staff-client-select-wrap .ts-control .item {
+    color: var(--ink);
+  }
 
   .staff-consent {
     margin-top: 20px;
@@ -1038,8 +1121,9 @@
             {% endif %}
             <div id="bloc-client-existant" style="display:none">
               <div class="staff-contact-option-title">Sélectionner un client</div>
-              <label class="staff-field-label" for="{{ contact_form.client.id_for_label }}">Client enregistré</label>
-              {{ contact_form.client }}
+              <div class="staff-client-select-wrap">
+                {{ contact_form.client }}
+              </div>
               {% for error in contact_form.client.errors %}
                 <div class="text-danger small">{{ error }}</div>
               {% endfor %}
@@ -1335,9 +1419,36 @@
       document.getElementById('bloc-client-existant').style.display = estExistant ? 'block' : 'none';
       document.getElementById('bloc-coordonnees-nouveau').style.display = estExistant ? 'none' : 'block';
     }
+
+    function initClientSearch() {
+      const select = document.getElementById('id_client');
+      if (!select || typeof TomSelect === 'undefined') return;
+
+      if (select.dataset.tomselectInitialized === 'true') return;
+
+      new TomSelect(select, {
+        create: false,
+        maxItems: 1,
+        allowEmptyOption: true,
+        placeholder: 'Rechercher un client...',
+        searchField: ['text'],
+        sortField: { field: 'text', direction: 'asc' },
+        closeAfterSelect: true,
+        hideSelected: false,
+        render: {
+          no_results: function(data, escape) {
+            return '<div class="no-results">Aucun client trouvé</div>';
+          }
+        }
+      });
+
+      select.dataset.tomselectInitialized = 'true';
+    }
+
     document.getElementById('type_client_nouveau').addEventListener('change', toggleStaffDemandeType);
     document.getElementById('type_client_existant').addEventListener('change', toggleStaffDemandeType);
     toggleStaffDemandeType();
+    initClientSearch();
     {% endif %}
     // ── FILTRES INITIAUX (depuis la vitrine) ───────────────────────────────────
     const REQUIRE_CATEGORY = {{ staff_mode|yesno:"true,false" }};
@@ -2345,5 +2456,70 @@
     const grid = document.getElementById('liste-grid');
     if (grid) grid.innerHTML = '<div class="liste-empty"><i class="bi bi-exclamation-triangle"></i><p>Erreur de chargement.</p></div>';
   });
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/js/tom-select.complete.min.js"></script>
+
+<script>
+    "use strict";
+
+    {% if staff_mode %}
+    function toggleStaffDemandeType() {
+        const estExistant = document.getElementById('type_client_existant').checked;
+
+        document.getElementById('bloc-client-existant').style.display =
+            estExistant ? 'block' : 'none';
+
+        document.getElementById('bloc-coordonnees-nouveau').style.display =
+            estExistant ? 'none' : 'block';
+    }
+
+    function initClientSearch() {
+        const select = document.getElementById('id_client');
+
+        if (!select || typeof TomSelect === 'undefined') return;
+
+        if (select.tomselect) return;
+
+        new TomSelect(select, {
+            create: false,
+            maxItems: 1,
+            allowEmptyOption: true,
+
+            placeholder: 'Rechercher par code ou nom du client...',
+
+            searchField: ['text'],
+            sortField: [
+                { field: '$order', direction: 'asc' }
+            ],
+
+            closeAfterSelect: true,
+            hideSelected: false,
+
+            render: {
+                no_results: function(data, escape) {
+                    return `
+                        <div class="no-results">
+                            <i class="bi bi-search me-2"></i>
+                            Aucun client trouvé pour "${escape(data.input)}"
+                        </div>
+                    `;
+                }
+            }
+        });
+    }
+
+    document.getElementById('type_client_nouveau')
+        .addEventListener('change', toggleStaffDemandeType);
+
+    document.getElementById('type_client_existant')
+        .addEventListener('change', toggleStaffDemandeType);
+
+    toggleStaffDemandeType();
+    initClientSearch();
+
+    {% endif %}
+
+    // CONSERVE ICI TOUT LE RESTE DE TON JAVASCRIPT EXISTANT
 </script>
 {% endblock %}

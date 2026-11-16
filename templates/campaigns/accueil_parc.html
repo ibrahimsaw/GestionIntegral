@@ -11,65 +11,12 @@
 {% endblock %}
 
 {% block topbar_actions %}
-  <div class="d-flex align-items-center gap-2 position-relative">
-    {% if not request.user.is_technicien %}
-      <div class="quick-actions-inline">
-        <button type="button" class="btn btn-primary btn-sm action-quick-btn" data-panel="demandes" data-cta-label="Nouveau" data-cta-url="{% url 'demande_creation' %}">
-          <i class="bi bi-inboxes me-1"></i>Demandes
-        </button>
-        <button type="button" class="btn btn-success btn-sm action-quick-btn" data-panel="campagnes" data-cta-label="Nouveau" data-cta-url="{% url 'campagne_create' %}">
-          <i class="bi bi-broadcast me-1"></i>Campagnes
-        </button>
-        <button type="button" class="btn btn-secondary btn-sm text-dark action-quick-btn" data-panel="reservations" data-cta-label="Nouveau" data-cta-url="{% url 'reservation_wizard_etape1' %}">
-          <i class="bi bi-calendar2-check me-1"></i>Réservations
-        </button>
-      </div>
-
-      <div id="quick-panel" class="quick-panel" hidden>
-        <div class="quick-panel-header">
-          <span id="quick-panel-title">Éléments en cours</span>
-          <a id="quick-panel-cta" href="{% url 'demande_creation' %}" class="quick-panel-cta">
-            <i class="bi bi-plus-circle me-2"></i><span id="quick-panel-cta-label">Nouveau</span>
-          </a>
-          <button type="button" id="quick-panel-close" aria-label="Fermer">×</button>
-        </div>
-        <div id="quick-panel-body" class="quick-panel-body">
-          <div class="quick-panel-section" data-quick-section="demandes">
-            {% for demande in demandes_en_cours_list %}
-              <a href="{% url 'demandes_liste' %}?statut=en_cours" class="quick-panel-item">
-                <strong>{{ demande.nom|default:"Demande sans nom" }}</strong>
-                <small>{{ demande.client.nom|default:"Client" }} • {{ demande.created_at|date:"d/m/Y" }}</small>
-              </a>
-            {% empty %}
-              <p class="quick-panel-empty">Aucune demande en cours.</p>
-            {% endfor %}
-          </div>
-
-          <div class="quick-panel-section" data-quick-section="campagnes">
-            {% for campagne in campagnes_en_cours_list %}
-              <a href="{% url 'campagne_detail' campagne.pk %}" class="quick-panel-item">
-                <strong>{{ campagne.nom }}</strong>
-                <small>{{ campagne.client.nom|default:"Client" }} • {{ campagne.date_debut|date:"d/m/Y" }} → {{ campagne.date_fin|date:"d/m/Y" }}</small>
-              </a>
-            {% empty %}
-              <p class="quick-panel-empty">Aucune campagne en cours.</p>
-            {% endfor %}
-          </div>
-
-          <div class="quick-panel-section" data-quick-section="reservations">
-            {% for reservation in reservations_en_cours_list %}
-              <a href="{% url 'reservation_list' %}?statut=a_suivre" class="quick-panel-item">
-                <strong>{{ reservation.nom }}</strong>
-                <small>{{ reservation.client.nom|default:"Client" }} • {{ reservation.date_debut|date:"d/m/Y" }} → {{ reservation.date_fin|date:"d/m/Y" }}</small>
-              </a>
-            {% empty %}
-              <p class="quick-panel-empty">Aucune réservation en cours.</p>
-            {% endfor %}
-          </div>
-        </div>
-      </div>
-    {% endif %}
-  </div>
+{% if not request.user.is_technicien %}
+  <a href="{% url 'demande_creation' %}" class="btn btn-primary btn-sm shadow-sm" aria-label="Nouvelle demande">
+    <i class="bi bi-plus-circle"></i>
+    <span>Nouvelle demande</span>
+  </a>
+{% endif %}
 {% endblock %}
 
 {% block page_toolbar %}{% endblock %}
@@ -198,6 +145,64 @@
     font-size: 0.85rem;
   }
 
+  .pg-list-modal-trigger {
+    white-space: nowrap;
+    font-weight: 600;
+  }
+
+  .pg-list-modal .pg-modal {
+    width: min(620px, 100%);
+  }
+
+  .pg-modal-list {
+    display: grid;
+    gap: 12px;
+    margin-top: 20px;
+  }
+
+  .pg-modal-item {
+    display: block;
+    padding: 14px 15px;
+    border: 1px solid #e7edf7;
+    border-radius: 12px;
+    background: linear-gradient(180deg, #fff 0%, #f7f9fd 100%);
+    color: #1f2d3d;
+    text-decoration: none;
+    transition: transform .15s ease, border-color .15s ease, box-shadow .15s ease;
+  }
+
+  .pg-modal-item:hover {
+    color: #1f2d3d;
+    text-decoration: none;
+    border-color: #dfeaff;
+    box-shadow: 0 10px 22px rgba(36, 87, 214, 0.08);
+    transform: translateY(-1px);
+  }
+
+  .pg-modal-item-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    margin-bottom: 6px;
+  }
+
+  .pg-modal-item strong {
+    display: block;
+    font-size: 0.95rem;
+  }
+
+  .pg-modal-item small,
+  .pg-modal-item-meta {
+    display: block;
+    color: #68798d;
+    font-size: 0.78rem;
+  }
+
+  .pg-modal-item-meta {
+    margin-top: 5px;
+  }
+
   .pg {
     --navy: #101c32;
     --blue: #2457d6;
@@ -261,11 +266,30 @@
   .pg-control-group .pg-btn { padding: 8px 10px; font-size: 12px; }
 
   /* ── Sélecteur de catégorie ── */
-  .pg-tabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 24px 0 20px; }
+  .pg-tabs {
+    display: flex; align-items: center; flex-wrap: nowrap; gap: 8px; margin: 24px 0 20px;
+    overflow-x: auto; scrollbar-width: thin;
+  }
+  .pg-tab-actions {
+    display: flex; align-items: center; gap: 8px; margin-left: auto; padding-left: 10px;
+    flex-wrap: wrap; justify-content: flex-end;
+  }
+  .pg-tab-action {
+    display: inline-flex; align-items: center; gap: 7px; padding: 9px 12px; border-radius: 10px;
+    background: #fff; border: 1px solid var(--line); color: #4b5d78; font: inherit; font-size: 12px;
+    font-weight: 700; cursor: pointer; white-space: nowrap; text-decoration: none;
+  }
+  .pg-tab-action:hover { border-color: #b9c6df; }
+  .pg-tab-action.is-primary {
+    background: var(--navy); border-color: var(--navy); color: #fff; box-shadow: 0 6px 16px rgba(15, 27, 51, .15);
+  }
+  .pg-tab-action.is-primary:hover { filter: brightness(1.03); }
+  .pg-tab-action .badge { font-size: 10px; }
   .pg-tab {
     display: inline-flex; align-items: center; gap: 9px;
     font: inherit; padding: 10px 16px; border-radius: 10px; cursor: pointer;
     background: #fff; border: 1px solid var(--line); color: #4b5d78; font-weight: 650;
+    flex: 0 0 auto;
   }
   .pg-tab:hover { border-color: #b9c6df; }
   .pg-tab .pg-dot { width: 9px; height: 9px; border-radius: 50%; flex: 0 0 auto; }
@@ -492,6 +516,8 @@
     .pg-faces-panel .pg-tabletop .pg-select { flex: 1 1 42%; min-width: 0; }
     .pg-faces-panel .pg-tablefoot { align-items: flex-start; flex-direction: column; padding: 12px 16px; }
     .pg-faces-panel .pg-pagination { justify-content: flex-start; }
+    .pg-tabs { flex-wrap: wrap; }
+    .pg-tab-actions { width: 100%; margin-left: 0; padding-left: 0; justify-content: flex-start; }
   }
   @media (prefers-reduced-motion: reduce) {
     .pg *, .pg *::before, .pg *::after { transition: none !important; }
@@ -966,6 +992,26 @@
       Écrans
       <small>{{ ecrans_total }}</small>
     </button>
+
+    {% if not request.user.is_technicien %}
+      <div class="pg-tab-actions">
+        <button type="button" class="pg-tab-action pg-list-modal-trigger" data-modal-target="pg-demandes-modal">
+          <i class="bi bi-inboxes"></i>
+          <span>Demandes</span>
+          {% if demandes_en_cours_list %}<span class="badge text-bg-primary-subtle">{{ demandes_en_cours_list|length }}</span>{% endif %}
+        </button>
+        <button type="button" class="pg-tab-action pg-list-modal-trigger" data-modal-target="pg-campaigns-modal">
+          <i class="bi bi-broadcast"></i>
+          <span>Campagnes</span>
+          {% if campagnes_en_cours_list %}<span class="badge text-bg-success-subtle">{{ campagnes_en_cours_list|length }}</span>{% endif %}
+        </button>
+        <button type="button" class="pg-tab-action pg-list-modal-trigger" data-modal-target="pg-reservations-modal">
+          <i class="bi bi-calendar2-check"></i>
+          <span>Réservations</span>
+          {% if reservations_en_cours_list %}<span class="badge text-bg-secondary">{{ reservations_en_cours_list|length }}</span>{% endif %}
+        </button>
+      </div>
+    {% endif %}
   </nav>
 
   <section class="pg-catpanel" id="cat-toutes" data-index="global" hidden>
@@ -1685,6 +1731,90 @@
       <div id="pg-month-body"></div>
     </div>
   </div>
+
+  <div class="pg-modalback pg-list-modal" id="pg-demandes-modal" hidden>
+    <div class="pg-modal" role="dialog" aria-modal="true" aria-labelledby="pg-demandes-title">
+      <div class="pg-modalhead">
+        <div>
+          <div class="pg-eyebrow">Pilotage</div>
+          <h2 id="pg-demandes-title">Demandes en cours</h2>
+        </div>
+        <button type="button" class="pg-close pg-list-close" data-modal-target="pg-demandes-modal" aria-label="Fermer">×</button>
+      </div>
+      {% if demandes_en_cours_list %}
+        <div class="pg-modal-list">
+          {% for demande in demandes_en_cours_list %}
+            <a href="{% url 'demandes_liste' %}?statut=en_cours" class="pg-modal-item">
+              <div class="pg-modal-item-head">
+                <strong>{{ demande.nom|default:"Demande sans nom" }}</strong>
+                <span class="badge text-bg-primary" style="color:#fff;">En cours</span>
+              </div>
+              <small>{{ demande.client.nom|default:"Client" }}</small>
+              <span class="pg-modal-item-meta">Créée le {{ demande.created_at|date:"d/m/Y" }}</span>
+            </a>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="pg-empty">Aucune demande en cours.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="pg-modalback pg-list-modal" id="pg-campaigns-modal" hidden>
+    <div class="pg-modal" role="dialog" aria-modal="true" aria-labelledby="pg-campaigns-title">
+      <div class="pg-modalhead">
+        <div>
+          <div class="pg-eyebrow">Pilotage</div>
+          <h2 id="pg-campaigns-title">Campagnes en cours</h2>
+        </div>
+        <button type="button" class="pg-close pg-list-close" data-modal-target="pg-campaigns-modal" aria-label="Fermer">×</button>
+      </div>
+      {% if campagnes_en_cours_list %}
+        <div class="pg-modal-list">
+          {% for campagne in campagnes_en_cours_list %}
+            <a href="{% url 'campagne_detail' campagne.pk %}" class="pg-modal-item">
+              <div class="pg-modal-item-head">
+                <strong>{{ campagne.nom }}</strong>
+                <span class="badge bg-{{ campagne.get_statut_badge }}" style="color:#fff;">{{ campagne.get_statut_display }}</span>
+              </div>
+              <small>{{ campagne.client.nom|default:"Client" }}</small>
+              <span class="pg-modal-item-meta">{{ campagne.date_debut|date:"d/m/Y" }} → {{ campagne.date_fin|date:"d/m/Y" }}</span>
+            </a>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="pg-empty">Aucune campagne en cours.</p>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="pg-modalback pg-list-modal" id="pg-reservations-modal" hidden>
+    <div class="pg-modal" role="dialog" aria-modal="true" aria-labelledby="pg-reservations-title">
+      <div class="pg-modalhead">
+        <div>
+          <div class="pg-eyebrow">Pilotage</div>
+          <h2 id="pg-reservations-title">Réservations en cours</h2>
+        </div>
+        <button type="button" class="pg-close pg-list-close" data-modal-target="pg-reservations-modal" aria-label="Fermer">×</button>
+      </div>
+      {% if reservations_en_cours_list %}
+        <div class="pg-modal-list">
+          {% for reservation in reservations_en_cours_list %}
+            <a href="{% url 'reservation_detail' reservation.client.pk reservation.pk %}" class="pg-modal-item">
+              <div class="pg-modal-item-head">
+                <strong>{{ reservation.nom }}</strong>
+                <span class="badge text-bg-success" style="color:#fff;">Confirmée</span>
+              </div>
+              <small>{{ reservation.client.nom|default:"Client" }}</small>
+              <span class="pg-modal-item-meta">{{ reservation.date_debut|date:"d/m/Y" }} → {{ reservation.date_fin|date:"d/m/Y" }}</span>
+            </a>
+          {% endfor %}
+        </div>
+      {% else %}
+        <p class="pg-empty">Aucune réservation en cours.</p>
+      {% endif %}
+    </div>
+  </div>
 </main>
 
 {{ parc_categories|json_script:"pg-data" }}
@@ -1695,53 +1825,44 @@
 {% block extra_js %}
 <script>
   (function () {
-    var quickPanel = document.getElementById('quick-panel');
-    var quickTitle = document.getElementById('quick-panel-title');
-    var quickCta = document.getElementById('quick-panel-cta');
-    var quickCtaLabel = document.getElementById('quick-panel-cta-label');
-    var quickSections = Array.prototype.slice.call(document.querySelectorAll('.quick-panel-section'));
-    var closeBtn = document.getElementById('quick-panel-close');
-    var quickButtons = document.querySelectorAll('.action-quick-btn');
+    var modalTriggers = document.querySelectorAll('.pg-list-modal-trigger');
+    var modals = document.querySelectorAll('.pg-list-modal');
+    var closeButtons = document.querySelectorAll('.pg-list-close');
 
-    function setQuickSection(type) {
-      if (!quickTitle) return;
-
-      var titleMap = {
-        demandes: 'Demandes en cours',
-        campagnes: 'Campagnes en cours',
-        reservations: 'Réservations en cours'
-      };
-
-      quickTitle.textContent = titleMap[type] || 'Éléments en cours';
-      quickSections.forEach(function (section) {
-        section.hidden = section.dataset.quickSection !== type;
+    function closeAllListModals() {
+      modals.forEach(function (modal) {
+        modal.hidden = true;
       });
-
-      var activeButton = document.querySelector('.action-quick-btn[data-panel="' + type + '"]');
-      if (quickCta && quickCtaLabel && activeButton) {
-        quickCta.setAttribute('href', activeButton.dataset.ctaUrl || quickCta.getAttribute('href'));
-        quickCtaLabel.textContent = activeButton.dataset.ctaLabel || quickCtaLabel.textContent;
-      }
     }
 
-    quickButtons.forEach(function (button) {
+    modalTriggers.forEach(function (button) {
       button.addEventListener('click', function () {
-        setQuickSection(button.dataset.panel);
-        if (quickPanel) quickPanel.hidden = false;
+        var targetId = button.dataset.modalTarget;
+        closeAllListModals();
+        var targetModal = document.getElementById(targetId);
+        if (targetModal) targetModal.hidden = false;
       });
     });
 
-    if (closeBtn) {
-      closeBtn.addEventListener('click', function () {
-        if (quickPanel) quickPanel.hidden = true;
+    closeButtons.forEach(function (button) {
+      button.addEventListener('click', function () {
+        var targetId = button.dataset.modalTarget;
+        var targetModal = document.getElementById(targetId);
+        if (targetModal) targetModal.hidden = true;
       });
-    }
+    });
 
-    document.addEventListener('click', function (event) {
-      if (!quickPanel) return;
-      var clickedButton = event.target.closest('.action-quick-btn');
-      if (!clickedButton && !event.target.closest('#quick-panel')) {
-        quickPanel.hidden = true;
+    modals.forEach(function (modal) {
+      modal.addEventListener('click', function (event) {
+        if (event.target === modal) {
+          modal.hidden = true;
+        }
+      });
+    });
+
+    document.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape') {
+        closeAllListModals();
       }
     });
   })();

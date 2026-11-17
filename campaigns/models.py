@@ -789,6 +789,18 @@ class DemandeReservation(models.Model):
         max_length=30,
         verbose_name="Téléphone",
     )
+    whatsapp = models.CharField(
+        max_length=30,
+        blank=True,
+        default='',
+        verbose_name="WhatsApp",
+    )
+    fonction_contact = models.CharField(
+        max_length=120,
+        blank=True,
+        default='',
+        verbose_name="Fonction du contact",
+    )
     accepte_contact = models.BooleanField(
         default=True,
         verbose_name="Accepte d'être recontacté",
@@ -992,6 +1004,11 @@ class DemandeReservation(models.Model):
                     self.telephone = match.telephone
                 if not self.societe:
                     self.societe = match.nom
+
+        if not self.societe:
+            principal = self.client or self.agence
+            if principal:
+                self.societe = principal.nom
 
         super().save(*args, **kwargs)
 

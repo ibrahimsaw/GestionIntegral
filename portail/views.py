@@ -1770,7 +1770,11 @@ class DemandePartageEtape1View(DemandePartageWizardBase):
         post_data['date_debut'] = state['date_debut']
         post_data['date_fin'] = state['date_fin']
         post_data['supports_selectionnees'] = '[]'
-        form = Etape1Form(post_data)
+        form = Etape1Form(
+            post_data,
+            is_edit_mode=True,
+            exclude_demande_id=demande.pk,
+        )
         if not form.is_valid():
             return self.render_step(request, token, form, state, faces)
 
@@ -1894,7 +1898,7 @@ class DemandePartageEtape2View(DemandePartageWizardBase):
                 demande.reference_client_saisie = reference
                 demande.client = client
                 demande.nom_contact = data['nom_contact']
-                demande.societe = data.get('societe', '')
+                demande.societe = data.get('societe') or (client.nom if client else '') or (demande.agence.nom if demande.agence else '')
                 demande.email = data['email']
                 demande.telephone = data['telephone']
                 demande.accepte_contact = data['accepte_contact']

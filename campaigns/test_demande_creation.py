@@ -127,6 +127,31 @@ class DemandHoldTests(TestCase):
 
         self.assertFalse(self.face.is_disponibles(self.start, self.end))
 
+    def test_edit_mode_invalid_selection_mentions_modification(self):
+        demande = DemandeReservation.objects.create(
+            nom_contact='Prospect E',
+            societe='Société E',
+            email='e@example.com',
+            telephone='70000004',
+            date_debut_souhaitee=self.start,
+            date_fin_souhaitee=self.end,
+            statut=DemandeReservation.STATUT_EN_COURS,
+        )
+        demande.faces_souhaitees.add(self.face)
+
+        form = Etape1Form(
+            data={
+                'faces_selectionnees': json.dumps([self.face.pk]),
+                'supports_selectionnees': '[]',
+                'date_debut': self.start.isoformat(),
+                'date_fin': self.end.isoformat(),
+            },
+            is_edit_mode=True,
+            exclude_demande_id=demande.pk,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+
     def test_api_check_dispo_blocks_faces_with_active_pending_demand_overlap(self):
         demande = DemandeReservation.objects.create(
             nom_contact='Prospect E',
@@ -208,6 +233,67 @@ class DemandeCreationViewTests(TestCase):
         self.assertTrue(form.is_valid(), form.errors)
         self.assertEqual(form.cleaned_data['type_compte'], Client.TYPE_AGENCE)
 
+    def test_contact_form_allows_empty_accounts_and_creates_new_client_data(self):
+        form = DemandeGestionContactForm(data={
+            'client': '',
+            'agence': '',
+            'contact': 'Nouveau Contact',
+            'telephone': '70000019',
+            'email': 'nouveau@example.com',
+            'societe': 'Nouvelle Société SARL',
+            'accepte_contact': 'on',
+        })
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data['type_client'], DemandeReservation.TYPE_CLIENT_NOUVEAU)
+        self.assertEqual(form.cleaned_data['primary'], 'client')
+        self.assertEqual(form.cleaned_data['new_client']['nom'], 'Nouvelle Société SARL')
+        self.assertEqual(form.cleaned_data['new_client']['type_entite'], Client.TYPE_CLIENT)
+
+    def test_contact_form_allows_agency_without_client_selection(self):
+        agence = Client.objects.create(
+            nom='Agence sans client',
+            type_entite=Client.TYPE_AGENCE,
+            email='agence-only@example.com',
+            telephone='70000020',
+        )
+
+        form = DemandeGestionContactForm(data={
+            'client': '',
+            'agence': agence.pk,
+            'contact': 'Contact agence',
+            'telephone': '70000021',
+            'email': 'contact-agence@example.com',
+            'societe': '',
+            'accepte_contact': 'on',
+        })
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertIsNone(form.cleaned_data['new_client'])
+        self.assertEqual(form.cleaned_data['societe'], 'Agence sans client')
+
+    def test_contact_form_preserves_existing_company_name_without_function_field(self):
+        client = Client.objects.create(
+            nom='Client société',
+            type_entite=Client.TYPE_CLIENT,
+            email='client@example.com',
+            telephone='70000013',
+            contact_nom='Jean Client',
+        )
+
+        form = DemandeGestionContactForm(data={
+            'client': client.pk,
+            'contact': 'Amina Contact',
+            'telephone': '70000014',
+            'email': 'amina@example.com',
+            'societe': 'Société propre',
+            'accepte_contact': 'on',
+        })
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertNotIn('fonction', form.fields)
+        self.assertEqual(form.cleaned_data['societe'], 'Société propre')
+
     def test_demand_allows_linking_an_agency(self):
         agence = Client.objects.create(
             nom='Agence de test',
@@ -229,6 +315,43 @@ class DemandeCreationViewTests(TestCase):
 
         self.assertEqual(demande.agence, agence)
         self.assertEqual(demande.agence_id, agence.pk)
+
+    def test_form_uses_selected_client_or_agency_name_as_company(self):
+        agence = Client.objects.create(
+            nom='Agence commerciale SARL',
+            type_entite=Client.TYPE_AGENCE,
+            email='agence-company@example.com',
+            telephone='70000015',
+        )
+        client = Client.objects.create(
+            nom='Client entreprise SA',
+            type_entite=Client.TYPE_CLIENT,
+            email='client-company@example.com',
+            telephone='70000016',
+        )
+
+        client_form = DemandeGestionContactForm(data={
+            'client': client.pk,
+            'agence': agence.pk,
+            'contact': 'Sonia Contact',
+            'telephone': '70000018',
+            'email': 'sonia@example.com',
+            'accepte_contact': 'on',
+        })
+        self.assertTrue(client_form.is_valid(), client_form.errors)
+        self.assertEqual(client_form.cleaned_data['societe'], 'Client entreprise SA')
+
+        agency_only_form = DemandeGestionContactForm(data={
+            'client': client.pk,
+            'agence': agence.pk,
+            'contact': 'Amina Contact',
+            'telephone': '70000017',
+            'email': 'amina@example.com',
+            'societe': '',
+            'accepte_contact': 'on',
+        })
+        self.assertTrue(agency_only_form.is_valid(), agency_only_form.errors)
+        self.assertEqual(agency_only_form.cleaned_data['societe'], 'Client entreprise SA')
 
     def test_format_prices_are_saved_on_demand_and_copied_to_reservation(self):
         standard = FormatSupport.objects.create(
@@ -500,6 +623,7 @@ class DemandeCreationViewTests(TestCase):
         )
         demande = DemandeReservation.objects.get()
         self.assertEqual(demande.statut, DemandeReservation.STATUT_EN_COURS)
+        self.assertEqual(demande.traite_par, self.staff)
         self.assertEqual(demande.client, client_obj)
         self.assertEqual(demande.reference_client_saisie, client_obj.reference)
         self.assertEqual(demande.nom_contact, 'Awa Contact')
@@ -750,7 +874,7 @@ class DemandeCreationViewTests(TestCase):
         )
         self.assertEqual(
             self.client.get(
-                reverse('portail:demande_partage', kwargs={'token': token})
+                reverse('portail:demande_partage', kwargs={'token': demande.token_partage})
             ).status_code,
             200,
         )

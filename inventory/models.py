@@ -907,7 +907,7 @@ class FacePanneau(models.Model):
     def __str__(self):
         return f"{self.support.code} — Face {self.label}"
 
-    def is_disponible(self, date_debut=None, date_fin=None):
+    def is_disponible(self, date_debut=None, date_fin=None, exclude_demande_id=None):
         """Vérifie si la face est libre sur une période donnée."""
         from campaigns.models import DemandeReservation, LigneCampagne
         from django.utils import timezone
@@ -921,7 +921,7 @@ class FacePanneau(models.Model):
         if hasattr(date_fin, 'date'):
             date_fin = date_fin.date()
 
-        blocage_actif = DemandeReservation.objects.filter(
+        qs = DemandeReservation.objects.filter(
             statut__in=[
                 DemandeReservation.STATUT_BROUILLON,
                 DemandeReservation.STATUT_NOUVELLE,
@@ -931,7 +931,10 @@ class FacePanneau(models.Model):
         ).filter(
             Q(date_debut_blocage__lte=date_fin, date_fin_blocage__gte=date_debut)
             | Q(date_debut_souhaitee__lte=date_fin, date_fin_souhaitee__gte=date_debut)
-        ).exists()
+        )
+        if exclude_demande_id is not None:
+            qs = qs.exclude(pk=exclude_demande_id)
+        blocage_actif = qs.exists()
 
         if blocage_actif:
             return False
@@ -953,7 +956,7 @@ class FacePanneau(models.Model):
             )
         ).exists()
         
-    def is_disponibles(self, date_debut=None, date_fin=None):
+    def is_disponibles(self, date_debut=None, date_fin=None, exclude_demande_id=None):
         """Vérifie si la face est libre sur une période donnée (campagnes + réservations)."""
         from campaigns.models import DemandeReservation, LigneCampagne, ReservationLigne
         from django.utils import timezone
@@ -967,7 +970,7 @@ class FacePanneau(models.Model):
         if hasattr(date_fin, 'date'):
             date_fin = date_fin.date()
  
-        blocage_actif = DemandeReservation.objects.filter(
+        qs = DemandeReservation.objects.filter(
             statut__in=[
                 DemandeReservation.STATUT_BROUILLON,
                 DemandeReservation.STATUT_NOUVELLE,
@@ -977,7 +980,10 @@ class FacePanneau(models.Model):
         ).filter(
             Q(date_debut_blocage__lte=date_fin, date_fin_blocage__gte=date_debut)
             | Q(date_debut_souhaitee__lte=date_fin, date_fin_souhaitee__gte=date_debut)
-        ).exists()
+        )
+        if exclude_demande_id is not None:
+            qs = qs.exclude(pk=exclude_demande_id)
+        blocage_actif = qs.exists()
 
         # 1. Vérification via les LigneCampagne (campagnes actives/à venir)
         occupee_campagne = LigneCampagne.objects.filter(face=self).filter(

@@ -1,0 +1,1843 @@
+import datetime
+import math
+import uuid
+from decimal import Decimal
+from django.conf import settings
+from django.core.exceptions import ValidationError
+from django.core.validators import FileExtensionValidator, MaxValueValidator, MinValueValidator
+from django.db import models
+from django.db.models import Q
+from django.utils import timezone
+from django.utils.translation import gettext_lazy as _
+
+from inventory.models import (
+    FormatSupport,
+    calculer_heures_chevauchement,
+    get_dynamic_format_choices,
+    normaliser_categorie_format,
+)
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Fonctions utilitaires
+# ══════════════════════════════════════════════════════════════════════════════
+
+def calculer_duree_tranches(tranches: str) -> float:
+    total_heures = 0.0
+    if not tranches:
+        return total_heures
+    plages = tranches.split(",")
+    for plage in plages:
+        try:
+            debut_str, fin_str = plage.split("-")
+            debut = datetime.datetime.strptime(debut_str.strip(), "%H:%M")
+            fin = datetime.datetime.strptime(fin_str.strip(), "%H:%M")
+            duree = (fin - debut).total_seconds() / 3600
+            total_heures += duree
+        except ValueError:
+            continue
+    return total_heures
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Constantes & Choix
+# ══════════════════════════════════════════════════════════════════════════════
+
+DUREE_CHOICES = [
+    (5, '5 secondes'),
+    (10, '10 secondes'),
+    (15, '15 secondes'),
+    (20, '20 secondes'),
+]
+
+FREQUENCE_CHOICES = [
+    (60, 'Toutes les 1 min'),
+    (120, 'Toutes les 2 min'),
+    (180, 'Toutes les 3 min'),
+    (240, 'Toutes les 4 min'),
+    (300, 'Toutes les 5 min'),
+    (600, 'Toutes les 10 min'),
+    (900, 'Toutes les 15 min'),
+    (1200, 'Toutes les 20 min'),
+    (1800, 'Toutes les 30 min'),
+]
+
+STATUT_BROUILLON = 'brouillon'
+STATUT_A_VENIR   = 'a_venir'
+STATUT_EN_COURS  = 'en_cours'
+STATUT_EN_PAUSE  = 'en_pause'
+STATUT_TERMINEE  = 'terminee'
+STATUT_ANNULEE   = 'annulee'
+
+STATUT_CHOICES = [
+    (STATUT_BROUILLON, 'Brouillon'),
+    (STATUT_A_VENIR,   'À venir'),
+    (STATUT_EN_COURS,  'En cours'),
+    (STATUT_EN_PAUSE,  'En pause'),
+    (STATUT_TERMINEE,  'Terminée'),
+    (STATUT_ANNULEE,   'Annulée'),
+]
+
+TYPE_CONTRAT_CHOICES = [
+    ('annuel',   'Contrat Annuel'),
+    ('mensuel',  'Contrat Mensuel'),
+    ('ponctuel', 'Ponctuel'),
+]
+
+TYPE_DOCUMENT_CONTRAT_CHOICES = [
+    ('contrat', 'Contrat'),
+    ('bon_commande', 'Bon de commande'),
+]
+
+def get_type_support_choices():
+    choix = [('ecran', 'Écran')]
+    valeurs = {'ecran'}
+    categories = sorted({
+        normaliser_categorie_format(categorie)
+        for categorie in FormatSupport.hors_ecran().values_list('categorie', flat=True)
+        if normaliser_categorie_format(categorie)
+    }, key=str.casefold)
+    for categorie in categories:
+        if categorie not in valeurs:
+            choix.append((categorie, categorie))
+            valeurs.add(categorie)
+    for valeur, label in get_dynamic_format_choices():
+        if valeur not in valeurs:
+            choix.append((valeur, label))
+            valeurs.add(valeur)
+    return choix
+
+STATUT_EN_ATTENTE = 'en_attente'
+STATUT_CONFIRMEE  = 'confirmee'
+STATUT_EXPIREE    = 'expiree'
+
+STATUT_RESERVATION_CHOICES = [
+    (STATUT_EN_ATTENTE, 'En attente'),
+    (STATUT_CONFIRMEE,  'Confirmée'),
+    (STATUT_ANNULEE,    'Annulée'),
+    (STATUT_EXPIREE,    'Expirée'),
+]
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Modèles de Base (Clients & Contrats)
+# ══════════════════════════════════════════════════════════════════════════════
+
+"""
+Modifications à apporter à Client (clients/models.py).
+Le champ `reference` est un code client court, unique, généré
+automatiquement à la création (ex: CLI-00001), sur le même principe
+que Support.save() dans inventory/models.py.
+"""
+
+
+class Client(models.Model):
+    """Client de la régie publicitaire."""
+
+    TYPE_CLIENT = 'client'
+    TYPE_AGENCE = 'agence'
+    TYPE_ENTITE_CHOICES = [
+        (TYPE_CLIENT, 'Client'),
+        (TYPE_AGENCE, 'Agence'),
+    ]
+
+    type_entite = models.CharField(
+        max_length=10,
+        choices=TYPE_ENTITE_CHOICES,
+        default=TYPE_CLIENT,
+        verbose_name="Type de compte",
+    )
+
+    # ── NOUVEAU CHAMP ────────────────────────────────────────────────────────
+    reference = models.CharField(
+        max_length=20,
+        unique=True,
+        blank=True,
+        editable=False,
+        verbose_name="Code de compte",
+        help_text="Généré automatiquement : CLI pour un client, AGE pour une agence.",
+    )
+
+    nom           = models.CharField(max_length=200, verbose_name="Raison sociale / Nom")
+    contact_nom   = models.CharField(max_length=150, blank=True, verbose_name="Nom du Contact principal")
+    telephone     = models.CharField(max_length=30)
+    email         = models.EmailField()
+    adresse       = models.TextField(blank=True)
+    logo          = models.ImageField(upload_to='logos/', blank=True, null=True)
+    notes         = models.TextField(blank=True)
+    created_at    = models.DateTimeField(auto_now_add=True)
+    actif         = models.BooleanField(default=True)
+
+    class Meta:
+        verbose_name = "Client"
+        verbose_name_plural = "Clients"
+        ordering = ['nom']
+
+    def __str__(self):
+        return self.nom
+
+    # ── NOUVELLE MÉTHODE ──────────────────────────────────────────────────────
+    def save(self, *args, **kwargs):
+        if not self.reference:
+            import random
+            import string
+            from django.utils import timezone
+            suffixe = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
+            prefixe = 'AGE' if self.type_entite == self.TYPE_AGENCE else 'CLI'
+            self.reference = f"{prefixe}-{timezone.now().year}-{suffixe}"
+        super().save(*args, **kwargs)
+
+    def get_contrat_actif(self):
+        from django.utils import timezone
+        today = timezone.now().date()
+        return self.contrats.filter(
+            actif=True,
+            date_debut__lte=today,
+            date_fin__gte=today,
+        ).order_by('-date_debut').first()
+
+    def get_type_contrat_display(self):
+        contrat = self.get_contrat_actif()
+        if contrat:
+            return f"{contrat.get_type_contrat_display()} — {contrat.nb_spots} spots"
+        return "Aucun contrat actif"
+
+    def campagnes_actives(self):
+        from django.utils import timezone
+        today = timezone.now().date()
+        return self.campagnes.filter(date_debut__lte=today, date_fin__gte=today, statut__in=['en_cours', 'a_venir'])
+
+    @classmethod
+    def get_client_interne(cls):
+        """Retourne le client utilisé pour les campagnes propres à INTEGRAL."""
+        client, created = cls.objects.get_or_create(
+            reference='CLI-INTEGRAL',
+            defaults={
+                'nom': 'INTEGRAL (Société)',
+                'contact_nom': 'Service interne',
+                'telephone': 'N/A',
+                'email': 'interne@integral.local',
+                'actif': True,
+            },
+        )
+        if not created and client.nom != 'INTEGRAL (Société)':
+            client.nom = 'INTEGRAL (Société)'
+            client.save(update_fields=['nom'])
+        return client
+
+class Contrat(models.Model):
+    """Contrat ou bon de commande rattaché à un client."""
+    client       = models.ForeignKey(Client, on_delete=models.CASCADE, related_name='contrats')
+    type_document = models.CharField(
+        max_length=20,
+        choices=TYPE_DOCUMENT_CONTRAT_CHOICES,
+        default='contrat',
+        verbose_name="Type de document",
+    )
+    reference = models.CharField(
+        max_length=40,
+        unique=True,
+        null=True,
+        blank=True,
+        verbose_name="Numéro",
+    )
+    type_contrat = models.CharField(max_length=20, choices=TYPE_CONTRAT_CHOICES, default='ponctuel')
+    nom          = models.CharField(max_length=200, blank=True, verbose_name="Nom du contrat (optionnel)")
+    date_debut   = models.DateField(verbose_name="Date de début")
+    date_fin     = models.DateField(verbose_name="Date de fin")
+    nb_spots     = models.PositiveIntegerField(default=0, verbose_name="Nombre de spots")
+    document = models.FileField(
+        upload_to='documents/contrats/',
+        blank=True,
+        null=True,
+        validators=[FileExtensionValidator(allowed_extensions=['pdf'])],
+        verbose_name="Document PDF",
+    )
+    actif        = models.BooleanField(default=True)
+    archive      = models.BooleanField(default=True)
+    notes        = models.TextField(blank=True)
+    created_at   = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name = "Contrat"
+        verbose_name_plural = "Contrats"
+        ordering = ['-date_debut']
+
+    def __str__(self):
+        return f"{self.reference or self.get_type_document_display()} — {self.client.nom}"
+
+    def save(self, *args, **kwargs):
+        is_new = self.pk is None
+        if not is_new and not self.reference:
+            self.reference = self._build_reference()
+            if kwargs.get('update_fields') is not None:
+                kwargs['update_fields'] = set(kwargs['update_fields']) | {'reference'}
+        super().save(*args, **kwargs)
+        if is_new and not self.reference:
+            self.reference = self._build_reference()
+            type(self).objects.filter(pk=self.pk).update(reference=self.reference)
+
+    def _build_reference(self):
+        prefix = 'BC' if self.type_document == 'bon_commande' else 'CTR'
+        year = self.date_debut.year if self.date_debut else timezone.localdate().year
+        return f'{prefix}-{year}-{self.pk:06d}'
+    
+    def get_nom(self):
+        if self.nom:
+            return f"{self.nom} \n ({self.date_debut:%d/%m/%Y} → {self.date_fin:%d/%m/%Y})"
+        return self.__str__()
+    
+    def nombre_jours(self):
+        if self.date_debut and self.date_fin:
+            return (self.date_fin - self.date_debut).days + 1
+        return 0
+
+    def spots_utilises(self):
+        return sum(c.calculer_nombre_spots() for c in self.campagnes.filter(statut__in=['en_cours', 'terminee']))
+    
+    def spots_restants(self):
+        return max(self.nb_spots - self.spots_utilises(), 0)
+    
+    def get_detail(self):
+        if self.nom:
+            return f"{self.nom} — {self.spots_restants()} spots"
+        return f"{self.client.nom} — {self.spots_restants()} spots"
+
+    def duree_jours(self):
+        if self.date_debut and self.date_fin:
+            return (self.date_fin - self.date_debut).days
+        return 0
+
+    def is_actif(self):
+        today = timezone.now().date()
+        return self.actif and self.date_debut <= today <= self.date_fin
+
+
+class PackageEcran(models.Model):
+    """Informations commerciales d'un package rattaché à un contrat."""
+    contrat = models.OneToOneField(
+        Contrat,
+        on_delete=models.CASCADE,
+        related_name='package_ecran',
+    )
+    agence = models.CharField(max_length=200, blank=True)
+    annonceur = models.CharField(max_length=200, blank=True)
+    prix_unitaire_fcfa = models.DecimalField(
+        max_digits=12,
+        decimal_places=2,
+        null=True,
+        blank=True,
+        validators=[MinValueValidator(0)],
+        verbose_name="Prix contractuel par spot (FCFA)",
+    )
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        verbose_name = "Package écran"
+        verbose_name_plural = "Packages écran"
+
+    def __str__(self):
+        return self.contrat.nom or str(self.contrat)
+
+
+class EcranParametresExploitation(models.Model):
+    """Hypothèses techniques et d'exploitation, saisies sans valeur fictive."""
+    MODE_MANUEL = 'manuel'
+    MODE_DISTANCE = 'distance'
+    MODE_CHOICES = [
+        (MODE_MANUEL, 'Manuelle / déplacement'),
+        (MODE_DISTANCE, 'À distance'),
+    ]
+
+    ecran = models.OneToOneField(
+        'inventory.EcranNumerique',
+        on_delete=models.CASCADE,
+        related_name='parametres_exploitation',
+    )
+    puissance_kw = models.DecimalField(
+        max_digits=8, decimal_places=3, null=True, blank=True,
+        validators=[MinValueValidator(0)],
+        verbose_name="Puissance électrique (kW)",
+    )
+    mode_commande = models.CharField(
+        max_length=12, choices=MODE_CHOICES, blank=True,
+    )
+    cout_intervention_fcfa = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True,
+        validators=[MinValueValidator(0)],
+        verbose_name="Coût d'un déplacement (FCFA)",
+    )
+    seuil_extinction_heures = models.DecimalField(
+        max_digits=5, decimal_places=1, null=True, blank=True,
+        validators=[MinValueValidator(0)],
+        verbose_name="Seuil d'extinction (heures)",
+    )
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        verbose_name = "Paramètres d'exploitation écran"
+        verbose_name_plural = "Paramètres d'exploitation écrans"
+
+    def __str__(self):
+        return f"Exploitation — {self.ecran.support.code}"
+
+
+class EcranBilanMensuel(models.Model):
+    """Relevés mensuels de consommation et dépenses réelles d'un écran."""
+    MOIS_CHOICES = [
+        (1, 'Janvier'), (2, 'Février'), (3, 'Mars'), (4, 'Avril'),
+        (5, 'Mai'), (6, 'Juin'), (7, 'Juillet'), (8, 'Août'),
+        (9, 'Septembre'), (10, 'Octobre'), (11, 'Novembre'),
+        (12, 'Décembre'),
+    ]
+
+    ecran = models.ForeignKey(
+        'inventory.EcranNumerique',
+        on_delete=models.CASCADE,
+        related_name='bilans_mensuels',
+    )
+    annee = models.PositiveSmallIntegerField(
+        validators=[MinValueValidator(2000), MaxValueValidator(2100)]
+    )
+    mois = models.PositiveSmallIntegerField(
+        choices=MOIS_CHOICES,
+        validators=[MinValueValidator(1), MaxValueValidator(12)],
+    )
+    consommation_kwh = models.DecimalField(
+        max_digits=12, decimal_places=3, null=True, blank=True,
+        validators=[MinValueValidator(0)],
+        verbose_name="Consommation électrique (kWh)",
+    )
+    tarif_energie_fcfa_kwh = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True,
+        validators=[MinValueValidator(0)],
+        verbose_name="Tarif électrique (FCFA/kWh)",
+    )
+    taxes_publicitaires_fcfa = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True,
+        validators=[MinValueValidator(0)],
+        verbose_name="Taxes publicitaires municipales (FCFA)",
+    )
+    loyer_site_fcfa = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True,
+        validators=[MinValueValidator(0)],
+        verbose_name="Loyer / redevance du site (FCFA)",
+    )
+    maintenance_fcfa = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True,
+        validators=[MinValueValidator(0)],
+        verbose_name="Maintenance (FCFA)",
+    )
+    frais_techniques_fcfa = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True,
+        validators=[MinValueValidator(0)],
+        verbose_name="Connexion et frais techniques (FCFA)",
+    )
+    autres_charges_fcfa = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True,
+        validators=[MinValueValidator(0)],
+        verbose_name="Autres charges (FCFA)",
+    )
+    encaissements_fcfa = models.DecimalField(
+        max_digits=12, decimal_places=2, null=True, blank=True,
+        validators=[MinValueValidator(0)],
+        verbose_name="Encaissements justifiés (FCFA)",
+    )
+    notes = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ['-annee', '-mois', 'ecran__support__code']
+        constraints = [
+            models.UniqueConstraint(
+                fields=['ecran', 'annee', 'mois'],
+                name='unique_ecran_bilan_mensuel',
+            ),
+        ]
+        verbose_name = "Bilan mensuel écran"
+        verbose_name_plural = "Bilans mensuels écrans"
+
+    def __str__(self):
+        return f"{self.ecran.support.code} — {self.mois:02d}/{self.annee}"
+
+    @property
+    def cout_electricite_fcfa(self):
+        if self.consommation_kwh is None or self.tarif_energie_fcfa_kwh is None:
+            return None
+        return self.consommation_kwh * self.tarif_energie_fcfa_kwh
+
+    @property
+    def total_charges_fcfa(self):
+        charges = [
+            self.cout_electricite_fcfa,
+            self.taxes_publicitaires_fcfa,
+            self.loyer_site_fcfa,
+            self.maintenance_fcfa,
+            self.frais_techniques_fcfa,
+            self.autres_charges_fcfa,
+        ]
+        if any(value is None for value in charges):
+            return None
+        return sum(charges, Decimal('0.00'))
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# Modèles de Réservations (Ordre de dépendance strict : 1. Reservation -> 2. Lignes)
+# ══════════════════════════════════════════════════════════════════════════════
+
+class Reservation(models.Model):
+    """Groupe de réservation globale pour un client."""
+    uuid = models.UUIDField(
+        default=uuid.uuid4,
+        editable=False,
+        unique=True,
+        db_index=True,
+        verbose_name="Identifiant public (UUID)",
+    )
+    reference = models.CharField(
+        max_length=50,
+        unique=True,
+        blank=True,
+        verbose_name="Référence",
+    )
+    nom = models.CharField(
+        max_length=200,
+        verbose_name="Nom de la réservation",
+    )
+    client = models.ForeignKey(
+        Client,
+        on_delete=models.CASCADE,
+        related_name='reservations_globales',
+        verbose_name="Client",
+    )
+    contrat = models.ForeignKey(
+        Contrat,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='reservations',
+        verbose_name="Contrat associé (optionnel)",
+    )
+    prix_faces_par_format = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name="Tarifs mensuels par format",
+    )
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='reservations_creees',
+        verbose_name="Créé par",
+    )
+    date_debut = models.DateTimeField(verbose_name="Date de début")
+    date_fin   = models.DateTimeField(verbose_name="Date de fin")
+    statut = models.CharField(
+        max_length=20,
+        choices=STATUT_RESERVATION_CHOICES,
+        default=STATUT_EN_ATTENTE,
+        verbose_name="Statut",
+    )
+    notes      = models.TextField(blank=True, verbose_name="Notes internes")
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name          = "Réservation"
+        verbose_name_plural   = "Réservations"
+        ordering              = ['-date_debut']
+
+    def __str__(self):
+        return f"{self.reference} — {self.client.nom} ({self.date_debut:%d/%m/%Y} → {self.date_fin:%d/%m/%Y})"
+
+    def save(self, *args, **kwargs):
+        if not self.reference:
+            self.reference = f"RES-{timezone.now().year}-{str(uuid.uuid4())[:6].upper()}"
+        super().save(*args, **kwargs)
+
+    def clean(self):
+        super().clean()
+        if self.date_debut and self.date_fin:
+            if self.date_fin <= self.date_debut:
+                raise ValidationError({
+                    'date_fin': _("La date de fin doit être postérieure à la date de début.")
+                })
+            if (self.date_fin - self.date_debut).days > 366:
+                raise ValidationError(_("La durée d'une réservation ne peut pas dépasser 1 an."))
+
+    def duree_jours(self) -> int:
+        if self.date_debut and self.date_fin:
+            return (self.date_fin.date() - self.date_debut.date()).days + 1
+        return 0
+
+    def nb_faces(self) -> int:
+        return self.lignes.count()
+
+    def nombre_mois_factures(self):
+        jours = self.duree_jours()
+        return math.ceil(jours / 30) if jours else 0
+
+    def montant_total(self):
+        mois = self.nombre_mois_factures()
+        total = Decimal('0.00')
+        for ligne in self.lignes.select_related('support'):
+            tarif = self.prix_faces_par_format.get(ligne.support.format)
+            if tarif in (None, ''):
+                continue
+            total += Decimal(str(tarif)) * mois
+        return total.quantize(Decimal('0.01'))
+
+    def is_active(self) -> bool:
+        now = timezone.now()
+        return self.statut in (STATUT_EN_ATTENTE, STATUT_CONFIRMEE) and self.date_debut <= now <= self.date_fin
+
+    def is_a_venir(self) -> bool:
+        return self.statut in (STATUT_EN_ATTENTE, STATUT_CONFIRMEE) and timezone.now() < self.date_debut
+
+    def is_expiree(self) -> bool:
+        return timezone.now() > self.date_fin
+
+    def get_statut_badge(self) -> str:
+        return {
+            STATUT_EN_ATTENTE: 'warning',
+            STATUT_CONFIRMEE:  'success',
+            STATUT_ANNULEE:    'danger',
+            STATUT_EXPIREE:    'secondary',
+        }.get(self.statut, 'secondary')
+
+    def auto_update_statut(self):
+        if self.statut in (STATUT_ANNULEE,):
+            return
+        if self.is_expiree():
+            self.statut = STATUT_EXPIREE
+            self.save(update_fields=['statut'])
+
+
+class ReservationLigne(models.Model):
+    """Une face réservée liée à un groupe de Réservation parent (Désormais défini APRÈS Reservation)."""
+    reservation = models.ForeignKey(Reservation, on_delete=models.CASCADE, related_name='lignes', verbose_name="Réservation")
+    support = models.ForeignKey('inventory.Support', on_delete=models.PROTECT, related_name='lignes_reservation', verbose_name="Support")
+    face = models.ForeignKey('inventory.FacePanneau', on_delete=models.SET_NULL, null=True, blank=True, related_name='lignes_reservation', verbose_name="Face")
+    notes      = models.TextField(blank=True, verbose_name="Notes")
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        verbose_name        = "Ligne de réservation"
+        verbose_name_plural = "Lignes de réservation"
+        ordering            = ['support__code', 'face__label']
+        unique_together     = [('reservation', 'face')]
+
+    def __str__(self):
+        face_label = f"Face {self.face.label}" if self.face else "—"
+        return f"{self.reservation.reference} | {self.support.code} ({face_label})"
+
+    @property
+    def tarif_mensuel(self):
+        tarif = self.reservation.prix_faces_par_format.get(self.support.format)
+        return Decimal(str(tarif)) if tarif not in (None, '') else None
+
+    @property
+    def montant_total(self):
+        if self.tarif_mensuel is None:
+            return None
+        return (
+            self.tarif_mensuel * self.reservation.nombre_mois_factures()
+        ).quantize(Decimal('0.01'))
+
+    def clean(self):
+        super().clean()
+        if self.support.type_support != 'panneau':
+            raise ValidationError(_("Les réservations sont uniquement applicables aux panneaux statiques."))
+        if not self.face:
+            raise ValidationError(_("Vous devez sélectionner une face pour un panneau statique."))
+        if self.face.support_id != self.support_id:
+            raise ValidationError(_("La face sélectionnée n'appartient pas au support choisi."))
+
+        date_debut = self.reservation.date_debut
+        date_fin   = self.reservation.date_fin
+
+        conflit_resa = (
+            ReservationLigne.objects.filter(
+                face=self.face,
+                reservation__date_debut__lt=date_fin,
+                reservation__date_fin__gt=date_debut,
+                reservation__statut__in=[STATUT_EN_ATTENTE, STATUT_CONFIRMEE],
+            )
+            .exclude(reservation=self.reservation)
+            .select_related('reservation__client')
+        )
+        if conflit_resa.exists():
+            conflit = conflit_resa.first()
+            raise ValidationError(_(f"La face {self.face} est déjà réservée du {conflit.reservation.date_debut:%d/%m/%Y} au {conflit.reservation.date_fin:%d/%m/%Y} (client : {conflit.reservation.client.nom})."))
+
+        from campaigns.models import LigneCampagne
+        conflit_camp = LigneCampagne.objects.filter(
+            face=self.face,
+            campagne__date_debut__lte=date_fin.date(),
+            campagne__date_fin__gte=date_debut.date(),
+            campagne__statut__in=['en_cours', 'a_venir'],
+        ).select_related('campagne__client')
+
+        if conflit_camp.exists():
+            conflit = conflit_camp.first()
+            raise ValidationError(_(f"La face {self.face} est occupée par la campagne « {conflit.campagne.nom} » (client : {conflit.campagne.client.nom}) du {conflit.campagne.date_debut:%d/%m/%Y} au {conflit.campagne.date_fin:%d/%m/%Y}."))
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
+    @property
+    def est_active(self) -> bool:
+        return self.reservation.is_active()
+
+    @property
+    def date_debut(self):
+        return self.reservation.date_debut
+
+    @property
+    def date_fin(self):
+        return self.reservation.date_fin
+
+
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# À AJOUTER À LA FIN DE campaigns/models.py
+# (après la classe LigneCampagne existante)
+# ══════════════════════════════════════════════════════════════════════════════
+
+# ══════════════════════════════════════════════════════════════════════════════
+# DemandeReservation — Demande publique (visiteur non connecté)
+# ══════════════════════════════════════════════════════════════════════════════
+class DemandeReservation(models.Model):
+    """
+    Demande de réservation soumise depuis le portail public par un visiteur
+    non authentifié.
+
+    Workflow :
+        Visiteur soumet → statut='nouvelle'
+        Staff traite   → statut='en_cours'
+        Staff valide   → crée Client + Reservation → statut='validee'
+        Staff refuse   → statut='refusee'
+
+    IMPORTANT : Ce modèle ne crée PAS automatiquement de Client ni de
+    Reservation. C'est le staff qui effectue ces opérations manuellement
+    depuis la vue de traitement (/staff/demandes/<uuid>/), SAUF si le
+    visiteur s'est déclaré "client existant" avec une référence valide :
+    dans ce cas, le Client est rapproché automatiquement au save()
+    (voir plus bas), mais la Reservation, elle, reste toujours créée
+    manuellement par le staff à la validation.
+    """
+
+    # ── Statuts ───────────────────────────────────────────────────────────────
+    STATUT_NOUVELLE  = 'nouvelle'
+    STATUT_EN_COURS  = 'en_cours'
+    STATUT_VALIDEE   = 'validee'
+    STATUT_REFUSEE   = 'refusee'
+    STATUT_BROUILLON = 'brouillon'
+
+    STATUT_CHOICES = [
+        (STATUT_BROUILLON, 'En attente de confirmation du client'),
+        (STATUT_NOUVELLE,  'Nouvelle'),
+        (STATUT_EN_COURS,  'En cours de traitement'),
+        (STATUT_VALIDEE,   'Validée'),
+        (STATUT_REFUSEE,   'Refusée'),
+    ]
+
+    # ── Type de client (NOUVEAU) ────────────────────────────────────────────
+    TYPE_CLIENT_NOUVEAU  = 'nouveau'
+    TYPE_CLIENT_EXISTANT = 'existant'
+    TYPE_CLIENT_CHOICES = [
+        (TYPE_CLIENT_NOUVEAU,  'Nouveau client'),
+        (TYPE_CLIENT_EXISTANT, 'Client existant'),
+    ]
+
+    # ── Identité ──────────────────────────────────────────────────────────────
+    uuid = models.UUIDField(
+        default=uuid.uuid4,
+        editable=False,
+        unique=True,
+        db_index=True,
+        verbose_name="Identifiant public",
+    )
+    reference = models.CharField(
+        max_length=50,
+        unique=True,
+        blank=True,
+        verbose_name="Référence",
+        help_text="Générée automatiquement. Ex: DEM-2026-A3F9K2",
+    )
+    token_partage = models.UUIDField(
+        null=True,
+        blank=True,
+        unique=True,
+        editable=False,
+        verbose_name="Lien sécurisé de confirmation client",
+    )
+
+    # ── Coordonnées du visiteur ───────────────────────────────────────────────
+    nom_contact = models.CharField(
+        max_length=200,
+        verbose_name="Nom complet",
+    )
+    societe = models.CharField(
+        max_length=200,
+        blank=True,
+        verbose_name="Nom de la société",
+    )
+    email = models.EmailField(
+        verbose_name="Email",
+    )
+    telephone = models.CharField(
+        max_length=30,
+        verbose_name="Téléphone",
+    )
+    whatsapp = models.CharField(
+        max_length=30,
+        blank=True,
+        default='',
+        verbose_name="WhatsApp",
+    )
+    fonction_contact = models.CharField(
+        max_length=120,
+        blank=True,
+        default='',
+        verbose_name="Fonction du contact",
+    )
+    accepte_contact = models.BooleanField(
+        default=True,
+        verbose_name="Accepte d'être recontacté",
+        help_text="Le visiteur a coché la case d'acceptation de contact commercial.",
+    )
+    prix_faces_par_format = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name="Tarifs mensuels par format",
+    )
+
+    # ── Type de client (NOUVEAU) ─────────────────────────────────────────────
+    type_client = models.CharField(
+        max_length=10,
+        choices=TYPE_CLIENT_CHOICES,
+        default=TYPE_CLIENT_NOUVEAU,
+        verbose_name="Type de client",
+    )
+    reference_client_saisie = models.CharField(
+        max_length=20,
+        blank=True,
+        verbose_name="Référence client saisie",
+        help_text="Code client (ex: CLI-2026-A3F9K2) fourni par le visiteur s'il se "
+                   "déclare déjà client. Rempli côté public, vérifié par le staff.",
+    )
+
+    # ── Supports souhaités ────────────────────────────────────────────────────
+    # ManyToMany vers FacePanneau : les faces sélectionnées sur la carte
+    faces_souhaitees = models.ManyToManyField(
+        'inventory.FacePanneau',
+        blank=True,
+        related_name='demandes_reservation',
+        verbose_name="Faces souhaitées",
+    )
+    # ManyToMany vers Support : pour les écrans (pas de face)
+    supports_souhaites = models.ManyToManyField(
+        'inventory.Support',
+        blank=True,
+        related_name='demandes_reservation',
+        verbose_name="Supports souhaités (écrans)",
+    )
+
+    # ── Période et projet ─────────────────────────────────────────────────────
+    date_debut_souhaitee = models.DateField(
+        verbose_name="Date de début souhaitée",
+    )
+    date_fin_souhaitee = models.DateField(
+        verbose_name="Date de fin souhaitée",
+    )
+    nom_campagne = models.CharField(
+        max_length=200,
+        blank=True,
+        verbose_name="Nom de la campagne / projet",
+    )
+    message = models.TextField(
+        blank=True,
+        verbose_name="Message libre",
+    )
+    date_debut_blocage = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Début du blocage temporaire",
+        help_text="Date à partir de laquelle la demande bloque les faces sélectionnées.",
+    )
+    date_fin_blocage = models.DateField(
+        null=True,
+        blank=True,
+        verbose_name="Fin du blocage temporaire",
+        help_text="Date jusqu'à laquelle les faces restent bloquées avant relance/validation.",
+    )
+
+    # ── Traitement staff ──────────────────────────────────────────────────────
+    statut = models.CharField(
+        max_length=20,
+        choices=STATUT_CHOICES,
+        default=STATUT_NOUVELLE,
+        verbose_name="Statut",
+        db_index=True,
+    )
+    notes_staff = models.TextField(
+        blank=True,
+        verbose_name="Notes internes staff",
+        help_text="Visible uniquement par le staff. Motif de refus, remarques…",
+    )
+    traite_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='demandes_traitees',
+        verbose_name="Traité par",
+    )
+    traite_le = models.DateTimeField(
+        null=True, blank=True,
+        verbose_name="Traité le",
+    )
+
+    # ── Associations de la demande ────────────────────────────────────────────
+    # Le client est associé à l'envoi de la demande; la réservation officielle
+    # reste créée par le staff au moment de la validation.
+    client = models.ForeignKey(
+        Client,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='demandes_reservation',
+        verbose_name="Client associé",
+        help_text="Client sélectionné ou créé automatiquement lors de l'envoi "
+                   "de la demande.",
+    )
+    agence = models.ForeignKey(
+        Client,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='demandes_reservation_agence',
+        limit_choices_to={'type_entite': Client.TYPE_AGENCE},
+        verbose_name="Agence associée",
+        help_text="Agence liée à la demande (sélectionnée ou créée à l'étape 1).",
+    )
+    reservation = models.ForeignKey(
+        Reservation,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='demande_origine',
+        verbose_name="Réservation créée",
+        help_text="Réservation officielle créée par le staff après validation.",
+    )
+    campagne = models.ForeignKey(
+        'Campagne',
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='demandes_suivi',
+        verbose_name="Campagne associée au suivi",
+        help_text="Campagne sélectionnée par le staff pour afficher ses piges sur la page de suivi.",
+    )
+
+    # ── Horodatage ────────────────────────────────────────────────────────────
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        verbose_name="Créée le",
+    )
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        verbose_name="Mise à jour le",
+    )
+
+    # ── Meta ──────────────────────────────────────────────────────────────────
+    class Meta:
+        verbose_name          = "Demande de réservation"
+        verbose_name_plural   = "Demandes de réservation"
+        ordering              = ['-created_at']
+        indexes               = [
+            models.Index(fields=['statut', '-created_at']),
+            models.Index(fields=['email']),
+        ]
+
+    def __str__(self):
+        return f"{self.reference} — {self.nom_contact} ({self.get_statut_display()})"
+
+    # ── Sauvegarde ────────────────────────────────────────────────────────────
+
+    def save(self, *args, **kwargs):
+        if not self.reference:
+            self.reference = f"DEM-{timezone.now().year}-{str(uuid.uuid4())[:6].upper()}"
+
+        if (
+            (self.pk is None or (not self.date_debut_blocage and not self.date_fin_blocage))
+            and self.date_debut_souhaitee
+            and self.date_fin_souhaitee
+        ):
+            self.date_debut_blocage = self.date_debut_souhaitee
+            self.date_fin_blocage = max(
+                self.date_fin_souhaitee,
+                self.date_debut_souhaitee + datetime.timedelta(days=7),
+            )
+
+        # ── NOUVEAU : rapprochement automatique du Client existant ──────────
+        # Si le visiteur se déclare "client existant" avec une référence, et
+        # qu'aucun Client n'est encore rattaché, on tente un rapprochement
+        # automatique par référence. Si ça ne matche pas, on laisse le champ
+        # vide : le staff verra reference_client_saisie et devra vérifier
+        # manuellement (faute de frappe possible, etc.) — voir les propriétés
+        # client_resolu_automatiquement / reference_client_non_trouvee.
+        if (
+            self.type_client == self.TYPE_CLIENT_EXISTANT
+            and self.reference_client_saisie
+            and not self.client_id
+        ):
+            match = Client.objects.filter(
+                reference__iexact=self.reference_client_saisie.strip(),
+                type_entite=Client.TYPE_CLIENT,
+            ).first()
+            if match:
+                self.client = match
+                # Le visiteur n'a pas ressaisi ses coordonnées (masquées côté
+                # formulaire en mode "client existant") : on les récupère
+                # depuis la fiche Client pour que la demande reste exploitable.
+                if not self.nom_contact:
+                    self.nom_contact = match.contact_nom or match.nom
+                if not self.email:
+                    self.email = match.email
+                if not self.telephone:
+                    self.telephone = match.telephone
+                if not self.societe:
+                    self.societe = match.nom
+
+        super().save(*args, **kwargs)
+
+    # ── Validation ────────────────────────────────────────────────────────────
+
+    def clean(self):
+        super().clean()
+        if self.date_debut_souhaitee and self.date_fin_souhaitee:
+            if self.date_fin_souhaitee <= self.date_debut_souhaitee:
+                raise ValidationError({
+                    'date_fin_souhaitee': _(
+                        "La date de fin doit être postérieure à la date de début."
+                    )
+                })
+            duree = (self.date_fin_souhaitee - self.date_debut_souhaitee).days
+            if duree > 366:
+                raise ValidationError(
+                    _("La durée souhaitée ne peut pas dépasser 1 an.")
+                )
+
+        if self.date_debut_blocage and self.date_fin_blocage:
+            if self.date_fin_blocage < self.date_debut_blocage:
+                raise ValidationError({
+                    'date_fin_blocage': _(
+                        "La date de fin du blocage ne peut pas être avant la date de début."
+                    )
+                })
+
+        # ── NOUVEAU : référence obligatoire si "client existant" ────────────
+        if self.type_client == self.TYPE_CLIENT_EXISTANT and not self.reference_client_saisie.strip():
+            raise ValidationError({
+                'reference_client_saisie': _(
+                    "Merci de renseigner votre référence client (ex: CLI-2026-A3F9K2)."
+                )
+            })
+
+    # ── Propriétés ────────────────────────────────────────────────────────────
+
+    @property
+    def duree_jours(self) -> int:
+        if self.date_debut_souhaitee and self.date_fin_souhaitee:
+            return (self.date_fin_souhaitee - self.date_debut_souhaitee).days + 1
+        return 0
+
+    @property
+    def est_nouvelle(self) -> bool:
+        return self.statut == self.STATUT_NOUVELLE
+
+    @property
+    def est_en_cours(self) -> bool:
+        return self.statut == self.STATUT_EN_COURS
+
+    @property
+    def est_validee(self) -> bool:
+        return self.statut == self.STATUT_VALIDEE
+
+    @property
+    def est_refusee(self) -> bool:
+        return self.statut == self.STATUT_REFUSEE
+
+    @property
+    def peut_etre_traitee(self) -> bool:
+        """True si la demande peut encore être validée ou refusée."""
+        return self.statut in (self.STATUT_NOUVELLE, self.STATUT_EN_COURS)
+
+    @property
+    def client_resolu_automatiquement(self) -> bool:
+        """
+        NOUVEAU. True si le Client a pu être rapproché automatiquement par
+        référence (utile pour l'affichage staff : badge vert de confirmation).
+        """
+        return self.type_client == self.TYPE_CLIENT_EXISTANT and self.client_id is not None
+
+    @property
+    def reference_client_non_trouvee(self) -> bool:
+        """
+        NOUVEAU. True si le visiteur a saisi une référence mais qu'aucun
+        Client ne matche (utile pour l'affichage staff : badge d'alerte,
+        vérification manuelle nécessaire avant validation).
+        """
+        return (
+            self.type_client == self.TYPE_CLIENT_EXISTANT
+            and bool(self.reference_client_saisie)
+            and not self.client_id
+        )
+
+    def get_statut_badge(self) -> str:
+        """Retourne la classe Bootstrap pour le badge de statut."""
+        return {
+            self.STATUT_BROUILLON: 'secondary',
+            self.STATUT_NOUVELLE:  'warning',
+            self.STATUT_EN_COURS:  'info',
+            self.STATUT_VALIDEE:   'success',
+            self.STATUT_REFUSEE:   'danger',
+        }.get(self.statut, 'secondary')
+
+    def get_statut_icon(self) -> str:
+        """Retourne l'icône Bootstrap Icons pour le statut."""
+        return {
+            self.STATUT_BROUILLON: 'bi-send',
+            self.STATUT_NOUVELLE:  'bi-clock',
+            self.STATUT_EN_COURS:  'bi-hourglass-split',
+            self.STATUT_VALIDEE:   'bi-check-circle-fill',
+            self.STATUT_REFUSEE:   'bi-x-circle-fill',
+        }.get(self.statut, 'bi-question-circle')
+
+    def marquer_en_cours(self, user=None):
+        """Passe la demande en statut 'en_cours'."""
+        self.statut = self.STATUT_EN_COURS
+        if user:
+            self.traite_par = user
+        self.save(update_fields=['statut', 'traite_par', 'updated_at'])
+
+    def marquer_validee(self, client, user, reservation=None, campagne=None):
+        """
+        Marque la demande comme validée et l'associe à la réservation ou campagne créée.
+        """
+        self.statut      = self.STATUT_VALIDEE
+        self.client      = client
+        self.reservation = reservation
+        self.traite_par  = user
+        self.traite_le   = timezone.now()
+        update_fields = [
+            'statut', 'client', 'reservation', 'traite_par', 'traite_le', 'updated_at',
+        ]
+        if campagne is not None:
+            self.campagne = campagne
+            update_fields.append('campagne')
+        self.save(update_fields=update_fields)
+
+    def marquer_refusee(self, user, notes: str = ''):
+        """Marque la demande comme refusée."""
+        self.statut     = self.STATUT_REFUSEE
+        self.traite_par = user
+        self.traite_le  = timezone.now()
+        if notes:
+            self.notes_staff = notes
+        self.save(update_fields=[
+            'statut', 'traite_par', 'traite_le',
+            'notes_staff', 'updated_at',
+        ])
+
+    def set_hold(self, jours=7):
+        """Bloque temporairement les faces sélectionnées pour la période demandée."""
+        if not self.date_debut_souhaitee or not self.date_fin_souhaitee:
+            return self.date_debut_blocage
+
+        start = self.date_debut_souhaitee
+        end = self.date_fin_souhaitee
+        self.date_debut_blocage = start
+        self.date_fin_blocage = max(
+            end,
+            start + datetime.timedelta(days=max(3, min(int(jours), 7))),
+        )
+        return self.date_fin_blocage
+
+    def prolonger_blocage(self, jours=3):
+        """Prolonge le blocage actuel pour poursuivre les échanges client."""
+        if not self.date_debut_blocage:
+            self.date_debut_blocage = timezone.localdate()
+        if not self.date_fin_blocage:
+            self.date_fin_blocage = self.date_debut_blocage
+        self.date_fin_blocage = self.date_fin_blocage + datetime.timedelta(days=max(1, int(jours)))
+        return self.date_fin_blocage
+
+    def is_hold_active_on(self, target_date=None):
+        """Vrai si les faces de cette demande sont encore bloquées à la date donnée."""
+        if not self.date_debut_blocage or not self.date_fin_blocage:
+            return False
+        target_date = target_date or timezone.localdate()
+        return self.date_debut_blocage <= target_date <= self.date_fin_blocage
+
+    def get_resume_emplacements(self) -> str:
+        """
+        Retourne un résumé textuel des emplacements demandés.
+        Ex: "OUA-001 Face A, BOB-012 Face B"
+        Utilisé dans les emails et la liste staff.
+        """
+        parties = []
+        for face in self.faces_souhaitees.select_related('support').all():
+            parties.append(f"{face.support.code} Face {face.label}")
+        for support in self.supports_souhaites.all():
+            parties.append(f"{support.code} (Écran)")
+        return ", ".join(parties) if parties else "Aucun emplacement"
+
+    def nb_emplacements(self) -> int:
+        """Nombre total d'emplacements demandés (faces + écrans)."""
+        return self.faces_souhaitees.count() + self.supports_souhaites.count()
+# ══════════════════════════════════════════════════════════════════════════════
+# Modèles de Campagnes (Écrans & Panneaux)
+# ══════════════════════════════════════════════════════════════════════════════
+
+class Campagne(models.Model):
+    """Campagne publicitaire globale."""
+    STATUT_BROUILLON = STATUT_BROUILLON
+    STATUT_A_VENIR   = STATUT_A_VENIR
+    STATUT_EN_COURS  = STATUT_EN_COURS
+    STATUT_EN_PAUSE  = STATUT_EN_PAUSE
+    STATUT_TERMINEE  = STATUT_TERMINEE
+    STATUT_ANNULEE   = STATUT_ANNULEE
+    STATUT_CHOICES   = STATUT_CHOICES
+    
+    client       = models.ForeignKey(Client, on_delete=models.PROTECT, related_name='campagnes')
+    agence       = models.ForeignKey(
+        Client,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='campagnes_agence',
+        limit_choices_to={'type_entite': Client.TYPE_AGENCE},
+        verbose_name="Agence",
+    )
+    annonceur    = models.CharField(
+        max_length=200,
+        blank=True,
+        verbose_name="Client / annonceur",
+        help_text="Client sélectionné ou saisi pour cette campagne.",
+    )
+    nom          = models.CharField(max_length=200, verbose_name="Nom de la campagne")
+    # les champs ne sont pas obligatoir
+    prix         = models.DecimalField(max_digits=14, decimal_places=2, default=0, verbose_name="Prix unitaire face",blank=True)
+    prix_affichage = models.DecimalField(max_digits=14, decimal_places=2, default=0, verbose_name="Prix unitaire affichage",blank=True)
+    prix_impression = models.DecimalField(max_digits=14, decimal_places=2, default=0, verbose_name="Prix unitaire impression",blank=True)
+    prix_faces_par_format = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name="Tarifs mensuels par format",
+    )
+    # lieu de la campagne donne des chois des ville des support
+    lieu = models.CharField(max_length=200, blank=True, verbose_name="Lieu de la campagne", help_text="Ville ou zone géographique de la campagne.")
+    reference    = models.CharField(max_length=50, unique=True, blank=True)
+    lien_piges   = models.URLField(
+        blank=True,
+        verbose_name="Lien des piges",
+        help_text="Lien en lecture seule vers les preuves photo de cette campagne sur Google Drive.",
+    )
+    date_debut   = models.DateField(verbose_name="Date de début")
+    date_fin     = models.DateField(verbose_name="Date de fin")
+    date_mise_en_pause = models.DateField(
+        null=True, blank=True, verbose_name="Date de mise en pause"
+    )
+    date_annulation = models.DateField(
+        null=True, blank=True, verbose_name="Date d'annulation"
+    )
+    statut       = models.CharField(max_length=20, choices=STATUT_CHOICES, default=STATUT_EN_COURS,blank=True)
+    type_support = models.CharField(
+        max_length=80,
+        choices=get_type_support_choices,
+        blank=True,
+        default='',
+        verbose_name="Type de support",
+        help_text="Écran ou format de panneau (ex: 4x3, 1x2, gm-5x4)."
+    )
+    est_mere = models.BooleanField(default=False, verbose_name="Campagne mère")
+    actif        = models.BooleanField(default=True)
+    bon_commande_en_attente = models.BooleanField(
+        default=False,
+        verbose_name="Bon de commande en attente",
+        help_text="À cocher si la campagne est créée sans contrat car le bon de commande n’a pas encore été reçu.",
+    )
+    
+    duree_passage = models.PositiveIntegerField(choices=DUREE_CHOICES, null=True, blank=True, verbose_name="Durée de passage (secondes)")
+    frequence = models.PositiveIntegerField(choices=FREQUENCE_CHOICES, default=120, null=True, blank=True, verbose_name="Fréquence de diffusion")
+    nombre_visuels = models.PositiveIntegerField(default=1, verbose_name="Nombre de visuels", help_text="Nombre de visuels diffusés dans la boucle. Par défaut : 1.")
+    tranches_horaires = models.CharField(max_length=500, default='08:00-12:00', blank=True, verbose_name="Tranches horaires de diffusion")
+    
+    notes        = models.TextField(blank=True)
+    created_by   = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True)
+    created_at   = models.DateTimeField(auto_now_add=True)
+    updated_at   = models.DateTimeField(auto_now=True)
+    contrat      = models.ForeignKey(Contrat, on_delete=models.SET_NULL, null=True, blank=True, related_name='campagnes')
+
+    campagne_parente = models.ForeignKey(
+        'self',
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='sous_campagnes',
+        verbose_name="Campagne mère",
+        help_text=(
+            "Si renseigné, cette campagne est une sous-campagne rattachée à une campagne mère. "
+            "Laissez vide pour une campagne autonome."
+        ),
+    )
+    class Meta:
+        verbose_name = "Campagne"
+        verbose_name_plural = "Campagnes"
+        ordering = ['-date_debut']
+
+    def __str__(self):
+        return f"{self.nom} — {self.client.nom}"
+
+    def save(self, *args, **kwargs):
+        if self.client_id is None:
+            self.client = Client.get_client_interne()
+        if not self.reference:
+            self.reference = f"CAM-{timezone.now().year}-{str(uuid.uuid4())[:6].upper()}"
+        super().save(*args, **kwargs)
+
+    def get_statut_badge(self):
+        badges = {
+            self.STATUT_BROUILLON: 'secondary',
+            self.STATUT_A_VENIR:   'info',
+            self.STATUT_EN_COURS:  'success',
+            self.STATUT_EN_PAUSE:  'warning',
+            self.STATUT_TERMINEE:  'dark',
+            self.STATUT_ANNULEE:   'danger',
+        }
+        return badges.get(self.statut, 'secondary')
+
+    def get_nombre_visuels_effective(self):
+        return max(self.nombre_visuels or 1, 1)
+
+    def nombre_supports(self):
+        if not self.pk:
+            return 0
+        return self.lignes.filter(support__isnull=False).values('support').distinct().count()
+
+    def nombre_faces(self):
+        if not self.pk:
+            return 0
+        return self.lignes.filter(face__isnull=False).values('face').distinct().count()
+
+    def nombre_mois_factures(self):
+        if not self.date_debut or not self.date_fin or self.date_fin < self.date_debut:
+            return 0
+        jours = (self.date_fin - self.date_debut).days + 1
+        return math.ceil(jours / 30)
+
+    def montant_total(self):
+        """Montant total de la campagne.
+
+        Pour une campagne mère, on somme les montants des sous-campagnes.
+        Le tarif des faces et emplacements est mensuel; celui des spots écran
+        s'applique à chaque spot diffusé sur toute la période.
+        """
+        if self.est_mere:
+            total = Decimal('0.00')
+            for enfant in self.sous_campagnes.all():
+                total += enfant.montant_total() or Decimal('0.00')
+            return total
+
+        if self.type_support == 'ecran':
+            prix = self.prix or Decimal('0.00')
+            spots = self.calculer_nombre_spots()
+            return (prix * Decimal(str(spots))).quantize(Decimal('0.01'))
+
+        if self.type_support == 'marche':
+            prix = self.prix or Decimal('0.00')
+            emplacements = self.nombre_emplacements() * self.nombre_mois_factures()
+            return (prix * Decimal(emplacements)).quantize(Decimal('0.01'))
+
+        if self.prix_faces_par_format:
+            total = sum(
+                (
+                    Decimal(str(
+                        self.prix_faces_par_format.get(
+                            ligne.face.support.format,
+                            self.prix or 0,
+                        ) or 0
+                    ))
+                    for ligne in self.lignes.filter(face__isnull=False).select_related(
+                        'face__support'
+                    )
+                ),
+                Decimal('0.00'),
+            )
+            return (total * self.nombre_mois_factures()).quantize(Decimal('0.01'))
+
+        prix = self.prix or Decimal('0.00')
+        faces = self.nombre_faces() * self.nombre_mois_factures()
+        return (prix * Decimal(faces)).quantize(Decimal('0.01'))
+    
+    def montant_total_affichage(self):
+        prix = self.prix_affichage or Decimal('0.00')
+
+        if self.est_mere:
+            total = Decimal('0.00')
+            for enfant in self.sous_campagnes.all():
+                total += enfant.montant_total_affichage() or Decimal('0.00')
+            return total
+
+        if self.type_support == 'ecran':
+            spots = self.calculer_nombre_spots()
+            return (prix * Decimal(str(spots))).quantize(Decimal('0.01'))
+
+        if self.type_support == 'marche':
+            emplacements = self.nombre_emplacements()
+            return (prix * Decimal(emplacements)).quantize(Decimal('0.01'))
+
+        faces = self.nombre_faces()
+        return (prix * Decimal(faces)).quantize(Decimal('0.01'))
+    
+    @staticmethod
+    def get_type_support_choices():
+        return get_type_support_choices()
+    
+    def montant_total_impression(self):
+        prix = self.prix_impression or Decimal('0.00') 
+        
+        if self.est_mere:
+            total = Decimal('0.00')
+            for enfant in self.sous_campagnes.all():
+                total += enfant.montant_total_impression() or Decimal('0.00')
+            return total
+        
+        if self.type_support == 'ecran':
+            spots = self.calculer_nombre_spots()
+            return (prix * Decimal(str(spots))).quantize(Decimal('0.01'))
+
+        if self.type_support == 'marche':
+            emplacements = self.nombre_emplacements()
+            return (prix * Decimal(emplacements)).quantize(Decimal('0.01'))
+
+        faces = self.nombre_faces()
+        return (prix * Decimal(faces)).quantize(Decimal('0.01'))
+    
+    def montant_total_display(self):
+        return f"{self.montant_total():,.2f}"
+    
+    def montant_total_display_affichage(self):
+            return f"{self.montant_total_affichage():,.2f}"
+        
+    def montant_total_display_impression(self):
+        return f"{self.montant_total_impression():,.2f}"
+
+    def nb_supports(self):
+        return self.lignes.count()
+    
+    def calculer_nombre_spots_ecran(self):
+        return self.calculer_nombre_spots() if self.type_support == 'ecran' else 0
+
+    def diffusions_par_heure(self):
+        if self.type_support == 'ecran' and self.frequence:
+            return (3600 / self.frequence) * self.get_nombre_visuels_effective()
+        return 0
+    
+    def nombre_spots_jour(self):
+        return self.diffusions_par_heure() * self.calculer_duree_tranches()
+    
+    def duree_jours(self):
+        if self.date_debut and self.date_fin:
+            return (self.date_fin - self.date_debut).days + 1
+        return 0
+    
+    def calculer_duree_tranches(self):
+        return calculer_duree_tranches(self.tranches_horaires)
+    
+    def nombre_emplacements(self):
+        if not self.pk:
+            return 0
+        return self.lignes.filter(emplacement__isnull=False).values('emplacement').distinct().count()
+
+    def calculer_nombre_spots(self):
+        if self.type_support == 'marche':
+            total_jours = self.duree_jours()
+            if total_jours == 0:
+                return 0
+            total = 0
+            for ligne in self.lignes.filter(emplacement__isnull=False).select_related('emplacement'):
+                jours_dispo = ligne.emplacement.jours_disponibles_sur_periode(
+                    self.date_debut, self.date_fin, exclude_campagne_id=self.pk
+                )
+                total += jours_dispo / total_jours
+            return round(total, 2)
+
+        if self.type_support and self.type_support != 'ecran':
+            total_jours = self.duree_jours()
+            if total_jours == 0:
+                return 0
+            total = 0
+            for ligne in self.lignes.select_related('face__support').all():
+                if not ligne.face:
+                    continue
+                support = ligne.face.support
+                jours_dispo = support.jours_disponibles_sur_periode(self.date_debut, self.date_fin)
+                total += jours_dispo / total_jours
+            return round(total, 2)
+
+        elif self.type_support == 'ecran':
+            return sum(ligne.calculer_spots() for ligne in self.lignes.all())
+        return 0
+    
+    def calculer_nombre_spots24(self):
+        if self.type_support == 'ecran':
+            return round(self.calculer_nombre_spots() / max(self.duree_jours(), 1), 2)
+        return 0
+    
+    def calculer_nombre_spotsjourecran(self):
+        if self.type_support == 'ecran' and self.lignes.count() > 0:
+            return round(
+                self.calculer_nombre_spots()
+                / max(self.duree_jours(), 1)
+                / self.lignes.count(),
+                2,
+            )
+        return 0
+
+    def auto_update_statut(self):
+        today = timezone.now().date()
+        if self.statut in (
+            self.STATUT_BROUILLON,
+            self.STATUT_EN_PAUSE,
+            self.STATUT_ANNULEE,
+        ):
+            return
+        if today < self.date_debut:
+            self.statut = self.STATUT_A_VENIR
+        elif self.date_debut <= today <= self.date_fin:
+            self.statut = self.STATUT_EN_COURS
+        else:
+            self.statut = self.STATUT_TERMINEE
+        self.save(update_fields=['statut'])
+
+    def clean(self):
+        super().clean()
+
+        # Hiérarchie campagnes mère / sous-campagne
+        if self.est_mere and self.campagne_parente_id:
+            raise ValidationError({'campagne_parente': "Une campagne mère ne peut pas être rattachée à une autre campagne mère."})
+
+        if self.est_mere and self.pk and self.lignes.exists():
+            raise ValidationError("Une campagne mère ne peut pas avoir de lignes de campagne directes.")
+
+        if self.est_mere and self.type_support:
+            raise ValidationError({'type_support': "Une campagne mère ne doit pas définir de type de support ou de format."})
+
+        if self.pk and self.campagne_parente_id and self.sous_campagnes.exists():
+            raise ValidationError("Une sous-campagne ne peut pas avoir des sous-campagnes.")
+
+        if self.campagne_parente_id:
+            mere = self.campagne_parente
+            if mere and not mere.est_mere:
+                raise ValidationError({'campagne_parente': "La campagne sélectionnée doit être une campagne mère."})
+            if mere and mere.campagne_parente_id:
+                raise ValidationError({'campagne_parente': "La campagne mère ne peut pas hériter d'une autre campagne mère."})
+            if self.type_support == '':
+                raise ValidationError({'type_support': "Le type de support ou format est obligatoire pour une sous-campagne."})
+
+        if not self.est_mere and not self.campagne_parente_id and self.type_support == '':
+            raise ValidationError({'type_support': "Le type de support ou format est obligatoire pour une campagne autonome."})
+
+        # if self.type_support == 'ecran' and self.campagne_parente_id and self.campagne_parente and self.campagne_parente.type_support != 'ecran':
+        #     raise ValidationError({'type_support': "La sous-campagne écran doit être rattachée à une campagne mère écran ou indiquer un type écran valide."})
+
+        if self.campagne_parente_id and self.date_debut and self.date_fin:
+            mere = self.campagne_parente
+            if mere and mere.date_debut and self.date_debut < mere.date_debut:
+                raise ValidationError({'date_debut': "La sous-campagne ne peut pas commencer avant la campagne mère."})
+            if mere and mere.date_fin and self.date_fin > mere.date_fin:
+                raise ValidationError({'date_fin': "La sous-campagne ne peut pas se terminer après la campagne mère."})
+
+        if self.type_support == 'ecran':
+            if not self.duree_passage:
+                raise ValidationError({'duree_passage': 'Ce champ est obligatoire pour les campagnes écran.'})
+            if not self.frequence:
+                raise ValidationError({'frequence': 'Ce champ est obligatoire pour les campagnes écran.'})
+            if not self.tranches_horaires:
+                raise ValidationError({'tranches_horaires': 'Ce champ est obligatoire pour les campagnes écran.'})
+
+
+class CampagneVisuel(models.Model):
+    campagne = models.ForeignKey(Campagne, related_name='visuels', on_delete=models.CASCADE)
+    fichier = models.FileField(upload_to='visuels/', verbose_name="Visuel / Affiche (photo ou vidéo)")
+
+    class Meta:
+        verbose_name = "Visuel de campagne"
+        verbose_name_plural = "Visuels de campagne"
+
+    def __str__(self):
+        return f"Visuel pour {self.campagne.nom}"
+
+
+class CampagnePause(models.Model):
+    campagne = models.ForeignKey(
+        'Campagne', on_delete=models.CASCADE, related_name='pauses'
+    )
+    date_debut = models.DateField(verbose_name="Date de mise en pause")
+    date_fin = models.DateField(
+        null=True, blank=True, verbose_name="Date de reprise"
+    )
+
+    class Meta:
+        ordering = ['date_debut', 'pk']
+        verbose_name = "Pause de campagne"
+        verbose_name_plural = "Pauses de campagne"
+
+
+class LigneCampagne(models.Model):
+    """Lien entre une campagne et un support (ou un emplacement de marché) avec ses surcharges spécifiques."""
+    campagne = models.ForeignKey(Campagne, on_delete=models.CASCADE, related_name='lignes')
+    support = models.ForeignKey('inventory.Support', on_delete=models.PROTECT, related_name='lignes_campagne', null=True, blank=True)
+    face = models.ForeignKey('inventory.FacePanneau', on_delete=models.SET_NULL, null=True, blank=True, related_name='lignes_campagne', verbose_name="Face (Panneau)")
+    emplacement = models.ForeignKey(
+        'inventory.Emplacement', on_delete=models.PROTECT, null=True, blank=True,
+        related_name='lignes_campagne', verbose_name="Emplacement (Marché)",
+        help_text="Renseigné uniquement pour les campagnes de type Marché — l'emplacement "
+                   "peut être réservé même s'il n'a pas encore de panneau installé."
+    )
+    visuel = models.FileField(upload_to='visuels/', blank=True, null=True, verbose_name="Visuel / Média")
+    ordre_dans_boucle = models.PositiveIntegerField(default=0, verbose_name="Priorité/Ordre")
+    notes = models.TextField(blank=True, verbose_name="Notes internes")
+
+    date_debut = models.DateField(null=True, blank=True, verbose_name="Date de début (écran)")
+    date_fin = models.DateField(null=True, blank=True, verbose_name="Date de fin (écran)")
+    duree_passage = models.PositiveIntegerField(choices=DUREE_CHOICES, null=True, blank=True, verbose_name="Durée de passage (secondes)")
+    frequence = models.PositiveIntegerField(choices=FREQUENCE_CHOICES, null=True, blank=True, verbose_name="Fréquence de diffusion")
+    tranches_horaires = models.CharField(max_length=500, blank=True, verbose_name="Tranches horaires spécifiques")
+
+    class Meta:
+        verbose_name = "Ligne de campagne"
+        verbose_name_plural = "Lignes de campagne"
+
+    def __str__(self):
+        if self.emplacement_id:
+            return f"{self.campagne.nom} -> {self.emplacement.code} ({self.emplacement.marche.nom})"
+        return f"{self.campagne.nom} -> {self.support.code}"
+
+    def clean(self):
+        super().clean()
+        if not self.support_id and not self.emplacement_id:
+            raise ValidationError("Une ligne de campagne doit référencer soit un support, soit un emplacement de marché.")
+        if self.support_id and self.emplacement_id:
+            raise ValidationError("Une ligne de campagne ne peut pas référencer à la fois un support et un emplacement.")
+    
+    def get_duree_passage_effective(self):
+        return self.duree_passage or self.campagne.duree_passage
+
+    def get_frequence_effective(self):
+        return self.frequence or self.campagne.frequence
+
+    def get_tranches_effective(self):
+        return self.tranches_horaires or self.campagne.tranches_horaires
+
+    def calculer_spots_sur_periode(self, date_debut, date_fin):
+        """Calcule les spots de la ligne sur la partie de période demandée."""
+        campagne_debut = self.campagne.date_debut
+        campagne_fin = self.campagne.date_fin
+        debut_ligne = max(self.date_debut or campagne_debut, campagne_debut)
+        fin_ligne = min(self.date_fin or campagne_fin, campagne_fin)
+        date_debut = max(date_debut, debut_ligne)
+        date_fin = min(date_fin, fin_ligne)
+        if date_debut > date_fin:
+            return 0
+
+        frequence      = self.get_frequence_effective()
+        duree_passage  = self.get_duree_passage_effective()
+        tranches       = self.get_tranches_effective()
+
+        if not frequence or not duree_passage:
+            return 0
+
+        nombre_visuels = self.campagne.get_nombre_visuels_effective() if self.campagne else 1
+        spots_par_heure = (3600 / frequence) * nombre_visuels
+        if self.support_id and self.support.type_support == 'ecran':
+            return self._calculer_spots_ecran_sur_periode(
+                date_debut,
+                date_fin,
+                spots_par_heure,
+                duree_passage,
+                tranches,
+            )
+
+        heures_tranches = calculer_duree_tranches(tranches)
+        spots_par_jour  = spots_par_heure * heures_tranches
+
+        pauses = self.campagne.pauses.filter(
+            date_debut__lte=date_fin,
+        ).filter(
+            Q(date_fin__gte=date_debut) | Q(date_fin__isnull=True)
+        ).order_by('date_debut')
+        jours_disponibles = 0
+        date_courante = date_debut
+        for pause in pauses:
+            pause_debut = max(pause.date_debut, date_debut)
+            pause_fin = min(
+                pause.date_fin or date_fin,
+                date_fin,
+            )
+            if pause_fin < date_courante:
+                continue
+            if pause_debut > date_courante:
+                jours_disponibles += self.support.jours_disponibles_sur_periode(
+                    date_courante, pause_debut - datetime.timedelta(days=1)
+                )
+            date_courante = max(
+                date_courante, pause_fin + datetime.timedelta(days=1)
+            )
+            if date_courante > date_fin:
+                break
+        if date_courante <= date_fin:
+            jours_disponibles += self.support.jours_disponibles_sur_periode(
+                date_courante, date_fin
+            )
+        return round(spots_par_jour * jours_disponibles)
+
+    def _calculer_spots_ecran_sur_periode(
+        self, date_debut, date_fin, spots_par_heure, duree_passage, tranches
+    ):
+        ecran = getattr(self.support, 'ecran_info', None)
+        if ecran is None:
+            jours_disponibles = self.support.jours_disponibles_sur_periode(
+                date_debut, date_fin
+            )
+            return round(
+                spots_par_heure
+                * calculer_duree_tranches(tranches)
+                * jours_disponibles
+            )
+        programmes = list(
+            ecran.programmes.filter(
+                date_debut__lte=date_fin,
+            ).filter(
+                Q(date_fin__gte=date_debut) | Q(date_fin__isnull=True)
+            ).prefetch_related('plages').order_by('-date_debut')
+        )
+        pauses = list(
+            self.campagne.pauses.filter(
+                date_debut__lte=date_fin,
+            ).filter(
+                Q(date_fin__gte=date_debut) | Q(date_fin__isnull=True)
+            ).values_list('date_debut', 'date_fin')
+        )
+        pannes = []
+        for periode in self.support.get_periodes_panne(include_signal=False):
+            debut = periode['debut']
+            fin = periode['fin'] or date_fin
+            debut = debut.date() if hasattr(debut, 'date') else debut
+            fin = fin.date() if hasattr(fin, 'date') else fin
+            pannes.append((debut, fin))
+
+        total_spots = 0.0
+        date_courante = date_debut
+        while date_courante <= date_fin:
+            if any(
+                debut_pause <= date_courante <= (fin_pause or date_fin)
+                for debut_pause, fin_pause in pauses
+            ) or any(
+                debut_panne <= date_courante <= fin_panne
+                for debut_panne, fin_panne in pannes
+            ):
+                date_courante += datetime.timedelta(days=1)
+                continue
+
+            programme_actif = next(
+                (
+                    programme for programme in programmes
+                    if programme.date_debut <= date_courante
+                    and (
+                        programme.date_fin is None
+                        or programme.date_fin >= date_courante
+                    )
+                ),
+                None,
+            )
+            if programme_actif:
+                plages_ecran = [
+                    (plage.heure_debut, plage.heure_fin)
+                    for plage in programme_actif.plages.all()
+                    if plage.jour_semaine == date_courante.weekday()
+                ]
+            else:
+                plages_ecran = [(ecran.heure_allumage, ecran.heure_extinction)]
+
+            heures_actives = calculer_heures_chevauchement(plages_ecran, tranches)
+            total_spots += (
+                spots_par_heure * heures_actives
+                if plages_ecran else 0
+            )
+            date_courante += datetime.timedelta(days=1)
+        return round(total_spots)
+
+    def calculer_spots(self):
+        """Calcule le nombre total de spots pour cette ligne écran."""
+        date_debut = self.date_debut or self.campagne.date_debut
+        date_fin = self.date_fin or self.campagne.date_fin
+        return self.calculer_spots_sur_periode(date_debut, date_fin)
+
+
+class PreuveDiffusion(models.Model):
+    """Preuve photo d'une diffusion sur une ligne de campagne."""
+
+    campagne = models.ForeignKey(
+        Campagne,
+        on_delete=models.CASCADE,
+        related_name='preuves_diffusion',
+    )
+    ligne = models.ForeignKey(
+        LigneCampagne,
+        on_delete=models.CASCADE,
+        related_name='preuves_diffusion',
+        verbose_name="Support / emplacement",
+    )
+    date_heure = models.DateTimeField(default=timezone.now, verbose_name="Date et heure de diffusion")
+    photo = models.ImageField(upload_to='piges/%Y/%m/', verbose_name="Photo de preuve")
+    observations = models.TextField(blank=True, verbose_name="Observations")
+    cree_par = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='preuves_diffusion_creees',
+    )
+    cree_le = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-date_heure', '-pk']
+        verbose_name = "Preuve de diffusion"
+        verbose_name_plural = "Preuves de diffusion"
+        constraints = [
+            models.UniqueConstraint(
+                fields=['campagne', 'ligne'],
+                name='unique_pige_campagne_ligne',
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.campagne.reference} — {self.ligne} — {self.date_heure:%d/%m/%Y %H:%M}"
+
+    def clean(self):
+        super().clean()
+        if self.ligne_id and self.campagne_id and self.ligne.campagne_id != self.campagne_id:
+            raise ValidationError({
+                'ligne': "Le support sélectionné n'appartient pas à cette campagne."
+            })
+
+        if self.date_heure and self.campagne_id:
+            date_debut = self.campagne.date_debut
+            date_fin = self.campagne.date_fin
+            if self.ligne_id:
+                date_debut = self.ligne.date_debut or date_debut
+                date_fin = self.ligne.date_fin or date_fin
+            date_diffusion = timezone.localtime(self.date_heure).date() if timezone.is_aware(self.date_heure) else self.date_heure.date()
+            if date_diffusion < date_debut or date_diffusion > date_fin:
+                raise ValidationError({
+                    'date_heure': "La date de diffusion doit être comprise dans la période de la campagne."
+                })

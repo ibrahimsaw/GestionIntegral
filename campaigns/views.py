@@ -6479,15 +6479,23 @@ def api_check_dispo(request, client_pk):
 
     # ── Faces bloquées par une demande de réservation en attente/traitement ─
     faces_demandes = {}
-    for demande in (
-        DemandeReservation.objects
-        .filter(
+    edit_uuid = request.session.get('gestion_demande_edit_uuid')
+    edit_demande_id = None
+    if edit_uuid:
+        edit_demande_id = DemandeReservation.objects.filter(uuid=edit_uuid).values_list('pk', flat=True).first()
+
+    demandes_qs = DemandeReservation.objects.filter(
             statut__in=[
                 DemandeReservation.STATUT_BROUILLON,
                 DemandeReservation.STATUT_NOUVELLE,
                 DemandeReservation.STATUT_EN_COURS,
             ],
         )
+    if edit_demande_id:
+        demandes_qs = demandes_qs.exclude(pk=edit_demande_id)
+
+    for demande in (
+        demandes_qs
         .filter(
             Q(date_debut_blocage__lte=date_fin.date(), date_fin_blocage__gte=date_debut.date())
             | Q(date_debut_souhaitee__lte=date_fin.date(), date_fin_souhaitee__gte=date_debut.date())
@@ -7024,72 +7032,49 @@ def _cle_code_support(code):
 
 
 def comptes_pour_recap(contact):
-    """Fiche détaillée (client, agence) pour le récapitulatif, comptes existants ou à créer."""
+    """Fiche détaillée (client, agence) pour le récapitulatif."""
     comptes = []
-    for role, existant, nouveau in (
-        ('Client', contact.get('client'), contact.get('new_client')),
-        ('Agence', contact.get('agence'), contact.get('new_agence')),
-    ):
-        if existant:
-            comptes.append({
-                'role': role, 'nouveau': False,
-                'reference': existant.reference, 'nom': existant.nom,
-                'contact': existant.contact_nom, 'telephone': existant.telephone,
-                'email': existant.email, 'adresse': existant.adresse,
-            })
-        elif nouveau:
-            comptes.append({
-                'role': role, 'nouveau': True, 'reference': '',
-                'nom': nouveau['nom'], 'contact': nouveau['contact_nom'],
-                'telephone': nouveau['telephone'], 'email': nouveau['email'],
-                'adresse': nouveau['adresse'],
-            })
+    client = contact.get('client')
+    agence = contact.get('agence')
+    if client:
+        comptes.append({
+            'role': 'Client', 'nouveau': False,
+            'reference': client.reference, 'nom': client.nom,
+            # Contact saisi dans le formulaire (celui de la demande)
+            'contact': contact.get('nom_contact') or client.contact_nom,
+            'telephone': contact.get('telephone') or client.telephone,
+            'whatsapp': contact.get('whatsapp', ''),
+            'email': contact.get('email') or client.email,
+            'adresse': client.adresse,
+        })
+    if agence:
+        comptes.append({
+            'role': 'Agence', 'nouveau': False,
+            'reference': agence.reference, 'nom': agence.nom,
+            'contact': agence.contact_nom, 'fonction': '',
+            'telephone': agence.telephone, 'whatsapp': '',
+            'email': agence.email, 'adresse': agence.adresse,
+        })
     return comptes
 
 
 def contact_session_depuis_demande(demande):
     """Pré-remplit l'étape « Client et agence » à partir d'une demande existante."""
     principal = demande.client
-    prospect = demande.type_client == DemandeReservation.TYPE_CLIENT_NOUVEAU
-    data = {
-        'client_mode': 'existant', 'client': '',
-        'client_nom': '', 'client_contact': '', 'client_telephone': '',
-        'client_email': '', 'client_adresse': '',
-        'agence_mode': 'aucun', 'agence': '',
-        'agence_nom': '', 'agence_contact': '', 'agence_telephone': '',
-        'agence_email': '', 'agence_adresse': '',
-        'accepte_contact': demande.accepte_contact,
-    }
     principal_est_agence = bool(
         principal and principal.type_entite == Client.TYPE_AGENCE
     )
-    # Slot client
-    if principal_est_agence:
-        data['client_mode'] = 'aucun'
-    elif prospect:
-        data.update(
-            client_mode='nouveau',
-            client_nom=demande.societe,
-            client_contact=demande.nom_contact,
-            client_telephone=demande.telephone,
-            client_email=demande.email,
-            client_adresse=principal.adresse if principal else '',
-        )
-    elif principal:
-        data.update(client_mode='existant', client=str(principal.pk))
-    # Slot agence
-    if principal_est_agence and prospect:
-        data.update(
-            agence_mode='nouveau',
-            agence_nom=demande.societe,
-            agence_contact=demande.nom_contact,
-            agence_telephone=demande.telephone,
-            agence_email=demande.email,
-            agence_adresse=principal.adresse,
-        )
-    elif demande.agence_id:
-        data.update(agence_mode='existant', agence=str(demande.agence_id))
-    return data
+    agence_id = demande.agence_id or (principal.pk if principal_est_agence else None)
+    return {
+        'client': str(principal.pk) if principal and not principal_est_agence else '',
+        'agence': str(agence_id) if agence_id else '',
+        'societe': demande.societe,
+        'contact': demande.nom_contact,
+        'telephone': demande.telephone,
+        'whatsapp': demande.whatsapp,
+        'email': demande.email,
+        'accepte_contact': demande.accepte_contact,
+    }
 
 
 class DemandeCreationView(StaffDemandeWizardBase):
@@ -7149,6 +7134,28 @@ class DemandeCreationView(StaffDemandeWizardBase):
             key: request.GET.get(key, '').strip() or inferred_filters[key]
             for key in ('ville', 'categorie', 'format')
         }
+        client_contact_data = {
+            str(client['id']): {
+                'contact_nom': client.get('contact_nom') or '',
+                'telephone': client.get('telephone') or '',
+                'email': client.get('email') or '',
+            }
+            for client in Client.objects.filter(
+                actif=True,
+                type_entite=Client.TYPE_CLIENT,
+            ).values('id', 'contact_nom', 'telephone', 'email')
+        }
+        agence_contact_data = {
+            str(client['id']): {
+                'contact_nom': client.get('contact_nom') or '',
+                'telephone': client.get('telephone') or '',
+                'email': client.get('email') or '',
+            }
+            for client in Client.objects.filter(
+                actif=True,
+                type_entite=Client.TYPE_AGENCE,
+            ).values('id', 'contact_nom', 'telephone', 'email')
+        }
         return render(request, self.template_name, self.step_context(
             request,
             form=selection_form,
@@ -7158,22 +7165,32 @@ class DemandeCreationView(StaffDemandeWizardBase):
             initial_tarifs_faces=request.session.get(self.session_prices_key, {}),
             filtres=filtres,
             nom_campagne=request.session.get(self.session_project_key, {}).get('nom_campagne', ''),
+            client_contact_data=json.dumps(client_contact_data),
+            agence_contact_data=json.dumps(agence_contact_data),
         ))
 
     def get(self, request):
         if request.session.get(self.session_edit_key) and request.GET.get('edit') != '1':
             self.clear_wizard_session(request)
         periode = request.session.get(self.session_period_key, {})
-        selection_form = Etape1Form(initial={
-            'faces_selectionnees': json.dumps(
-                request.session.get(self.session_faces_key, [])
-            ),
-            'supports_selectionnees': json.dumps(
-                request.session.get(self.session_supports_key, [])
-            ),
-            'date_debut': periode.get('date_debut'),
-            'date_fin': periode.get('date_fin'),
-        })
+        edit_uuid = request.session.get(self.session_edit_key)
+        edit_demande_id = None
+        if edit_uuid:
+            edit_demande_id = DemandeReservation.objects.filter(uuid=edit_uuid).values_list('pk', flat=True).first()
+        selection_form = Etape1Form(
+            initial={
+                'faces_selectionnees': json.dumps(
+                    request.session.get(self.session_faces_key, [])
+                ),
+                'supports_selectionnees': json.dumps(
+                    request.session.get(self.session_supports_key, [])
+                ),
+                'date_debut': periode.get('date_debut'),
+                'date_fin': periode.get('date_fin'),
+            },
+            exclude_demande_id=edit_demande_id,
+            is_edit_mode=bool(edit_demande_id),
+        )
         return self._render_step(
             request,
             selection_form,
@@ -7184,7 +7201,15 @@ class DemandeCreationView(StaffDemandeWizardBase):
         )
 
     def post(self, request):
-        selection_form = Etape1Form(request.POST)
+        edit_uuid = request.session.get(self.session_edit_key)
+        edit_demande_id = None
+        if edit_uuid:
+            edit_demande_id = DemandeReservation.objects.filter(uuid=edit_uuid).values_list('pk', flat=True).first()
+        selection_form = Etape1Form(
+            request.POST,
+            exclude_demande_id=edit_demande_id,
+            is_edit_mode=bool(edit_demande_id),
+        )
         contact_form = DemandeGestionContactForm(
             request.POST,
             ignore_account_pks=self.editing_account_pks(request),
@@ -7409,6 +7434,8 @@ class DemandeCreationEtape2View(StaffDemandeWizardBase):
                 else:
                     demande = DemandeReservation(
                         statut=DemandeReservation.STATUT_EN_COURS,
+                        traite_par=request.user,
+                        traite_le=timezone.now(),
                         token_partage=uuid.uuid4(),
                     )
                 # En modification d'un prospect, on met à jour sa fiche plutôt
@@ -7442,6 +7469,8 @@ class DemandeCreationEtape2View(StaffDemandeWizardBase):
                 demande.societe = data['societe']
                 demande.email = data['email']
                 demande.telephone = data['telephone']
+                demande.whatsapp = data.get('whatsapp', '')
+                demande.fonction_contact = ''
                 demande.accepte_contact = data['accepte_contact']
                 demande.date_debut_souhaitee = date.fromisoformat(context['periode']['date_debut'])
                 demande.date_fin_souhaitee = date.fromisoformat(context['periode']['date_fin'])
@@ -7564,7 +7593,9 @@ class DemandeAutoriserModificationView(StaffRequiredMixin, View):
         )
         if demande.statut == DemandeReservation.STATUT_BROUILLON:
             demande.statut = DemandeReservation.STATUT_EN_COURS
-            demande.save(update_fields=['statut', 'updated_at'])
+            demande.traite_par = request.user
+            demande.traite_le = timezone.now()
+            demande.save(update_fields=['statut', 'traite_par', 'traite_le', 'updated_at'])
             messages.success(request, "Le lien de modification client est désactivé.")
             return redirect('demande_detail', uuid=uuid)
 

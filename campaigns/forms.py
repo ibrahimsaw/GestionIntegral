@@ -1106,110 +1106,63 @@ class DemandeGestionContactForm(forms.Form):
     """
     Étape « Client et agence » de la création d'une demande (staff).
 
-    Deux emplacements indépendants, chacun avec son mode :
-      - client : « existant » (liste), « nouveau » (saisie sur place) ou « aucun »
-      - agence : « existant », « nouveau » ou « aucun »
-    Au moins un des deux comptes est obligatoire. Les combinaisons possibles :
-      client existant / nouveau  ×  agence existante / nouvelle / aucune
-      agence existante / nouvelle (sans client)  ·  ou aucun compte.
+    Formulaire à plat :
+      - client (facultatif) : compte existant de type « client »
+      - agence (facultative) : compte existant de type « agence »
+      - contact principal, téléphone et e-mail (obligatoires)
+    Si aucun compte n'est sélectionné, les informations saisies permettent de créer
+    automatiquement un nouveau compte client lors de l'enregistrement de la demande.
     """
-    MODE_EXISTANT = 'existant'
-    MODE_NOUVEAU = 'nouveau'
-    MODE_AUCUN = 'aucun'
-    MODE_CHOICES = [
-        (MODE_EXISTANT, 'Compte existant'),
-        (MODE_NOUVEAU, 'Nouveau compte'),
-        (MODE_AUCUN, 'Aucun'),
-    ]
 
-    # ── Client ───────────────────────────────────────────────────────────────
-    client_mode = forms.ChoiceField(
-        choices=MODE_CHOICES, initial=MODE_EXISTANT, required=False,
-        widget=forms.RadioSelect,
-    )
     client = forms.ModelChoiceField(
         queryset=Client.objects.none(), required=False, label="Client",
-        empty_label="— Choisir un client —",
+        empty_label="— Aucun client sélectionné —",
         widget=forms.Select(attrs={'class': 'form-control-e3'}),
-    )
-    client_nom = forms.CharField(
-        max_length=200, required=False, label="Nom / raison sociale",
-        widget=forms.TextInput(attrs={'class': 'form-control-e3'}),
-    )
-    client_contact = forms.CharField(
-        max_length=150, required=False, label="Nom du contact principal",
-        widget=forms.TextInput(attrs={'class': 'form-control-e3'}),
-    )
-    client_telephone = forms.CharField(
-        max_length=30, required=False, label="Téléphone",
-        widget=forms.TextInput(attrs={'class': 'form-control-e3'}),
-    )
-    client_email = forms.EmailField(
-        required=False, label="E-mail",
-        widget=forms.EmailInput(attrs={'class': 'form-control-e3'}),
-    )
-    client_adresse = forms.CharField(
-        required=False, label="Adresse (facultative)",
-        widget=forms.Textarea(attrs={'class': 'form-control-e3', 'rows': 2}),
-    )
-
-    # ── Agence ───────────────────────────────────────────────────────────────
-    agence_mode = forms.ChoiceField(
-        choices=MODE_CHOICES, initial=MODE_AUCUN, required=False,
-        widget=forms.RadioSelect,
     )
     agence = forms.ModelChoiceField(
         queryset=Client.objects.none(), required=False, label="Agence",
-        empty_label="— Choisir une agence —",
+        empty_label="— Aucune agence —",
         widget=forms.Select(attrs={'class': 'form-control-e3'}),
     )
-    agence_nom = forms.CharField(
-        max_length=200, required=False, label="Nom / raison sociale",
+    contact = forms.CharField(
+        max_length=150, required=True, label="Contact principal",
+        error_messages={'required': "Renseignez le contact principal."},
         widget=forms.TextInput(attrs={'class': 'form-control-e3'}),
     )
-    agence_contact = forms.CharField(
-        max_length=150, required=False, label="Nom du contact principal",
+    societe = forms.CharField(
+        max_length=200, required=False, label="Nom de la société",
         widget=forms.TextInput(attrs={'class': 'form-control-e3'}),
     )
-    agence_telephone = forms.CharField(
-        max_length=30, required=False, label="Téléphone",
-        widget=forms.TextInput(attrs={'class': 'form-control-e3'}),
+    telephone = forms.CharField(
+        max_length=30, required=True, label="Téléphone",
+        error_messages={'required': "Renseignez le téléphone."},
+        widget=forms.TextInput(attrs={'class': 'form-control-e3', 'type': 'tel'}),
     )
-    agence_email = forms.EmailField(
-        required=False, label="E-mail",
+    email = forms.EmailField(
+        required=True, label="E-mail",
+        error_messages={'required': "Renseignez l'e-mail."},
         widget=forms.EmailInput(attrs={'class': 'form-control-e3'}),
     )
-    agence_adresse = forms.CharField(
-        required=False, label="Adresse (facultative)",
-        widget=forms.Textarea(attrs={'class': 'form-control-e3', 'rows': 2}),
-    )
-
     accepte_contact = forms.BooleanField(
         required=False, initial=True,
         widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
     )
 
-    SLOTS = (
-        ('client', Client.TYPE_CLIENT, 'le client'),
-        ('agence', Client.TYPE_AGENCE, "l'agence"),
-    )
-
     def __init__(self, *args, ignore_account_pks=(), **kwargs):
         super().__init__(*args, **kwargs)
-        # Comptes déjà liés à la demande en cours de modification : ils ne comptent
-        # pas comme doublons quand on revalide leurs propres coordonnées.
+        # Conservé pour compatibilité avec les vues (plus utilisé : plus de création de comptes).
         self.ignore_account_pks = {pk for pk in ignore_account_pks if pk}
         self.fields['client'].queryset = Client.objects.filter(
             actif=True, type_entite=Client.TYPE_CLIENT,
         ).order_by('nom')
         self.fields['client'].label_from_instance = (
-            lambda client: f"{client.reference} · {client.nom}"
+            lambda client: client.nom
         )
         self.fields['agence'].queryset = Client.objects.filter(
             actif=True, type_entite=Client.TYPE_AGENCE,
         ).order_by('nom')
         self.fields['agence'].label_from_instance = (
-            lambda client: f"{client.reference} · {client.nom}"
+            lambda client: client.nom
         )
 
     # ── Aides pour les vues ──────────────────────────────────────────────────
@@ -1233,82 +1186,45 @@ class DemandeGestionContactForm(forms.Form):
             payload[name] = value
         return payload
 
-    # ── Validation (aucun champ obligatoire) ─────────────────────────────────
-    def _lire_emplacement(self, cleaned, prefix, type_entite):
-        """Retourne (compte_existant, donnees_nouveau_compte) ; tout est facultatif."""
-        default = self.MODE_EXISTANT if prefix == 'client' else self.MODE_AUCUN
-        mode = cleaned.get(f'{prefix}_mode') or default
-
-        if mode == self.MODE_EXISTANT:
-            compte = cleaned.get(prefix)
-            cleaned[f'{prefix}_mode'] = mode if compte else self.MODE_AUCUN
-            return compte, None
-
-        # « nouveau » ou « aucun » : une sélection résiduelle de la liste est ignorée.
-        self._errors.pop(prefix, None)
-        cleaned[prefix] = None
-        if mode != self.MODE_NOUVEAU:
-            cleaned[f'{prefix}_mode'] = self.MODE_AUCUN
-            return None, None
-
-        nom = (cleaned.get(f'{prefix}_nom') or '').strip()
-        contact = (cleaned.get(f'{prefix}_contact') or '').strip()
-        email = (cleaned.get(f'{prefix}_email') or '').strip()
-        telephone = (cleaned.get(f'{prefix}_telephone') or '').strip()
-        adresse = (cleaned.get(f'{prefix}_adresse') or '').strip()
-        if not any((nom, contact, email, telephone, adresse)):
-            # Rien de saisi : aucun compte n'est créé.
-            cleaned[f'{prefix}_mode'] = self.MODE_AUCUN
-            return None, None
-        cleaned[f'{prefix}_mode'] = mode
-        return None, {
-            'type_entite': type_entite,
-            # Un nom est nécessaire pour créer la fiche : repli sur les autres infos saisies.
-            'nom': nom or contact or email or telephone or 'Prospect sans nom',
-            'contact_nom': contact,
-            'email': email,
-            'telephone': telephone,
-            'adresse': adresse,
-        }
-
     def clean(self):
         cleaned = super().clean()
-        client_obj, client_new = self._lire_emplacement(cleaned, 'client', Client.TYPE_CLIENT)
-        agence_obj, agence_new = self._lire_emplacement(cleaned, 'agence', Client.TYPE_AGENCE)
+        client = cleaned.get('client')
+        agence = cleaned.get('agence')
 
-        cleaned['client'] = client_obj
-        cleaned['agence'] = agence_obj
-        cleaned['new_client'] = client_new
-        cleaned['new_agence'] = agence_new
+        contact = (cleaned.get('contact') or '').strip()
+        societe = (cleaned.get('societe') or '').strip()
+        telephone = (cleaned.get('telephone') or '').strip()
+        email = (cleaned.get('email') or '').strip()
 
-        # Compte principal : le client s'il y en a un, sinon l'agence, sinon aucun.
-        if client_obj or client_new:
-            primary, existing, new = 'client', client_obj, client_new
-        elif agence_obj or agence_new:
-            primary, existing, new = 'agence', agence_obj, agence_new
+        principal = client or agence
+        cleaned['new_client'] = None
+        cleaned['new_agence'] = None
+
+        if client:
+            cleaned['primary'] = 'client'
+            cleaned['type_compte'] = Client.TYPE_CLIENT
+            cleaned['type_client'] = DemandeReservation.TYPE_CLIENT_EXISTANT
+        elif agence:
+            cleaned['primary'] = 'agence'
+            cleaned['type_compte'] = Client.TYPE_AGENCE
+            cleaned['type_client'] = DemandeReservation.TYPE_CLIENT_EXISTANT
         else:
-            primary, existing, new = None, None, None
-        cleaned['primary'] = primary
-        cleaned['type_compte'] = (
-            Client.TYPE_AGENCE if primary == 'agence' else Client.TYPE_CLIENT
-        )
-        cleaned['type_client'] = (
-            DemandeReservation.TYPE_CLIENT_EXISTANT if existing
-            else DemandeReservation.TYPE_CLIENT_NOUVEAU
-        )
+            cleaned['primary'] = 'client'
+            cleaned['type_compte'] = Client.TYPE_CLIENT
+            cleaned['type_client'] = DemandeReservation.TYPE_CLIENT_NOUVEAU
+            cleaned['new_client'] = {
+                'nom': societe or contact or 'Nouvel établissement',
+                'contact_nom': contact,
+                'email': email,
+                'telephone': telephone,
+                'adresse': '',
+                'actif': True,
+                'type_entite': Client.TYPE_CLIENT,
+            }
 
-        if existing:
-            cleaned['societe'] = existing.nom
-            cleaned['nom_contact'] = existing.contact_nom or existing.nom
-            cleaned['email'] = existing.email
-            cleaned['telephone'] = existing.telephone
-            cleaned['adresse'] = existing.adresse
-        elif new:
-            cleaned['societe'] = new['nom']
-            cleaned['nom_contact'] = new['contact_nom'] or new['nom']
-            cleaned['email'] = new['email']
-            cleaned['telephone'] = new['telephone']
-            cleaned['adresse'] = new['adresse']
-        else:
-            cleaned.update(societe='', nom_contact='', email='', telephone='', adresse='')
+        cleaned['societe'] = societe or (principal.nom if principal else cleaned['new_client']['nom'])
+        cleaned['nom_contact'] = contact or (client.contact_nom if client else '') or (principal.nom if principal else '')
+        cleaned['email'] = email
+        cleaned['telephone'] = telephone
+        cleaned['adresse'] = client.adresse if client else (agence.adresse if agence else '')
         return cleaned

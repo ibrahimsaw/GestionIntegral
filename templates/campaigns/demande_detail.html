@@ -47,329 +47,548 @@
 {% endblock contentbouton %}
 
 {% block extra_head %}
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700;12..96,800&display=swap" rel="stylesheet">
 <style>
-  .fd {
-    --ink: #161a22;
-    --muted: #667085;
-    --line: #e4e7ec;
-    --paper: #ffffff;
-    --sunk: #f5f6f8;
-    --brand: var(--color-primary, #932e2b);
-    --brand-deep: #6f201e;
-    --display: 'Bricolage Grotesque', var(--bs-body-font-family, system-ui), sans-serif;
-    color: var(--ink);
+  .demande-recap {
+    --dr-brand: var(--color-primary, #932e2b);
+    --dr-brand-soft: color-mix(in srgb, var(--dr-brand) 9%, #fff);
+    --dr-brand-line: color-mix(in srgb, var(--dr-brand) 22%, #fff);
+    --dr-brand-deep: color-mix(in srgb, var(--dr-brand) 78%, #000);
+    --dr-ink: #1f2623;
+    --dr-ink-2: #3c4540;
+    --dr-muted: #6f7873;
+    --dr-line: #e6e8e4;
+    --dr-soft: #f6f7f5;
+    --dr-ok: #198754;
+    --dr-warn: #b45f0a;
+    --dr-radius: 8px;
+    --dr-shadow: 0 1px 2px rgba(31, 38, 35, .04), 0 6px 20px rgba(31, 38, 35, .05);
+    color: var(--dr-ink);
+    font-variant-numeric: tabular-nums;
   }
+  .demande-recap * { box-sizing: border-box; }
 
   /* ── États : couleur + libellé ── */
-  .fd-st-nouvelle  { --st: #b45309; --st-bg: #fef3c7; }
-  .fd-st-brouillon { --st: #475569; --st-bg: #e2e8f0; }
-  .fd-st-en_cours  { --st: #1d4ed8; --st-bg: #dbeafe; }
-  .fd-st-validee   { --st: #15803d; --st-bg: #dcfce7; }
-  .fd-st-refusee   { --st: #b91c1c; --st-bg: #fee2e2; }
+  .dr-st-nouvelle  { --st: #b45309; --st-bg: #fef3c7; }
+  .dr-st-brouillon { --st: #475569; --st-bg: #e2e8f0; }
+  .dr-st-en_cours  { --st: #1d4ed8; --st-bg: #dbeafe; }
+  .dr-st-validee   { --st: #15803d; --st-bg: #dcfce7; }
+  .dr-st-refusee   { --st: #b91c1c; --st-bg: #fee2e2; }
 
-  /* ═════════ Bandeau ═════════ */
-  .fd-band {
-    background: var(--brand); color: #fff;
-    border-radius: 8px; padding: 26px 30px 0; margin-bottom: 22px;
-    position: relative; overflow: hidden;
+  /* ── Bandeau d'introduction ── */
+  .dr-hero {
+    position: relative; display: flex; align-items: center; gap: 18px;
+    margin-bottom: 18px; padding: 22px 26px; overflow: hidden;
+    border-radius: var(--dr-radius);
+    background: linear-gradient(120deg, var(--dr-brand-deep) 0%, var(--dr-brand) 62%, color-mix(in srgb, var(--dr-brand) 70%, #fff) 100%);
+    color: #fff; box-shadow: var(--dr-shadow);
   }
-  .fd-band::after {            /* grand « signe » décoratif discret */
-    content: "\F3E5"; font-family: "bootstrap-icons";
-    position: absolute; right: -10px; top: -30px; font-size: 11rem; line-height: 1;
-    color: rgba(255,255,255,.07); pointer-events: none;
+  .dr-hero::after {
+    content: ""; position: absolute; right: -70px; top: -90px; width: 280px; height: 280px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(255, 255, 255, .18), transparent 68%); pointer-events: none;
   }
-  .fd-band-top { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 14px; position: relative; z-index: 1; }
-  .fd-ref { font-family: var(--display); font-size: 2.1rem; font-weight: 800; letter-spacing: -.02em; line-height: 1.05; margin: 0; }
-  .fd-who { margin: 8px 0 0; font-size: 1rem; opacity: .92; }
-  .fd-who b { font-weight: 650; }
-  .fd-chip {
-    display: inline-flex; align-items: center; gap: 7px;
-    background: #fff; color: var(--st); border-radius: 999px;
-    padding: 7px 15px; font-weight: 700; font-size: .85rem;
+  .dr-hero > * { position: relative; z-index: 1; }
+  .dr-hero-icon {
+    display: grid; place-items: center; width: 52px; height: 52px; flex: 0 0 52px;
+    border-radius: 14px; background: rgba(255, 255, 255, .16); border: 1px solid rgba(255, 255, 255, .28); font-size: 1.4rem;
   }
-
-  .fd-facts { display: flex; flex-wrap: wrap; margin: 24px -30px 0; border-top: 1px solid rgba(255,255,255,.18); position: relative; z-index: 1; background: var(--brand-deep); }
-  .fd-fact { flex: 1 1 180px; padding: 15px 30px; border-right: 1px solid rgba(255,255,255,.14); min-width: 0; }
-  .fd-fact:last-child { border-right: none; }
-  .fd-fact span { display: block; font-size: .8rem; opacity: .72; margin-bottom: 2px; }
-  .fd-fact strong { font-family: var(--display); font-size: 1.12rem; font-weight: 700; font-variant-numeric: tabular-nums; }
-  @media (max-width: 575.98px) {
-    .fd-band { padding: 20px 18px 0; }
-    .fd-facts { margin-left: -18px; margin-right: -18px; }
-    .fd-fact { padding: 12px 18px; flex-basis: 50%; }
-    .fd-ref { font-size: 1.6rem; }
+  .dr-hero-main { flex: 1 1 auto; min-width: 0; }
+  .dr-hero-kicker { margin: 0 0 3px; font-size: .68rem; font-weight: 800; letter-spacing: .14em; text-transform: uppercase; color: rgba(255, 255, 255, .78); }
+  .dr-hero-title { margin: 0; font-size: 1.4rem; font-weight: 800; letter-spacing: -.025em; }
+  .dr-hero-sub { margin: 4px 0 0; font-size: .84rem; color: rgba(255, 255, 255, .84); }
+  .dr-hero-sub b { font-weight: 750; color: #fff; }
+  .dr-chip-status {
+    display: inline-flex; align-items: center; gap: 7px; flex: 0 0 auto;
+    padding: 7px 15px; border-radius: 999px; background: #fff; color: var(--st);
+    font-size: .8rem; font-weight: 800; box-shadow: 0 4px 12px rgba(0,0,0,.14);
   }
 
-  /* ═════════ Parcours (vraie séquence) ═════════ */
-  .fd-flow { display: flex; background: var(--paper); border: 1px solid var(--line); border-radius: 8px; margin-bottom: 22px; overflow: hidden; }
-  .fd-step { flex: 1; display: flex; align-items: center; gap: 12px; padding: 14px 18px; border-right: 1px solid var(--line); color: var(--muted); font-size: .9rem; min-width: 0; }
-  .fd-step:last-child { border-right: none; }
-  .fd-step-dot { width: 28px; height: 28px; border-radius: 50%; flex-shrink: 0; display: flex; align-items: center; justify-content: center; border: 2px solid var(--line); font-size: .8rem; }
-  .fd-step b { display: block; color: var(--ink); font-weight: 650; line-height: 1.2; }
-  .fd-step small { color: var(--muted); }
-  .fd-step.is-done .fd-step-dot { background: var(--brand); border-color: var(--brand); color: #fff; }
-  .fd-step.is-current { background: var(--st-bg); }
-  .fd-step.is-current .fd-step-dot { background: var(--st); border-color: var(--st); color: #fff; }
-  .fd-step.is-current b { color: var(--st); }
+  /* ── Étapes ── */
+  .dr-steps {
+    display: grid; grid-template-columns: repeat(3, 1fr); margin-bottom: 18px; overflow: hidden;
+    border: 1px solid var(--dr-line); border-radius: var(--dr-radius); background: #fff;
+  }
+  .dr-step { display: flex; align-items: center; gap: 11px; min-width: 0; padding: 12px 18px; color: var(--dr-muted); }
+  .dr-step + .dr-step { border-left: 1px solid var(--dr-line); }
+  .dr-step.is-done { background: #f6faf7; }
+  .dr-step.is-current { background: var(--dr-brand-soft); box-shadow: inset 0 -3px 0 var(--dr-brand); }
+  .dr-step.is-final-validee { background: var(--st-bg); box-shadow: inset 0 -3px 0 var(--st); }
+  .dr-step.is-final-refusee { background: var(--st-bg); box-shadow: inset 0 -3px 0 var(--st); }
+  .dr-step-number {
+    display: grid; place-items: center; width: 28px; height: 28px; flex: 0 0 28px;
+    border: 1px solid #dfe4de; border-radius: 50%; background: #fff; color: var(--dr-muted); font-size: .74rem; font-weight: 800;
+  }
+  .dr-step.is-done .dr-step-number { border-color: var(--dr-ok); background: var(--dr-ok); color: #fff; }
+  .dr-step.is-current .dr-step-number { border-color: var(--dr-brand); background: var(--dr-brand); color: #fff; }
+  .dr-step.is-final-validee .dr-step-number, .dr-step.is-final-refusee .dr-step-number { border-color: var(--st); background: var(--st); color: #fff; }
+  .dr-step-label { display: block; font-size: .8rem; font-weight: 750; line-height: 1.25; }
+  .dr-step-label small { display: block; margin-top: 1px; font-size: .68rem; font-weight: 600; color: var(--dr-muted); }
+  .dr-step.is-done .dr-step-label { color: #287348; }
+  .dr-step.is-current .dr-step-label { color: var(--dr-brand); }
+  .dr-step.is-final-validee .dr-step-label, .dr-step.is-final-refusee .dr-step-label { color: var(--st); }
+
+  /* ── Indicateurs clés ── */
+  .dr-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
+  .dr-kpi {
+    display: flex; align-items: center; gap: 12px; min-width: 0; padding: 14px 16px;
+    border: 1px solid var(--dr-line); border-radius: var(--dr-radius); background: #fff; box-shadow: var(--dr-shadow);
+  }
+  .dr-kpi-icon {
+    display: grid; place-items: center; width: 40px; height: 40px; flex: 0 0 40px;
+    border-radius: 10px; background: var(--dr-brand-soft); color: var(--dr-brand); font-size: 1.05rem;
+  }
+  .dr-kpi-label { display: block; color: var(--dr-muted); font-size: .66rem; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
+  .dr-kpi-value { display: block; color: var(--dr-ink); font-size: 1.05rem; font-weight: 800; letter-spacing: -.02em; line-height: 1.25; overflow-wrap: anywhere; }
+  .dr-kpi-value small { font-size: .72rem; font-weight: 650; color: var(--dr-muted); letter-spacing: 0; }
+
+  /* ── Mise en page ── */
+  .dr-grid { display: grid; grid-template-columns: minmax(0, 1fr) 350px; align-items: start; gap: 18px; }
+  .dr-panel {
+    margin-bottom: 16px; overflow: hidden; border: 1px solid var(--dr-line);
+    border-radius: var(--dr-radius); background: #fff; box-shadow: var(--dr-shadow);
+  }
+  .dr-panel-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 14px 18px; border-bottom: 1px solid var(--dr-line); background: #fcfcfb;
+  }
+  .dr-panel-heading { display: flex; align-items: center; gap: 11px; min-width: 0; }
+  .dr-panel-icon {
+    display: grid; place-items: center; width: 34px; height: 34px; flex: 0 0 34px;
+    border-radius: 9px; background: var(--dr-brand-soft); color: var(--dr-brand); font-size: .95rem;
+  }
+  .dr-panel-title { margin: 0; color: var(--dr-ink); font-size: .92rem; font-weight: 800; }
+  .dr-panel-caption { margin: 2px 0 0; color: var(--dr-muted); font-size: .72rem; }
+  .dr-panel-body { padding: 18px 20px; }
+  .dr-hint { margin: 0; color: var(--dr-muted); font-size: .78rem; line-height: 1.55; }
+  .dr-pill {
+    display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px; border-radius: 999px;
+    background: #f2f4f1; color: #4b554f; font-size: .72rem; font-weight: 750; white-space: nowrap;
+  }
+  .dr-pill.is-new { background: #fdf0e3; color: var(--dr-warn); }
+  .dr-pill.is-ok { background: #e7f4ec; color: #1d6b43; }
+  .dr-pill.is-off { background: #fdeaea; color: #b42323; }
+  .dr-pill.is-brand { background: var(--dr-brand-soft); color: var(--dr-brand); }
+  .dr-muted { color: var(--dr-muted); font-weight: 500; }
+  .dr-empty {
+    padding: 22px; text-align: center; color: var(--dr-muted); font-size: .84rem;
+    border: 1px dashed #d4d9d3; border-radius: var(--dr-radius); background: var(--dr-soft);
+  }
+  .dr-empty i { display: block; margin-bottom: 6px; font-size: 1.5rem; opacity: .6; }
+
+  /* ── Emplacements ── */
+  .dr-table-head, .dr-place {
+    display: grid; grid-template-columns: minmax(120px, 170px) minmax(0, 1fr) 150px; align-items: center; gap: 14px;
+  }
+  .dr-table-head {
+    padding: 9px 16px; background: var(--dr-soft); border: 1px solid var(--dr-line); border-bottom: 0;
+    border-radius: var(--dr-radius) var(--dr-radius) 0 0;
+    color: var(--dr-muted); font-size: .64rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase;
+  }
+  .dr-place-list { max-height: 600px; overflow-y: auto; border: 1px solid var(--dr-line); border-radius: 0 0 var(--dr-radius) var(--dr-radius); }
+  .dr-place { padding: 11px 16px; border-bottom: 1px solid #eff1ed; background: #fff; transition: background .15s; }
+  .dr-place:nth-child(even) { background: #fbfcfa; }
+  .dr-place:hover { background: var(--dr-brand-soft); }
+  .dr-place:last-child { border-bottom: 0; }
+  .dr-place-id { display: flex; align-items: center; gap: 9px; min-width: 0; }
+  .dr-place-icon {
+    display: grid; place-items: center; width: 32px; height: 32px; flex: 0 0 32px;
+    border-radius: 8px; background: var(--dr-brand-soft); color: var(--dr-brand); font-size: .9rem;
+  }
+  .dr-place-icon.is-screen { background: #ede9fe; color: #5b21b6; }
+  .dr-place-code { display: block; color: var(--dr-ink); font-size: .84rem; font-weight: 800; letter-spacing: .01em; }
+  .dr-face-chip {
+    display: inline-block; margin-top: 2px; padding: 1px 8px; border-radius: 999px;
+    background: var(--dr-brand); color: #fff; font-size: .64rem; font-weight: 800; letter-spacing: .04em;
+  }
+  .dr-place-name { overflow-wrap: anywhere; color: #2a322e; font-size: .8rem; font-weight: 650; line-height: 1.35; }
+  .dr-place-loc { display: flex; align-items: center; gap: 5px; margin-top: 3px; color: var(--dr-muted); font-size: .72rem; }
+  .dr-place-loc i { color: var(--dr-brand); opacity: .8; }
+  .dr-chip { display: inline-flex; align-items: center; gap: 5px; padding: 3px 9px; border-radius: 6px; background: #f1f3f0; color: #4a544e; font-size: .68rem; font-weight: 700; }
+  .dr-chip.is-cat { background: #eaf0f7; color: #38577d; }
+  .dr-chip.is-screen { background: #ede9fe; color: #5b21b6; }
+
+  /* ── Lignes d'information (période, historique, blocage) ── */
+  .dr-line {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 9px 0; border-bottom: 1px dashed var(--dr-line); font-size: .8rem;
+  }
+  .dr-line:first-child { padding-top: 0; }
+  .dr-line:last-child { padding-bottom: 0; border-bottom: 0; }
+  .dr-line > span { color: var(--dr-muted); display: inline-flex; align-items: center; gap: 8px; }
+  .dr-line > span i { color: var(--dr-brand); opacity: .85; }
+  .dr-line > strong { font-weight: 800; text-align: right; overflow-wrap: anywhere; }
+
+  /* ── Texte libre ── */
+  .dr-project-name { color: var(--dr-ink); font-size: .95rem; font-weight: 800; }
+  .dr-text { margin: 0; padding: 12px 14px; border-left: 3px solid var(--dr-brand-line); background: var(--dr-soft); border-radius: 0 6px 6px 0; color: var(--dr-ink-2); font-size: .84rem; line-height: 1.65; white-space: pre-wrap; }
+  .dr-text.is-note { border-left-color: #f59e0b; background: #fffbeb; }
+  .dr-project-name + .dr-text { margin-top: 10px; }
+
+  .dr-warn { display: flex; gap: 10px; padding: 11px 13px; background: #fffbeb; border: 1px solid #fde68a; border-radius: var(--dr-radius); color: #92400e; font-size: .78rem; line-height: 1.5; }
+  .dr-warn i { margin-top: 2px; }
+
+  /* ── Contact ── */
+  .dr-account-head {
+    display: flex; align-items: center; gap: 12px; padding: 13px 16px;
+    background: linear-gradient(100deg, var(--dr-soft), #fff); border-bottom: 1px solid var(--dr-line);
+  }
+  .dr-avatar {
+    display: grid; place-items: center; width: 42px; height: 42px; flex: 0 0 42px;
+    border-radius: 12px; background: var(--dr-brand); color: #fff; font-size: 1rem; font-weight: 800; letter-spacing: .02em; text-transform: uppercase;
+  }
+  .dr-account-role { display: block; color: var(--dr-muted); font-size: .66rem; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
+  .dr-account-name { display: block; color: var(--dr-ink); font-size: .95rem; font-weight: 800; letter-spacing: -.01em; overflow-wrap: anywhere; }
+  .dr-fact { display: flex; gap: 11px; padding: 12px 16px; border-bottom: 1px solid #f0f2ee; min-width: 0; }
+  .dr-fact:last-child { border-bottom: 0; }
+  .dr-fact > i { flex: 0 0 auto; margin-top: 2px; color: var(--dr-brand); font-size: .95rem; opacity: .85; }
+  .dr-fact-label { display: block; margin-bottom: 2px; color: var(--dr-muted); font-size: .64rem; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
+  .dr-fact-value { overflow-wrap: anywhere; color: #2a322e; font-size: .84rem; font-weight: 650; }
+  .dr-fact-value a { color: inherit; text-decoration: none; border-bottom: 1px dashed #b9c0bb; }
+  .dr-fact-value a:hover { color: var(--dr-brand); border-color: var(--dr-brand); }
+
+  /* ── Réservations du client ── */
+  .dr-resa { padding: 11px 13px; border: 1px solid var(--dr-line); border-radius: var(--dr-radius); background: #fff; margin-bottom: 9px; }
+  .dr-resa:last-child { margin-bottom: 0; }
+  .dr-resa-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+  .dr-resa-top strong { font-size: .84rem; font-weight: 800; }
+  .dr-resa-dates { margin-top: 3px; color: var(--dr-muted); font-size: .74rem; }
+  .dr-resa ul { margin: 8px 0 0; padding-left: 18px; font-size: .74rem; color: var(--dr-ink-2); }
+
+  /* ── Carte d'action ── */
+  .dr-action-card {
+    margin-bottom: 16px; padding: 18px; border: 1px solid var(--dr-brand-line); border-radius: var(--dr-radius);
+    background: linear-gradient(180deg, #fff, var(--dr-brand-soft)); box-shadow: var(--dr-shadow);
+  }
+  .dr-action-card.is-share { border-style: dashed; }
+  .dr-action-title { margin: 0; color: var(--dr-ink); font-size: .98rem; font-weight: 800; }
+  .dr-action-copy { margin: 6px 0 14px; color: var(--dr-muted); font-size: .76rem; line-height: 1.55; }
+  .dr-btn {
+    display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 44px;
+    border-radius: var(--dr-radius); font-size: .82rem; font-weight: 750; text-decoration: none; cursor: pointer;
+    transition: transform .15s, box-shadow .15s, background .15s, border-color .15s;
+  }
+  .dr-btn + .dr-btn, form + .dr-btn { margin-top: 9px; }
+  .dr-btn:hover { transform: translateY(-1px); }
+  .dr-btn:focus-visible { outline: 2px solid var(--dr-brand); outline-offset: 2px; }
+  .dr-btn-back { border: 1px solid #d9ded8; background: #fff; color: var(--dr-ink-2); }
+  .dr-btn-back:hover { border-color: #aeb8b0; background: var(--dr-soft); color: var(--dr-ink); }
+  .dr-btn-submit { border: 1px solid var(--dr-brand); background: var(--dr-brand); color: #fff; box-shadow: 0 6px 14px color-mix(in srgb, var(--dr-brand) 28%, transparent); }
+  .dr-btn-submit:hover { background: var(--dr-brand-deep); color: #fff; }
+  .dr-btn-danger { border: 1px solid #f0c4c4; background: #fff; color: #b42323; }
+  .dr-btn-danger:hover { background: #fdeaea; border-color: #e59a9a; color: #8f1a1a; }
+  .dr-btn-sm { min-height: 36px; width: auto; padding: 0 14px; font-size: .76rem; display: inline-flex; margin-top: 12px; }
+  .dr-actions-stack { display: grid; gap: 9px; }
+  .dr-actions-stack form { margin: 0; }
+  .dr-action-note { display: flex; gap: 8px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--dr-brand-line); color: var(--dr-muted); font-size: .72rem; line-height: 1.5; }
+  .dr-action-note i { flex: 0 0 auto; color: var(--dr-ok); }
+  .dr-extend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .dr-extend .dr-btn { width: auto; min-height: 34px; padding: 0 14px; font-size: .74rem; margin: 0; }
+  .dr-copy { display: flex; gap: 8px; }
+  .dr-copy input { flex: 1; min-width: 0; height: 42px; padding: 0 12px; border: 1px solid var(--dr-line); border-radius: var(--dr-radius); background: #fff; font-size: .78rem; color: var(--dr-ink-2); }
+  .dr-copy .dr-btn { width: auto; padding: 0 16px; margin: 0; }
+
+  .demande-recap select, .demande-recap .form-select { width: 100%; }
+  .demande-recap .form-label { font-size: .78rem; font-weight: 750; }
+
+  /* ── Responsive ── */
+  @media (max-width: 1199.98px) { .dr-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (max-width: 991.98px) {
+    .dr-grid { grid-template-columns: 1fr; }
+  }
   @media (max-width: 767.98px) {
-    .fd-flow { flex-direction: column; }
-    .fd-step { border-right: none; border-bottom: 1px solid var(--line); }
-    .fd-step:last-child { border-bottom: none; }
+    .dr-hero { padding: 16px; gap: 12px; flex-wrap: wrap; }
+    .dr-hero-title { font-size: 1.15rem; }
+    .dr-hero-icon { width: 42px; height: 42px; flex-basis: 42px; font-size: 1.15rem; }
+    .dr-steps { grid-template-columns: 1fr; }
+    .dr-step + .dr-step { border-left: 0; border-top: 1px solid var(--dr-line); }
+    .dr-panel-body { padding: 14px; }
+    .dr-table-head { display: none; }
+    .dr-place-list { border-radius: var(--dr-radius); }
+    .dr-place { grid-template-columns: 1fr; gap: 8px; }
   }
-
-  /* ═════════ Panneaux ═════════ */
-  .fd-panel { background: var(--paper); border: 1px solid var(--line); border-radius: 8px; margin-bottom: 22px; overflow: hidden; }
-  .fd-panel-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 16px 22px 0; }
-  .fd-panel-title { font-family: var(--display); font-size: 1.1rem; font-weight: 700; margin: 0; letter-spacing: -.01em; }
-  .fd-panel-title i { color: var(--brand); margin-right: 9px; }
-  .fd-badge { font-size: .8rem; font-weight: 700; color: var(--brand); background: rgba(147,46,43,.09); border-radius: 999px; padding: 3px 11px; font-variant-numeric: tabular-nums; }
-  .fd-panel-body { padding: 16px 22px 22px; }
-  .fd-hint { margin: 0; color: var(--muted); font-size: .88rem; line-height: 1.6; }
-
-  /* ═════════ Plaques d'emplacement ═════════ */
-  .fd-plates { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 12px; padding: 16px 22px 22px; }
-  .fd-plate { display: flex; align-items: stretch; border: 1px solid var(--line); border-radius: 10px; overflow: hidden; background: var(--paper); transition: border-color .15s, box-shadow .15s; }
-  .fd-plate:hover { border-color: var(--brand); box-shadow: 0 2px 10px rgba(22,26,34,.08); }
-  .fd-plate-key {
-    width: 54px; flex-shrink: 0; display: flex; align-items: center; justify-content: center;
-    background: var(--ink); color: #fff; font-family: var(--display); font-weight: 800; font-size: 1.5rem;
-  }
-  .fd-plate-key.is-screen { background: #4c1d95; font-size: 1.25rem; }
-  .fd-plate-main { padding: 11px 14px; min-width: 0; }
-  .fd-plate-code { font-weight: 700; font-size: .95rem; line-height: 1.25; }
-  .fd-plate-kind { font-size: .82rem; color: var(--muted); }
-  .fd-plate-loc { font-size: .8rem; color: var(--muted); margin-top: 3px; }
-  .fd-plate-loc i { color: var(--brand); margin-right: 4px; }
-  .fd-empty { padding: 26px 22px 30px; text-align: center; color: var(--muted); }
-  .fd-empty i { display: block; font-size: 1.8rem; opacity: .35; margin-bottom: 6px; }
-
-  /* ═════════ Lignes d'info ═════════ */
-  .fd-rows { margin: 12px 0 0; padding: 0; }
-  .fd-row { display: flex; align-items: flex-start; gap: 12px; padding: 12px 22px; border-top: 1px solid var(--line); font-size: .9rem; }
-  .fd-row:first-child { border-top: none; }
-  .fd-row > i { color: var(--brand); width: 18px; text-align: center; margin-top: 2px; flex-shrink: 0; }
-  .fd-row-label { color: var(--muted); flex: 0 0 auto; min-width: 118px; }
-  .fd-row-value { font-weight: 600; margin-left: auto; text-align: right; min-width: 0; overflow-wrap: anywhere; }
-  .fd-row-value a { color: var(--brand); text-decoration: none; }
-  .fd-row-value a:hover { text-decoration: underline; }
-  .fd-row.is-stack .fd-row-value { margin-left: 0; text-align: left; }
-
-  /* ═════════ Texte libre ═════════ */
-  .fd-text { margin: 0; font-size: .95rem; line-height: 1.7; white-space: pre-wrap; max-width: 72ch; }
-  .fd-note { background: #fffbeb; border-left: 4px solid #f59e0b; border-radius: 0 8px 8px 0; padding: 14px 18px; }
-
-  .fd-warn { display: flex; gap: 10px; padding: 12px 14px; background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; color: #92400e; font-size: .86rem; line-height: 1.5; }
-  .fd-warn i { margin-top: 2px; }
-
-  /* ═════════ Panneau d'action ═════════ */
-  .fd-action { border: 2px solid var(--st); }
-  .fd-action .fd-panel-head { padding-bottom: 0; }
-  .fd-share { border-style: dashed; border-color: var(--brand); }
-
-  .fd select, .fd .form-select { width: 100%; }
-  .fd :focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+  @media (max-width: 575.98px) { .dr-kpis { grid-template-columns: 1fr; } }
 </style>
 {% endblock %}
 
 {% block content %}
-<div class="fd fd-st-{{ demande.statut }}">
+<div class="demande-recap dr-st-{{ demande.statut }}">
 
   {# ═════════ Bandeau ═════════ #}
-  <header class="fd-band">
-    <div class="fd-band-top">
-      <div>
-        <h1 class="fd-ref">{{ demande.reference }}</h1>
-        <p class="fd-who"><b>{{ demande.nom_contact }}</b>{% if demande.societe %} · {{ demande.societe }}{% endif %}</p>
-      </div>
-      <span class="fd-chip"><i class="bi {{ demande.get_statut_icon }}"></i>{{ demande.get_statut_display }}</span>
+  <header class="dr-hero">
+    <span class="dr-hero-icon"><i class="bi bi-file-earmark-text"></i></span>
+    <div class="dr-hero-main">
+      <p class="dr-hero-kicker">Demande client</p>
+      <h1 class="dr-hero-title">{{ demande.reference }}</h1>
+      <p class="dr-hero-sub"><b>{{ demande.nom_contact }}</b>{% if demande.societe %} · {{ demande.societe }}{% endif %}</p>
     </div>
-    <div class="fd-facts">
-      <div class="fd-fact"><span>Période souhaitée</span><strong>{{ demande.date_debut_souhaitee|date:"d/m/Y" }} → {{ demande.date_fin_souhaitee|date:"d/m/Y" }}</strong></div>
-      <div class="fd-fact"><span>Durée</span><strong>{{ demande.duree_jours }} jour{{ demande.duree_jours|pluralize }}</strong></div>
-      <div class="fd-fact"><span>Emplacements</span><strong>{{ demande.nb_emplacements }}</strong></div>
-      <div class="fd-fact"><span>Reçue le</span><strong>{{ demande.created_at|date:"d/m/Y à H:i" }}</strong></div>
-    </div>
+    <span class="dr-chip-status"><i class="bi {{ demande.get_statut_icon }}"></i>{{ demande.get_statut_display }}</span>
   </header>
 
   {# ═════════ Parcours de la demande ═════════ #}
-  <ol class="fd-flow" style="list-style:none;padding:0" aria-label="Avancement de la demande">
-    <li class="fd-step {% if demande.statut == 'brouillon' or demande.statut == 'nouvelle' %}is-current{% else %}is-done{% endif %}">
-      <span class="fd-step-dot"><i class="bi {% if demande.statut == 'brouillon' or demande.statut == 'nouvelle' %}bi-inbox{% else %}bi-check-lg{% endif %}"></i></span>
-      <div>
-        <b>{% if demande.statut == 'brouillon' %}Brouillon client{% else %}Reçue{% endif %}</b>
+  <nav class="dr-steps" aria-label="Avancement de la demande">
+    <div class="dr-step {% if demande.statut == 'brouillon' or demande.statut == 'nouvelle' %}is-current{% else %}is-done{% endif %}"{% if demande.statut == 'brouillon' or demande.statut == 'nouvelle' %} aria-current="step"{% endif %}>
+      <span class="dr-step-number">{% if demande.statut == 'brouillon' or demande.statut == 'nouvelle' %}1{% else %}<i class="bi bi-check-lg"></i>{% endif %}</span>
+      <span class="dr-step-label">{% if demande.statut == 'brouillon' %}Brouillon client{% else %}Reçue{% endif %}
         <small>{% if demande.statut == 'brouillon' %}Le client doit confirmer{% else %}{{ demande.created_at|date:"d/m/Y" }}{% endif %}</small>
-      </div>
-    </li>
-    <li class="fd-step {% if demande.statut == 'en_cours' %}is-current{% elif demande.statut == 'validee' or demande.statut == 'refusee' %}is-done{% endif %}">
-      <span class="fd-step-dot"><i class="bi {% if demande.statut == 'validee' or demande.statut == 'refusee' %}bi-check-lg{% else %}bi-hourglass-split{% endif %}"></i></span>
-      <div><b>En traitement</b><small>Étude par l’équipe</small></div>
-    </li>
-    <li class="fd-step {% if demande.statut == 'validee' or demande.statut == 'refusee' %}is-current{% endif %}">
-      <span class="fd-step-dot"><i class="bi {% if demande.statut == 'validee' %}bi-check2-circle{% elif demande.statut == 'refusee' %}bi-x-circle{% else %}bi-flag{% endif %}"></i></span>
-      <div>
-        <b>{% if demande.statut == 'validee' %}Validée{% elif demande.statut == 'refusee' %}Refusée{% else %}Décision{% endif %}</b>
+      </span>
+    </div>
+    <div class="dr-step {% if demande.statut == 'en_cours' %}is-current{% elif demande.statut == 'validee' or demande.statut == 'refusee' %}is-done{% endif %}"{% if demande.statut == 'en_cours' %} aria-current="step"{% endif %}>
+      <span class="dr-step-number">{% if demande.statut == 'validee' or demande.statut == 'refusee' %}<i class="bi bi-check-lg"></i>{% else %}2{% endif %}</span>
+      <span class="dr-step-label">En traitement<small>Étude par l’équipe</small></span>
+    </div>
+    <div class="dr-step {% if demande.statut == 'validee' %}is-final-validee{% elif demande.statut == 'refusee' %}is-final-refusee{% endif %}"{% if demande.statut == 'validee' or demande.statut == 'refusee' %} aria-current="step"{% endif %}>
+      <span class="dr-step-number">{% if demande.statut == 'validee' %}<i class="bi bi-check2-circle"></i>{% elif demande.statut == 'refusee' %}<i class="bi bi-x-circle"></i>{% else %}3{% endif %}</span>
+      <span class="dr-step-label">{% if demande.statut == 'validee' %}Validée{% elif demande.statut == 'refusee' %}Refusée{% else %}Décision{% endif %}
         <small>{% if demande.traite_le %}{{ demande.traite_le|date:"d/m/Y" }}{% else %}Valider ou refuser{% endif %}</small>
-      </div>
-    </li>
-  </ol>
+      </span>
+    </div>
+  </nav>
 
-  <div class="row g-4">
+  {# ═════════ Indicateurs clés ═════════ #}
+  <section class="dr-kpis" aria-label="Résumé de la demande">
+    <div class="dr-kpi">
+      <span class="dr-kpi-icon"><i class="bi bi-calendar-range"></i></span>
+      <div>
+        <span class="dr-kpi-label">Période souhaitée</span>
+        <span class="dr-kpi-value">{{ demande.date_debut_souhaitee|date:"d/m/Y" }} <small>→</small> {{ demande.date_fin_souhaitee|date:"d/m/Y" }}</span>
+      </div>
+    </div>
+    <div class="dr-kpi">
+      <span class="dr-kpi-icon"><i class="bi bi-hourglass-split"></i></span>
+      <div>
+        <span class="dr-kpi-label">Durée</span>
+        <span class="dr-kpi-value">{{ demande.duree_jours }} <small>jour{{ demande.duree_jours|pluralize }}</small></span>
+      </div>
+    </div>
+    <div class="dr-kpi">
+      <span class="dr-kpi-icon"><i class="bi bi-signpost-2"></i></span>
+      <div>
+        <span class="dr-kpi-label">Emplacements</span>
+        <span class="dr-kpi-value">{{ demande.nb_emplacements }}</span>
+      </div>
+    </div>
+    <div class="dr-kpi">
+      <span class="dr-kpi-icon"><i class="bi bi-inbox"></i></span>
+      <div>
+        <span class="dr-kpi-label">Reçue le</span>
+        <span class="dr-kpi-value">{{ demande.created_at|date:"d/m/Y" }} <small>à {{ demande.created_at|date:"H:i" }}</small></span>
+      </div>
+    </div>
+  </section>
+
+  <div class="dr-grid">
 
     {# ═════════ Colonne principale ═════════ #}
-    <div class="col-lg-8 order-lg-1 order-2">
+    <div>
 
-      <section class="fd-panel">
-        <div class="fd-panel-head">
-          <h2 class="fd-panel-title"><i class="bi bi-geo-alt-fill"></i>Emplacements demandés</h2>
-          <span class="fd-badge">{{ demande.nb_emplacements }}</span>
-        </div>
-        {% if demande.nb_emplacements == 0 %}
-          <div class="fd-empty"><i class="bi bi-inbox"></i>Aucun emplacement enregistré.</div>
-        {% else %}
-        <div class="fd-plates">
-          {% for face in demande.faces_souhaitees.all %}
-          <div class="fd-plate">
-            <div class="fd-plate-key" title="Face {{ face.label }}">{{ face.label }}</div>
-            <div class="fd-plate-main">
-              <div class="fd-plate-code">{{ face.support.code }}</div>
-              <div class="fd-plate-loc"><i class="bi bi-geo-alt"></i>{{ face.support.ville }}{% if face.support.quartier %} · {{ face.support.nom }}{% endif %}</div>
+      <section class="dr-panel">
+        <div class="dr-panel-head">
+          <div class="dr-panel-heading">
+            <span class="dr-panel-icon"><i class="bi bi-geo-alt"></i></span>
+            <div>
+              <h2 class="dr-panel-title">Emplacements demandés</h2>
+              <p class="dr-panel-caption">Faces et écrans souhaités par le client</p>
             </div>
           </div>
-          {% endfor %}
-          {% for support in demande.supports_souhaites.all %}
-          <div class="fd-plate">
-            <div class="fd-plate-key is-screen" title="Écran numérique"><i class="bi bi-display"></i></div>
-            <div class="fd-plate-main">
-              <div class="fd-plate-code">{{ support.code }}</div>
-              <div class="fd-plate-kind">Écran numérique</div>
-              <div class="fd-plate-loc"><i class="bi bi-geo-alt"></i>{{ support.ville }}{% if support.quartier %} · {{ support.quartier }}{% endif %}</div>
-            </div>
-          </div>
-          {% endfor %}
+          <span class="dr-pill is-brand">{{ demande.nb_emplacements }} emplacement{{ demande.nb_emplacements|pluralize }}</span>
         </div>
-        {% endif %}
+        <div class="dr-panel-body">
+          {% if demande.nb_emplacements == 0 %}
+            <div class="dr-empty"><i class="bi bi-inbox"></i>Aucun emplacement enregistré.</div>
+          {% else %}
+          <div class="dr-table-head" aria-hidden="true">
+            <span>Code</span><span>Support &amp; lieu</span><span>Type</span>
+          </div>
+          <div class="dr-place-list">
+            {% for face in demande.faces_souhaitees.all %}
+            <div class="dr-place">
+              <div class="dr-place-id">
+                <span class="dr-place-icon"><i class="bi bi-signpost-2"></i></span>
+                <div>
+                  <span class="dr-place-code">{{ face.support.code }}</span>
+                  <span class="dr-face-chip">Face {{ face.label }}</span>
+                </div>
+              </div>
+              <div>
+                <div class="dr-place-name">{{ face.support.nom }}</div>
+                {% if face.support.quartier or face.support.ville %}
+                  <div class="dr-place-loc"><i class="bi bi-geo-alt-fill"></i>{{ face.support.quartier }}{% if face.support.quartier and face.support.ville %} · {% endif %}{{ face.support.ville }}</div>
+                {% endif %}
+              </div>
+              <div><span class="dr-chip is-cat"><i class="bi bi-signpost-2"></i> Panneau</span></div>
+            </div>
+            {% endfor %}
+            {% for support in demande.supports_souhaites.all %}
+            <div class="dr-place">
+              <div class="dr-place-id">
+                <span class="dr-place-icon is-screen"><i class="bi bi-display"></i></span>
+                <div>
+                  <span class="dr-place-code">{{ support.code }}</span>
+                </div>
+              </div>
+              <div>
+                <div class="dr-place-name">{{ support.nom }}</div>
+                {% if support.quartier or support.ville %}
+                  <div class="dr-place-loc"><i class="bi bi-geo-alt-fill"></i>{{ support.quartier }}{% if support.quartier and support.ville %} · {% endif %}{{ support.ville }}</div>
+                {% endif %}
+              </div>
+              <div><span class="dr-chip is-screen"><i class="bi bi-display"></i> Écran numérique</span></div>
+            </div>
+            {% endfor %}
+          </div>
+          {% endif %}
+        </div>
       </section>
 
-      <section class="fd-panel">
-        <div class="fd-panel-head"><h2 class="fd-panel-title"><i class="bi bi-calendar3"></i>Période et projet</h2></div>
-        <div class="fd-rows">
-          <div class="fd-row"><i class="bi bi-calendar-range"></i><span class="fd-row-label">Période souhaitée</span><span class="fd-row-value">{{ demande.date_debut_souhaitee|date:"d/m/Y" }} → {{ demande.date_fin_souhaitee|date:"d/m/Y" }}</span></div>
-          <div class="fd-row"><i class="bi bi-hourglass-split"></i><span class="fd-row-label">Durée</span><span class="fd-row-value">{{ demande.duree_jours }} jour{{ demande.duree_jours|pluralize }}</span></div>
+      <section class="dr-panel">
+        <div class="dr-panel-head">
+          <div class="dr-panel-heading">
+            <span class="dr-panel-icon"><i class="bi bi-calendar3"></i></span>
+            <div>
+              <h2 class="dr-panel-title">Période et projet</h2>
+              <p class="dr-panel-caption">Dates de diffusion souhaitées</p>
+            </div>
+          </div>
+        </div>
+        <div class="dr-panel-body">
+          <div class="dr-line"><span><i class="bi bi-calendar-range"></i>Période souhaitée</span><strong>{{ demande.date_debut_souhaitee|date:"d/m/Y" }} → {{ demande.date_fin_souhaitee|date:"d/m/Y" }}</strong></div>
+          <div class="dr-line"><span><i class="bi bi-hourglass-split"></i>Durée</span><strong>{{ demande.duree_jours }} jour{{ demande.duree_jours|pluralize }}</strong></div>
           {% if demande.nom_campagne %}
-          <div class="fd-row"><i class="bi bi-megaphone"></i><span class="fd-row-label">Campagne / projet</span><span class="fd-row-value">{{ demande.nom_campagne }}</span></div>
+          <div class="dr-line"><span><i class="bi bi-megaphone"></i>Campagne / projet</span><strong>{{ demande.nom_campagne }}</strong></div>
           {% endif %}
         </div>
       </section>
 
       {% if demande.message %}
-      <section class="fd-panel">
-        <div class="fd-panel-head"><h2 class="fd-panel-title"><i class="bi bi-chat-left-text-fill"></i>Message du client</h2></div>
-        <div class="fd-panel-body"><p class="fd-text">{{ demande.message }}</p></div>
+      <section class="dr-panel">
+        <div class="dr-panel-head">
+          <div class="dr-panel-heading">
+            <span class="dr-panel-icon"><i class="bi bi-chat-left-text"></i></span>
+            <div><h2 class="dr-panel-title">Message du client</h2></div>
+          </div>
+        </div>
+        <div class="dr-panel-body"><p class="dr-text">{{ demande.message }}</p></div>
       </section>
       {% endif %}
 
       {% if demande.notes_staff %}
-      <section class="fd-panel">
-        <div class="fd-panel-head"><h2 class="fd-panel-title"><i class="bi bi-sticky-fill" style="color:#d97706"></i>Notes internes</h2></div>
-        <div class="fd-panel-body"><p class="fd-text fd-note">{{ demande.notes_staff }}</p></div>
+      <section class="dr-panel">
+        <div class="dr-panel-head">
+          <div class="dr-panel-heading">
+            <span class="dr-panel-icon" style="background:#fef3c7;color:#d97706"><i class="bi bi-sticky"></i></span>
+            <div><h2 class="dr-panel-title">Notes internes</h2></div>
+          </div>
+        </div>
+        <div class="dr-panel-body"><p class="dr-text is-note">{{ demande.notes_staff }}</p></div>
       </section>
       {% endif %}
 
     </div>
 
     {# ═════════ Colonne latérale ═════════ #}
-    <div class="col-lg-4 order-lg-2 order-1">
+    <aside>
 
-      <section class="fd-panel fd-action">
-        <div class="fd-panel-head"><h2 class="fd-panel-title"><i class="bi bi-check2-square"></i>Traitement</h2></div>
-        <div class="fd-panel-body">
-          {% if demande.peut_etre_traitee %}
-            <div class="d-grid gap-2">
-              <form method="post" action="{% url 'demande_valider' demande.uuid %}"
-                    onsubmit="return confirm('Confirmer la création d’une réservation pour cette demande ?');">
-                {% csrf_token %}
-                {% if demande.supports_souhaites.exists %}
-                  <div class="fd-warn"><i class="bi bi-exclamation-triangle-fill"></i><span>Cette demande comprend un écran numérique. Son traitement doit être fait manuellement.</span></div>
-                {% else %}
-                  <a href="{% url 'campagne_create' %}?demande={{ demande.uuid }}" class="btn btn-outline-primary w-100 py-2 fw-semibold mb-2">
-                    <i class="bi bi-megaphone me-1"></i>Créer une campagne
-                  </a>
-                  <button type="submit" class="btn btn-disponible w-100 py-2 fw-semibold">
-                    <i class="bi bi-calendar-check me-1"></i>Créer une réservation
-                  </button>
-
-                  <p class="fd-hint mb-0">Les réservations existantes restent inchangées. Pour une campagne, vous pourrez choisir une réservation du même client et reprendre les faces réservées.</p>
-                {% endif %}
-              </form>
-              <button type="button" class="btn btn-panne w-100 py-2 fw-semibold" data-bs-toggle="modal" data-bs-target="#modalRefus">
-                <i class="bi bi-x-circle me-1"></i>Refuser la demande
-              </button>
-            </div>
-          {% else %}
-            {% if demande.statut == 'brouillon' %}
-              <p class="fd-hint">Le client doit vérifier et confirmer cette demande avant qu’elle puisse être traitée comme réservation.</p>
-            {% elif demande.statut == 'en_cours' and demande.token_partage %}
-              <p class="fd-hint">La demande est en cours de traitement. Vous pouvez la valider ou la refuser, ou autoriser le client à la modifier.</p>
-            {% else %}
-              <p class="fd-hint">
-                Cette demande a déjà été traitée
-                {% if demande.traite_par %} par <strong>{{ demande.traite_par.get_full_name|default:demande.traite_par.username }}</strong>{% endif %}
-                {% if demande.traite_le %} le {{ demande.traite_le|date:"d/m/Y à H:i" }}{% endif %}.
-              </p>
-            {% endif %}
-            {% if demande.reservation %}
-            <a href="{% url 'reservation_detail_direct' pk=demande.reservation.pk %}" class="btn btn-sm btn-outline-secondary mt-3">
-              <i class="bi bi-arrow-up-right-square me-1"></i>Voir la réservation {{ demande.reservation.reference }}
-            </a>
-            {% endif %}
-            {% if demande.campagne %}
-            <a href="{% url 'campagne_detail' pk=demande.campagne.pk %}" class="btn btn-sm btn-outline-primary mt-3">
-              <i class="bi bi-arrow-up-right-square me-1"></i>Voir la campagne {{ demande.campagne.reference }}
-            </a>
-            {% endif %}
+      {# ── Traitement ── #}
+      <section class="dr-action-card">
+        <h2 class="dr-action-title">Traitement</h2>
+        {% if demande.peut_etre_traitee %}
+          <p class="dr-action-copy">Validez la demande pour créer la réservation, ou refusez-la avec un motif.</p>
+          <div class="dr-actions-stack">
+            <form method="post" action="{% url 'demande_valider' demande.uuid %}"
+                  onsubmit="return confirm('Confirmer la création d’une réservation pour cette demande ?');">
+              {% csrf_token %}
+              {% if demande.supports_souhaites.exists %}
+                <div class="dr-warn"><i class="bi bi-exclamation-triangle-fill"></i><span>Cette demande comprend un écran numérique. Son traitement doit être fait manuellement.</span></div>
+              {% else %}
+                <a href="{% url 'campagne_create' %}?demande={{ demande.uuid }}" class="dr-btn dr-btn-back">
+                  <i class="bi bi-megaphone"></i>Créer une campagne
+                </a>
+                <button type="submit" class="dr-btn dr-btn-submit" style="margin-top:9px">
+                  <i class="bi bi-calendar-check"></i>Créer une réservation
+                </button>
+              {% endif %}
+            </form>
+            <button type="button" class="dr-btn dr-btn-danger" data-bs-toggle="modal" data-bs-target="#modalRefus">
+              <i class="bi bi-x-circle"></i>Refuser la demande
+            </button>
+          </div>
+          {% if not demande.supports_souhaites.exists %}
+          <div class="dr-action-note">
+            <i class="bi bi-info-circle-fill"></i>
+            <span>Les réservations existantes restent inchangées. Pour une campagne, vous pourrez choisir une réservation du même client et reprendre les faces réservées.</span>
+          </div>
           {% endif %}
-        </div>
+        {% else %}
+          {% if demande.statut == 'brouillon' %}
+            <p class="dr-action-copy mb-0">Le client doit vérifier et confirmer cette demande avant qu’elle puisse être traitée comme réservation.</p>
+          {% elif demande.statut == 'en_cours' and demande.token_partage %}
+            <p class="dr-action-copy mb-0">La demande est en cours de traitement. Vous pouvez la valider ou la refuser, ou autoriser le client à la modifier.</p>
+          {% else %}
+            <p class="dr-action-copy mb-0">
+              Cette demande a déjà été traitée
+              {% if demande.traite_par %} par <strong>{{ demande.traite_par.get_full_name|default:demande.traite_par.username }}</strong>{% endif %}
+              {% if demande.traite_le %} le {{ demande.traite_le|date:"d/m/Y à H:i" }}{% endif %}.
+            </p>
+          {% endif %}
+          {% if demande.reservation %}
+          <a href="{% url 'reservation_detail_direct' pk=demande.reservation.pk %}" class="dr-btn dr-btn-back dr-btn-sm">
+            <i class="bi bi-arrow-up-right-square"></i>Voir la réservation {{ demande.reservation.reference }}
+          </a>
+          {% endif %}
+          {% if demande.campagne %}
+          <a href="{% url 'campagne_detail' pk=demande.campagne.pk %}" class="dr-btn dr-btn-back dr-btn-sm">
+            <i class="bi bi-arrow-up-right-square"></i>Voir la campagne {{ demande.campagne.reference }}
+          </a>
+          {% endif %}
+        {% endif %}
       </section>
 
       {% if demande.date_debut_blocage and demande.date_fin_blocage %}
-      <section class="fd-panel">
-        <div class="fd-panel-head"><h2 class="fd-panel-title"><i class="bi bi-shield-lock-fill"></i>Blocage temporaire</h2></div>
-        <div class="fd-panel-body">
-          <div class="fd-rows">
-            <div class="fd-row"><i class="bi bi-calendar-check"></i><span class="fd-row-label">Début</span><span class="fd-row-value">{{ demande.date_debut_blocage|date:"d/m/Y" }}</span></div>
-            <div class="fd-row"><i class="bi bi-calendar-x"></i><span class="fd-row-label">Fin</span><span class="fd-row-value">{{ demande.date_fin_blocage|date:"d/m/Y" }}</span></div>
+      <section class="dr-panel">
+        <div class="dr-panel-head">
+          <div class="dr-panel-heading">
+            <span class="dr-panel-icon"><i class="bi bi-shield-lock"></i></span>
+            <div>
+              <h2 class="dr-panel-title">Blocage temporaire</h2>
+              <p class="dr-panel-caption">Emplacements retenus pour le client</p>
+            </div>
           </div>
+        </div>
+        <div class="dr-panel-body">
+          <div class="dr-line"><span><i class="bi bi-calendar-check"></i>Début</span><strong>{{ demande.date_debut_blocage|date:"d/m/Y" }}</strong></div>
+          <div class="dr-line"><span><i class="bi bi-calendar-x"></i>Fin</span><strong>{{ demande.date_fin_blocage|date:"d/m/Y" }}</strong></div>
           {% if user.is_staff_regie_role and demande.statut != 'validee' and demande.statut != 'refusee' %}
-          <div class="mt-3">
-            <p class="fd-hint mb-2">Le blocage est actif tant que les échanges avec le client ne sont pas terminés.</p>
-            <form method="post" action="{% url 'demande_prolonger_blocage' demande.uuid %}" class="d-flex flex-wrap gap-2">
-              {% csrf_token %}
-              <button type="submit" name="jours" value="3" class="btn btn-outline-warning btn-sm">+3 jours</button>
-              <button type="submit" name="jours" value="5" class="btn btn-outline-warning btn-sm">+5 jours</button>
-              <button type="submit" name="jours" value="7" class="btn btn-outline-warning btn-sm">+7 jours</button>
-            </form>
-          </div>
+          <p class="dr-hint" style="margin-top:14px">Le blocage est actif tant que les échanges avec le client ne sont pas terminés.</p>
+          <form method="post" action="{% url 'demande_prolonger_blocage' demande.uuid %}" class="dr-extend">
+            {% csrf_token %}
+            <button type="submit" name="jours" value="3" class="dr-btn dr-btn-back">+3 jours</button>
+            <button type="submit" name="jours" value="5" class="dr-btn dr-btn-back">+5 jours</button>
+            <button type="submit" name="jours" value="7" class="dr-btn dr-btn-back">+7 jours</button>
+          </form>
           {% endif %}
         </div>
       </section>
       {% endif %}
 
       {% if reservations_client_periode %}
-      <section class="fd-panel">
-        <div class="fd-panel-head"><h2 class="fd-panel-title"><i class="bi bi-calendar2-range"></i>Réservations du client sur cette période</h2></div>
-        <div class="fd-panel-body">
-          <p class="fd-hint">Consultation uniquement : ces réservations ne seront pas modifiées par le traitement de cette demande.</p>
+      <section class="dr-panel">
+        <div class="dr-panel-head">
+          <div class="dr-panel-heading">
+            <span class="dr-panel-icon"><i class="bi bi-calendar2-range"></i></span>
+            <div>
+              <h2 class="dr-panel-title">Réservations du client</h2>
+              <p class="dr-panel-caption">Sur cette période · consultation uniquement</p>
+            </div>
+          </div>
+        </div>
+        <div class="dr-panel-body">
           {% for reservation in reservations_client_periode %}
-            <div class="border rounded-3 p-3 mb-2">
-              <div class="d-flex justify-content-between gap-2">
+            <div class="dr-resa">
+              <div class="dr-resa-top">
                 <strong>{{ reservation.reference }}</strong>
-                <span class="badge text-bg-light">{{ reservation.get_statut_display }}</span>
+                <span class="dr-pill">{{ reservation.get_statut_display }}</span>
               </div>
-              <div class="small text-muted mt-1">{{ reservation.date_debut|date:"d/m/Y" }} – {{ reservation.date_fin|date:"d/m/Y" }}</div>
-              <ul class="small mb-0 mt-2 ps-3">
+              <div class="dr-resa-dates">{{ reservation.date_debut|date:"d/m/Y" }} – {{ reservation.date_fin|date:"d/m/Y" }}</div>
+              <ul>
                 {% for ligne in reservation.lignes.all %}
                   <li>{{ ligne.support.code }}{% if ligne.face %} — Face {{ ligne.face.label }}{% endif %}</li>
                 {% empty %}
@@ -378,85 +597,115 @@
               </ul>
             </div>
           {% endfor %}
+          <p class="dr-hint" style="margin-top:12px">Ces réservations ne seront pas modifiées par le traitement de cette demande.</p>
         </div>
       </section>
       {% endif %}
 
       {% if share_url %}
-      <section class="fd-panel fd-share">
-        <div class="fd-panel-head"><h2 class="fd-panel-title"><i class="bi bi-share-fill"></i>Partager avec le client</h2></div>
-        <div class="fd-panel-body">
-          <p class="fd-hint mb-3">Envoyez ce lien au client. Il pourra modifier les emplacements, les dates, le projet et ses coordonnées, puis confirmer la demande. La réservation restera à valider par le staff.</p>
-          <div class="input-group">
-            <input type="text" class="form-control" id="demande-share-url" value="{{ share_url }}" readonly>
-            <button type="button" class="btn btn-primary" id="copy-demande-link"><i class="bi bi-clipboard me-1"></i>Copier</button>
-          </div>
+      <section class="dr-action-card is-share">
+        <h2 class="dr-action-title"><i class="bi bi-share-fill me-2" style="color:var(--dr-brand)"></i>Partager avec le client</h2>
+        <p class="dr-action-copy">Envoyez ce lien au client. Il pourra modifier les emplacements, les dates, le projet et ses coordonnées, puis confirmer la demande. La réservation restera à valider par le staff.</p>
+        <div class="dr-copy">
+          <input type="text" id="demande-share-url" value="{{ share_url }}" readonly>
+          <button type="button" class="dr-btn dr-btn-submit" id="copy-demande-link"><i class="bi bi-clipboard"></i>Copier</button>
         </div>
       </section>
       {% endif %}
 
-      <section class="fd-panel">
-        <div class="fd-panel-head"><h2 class="fd-panel-title"><i class="bi bi-person-fill"></i>Contact</h2></div>
-        <div class="fd-rows">
-          <div class="fd-row is-stack"><i class="bi bi-person"></i><span class="fd-row-value">{{ demande.nom_contact }}{% if demande.societe %}<br><span style="font-weight:400;color:var(--muted)">{{ demande.societe }}</span>{% endif %}</span></div>
-          <div class="fd-row is-stack"><i class="bi bi-envelope"></i><span class="fd-row-value"><a href="mailto:{{ demande.email }}">{{ demande.email }}</a></span></div>
-          <div class="fd-row is-stack"><i class="bi bi-telephone"></i><span class="fd-row-value"><a href="tel:{{ demande.telephone }}">{{ demande.telephone }}</a></span></div>
-          <div class="fd-row">
-            <i class="bi bi-chat-check"></i><span class="fd-row-label" style="min-width:0">Contact accepté</span>
-            <span class="fd-row-value">
-              {% if demande.accepte_contact %}
-                <span class="badge badge-status bs-disponible"><i class="bi bi-check2 me-1"></i>Oui</span>
-              {% else %}
-                <span class="badge badge-status bs-panne"><i class="bi bi-x me-1"></i>Non</span>
-              {% endif %}
-            </span>
+      {# ── Contact ── #}
+      <section class="dr-panel">
+        <div class="dr-panel-head">
+          <div class="dr-panel-heading">
+            <span class="dr-panel-icon"><i class="bi bi-person-vcard"></i></span>
+            <div><h2 class="dr-panel-title">Contact</h2></div>
+          </div>
+          {% if demande.accepte_contact %}
+            <span class="dr-pill is-ok"><i class="bi bi-check2"></i>Contact accepté</span>
+          {% else %}
+            <span class="dr-pill is-off"><i class="bi bi-x"></i>Contact refusé</span>
+          {% endif %}
+        </div>
+        <div class="dr-account-head">
+          <span class="dr-avatar">{{ demande.nom_contact|slice:":2"|default:"?" }}</span>
+          <div>
+            <span class="dr-account-role">Demandeur</span>
+            <span class="dr-account-name">{{ demande.nom_contact }}</span>
+            {% if demande.societe %}<span class="dr-muted" style="font-size:.78rem">{{ demande.societe }}</span>{% endif %}
           </div>
         </div>
-        <div style="height:10px"></div>
+        <div>
+          <div class="dr-fact">
+            <i class="bi bi-envelope"></i>
+            <div><span class="dr-fact-label">E-mail</span><div class="dr-fact-value">{% if demande.email %}<a href="mailto:{{ demande.email }}">{{ demande.email }}</a>{% else %}—{% endif %}</div></div>
+          </div>
+          <div class="dr-fact">
+            <i class="bi bi-telephone"></i>
+            <div><span class="dr-fact-label">Téléphone</span><div class="dr-fact-value">{% if demande.telephone %}<a href="tel:{{ demande.telephone }}">{{ demande.telephone }}</a>{% else %}—{% endif %}</div></div>
+          </div>
+          {% if demande.whatsapp %}
+          <div class="dr-fact">
+            <i class="bi bi-whatsapp" style="color:#25d366"></i>
+            <div><span class="dr-fact-label">WhatsApp</span><div class="dr-fact-value">{{ demande.whatsapp }}</div></div>
+          </div>
+          {% endif %}
+        </div>
       </section>
 
       {% if user.is_staff_regie_role %}
-      <section class="fd-panel">
-        <div class="fd-panel-head"><h2 class="fd-panel-title"><i class="bi bi-camera-fill"></i>Campagne et piges</h2></div>
-        <div class="fd-panel-body">
+      <section class="dr-panel">
+        <div class="dr-panel-head">
+          <div class="dr-panel-heading">
+            <span class="dr-panel-icon"><i class="bi bi-camera"></i></span>
+            <div>
+              <h2 class="dr-panel-title">Campagne et piges</h2>
+              <p class="dr-panel-caption">Association à une campagne du client</p>
+            </div>
+          </div>
+        </div>
+        <div class="dr-panel-body">
           {% if demande.campagne and demande.campagne.lien_piges %}
-            <a href="{{ demande.campagne.lien_piges }}" target="_blank" rel="noopener noreferrer" class="btn btn-sm btn-outline-primary mb-3">
-              <i class="bi bi-folder2-open me-1"></i>Ouvrir les piges de la campagne
+            <a href="{{ demande.campagne.lien_piges }}" target="_blank" rel="noopener noreferrer" class="dr-btn dr-btn-back" style="margin-bottom:14px">
+              <i class="bi bi-folder2-open"></i>Ouvrir les piges de la campagne
             </a>
           {% endif %}
           {% if demande.client or demande.reservation %}
             <form method="post" action="{% url 'demande_associer_campagne' demande.uuid %}">
               {% csrf_token %}
-              <label class="form-label fw-semibold" for="{{ campagne_form.campagne.id_for_label }}">{{ campagne_form.campagne.label }}</label>
+              <label class="form-label" for="{{ campagne_form.campagne.id_for_label }}">{{ campagne_form.campagne.label }}</label>
               {{ campagne_form.campagne }}
               {% for error in campagne_form.campagne.errors %}
                 <div class="invalid-feedback d-block">{{ error }}</div>
               {% endfor %}
               <div class="form-text mb-3">Seules les campagnes du client associé sont proposées. Le lien Drive apparaîtra dans son suivi s'il existe.</div>
-              <button type="submit" class="btn btn-primary btn-sm"><i class="bi bi-link-45deg me-1"></i>Enregistrer l'association</button>
+              <button type="submit" class="dr-btn dr-btn-submit"><i class="bi bi-link-45deg"></i>Enregistrer l'association</button>
             </form>
           {% else %}
-            <p class="fd-hint">Associez d'abord cette demande à un client pour sélectionner l'une de ses campagnes.</p>
+            <p class="dr-hint">Associez d'abord cette demande à un client pour sélectionner l'une de ses campagnes.</p>
           {% endif %}
         </div>
       </section>
       {% endif %}
 
-      <section class="fd-panel">
-        <div class="fd-panel-head"><h2 class="fd-panel-title"><i class="bi bi-clock-history"></i>Historique</h2></div>
-        <div class="fd-rows">
-          <div class="fd-row"><span class="fd-row-label" style="min-width:0">Reçue le</span><span class="fd-row-value">{{ demande.created_at|date:"d/m/Y H:i" }}</span></div>
+      <section class="dr-panel">
+        <div class="dr-panel-head">
+          <div class="dr-panel-heading">
+            <span class="dr-panel-icon"><i class="bi bi-clock-history"></i></span>
+            <div><h2 class="dr-panel-title">Historique</h2></div>
+          </div>
+        </div>
+        <div class="dr-panel-body">
+          <div class="dr-line"><span>Reçue le</span><strong>{{ demande.created_at|date:"d/m/Y H:i" }}</strong></div>
           {% if demande.traite_le %}
-          <div class="fd-row"><span class="fd-row-label" style="min-width:0">Traitée le</span><span class="fd-row-value">{{ demande.traite_le|date:"d/m/Y H:i" }}</span></div>
+          <div class="dr-line"><span>Traitée le</span><strong>{{ demande.traite_le|date:"d/m/Y H:i" }}</strong></div>
           {% endif %}
           {% if demande.traite_par %}
-          <div class="fd-row"><span class="fd-row-label" style="min-width:0">Traitée par</span><span class="fd-row-value">{{ demande.traite_par.get_full_name|default:demande.traite_par.username }}</span></div>
+          <div class="dr-line"><span>Traitée par</span><strong>{{ demande.traite_par.get_full_name|default:demande.traite_par.username }}</strong></div>
           {% endif %}
         </div>
-        <div style="height:10px"></div>
       </section>
 
-    </div>
+    </aside>
   </div>
 </div>
 

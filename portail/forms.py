@@ -2,6 +2,7 @@
 import json
 from django import forms
 from django.utils import timezone
+from campaigns.models import Client, DemandeReservation
 from inventory.models import FacePanneau, Support
 
 
@@ -23,6 +24,11 @@ class Etape1Form(forms.Form):
     clic sur un marqueur de la carte. Adapte les `name=` des inputs côté
     template si tes noms diffèrent.
     """
+
+    def __init__(self, *args, **kwargs):
+        self.is_edit_mode = kwargs.pop('is_edit_mode', False)
+        self.exclude_demande_id = kwargs.pop('exclude_demande_id', None)
+        super().__init__(*args, **kwargs)
 
     faces_selectionnees = forms.CharField(
         widget=forms.HiddenInput(),
@@ -92,13 +98,19 @@ class Etape1Form(forms.Form):
             indisponibles = [
                 f"{face.support.code} Face {face.label}"
                 for face in faces
-                if not face.is_disponibles(date_debut, date_fin)
+                if not face.is_disponibles(date_debut, date_fin, self.exclude_demande_id)
             ]
             if indisponibles:
-                raise forms.ValidationError(
-                    "Les emplacements suivants ne sont plus disponibles sur cette période : "
-                    + ", ".join(indisponibles)
-                )
+                if self.is_edit_mode:
+                    message = (
+                        "Les emplacements suivants ne sont plus disponibles pour cette modification "
+                        "sur la période demandée : "
+                    )
+                else:
+                    message = (
+                        "Les emplacements suivants ne sont plus disponibles sur cette période : "
+                    )
+                raise forms.ValidationError(message + ", ".join(indisponibles))
 
         cleaned['faces_uuids']    = faces_ids
         cleaned['supports_uuids'] = supports_ids
@@ -133,7 +145,7 @@ si le reste diffère chez toi.
 from django import forms
 from django.core.exceptions import ValidationError
 
-from campaigns.models import DemandeReservation
+from campaigns.models import Client, DemandeReservation
 
 class Etape3Form(forms.Form):
     nom_contact = forms.CharField(
@@ -194,6 +206,13 @@ class Etape3Form(forms.Form):
                     'reference_client_saisie',
                     "Merci de renseigner votre référence client (ex: CLI-2026-A3F9K2)."
                 )
+            else:
+                principal = Client.objects.filter(
+                    reference__iexact=reference,
+                    type_entite=Client.TYPE_CLIENT,
+                ).first()
+                if principal and not cleaned_data.get('societe'):
+                    cleaned_data['societe'] = principal.nom
         else:
             for field, msg in [
                 ('nom_contact', "Ce champ est obligatoire."),

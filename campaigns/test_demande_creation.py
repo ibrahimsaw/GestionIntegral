@@ -7,6 +7,7 @@ from django.test import TestCase
 from django.urls import reverse
 from django.utils import timezone
 
+from campaigns.forms import DemandeGestionContactForm
 from campaigns.models import (
     Campagne,
     Client,
@@ -189,6 +190,45 @@ class DemandeCreationViewTests(TestCase):
 
     def complete_step_two(self):
         return self.client.post(reverse('demande_creation_etape2'), {})
+
+    def test_prospect_form_allows_account_type_client_or_agency(self):
+        form = DemandeGestionContactForm(data={
+            'type_client': DemandeReservation.TYPE_CLIENT_NOUVEAU,
+            'type_compte': Client.TYPE_AGENCE,
+            'nom_contact': 'Agence SARL',
+            'societe': 'Agence SARL',
+            'email': 'agence@example.com',
+            'telephone': '70000009',
+            'adresse': 'Ouagadougou',
+            'agence': '',
+            'accepte_contact': 'on',
+        })
+
+        self.assertIn('type_compte', form.fields)
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data['type_compte'], Client.TYPE_AGENCE)
+
+    def test_demand_allows_linking_an_agency(self):
+        agence = Client.objects.create(
+            nom='Agence de test',
+            type_entite=Client.TYPE_AGENCE,
+            email='agence-test@example.com',
+            telephone='70000011',
+        )
+
+        demande = DemandeReservation.objects.create(
+            nom_contact='Client Test',
+            societe='Société Test',
+            email='client-test@example.com',
+            telephone='70000012',
+            date_debut_souhaitee=self.start,
+            date_fin_souhaitee=self.end,
+            statut=DemandeReservation.STATUT_NOUVELLE,
+            agence=agence,
+        )
+
+        self.assertEqual(demande.agence, agence)
+        self.assertEqual(demande.agence_id, agence.pk)
 
     def test_format_prices_are_saved_on_demand_and_copied_to_reservation(self):
         standard = FormatSupport.objects.create(
@@ -942,7 +982,8 @@ class DemandeCreationViewTests(TestCase):
         self.assertContains(response, 'Informations client, période et emplacements')
         self.assertContains(response, 'Client et coordonnées')
         self.assertContains(response, 'name="type_client"')
-        self.assertNotContains(response, 'name="nom_campagne"')
+        self.assertContains(response, 'name="nom_campagne"')
+        self.assertContains(response, 'Nom de la campagne')
         self.assertNotContains(response, 'Message / précisions')
         self.assertNotContains(response, 'Tous les quartiers')
         self.assertNotContains(response, 'Tous états')

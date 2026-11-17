@@ -1274,6 +1274,7 @@ class ReserverEtape1View(View):
 
         # Période déjà saisie précédemment (retour en arrière depuis étape 2/3)
         periode = request.session.get('demande_periode', {})
+        etape2 = request.session.get('demande_etape2', {})
 
         form = Etape1Form(initial={
             'faces_selectionnees': json.dumps(
@@ -1289,6 +1290,7 @@ class ReserverEtape1View(View):
             'form':   form,
             'panier': self._panier(request),
             'filtres': filtres,
+            'nom_campagne': etape2.get('nom_campagne', ''),
         })
 
     def post(self, request):
@@ -1307,6 +1309,7 @@ class ReserverEtape1View(View):
             'form':   form,
             'panier': self._panier(request),
             'filtres': self._filtres(request),
+            'nom_campagne': request.session.get('demande_etape2', {}).get('nom_campagne', ''),
         })
 
 
@@ -1638,9 +1641,7 @@ class DemandePartageWizardBase(View):
     def session_key(self, token):
         return f'demande_partage_{token.hex}'
 
-    def get_state(self, request, demande, token):
-        key = self.session_key(token)
-        state = request.session.get(key)
+    def get_allowed_categories(self, demande):
         initial_formats = list(
             demande.faces_souhaitees.values_list(
                 'support__format',
@@ -1652,10 +1653,15 @@ class DemandePartageWizardBase(View):
                 code__in=[code for code in initial_formats if code]
             ).values_list('code', 'categorie')
         )
-        allowed_categories = sorted({
+        return sorted({
             categories_initiales.get(code) or 'Autres'
             for code in initial_formats
         })
+
+    def get_state(self, request, demande, token):
+        key = self.session_key(token)
+        state = request.session.get(key)
+        allowed_categories = self.get_allowed_categories(demande)
         if state is None:
             state = {
                 'faces': list(demande.faces_souhaitees.values_list('pk', flat=True)),
@@ -1678,11 +1684,8 @@ class DemandePartageWizardBase(View):
             }
             request.session[key] = state
         else:
-            state.setdefault(
-                'client_name',
-                demande.client.nom if demande.client else '',
-            )
-            state.setdefault('allowed_categories', allowed_categories)
+            state['client_name'] = demande.client.nom if demande.client else ''
+            state['allowed_categories'] = allowed_categories
         return state
 
     def get_selections(self, request, demande, token):
@@ -1788,13 +1791,17 @@ class DemandePartageEtape1View(DemandePartageWizardBase):
             selected_categories_by_format.get(code) or 'Autres'
             for code in selected_formats
         }
-        if not selected_categories.issubset(set(state['allowed_categories'])):
+        allowed_categories = set(self.get_allowed_categories(demande))
+
+        if not selected_categories.issubset(allowed_categories):
             form.add_error(
                 None,
                 "Vous ne pouvez sélectionner que des faces de la catégorie "
                 "initialement demandée.",
             )
             return self.render_step(request, token, form, state, faces)
+
+        state['allowed_categories'] = sorted(allowed_categories)
 
         state.update({
             'faces': data['faces_uuids'],

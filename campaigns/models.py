@@ -897,6 +897,15 @@ class DemandeReservation(models.Model):
         help_text="Client sélectionné ou créé automatiquement lors de l'envoi "
                    "de la demande.",
     )
+    agence = models.ForeignKey(
+        Client,
+        on_delete=models.SET_NULL,
+        null=True, blank=True,
+        related_name='demandes_reservation_agence',
+        limit_choices_to={'type_entite': Client.TYPE_AGENCE},
+        verbose_name="Agence associée",
+        help_text="Agence liée à la demande (sélectionnée ou créée à l'étape 1).",
+    )
     reservation = models.ForeignKey(
         Reservation,
         on_delete=models.SET_NULL,
@@ -1229,7 +1238,7 @@ class Campagne(models.Model):
     )
     statut       = models.CharField(max_length=20, choices=STATUT_CHOICES, default=STATUT_EN_COURS,blank=True)
     type_support = models.CharField(
-        max_length=20,
+        max_length=80,
         choices=get_type_support_choices,
         blank=True,
         default='',

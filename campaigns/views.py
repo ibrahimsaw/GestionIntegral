@@ -1,4 +1,5 @@
 import calendar
+import re
 import json
 import uuid
 from datetime import date, datetime, time, timedelta
@@ -4532,7 +4533,7 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
                 else None
             ) or (
                 Client.objects.filter(
-                    email__iexact=demande.email,
+                    email__iexact=demande.email or '\0',
                     type_entite=Client.TYPE_CLIENT,
                 )
                 .order_by('pk')
@@ -4540,6 +4541,7 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
             )
             initial.update({
                 'client': client.pk if client else '',
+                'agence': demande.agence_id or '',
                 'annonceur': demande.societe or demande.nom_contact,
                 'nom': demande.nom_campagne or f"Campagne {demande.reference}",
                 'date_debut': demande.date_debut_souhaitee,
@@ -6959,6 +6961,17 @@ class StaffDemandeWizardBase(StaffRequiredMixin, View):
         supports = list(Support.objects.filter(pk__in=support_ids))
         return faces, supports
 
+    def editing_account_pks(self, request):
+        """Comptes (client/agence) déjà liés à la demande en cours de modification."""
+        edit_uuid = request.session.get(self.session_edit_key)
+        if not edit_uuid:
+            return ()
+        return tuple(
+            DemandeReservation.objects.filter(uuid=edit_uuid)
+            .values_list('client_id', 'agence_id')
+            .first() or ()
+        )
+
     def clear_wizard_session(self, request):
         for key in (
             self.session_faces_key,
@@ -6972,7 +6985,9 @@ class StaffDemandeWizardBase(StaffRequiredMixin, View):
             request.session.pop(key, None)
 
     def step_context(self, request, **context):
+        project = request.session.get(self.session_project_key, {}) or {}
         context.update(self.template_context)
+        camp = project.get('nom_campagne', '')
         context.update({
             'step1_url': reverse('demande_creation'),
             'step2_url': reverse('demande_creation_etape2'),
@@ -6986,8 +7001,95 @@ class StaffDemandeWizardBase(StaffRequiredMixin, View):
                 else reverse('demandes_liste')
             ),
             'editing_request': bool(request.session.get(self.session_edit_key)),
+            'state': {'nom_campagne': camp},
+            'nom_campagne': camp,
+            'message': project.get('message', ''),
         })
         return context
+
+
+def _cle_code_naturelle(code):
+    """Clé de tri « naturelle » : OUA-10 passe après OUA-9."""
+    return [
+        (0, int(part)) if part.isdigit() else (1, part.casefold())
+        for part in re.split(r'(\d+)', str(code or '')) if part != ''
+    ]
+
+
+def _cle_code_support(code):
+    """Tri par numéro croissant (001, 002 … 034, 037), puis par préfixe."""
+    match = re.search(r'(\d+)\s*$', str(code or ''))
+    numero = int(match.group(1)) if match else float('inf')
+    return (numero, _cle_code_naturelle(code))
+
+
+def comptes_pour_recap(contact):
+    """Fiche détaillée (client, agence) pour le récapitulatif, comptes existants ou à créer."""
+    comptes = []
+    for role, existant, nouveau in (
+        ('Client', contact.get('client'), contact.get('new_client')),
+        ('Agence', contact.get('agence'), contact.get('new_agence')),
+    ):
+        if existant:
+            comptes.append({
+                'role': role, 'nouveau': False,
+                'reference': existant.reference, 'nom': existant.nom,
+                'contact': existant.contact_nom, 'telephone': existant.telephone,
+                'email': existant.email, 'adresse': existant.adresse,
+            })
+        elif nouveau:
+            comptes.append({
+                'role': role, 'nouveau': True, 'reference': '',
+                'nom': nouveau['nom'], 'contact': nouveau['contact_nom'],
+                'telephone': nouveau['telephone'], 'email': nouveau['email'],
+                'adresse': nouveau['adresse'],
+            })
+    return comptes
+
+
+def contact_session_depuis_demande(demande):
+    """Pré-remplit l'étape « Client et agence » à partir d'une demande existante."""
+    principal = demande.client
+    prospect = demande.type_client == DemandeReservation.TYPE_CLIENT_NOUVEAU
+    data = {
+        'client_mode': 'existant', 'client': '',
+        'client_nom': '', 'client_contact': '', 'client_telephone': '',
+        'client_email': '', 'client_adresse': '',
+        'agence_mode': 'aucun', 'agence': '',
+        'agence_nom': '', 'agence_contact': '', 'agence_telephone': '',
+        'agence_email': '', 'agence_adresse': '',
+        'accepte_contact': demande.accepte_contact,
+    }
+    principal_est_agence = bool(
+        principal and principal.type_entite == Client.TYPE_AGENCE
+    )
+    # Slot client
+    if principal_est_agence:
+        data['client_mode'] = 'aucun'
+    elif prospect:
+        data.update(
+            client_mode='nouveau',
+            client_nom=demande.societe,
+            client_contact=demande.nom_contact,
+            client_telephone=demande.telephone,
+            client_email=demande.email,
+            client_adresse=principal.adresse if principal else '',
+        )
+    elif principal:
+        data.update(client_mode='existant', client=str(principal.pk))
+    # Slot agence
+    if principal_est_agence and prospect:
+        data.update(
+            agence_mode='nouveau',
+            agence_nom=demande.societe,
+            agence_contact=demande.nom_contact,
+            agence_telephone=demande.telephone,
+            agence_email=demande.email,
+            agence_adresse=principal.adresse,
+        )
+    elif demande.agence_id:
+        data.update(agence_mode='existant', agence=str(demande.agence_id))
+    return data
 
 
 class DemandeCreationView(StaffDemandeWizardBase):
@@ -6995,11 +7097,7 @@ class DemandeCreationView(StaffDemandeWizardBase):
     template_name = 'portail/reserver_etape1.html'
 
     def _render_step(self, request, selection_form, contact_form):
-        for field_name in ('client', 'nom_contact', 'societe', 'email', 'telephone'):
-            contact_form.fields[field_name].widget.attrs.update({
-                'form': 'form-etape1',
-                'class': 'form-control-e3 staff-field-control',
-            })
+        contact_form.apply_staff_widget_attrs('form-etape1')
         faces, _ = self.get_selections(request)
         formats = {
             item.code: item
@@ -7059,6 +7157,7 @@ class DemandeCreationView(StaffDemandeWizardBase):
             initial_selected_faces=initial_selected_faces,
             initial_tarifs_faces=request.session.get(self.session_prices_key, {}),
             filtres=filtres,
+            nom_campagne=request.session.get(self.session_project_key, {}).get('nom_campagne', ''),
         ))
 
     def get(self, request):
@@ -7079,13 +7178,17 @@ class DemandeCreationView(StaffDemandeWizardBase):
             request,
             selection_form,
             DemandeGestionContactForm(
-                initial=request.session.get(self.session_contact_key, {})
+                initial=request.session.get(self.session_contact_key, {}),
+                ignore_account_pks=self.editing_account_pks(request),
             ),
         )
 
     def post(self, request):
         selection_form = Etape1Form(request.POST)
-        contact_form = DemandeGestionContactForm(request.POST)
+        contact_form = DemandeGestionContactForm(
+            request.POST,
+            ignore_account_pks=self.editing_account_pks(request),
+        )
         selection_valid = selection_form.is_valid()
         contact_valid = contact_form.is_valid()
         forms_valid = selection_valid and contact_valid
@@ -7145,21 +7248,13 @@ class DemandeCreationView(StaffDemandeWizardBase):
                 request, selection_form, contact_form
             )
 
-        contact = contact_form.cleaned_data
-        request.session[self.session_contact_key] = {
-            'type_client': contact['type_client'],
-            'client': str(contact['client'].pk) if contact['client'] else '',
-            'nom_contact': contact['nom_contact'],
-            'societe': contact['societe'],
-            'email': contact['email'],
-            'telephone': contact['telephone'],
-            'accepte_contact': contact['accepte_contact'],
-        }
-        if not request.session.get(self.session_edit_key):
-            request.session[self.session_project_key] = {
-                'nom_campagne': '',
-                'message': '',
-            }
+        request.session[self.session_contact_key] = contact_form.session_payload()
+        project_data = request.session.get(self.session_project_key, {}) or {}
+        project_data.update({
+            'nom_campagne': (request.POST.get('nom_campagne') or '').strip(),
+            'message': (request.POST.get('message') or '').strip(),
+        })
+        request.session[self.session_project_key] = project_data
         return redirect('demande_creation_etape2')
 
 
@@ -7169,6 +7264,11 @@ class DemandeCreationEtape2View(StaffDemandeWizardBase):
 
     def _context(self, request):
         faces, supports = self.get_selections(request)
+        # Ordre croissant du code de la face (support, puis face).
+        faces.sort(
+            key=lambda f: (_cle_code_support(f.support.code), _cle_code_naturelle(f.label)),
+        )
+        supports.sort(key=lambda s: _cle_code_support(s.code))
         periode = request.session.get(self.session_period_key, {})
         date_debut = periode.get('date_debut')
         date_fin = periode.get('date_fin')
@@ -7180,11 +7280,13 @@ class DemandeCreationEtape2View(StaffDemandeWizardBase):
             messages.warning(request, "Veuillez renseigner les coordonnées du demandeur.")
             return None
         contact_payload = dict(contact_data)
-        contact_payload['client'] = contact_payload.get('client') or ''
         contact_payload['accepte_contact'] = (
             'on' if contact_payload.get('accepte_contact') else ''
         )
-        contact_form = DemandeGestionContactForm(contact_payload)
+        contact_form = DemandeGestionContactForm(
+            contact_payload,
+            ignore_account_pks=self.editing_account_pks(request),
+        )
         if not contact_form.is_valid():
             messages.warning(
                 request,
@@ -7238,11 +7340,48 @@ class DemandeCreationEtape2View(StaffDemandeWizardBase):
             project=project,
             nombre_emplacements=len(faces) + len(supports),
             duree_jours=days,
+            comptes=comptes_pour_recap(contact_form.cleaned_data),
+            faces_lignes=[
+                {
+                    'face': face,
+                    'code': f"{face.support.code} · Face {face.label}",
+                    'format_code': face.support.format,
+                    'format_dimensions': (
+                        formats[face.support.format].dimensions
+                        if face.support.format in formats else ''
+                    ),
+                    'categorie': (
+                        formats[face.support.format].categorie
+                        if face.support.format in formats else ''
+                    ) or 'Autres',
+                    'tarif': tarifs.get(face.support.format, ''),
+                }
+                for face in faces
+            ],
             tarifs_faces_par_format=tarifs,
             tarifs_lignes=tarifs_lignes,
             mois_factures=mois_factures,
             total_faces=total_faces,
         )
+
+    @staticmethod
+    def _resoudre_compte(existant, nouveau, reutilisable=None):
+        """Compte sélectionné, sinon compte créé (ou prospect mis à jour) à partir de la saisie."""
+        if existant:
+            return existant
+        if not nouveau:
+            return None
+        if reutilisable and reutilisable.type_entite == nouveau['type_entite']:
+            reutilisable.nom = nouveau['nom']
+            reutilisable.contact_nom = nouveau['contact_nom']
+            reutilisable.email = nouveau['email']
+            reutilisable.telephone = nouveau['telephone']
+            reutilisable.adresse = nouveau['adresse']
+            reutilisable.save(update_fields=[
+                'nom', 'contact_nom', 'email', 'telephone', 'adresse',
+            ])
+            return reutilisable
+        return Client.objects.create(**nouveau)
 
     def get(self, request):
         context = self._context(request)
@@ -7255,11 +7394,6 @@ class DemandeCreationEtape2View(StaffDemandeWizardBase):
         if context is None:
             return redirect('demande_creation')
         data = context['contact']
-        client = (
-            data['client']
-            if data['type_client'] == DemandeReservation.TYPE_CLIENT_EXISTANT
-            else None
-        )
         edit_uuid = request.session.get(self.session_edit_key)
         demande_uuid = edit_uuid
         try:
@@ -7277,60 +7411,37 @@ class DemandeCreationEtape2View(StaffDemandeWizardBase):
                         statut=DemandeReservation.STATUT_EN_COURS,
                         token_partage=uuid.uuid4(),
                     )
-                client_prospect_existant = (
+                # En modification d'un prospect, on met à jour sa fiche plutôt
+                # que d'en créer une seconde (compte principal uniquement).
+                prospect_existant = (
                     demande.client
                     if demande.pk
                     and demande.type_client == DemandeReservation.TYPE_CLIENT_NOUVEAU
                     and demande.client_id
-                    and demande.client.type_entite == Client.TYPE_CLIENT
                     else None
                 )
-                if data['type_client'] == DemandeReservation.TYPE_CLIENT_EXISTANT:
-                    client = data['client']
-                elif client_prospect_existant:
-                    client = client_prospect_existant
-                    client.nom = data['societe'] or data['nom_contact']
-                    client.contact_nom = data['nom_contact']
-                    client.email = data['email']
-                    client.telephone = data['telephone']
-                    client.save(update_fields=[
-                        'nom', 'contact_nom', 'email', 'telephone',
-                    ])
-                else:
-                    client = Client.objects.create(
-                        type_entite=Client.TYPE_CLIENT,
-                        nom=data['societe'] or data['nom_contact'],
-                        contact_nom=data['nom_contact'],
-                        email=data['email'],
-                        telephone=data['telephone'],
-                    )
-                demande.client = client
+                primary = data['primary']
+                client = self._resoudre_compte(
+                    data['client'], data['new_client'],
+                    prospect_existant if primary == 'client' else None,
+                )
+                agence = self._resoudre_compte(
+                    data['agence'], data['new_agence'],
+                    prospect_existant if primary == 'agence' else None,
+                )
+                principal = client or agence
+                demande.client = principal
+                demande.agence = agence
                 demande.type_client = data['type_client']
                 demande.reference_client_saisie = (
-                    client.reference
+                    principal.reference
                     if data['type_client'] == DemandeReservation.TYPE_CLIENT_EXISTANT
                     else ''
                 )
-                demande.nom_contact = (
-                    (client.contact_nom or client.nom)
-                    if data['type_client'] == DemandeReservation.TYPE_CLIENT_EXISTANT
-                    else data['nom_contact']
-                )
-                demande.societe = (
-                    client.nom
-                    if data['type_client'] == DemandeReservation.TYPE_CLIENT_EXISTANT
-                    else data['societe']
-                )
-                demande.email = (
-                    client.email
-                    if data['type_client'] == DemandeReservation.TYPE_CLIENT_EXISTANT
-                    else data['email']
-                )
-                demande.telephone = (
-                    client.telephone
-                    if data['type_client'] == DemandeReservation.TYPE_CLIENT_EXISTANT
-                    else data['telephone']
-                )
+                demande.nom_contact = data['nom_contact']
+                demande.societe = data['societe']
+                demande.email = data['email']
+                demande.telephone = data['telephone']
                 demande.accepte_contact = data['accepte_contact']
                 demande.date_debut_souhaitee = date.fromisoformat(context['periode']['date_debut'])
                 demande.date_fin_souhaitee = date.fromisoformat(context['periode']['date_fin'])
@@ -7339,7 +7450,8 @@ class DemandeCreationEtape2View(StaffDemandeWizardBase):
                 demande.prix_faces_par_format = request.session.get(
                     self.session_prices_key, {}
                 )
-                demande.full_clean(exclude=['reference'])
+                # Coordonnées facultatives à l'étape 1 : on ne les exige pas ici.
+                demande.full_clean(exclude=['reference', 'nom_contact', 'email', 'telephone'])
                 demande.save()
                 demande.faces_souhaitees.set(context['faces'])
                 demande.supports_souhaites.set(context['supports'])
@@ -7403,7 +7515,7 @@ class DemandeDetailView(LoginRequiredMixin, View):
             else None
         ) or (
             Client.objects.filter(
-                email__iexact=demande.email,
+                email__iexact=demande.email or '\0',
                 type_entite=Client.TYPE_CLIENT,
             )
             .order_by('pk')
@@ -7509,15 +7621,9 @@ class DemandeModifierView(StaffRequiredMixin, View):
             'nom_campagne': demande.nom_campagne,
             'message': demande.message,
         }
-        request.session[StaffDemandeWizardBase.session_contact_key] = {
-            'type_client': demande.type_client,
-            'client': demande.client_id or '',
-            'nom_contact': demande.nom_contact,
-            'societe': demande.societe,
-            'email': demande.email,
-            'telephone': demande.telephone,
-            'accepte_contact': demande.accepte_contact,
-        }
+        request.session[StaffDemandeWizardBase.session_contact_key] = (
+            contact_session_depuis_demande(demande)
+        )
         return redirect(f"{reverse('demande_creation')}?edit=1")
 
 

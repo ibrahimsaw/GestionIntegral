@@ -367,7 +367,7 @@ class Support(models.Model):
     
     # ── Format (panneaux uniquement) ──────────────────────────────────────
     format = models.CharField(
-        max_length=20,
+        max_length=80,
         choices=get_dynamic_format_choices,
         blank=True, default='',
         verbose_name="Format & Type",

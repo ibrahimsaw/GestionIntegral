@@ -38,6 +38,7 @@ from inventory.models import (
     SupportDeletionRequest,
 )
 from inventory.views import (
+    CarteView,
     FormatSupportDetailView,
     FormatSupportListView,
     SupportListView,
@@ -1882,6 +1883,139 @@ class SupportFormCategoryFilterTests(TestCase):
 
         self.assertIn('format', form.errors)
         self.assertIn('ne correspond pas à la catégorie', form.errors['format'][0])
+
+
+class SupportArchiveVisibilityTests(TestCase):
+    def setUp(self):
+        staff = get_user_model().objects.create_user(
+            username='support-archive-staff',
+            password='test-password',
+            role='staff',
+        )
+        self.client.force_login(staff)
+        archive_format = FormatSupport.objects.create(
+            code='SUPPORT-ARCHIVE-FORMAT',
+            dimensions='4m x 3m',
+            superficie=12,
+            categorie='Standard',
+        )
+        self.active_support = Support.objects.create(
+            code='SUPPORT-ACTIVE-TEST',
+            nom='Support actif de test',
+            type_support=Support.TYPE_PANNEAU,
+            format=archive_format.code,
+            latitude=12.35,
+            longitude=-1.53,
+            ville='Ville active',
+        )
+        FacePanneau.objects.create(
+            support=self.active_support,
+            label=FacePanneau.LABEL_A,
+        )
+        self.support = Support.objects.create(
+            code='SUPPORT-ARCHIVE-TEST',
+            nom='Support archivé de test',
+            type_support=Support.TYPE_ECRAN,
+            latitude=12.34,
+            longitude=-1.52,
+            ville='Ville archive',
+            actif=False,
+        )
+
+    def test_archived_support_stays_in_inventory_list_but_not_map_or_stats(self):
+        response = self.client.get(reverse('support_list'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, self.support.code)
+        self.assertContains(response, 'Archivé')
+        self.assertContains(response, 'value="archiver"')
+        self.assertContains(response, 'value="reactiver"')
+
+        geojson = self.client.get(reverse('api_geojson'))
+        self.assertEqual(geojson.status_code, 200)
+        feature_ids = {
+            feature['properties']['id']
+            for feature in geojson.json()['features']
+        }
+        self.assertIn(self.active_support.pk, feature_ids)
+        self.assertNotIn(self.support.pk, feature_ids)
+
+        view = CarteView()
+        view.request = RequestFactory().get('/inventory/carte/')
+        view.args = ()
+        view.kwargs = {}
+        self.assertEqual(view.get_context_data()['stats']['total'], 1)
+
+    def test_existing_support_form_can_archive_and_restore_but_creation_cannot(self):
+        form = SupportForm(instance=self.support)
+        self.assertIn('actif', form.fields)
+        self.assertNotIn('actif', SupportForm().fields)
+
+        form = SupportForm(
+            data={
+                'code': self.support.code,
+                'nom': self.support.nom,
+                'latitude': '12.34',
+                'longitude': '-1.52',
+                'ville': self.support.ville,
+                'etat': self.support.etat,
+            },
+            instance=self.support,
+        )
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertFalse(form.cleaned_data['actif'])
+        form.save()
+        self.support.refresh_from_db()
+        self.assertFalse(self.support.actif)
+
+        form = SupportForm(
+            data={
+                'code': self.support.code,
+                'nom': self.support.nom,
+                'latitude': '12.34',
+                'longitude': '-1.52',
+                'ville': self.support.ville,
+                'etat': self.support.etat,
+                'actif': 'on',
+            },
+            instance=self.support,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        form.save()
+        self.support.refresh_from_db()
+        self.assertTrue(self.support.actif)
+
+    def test_archived_support_is_not_offered_for_new_campaigns(self):
+        form = LigneCampagneForm(data={'type_support': Support.TYPE_ECRAN})
+
+        self.assertNotIn(self.support, form.fields['support'].queryset)
+
+    def test_bulk_archive_and_restore_keep_support_in_inventory(self):
+        response = self.client.post(
+            reverse('support_bulk_action'),
+            {
+                'action': 'archiver',
+                'selected_ids': [self.active_support.pk],
+            },
+        )
+
+        self.assertRedirects(response, reverse('support_list'))
+        self.active_support.refresh_from_db()
+        self.assertFalse(self.active_support.actif)
+        self.assertContains(self.client.get(reverse('support_list')), self.active_support.code)
+
+        response = self.client.post(
+            reverse('support_bulk_action'),
+            {
+                'action': 'reactiver',
+                'selected_ids': [self.active_support.pk],
+            },
+        )
+
+        self.assertRedirects(response, reverse('support_list'))
+        self.active_support.refresh_from_db()
+        self.assertTrue(self.active_support.actif)
 
 
 class SupportMarketPlacementDefaultsTests(TestCase):

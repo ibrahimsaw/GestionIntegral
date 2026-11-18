@@ -888,7 +888,10 @@ class SupportDetailView(DetailView):
             # NOTE : Si vous voulez qu'un client puisse voir TOUS les panneaux pour réserver,
             # supprimez le filtre .filter(...) ci-dessous et mettez juste Support.objects.all()
             return get_object_or_404(
-                Support.objects.filter(lignes_campagne__campagne__client=client).distinct(),
+                Support.objects.filter(
+                    actif=True,
+                    lignes_campagne__campagne__client=client,
+                ).distinct(),
                 uuid=uuid_val
             )
         
@@ -1248,7 +1251,10 @@ class ReserverEtape1View(View):
         if not ids:
             return []
         return list(
-            FacePanneau.objects.filter(pk__in=ids)
+            FacePanneau.objects.filter(
+                pk__in=ids,
+                support__actif=True,
+            )
             .select_related('support')
         )
 
@@ -1321,7 +1327,12 @@ class ReserverView(View):
         ids = request.session.get('demande_faces_uuids', [])
         if not ids:
             return []
-        return list(FacePanneau.objects.filter(pk__in=ids).select_related('support'))
+        return list(
+            FacePanneau.objects.filter(
+                pk__in=ids,
+                support__actif=True,
+            ).select_related('support')
+        )
 
     def _filtres(self, request):
         return {
@@ -1363,8 +1374,11 @@ class ReserverView(View):
         d = form.cleaned_data
         faces_ids    = d['faces_uuids']
         supports_ids = d['supports_uuids']
-        faces    = list(FacePanneau.objects.filter(pk__in=faces_ids).select_related('support'))
-        supports = list(Support.objects.filter(pk__in=supports_ids))
+        faces    = list(FacePanneau.objects.filter(
+            pk__in=faces_ids,
+            support__actif=True,
+        ).select_related('support'))
+        supports = list(Support.objects.filter(pk__in=supports_ids, actif=True))
 
         demande = DemandeReservation.objects.create(
             nom_contact             = d.get('nom_contact', ''),
@@ -1407,8 +1421,11 @@ class ReserverEtape2View(View):
     def _get_selections(self, request):
         faces_ids    = request.session.get('demande_faces_uuids', [])
         supports_ids = request.session.get('demande_supports_uuids', [])
-        faces    = list(FacePanneau.objects.filter(pk__in=faces_ids).select_related('support'))
-        supports = list(Support.objects.filter(pk__in=supports_ids))
+        faces    = list(FacePanneau.objects.filter(
+            pk__in=faces_ids,
+            support__actif=True,
+        ).select_related('support'))
+        supports = list(Support.objects.filter(pk__in=supports_ids, actif=True))
         return faces, supports
 
     def get(self, request):
@@ -1475,8 +1492,11 @@ class ReserverEtape3View(View):
         periode      = request.session.get('demande_periode', {})
         etape2_extra = request.session.get('demande_etape2', {})
 
-        faces    = list(FacePanneau.objects.filter(pk__in=faces_ids).select_related('support'))
-        supports = list(Support.objects.filter(pk__in=supports_ids))
+        faces    = list(FacePanneau.objects.filter(
+            pk__in=faces_ids,
+            support__actif=True,
+        ).select_related('support'))
+        supports = list(Support.objects.filter(pk__in=supports_ids, actif=True))
 
         # Dict reconstruit pour rester compatible avec le template existant
         # (qui attend etape2.date_debut / etape2.date_fin / etape2.nom_campagne / etape2.message)
@@ -1691,10 +1711,13 @@ class DemandePartageWizardBase(View):
     def get_selections(self, request, demande, token):
         state = self.get_state(request, demande, token)
         faces = list(
-            FacePanneau.objects.filter(pk__in=state['faces'])
+            FacePanneau.objects.filter(
+                pk__in=state['faces'],
+                support__actif=True,
+            )
             .select_related('support')
         )
-        supports = list(Support.objects.filter(pk__in=state['supports']))
+        supports = list(Support.objects.filter(pk__in=state['supports'], actif=True))
         return state, faces, supports
 
     def step_context(self, token, **context):
@@ -1780,7 +1803,8 @@ class DemandePartageEtape1View(DemandePartageWizardBase):
 
         data = form.cleaned_data
         selected_faces = FacePanneau.objects.filter(
-            pk__in=data['faces_uuids']
+            pk__in=data['faces_uuids'],
+            support__actif=True,
         ).select_related('support')
         selected_formats = {
             face.support.format
@@ -2076,7 +2100,10 @@ class ApiCheckDispoView(View):
             return JsonResponse({'error': 'date_fin doit être > date_debut'}, status=400)
 
         faces = (
-            FacePanneau.objects.filter(uuid__in=faces_uuids)
+            FacePanneau.objects.filter(
+                uuid__in=faces_uuids,
+                support__actif=True,
+            )
             .select_related('support')
             .prefetch_related(
                 Prefetch(

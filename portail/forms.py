@@ -85,11 +85,16 @@ class Etape1Form(forms.Form):
                 self.add_error('date_debut', "La date de début ne peut pas être dans le passé.")
 
         # ── Vérification d'existence ───────────────────────────────────────
-        faces = list(FacePanneau.objects.filter(pk__in=faces_ids).select_related('support'))
+        faces = list(
+            FacePanneau.objects.filter(
+                pk__in=faces_ids,
+                support__actif=True,
+            ).select_related('support')
+        )
         if len(faces) != len(set(faces_ids)):
             raise forms.ValidationError("Une ou plusieurs faces sélectionnées sont introuvables.")
 
-        supports = list(Support.objects.filter(pk__in=supports_ids))
+        supports = list(Support.objects.filter(pk__in=supports_ids, actif=True))
         if len(supports) != len(set(supports_ids)):
             raise forms.ValidationError("Un ou plusieurs écrans sélectionnés sont introuvables.")
 
@@ -329,10 +334,15 @@ class ReserverUniquForm(forms.Form):
                 self.add_error('date_debut', "La date de début ne peut pas être dans le passé.")
 
         # ── Vérification existence + disponibilité ─────────────────────
-        faces = list(FacePanneau.objects.filter(pk__in=faces_ids).select_related('support'))
+        faces = list(
+            FacePanneau.objects.filter(
+                pk__in=faces_ids,
+                support__actif=True,
+            ).select_related('support')
+        )
         if len(faces) != len(set(faces_ids)):
             raise forms.ValidationError("Une ou plusieurs faces sélectionnées sont introuvables.")
-        supports = list(Support.objects.filter(pk__in=supports_ids))
+        supports = list(Support.objects.filter(pk__in=supports_ids, actif=True))
         if len(supports) != len(set(supports_ids)):
             raise forms.ValidationError("Un ou plusieurs écrans sélectionnés sont introuvables.")
         if date_debut and date_fin and not self.errors:

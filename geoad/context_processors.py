@@ -22,7 +22,7 @@ def inventory_villes(request):
     global_categories = {}
     global_category_labels = set()
 
-    supports = Support.objects.select_related('ecran_info').values(
+    supports = Support.objects.filter(actif=True).select_related('ecran_info').values(
         'ville',
         'type_support',
         'format',

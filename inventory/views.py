@@ -196,11 +196,13 @@ class FormatSupportDetailView(LoginRequiredMixin, DetailView):
         # les panneaux dans Support.format.
         if est_ecran:
             supports = Support.objects.filter(
+                actif=True,
                 type_support=Support.TYPE_ECRAN,
                 ecran_info__cellule=fmt.code,
             )
         else:
             supports = Support.objects.filter(
+                actif=True,
                 type_support=Support.TYPE_PANNEAU,
                 format=fmt.code,
             )
@@ -245,6 +247,7 @@ class FormatSupportDetailView(LoginRequiredMixin, DetailView):
             'is_paginated': False,
             'support_count': support_count,
             'format_utilise_panneau': Support.objects.filter(
+                actif=True,
                 type_support=Support.TYPE_PANNEAU,
                 format=fmt.code,
             ).exists(),
@@ -815,6 +818,8 @@ class ApiGeojsonView(View):
         qs = Support.objects.select_related(
             'emplacement__marche',
         ).prefetch_related('faces').filter(
+            actif=True,
+        ).filter(
             Q(latitude__isnull=False, longitude__isnull=False)
             | Q(
                 emplacement__marche__latitude__isnull=False,
@@ -1166,17 +1171,18 @@ class CarteView(LoginRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        supports = Support.objects.filter(actif=True)
         context['stats'] = {
-            'total': Support.objects.count(),
-            'bon': Support.objects.filter(
+            'total': supports.count(),
+            'bon': supports.filter(
                 etat=Support.ETAT_BON,
             ).count(),
-            'maintenance': Support.objects.filter(
+            'maintenance': supports.filter(
                 etat=Support.ETAT_A_MAINTENIR,
             ).count(),
-            'panne': Support.objects.filter(etat='panne').count(),
-            'panneaux': Support.objects.filter(type_support='panneau').count(),
-            'ecrans': Support.objects.filter(type_support='ecran').count(),
+            'panne': supports.filter(etat='panne').count(),
+            'panneaux': supports.filter(type_support='panneau').count(),
+            'ecrans': supports.filter(type_support='ecran').count(),
         }
         context['cfg'] = settings.DESIGN_CONFIG
         return context
@@ -3331,6 +3337,28 @@ class SupportBulkActionView(StaffRequiredMixin, View):
             Support.objects.filter(pk__in=selected_ids).update(etat=target_etat)
             labels = dict(Support.ETAT_CHOICES)
             messages.success(request, f"État « {labels.get(target_etat, target_etat)} » appliqué à {len(supports)} support(s).")
+
+        elif action in ('archiver', 'reactiver'):
+            target_actif = action == 'reactiver'
+            ids_a_mettre_a_jour = [
+                support.pk for support in supports
+                if support.actif != target_actif
+            ]
+            nombre_modifie = Support.objects.filter(
+                pk__in=ids_a_mettre_a_jour,
+            ).update(actif=target_actif)
+            statut = 'réactivé(s)' if target_actif else 'archivé(s)'
+            deja_statut = 'déjà actifs' if target_actif else 'déjà archivés'
+            messages.success(
+                request,
+                f"{nombre_modifie} support(s) {statut}.",
+            )
+            nombre_deja = len(supports) - nombre_modifie
+            if nombre_deja:
+                messages.info(
+                    request,
+                    f"{nombre_deja} support(s) étaient {deja_statut}.",
+                )
 
         elif action == 'demander_suppression':
             eligible = [s for s in supports if not s.lignes_campagne.exists() and not s.lignes_reservation.exists()]

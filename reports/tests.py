@@ -357,6 +357,37 @@ class SupportsReportFormatFilterTests(TestCase):
                     expected_format,
                 )
 
+    def test_archived_support_is_excluded_from_report_filters_and_excel(self):
+        archived = Support.objects.create(
+            code="REPORT-SUPPORT-ARCHIVED",
+            nom="Support archivé",
+            type_support=Support.TYPE_PANNEAU,
+            format="REPORT-FORMAT-SMALL",
+            latitude=12.34,
+            longitude=-1.52,
+            ville="Ville archivée",
+            actif=False,
+        )
+        FacePanneau.objects.create(
+            support=archived,
+            label=FacePanneau.LABEL_A,
+        )
+
+        response = self.client.get(reverse("supports_report"))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["total_panneaux"], 2)
+        self.assertNotContains(response, archived.code)
+        self.assertNotIn("Ville archivée", response.context["villes"])
+
+        excel_response = self.client.get(reverse("supports_export_excel"))
+        self.assertEqual(excel_response.status_code, 200)
+        workbook = load_workbook(BytesIO(excel_response.content), read_only=True)
+        rows = list(workbook["État Supports"].iter_rows(values_only=True))
+        self.assertFalse(
+            any(archived.code in str(value) for row in rows for value in row)
+        )
+
     def test_report_can_hide_availability_kpis_without_hiding_other_totals(self):
         response = self.client.get(
             reverse("supports_report"),

@@ -53,9 +53,21 @@ class LedDashboardDataTests(TestCase):
             longitude=-1.53,
             ville='Ouagadougou',
         )
+        archived_support = Support.objects.create(
+            code='FACE-COUNT-ARCHIVED',
+            nom='Support archivé FACE-COUNT',
+            type_support=Support.TYPE_PANNEAU,
+            format=format_support.code,
+            latitude=12.36,
+            longitude=-1.54,
+            ville='Ouagadougou',
+            actif=False,
+        )
         face_a = FacePanneau.objects.create(support=support, label='A')
         face_b = FacePanneau.objects.create(support=support, label='B')
         FacePanneau.objects.create(support=other_support, label='A')
+        FacePanneau.objects.create(support=archived_support, label='A')
+        FacePanneau.objects.create(support=archived_support, label='B')
         campaign = Campagne.objects.create(
             client=client,
             nom='Campagne des faces du jour',

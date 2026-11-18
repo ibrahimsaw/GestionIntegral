@@ -405,7 +405,6 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 'campagnes': [],
                 'nb_supports': 0,
                 'nb_actifs': 0,
-                'nb_inactifs': 0,
                 'nb_bon': 0,
                 'nb_maintenance': 0,
                 'nb_panne': 0,
@@ -420,14 +419,14 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             }
             for key, label, _ in self.SUPPORT_GROUP_DEFINITIONS
         }
-        supports_qs = Support.objects.prefetch_related('faces')
+        supports_qs = Support.objects.filter(actif=True).prefetch_related('faces')
         if ville_active:
             supports_qs = supports_qs.filter(ville__iexact=ville_active)
         for support in supports_qs:
             key = self._support_category_key(support, format_categories)
             group = groups[key]
             group['nb_supports'] += 1
-            group['nb_actifs' if support.actif else 'nb_inactifs'] += 1
+            group['nb_actifs'] += 1
             state_key = {
                 Support.ETAT_BON: 'nb_bon',
                 Support.ETAT_A_MAINTENIR: 'nb_maintenance',
@@ -661,7 +660,10 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         formats = {f.code: f for f in FormatSupport.objects.filter(code__in=codes_all)}
         faces_qs = (
             FacePanneau.objects
-            .filter(support__format__in=codes_all)
+            .filter(
+                support__actif=True,
+                support__format__in=codes_all,
+            )
             .select_related('support__emplacement__marche')
             .order_by('support__code', 'label')
         )
@@ -874,8 +876,12 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         support_ids=None, include_face_rates=False,
     ):
         """Calcule l'occupation depuis janvier et la prévision annuelle par format."""
-        faces = FacePanneau.objects.filter(support__format__in=format_codes)
+        faces = FacePanneau.objects.filter(
+            support__actif=True,
+            support__format__in=format_codes,
+        )
         lines = LigneCampagne.objects.filter(
+            face__support__actif=True,
             face__support__format__in=format_codes,
             campagne__date_debut__lte=year_end,
             campagne__date_fin__gte=year_start,
@@ -1753,6 +1759,8 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             selected_screen_date = date(selected_screen_year, 1, 1)
         ville_active = self.request.GET.get("ville", "").strip()
         supports_classes = Support.objects.filter(
+            actif=True,
+        ).filter(
             Q(type_support=Support.TYPE_ECRAN)
             | Q(emplacement__isnull=False)
             | Q(format__in=FormatSupport.objects.exclude(categorie='').values('code'))
@@ -1797,7 +1805,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             ).append(format_support.code)
 
         # ── Querysets de base ──
-        supports = Support.objects.all()
+        supports = Support.objects.filter(actif=True)
         campagnes_qs = Campagne.objects.select_related('client').order_by('-created_at')
         clients_qs = Client.objects.filter(
             actif=False,
@@ -1868,7 +1876,9 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         ])
 
         # ── Faces les plus productives ──
-        top_faces_qs = FacePanneau.objects.select_related('support').annotate(
+        top_faces_qs = FacePanneau.objects.select_related('support').filter(
+            support__actif=True,
+        ).annotate(
             usage_count=Count('lignes_campagne', filter=Q(lignes_campagne__campagne__statut__in=['en_cours', 'a_venir', 'en_pause'])),
             revenue=Coalesce(
                 Sum('lignes_campagne__campagne__prix', filter=Q(lignes_campagne__campagne__statut__in=['en_cours', 'a_venir', 'en_pause'])),
@@ -2466,10 +2476,14 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
         format_codes = [format_support.code for format_support in formats]
         supports_qs = Support.objects.filter(
+            actif=True,
             type_support=Support.TYPE_PANNEAU,
             format__in=format_codes,
         )
-        faces_qs = FacePanneau.objects.filter(support__format__in=format_codes)
+        faces_qs = FacePanneau.objects.filter(
+            support__actif=True,
+            support__format__in=format_codes,
+        )
         if ville_active:
             supports_qs = supports_qs.filter(ville__iexact=ville_active)
             faces_qs = faces_qs.filter(support__ville__iexact=ville_active)
@@ -2554,7 +2568,10 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         if not all_codes:
             return []
 
-        faces_qs = FacePanneau.objects.filter(support__format__in=all_codes)
+        faces_qs = FacePanneau.objects.filter(
+            support__actif=True,
+            support__format__in=all_codes,
+        )
         if ville_active:
             faces_qs = faces_qs.filter(support__ville__iexact=ville_active)
 
@@ -2575,6 +2592,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
 
         # 3) nb de supports en bon état par format
         supports_qs = Support.objects.filter(
+            actif=True,
             type_support=Support.TYPE_PANNEAU,
             format__in=all_codes,
             etat__in=Support.ETATS_OPERATIONNELS,
@@ -2678,6 +2696,7 @@ class FormatDetailView(LoginRequiredMixin, TemplateView):
             marche_objects = list(marches_qs)
             panneaux_par_marche = dict(
                 Support.objects.filter(
+                    actif=True,
                     type_support=Support.TYPE_PANNEAU,
                     emplacement__marche_id__in=[
                         marche.pk for marche in marche_objects
@@ -2702,6 +2721,7 @@ class FormatDetailView(LoginRequiredMixin, TemplateView):
             ]
             marche_ids = [marche.pk for marche in marche_objects]
             supports_qs = Support.objects.filter(
+                actif=True,
                 type_support=Support.TYPE_PANNEAU,
                 emplacement__marche_id__in=marche_ids,
             ).select_related('emplacement__marche')
@@ -2717,6 +2737,7 @@ class FormatDetailView(LoginRequiredMixin, TemplateView):
             )
             format_support = {'categorie': 'Géant', 'dimensions': '', 'code': 'geant'}
             supports_qs = Support.objects.filter(
+                actif=True,
                 type_support=Support.TYPE_PANNEAU,
                 format__in=[format_obj.code for format_obj in formats],
             )
@@ -2724,6 +2745,7 @@ class FormatDetailView(LoginRequiredMixin, TemplateView):
         else:
             format_support = get_object_or_404(FormatSupport, code=code)
             supports_qs = Support.objects.filter(
+                actif=True,
                 type_support=Support.TYPE_PANNEAU, format=code,
             )
             format_by_code = {format_support.code: format_support}
@@ -2958,6 +2980,7 @@ class FormatDetailView(LoginRequiredMixin, TemplateView):
 
     def _get_screen_context(self, context, ville_active, today):
         screens_qs = Support.objects.filter(
+            actif=True,
             type_support=Support.TYPE_ECRAN
         ).select_related('ecran_info').order_by('ville', 'quartier', 'code')
         if ville_active:
@@ -3015,7 +3038,7 @@ def _build_alertes():
     today = timezone.now().date()
     fin_dans_7j = today + timezone.timedelta(days=2)
 
-    supports_panne = Support.objects.filter(etat='panne').only('code', 'pk')
+    supports_panne = Support.objects.filter(actif=True, etat='panne').only('code', 'pk')
     for s in supports_panne:
         alertes.append({
             'id': f'support-panne-{s.pk}',
@@ -5104,6 +5127,7 @@ class SupportBulkActionView(StaffRequiredMixin, View):
         # Liste des villes disponibles, pour le select de filtre dans le template
         villes_disponibles = (
             Support.objects
+            .filter(actif=True)
             .exclude(ville__exact='')
             .values_list('ville', flat=True)
             .distinct()
@@ -5113,6 +5137,7 @@ class SupportBulkActionView(StaffRequiredMixin, View):
         if type_support == 'ecran':
             # Écrans : on filtre sur le type d'écran, éventuellement la ville.
             supports_qs = Support.objects.filter(
+                actif=True,
                 type_support='ecran',
                 etat__in=Support.ETATS_OPERATIONNELS
             )
@@ -5170,12 +5195,14 @@ class SupportBulkActionView(StaffRequiredMixin, View):
             # Les campagnes historiques peuvent encore porter le type générique
             # "panneau", tandis que les nouvelles campagnes stockent un code format.
             supports_qs = Support.objects.filter(
+                actif=True,
                 type_support='panneau',
                 format=type_support,
                 etat__in=Support.ETATS_OPERATIONNELS
             )
             if type_support == Support.TYPE_PANNEAU:
                 supports_qs = Support.objects.filter(
+                    actif=True,
                     type_support=Support.TYPE_PANNEAU,
                     etat__in=Support.ETATS_OPERATIONNELS,
                 )
@@ -5185,6 +5212,7 @@ class SupportBulkActionView(StaffRequiredMixin, View):
                 ).values('code')
                 if formats_categorie.exists():
                     supports_qs = Support.objects.filter(
+                        actif=True,
                         type_support=Support.TYPE_PANNEAU,
                         format__in=formats_categorie,
                         etat__in=Support.ETATS_OPERATIONNELS,
@@ -5194,6 +5222,7 @@ class SupportBulkActionView(StaffRequiredMixin, View):
                     categorie__iexact=type_support,
                 ).values('code')
                 supports_qs = Support.objects.filter(
+                    actif=True,
                     type_support=Support.TYPE_PANNEAU,
                     format__in=formats_categorie,
                     etat__in=Support.ETATS_OPERATIONNELS,
@@ -5204,6 +5233,7 @@ class SupportBulkActionView(StaffRequiredMixin, View):
                 ).values('code')
                 if formats_categorie.exists():
                     supports_qs = Support.objects.filter(
+                        actif=True,
                         type_support=Support.TYPE_PANNEAU,
                         format__in=formats_categorie,
                         etat__in=Support.ETATS_OPERATIONNELS,
@@ -5236,7 +5266,10 @@ class SupportBulkActionView(StaffRequiredMixin, View):
             pending_face_ids = request.GET.getlist('pending_faces')
             if pending_face_ids:
                 selectionnes.update(
-                    FacePanneau.objects.filter(pk__in=pending_face_ids)
+                    FacePanneau.objects.filter(
+                        pk__in=pending_face_ids,
+                        support__actif=True,
+                    )
                     .values_list('pk', flat=True)
                 )
 
@@ -6827,7 +6860,10 @@ class AjaxCheckFacesDispoView(StaffOnlyMixin, View):
 
         # Vérifier chaque face
         resultats = []
-        faces = FacePanneau.objects.filter(pk__in=face_ids).select_related('support')
+        faces = FacePanneau.objects.filter(
+            pk__in=face_ids,
+            support__actif=True,
+        ).select_related('support')
 
         for face in faces:
             statut = face.get_statut(date_debut=date_debut, date_fin=date_fin)
@@ -6963,10 +6999,13 @@ class StaffDemandeWizardBase(StaffRequiredMixin, View):
         face_ids = request.session.get(self.session_faces_key, [])
         support_ids = request.session.get(self.session_supports_key, [])
         faces = list(
-            FacePanneau.objects.filter(pk__in=face_ids)
+            FacePanneau.objects.filter(
+                pk__in=face_ids,
+                support__actif=True,
+            )
             .select_related('support')
         )
-        supports = list(Support.objects.filter(pk__in=support_ids))
+        supports = list(Support.objects.filter(pk__in=support_ids, actif=True))
         return faces, supports
 
     def editing_account_pks(self, request):
@@ -7220,7 +7259,8 @@ class DemandeCreationView(StaffDemandeWizardBase):
             request.session[self.session_faces_key] = selection['faces_uuids']
             request.session[self.session_supports_key] = selection['supports_uuids']
             selected_faces = FacePanneau.objects.filter(
-                pk__in=selection['faces_uuids']
+                pk__in=selection['faces_uuids'],
+                support__actif=True,
             ).select_related('support')
             formats_attendus = {
                 face.support.format for face in selected_faces
@@ -8034,7 +8074,10 @@ class ReservationWizardEtape2View(StaffRequiredMixin, View):
 
         # Pré-remplissage du panier JS à partir des faces déjà en session.
         panier_faces = (
-            FacePanneau.objects.filter(id__in=selectionnes)
+            FacePanneau.objects.filter(
+                id__in=selectionnes,
+                support__actif=True,
+            )
             .select_related('support')
         )
 
@@ -8139,7 +8182,10 @@ class ReservationWizardEtape3View(StaffRequiredMixin, View):
 
         date_debut, date_fin = _parse_dates(dates['date_debut'], dates['date_fin'])
         faces = (
-            FacePanneau.objects.filter(id__in=face_ids)
+            FacePanneau.objects.filter(
+                id__in=face_ids,
+                support__actif=True,
+            )
             .select_related('support')
             .order_by('support__code', 'label')
         )

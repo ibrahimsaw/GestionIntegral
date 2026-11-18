@@ -343,6 +343,7 @@ class ApiTauxOccupationView(LoginRequiredMixin, View):
 
         result = []
         for s in Support.objects.filter(
+            actif=True,
             etat__in=Support.ETATS_OPERATIONNELS,
         ).prefetch_related('faces'):
             taux = 0.0

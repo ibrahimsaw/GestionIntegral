@@ -123,7 +123,7 @@ def _build_context_panneaux(filters: dict) -> dict:
 
     # ── Base queryset ────────────────────────────────────────────
     qs = (
-        Support.objects
+        Support.objects.filter(actif=True)
         .prefetch_related("faces__lignes_campagne__campagne__client")
         .order_by("ville", "quartier", "nom")
     )
@@ -142,6 +142,7 @@ def _build_context_panneaux(filters: dict) -> dict:
 
     format_codes = set(
         Support.objects.filter(
+            actif=True,
             type_support=Support.TYPE_PANNEAU,
         )
         .exclude(format="")
@@ -334,7 +335,10 @@ def _build_context_panneaux(filters: dict) -> dict:
             continue
         marche_occupees = sum(1 for face in faces_marche if face["occupee"])
         marche_libres = sum(1 for face in faces_marche if face["statut"] == "libre")
-        supports_connectes = Support.objects.filter(emplacement__marche=marche).count()
+        supports_connectes = Support.objects.filter(
+            actif=True,
+            emplacement__marche=marche,
+        ).count()
         total_faces += len(faces_marche)
         total_occupees += marche_occupees
         total_libres += marche_libres
@@ -384,7 +388,7 @@ def _build_context_panneaux(filters: dict) -> dict:
     ]
 
     # ── Données pour les <select> de filtres ────────────────────
-    all_supports = Support.objects.all()
+    all_supports = Support.objects.filter(actif=True)
 
     villes    = sorted({v.strip() for v in all_supports.values_list("ville",    flat=True) if v and v.strip()})
     quartiers = sorted({q.strip() for q in all_supports.values_list("quartier", flat=True) if q and q.strip()})

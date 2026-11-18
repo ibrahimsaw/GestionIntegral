@@ -883,8 +883,13 @@ class LigneCampagneForm(forms.ModelForm):
 
         # Les supports fonctionnels restent réservables même si une maintenance est à prévoir.
         supports_qs = Support.objects.filter(
+            actif=True,
             etat__in=Support.ETATS_OPERATIONNELS,
         ).order_by('code')
+        if self.instance.pk and self.instance.support_id:
+            supports_qs = supports_qs | Support.objects.filter(
+                pk=self.instance.support_id,
+            )
 
         # Gestion du type sélectionné (via POST ou instance existante)
         selected_type = self.data.get('type_support')

@@ -36,7 +36,7 @@ class SupportForm(forms.ModelForm):
             'format',
             'latitude', 'longitude',
             'adresse', 'ville', 'quartier',
-            'etat', 'photo_principale', 'notes',
+            'etat', 'actif', 'photo_principale', 'notes',
         ]
         widgets = {
             'code': forms.TextInput(attrs={
@@ -64,6 +64,7 @@ class SupportForm(forms.ModelForm):
             'ville':     forms.TextInput(attrs=W),
             'quartier':  forms.TextInput(attrs=W),
             'etat':      forms.Select(attrs=S),
+            'actif':     forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'photo_principale': forms.FileInput(attrs={'class': 'form-control'}),
             'notes':     forms.Textarea(attrs={**W, 'rows': 3}),
         }
@@ -114,6 +115,11 @@ class SupportForm(forms.ModelForm):
 
         # ── Cas ÉDITION ──────────────────────────────────────────────────
         if self.instance and self.instance.pk:
+            self.fields['actif'].label = "Support actif et visible"
+            self.fields['actif'].help_text = (
+                "Décochez pour archiver ce support. Il restera dans la liste des "
+                "supports, mais sera masqué des cartes, statistiques et nouvelles réservations."
+            )
             # Le type ne peut plus changer
             self.fields['type_support'].disabled = True
             self.fields['type_support'].help_text = (
@@ -132,6 +138,7 @@ class SupportForm(forms.ModelForm):
 
         # ── Cas CRÉATION ─────────────────────────────────────────────────
         else:
+            del self.fields['actif']
             self.fields['nb_faces'].initial = 2
             # format non obligatoire à la création (validé dans clean())
             self.fields['format'].required = False

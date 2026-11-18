@@ -13,7 +13,7 @@ from PIL import Image
 
 from accounts.models import User
 from campaigns.models import Campagne, Client, LigneCampagne, PreuveDiffusion
-from inventory.models import Maintenance, Support
+from inventory.models import FacePanneau, FormatSupport, Maintenance, Support
 from piges.drive_piges import DrivePigesError
 from piges.models import PigeFichier
 from reports.pannes_report_view import _add_months
@@ -274,6 +274,154 @@ class GroupSupportsByQuartierTests(SimpleTestCase):
         self.assertEqual(
             [item["code"] for item in sections[1]["items"]],
             ["B", "A"],
+        )
+
+
+class SupportsReportFormatFilterTests(TestCase):
+    def setUp(self):
+        staff = User.objects.create_user(
+            username="supports-report-format-filter",
+            password="test-password",
+            role=User.ROLE_STAFF,
+        )
+        self.client.force_login(staff)
+        FormatSupport.objects.create(
+            code="REPORT-FORMAT-SMALL",
+            dimensions="4m x 3m",
+            superficie=12,
+            categorie="12m²",
+        )
+        FormatSupport.objects.create(
+            code="REPORT-FORMAT-LARGE",
+            dimensions="8m x 4m",
+            superficie=32,
+            categorie="Géant",
+        )
+        for code, format_code in (
+            ("REPORT-SUPPORT-SMALL", "REPORT-FORMAT-SMALL"),
+            ("REPORT-SUPPORT-LARGE", "REPORT-FORMAT-LARGE"),
+        ):
+            support = Support.objects.create(
+                code=code,
+                nom=code,
+                ancien_nom="Ancien panneau test" if format_code == "REPORT-FORMAT-SMALL" else "",
+                type_support=Support.TYPE_PANNEAU,
+                format=format_code,
+                latitude=12.34,
+                longitude=-1.52,
+                ville="Ouagadougou",
+            )
+            FacePanneau.objects.create(
+                support=support,
+                label=FacePanneau.LABEL_A,
+            )
+
+    def test_format_filter_updates_report_totals_and_keeps_legend(self):
+        response = self.client.get(
+            reverse("supports_report"),
+            {"categorie": "Panneau", "format": "REPORT-FORMAT-SMALL"},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context["filters"]["format"], "REPORT-FORMAT-SMALL")
+        self.assertEqual(response.context["total_panneaux"], 1)
+        self.assertEqual(response.context["total_faces"], 1)
+        self.assertEqual(response.context["total_libres"], 1)
+        self.assertEqual(response.context["total_reservees"], 0)
+        self.assertEqual(response.context["total_occupees"], 0)
+        self.assertContains(response, "REPORT-SUPPORT-SMALL")
+        self.assertContains(response, "(Ancien panneau test)")
+        self.assertIn("12m²", response.context["categories_rapport"])
+        self.assertIn("Géant", response.context["categories_rapport"])
+        self.assertContains(response, 'name="format"')
+        self.assertContains(response, "Supports")
+        self.assertContains(response, "Faces totales")
+        self.assertContains(response, "Légende :")
+        self.assertContains(response, "En panne")
+
+    def test_format_categories_filter_supports_by_their_registered_category(self):
+        for category, expected_format in (
+            ("12m²", "REPORT-FORMAT-SMALL"),
+            ("Géant", "REPORT-FORMAT-LARGE"),
+        ):
+            with self.subTest(category=category):
+                response = self.client.get(
+                    reverse("supports_report"),
+                    {"categorie": category},
+                )
+
+                self.assertEqual(response.status_code, 200)
+                self.assertEqual(response.context["total_panneaux"], 1)
+                self.assertEqual(
+                    response.context["panneaux"][0]["support"].format,
+                    expected_format,
+                )
+
+    def test_report_can_hide_availability_kpis_without_hiding_other_totals(self):
+        response = self.client.get(
+            reverse("supports_report"),
+            {
+                "afficher_faces_libres": "0",
+                "afficher_faces_reservees": "0",
+                "afficher_faces_occupees": "0",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(response.context["afficher_faces_libres"])
+        self.assertFalse(response.context["afficher_faces_reservees"])
+        self.assertFalse(response.context["afficher_faces_occupees"])
+        self.assertContains(response, '<div class="cl-kpi-lbl">Total Supports</div>')
+        self.assertContains(response, '<div class="cl-kpi-lbl">Faces Totales</div>')
+        self.assertNotContains(response, '<div class="cl-kpi-lbl">Faces Libres</div>')
+        self.assertNotContains(response, '<div class="cl-kpi-lbl">Faces Réservées</div>')
+        self.assertNotContains(response, '<div class="cl-kpi-lbl">Faces Occupées</div>')
+        self.assertNotContains(response, '<div class="kpi-label">Faces libres</div>')
+        self.assertNotContains(response, '<div class="kpi-label">Faces réservées</div>')
+        self.assertNotContains(response, '<div class="kpi-label">Faces occupées</div>')
+
+    def test_excel_export_uses_filters_and_selected_display_options(self):
+        response = self.client.get(
+            reverse("supports_export_excel"),
+            {
+                "categorie": "12m²",
+                "format": "REPORT-FORMAT-SMALL",
+                "afficher_etat": "0",
+                "afficher_client": "0",
+                "afficher_faces_libres": "0",
+                "afficher_faces_reservees": "0",
+                "afficher_faces_occupees": "0",
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        workbook = load_workbook(BytesIO(response.content), read_only=True)
+        report_sheet = workbook["État Supports"]
+        report_headers = [
+            cell.value for cell in report_sheet[3]
+        ]
+        self.assertNotIn("Statut", report_headers)
+        self.assertEqual(report_sheet["A4"].value, "REPORT-SUPPORT-SMALL")
+        self.assertEqual(
+            report_sheet["B4"].value,
+            "REPORT-SUPPORT-SMALL (Ancien panneau test)",
+        )
+        self.assertEqual(report_sheet.max_row, 4)
+        self.assertIn("Catégories : 12m²", report_sheet["A1"].value)
+        self.assertIn("Format :", report_sheet["A1"].value)
+
+        summary_sheet = workbook["Résumé"]
+        summary = {
+            row[0]: row[1]
+            for row in summary_sheet.iter_rows(
+                min_row=4,
+                max_col=2,
+                values_only=True,
+            )
+        }
+        self.assertEqual(
+            summary,
+            {"Supports": 1, "Faces totales": 1},
         )
 
 

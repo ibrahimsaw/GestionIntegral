@@ -8,6 +8,7 @@ urlpatterns = [
     path('api/support/<int:pk>/faces/', api_faces_support, name='api_faces_support'),
     path('api/faces/<int:support_id>/', get_faces_support, name='api_faces_support'),
     path('supports/next-code/', support_next_code, name='support_next_code'),
+    path('supports/actions/', SupportBulkActionView.as_view(), name='support_bulk_action'),
 
     # CRUD
     path('', SupportListView.as_view(), name='support_list'),

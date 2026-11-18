@@ -347,6 +347,21 @@ class MarcheDetailView(LoginRequiredMixin, DetailView):
         context['paginator'] = page_obj.paginator
         context['is_paginated'] = False
         context['title'] = self.object.nom
+
+        # ── Campagnes actives et historique ───────────────────────────────
+        lignes_actives = LigneCampagne.objects.filter(
+            support=self.object,
+            campagne__date_debut__lte=timezone.localdate(),
+            campagne__date_fin__gte=timezone.localdate(),
+        ).select_related('campagne__client', 'face')
+
+        historique = LigneCampagne.objects.filter(
+            support=self.object,
+            campagne__date_fin__lt=timezone.localdate(),
+        ).select_related('campagne__client').order_by('-campagne__date_fin')[:10]
+
+        context['lignes_actives'] = lignes_actives
+        context['historique'] = historique
         return context
 
 
@@ -1831,7 +1846,7 @@ class SupportDetailView(ClientStaffRequiredMixin, DetailView):
             'taux_annuel': round(
                 occupied_days_annual / (len(face_ids) * year_days) * 100,
                 1,
-            ),
+            ) if year_days > 0 else 0,
             'taux_par_face': taux_par_face,
         }
 
@@ -1845,8 +1860,8 @@ class SupportDetailView(ClientStaffRequiredMixin, DetailView):
             support=ecran.support,
             campagne__statut__in=[
                 Campagne.STATUT_EN_COURS,
-                Campagne.STATUT_EN_PAUSE,
                 Campagne.STATUT_A_VENIR,
+                Campagne.STATUT_EN_PAUSE,
                 Campagne.STATUT_TERMINEE,
             ],
             campagne__date_debut__lte=today,
@@ -2385,7 +2400,7 @@ class SupportUpdateView(StaffRequiredMixin, UpdateView):
                 AuditLog.ACTION_UPDATE,
                 'inventory',
                 obj=support,
-                detail=f"Modification support: {support.code}"
+                detail=f"Modification du support: {support.code}",
             )
 
         messages.success(self.request, f'Le support {support.code} a été mis à jour.')
@@ -2432,12 +2447,9 @@ class SupportDeleteView(StaffRequiredMixin, DeleteView):
 
                 if request.user.is_admin:
                     SupportDeletionRequest.objects.filter(
-                        support=support,
+                        support_id__in=[support.pk],
                         status=SupportDeletionRequest.STATUS_PENDING,
-                    ).update(
-                        status=SupportDeletionRequest.STATUS_CANCELLED,
-                        decided_at=timezone.now(),
-                    )
+                    ).update(status=SupportDeletionRequest.STATUS_CANCELLED, decided_at=timezone.now())
                     transaction.on_commit(lambda: cache.delete('dashboard_alertes'))
                     return self._delete_support(request, support)
 
@@ -3285,3 +3297,80 @@ class PeriodePanneDetailView(LoginRequiredMixin, View):
             },
             'title': f'Période de panne — {panne.support.code}',
         })
+
+
+# ── ACTIONS GROUPEES SUR LES SUPPORTS ────────────────────────────────────────
+
+class SupportBulkActionView(StaffRequiredMixin, View):
+    """Applique une action groupée aux supports sélectionnés depuis la liste."""
+
+    def post(self, request, *args, **kwargs):
+        raw_ids = request.POST.getlist('selected_ids')
+        try:
+            selected_ids = {int(value) for value in raw_ids}
+        except (TypeError, ValueError):
+            messages.error(request, "La sélection de supports est invalide.")
+            return redirect('support_list')
+
+        if not selected_ids:
+            messages.warning(request, "Cochez au moins un support.")
+            return redirect('support_list')
+
+        supports = list(Support.objects.filter(pk__in=selected_ids).order_by('code'))
+        if len(supports) != len(selected_ids):
+            messages.error(request, "La sélection contient un support invalide.")
+            return redirect('support_list')
+
+        action = request.POST.get('action')
+        if action in ('etat_bon', 'etat_signal', 'etat_panne'):
+            target_etat = {
+                'etat_bon': Support.ETAT_BON,
+                'etat_signal': Support.ETAT_A_MAINTENIR,
+                'etat_panne': Support.ETAT_PANNE,
+            }[action]
+            Support.objects.filter(pk__in=selected_ids).update(etat=target_etat)
+            labels = dict(Support.ETAT_CHOICES)
+            messages.success(request, f"État « {labels.get(target_etat, target_etat)} » appliqué à {len(supports)} support(s).")
+
+        elif action == 'demander_suppression':
+            eligible = [s for s in supports if not s.lignes_campagne.exists() and not s.lignes_reservation.exists()]
+            blocked = [s.code for s in supports if s not in eligible]
+
+            if request.user.is_admin:
+                if eligible:
+                    ids = [support.pk for support in eligible]
+                    SupportDeletionRequest.objects.filter(
+                        support_id__in=ids,
+                        status=SupportDeletionRequest.STATUS_PENDING,
+                    ).update(status=SupportDeletionRequest.STATUS_CANCELLED, decided_at=timezone.now())
+                    Support.objects.filter(pk__in=ids).delete()
+                    messages.success(request, f"{len(eligible)} support(s) supprimé(s).")
+            else:
+                created = 0
+                existing = 0
+                for support in eligible:
+                    pending = SupportDeletionRequest.objects.filter(
+                        support=support,
+                        status=SupportDeletionRequest.STATUS_PENDING,
+                    ).exists()
+                    if pending:
+                        existing += 1
+                        continue
+                    SupportDeletionRequest.objects.create(
+                        support=support,
+                        support_code=support.code,
+                        requested_by=request.user,
+                        requester_name=request.user.get_full_name() or request.user.username,
+                    )
+                    created += 1
+                if created:
+                    messages.success(request, f"{created} demande(s) de suppression enregistrée(s).")
+                if existing:
+                    messages.warning(request, f"{existing} demande(s) étaient déjà en attente.")
+
+            if blocked:
+                messages.error(request, "Suppression bloquée pour : " + ", ".join(blocked))
+        else:
+            messages.error(request, "Action groupée inconnue.")
+
+        return redirect('support_list')

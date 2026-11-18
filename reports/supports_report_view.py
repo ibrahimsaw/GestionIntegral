@@ -135,9 +135,30 @@ def _build_context_panneaux(filters: dict) -> dict:
     q         = filters.get("q",         "").strip()
     client_pk = filters.get("client_pk", "")
     marche_pk = filters.get("marche_pk", "").strip()
+    format_code = filters.get("format", "").strip()
     categories = filters.get("categories", [])
     if isinstance(categories, str):
         categories = [categories] if categories else []
+
+    format_codes = set(
+        Support.objects.filter(
+            type_support=Support.TYPE_PANNEAU,
+        )
+        .exclude(format="")
+        .values_list("format", flat=True)
+    )
+    formats_supports = list(
+        FormatSupport.objects.filter(
+            code__in=format_codes,
+        ).order_by("categorie", "code")
+    )
+    formats_par_categorie = {}
+    for format_support in formats_supports:
+        if format_support.categorie:
+            formats_par_categorie.setdefault(
+                format_support.categorie,
+                [],
+            ).append(format_support.code)
 
     if categories:
         non_market_filters = Q()
@@ -149,13 +170,23 @@ def _build_context_panneaux(filters: dict) -> dict:
             non_market_filters |= Q(type_support=Support.TYPE_ECRAN)
         if "Marché" in categories:
             non_market_filters |= Q(emplacement__isnull=False)
+        for categorie in categories:
+            codes_formats = formats_par_categorie.get(categorie)
+            if codes_formats:
+                non_market_filters |= Q(
+                    type_support=Support.TYPE_PANNEAU,
+                    format__in=codes_formats,
+                )
         qs = qs.filter(non_market_filters) if non_market_filters else qs.none()
     elif marche_pk:
         qs = qs.filter(emplacement__marche_id=marche_pk)
     else:
         qs = qs.exclude(emplacement__isnull=False)
 
-    include_markets = not categories or "Marché" in categories or bool(marche_pk)
+    include_markets = (
+        not format_code
+        and (not categories or "Marché" in categories or bool(marche_pk))
+    )
     if categories and categories == ["Marché"] and not marche_pk:
         qs = qs.none()
 
@@ -163,6 +194,8 @@ def _build_context_panneaux(filters: dict) -> dict:
         qs = qs.filter(ville__iexact=ville)
     if quartier:
         qs = qs.filter(quartier__iexact=quartier)
+    if format_code:
+        qs = qs.filter(format=format_code)
     if statut:
         qs = qs.filter(etat=statut)
     if q:
@@ -256,6 +289,7 @@ def _build_context_panneaux(filters: dict) -> dict:
             "code"        : support.code,
             "code_ext"    : support.code_ext or "—",
             "nom"         : support.nom,
+            "ancien_nom"  : support.ancien_nom,
             "type"        : "Écran" if support.type_support == Support.TYPE_ECRAN else "Sucette" if support.format == "1x2" else "Marché" if support.is_dans_marche else "Panneau",
             "ville"       : support.ville,
             "quartier"    : support.quartier,
@@ -355,10 +389,25 @@ def _build_context_panneaux(filters: dict) -> dict:
     villes    = sorted({v.strip() for v in all_supports.values_list("ville",    flat=True) if v and v.strip()})
     quartiers = sorted({q.strip() for q in all_supports.values_list("quartier", flat=True) if q and q.strip()})
     statuts   = sorted({s.strip() for s in all_supports.values_list("etat",     flat=True) if s and s.strip()})
+    formats_rapport = [
+        {"code": format_support.code, "label": str(format_support)}
+        for format_support in formats_supports
+    ]
+    formats_connus = {format_support["code"] for format_support in formats_rapport}
+    formats_rapport.extend(
+        {"code": code, "label": code}
+        for code in sorted(format_codes - formats_connus)
+    )
     clients   = Client.objects.filter(
         type_entite=Client.TYPE_CLIENT,
     ).order_by("nom")
     marches_list = Marche.objects.filter(actif=True).order_by("nom")
+    categories_rapport = ["Panneau", "Écran", "Marché", "Sucette"]
+    categories_rapport.extend(
+        categorie
+        for categorie in sorted(formats_par_categorie, key=str.casefold)
+        if categorie not in categories_rapport
+    )
 
     return {
         "panneaux"          : panneaux,
@@ -367,12 +416,16 @@ def _build_context_panneaux(filters: dict) -> dict:
         "categories_selectionnees": categories,
         "afficher_etat": filters.get("afficher_etat", "1") == "1",
         "afficher_client": filters.get("afficher_client", "1") == "1",
-        "categories_rapport": ["Panneau", "Écran", "Marché", "Sucette"],
+        "afficher_faces_libres": filters.get("afficher_faces_libres", "1") == "1",
+        "afficher_faces_reservees": filters.get("afficher_faces_reservees", "1") == "1",
+        "afficher_faces_occupees": filters.get("afficher_faces_occupees", "1") == "1",
+        "categories_rapport": categories_rapport,
         "categories_sections": categories_sections,
         "quartier_sections": _group_supports_by_quartier(panneaux),
         "villes"            : villes,
         "quartiers"         : quartiers,
         "statuts"           : statuts,
+        "formats_rapport"   : formats_rapport,
         "clients"           : clients,
         "marches_list"      : marches_list,
         "occupation_choices": OCCUPATION_CHOICES,
@@ -391,12 +444,16 @@ def _filters_from_request(request) -> dict:
         "quartier"  : request.GET.get("quartier",  ""),
         "statut"    : request.GET.get("statut",    ""),
         "occupation": request.GET.get("occupation",""),
+        "format"    : request.GET.get("format", "").strip(),
         "client_pk" : request.GET.get("client_pk", ""),
         "marche_pk" : request.GET.get("marche_pk", ""),
         "q"         : request.GET.get("q",         ""),
         "categories": request.GET.getlist("categorie"),
         "afficher_etat": request.GET.get("afficher_etat", "1"),
         "afficher_client": request.GET.get("afficher_client", "1"),
+        "afficher_faces_libres": request.GET.get("afficher_faces_libres", "1"),
+        "afficher_faces_reservees": request.GET.get("afficher_faces_reservees", "1"),
+        "afficher_faces_occupees": request.GET.get("afficher_faces_occupees", "1"),
     }
 
 # ══════════════════════════════════════════════════════════════════
@@ -484,7 +541,9 @@ class ExportSupportsExcelView(ClientStaffRequiredMixin, View):
         )
 
         # ── Colonnes sheet principal ──
-        base_cols = ["Code", "Nom", "Ville", "Quartier", "Adresse", "Statut"]
+        base_cols = ["Code", "Nom", "Ville", "Quartier", "Adresse"]
+        if context["afficher_etat"]:
+            base_cols.append("Statut")
         face_cols = [f"Face {chr(65 + i)}" for i in range(max_faces)]
         all_cols  = base_cols + face_cols
 
@@ -493,9 +552,12 @@ class ExportSupportsExcelView(ClientStaffRequiredMixin, View):
         clients_data = {}
 
         for panneau in context["panneaux"]:
+            nom_affiche = panneau["nom"]
+            if panneau.get("ancien_nom"):
+                nom_affiche += f' ({panneau["ancien_nom"]})'
             row = {
                 "Code"    : panneau["code"],
-                "Nom"     : panneau["nom"],
+                "Nom"     : nom_affiche,
                 "Ville"   : panneau["ville"],
                 "Quartier": panneau["quartier"],
                 "Adresse" : panneau["adresse"],
@@ -506,49 +568,50 @@ class ExportSupportsExcelView(ClientStaffRequiredMixin, View):
                 lettre = chr(65 + i)
                 statut = face_data["statut"]
 
-                if statut == "occupe" and face_data["campagnes"]:
-                    camp       = face_data["campagnes"][0]
-                    client_nom = camp.client.nom if camp.client else "Inconnu"
-                    contenu    = f"● Occupée\n{client_nom} — {camp.nom}"
-                    if client_nom not in clients_data:
-                        clients_data[client_nom] = []
-                    clients_data[client_nom].append({
-                        "Code"    : panneau["code"],
-                        "Nom"     : panneau["nom"],
-                        "Ville"   : panneau["ville"],
-                        "Quartier": panneau["quartier"],
-                        "Adresse" : panneau["adresse"],
-                        "Face"    : lettre,
-                        "Statut"  : "Occupée",
-                        "Campagne": camp.nom,
-                        "Début"   : camp.date_debut.strftime("%d/%m/%Y"),
-                        "Fin"     : camp.date_fin.strftime("%d/%m/%Y"),
-                    })
-
-                elif statut == "reserve":
-                    resa = (
-                        face_data["face"].lignes_client
-                        .filter(date_fin__gte=now)
-                        .select_related("client")
-                        .first()
-                    )
-                    client_nom = resa.client.nom if resa and resa.client else "Inconnu"
-                    contenu    = f"◈ Réservée\n{client_nom}" if resa else "◈ Réservée"
-                    if resa and resa.client:
-                        if client_nom not in clients_data:
-                            clients_data[client_nom] = []
-                        clients_data[client_nom].append({
+                if statut == "occupe":
+                    campagnes = face_data["campagnes"]
+                    contenu = "● Occupée"
+                    if context["afficher_client"] and campagnes:
+                        camp = campagnes[0]
+                        client_nom = camp.client.nom if camp.client else "Inconnu"
+                        contenu = f"● Occupée\n{client_nom} — {camp.nom}"
+                        clients_data.setdefault(client_nom, []).append({
                             "Code"    : panneau["code"],
-                            "Nom"     : panneau["nom"],
+                            "Nom"     : nom_affiche,
                             "Ville"   : panneau["ville"],
                             "Quartier": panneau["quartier"],
                             "Adresse" : panneau["adresse"],
                             "Face"    : lettre,
-                            "Statut"  : "Réservée",
-                            "Campagne": "— (Réservation)",
-                            "Début"   : resa.date_debut.strftime("%d/%m/%Y"),
-                            "Fin"     : resa.date_fin.strftime("%d/%m/%Y"),
+                            "Statut"  : "Occupée",
+                            "Campagne": camp.nom,
+                            "Début"   : camp.date_debut.strftime("%d/%m/%Y"),
+                            "Fin"     : camp.date_fin.strftime("%d/%m/%Y"),
                         })
+
+                elif statut == "reserve":
+                    contenu = "◈ Réservée"
+                    if context["afficher_client"]:
+                        resa = (
+                            face_data["face"].lignes_client
+                            .filter(date_fin__gte=now)
+                            .select_related("client")
+                            .first()
+                        )
+                        client_nom = resa.client.nom if resa and resa.client else ""
+                        if client_nom:
+                            contenu = f"◈ Réservée\n{client_nom}"
+                            clients_data.setdefault(client_nom, []).append({
+                                "Code"    : panneau["code"],
+                                "Nom"     : nom_affiche,
+                                "Ville"   : panneau["ville"],
+                                "Quartier": panneau["quartier"],
+                                "Adresse" : panneau["adresse"],
+                                "Face"    : lettre,
+                                "Statut"  : "Réservée",
+                                "Campagne": "— (Réservation)",
+                                "Début"   : resa.date_debut.strftime("%d/%m/%Y"),
+                                "Fin"     : resa.date_fin.strftime("%d/%m/%Y"),
+                            })
 
                 else:
                     contenu = "__"
@@ -605,6 +668,19 @@ class ExportSupportsExcelView(ClientStaffRequiredMixin, View):
             if filters.get("ville"):      titre_parts.append(f"Ville : {filters['ville']}")
             if filters.get("quartier"):   titre_parts.append(f"Quartier : {filters['quartier']}")
             if filters.get("occupation"): titre_parts.append(f"Occupation : {filters['occupation']}")
+            if filters.get("statut"):     titre_parts.append(f"État : {filters['statut']}")
+            if filters.get("categories"):
+                titre_parts.append(f"Catégories : {', '.join(filters['categories'])}")
+            if filters.get("format"):
+                format_label = next(
+                    (
+                        item["label"]
+                        for item in context["formats_rapport"]
+                        if item["code"] == filters["format"]
+                    ),
+                    filters["format"],
+                )
+                titre_parts.append(f"Format : {format_label}")
             ws["A1"] = "  |  ".join(titre_parts)
             ws["A1"].font = titre_font
 
@@ -619,12 +695,11 @@ class ExportSupportsExcelView(ClientStaffRequiredMixin, View):
 
             # Index colonnes
             face_col_indices = [i + 1 for i, col in enumerate(all_cols) if col.startswith("Face ")]
-            statut_col_index = all_cols.index("Statut") + 1
-
             # ── Coloration par ligne ──
-            for row in ws.iter_rows(min_row=4, max_row=ws.max_row):
-                statut_val = row[statut_col_index - 1].value
-                en_panne   = statut_val and statut_val != "Bon état"
+            for row_index, row in enumerate(
+                ws.iter_rows(min_row=4, max_row=ws.max_row)
+            ):
+                en_panne = context["panneaux"][row_index]["etat_raw"] == "panne"
 
                 for cell in row:
                     cell.font   = font_panne_row if en_panne else font_normal
@@ -666,7 +741,7 @@ class ExportSupportsExcelView(ClientStaffRequiredMixin, View):
             for i, col_name in enumerate(all_cols, start=1):
                 ws.column_dimensions[get_column_letter(i)].width = col_widths.get(col_name, 28)
 
-            ws.freeze_panes = "G4"
+            ws.freeze_panes = f"{get_column_letter(len(base_cols) + 1)}4"
 
             # ════════════════════════════════
             # SHEETS PAR CLIENT
@@ -747,6 +822,41 @@ class ExportSupportsExcelView(ClientStaffRequiredMixin, View):
                     ws_c.column_dimensions[get_column_letter(i)].width = col_widths_client.get(col_name, 28)
 
                 ws_c.freeze_panes = "F4"
+
+            resume_rows = [
+                {"Indicateur": "Supports", "Valeur": context["total_panneaux"]},
+                {"Indicateur": "Faces totales", "Valeur": context["total_faces"]},
+            ]
+            for filtre, cle, valeur in (
+                ("afficher_faces_libres", "Faces libres", context["total_libres"]),
+                ("afficher_faces_reservees", "Faces réservées", context["total_reservees"]),
+                ("afficher_faces_occupees", "Faces occupées", context["total_occupees"]),
+            ):
+                if context[filtre]:
+                    resume_rows.append({"Indicateur": cle, "Valeur": valeur})
+
+            resume_name = "Résumé"
+            suffix = 2
+            while resume_name in writer.sheets:
+                resume_name = f"Résumé {suffix}"
+                suffix += 1
+            pd.DataFrame(resume_rows, columns=["Indicateur", "Valeur"]).to_excel(
+                writer,
+                index=False,
+                sheet_name=resume_name,
+                startrow=2,
+            )
+            ws_resume = writer.sheets[resume_name]
+            ws_resume["A1"] = f"Résumé du rapport — généré le {date.today():%d/%m/%Y}"
+            ws_resume["A1"].font = titre_font
+            for cell in ws_resume[3]:
+                cell.fill = header_fill
+                cell.font = header_font
+                cell.alignment = Alignment(horizontal="center", vertical="center")
+                cell.border = _thin_border("1E293B")
+            ws_resume.column_dimensions["A"].width = 28
+            ws_resume.column_dimensions["B"].width = 16
+            ws_resume.freeze_panes = "A4"
 
         buffer.seek(0)
 

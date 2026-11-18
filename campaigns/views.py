@@ -7142,7 +7142,6 @@ class DemandeCreationView(StaffDemandeWizardBase):
             }
             for client in Client.objects.filter(
                 actif=True,
-                type_entite=Client.TYPE_CLIENT,
             ).values('id', 'contact_nom', 'telephone', 'email')
         }
         agence_contact_data = {
@@ -7153,7 +7152,6 @@ class DemandeCreationView(StaffDemandeWizardBase):
             }
             for client in Client.objects.filter(
                 actif=True,
-                type_entite=Client.TYPE_AGENCE,
             ).values('id', 'contact_nom', 'telephone', 'email')
         }
         return render(request, self.template_name, self.step_context(

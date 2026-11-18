@@ -706,19 +706,18 @@
     grid-area: header;
     min-width: 0;
     padding: 14px 16px;
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: start;
-    gap: 12px;
+    display: block;
   }
   .sc-info { min-width: 0; }
-  .sc-code { font-family: var(--mono); font-size: .72rem; font-weight: 600; color: var(--brand); letter-spacing: .02em; }
+  .sc-code { display: inline-block; font-family: var(--mono); font-size: .72rem; font-weight: 600; color: var(--brand); letter-spacing: .02em; vertical-align: middle; }
   .sc-quartier { display: flex; align-items: center; gap: 5px; margin-top: 3px; font-size: .74rem; color: var(--muted); }
   .sc-quartier i { color: var(--brand); font-size: .72rem; }
   .sc-nom  { font-size: .95rem; font-weight: 650; color: var(--ink); white-space: normal; overflow-wrap: anywhere; line-height: 1.4; }
   .sc-addr { font-size: .76rem; color: var(--muted); white-space: normal; overflow-wrap: anywhere; line-height: 1.4; }
   .sc-format {
+    display: inline-block;
     flex-shrink: 0;
+    margin-left: 8px;
     padding: 3px 10px;
     border: 1px solid var(--line);
     border-radius: 999px;
@@ -997,11 +996,16 @@
   .staff-v2 .nd-aside {
     z-index: 1021;
   }
-  .staff-v2 .panier-body,
   .staff-v2 .panier-section,
   .staff-v2 .nd-recap {
     max-height: none !important;
     overflow: visible !important;
+  }
+
+  .account-field-readonly {
+    background: #f3f4f6 !important;
+    color: #6b7280 !important;
+    cursor: not-allowed;
   }
 </style>
 
@@ -1274,9 +1278,14 @@
   .cc-grid-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .cc-field > label { display: block; margin-bottom: 6px; font-size: .88rem; font-weight: 800; color: var(--ink); }
   .cc-req { color: #e11d1d; font-weight: 800; }
+ 
+
+
+
+
   .cc-input { position: relative; }
   .cc-input input:not([type=checkbox]):not([type=radio]), .cc-input select, .cc-input textarea {
-    width:  100%; min-height: 44px; padding: 0 14px; border: 1.5px solid var(--line-strong); border-radius: 10px;
+    width:                                                                                                                                 100%; min-height: 44px; padding: 0 14px; border: 1.5px solid var(--line-strong); border-radius: 10px;
     background: #fff; color: var(--ink); font-size: .92rem; box-shadow: none;
 
   }
@@ -1302,7 +1311,6 @@
     overflow: visible;
   }
   .staff-v2 .nd-recap { overflow: visible; }
-  .staff-v2 .panier-body { max-height: none; overflow: visible; }
   .nd-acc { margin-bottom: 12px; }
   .nd-recap { border: 1px solid var(--line); border-radius: var(--radius); background: #fff; box-shadow: var(--dr-shadow); overflow: hidden; }
   .nd-recap-head { display: flex; align-items: center; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--line); }
@@ -1422,7 +1430,7 @@
   }
   .nd-tarif td .nd-unit { margin-left: 8px; color: var(--muted); font-size: .76rem; font-weight: 700; }
   .nd-tarif-support {
-    display: flex; align-items: center; justify-content: space-between; gap: 12px; min-width: 190px;
+    display: flex; align-items: center; justify-content: space-between; gap: 12px, 0;
   }
   .nd-support-name { display: flex; flex-direction: column; gap: 3px; }
   .nd-support-name strong { color: var(--ink); font-size: .82rem; }
@@ -1569,6 +1577,11 @@
             <div class="cc-input"><i class="bi bi-envelope cc-ico" style="color:#dc2626"></i>{{ contact_form.email }}</div>
             {% for error in contact_form.email.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
           </div>
+          <div class="cc-field has-ico ">
+            <label for="{{ contact_form.whatsapp.id_for_label }}">WhatsApp</label>
+            <div class="cc-input"><i class="bi bi-whatsapp cc-ico" style="color:#25d366"></i>{{ contact_form.whatsapp }}</div>
+            {% for error in contact_form.whatsapp.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
+          </div>
         </div>
 
         <div class="acc-summary is-empty" id="acc-summary" aria-live="polite" hidden>
@@ -1591,19 +1604,31 @@
         </summary>
         <div class="nd-body">
           <div class="cf-block">
-            <div class=""><b>Où diffuser ?</b><small>Ville et catégorie</small></div>
+            <div class=""><b>Où diffuser ?</b><small>Ville, catégorie et format</small></div>
             <div id="filtres-carte" style="display:none;gap:6px;flex-wrap:wrap">
-              <select class="mf-select" id="filter-ville"><option value="">Toutes les villes</option></select>
-              <select class="mf-select" id="filter-categorie" aria-required="true"><option value="">Choisir un support</option></select>
-              <div id="filter-format-wrap" class="staff-format-filter">
-                <select class="mf-select" id="filter-format"><option value="">Tous formats</option></select>
+              <select class="mf-select" id="filter-ville">
+              </select>
+              {% if not shared_edit_mode %}
+              <select class="mf-select" id="filter-categorie" {% if staff_mode %}aria-required="true"{% endif %}>
+              </select>
+              {% endif %}
+              <div id="filter-format-wrap" class="{% if staff_mode or shared_edit_mode %}staff-format-filter{% endif %}">
+                <select class="mf-select" id="filter-format">
+                  <option value="">Tous formats</option>
+                </select>
               </div>
             </div>
             <div id="filtres-liste" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-              <select class="mf-select" id="list-filter-ville"><option value="">Toutes les villes</option></select>
-              <select class="mf-select" id="list-filter-categorie" aria-required="true"><option value="">Choisir un support</option></select>
-              <div id="list-filter-format-wrap" class="staff-format-filter">
-                <select class="mf-select" id="list-filter-format"><option value="">Tous formats</option></select>
+              <select class="mf-select" id="list-filter-ville">
+              </select>
+              {% if not shared_edit_mode %}
+              <select class="mf-select" id="list-filter-categorie" {% if staff_mode %}aria-required="true"{% endif %}>
+              </select>
+              {% endif %}
+              <div id="list-filter-format-wrap" class="{% if staff_mode or shared_edit_mode %}staff-format-filter{% endif %}">
+                <select class="mf-select" id="list-filter-format">
+                  <option value="">Tous formats</option>
+                </select>
               </div>
             </div>
           </div>
@@ -1755,7 +1780,6 @@
       <div class="nd-recap">
         <div class="nd-recap-head"><i class="bi bi-clipboard"></i><h2>Récapitulatif de la demande</h2></div>
         <div class="nd-rrow"><i class="bi bi-person"></i><div><b>Client &amp; agence</b><div class="nd-rval" id="rc-compte">Non renseigné</div></div></div>
-        <div class="nd-rrow"><i class="bi bi-calendar-range"></i><div><b>Diffusion</b><div class="nd-rval" id="rc-diffusion">À définir</div></div></div>
         <div class="nd-rrow"><i class="bi bi-megaphone"></i><div><b>Campagne</b><div class="nd-rval" id="rc-campagne">Non renseignée</div></div></div>
         <div class="nd-rrow"><i class="bi bi-coin"></i><div><b>Tarification <small>(estimatif)</small></b><div class="nd-rval" id="rc-tarif">Non renseignée</div></div></div>
 
@@ -1842,16 +1866,14 @@
 
     <section class="cf-sec cf-sec-period" style="padding-bottom:14px">
       {% if staff_mode or shared_edit_mode %}<h2 class="cf-h"><span class="cf-h-ico"><i class="bi bi-calendar-range"></i></span>{% if staff_mode %}Campagne et période de diffusion{% else %}Période de diffusion{% endif %}</h2>
-      <p class="cf-sub">{% if staff_mode %}Choisissez d'abord la ville et la catégorie, puis les dates.{% else %}Choisissez la ville et la catégorie, puis les dates.{% endif %}</p>{% endif %}
+      <p class="cf-sub">{% if staff_mode %}Choisissez d'abord la catégorie, puis les dates.{% else %}Choisissez la catégorie, puis les dates.{% endif %}</p>{% endif %}
       <div class="cf-block cf-block-where">
-        <div class="cf-block-h"><span class="cf-block-n"></span><b>Où diffuser ?</b><small>Ville et catégorie</small></div>
+        <div class="cf-block-h"><span class="cf-block-n"></span><b>Où diffuser ?</b><small>Ville, catégorie et format</small></div>
       <div id="filtres-carte" style="display:none;gap:6px;flex-wrap:wrap">
         <select class="mf-select" id="filter-ville">
-          <option value="">Toutes les villes</option>
         </select>
         {% if not shared_edit_mode %}
         <select class="mf-select" id="filter-categorie" {% if staff_mode %}aria-required="true"{% endif %}>
-          <option value="">{% if staff_mode %}Choisir un support{% else %}Toutes catégories{% endif %}</option>
         </select>
         {% endif %}
         <div id="filter-format-wrap" class="{% if staff_mode or shared_edit_mode %}staff-format-filter{% endif %}">
@@ -1862,11 +1884,9 @@
       </div>
       <div id="filtres-liste" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
         <select class="mf-select" id="list-filter-ville">
-          <option value="">Toutes les villes</option>
         </select>
         {% if not shared_edit_mode %}
         <select class="mf-select" id="list-filter-categorie" {% if staff_mode %}aria-required="true"{% endif %}>
-          <option value="">{% if staff_mode %}Choisir un support{% else %}Toutes catégories{% endif %}</option>
         </select>
         {% endif %}
         <div id="list-filter-format-wrap" class="{% if staff_mode or shared_edit_mode %}staff-format-filter{% endif %}">
@@ -1875,8 +1895,7 @@
           </select>
         </div>
       </div>
-
-      </div>
+    </div>
       {% if staff_mode %}
       <div class="cf-block">
         <div class="cf-block-h"><span class="cf-block-n"></span><b>Campagne</b><small>Facultatif</small></div>
@@ -2446,16 +2465,12 @@
           lines.push(`${escHtml(format.label)} : ${format.count} face${format.count > 1 ? 's' : ''}`);
         });
         recap.innerHTML = lines.length
-          ? lines.join('<br>') + `<br>Montant total : <strong class="nd-total">${fmtFcfa(total)} FCFA</strong>`
-          : '';
+          ? `Pour ${lines.join(', ')}`
+          : 'Aucune face sélectionnée';
       }
     }
 
-    function isPanierContainsSupport(supportId) {
-      return Object.values(panier).some(item => item.support_id === String(supportId));
-    }
-
-    // ── POPUP PANNEAU ──────────────────────────────────────────────────────────
+    // ── POPUP PANNEAU �───────────────────────────────────────────────────────────
     function openPopupById(supportId, marker) {
       if (currentPopup) currentPopup.remove();
       const feat = allFeatures.find(f => f.properties.id === supportId);
@@ -2524,9 +2539,9 @@
     function getFilteredFeatures(isListeView = false) {
       const prefix = isListeView ? 'list-filter-' : 'filter-';
 
-      const ville = document.getElementById(prefix + 'ville')?.value || '';
       const categorie = document.getElementById(prefix + 'categorie')?.value || '';
       const fmt = document.getElementById(prefix + 'format')?.value || '';
+      const ville = document.getElementById(prefix + 'ville')?.value || '';
       if (REQUIRE_CATEGORY && !categorie) return [];
 
       let q = '';
@@ -2540,9 +2555,9 @@
         if (p.type !== 'panneau') return false;
         if (SHARED_EDIT_MODE && !SHARED_ALLOWED_CATEGORIES.includes(p.categorie || 'Autres')) return false;
 
-        if (ville && p.ville !== ville) return false;
         if (categorie && p.categorie !== categorie) return false;
         if (fmt && p.format !== fmt) return false;
+        if (ville && p.ville !== ville) return false;
         if (q && !String(p.code||'').toLowerCase().includes(q)
               && !(p.quartier||'').toLowerCase().includes(q)
               && !(p.nom||'').toLowerCase().includes(q)) return false;
@@ -2624,58 +2639,67 @@
 
       const panneaux = getPanneaux();
 
-      function rebuild(el, field, skipKey, labelFn) {
+      function rebuild(el, field, skipKey, filters, labelFn) {
         if (!el) return;
         const values = new Map();
+        const counts = new Map();
 
         panneaux.forEach(f => {
           const p = f.properties;
-          if (!matchesFacet(p, current, skipKey)) return;
+          if (!matchesFacet(p, filters, skipKey)) return;
           const val = p[field];
           if (!val) return;
           if (!values.has(val)) values.set(val, labelFn ? labelFn(p) : val);
+          if (field === 'ville' || field === 'categorie') {
+            counts.set(val, (counts.get(val) || 0) + 1);
+          }
         });
 
-        const placeholder = el.options[0];
+        const placeholder = el.options[0] && !el.options[0].value ? el.options[0] : null;
         el.innerHTML = '';
-        el.appendChild(placeholder);
+        if (placeholder) el.appendChild(placeholder);
 
         Array.from(values.entries())
-          .sort((a, b) => field === 'format'
-            ? compareFormatLabels(a[1], b[1])
-            : String(a[1]).localeCompare(String(b[1])))
+          .sort((a, b) => {
+            if (field === 'ville' || field === 'categorie') {
+              return counts.get(b[0]) - counts.get(a[0])
+                || String(a[1]).localeCompare(String(b[1]), 'fr', { sensitivity: 'base' });
+            }
+            return field === 'format'
+              ? compareFormatLabels(a[1], b[1])
+              : String(a[1]).localeCompare(String(b[1]));
+          })
           .forEach(([val, lbl]) => {
             const opt = document.createElement('option');
             opt.value = val; opt.textContent = lbl;
             el.appendChild(opt);
           });
 
-        el.value = (current[skipKey] && values.has(current[skipKey])) ? current[skipKey] : '';
+        const selectedValue = current[skipKey] && values.has(current[skipKey])
+          ? current[skipKey]
+          : (placeholder
+            ? placeholder.value
+            : (el.options[0] ? el.options[0].value : ''));
+        el.value = selectedValue;
       }
 
-      rebuild(elVille,     'ville',     'ville');
-      rebuild(elCategorie, 'categorie', 'categorie');
-      rebuild(elFormat,    'format',    'format', p => p.format_display || p.format);
+      rebuild(elVille,     'ville',     'ville',     { ville: current.ville });
+      current.ville = elVille ? elVille.value : '';
+      rebuild(elCategorie, 'categorie', 'categorie', { ville: current.ville });
+      current.categorie = elCategorie ? elCategorie.value : '';
+      const formatFilters = { ville: current.ville, categorie: current.categorie };
+      rebuild(elFormat,    'format',    'format',    formatFilters, p => p.format_display || p.format);
 
       const formatWrap = document.getElementById(prefix + 'format-wrap');
-      if (formatWrap && REQUIRE_CATEGORY) {
-        const categoryFormats = new Set(
+      if (formatWrap) {
+        const availableFormats = new Set(
           panneaux
-            .filter(feature => {
-              const p = feature.properties;
-              const categoryMatches = SHARED_EDIT_MODE
-                ? SHARED_ALLOWED_CATEGORIES.includes(p.categorie || 'Autres')
-                : p.categorie === current.categorie;
-              return categoryMatches
-                && (!current.ville || p.ville === current.ville);
-            })
+            .filter(feature => matchesFacet(feature.properties, formatFilters, 'format'))
             .map(feature => feature.properties.format)
             .filter(Boolean)
         );
-        formatWrap.style.display = (SHARED_EDIT_MODE || current.categorie) && categoryFormats.size > 1
-          ? ''
-          : 'none';
-        if (categoryFormats.size <= 1 && elFormat) elFormat.value = '';
+        formatWrap.style.display = availableFormats.size > 1 ? '' : 'none';
+        if (availableFormats.size <= 1 && elFormat) elFormat.value = '';
       }
       if (prefix === 'filter-') {
         const categoryHint = document.getElementById('map-category-hint');
@@ -2793,10 +2817,10 @@
         <div class="sc-header">
           <div class="sc-info">
             <div class="sc-code">${p.code}</div>
+            ${formatBadge}
             <div class="sc-nom">${p.nom}</div>
             <div class="sc-quartier"><i class="bi bi-geo-alt"></i> ${p.quartier || 'Quartier non renseigné'}${p.ville ? ' · ' + p.ville : ''}</div>
           </div>
-          ${formatBadge}
         </div>
         <div class="sc-faces">
           ${facesHtml || '<span style="font-size:.7rem;color:#94a3b8;padding:4px">Aucune face disponible</span>'}
@@ -2811,6 +2835,7 @@
       refreshFacetSelects('filter-');
       refreshFacetSelects('list-filter-');
       applyInitialFiltres();
+      if (currentView === 'liste') renderListe();
     }
 
     function applyInitialFiltres() {
@@ -2827,7 +2852,11 @@
 
       ['filter-', 'list-filter-'].forEach(prefix => {
         setSelectValue(prefix + 'ville', ville);
+        const categorySelect = document.getElementById(prefix + 'categorie');
+        if (ville && !categorie && categorySelect) categorySelect.value = '';
+        refreshFacetSelects(prefix);
         setSelectValue(prefix + 'categorie', categorie);
+        refreshFacetSelects(prefix);
         setSelectValue(prefix + 'format', format);
         refreshFacetSelects(prefix);
       });
@@ -2837,24 +2866,26 @@
     }
 
     // ── Triggers : vue Carte ────────────────────────────────────────────────
-    function onCarteFilterChange() {
+    function onCarteFilterChange(event) {
+      if (event.target.id === 'filter-ville' && filterCategorie) filterCategorie.value = '';
       refreshFacetSelects('filter-');
       applyCarteFilters(true);
     }
-    document.getElementById('filter-ville').addEventListener('change', onCarteFilterChange);
     const filterCategorie = document.getElementById('filter-categorie');
     if (filterCategorie) filterCategorie.addEventListener('change', onCarteFilterChange);
     document.getElementById('filter-format').addEventListener('change', onCarteFilterChange);
+    document.getElementById('filter-ville').addEventListener('change', onCarteFilterChange);
 
     // ── Triggers : vue Liste ─────────────────────────────────────────────────
-    function onListeFilterChange() {
+    function onListeFilterChange(event) {
+      if (event.target.id === 'list-filter-ville' && listFilterCategorie) listFilterCategorie.value = '';
       refreshFacetSelects('list-filter-');
       renderListe();
     }
-    document.getElementById('list-filter-ville').addEventListener('change', onListeFilterChange);
     const listFilterCategorie = document.getElementById('list-filter-categorie');
     if (listFilterCategorie) listFilterCategorie.addEventListener('change', onListeFilterChange);
     document.getElementById('list-filter-format').addEventListener('change', onListeFilterChange);
+    document.getElementById('list-filter-ville').addEventListener('change', onListeFilterChange);
     document.getElementById('list-search').addEventListener('input', renderListe);
 
 
@@ -3036,6 +3067,10 @@
     if (elDureeJours) elDureeJours.addEventListener('input', onDureeChange);
 
   // ── PANIER ────────────────────────────────────────────────────────────────
+    function isPanierContainsSupport(supportId) {
+      return Object.values(panier).some(item => item.support_id === String(supportId));
+    }
+
     function toggleFace(faceId, code, label, quartier, supportId, formatCode, formatDisplay, categorie) {
       const key = String(faceId);
       if (panier[key]) delete panier[key];
@@ -3089,8 +3124,8 @@
           el.innerHTML = `
             <div class="pi-icon">${faceLabel}</div>
             <div class="pi-info">
-              <div class="pi-code">${item.code} · ${item.label}</div>
-              <div class="pi-addr">${item.quartier || ''}</div>
+              <div class="pi-code">${item.code} · ${item.format_display}</div>
+              <div class="pi-addr"> ${item.quartier || ''}</div>
             </div>
             <button class="pi-remove" onclick="removePanierItem('${uuid}')" title="Retirer">
               <i class="bi bi-x"></i>
@@ -3192,52 +3227,52 @@
 
     const clientProfile = clientId && clientProfiles[clientId] ? clientProfiles[clientId] : null;
     const agenceProfile = agenceId && agenceProfiles[agenceId] ? agenceProfiles[agenceId] : null;
-    const selectedClientName = clientSelect && clientSelect.selectedOptions && clientSelect.selectedOptions[0] && clientSelect.value
+    const preferredProfile = clientProfile || agenceProfile || null;
+
+    const selectedClientName = clientSelect && clientSelect.selectedOptions && clientSelect.selectedOptions[0] && clientId
       ? clientSelect.selectedOptions[0].text.trim()
       : '';
-    const selectedAgenceName = agenceSelect && agenceSelect.selectedOptions && agenceSelect.selectedOptions[0] && agenceSelect.value
+    const selectedAgenceName = agenceSelect && agenceSelect.selectedOptions && agenceSelect.selectedOptions[0] && agenceId
       ? agenceSelect.selectedOptions[0].text.trim()
       : '';
 
-    const preferredProfile = clientProfile && (
-      clientProfile.contact_nom || clientProfile.telephone || clientProfile.email
-    )
-      ? clientProfile
-      : (agenceProfile || null);
+    const setAccountField = (fieldId, accountValue) => {
+      const field = document.getElementById(fieldId);
+      if (!field) return;
 
-    const mapping = {
-      id_contact: preferredProfile ? (preferredProfile.contact_nom || '') : '',
-      id_telephone: preferredProfile ? (preferredProfile.telephone || '') : '',
-      id_email: preferredProfile ? (preferredProfile.email || '') : '',
+      const value = String(accountValue || '').trim();
+
+      if (value) {
+        // Une valeur connue du compte est toujours synchronisée puis verrouillée.
+        field.value = value;
+        field.readOnly = true;
+        field.dataset.accountDerived = 'true';
+        field.setAttribute('aria-readonly', 'true');
+        field.classList.add('account-field-readonly');
+      } else {
+        // Si le compte ne fournit pas cette information, elle reste saisissable.
+        if (field.dataset.accountDerived === 'true') {
+          field.value = '';
+        }
+        field.readOnly = false;
+        delete field.dataset.accountDerived;
+        field.removeAttribute('aria-readonly');
+        field.classList.remove('account-field-readonly');
+      }
     };
 
-    if (societeField) {
-      const preferredCompanyName = selectedClientName || selectedAgenceName || '';
-      const isBlank = !String(societeField.value || '').trim();
-      const shouldKeepManualSociete = !isBlank && societeField.dataset.userEdited === 'true';
-      if (!shouldKeepManualSociete && preferredCompanyName) {
-        societeField.value = preferredCompanyName;
-        societeField.dataset.userEdited = 'false';
-      }
-    }
+    setAccountField('id_societe', selectedClientName || selectedAgenceName);
+    setAccountField('id_contact', preferredProfile ? preferredProfile.contact_nom : '');
+    setAccountField('id_telephone', preferredProfile ? preferredProfile.telephone : '');
+    setAccountField('id_email', preferredProfile ? preferredProfile.email : '');
 
-    Object.entries(mapping).forEach(([fieldId, value]) => {
+    ['id_contact', 'id_telephone', 'id_email', 'id_societe', 'id_whatsapp'].forEach((fieldId) => {
       const field = document.getElementById(fieldId);
-      if (!field) return;
-      const isBlank = !String(field.value || '').trim();
-      const shouldKeepManualValue = !isBlank && field.dataset.userEdited === 'true';
-      if (!shouldKeepManualValue && value) {
-        field.value = value;
-        field.dataset.userEdited = 'false';
-      }
-    });
-
-    ['id_contact', 'id_telephone', 'id_email', 'id_societe'].forEach((fieldId) => {
-      const field = document.getElementById(fieldId);
-      if (!field) return;
+      if (!field || field.dataset.manualListenerAdded === 'true') return;
+      field.dataset.manualListenerAdded = 'true';
       field.addEventListener('input', function () {
-        field.dataset.userEdited = 'true';
-      }, { once: true });
+        if (!field.readOnly) field.dataset.userEdited = 'true';
+      });
     });
   }
 
@@ -3250,6 +3285,12 @@
       allowEmptyOption: true,
       placeholder: placeholder,
       searchField: ['text'],
+      score: function (search) {
+        const query = search.trim().toLocaleLowerCase();
+        return function (item) {
+          return String(item.text || '').trim().toLocaleLowerCase().startsWith(query) ? 1 : 0;
+        };
+      },
       sortField: [{ field: '$order', direction: 'asc' }],
       closeAfterSelect: true,
       hideSelected: false,
@@ -3304,29 +3345,15 @@
     const client = opt('id_client'), agence = opt('id_agence');
     const contact = val('id_contact');
     const tel = val('id_telephone'), mail = val('id_email');
+    const whatsapp = val('id_whatsapp');
     const lignes = [];
     if (client) lignes.push('<strong>' + esc(client) + '</strong>');
     if (agence) lignes.push('Agence : ' + esc(agence));
     if (contact) lignes.push('Contact : ' + esc(contact));
     if (tel) lignes.push('<i class="bi bi-telephone"></i>' + esc(tel));
     if (mail) lignes.push('<i class="bi bi-envelope"></i>' + esc(mail));
+    if (whatsapp) lignes.push('<i class="bi bi-whatsapp" style="color:#25d366"></i>' + esc(whatsapp));
     put('rc-compte', lignes.length ? lignes.join('<br>') : 'Non renseigné', !lignes.length);
-
-    // Diffusion
-    const ville = opt('list-filter-ville') || opt('filter-ville');
-    const cat = opt('list-filter-categorie') || opt('filter-categorie');
-    const format = opt('list-filter-format') || opt('filter-format');
-    const debut = val('hidden-date-debut') || val('date-debut');
-    const fin = val('hidden-date-fin') || val('date-fin');
-    const d = [];
-    if (ville) d.push('<i class="bi bi-geo-alt"></i>' + esc(ville));
-    if (cat) d.push('<i class="bi bi-signpost-2"></i>' + esc(cat) + (format ? ' · ' + esc(format) : ''));
-    if (debut && fin) {
-      d.push('<i class="bi bi-calendar-range"></i>' + fmt(debut) + ' → ' + fmt(fin));
-      const n = nbJours(debut, fin);
-      if (n) d.push('<i class="bi bi-hourglass-split"></i>' + n + ' jour' + (n > 1 ? 's' : ''));
-    }
-    put('rc-diffusion', d.length ? d.join('<br>') : 'À définir', !d.length);
 
     // Campagne & tarification
     const camp = val('nom_campagne');

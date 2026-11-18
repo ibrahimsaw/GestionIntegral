@@ -203,11 +203,11 @@ class DemandeCreationViewTests(TestCase):
             'supports_selectionnees': '[]',
             'date_debut': self.start.isoformat(),
             'date_fin': self.end.isoformat(),
-            'type_client': DemandeReservation.TYPE_CLIENT_NOUVEAU,
-            'nom_contact': 'Moussa Prospect',
+            'contact': 'Moussa Prospect',
             'societe': 'Nouvelle société',
             'email': 'moussa@example.com',
             'telephone': '71000000',
+            'whatsapp': '72000000',
             'accepte_contact': 'on',
         }
         data.update(overrides)
@@ -271,6 +271,83 @@ class DemandeCreationViewTests(TestCase):
         self.assertTrue(form.is_valid(), form.errors)
         self.assertIsNone(form.cleaned_data['new_client'])
         self.assertEqual(form.cleaned_data['societe'], 'Agence sans client')
+
+    def test_client_and_agency_selectors_accept_either_account_but_require_distinct_accounts(self):
+        client = Client.objects.create(
+            nom='Client sélectionnable comme agence',
+            type_entite=Client.TYPE_CLIENT,
+            email='client-agence@example.com',
+            telephone='70000022',
+        )
+        agence = Client.objects.create(
+            nom='Agence sélectionnable comme client',
+            type_entite=Client.TYPE_AGENCE,
+            email='agence-client@example.com',
+            telephone='70000023',
+        )
+        data = {
+            'client': agence.pk,
+            'agence': client.pk,
+            'contact': 'Contact principal',
+            'telephone': '70000024',
+            'email': 'contact@example.com',
+        }
+
+        form = DemandeGestionContactForm(data=data)
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertEqual(form.cleaned_data['client'], agence)
+        self.assertEqual(form.cleaned_data['agence'], client)
+
+        duplicate_data = {**data, 'agence': agence.pk}
+        duplicate_form = DemandeGestionContactForm(data=duplicate_data)
+
+        self.assertFalse(duplicate_form.is_valid())
+        self.assertIn('agence', duplicate_form.errors)
+
+    def test_cross_role_accounts_prefill_and_save_on_demand(self):
+        client = Client.objects.create(
+            nom='Client sélectionné comme agence',
+            type_entite=Client.TYPE_CLIENT,
+            email='client-agence@example.com',
+            telephone='70000025',
+            contact_nom='Contact client',
+        )
+        agence = Client.objects.create(
+            nom='Agence sélectionnée comme client',
+            type_entite=Client.TYPE_AGENCE,
+            email='agence-client@example.com',
+            telephone='70000026',
+            contact_nom='Contact agence',
+        )
+
+        response = self.client.get(reverse('demande_creation'))
+        self.assertEqual(response.status_code, 200)
+        client_profiles = json.loads(response.context['client_contact_data'])
+        agency_profiles = json.loads(response.context['agence_contact_data'])
+        for account in (client, agence):
+            self.assertEqual(
+                client_profiles[str(account.pk)]['contact_nom'],
+                account.contact_nom,
+            )
+            self.assertEqual(
+                agency_profiles[str(account.pk)]['contact_nom'],
+                account.contact_nom,
+            )
+
+        response = self.complete_step_one(
+            client=agence.pk,
+            agence=client.pk,
+        )
+        self.assertRedirects(response, reverse('demande_creation_etape2'))
+        response = self.complete_step_two()
+        demande = DemandeReservation.objects.get()
+        self.assertRedirects(
+            response,
+            reverse('demande_detail', kwargs={'uuid': demande.uuid}),
+        )
+        self.assertEqual(demande.client, agence)
+        self.assertEqual(demande.agence, client)
 
     def test_contact_form_preserves_existing_company_name_without_function_field(self):
         client = Client.objects.create(
@@ -600,12 +677,11 @@ class DemandeCreationViewTests(TestCase):
 
         self.assertRedirects(
             self.complete_step_one(
-                type_client=DemandeReservation.TYPE_CLIENT_EXISTANT,
                 client=client_obj.pk,
-                nom_contact='',
+                contact='Awa Contact',
                 societe='',
-                email='',
-                telephone='',
+                email='awa@example.com',
+                telephone='70000000',
                 accepte_contact='on',
             ),
             reverse('demande_creation_etape2'),
@@ -944,6 +1020,7 @@ class DemandeCreationViewTests(TestCase):
         self.assertEqual(demande.client.contact_nom, 'Moussa Prospect')
         self.assertEqual(demande.client.email, 'moussa@example.com')
         self.assertEqual(demande.client.telephone, '71000000')
+        self.assertEqual(demande.whatsapp, '72000000')
         self.assertTrue(demande.accepte_contact)
         self.assertEqual(demande.nom_contact, 'Moussa Prospect')
         self.assertEqual(demande.nom_campagne, '')
@@ -1129,6 +1206,13 @@ class DemandeCreationViewTests(TestCase):
 
         list_response = self.client.get(reverse('demandes_liste'))
         self.assertContains(list_response, 'Créer une demande')
+
+    def test_wizard_displays_city_filters_for_map_and_list(self):
+        response = self.client.get(reverse('demande_creation'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'id="filter-ville"')
+        self.assertContains(response, 'id="list-filter-ville"')
 
     def test_invalid_contact_keeps_the_user_on_the_combined_first_step(self):
         response = self.complete_step_one(email='adresse-invalide')

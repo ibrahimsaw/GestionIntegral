@@ -1143,6 +1143,10 @@ class DemandeGestionContactForm(forms.Form):
         error_messages={'required': "Renseignez l'e-mail."},
         widget=forms.EmailInput(attrs={'class': 'form-control-e3'}),
     )
+    whatsapp = forms.CharField(
+        max_length=30, required=False, label="WhatsApp",
+        widget=forms.TextInput(attrs={'class': 'form-control-e3', 'type': 'tel'}),
+    )
     accepte_contact = forms.BooleanField(
         required=False, initial=True,
         widget=forms.CheckboxInput(attrs={'class': 'form-check-input'}),
@@ -1153,13 +1157,13 @@ class DemandeGestionContactForm(forms.Form):
         # Conservé pour compatibilité avec les vues (plus utilisé : plus de création de comptes).
         self.ignore_account_pks = {pk for pk in ignore_account_pks if pk}
         self.fields['client'].queryset = Client.objects.filter(
-            actif=True, type_entite=Client.TYPE_CLIENT,
+            actif=True,
         ).order_by('nom')
         self.fields['client'].label_from_instance = (
             lambda client: client.nom
         )
         self.fields['agence'].queryset = Client.objects.filter(
-            actif=True, type_entite=Client.TYPE_AGENCE,
+            actif=True,
         ).order_by('nom')
         self.fields['agence'].label_from_instance = (
             lambda client: client.nom
@@ -1190,10 +1194,13 @@ class DemandeGestionContactForm(forms.Form):
         cleaned = super().clean()
         client = cleaned.get('client')
         agence = cleaned.get('agence')
+        if client and agence and client.pk == agence.pk:
+            self.add_error('agence', "Sélectionnez un compte différent du client.")
 
         contact = (cleaned.get('contact') or '').strip()
         societe = (cleaned.get('societe') or '').strip()
         telephone = (cleaned.get('telephone') or '').strip()
+        whatsapp = (cleaned.get('whatsapp') or '').strip()
         email = (cleaned.get('email') or '').strip()
 
         principal = client or agence
@@ -1226,5 +1233,6 @@ class DemandeGestionContactForm(forms.Form):
         cleaned['nom_contact'] = contact or (client.contact_nom if client else '') or (principal.nom if principal else '')
         cleaned['email'] = email
         cleaned['telephone'] = telephone
+        cleaned['whatsapp'] = whatsapp
         cleaned['adresse'] = client.adresse if client else (agence.adresse if agence else '')
         return cleaned

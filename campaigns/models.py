@@ -914,7 +914,6 @@ class DemandeReservation(models.Model):
         on_delete=models.SET_NULL,
         null=True, blank=True,
         related_name='demandes_reservation_agence',
-        limit_choices_to={'type_entite': Client.TYPE_AGENCE},
         verbose_name="Agence associée",
         help_text="Agence liée à la demande (sélectionnée ou créée à l'étape 1).",
     )

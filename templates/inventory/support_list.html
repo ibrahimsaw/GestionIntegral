@@ -184,11 +184,15 @@
 
 {# ── SECTION TABLEAU DES SUPPORTS ── #}
 <div data-client-pagination data-page-size="20">
+<form method="post" id="support-actions-form" action="{% url 'support_bulk_action' %}">
+  {% csrf_token %}
+  <input type="hidden" name="action" id="support-action-input">
 <div class="card table-custom-card">
   <div class="card-header bg-white py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-2 border-bottom">
-    <div class="d-flex align-items-center gap-2">
+    <div class="d-flex align-items-center gap-3">
+      <input type="checkbox" id="support-select-all" class="form-check-input mt-0" title="Tout sélectionner">
       <h6 class="mb-0 fw-bold text-dark">Résultats</h6>
-      <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2.5 py-1 font-monospace" style="font-size: 0.75rem;">
+      <span id="support-selection-count" class="badge bg-primary-subtle text-primary border border-primary-subtle px-2.5 py-1 font-monospace" style="font-size: 0.75rem;">
         {{ supports|length }} support{{ supports|length|pluralize }}
       </span>
       {% if pending_deletion_count %}
@@ -200,6 +204,22 @@
         {% endif %}
       {% endif %}
     </div>
+
+    <div id="support-actions-bar" class="d-flex align-items-center gap-2" style="display:none;">
+      {% if user.is_staff_regie_role %}
+      <select id="support-action-select" class="form-select form-select-sm" style="width:auto;">
+        <option value="">Sélectionner une action</option>
+        <option value="etat_bon">Marquer bon état</option>
+        <option value="etat_signal">Marquer signal/à maintenir</option>
+        <option value="etat_panne">Marquer en panne</option>
+        <option value="demander_suppression">Supprimer / demander la suppression</option>
+      </select>
+      <button type="button" class="btn btn-sm btn-primary shadow-sm" onclick="confirmerSupportAction()">
+        <i class="bi bi-check-lg me-1"></i>Appliquer
+      </button>
+      {% endif %}
+    </div>
+
     <a href="{% url 'carte' %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}" class="btn btn-sm btn-outline-primary px-3 shadow-sm d-flex align-items-center gap-1">
       <i class="bi bi-map-fill"></i>
       <span>Afficher sur la carte</span>
@@ -210,6 +230,7 @@
     <table id="tableSupports" class="table table-supports mb-0 align-middle">
       <thead>
         <tr>
+          <th style="width:2.5rem" class="ps-3"></th>
           <th>{% sortable_th sort_links sort_key sort_dir 'code' 'Code' %}</th>
           <th>{% sortable_th sort_links sort_key sort_dir 'code_mairie' 'N°Mairie' %}</th>
           <th>{% sortable_th sort_links sort_key sort_dir 'nom' 'Nom' %}</th>
@@ -245,6 +266,9 @@
 
           {# Ligne standard du support #}
           <tr data-client-page-item class="support-row {% if s.etat == 'panne' %}table-danger bg-opacity-25{% endif %}">
+            <td class="ps-3">
+              <input type="checkbox" name="selected_ids" value="{{ s.pk }}" class="form-check-input mt-0 support-row-checkbox">
+            </td>
             <td>
               <span class="code-primary">{{ s.code }}</span>
             </td>
@@ -369,6 +393,7 @@
   </div>
 </div>
 </div>
+</form>
 
 {% endwith %}
   {% if not request.user.is_technicien %}
@@ -421,6 +446,70 @@
       if (supportFormatFilter) supportFormatFilter.value = '';
       supportCityFilter.form.submit();
     });
+  }
+
+  function majSupportSelection() {
+    const checkboxes = document.querySelectorAll('.support-row-checkbox');
+    const visibleCheckboxes = Array.from(checkboxes).filter((checkbox) => {
+      const row = checkbox.closest('[data-client-page-item]');
+      return !row || row.style.display !== 'none';
+    });
+    const selectAll = document.getElementById('support-select-all');
+    const actionsBar = document.getElementById('support-actions-bar');
+    const countLabel = document.getElementById('support-selection-count');
+    if (!actionsBar || !countLabel) return;
+
+    const total = checkboxes.length;
+    const checked = document.querySelectorAll('.support-row-checkbox:checked').length;
+    if (checked > 0) {
+      actionsBar.style.display = 'flex';
+      countLabel.textContent = checked + ' sélectionné(s)';
+    } else {
+      actionsBar.style.display = 'none';
+      countLabel.textContent = total + ' support(s)';
+    }
+
+    if (selectAll) {
+      const checkedVisible = visibleCheckboxes.filter((checkbox) => checkbox.checked).length;
+      selectAll.indeterminate = checkedVisible > 0 && checkedVisible < visibleCheckboxes.length;
+      selectAll.checked = visibleCheckboxes.length > 0 && checkedVisible === visibleCheckboxes.length;
+    }
+  }
+
+  document.addEventListener('change', (event) => {
+    if (event.target.matches('#support-select-all')) {
+      document.querySelectorAll('.support-row-checkbox').forEach((checkbox) => {
+        const row = checkbox.closest('[data-client-page-item]');
+        if (!row || row.style.display !== 'none') checkbox.checked = event.target.checked;
+      });
+      majSupportSelection();
+    } else if (event.target.matches('.support-row-checkbox')) {
+      majSupportSelection();
+    }
+  });
+  document.addEventListener('client-pagination-page-changed', majSupportSelection);
+  majSupportSelection();
+
+  function confirmerSupportAction() {
+    const actionSelect = document.getElementById('support-action-select');
+    const actionInput = document.getElementById('support-action-input');
+    const form = document.getElementById('support-actions-form');
+    if (!actionSelect || !actionInput || !form) return;
+
+    const action = actionSelect.value;
+    const checked = document.querySelectorAll('.support-row-checkbox:checked').length;
+    if (!action) {
+      alert('Veuillez sélectionner une action.');
+      return;
+    }
+    if (checked === 0) {
+      alert('Veuillez sélectionner au moins un support.');
+      return;
+    }
+    if (!confirm(`Confirmer cette action sur ${checked} support(s) ?`)) return;
+
+    actionInput.value = action;
+    form.submit();
   }
 </script>
 {% endblock %}

@@ -22,203 +22,97 @@
   {% endif %}
 {% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/gestion-listes.css' %}?v=20261118">
+{% endblock %}
+
 {% block content %}
 
-{# ═══════════════════════════════════════════ #}
-{# ── BANNIÈRE HÉRO DU MODULE CAMPAGNES ── #}
-{# ═══════════════════════════════════════════ #}
-<div class="cl-hero mb-4">
-  <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
-    <div>
-      <div class="cl-hero-title">
-        <i class="bi bi-megaphone-fill me-2"></i>Gestion des Campagnes
-      </div>
-      <div class="cl-hero-sub">
-        Pilotez les réservations, plannings de diffusion, spots vidéo et performances de vos campagnes.
-      </div>
-    </div>
-    {% if user.is_staff_regie_role %}
-    <div class="d-flex gap-2 flex-wrap align-items-center d-inline d-md-none me-1">
-      <a href="{% url 'simulation_ecran' %}" class="btn btn-outline-light shadow-sm d-inline d-md-none me-1" style="font-weight: 600;">
-        <i class="bi bi-calculator me-1"></i>Simulateur
-      </a>
-      <a href="{% url 'campagne_create' %}" class="btn btn-light shadow-sm d-inline d-md-none me-1" style="font-weight: 700; color: #932e2b;">
-        <i class="bi bi-plus-lg me-1"></i>Nouvelle Campagne
-      </a>
-    </div>
-    {% endif %}
-  </div>
-</div>
-
-{# ═══════════════════════════════════════════ #}
-{# ── RUBAN DE 4 CARTES KPI STATISTIQUES ── #}
-{# ═══════════════════════════════════════════ #}
-<div class="row g-3 mb-4">
-  {# 1. Total Campagnes #}
-  <div class="col-6 col-md-3">
-    <div class="cl-kpi-card">
-      <div class="cl-kpi-icon" style="background:#eff6ff; color:#2563eb; border:1px solid #dbeafe;">
-        <i class="bi bi-megaphone"></i>
-      </div>
+<div class="dl dl-campagnes">
+  <header class="dl-intro">
+    <div class="dl-intro-main">
+      <span class="dl-intro-icon" aria-hidden="true"><i class="bi bi-megaphone-fill"></i></span>
       <div>
-        <div class="cl-kpi-val">{{ kpi_total|default:0 }}</div>
-        <div class="cl-kpi-lbl">Total Campagnes</div>
+        <div class="dl-intro-eyebrow">Espace de gestion</div>
+        <h1>Campagnes publicitaires</h1>
+        <p>Pilotez les réservations, plannings de diffusion, spots vidéo et performances de vos campagnes.</p>
       </div>
     </div>
-  </div>
-
-  {# 2. En Cours #}
-  <div class="col-6 col-md-3">
-    <div class="cl-kpi-card">
-      <div class="cl-kpi-icon" style="background:#ecfdf5; color:#059669; border:1px solid #d1fae5;">
-        <i class="bi bi-broadcast"></i>
-      </div>
+    <div class="dl-total">
+      <span class="dl-total-icon" aria-hidden="true"><i class="bi bi-megaphone"></i></span>
       <div>
-        <div class="cl-kpi-val" style="color:#059669;">{{ kpi_en_cours|default:0 }}</div>
-        <div class="cl-kpi-lbl">En Cours</div>
+        <strong>{{ campagnes|length }}</strong>
+        <span class="dl-total-label">campagne{{ campagnes|length|pluralize }} affichée{{ campagnes|length|pluralize }}</span>
       </div>
     </div>
-  </div>
-
-  {# 3. À Venir #}
-  <div class="col-6 col-md-3">
-    <div class="cl-kpi-card">
-      <div class="cl-kpi-icon" style="background:#f0fdf4; color:#0284c7; border:1px solid #e0f2fe;">
-        <i class="bi bi-calendar-check"></i>
-      </div>
-      <div>
-        <div class="cl-kpi-val" style="color:#0284c7;">{{ kpi_a_venir|default:0 }}</div>
-        <div class="cl-kpi-lbl">À Venir</div>
-      </div>
-    </div>
-  </div>
-
-  {# 4. Terminées #}
-  <div class="col-6 col-md-3">
-    <div class="cl-kpi-card">
-      <div class="cl-kpi-icon" style="background:#f8fafc; color:#475569; border:1px solid #e2e8f0;">
-        <i class="bi bi-check2-all"></i>
-      </div>
-      <div>
-        <div class="cl-kpi-val" style="color:#475569;">{{ kpi_terminee|default:0 }}</div>
-        <div class="cl-kpi-lbl">Terminées</div>
-      </div>
-    </div>
-  </div>
-</div>
+  </header>
 
 {# ═══════════════════════════════════════════ #}
 {# ── SECTION FILTRES RAPIDES & AVANCÉS ── #}
 {# ═══════════════════════════════════════════ #}
-<div class="card filter-card mb-4">
-  <div class="card-body p-3 p-lg-4">
-
+<div class="dl-campaign-filters">
     {# Onglets de statut rapides #}
-    <div class="d-flex flex-wrap gap-2 mb-3 pb-3 border-bottom align-items-center">
-      <span class="small text-muted fw-bold me-2" style="font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.5px;">Statut :</span>
+    <nav class="dl-tabs" aria-label="Filtrer par statut">
       <a href="?{% if q %}q={{ q }}&{% endif %}{% if type_support %}type_support={{ type_support }}&{% endif %}{% if categorie_active %}categorie={{ categorie_active|urlencode }}&{% endif %}{% if actif %}actif={{ actif }}{% endif %}"
-         class="cpl-tab-btn {% if not statut %}active{% endif %}">
-        <i class="bi bi-grid-fill"></i>Toutes
-        <span class="cpl-tab-badge">{{ kpi_total|default:0 }}</span>
+         class="dl-tab {% if not statut %}is-active{% endif %}">
+        Toutes
+        <span class="dl-tab-count">{{ kpi_total|default:0 }}</span>
       </a>
       <a href="?statut=en_cours{% if q %}&q={{ q }}{% endif %}{% if type_support %}&type_support={{ type_support }}{% endif %}{% if categorie_active %}&categorie={{ categorie_active|urlencode }}{% endif %}{% if actif %}&actif={{ actif }}{% endif %}"
-         class="cpl-tab-btn {% if statut == 'en_cours' %}active{% endif %}">
-        <i class="bi bi-broadcast text-success"></i>En cours
-        <span class="cpl-tab-badge">{{ kpi_en_cours|default:0 }}</span>
+         class="dl-tab {% if statut == 'en_cours' %}is-active{% endif %}">
+        En cours
+        <span class="dl-tab-count">{{ kpi_en_cours|default:0 }}</span>
       </a>
       <a href="?statut=en_pause{% if q %}&q={{ q }}{% endif %}{% if type_support %}&type_support={{ type_support }}{% endif %}{% if categorie_active %}&categorie={{ categorie_active|urlencode }}{% endif %}{% if actif %}&actif={{ actif }}{% endif %}"
-         class="cpl-tab-btn {% if statut == 'en_pause' %}active{% endif %}">
-        <i class="bi bi-pause-circle text-warning"></i>En pause
-        <span class="cpl-tab-badge">{{ kpi_en_pause|default:0 }}</span>
+         class="dl-tab {% if statut == 'en_pause' %}is-active{% endif %}">
+        En pause
+        <span class="dl-tab-count">{{ kpi_en_pause|default:0 }}</span>
       </a>
       <a href="?statut=a_venir{% if q %}&q={{ q }}{% endif %}{% if type_support %}&type_support={{ type_support }}{% endif %}{% if categorie_active %}&categorie={{ categorie_active|urlencode }}{% endif %}{% if actif %}&actif={{ actif }}{% endif %}"
-         class="cpl-tab-btn {% if statut == 'a_venir' %}active{% endif %}">
-        <i class="bi bi-calendar-check text-info"></i>À venir
-        <span class="cpl-tab-badge">{{ kpi_a_venir|default:0 }}</span>
+         class="dl-tab {% if statut == 'a_venir' %}is-active{% endif %}">
+        À venir
+        <span class="dl-tab-count">{{ kpi_a_venir|default:0 }}</span>
       </a>
       <a href="?statut=terminee{% if q %}&q={{ q }}{% endif %}{% if type_support %}&type_support={{ type_support }}{% endif %}{% if categorie_active %}&categorie={{ categorie_active|urlencode }}{% endif %}{% if actif %}&actif={{ actif }}{% endif %}"
-         class="cpl-tab-btn {% if statut == 'terminee' %}active{% endif %}">
-        <i class="bi bi-check2-all text-secondary"></i>Terminées
-        <span class="cpl-tab-badge">{{ kpi_terminee|default:0 }}</span>
+         class="dl-tab {% if statut == 'terminee' %}is-active{% endif %}">
+        Terminées
+        <span class="dl-tab-count">{{ kpi_terminee|default:0 }}</span>
       </a>
       {% if kpi_brouillon > 0 %}
       <a href="?statut=brouillon{% if q %}&q={{ q }}{% endif %}{% if type_support %}&type_support={{ type_support }}{% endif %}{% if categorie_active %}&categorie={{ categorie_active|urlencode }}{% endif %}{% if actif %}&actif={{ actif }}{% endif %}"
-         class="cpl-tab-btn {% if statut == 'brouillon' %}active{% endif %}">
-        <i class="bi bi-pencil-square text-warning"></i>Brouillons
-        <span class="cpl-tab-badge">{{ kpi_brouillon|default:0 }}</span>
+         class="dl-tab {% if statut == 'brouillon' %}is-active{% endif %}">
+        Brouillons
+        <span class="dl-tab-count">{{ kpi_brouillon|default:0 }}</span>
       </a>
       {% endif %}
-    </div>
+    </nav>
 
-    <div class="d-flex flex-wrap gap-2 mb-3 pb-3 border-bottom align-items-center">
-      <span class="small text-muted fw-bold me-2" style="font-size:0.72rem;text-transform:uppercase;letter-spacing:0.5px;">Catégorie :</span>
+    <nav class="dl-tabs dl-category-tabs" aria-label="Filtrer par catégorie">
       {% for category in campaign_category_filters %}
       <a href="{{ category.url }}"
-         class="cpl-tab-btn {% if categorie_active == category.value %}active{% endif %}">
-        <i class="bi bi-tag"></i>{{ category.label }}
-        <span class="cpl-tab-badge">{{ category.count }}</span>
+         class="dl-tab {% if categorie_active == category.value %}is-active{% endif %}">
+        {{ category.label }}
+        <span class="dl-tab-count">{{ category.count }}</span>
       </a>
       {% endfor %}
-    </div>
-
-    {# Recherche de campagnes #}
-    <form method="get" id="campaign-search-form" class="mb-0">
-      {% if categorie_active %}<input type="hidden" name="categorie" value="{{ categorie_active }}">{% endif %}
-      {% if statut %}<input type="hidden" name="statut" value="{{ statut }}">{% endif %}
-      <div class="col-xl-5 col-md-8">
-        <label class="filter-label" for="campaign-search"><i class="bi bi-search"></i>Recherche</label>
-        <div class="input-group input-group-sm">
-          <span class="input-group-text"><i class="bi bi-search"></i></span>
-          <input type="search" id="campaign-search" name="q" value="{{ q }}" class="form-control" placeholder="Client, nom de campagne, référence..." autocomplete="off">
-        </div>
-      </div>
-    </form>
-
-    {# ── Badges des filtres actifs ── #}
-    {% if q or statut or type_support or categorie_active or actif %}
-    <div class="d-flex flex-wrap gap-2 align-items-center mt-3 pt-3 border-top">
-      <span class="small text-muted fw-bold me-1" style="font-size: 0.72rem;">Filtres actifs :</span>
-      {% if q %}
-        <span class="active-filter-pill"><i class="bi bi-search"></i>"{{ q }}"</span>
-      {% endif %}
-      {% if statut %}
-        <span class="active-filter-pill"><i class="bi bi-activity"></i>Statut: {{ statut|title }}</span>
-      {% endif %}
-      {% if type_support %}
-        <span class="active-filter-pill"><i class="bi bi-grid"></i>Type: {{ type_support|title }}</span>
-      {% endif %}
-      {% if categorie_active %}
-        <span class="active-filter-pill"><i class="bi bi-tag"></i>Catégorie: {{ categorie_active }}</span>
-      {% endif %}
-      <a href="{% url 'campagne_list' %}" class="small text-danger text-decoration-none ms-2 fw-semibold" style="font-size: 0.75rem;">
-        <i class="bi bi-x-circle me-1"></i>Effacer tout
-      </a>
-    </div>
-    {% endif %}
-
+    </nav>
   </div>
-</div>
 
 {# ═══════════════════════════════════════════ #}
 {# ── TABLEAU DES CAMPAGNES ── #}
 {# ═══════════════════════════════════════════ #}
 <div data-client-pagination data-page-size="20">
-<form method="post" id="form-actions">
-  {% csrf_token %}
-  <input type="hidden" name="action" id="action-input">
-
-  <div class="card table-custom-card">
-    <div class="card-header bg-white py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-2 border-bottom">
-      <div class="d-flex align-items-center gap-3">
+  <section class="dl-card">
+    <div class="dl-card-head">
+      <span><i class="bi bi-table"></i>Campagnes publicitaires</span>
+      <div class="dl-card-head-actions">
         <input type="checkbox" id="select-all" class="form-check-input mt-0" title="Tout sélectionner">
-        <h6 class="mb-0 fw-bold text-dark">Campagnes publicitaires</h6>
-        <span id="selection-count" class="badge bg-primary-subtle text-primary border border-primary-subtle px-2.5 py-1 font-monospace" style="font-size: 0.75rem;">
+        <span id="selection-count" class="dl-count">
           {{ campagnes|length }} campagne{{ campagnes|length|pluralize }}
         </span>
-      </div>
 
       <!-- Actions groupées -->
-      <div id="actions-bar" class="d-flex align-items-center gap-2" style="display:none;">
+      <div id="actions-bar" class="align-items-center gap-2" style="display:none;">
         {% if user.is_staff_regie_role %}
         <select id="action-select" class="form-select form-select-sm" style="width:auto;">
           <option value="">Sélectionner une action</option>
@@ -235,11 +129,50 @@
         </button>
         {% endif %}
       </div>
+      </div>
     </div>
 
-    <div class="card-body p-0">
-      <div class="table-responsive">
-        <table class="table table-hover mb-0 align-middle table-supports">
+    <div class="dl-table-tools">
+      <form method="get" id="campaign-search-form" class="dl-search-form">
+        {% if categorie_active %}<input type="hidden" name="categorie" value="{{ categorie_active }}">{% endif %}
+        {% if statut %}<input type="hidden" name="statut" value="{{ statut }}">{% endif %}
+        <div>
+          <label for="campaign-search">Rechercher</label>
+          <div class="input-group input-group-sm">
+            <span class="input-group-text"><i class="bi bi-search"></i></span>
+            <input type="search" id="campaign-search" name="q" value="{{ q }}" class="form-control" placeholder="Client, nom de campagne, référence..." autocomplete="off">
+          </div>
+        </div>
+      </form>
+
+      {% if q or statut or type_support or categorie_active or actif %}
+      <div class="dl-active-filters">
+        <span class="dl-active-filters-label">Filtres actifs :</span>
+        {% if q %}
+          <span class="dl-filter-chip"><i class="bi bi-search"></i>"{{ q }}"</span>
+        {% endif %}
+        {% if statut %}
+          <span class="dl-filter-chip"><i class="bi bi-activity"></i>Statut: {{ statut|title }}</span>
+        {% endif %}
+        {% if type_support %}
+          <span class="dl-filter-chip"><i class="bi bi-grid"></i>Type: {{ type_support|title }}</span>
+        {% endif %}
+        {% if categorie_active %}
+          <span class="dl-filter-chip"><i class="bi bi-tag"></i>Catégorie: {{ categorie_active }}</span>
+        {% endif %}
+        <a href="{% url 'campagne_list' %}" class="dl-filter-chip text-danger text-decoration-none">
+          <i class="bi bi-x-circle me-1"></i>Effacer tout
+        </a>
+      </div>
+      {% endif %}
+    </div>
+
+    <form method="post" id="form-actions">
+      {% csrf_token %}
+      <input type="hidden" name="action" id="action-input">
+
+    <div class="table-responsive">
+        <table class="table dl-table align-middle">
           <thead>
             <tr>
               <th style="width:2.5rem" class="ps-3"></th>
@@ -261,40 +194,39 @@
           </thead>
           <tbody data-client-pagination-group>
             {% for c in campagnes %}
-              <tr data-client-page-item class="support-row {% if user.is_admin and not c.actif %}opacity-75 bg-light{% endif %}">
+              <tr data-client-page-item class="dl-row dl-campagne-row dl-campagne-row-{{ c.statut }} support-row{% if user.is_admin and not c.actif %} is-archived{% endif %}">
               <td class="ps-3">
                 <input type="checkbox" name="selected_ids" value="{{ c.pk }}" class="form-check-input mt-0 row-checkbox">
               </td>
               
               {# Référence #}
               <td>
-                <span class="code-primary fw-bold font-monospace">{{ c.reference }}</span>
+                <span class="dl-ref">{{ c.reference }}</span>
               </td>
 
               {# Client #}
               <td>
-                <div class="d-flex align-items-center gap-2">
-                  <div>
-                    <div class="fw-bold text-dark" style="font-size:0.84rem;">{{ c.client.nom }}</div>
-                    {% if c.agence %}
-                      <div class="small text-muted" style="font-size:0.72rem;">Agence : {{ c.agence.nom }}</div>
-                    {% endif %}
+                <div class="dl-person">
+                  <div class="dl-avatar" aria-hidden="true">{{ c.client.nom|slice:":2"|upper }}</div>
+                  <div style="min-width:0">
+                    <div class="dl-person-name">{{ c.client.nom }}</div>
+                    {% if c.agence %}<div class="dl-person-co">Agence : {{ c.agence.nom }}</div>{% endif %}
                   </div>
                 </div>
               </td>
 
               {# Nom & Liens #}
               <td>
-                <a href="{% url 'campagne_detail' c.pk %}" class="text-dark fw-bold text-decoration-none" style="font-size:0.86rem;">
+                <a href="{% url 'campagne_detail' c.pk %}" class="dl-campagne-link">
                   {{ c.nom }}
                 </a>
                 {% if c.campagne_parente %}
-                <div class="small text-muted mt-1" style="font-size:0.72rem;">
+                <div class="dl-sub dl-sub-by">
                   <i class="bi bi-arrow-return-right me-1 text-primary"></i>Sous-campagne de
                   <a href="{% url 'campagne_detail' c.campagne_parente.pk %}" class="text-primary text-decoration-none fw-semibold">{{ c.campagne_parente.nom }}</a>
                 </div>
                 {% elif c.est_mere %}
-                <div class="small text-primary mt-1 fw-semibold" style="font-size:0.72rem;">
+                <div class="dl-sub dl-sub-by text-primary fw-semibold">
                   <i class="bi bi-diagram-3 me-1"></i>Campagne mère • {{ c.sous_campagnes.count }} sous-campagne{{ c.sous_campagnes.count|pluralize }}
                 </div>
                 {% endif %}
@@ -302,28 +234,28 @@
 
               {# Statut #}
               <td>
-                <span class="badge badge-status bs-{{ c.statut }} {% if c.statut == 'en_pause' %}bg-warning-subtle text-warning-emphasis{% endif %}">{{ c.get_statut_display }}</span>
+                <span class="dl-pill">{{ c.get_statut_display }}</span>
               </td>
 
               {# Période #}
               <td>
-                <div class="font-monospace small fw-bold text-dark" style="font-size:0.82rem;">
-                  <i class="bi bi-calendar3 me-1 text-muted"></i>{{ c.date_debut|date:"d/m/Y" }}
+                <div class="dl-period">
+                  {{ c.date_debut|date:"d/m/Y" }}
                 </div>
-                <div class="font-monospace text-muted mt-0.5" style="font-size:0.72rem;">
-                  <i class="bi bi-arrow-right me-1"></i>{{ c.date_fin|date:"d/m/Y" }}
+                <div class="dl-sub">
+                  {{ c.date_fin|date:"d/m/Y" }}
                 </div>
               </td>
 
               {# Supports #}
               <td>
-                <span class="badge bg-light text-secondary border font-monospace" style="font-size:0.75rem;">
+                <span class="dl-places">
                   {% if c.type_support == 'ecran' %}
-                    {{ c.calculer_nombre_spots|default:"—" }} spots/{{ c.nb_supports }} écran{{ c.nb_supports|pluralize }}
+                    <i class="bi bi-display"></i>{{ c.calculer_nombre_spots|default:"—" }} spots / {{ c.nb_supports }} écran{{ c.nb_supports|pluralize }}
                   {% elif c.type_support == 'marche' %}
-                    {{ c.nb_supports }} marché{{ c.nb_supports|pluralize }}
+                    <i class="bi bi-shop"></i>{{ c.nb_supports }} marché{{ c.nb_supports|pluralize }}
                   {% else %}
-                  {{ c.calculer_nombre_spots|default:"—" }} face{{c.calculer_nombre_spots|pluralize }}/{{ c.nb_supports }} support{{ c.nb_supports|pluralize }}
+                    <i class="bi bi-signpost-split"></i>{{ c.calculer_nombre_spots|default:"—" }} face{{ c.calculer_nombre_spots|pluralize }} / {{ c.nb_supports }} support{{ c.nb_supports|pluralize }}
                   {% endif %}
                 </span>
               </td>
@@ -375,18 +307,18 @@
               {# Actions #}
               <td class="text-end pe-4">
                 <div class="d-inline-flex gap-1 justify-content-end">
-                  <a href="{% url 'campagne_detail' c.pk %}" class="btn btn-sm btn-outline-primary btn-action-icon" title="Voir le détail de la campagne">
+                  <a href="{% url 'campagne_detail' c.pk %}" class="dl-open" title="Voir le détail de la campagne">
                     <i class="bi bi-eye"></i>
                   </a>
                   {% if user.is_staff_regie_role %}
-                  <a href="{% url 'campagne_edit' c.pk %}" class="btn btn-sm btn-outline-secondary btn-action-icon" title="Modifier la campagne">
+                  <a href="{% url 'campagne_edit' c.pk %}" class="dl-open dl-open-secondary" title="Modifier la campagne">
                     <i class="bi bi-pencil"></i>
                   </a>
-                  <a href="{% url 'campagne_delete' c.pk %}" class="btn btn-sm btn-outline-danger btn-action-icon" title="Supprimer la campagne">
+                  <a href="{% url 'campagne_delete' c.pk %}" class="dl-open dl-open-danger" title="Supprimer la campagne">
                     <i class="bi bi-trash"></i>
                   </a>
                   {% endif %}
-                  <a href="{% url 'campagne_preview' c.pk %}" class="btn btn-sm btn-outline-view btn-action-icon" title="Aperçu de la campagne">
+                  <a href="{% url 'campagne_preview' c.pk %}" class="dl-open" title="Aperçu de la campagne">
                     <i class="bi bi-download"></i>
                   </a>
                 </div>
@@ -395,13 +327,13 @@
             </tr>
           {% empty %}
             <tr>
-              <td colspan="12" class="text-center py-5 text-muted">
-                <div class="py-3">
-                  <i class="bi bi-megaphone text-muted d-block mb-3" style="font-size:2.8rem;opacity:0.3;"></i>
-                  <h6 class="fw-bold text-dark mb-1">Aucune campagne trouvée</h6>
-                  <p class="text-muted small mb-3">Aucune campagne ne correspond aux critères de recherche actuels.</p>
+              <td colspan="{% if user.is_admin %}10{% else %}9{% endif %}">
+                <div class="dl-empty">
+                  <i class="bi bi-megaphone"></i>
+                  <h2>Aucune campagne trouvée</h2>
+                  <p>Aucune campagne ne correspond aux critères de recherche actuels.</p>
                   {% if user.is_staff_regie_role %}
-                  <a href="{% url 'campagne_create' %}" class="btn btn-primary btn-sm px-3 shadow-sm">
+                  <a href="{% url 'campagne_create' %}" class="btn btn-primary btn-sm px-3 shadow-sm mt-3">
                     <i class="bi bi-plus-lg me-1"></i>Créer une nouvelle campagne
                   </a>
                   {% endif %}
@@ -411,16 +343,15 @@
           {% endfor %}
           </tbody>
         </table>
-      </div>
     </div>
-  </div>
-</form>
+    </form>
+  </section>
 
 <div data-client-pagination-controls></div>
 </div>
 
 {# ── BOUTONS D'EXPORT ET APERÇU RAPPORT (EN BAS) ── #}
-<div class="d-flex gap-3 justify-content-center flex-wrap my-4">
+<div class="dl-exports d-flex gap-3 justify-content-center flex-wrap">
   <a href="{% url 'reports_index' %}" class="cld-btn-export cld-btn-view">
     <i class="bi bi-eye-fill"></i> Aperçu Rapport Web
   </a>
@@ -429,6 +360,7 @@
     <i class="bi bi-file-earmark-pdf-fill"></i> Télécharger Dossier PDF
   </a>
 -->
+</div>
 </div>
 
 <script>

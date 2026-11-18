@@ -1272,17 +1272,23 @@ class SupportListView(TechnicienStaffRequiredMixin, ClientSidePaginationMixin, S
     }
 
     def get_queryset(self):
-        queryset = Support.objects.prefetch_related('faces').select_related('ecran_info').all()
-        q = self.request.GET.get('q', '')
-        type_f = self.request.GET.get('type', '')
-        category_f = self.request.GET.get('categorie', '')
-        etat_f = self.request.GET.get('etat', '')
-        ville_f = self.request.GET.get('ville', '')
-        occupation_f = self.request.GET.get('occupation', '')
-        type_panneau_f = self.request.GET.get('type_panneau', '')
-        desactif = self.request.GET.get('desactif', '')
+        return self._get_filtered_queryset()
 
-        # Filtre par format (code) — la valeur envoyée par le <select> est bien le code
+    def _get_filtered_queryset(self, excluded_filters=()):
+        query_params = self.request.GET.copy()
+        for filter_name in excluded_filters:
+            query_params[filter_name] = ''
+
+        queryset = Support.objects.prefetch_related('faces').select_related('ecran_info').all()
+        q = query_params.get('q', '')
+        type_f = query_params.get('type', '')
+        category_f = query_params.get('categorie', '')
+        etat_f = query_params.get('etat', '')
+        ville_f = query_params.get('ville', '')
+        occupation_f = query_params.get('occupation', '')
+        type_panneau_f = query_params.get('type_panneau', '')
+
+        # Filtre par format (code) — la valeur du bouton radio est le code
         if type_panneau_f:
             fmt = FormatSupport.objects.filter(code=type_panneau_f).first()
             if (
@@ -1337,86 +1343,106 @@ class SupportListView(TechnicienStaffRequiredMixin, ClientSidePaginationMixin, S
         if ville_f:
             queryset = queryset.filter(ville__iexact=ville_f)
 
-        if occupation_f in ['occupe', 'total_occupe', 'libre', 'reserve', 'total_reserve', 'non_reserve', 'occupe_ou_reserve']:
-            if occupation_f == 'occupe':
-                queryset = [s for s in queryset if s.is_occupe()]
-            elif occupation_f == 'total_occupe':
-                queryset = [s for s in queryset if s.is_occupe() and not s.is_libre()]
-            elif occupation_f == 'reserve':
-                queryset = [s for s in queryset if s.is_reserve()]
-            elif occupation_f == 'total_reserve':
-                queryset = [s for s in queryset if s.is_reserve() and not s.is_libre() and not s.is_occupe()]
-            elif occupation_f == 'non_reserve':
-                queryset = [s for s in queryset if not s.is_reserve()]
-            elif occupation_f == 'occupe_ou_reserve':
-                queryset = [s for s in queryset if s.is_occupe() or s.is_reserve()]
-            else:  # libre
-                queryset = [s for s in queryset if not s.is_occupe() and not s.is_reserve()]
+        occupation_filters = {
+            'occupe': lambda flags: flags[0],
+            'libre': lambda flags: not flags[0] and not flags[1],
+            'reserve': lambda flags: flags[1],
+            'total_occupe': lambda flags: flags[0] and not flags[2],
+            'total_reserve': lambda flags: flags[1] and not flags[2] and not flags[0],
+            'non_reserve': lambda flags: not flags[1],
+            'occupe_ou_reserve': lambda flags: flags[0] or flags[1],
+        }
+        occupation_predicate = occupation_filters.get(occupation_f)
+        if occupation_predicate:
+            queryset = [
+                support for support in queryset
+                if occupation_predicate(self._get_occupation_flags(support))
+            ]
 
         return queryset
+
+    def _get_occupation_flags(self, support):
+        if not hasattr(self, '_occupation_flags_cache'):
+            self._occupation_flags_cache = {}
+        if support.pk not in self._occupation_flags_cache:
+            self._occupation_flags_cache[support.pk] = (
+                support.is_occupe(),
+                support.is_reserve(),
+                support.is_libre(),
+            )
+        return self._occupation_flags_cache[support.pk]
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         type_f = self.request.GET.get('type', '')
         ville_f = self.request.GET.get('ville', '').strip()
         category_f = self.request.GET.get('categorie', '')
-        support_scope = Support.objects.all()
-        if ville_f:
-            support_scope = support_scope.filter(ville__iexact=ville_f)
-        if type_f:
-            support_scope = support_scope.filter(type_support=type_f)
+        city_supports = list(self._get_filtered_queryset(
+            excluded_filters=('ville', 'categorie', 'type_panneau'),
+        ))
+        category_supports = list(self._get_filtered_queryset(
+            excluded_filters=('categorie', 'type_panneau'),
+        ))
+        format_supports = list(self._get_filtered_queryset(
+            excluded_filters=('type_panneau',),
+        ))
+        state_supports = list(self._get_filtered_queryset(
+            excluded_filters=('etat',),
+        ))
+        occupation_supports = list(self._get_filtered_queryset(
+            excluded_filters=('occupation',),
+        ))
 
-        panel_format_codes = set(
-            support_scope.filter(type_support=Support.TYPE_PANNEAU)
-            .exclude(format='')
-            .values_list('format', flat=True)
+        villes = sorted({
+            support.ville.strip()
+            for support in city_supports
+            if support.ville and support.ville.strip()
+        })
+
+        def collect_format_codes(supports):
+            panel_codes = set()
+            screen_codes = set()
+            has_screens = False
+            for support in supports:
+                if support.type_support == Support.TYPE_PANNEAU and support.format:
+                    panel_codes.add(support.format)
+                elif support.type_support == Support.TYPE_ECRAN:
+                    has_screens = True
+                    screen_info = getattr(support, 'ecran_info', None)
+                    if screen_info and screen_info.cellule:
+                        screen_codes.add(screen_info.cellule)
+            return panel_codes, screen_codes, has_screens
+
+        category_panel_codes, category_screen_codes, has_screen_category = (
+            collect_format_codes(category_supports)
         )
-        screen_format_codes = set(
-            support_scope.filter(type_support=Support.TYPE_ECRAN)
-            .exclude(ecran_info__cellule__isnull=True)
-            .exclude(ecran_info__cellule='')
-            .values_list('ecran_info__cellule', flat=True)
-        )
+        panel_format_codes, screen_format_codes, _ = collect_format_codes(format_supports)
+        category_format_codes = category_panel_codes | category_screen_codes
         available_format_codes = panel_format_codes | screen_format_codes
         formats_by_code = {
             format_support.code: format_support
-            for format_support in FormatSupport.objects.filter(code__in=available_format_codes)
+            for format_support in FormatSupport.objects.filter(
+                code__in=category_format_codes | available_format_codes,
+            )
         }
 
         categories = {
             format_support.categorie
-            for format_support in formats_by_code.values()
-            if format_support.categorie
+            for code, format_support in formats_by_code.items()
+            if code in category_format_codes and format_support.categorie
         }
-        if support_scope.filter(type_support=Support.TYPE_ECRAN).exists():
+        if has_screen_category:
             categories.add('Ecran')
         if any(
-            not formats_by_code[code].categorie
-            for code in panel_format_codes
-            if code in formats_by_code
+            code in formats_by_code and not formats_by_code[code].categorie
+            for code in category_panel_codes
         ):
             categories.add('Autre')
         category_choices = sorted(categories, key=str.casefold)
 
-        category_codes = available_format_codes
-        if category_f:
-            if category_f.casefold() == 'ecran':
-                category_codes = screen_format_codes
-            elif category_f == 'Autre':
-                category_codes = {
-                    code for code in panel_format_codes
-                    if code in formats_by_code and not formats_by_code[code].categorie
-                }
-            else:
-                category_codes = {
-                    code for code in available_format_codes
-                    if code in formats_by_code
-                    and (formats_by_code[code].categorie or '').casefold() == category_f.casefold()
-                }
-
         type_panneau_choices = []
         for code in sorted(
-            category_codes,
+            available_format_codes,
             key=lambda value: format_sort_key(formats_by_code.get(value) or value),
         ):
             format_support = formats_by_code.get(code)
@@ -1433,10 +1459,37 @@ class SupportListView(TechnicienStaffRequiredMixin, ClientSidePaginationMixin, S
             )
             type_panneau_choices.append((code, label))
 
-        villes = sorted({
-            v.strip() for v in Support.objects.values_list('ville', flat=True)
-            if v and v.strip()
-        })
+        state_values = {support.etat for support in state_supports}
+        etat_choices = []
+        if state_values.intersection(Support.ETATS_OPERATIONNELS):
+            etat_choices.append((Support.ETAT_BON, 'Bon état'))
+        if Support.ETAT_A_MAINTENIR in state_values:
+            etat_choices.append((Support.ETAT_A_MAINTENIR, 'Signal'))
+        if Support.ETAT_PANNE in state_values:
+            etat_choices.append((Support.ETAT_PANNE, 'En panne'))
+
+        available_occupations = set()
+        for support in occupation_supports:
+            occupied, reserved, physically_free = self._get_occupation_flags(support)
+            if occupied:
+                available_occupations.add('occupe')
+            if not occupied and not reserved:
+                available_occupations.add('libre')
+            if reserved:
+                available_occupations.add('reserve')
+            if occupied and not physically_free:
+                available_occupations.add('total_occupe')
+            if reserved and not physically_free and not occupied:
+                available_occupations.add('total_reserve')
+            if not reserved:
+                available_occupations.add('non_reserve')
+            if occupied or reserved:
+                available_occupations.add('occupe_ou_reserve')
+        occupation_choices = {
+            value: label
+            for value, label in self.occupation.items()
+            if value in available_occupations
+        }
 
         context.update({
             'q': self.request.GET.get('q', ''),
@@ -1444,11 +1497,12 @@ class SupportListView(TechnicienStaffRequiredMixin, ClientSidePaginationMixin, S
             'ville_f': ville_f,
             'category_f': category_f,
             'category_choices': category_choices,
+            'etat_choices': etat_choices,
             'etat_f': self.request.GET.get('etat', ''),
             'occupation_f': self.request.GET.get('occupation', ''),
             'type_panneau_f': self.request.GET.get('type_panneau', ''),
             'type_panneau_choices': type_panneau_choices,
-            'occupation_choices': self.occupation,
+            'occupation_choices': occupation_choices,
             'villes': villes,
             'desactif': self.request.GET.get('desactif', '')
         })

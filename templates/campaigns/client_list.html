@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load sort_tags %}
+{% load static sort_tags %}
 
 {% block title %}Portefeuille Clients et agences — Integral{% endblock %}
 
@@ -16,138 +16,36 @@
   {% endif %}
 {% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/gestion-listes.css' %}?v=20261118-clients">
+{% endblock %}
+
 {% block content %}
-<style>
-  .client-list-page {
-    --client-list-accent: var(--color-primary, #932e2b);
-    padding: 1rem;
-    border-radius: 1.25rem;
-    background: #f4f6fa;
-  }
-  .client-list-page .cl-hero {
-    position: relative;
-    overflow: hidden;
-    padding: clamp(1.35rem, 3vw, 2.2rem) !important;
-    border: 1px solid rgba(255,255,255,.2) !important;
-    border-radius: 1.1rem !important;
-    background:
-      radial-gradient(circle at 88% 12%, rgba(255,255,255,.18), transparent 18rem),
-      linear-gradient(115deg, #5e1c1a, #932e2b 58%, #bd5144) !important;
-    box-shadow: 0 1rem 2rem rgba(92,35,32,.17) !important;
-  }
-  .client-list-page .cl-hero-title { font-size: clamp(1.25rem, 3vw, 1.8rem); line-height: 1.25; }
-  .client-list-page .cl-hero-sub { max-width: 55rem; line-height: 1.55; }
-  .client-list-page .cl-kpi-card {
-    min-height: 94px;
-    border-radius: .9rem !important;
-    box-shadow: 0 .4rem 1.1rem rgba(25,35,55,.055) !important;
-  }
-  .client-list-page .cl-kpi-icon { border-radius: .8rem !important; }
-  .client-list-page .cl-filter-card {
-    padding: 1.15rem;
-    border: 1px solid #e2e7ef;
-    border-radius: 1rem !important;
-    background: #fff;
-    box-shadow: 0 .45rem 1.2rem rgba(25,35,55,.055);
-  }
-  .client-list-page .cl-search-input { min-height: 2.8rem; border-color: #d7dde6; }
-  .client-list-page .cl-search-input:focus { border-color: var(--client-list-accent); box-shadow: 0 0 0 .2rem rgba(147,46,43,.12); }
-  .client-list-page .cl-filter-pill { border-radius: 999px !important; }
-  .client-list-page .cl-view-btn { min-width: 2.7rem; min-height: 2.6rem; border-radius: .6rem !important; }
-  .client-list-page .cl-card {
-    border: 1px solid #e1e6ee;
-    border-radius: 1rem !important;
-    box-shadow: 0 .45rem 1.2rem rgba(25,35,55,.06);
-    transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
-  }
-  .client-list-page .cl-card:hover {
-    transform: translateY(-4px);
-    border: 1px solid rgba(147,46,43,.45);
-    box-shadow: 0 1rem 1.8rem rgba(25,35,55,.12);
-  }
-  .client-list-page .cl-card-inactive { border-left: 4px solid #94a3b8; }
-  .client-list-page .cl-card-head { padding: 1.15rem 1.25rem; background: linear-gradient(110deg, #fff, #fafbfc); }
-  .client-list-page .cl-avatar { border-radius: .85rem !important; box-shadow: 0 .2rem .55rem rgba(25,35,55,.06); }
-  .client-list-page .cl-badge-ref { padding: .22rem .55rem; border: 1px solid #e8ebf0; border-radius: 999px; background: #f8fafc; }
-  .client-list-page .cl-badge-status { border-radius: 999px !important; padding: .25rem .55rem; }
-  .client-list-page .cl-card-body { gap: .9rem; }
-  .client-list-page .cl-contact-pill { min-height: 2.35rem; border-color: #e5e9ef; border-radius: .65rem !important; background: #fafbfc; }
-  .client-list-page .cl-stats-box { border-color: #e5e9ef; border-radius: .8rem !important; background: linear-gradient(135deg, #f8fafc, #fff); }
-  .client-list-page .cl-stat-num { font-size: 1.05rem; }
-  .client-list-page .cl-card-foot { gap: .65rem; border-radius: 0 0 1rem 1rem; background: #f8f9fb; }
-  .client-list-page .cl-card-foot .btn { min-height: 2rem; display: inline-flex; align-items: center; justify-content: center; border-radius: .6rem !important; }
-  .client-list-page .table-custom-card {
-    overflow: hidden;
-    border: 1px solid #e1e6ee !important;
-    border-radius: 1rem !important;
-    background: #fff;
-    box-shadow: 0 .45rem 1.2rem rgba(25,35,55,.06) !important;
-  }
-  .client-list-page #clientsTableView thead th {
-    padding: .9rem .75rem;
-    border-bottom: 1px solid #e4e8ef;
-    background: #f7f8fb;
-    color: #667085;
-    font-size: .68rem;
-    font-weight: 800;
-    letter-spacing: .045em;
-    text-transform: uppercase;
-    white-space: nowrap;
-  }
-  .client-list-page #clientsTableView tbody td { padding: .8rem .75rem; border-color: #edf0f4; }
-  .client-list-page #clientsTableView tbody tr:nth-child(even) { background: #fafbfc; }
-  .client-list-page #clientsTableView tbody tr:hover { background: #fff5f3; }
-  .client-list-page #clientsTableView .btn { border-radius: .55rem !important; }
-  .client-list-page .cld-btn-export { border-radius: .7rem !important; box-shadow: 0 .3rem .8rem rgba(25,35,55,.06); }
-  @media (max-width: 767.98px) {
-    .client-list-page .cl-filter-card { padding: .9rem; }
-    .client-list-page .cl-card-foot { align-items: flex-start; flex-direction: column; }
-    .client-list-page .cl-card-foot > .d-flex { width: 100%; justify-content: flex-end; }
-  }
-  @media (max-width: 575.98px) {
-    .client-list-page { padding: .55rem; border-radius: .85rem; }
-    .client-list-page .cl-hero { border-radius: .85rem !important; }
-    .client-list-page .cl-kpi-card { min-height: 78px; gap: .65rem; padding: .8rem !important; }
-    .client-list-page .cl-kpi-icon { width: 2.35rem; height: 2.35rem; font-size: 1rem; }
-    .client-list-page .cl-kpi-val { font-size: 1.1rem; }
-    .client-list-page .cl-kpi-lbl { font-size: .68rem; }
-    .client-list-page .cl-filter-card .cl-filter-pill { flex: 1 1 auto; justify-content: center; }
-    .client-list-page .cl-filter-card form > div:last-child { justify-content: stretch !important; }
-    .client-list-page .cl-card-foot { padding-inline: 1rem; }
-    .client-list-page .cld-btn-export { justify-content: center; flex: 1 1 100%; }
-  }
-</style>
 
-<div class="container-fluid py-2 client-list-page">
+<div class="dl dl-clients">
 
-  {# ═══════════════════════════════════════════ #}
-  {# ── BANNIÈRE HÉRO DU PORTEFEUILLE ── #}
-  {# ═══════════════════════════════════════════ #}
-  <div class="cl-hero mb-4" style="border: 1px solid rgba(255,255,255,0.08); border-radius: 8px !important; box-shadow: 0 10px 30px rgba(15, 23, 42, 0.18);">
-    <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
+  <header class="dl-intro">
+    <div class="dl-intro-main">
+      <span class="dl-intro-icon" aria-hidden="true"><i class="bi bi-people-fill"></i></span>
       <div>
-        <div class="cl-hero-title d-flex align-items-center gap-2">
-          <i class="bi bi-people-fill" style="color:var(--color-secondary);"></i>
-          <span>Portefeuille Clients & Agences</span>
-        </div>
-        <div class="cl-hero-sub mt-1">
-          Supervisez les clients, les agences, les contrats de régie, les historiques de diffusion et les actions commerciales.
-        </div>
+        <div class="dl-intro-eyebrow">Espace de gestion</div>
+        <h1>Portefeuille Clients & Agences</h1>
+        <p>Supervisez les clients, les agences, les contrats de régie, les historiques de diffusion et les actions commerciales.</p>
       </div>
-      {% if user.is_staff_regie_role %}
-      <div class="d-flex gap-2 flex-wrap align-items-center d-inline d-md-none me-1">
-        <a href="{% url 'client_create' %}" class="btn btn-light shadow-sm d-inline d-md-none me-1" style="font-weight:700; color:#932e2b; border-radius:8px; padding:0.55rem 1.3rem;">
-          <i class="bi bi-plus-lg me-1"></i>Nouveau compte
-        </a>
-      </div>
-      {% endif %}
     </div>
-  </div>
+    <div class="dl-total">
+      <span class="dl-total-icon" aria-hidden="true"><i class="bi bi-people"></i></span>
+      <div>
+        <strong>{{ kpi_total_clients|default:0 }}</strong>
+        <span class="dl-total-label">compte{{ kpi_total_clients|default:0|pluralize }} au portefeuille</span>
+      </div>
+    </div>
+  </header>
 
   {# ═══════════════════════════════════════════ #}
   {# ── RUBAN DE 5 CARTES KPI STATISTIQUES ── #}
   {# ═══════════════════════════════════════════ #}
-  <div class="row g-3 mb-4">
+  <div class="row g-3 mb-4 dl-client-kpis">
     {# 1. Total Clients #}
     <div class="col-6 col-md-4 col-xl">
       <div class="cl-kpi-card">
@@ -217,49 +115,46 @@
   {# ═══════════════════════════════════════════ #}
   {# ── BARRE DE RECHERCHE, FILTRES & VUES ── #}
   {# ═══════════════════════════════════════════ #}
-  <div class="cl-filter-card mb-4">
-    <form method="get" id="clientFilterForm" class="row g-2 align-items-center">
-      {# Champ Recherche #}
-      <div class="col-lg-5 col-md-12">
+  <div class="dl-card dl-client-filters">
+    <form method="get" id="clientFilterForm" class="dl-client-filter-form">
+      <input type="hidden" name="status" id="statusInput" value="{{ status_filter }}">
+
+      <div class="dl-client-search">
+        <label for="client-search" class="form-label">Rechercher</label>
         <div class="input-group">
-          <span class="input-group-text bg-light border-end-0" style="border-radius:8px 0 0 8px !important; border-color:#cbd5e1;">
-            <i class="bi bi-search text-muted"></i>
-          </span>
-          <input type="text" name="q" value="{{ q }}" class="form-control cl-search-input border-start-0" placeholder="Rechercher par nom, contact, référence, téléphone, email..." style="border-radius:0 8px 8px 0 !important;">
+          <span class="input-group-text"><i class="bi bi-search"></i></span>
+          <input id="client-search" type="search" name="q" value="{{ q }}" class="form-control" placeholder="Nom, contact, référence, téléphone, e-mail..." autocomplete="off">
         </div>
       </div>
 
-      {# Filtres Statut #}
-      <div class="col-lg-5 col-md-8 d-flex gap-2 flex-wrap align-items-center">
-        <input type="hidden" name="status" id="statusInput" value="{{ status_filter }}">
-        <a href="?{% if q %}q={{ q }}&{% endif %}status=" class="cl-filter-pill {% if not status_filter %}active{% endif %}">
-          <i class="bi bi-grid-fill"></i>Tous ({{ kpi_total_clients|default:0 }})
+      <nav class="dl-tabs dl-client-status-tabs" aria-label="Filtrer les comptes">
+        <a href="?{% if q %}q={{ q }}&{% endif %}status=" class="dl-tab {% if not status_filter %}is-active{% endif %}">
+          Tous <span class="dl-tab-count">{{ kpi_total_clients|default:0 }}</span>
         </a>
-        <a href="?{% if q %}q={{ q }}&{% endif %}status=actif" class="cl-filter-pill {% if status_filter == 'actif' %}active{% endif %}">
-          <i class="bi bi-check-circle"></i>Actifs ({{ kpi_actifs_count|default:0 }})
+        <a href="?{% if q %}q={{ q }}&{% endif %}status=actif" class="dl-tab {% if status_filter == 'actif' %}is-active{% endif %}">
+          Actifs <span class="dl-tab-count">{{ kpi_actifs_count|default:0 }}</span>
         </a>
         {% if user.is_admin %}
-        <a href="?{% if q %}q={{ q }}&{% endif %}status=inactif" class="cl-filter-pill {% if status_filter == 'inactif' %}active{% endif %}">
-          <i class="bi bi-x-circle"></i>Inactifs ({{ kpi_inactifs_count|default:0 }})
+        <a href="?{% if q %}q={{ q }}&{% endif %}status=inactif" class="dl-tab {% if status_filter == 'inactif' %}is-active{% endif %}">
+          Inactifs <span class="dl-tab-count">{{ kpi_inactifs_count|default:0 }}</span>
         </a>
         {% endif %}
-      </div>
+      </nav>
 
-      {# Sélecteur de vue (Grille / Tableau) & Bouton validation #}
-      <div class="col-lg-2 col-md-4 d-flex justify-content-end gap-2">
-        <button type="submit" class="btn btn-primary btn-sm flex-fill" style="border-radius:8px; font-weight:600; font-size:0.83rem;">
+      <div class="dl-client-filter-actions">
+        <button type="submit" class="btn btn-primary btn-sm">
           <i class="bi bi-funnel me-1"></i>Filtrer
         </button>
         {% if q or status_filter %}
-        <a href="{% url 'client_list' %}" class="btn btn-outline-secondary btn-sm" style="border-radius:8px;" title="Réinitialiser">
+        <a href="{% url 'client_list' %}" class="dl-open" title="Réinitialiser les filtres" aria-label="Réinitialiser les filtres">
           <i class="bi bi-x-lg"></i>
         </a>
         {% endif %}
-        <div class="btn-group" role="group" style="border-radius:8px;">
-          <button type="button" class="cl-view-btn active" id="btnViewGrid" title="Vue Grille" onclick="setViewMode('grid')">
+        <div class="dl-client-view-toggle" role="group" aria-label="Mode d'affichage">
+          <button type="button" class="dl-client-view-btn active" id="btnViewGrid" title="Vue Grille" aria-label="Vue grille" onclick="setViewMode('grid')">
             <i class="bi bi-grid-3x3-gap-fill"></i>
           </button>
-          <button type="button" class="cl-view-btn" id="btnViewTable" title="Vue Tableau" onclick="setViewMode('table')">
+          <button type="button" class="dl-client-view-btn" id="btnViewTable" title="Vue Tableau" aria-label="Vue tableau" onclick="setViewMode('table')">
             <i class="bi bi-table"></i>
           </button>
         </div>
@@ -267,16 +162,13 @@
     </form>
 
     {% if q or status_filter %}
-    <div class="mt-2 text-muted d-flex align-items-center gap-2" style="font-size:0.78rem;">
-      <i class="bi bi-info-circle text-primary"></i>
-      <span>
-        Filtre actif : 
-        {% if q %}<strong>Recherche: "{{ q }}"</strong>{% endif %}
-        {% if status_filter %} <span class="badge bg-light text-dark border ms-1" style="border-radius:8px;">Statut : {{ status_filter|capfirst }}</span>{% endif %}
-        ({{ clients|length }} résultat{{ clients|length|pluralize }})
-      </span>
-      <a href="{% url 'client_list' %}" class="text-danger ms-auto text-decoration-none fw-bold" style="font-size:0.75rem;">
-        <i class="bi bi-x-circle me-1"></i>Effacer les filtres
+    <div class="dl-active-filters">
+      <span class="dl-active-filters-label">Filtres actifs :</span>
+      {% if q %}<span class="dl-filter-chip"><i class="bi bi-search"></i>Recherche : "{{ q }}"</span>{% endif %}
+      {% if status_filter %}<span class="dl-filter-chip"><i class="bi bi-activity"></i>Statut : {{ status_filter|capfirst }}</span>{% endif %}
+      <span class="dl-filter-chip">{{ clients|length }} résultat{{ clients|length|pluralize }}</span>
+      <a href="{% url 'client_list' %}" class="dl-filter-chip text-danger text-decoration-none">
+        <i class="bi bi-x-circle"></i>Effacer les filtres
       </a>
     </div>
     {% endif %}
@@ -289,7 +181,7 @@
   <div id="clientsGridView" class="row g-3" data-client-pagination-group>
     {% for c in clients %}
     <div class="col-md-6 col-xl-4 client-item-card" data-client-page-item>
-      <div class="cl-card {% if c.actif %}cl-card-active{% else %}cl-card-inactive{% endif %} shadow-sm">
+      <div class="cl-card dl-client-card {% if c.actif %}cl-card-active{% else %}cl-card-inactive{% endif %}">
         
         {# En-tête de carte #}
         <div class="cl-card-head">
@@ -306,11 +198,11 @@
             <div class="d-flex align-items-center justify-content-between gap-1 mb-1">
               <span class="cl-badge-ref">{{ c.reference }}</span>
               {% if c.actif %}
-                <span class="cl-badge-status cl-badge-actif">
+                <span class="dl-pill dl-client-pill-active">
                   <span class="cld-status-dot-active" style="background:#166534; width:5px; height:5px;"></span>Actif
                 </span>
               {% else %}
-                <span class="cl-badge-status cl-badge-inactif">
+                <span class="dl-pill dl-client-pill-inactive">
                   <i class="bi bi-circle-fill" style="font-size:5px;"></i>Inactif
                 </span>
               {% endif %}
@@ -379,20 +271,20 @@
           <div class="d-flex gap-1 align-items-center">
             {% if user.is_staff_regie_role %}
               {% if c.type_entite == 'client' %}
-              <a href="{% url 'campagne_create' %}?client={{ c.pk }}" class="btn btn-sm btn-outline-primary py-1 px-2" style="font-size:0.74rem; border-radius:8px;" title="Créer une campagne">
+              <a href="{% url 'campagne_create' %}?client={{ c.pk }}" class="dl-open" title="Créer une campagne" aria-label="Créer une campagne">
                 <i class="bi bi-megaphone"></i>
               </a>
-              <a href="{% url 'reservation_wizard_etape1' c.pk %}" class="btn btn-sm btn-outline-secondary py-1 px-2" style="font-size:0.74rem; border-radius:8px;" title="Nouvelle Réservation">
+              <a href="{% url 'reservation_wizard_etape1' c.pk %}" class="dl-open dl-open-secondary" title="Nouvelle réservation" aria-label="Nouvelle réservation">
                 <i class="bi bi-calendar-plus"></i>
               </a>
-              <a href="{% url 'preview_client_pdf' c.pk %}" class="btn btn-sm btn-outline-view py-1 px-2" style="font-size: 0.74rem;" title="Aperçu du dossier client">
+              <a href="{% url 'preview_client_pdf' c.pk %}" class="dl-open dl-open-secondary" title="Aperçu du dossier client" aria-label="Aperçu du dossier client">
                 <i class="bi bi-download"></i>
               </a>
               {% endif %}
-              <a href="{% url 'client_edit' c.pk %}" class="btn btn-sm btn-outline-secondary py-1 px-2" style="font-size:0.74rem; border-radius:8px;" title="Modifier le client">
+              <a href="{% url 'client_edit' c.pk %}" class="dl-open dl-open-secondary" title="Modifier le client" aria-label="Modifier le client">
                 <i class="bi bi-pencil"></i>
               </a>
-              <a href="{% url 'client_delete' c.pk %}" class="btn btn-sm btn-outline-danger py-1 px-2" style="font-size:0.74rem; border-radius:8px;" title="Supprimer le client">
+              <a href="{% url 'client_delete' c.pk %}" class="dl-open dl-open-danger" title="Supprimer le client" aria-label="Supprimer le client">
                 <i class="bi bi-trash"></i>
               </a>
             {% endif %}
@@ -403,10 +295,10 @@
     </div>
     {% empty %}
     <div class="col-12">
-      <div class="card text-center p-5 border-0 shadow-sm" style="border-radius:8px;">
-        <i class="bi bi-people text-muted" style="font-size:3rem;"></i>
-        <h5 class="fw-bold mt-3 text-dark">        Aucun compte trouvé</h5>
-        <p class="text-muted" style="max-width:420px; margin:0 auto 1.5rem; font-size:0.85rem;">
+      <div class="dl-empty">
+        <i class="bi bi-people"></i>
+        <h2>Aucun compte trouvé</h2>
+        <p>
           {% if q or status_filter %}
             Aucun résultat ne correspond à vos critères de recherche.
           {% else %}
@@ -414,11 +306,9 @@
           {% endif %}
         </p>
         {% if user.is_staff_regie_role %}
-        <div>
-          <a href="{% url 'client_create' %}" class="btn btn-primary px-4 py-2" style="border-radius:8px; font-weight:600;">
-            <i class="bi bi-plus-lg me-1"></i>Créer le premier compte
-          </a>
-        </div>
+        <a href="{% url 'client_create' %}" class="btn btn-primary btn-sm px-3 mt-3">
+          <i class="bi bi-plus-lg me-1"></i>Créer le premier compte
+        </a>
         {% endif %}
       </div>
     </div>
@@ -428,9 +318,9 @@
   {# ═══════════════════════════════════════════ #}
   {# ── VUE 2 : TABLEAU COMPACT (TABLE VIEW) ── #}
   {# ═══════════════════════════════════════════ #}
-  <div id="clientsTableView" class="card table-custom-card d-none shadow-sm" style="border: 1px solid #e2e8f0; border-radius: 8px;">
+  <div id="clientsTableView" class="dl-card dl-client-table d-none">
     <div class="table-responsive">
-      <table class="table table-hover mb-0 align-middle">
+      <table class="table dl-table align-middle">
         <thead>
           <tr>
             <th style="width: 130px;">{% sortable_th sort_links sort_key sort_dir 'reference' 'Référence' %}</th>
@@ -445,9 +335,9 @@
         </thead>
         <tbody data-client-pagination-group>
           {% for c in clients %}
-          <tr data-client-page-item>
+          <tr data-client-page-item class="dl-row dl-client-row {% if c.actif %}dl-client-row-actif{% else %}dl-client-row-inactif{% endif %}">
             <td>
-              <span class="cl-badge-ref">{{ c.reference }}</span>
+              <span class="dl-ref">{{ c.reference }}</span>
             </td>
             <td>
               <div class="d-flex align-items-center gap-2">
@@ -461,12 +351,12 @@
                   {% endif %}
                 </div>
                 <div>
-                  <a href="{% url 'client_detail' c.pk %}" class="text-dark fw-bold text-decoration-none" style="font-size:0.88rem;">
+                  <a href="{% url 'client_detail' c.pk %}" class="dl-client-link">
                     {{ c.nom }}
                   </a>
                   <span class="badge rounded-pill bg-light text-dark border ms-1">{{ c.get_type_entite_display }}</span>
                   {% if c.adresse %}
-                    <div class="text-muted text-truncate" style="font-size:0.72rem; max-width:220px;">
+                    <div class="dl-sub text-truncate" style="max-width:220px;">
                       <i class="bi bi-geo-alt me-1"></i>{{ c.adresse }}
                     </div>
                   {% endif %}
@@ -491,7 +381,7 @@
               </div>
             </td>
             <td class="text-center">
-              <span class="badge bg-light text-dark border px-2 py-1 cl-mono" style="border-radius:8px; font-weight:700; font-size:0.8rem;">
+              <span class="dl-count">
                 {{ c.campagnes_stats.total|default:0 }}
               </span>
             </td>
@@ -507,33 +397,33 @@
             </td>
             <td class="text-center">
               {% if c.actif %}
-                <span class="cl-badge-status cl-badge-actif">
+                <span class="dl-pill dl-client-pill-active">
                   <span class="cld-status-dot-active" style="background:#166534; width:5px; height:5px;"></span>Actif
                 </span>
               {% else %}
-                <span class="cl-badge-status cl-badge-inactif">
+                <span class="dl-pill dl-client-pill-inactive">
                   <i class="bi bi-circle-fill" style="font-size:5px;"></i>Inactif
                 </span>
               {% endif %}
             </td>
             <td class="text-end">
               <div class="d-flex gap-1 justify-content-end align-items-center">
-                <a href="{% url 'client_detail' c.pk %}" class="btn btn-sm btn-outline-primary py-1 px-2" style="border-radius:8px; font-size:0.75rem;" title="Voir la fiche client">
+                <a href="{% url 'client_detail' c.pk %}" class="dl-open" title="Voir la fiche client" aria-label="Voir la fiche client">
                   <i class="bi bi-eye"></i>
                 </a>
                 {% if user.is_staff_regie_role %}
                   {% if c.type_entite == 'client' %}
-                  <a href="{% url 'campagne_create' %}?client={{ c.pk }}" class="btn btn-sm btn-outline-secondary py-1 px-2" style="border-radius:8px; font-size:0.75rem;" title="Créer une campagne">
+                  <a href="{% url 'campagne_create' %}?client={{ c.pk }}" class="dl-open dl-open-secondary" title="Créer une campagne" aria-label="Créer une campagne">
                     <i class="bi bi-megaphone"></i>
                   </a>
-                  <a href="{% url 'reservation_wizard_etape1' c.pk %}" class="btn btn-sm btn-outline-secondary py-1 px-2" style="border-radius:8px; font-size:0.75rem;" title="Réserver">
+                  <a href="{% url 'reservation_wizard_etape1' c.pk %}" class="dl-open dl-open-secondary" title="Réserver" aria-label="Réserver">
                     <i class="bi bi-calendar-plus"></i>
                   </a>
                   {% endif %}
-                  <a href="{% url 'client_edit' c.pk %}" class="btn btn-sm btn-outline-secondary py-1 px-2" style="border-radius:8px; font-size:0.75rem;" title="Modifier">
+                  <a href="{% url 'client_edit' c.pk %}" class="dl-open dl-open-secondary" title="Modifier" aria-label="Modifier">
                     <i class="bi bi-pencil"></i>
                   </a>
-                  <a href="{% url 'client_delete' c.pk %}" class="btn btn-sm btn-outline-danger py-1 px-2" style="border-radius:8px; font-size:0.75rem;" title="Supprimer">
+                  <a href="{% url 'client_delete' c.pk %}" class="dl-open dl-open-danger" title="Supprimer" aria-label="Supprimer">
                     <i class="bi bi-trash"></i>
                   </a>
                 {% endif %}
@@ -542,9 +432,12 @@
           </tr>
           {% empty %}
           <tr>
-            <td colspan="8" class="text-center py-5 text-muted">
-              <i class="bi bi-people fs-2 d-block mb-2"></i>
-              Aucun compte trouvé dans le portefeuille.
+            <td colspan="8">
+              <div class="dl-empty">
+                <i class="bi bi-people"></i>
+                <h2>Aucun compte trouvé</h2>
+                <p>Aucun compte trouvé dans le portefeuille.</p>
+              </div>
             </td>
           </tr>
           {% endfor %}
@@ -557,7 +450,7 @@
   </div>
 
   {# ── BOUTONS D'EXPORT ET APERÇU RAPPORT (EN BAS) ── #}
-  <div class="d-flex gap-3 justify-content-center flex-wrap my-4">
+  <div class="dl-exports d-flex gap-3 justify-content-center flex-wrap">
     <a href="{% url 'clients_report' %}" class="cld-btn-export cld-btn-view">
       <i class="bi bi-eye-fill"></i> Aperçu Rapport Web
     </a>

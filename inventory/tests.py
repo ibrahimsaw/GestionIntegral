@@ -2629,6 +2629,22 @@ class SupportListCategoryFilterTests(TestCase):
         )
         self.assertEqual(list(view.get_queryset()), [self.sucette])
 
+    def test_filter_options_only_include_values_with_matching_supports(self):
+        view = self.get_view({'ville': 'Bobo-Dioulasso'})
+        context = view.get_context_data(object_list=view.get_queryset())
+
+        self.assertEqual(context['villes'], ['Bobo-Dioulasso', 'Ouagadougou'])
+        self.assertEqual(context['category_choices'], ['Sucette'])
+        self.assertEqual(
+            context['type_panneau_choices'],
+            [('FILTER-SUCETTE', '1m × 2m')],
+        )
+        self.assertEqual(context['etat_choices'], [(Support.ETAT_BON, 'Bon état')])
+        self.assertEqual(
+            context['occupation_choices'],
+            {'libre': 'Libre', 'non_reserve': 'Non réservé'},
+        )
+
     def test_category_choices_and_formats_are_exposed_to_filter(self):
         view = self.get_view({'categorie': 'Géant'})
         queryset = view.get_queryset()
@@ -2647,7 +2663,11 @@ class SupportListCategoryFilterTests(TestCase):
             [('FILTER-GEANT', '8m × 6m')],
         )
         self.assertIn('name="categorie"', rendered)
-        self.assertIn('<option value="Géant" selected>Géant</option>', rendered)
+        self.assertRegex(
+            rendered,
+            r'type="radio" name="categorie" id="support-category-\d+" value="Géant" checked',
+        )
+        self.assertNotIn('<select id="support-category"', rendered)
         self.assertNotIn('Tous les types', rendered)
 
 

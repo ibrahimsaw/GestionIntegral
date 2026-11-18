@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load sort_tags %}
+{% load static sort_tags %}
 {% block title %}Supports — Integral{% endblock %}
 {% block topbar_title %}<i class="bi bi-geo-alt me-2" style="color:var(--color-primary)"></i>Inventaire des Supports{% endblock %}
 {% block topbar_actions %}
@@ -22,17 +22,28 @@
 {% endblock %}
 {% block page_toolbar %}{% endblock %}
 
+{% block extra_head %}
+<link rel="stylesheet" href="{% static 'css/gestion-listes.css' %}?v=20261118-support-buttons">
+{% endblock %}
+
 {% block content %}
 
-{# ── BANNIÈRE HÉRO (CL-HERO) ── #}
-<div class="cl-hero mb-4">
-  <div class="d-flex justify-content-between align-items-center flex-wrap gap-3">
-    <div>
-      <div class="cl-hero-title">
-        <i class="bi bi-geo-alt-fill me-2"></i>Inventaire & Parc des Supports
+<div class="dl dl-supports">
+  {# ── En-tête partagé ── #}
+  <header class="dl-intro">
+    <div class="dl-intro-main">
+      <span class="dl-intro-icon" aria-hidden="true"><i class="bi bi-geo-alt-fill"></i></span>
+      <div>
+        <div class="dl-intro-eyebrow">Espace de gestion</div>
+        <h1>Inventaire &amp; parc des supports</h1>
+        <p>Consultez et supervisez l'ensemble de vos supports d'affichage : panneaux, écrans numériques et marchés.</p>
       </div>
-      <div class="cl-hero-sub">
-        Consultez et supervisez l'ensemble de vos supports d'affichage : panneaux, écrans numériques et marchés.
+    </div>
+    <div class="dl-total">
+      <span class="dl-total-icon" aria-hidden="true"><i class="bi bi-signpost-2"></i></span>
+      <div>
+        <strong>{{ supports|length }}</strong>
+        <span class="dl-total-label">support{{ supports|length|pluralize }} affiché{{ supports|length|pluralize }}</span>
       </div>
     </div>
     {% if user.is_staff_regie_role %}
@@ -51,97 +62,108 @@
       </a>
     </div>
     {% endif %}
-  </div>
-</div>
+  </header>
 
 {# ── Déterminer si le type est filtré ── #}
 {% with is_type_filtered=type_f|default:category_f|default:type_panneau_f %}
 
 {# ── SECTION FILTRES ── #}
-<div class="card filter-card mb-4">
-  <div class="card-body p-3 p-lg-4">
-    <form method="get" class="row g-3 align-items-end">
+<div class="dl-card dl-support-filter-card">
+  <div class="dl-support-filter-body">
+    <form method="get" class="dl-support-filter-form">
       
       {# Recherche textuelle #}
-      <div class="col-xl-2 col-lg-3 col-md-4 col-sm-6">
-        <label class="filter-label"><i class="bi bi-search"></i>Recherche</label>
-        <div class="input-group input-group-sm">
-          <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Code, nom, ancien nom, adresse...">
+      <div class="dl-support-filter-search">
+        <label for="support-search" class="form-label">Rechercher</label>
+        <div class="input-group">
+          <span class="input-group-text"><i class="bi bi-search"></i></span>
+          <input id="support-search" type="search" name="q" value="{{ q }}" class="form-control" placeholder="Code, nom, ancien nom, adresse..." autocomplete="off">
         </div>
       </div>
 
-      {# Catégorie de support #}
-      {% if type_panneau_f != '1x2' and desactif != 'ecran' and desactif != 'panneau' %}
-      <div class="col-xl-2 col-lg-3 col-md-4 col-sm-6">
-        <label class="filter-label"><i class="bi bi-grid"></i>Catégorie</label>
-        <select name="categorie" class="form-select form-select-sm">
-          <option value="">Toutes les catégories</option>
-          {% for categorie in category_choices %}
-            <option value="{{ categorie }}" {% if category_f == categorie %}selected{% endif %}>{{ categorie }}</option>
+      {# Ville #}
+      {% if villes and desactif != 'ville' %}
+      <div class="dl-support-filter-group">
+        <span id="support-city-label" class="dl-support-filter-label">Ville</span>
+        <div class="dl-support-filter-options" role="radiogroup" aria-labelledby="support-city-label">
+          <input class="btn-check" type="radio" name="ville" id="support-city-all" value="" {% if not ville_f %}checked{% endif %}>
+          <label class="dl-support-filter-option" for="support-city-all">Toutes</label>
+          {% for ville in villes %}
+            <input class="btn-check" type="radio" name="ville" id="support-city-{{ forloop.counter }}" value="{{ ville }}" {% if ville_f == ville %}checked{% endif %}>
+            <label class="dl-support-filter-option" for="support-city-{{ forloop.counter }}">{{ ville }}</label>
           {% endfor %}
-        </select>
+        </div>
       </div>
       {% endif %}
 
-      {# Ville #}
-      {% if desactif != 'ville' %}
-      <div class="col-xl-2 col-lg-3 col-md-4 col-sm-6">
-        <label class="filter-label"><i class="bi bi-geo-alt"></i>Ville</label>
-        <select name="ville" class="form-select form-select-sm">
-          <option value="">Toutes les villes</option>
-          {% for ville in villes %}
-            <option value="{{ ville }}" {% if ville_f == ville %}selected{% endif %}>{{ ville }}</option>
+      {# Catégorie de support #}
+      {% if category_choices and type_panneau_f != '1x2' and desactif != 'ecran' and desactif != 'panneau' %}
+      <div class="dl-support-filter-group">
+        <span id="support-category-label" class="dl-support-filter-label">Catégorie</span>
+        <div class="dl-support-filter-options" role="radiogroup" aria-labelledby="support-category-label">
+          <input class="btn-check" type="radio" name="categorie" id="support-category-all" value="" {% if not category_f %}checked{% endif %}>
+          <label class="dl-support-filter-option" for="support-category-all">Toutes</label>
+          {% for categorie in category_choices %}
+            <input class="btn-check" type="radio" name="categorie" id="support-category-{{ forloop.counter }}" value="{{ categorie }}" {% if category_f == categorie %}checked{% endif %}>
+            <label class="dl-support-filter-option" for="support-category-{{ forloop.counter }}">{{ categorie }}</label>
           {% endfor %}
-        </select>
+        </div>
+      </div>
+      {% endif %}
+
+      {# Format #}
+      {% if type_panneau_choices and type_panneau_f != '1x2' %}
+      <div class="dl-support-filter-group dl-support-filter-format">
+        <span id="support-format-label" class="dl-support-filter-label">Format</span>
+        <div class="dl-support-filter-options" role="radiogroup" aria-labelledby="support-format-label">
+          <input class="btn-check" type="radio" name="type_panneau" id="support-format-all" value="" {% if not type_panneau_f %}checked{% endif %}>
+          <label class="dl-support-filter-option" for="support-format-all">Tous</label>
+          {% for code, libelle in type_panneau_choices %}
+            <input class="btn-check" type="radio" name="type_panneau" id="support-format-{{ forloop.counter }}" value="{{ code }}" {% if type_panneau_f == code %}checked{% endif %}>
+            <label class="dl-support-filter-option" for="support-format-{{ forloop.counter }}">{{ libelle }}</label>
+          {% endfor %}
+        </div>
       </div>
       {% endif %}
 
       {# État technique #}
-      <div class="col-xl-2 col-lg-3 col-md-4 col-sm-6">
-        <label class="filter-label"><i class="bi bi-activity"></i>État</label>
-        <select name="etat" class="form-select form-select-sm">
-          <option value="">Tous les états</option>
-          <option value="bon"   {% if etat_f == 'bon'   %}selected{% endif %}>Bon état</option>
-          <option value="a_maintenir" {% if etat_f == 'a_maintenir' %}selected{% endif %}>Signal</option>
-          <option value="panne" {% if etat_f == 'panne' %}selected{% endif %}>En panne</option>
-        </select>
+      {% if etat_choices %}
+      <div class="dl-support-filter-group">
+        <span id="support-state-label" class="dl-support-filter-label">État</span>
+        <div class="dl-support-filter-options" role="radiogroup" aria-labelledby="support-state-label">
+          <input class="btn-check" type="radio" name="etat" id="support-state-all" value="" {% if not etat_f %}checked{% endif %}>
+          <label class="dl-support-filter-option" for="support-state-all">Tous</label>
+          {% for value, label in etat_choices %}
+            <input class="btn-check" type="radio" name="etat" id="support-state-{{ forloop.counter }}" value="{{ value }}" {% if etat_f == value %}checked{% endif %}>
+            <label class="dl-support-filter-option" for="support-state-{{ forloop.counter }}">{{ label }}</label>
+          {% endfor %}
+        </div>
       </div>
+      {% endif %}
 
       {# Occupation commerciale #}
-      <div class="col-xl-2 col-lg-3 col-md-4 col-sm-6">
-        <label class="filter-label"><i class="bi bi-pie-chart"></i>Occupation</label>
-        <select name="occupation" class="form-select form-select-sm">
-          <option value="">Toutes occupations</option>
+      {% if occupation_choices %}
+      <div class="dl-support-filter-group">
+        <span id="support-occupation-label" class="dl-support-filter-label">Occupation</span>
+        <div class="dl-support-filter-options" role="radiogroup" aria-labelledby="support-occupation-label">
+          <input class="btn-check" type="radio" name="occupation" id="support-occupation-all" value="" {% if not occupation_f %}checked{% endif %}>
+          <label class="dl-support-filter-option" for="support-occupation-all">Toutes</label>
           {% for value, label in occupation_choices.items %}
-            <option value="{{ value }}" {% if occupation_f == value %}selected{% endif %}>{{ label }}</option>
+            <input class="btn-check" type="radio" name="occupation" id="support-occupation-{{ forloop.counter }}" value="{{ value }}" {% if occupation_f == value %}checked{% endif %}>
+            <label class="dl-support-filter-option" for="support-occupation-{{ forloop.counter }}">{{ label }}</label>
           {% endfor %}
-        </select>
-      </div>
-
-      {# Format #}
-      {% if type_panneau_f != '1x2' %}
-      <div class="col-xl-2 col-lg-3 col-md-4 col-sm-6">
-        <label class="filter-label"><i class="bi bi-aspect-ratio"></i>Format de la catégorie</label>
-        <select name="type_panneau" class="form-select form-select-sm">
-          <option value="">Tous les formats</option>
-          {% for code, libelle in type_panneau_choices %}
-            <option value="{{ code }}" {% if type_panneau_f == code %}selected{% endif %}>
-              {{ libelle }}
-            </option>
-          {% endfor %}
-        </select>
+        </div>
       </div>
       {% endif %}
 
       {# Boutons Filtrer / Réinitialiser #}
-      <div class="col-xl-2 col-lg-3 col-md-4 col-sm-6 d-flex gap-2">
-        <button type="submit" class="btn btn-primary btn-sm flex-fill shadow-sm d-flex align-items-center justify-content-center gap-1">
-          <i class="bi bi-funnel-fill"></i>
-          <span>Filtrer</span>
+      <div class="dl-support-filter-actions dl-support-filter-submit">
+        <button type="submit" class="btn btn-primary btn-sm">
+          <i class="bi bi-funnel me-1"></i>Filtrer
         </button>
         {% if q or type_f or category_f or ville_f or etat_f or occupation_f or type_panneau_f %}
-        <a href="{% url 'support_list' %}" class="btn btn-outline-secondary btn-sm" title="Réinitialiser tous les filtres">
-          <i class="bi bi-arrow-counterclockwise"></i>
+        <a href="{% url 'support_list' %}" class="dl-open" title="Réinitialiser tous les filtres" aria-label="Réinitialiser tous les filtres">
+          <i class="bi bi-x-lg"></i>
         </a>
         {% endif %}
       </div>
@@ -150,31 +172,31 @@
 
     {# ── Badges des filtres actifs ── #}
     {% if q or type_f or category_f or ville_f or etat_f or occupation_f or type_panneau_f %}
-    <div class="d-flex flex-wrap gap-2 align-items-center mt-3 pt-3 border-top">
-      <span class="small text-muted fw-bold me-1" style="font-size: 0.72rem;">Filtres actifs :</span>
+    <div class="dl-active-filters">
+      <span class="dl-active-filters-label">Filtres actifs :</span>
       {% if q %}
-        <span class="active-filter-pill"><i class="bi bi-search"></i>"{{ q }}"</span>
+        <span class="dl-filter-chip"><i class="bi bi-search"></i>"{{ q }}"</span>
       {% endif %}
       {% if type_f %}
-        <span class="active-filter-pill"><i class="bi bi-grid"></i>Type: {{ type_f|title }}</span>
+        <span class="dl-filter-chip"><i class="bi bi-grid"></i>Type : {{ type_f|title }}</span>
       {% endif %}
       {% if category_f %}
-        <span class="active-filter-pill"><i class="bi bi-grid"></i>Catégorie: {{ category_f }}</span>
+        <span class="dl-filter-chip"><i class="bi bi-grid"></i>Catégorie : {{ category_f }}</span>
       {% endif %}
       {% if ville_f %}
-        <span class="active-filter-pill"><i class="bi bi-geo-alt"></i>{{ ville_f }}</span>
+        <span class="dl-filter-chip"><i class="bi bi-geo-alt"></i>{{ ville_f }}</span>
       {% endif %}
       {% if etat_f %}
-        <span class="active-filter-pill"><i class="bi bi-activity"></i>État: {{ etat_f|title }}</span>
+        <span class="dl-filter-chip"><i class="bi bi-activity"></i>État : {{ etat_f|title }}</span>
       {% endif %}
       {% if occupation_f %}
-        <span class="active-filter-pill"><i class="bi bi-pie-chart"></i>{{ occupation_f|title }}</span>
+        <span class="dl-filter-chip"><i class="bi bi-pie-chart"></i>{{ occupation_f|title }}</span>
       {% endif %}
       {% if type_panneau_f %}
-        <span class="active-filter-pill"><i class="bi bi-aspect-ratio"></i>Format: {{ type_panneau_f }}</span>
+        <span class="dl-filter-chip"><i class="bi bi-aspect-ratio"></i>Format : {{ type_panneau_f }}</span>
       {% endif %}
-      <a href="{% url 'support_list' %}" class="small text-danger text-decoration-none ms-2 fw-semibold" style="font-size: 0.75rem;">
-        <i class="bi bi-x-circle me-1"></i>Effacer tout
+      <a href="{% url 'support_list' %}" class="dl-filter-chip text-danger text-decoration-none">
+        <i class="bi bi-x-circle"></i>Effacer les filtres
       </a>
     </div>
     {% endif %}
@@ -187,12 +209,12 @@
 <form method="post" id="support-actions-form" action="{% url 'support_bulk_action' %}">
   {% csrf_token %}
   <input type="hidden" name="action" id="support-action-input">
-<div class="card table-custom-card">
-  <div class="card-header bg-white py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-2 border-bottom">
+<section class="dl-card dl-support-table-card">
+  <div class="dl-card-head dl-support-table-head">
     <div class="d-flex align-items-center gap-3">
       <input type="checkbox" id="support-select-all" class="form-check-input mt-0" title="Tout sélectionner">
-      <h6 class="mb-0 fw-bold text-dark">Résultats</h6>
-      <span id="support-selection-count" class="badge bg-primary-subtle text-primary border border-primary-subtle px-2.5 py-1 font-monospace" style="font-size: 0.75rem;">
+      <span><i class="bi bi-table"></i>Résultats</span>
+      <span id="support-selection-count" class="dl-count">
         {{ supports|length }} support{{ supports|length|pluralize }}
       </span>
       {% if pending_deletion_count %}
@@ -205,7 +227,7 @@
       {% endif %}
     </div>
 
-    <div id="support-actions-bar" class="d-flex align-items-center gap-2" style="display:none;">
+    <div id="support-actions-bar" class="dl-support-actions-bar" style="display:none;">
       {% if user.is_staff_regie_role %}
       <select id="support-action-select" class="form-select form-select-sm" style="width:auto;">
         <option value="">Sélectionner une action</option>
@@ -222,14 +244,14 @@
       {% endif %}
     </div>
 
-    <a href="{% url 'carte' %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}" class="btn btn-sm btn-outline-primary px-3 shadow-sm d-flex align-items-center gap-1">
+    <a href="{% url 'carte' %}{% if request.GET %}?{{ request.GET.urlencode }}{% endif %}" class="dl-open dl-support-map-link">
       <i class="bi bi-map-fill"></i>
       <span>Afficher sur la carte</span>
     </a>
   </div>
 
   <div class="table-responsive">
-    <table id="tableSupports" class="table table-supports mb-0 align-middle">
+    <table id="tableSupports" class="table dl-table table-supports mb-0 align-middle">
       <thead>
         <tr>
           <th style="width:2.5rem" class="ps-3"></th>
@@ -251,7 +273,7 @@
           {# Si la VILLE change, on affiche une ligne de séparation pour la ville #}
           {% ifchanged s.ville %}
             <tr class="ville-separator-row" data-client-page-separator>
-              <td colspan="{% if is_type_filtered %}6{% else %}7{% endif %}" class="ps-3 py-2">
+              <td colspan="{% if is_type_filtered %}7{% else %}8{% endif %}" class="ps-3 py-2">
                 <i class="bi bi-building me-2"></i>{{ s.ville|default:"Ville non spécifiée" }}
               </td>
             </tr>
@@ -260,25 +282,25 @@
           {# Si le QUARTIER change (ou si la ville a changé), on met une ligne pour le quartier #}
           {% ifchanged s.ville s.quartier %}
             <tr class="quartier-separator-row" data-client-page-separator>
-              <td colspan="{% if is_type_filtered %}6{% else %}7{% endif %}">
+              <td colspan="{% if is_type_filtered %}7{% else %}8{% endif %}">
                 <i class="bi bi-signpost-split me-1"></i>Quartier : {{ s.quartier|default:"Général / Non spécifié" }}
               </td>
             </tr>
           {% endifchanged %}
 
           {# Ligne standard du support #}
-          <tr data-client-page-item class="support-row {% if s.etat == 'panne' %}table-danger bg-opacity-25{% endif %}">
+          <tr data-client-page-item class="support-row dl-row dl-support-row {% if s.etat == 'bon' %}dl-support-row-bon{% elif s.etat == 'a_maintenir' %}dl-support-row-maintenance{% else %}dl-support-row-panne{% endif %} {% if not s.actif %}is-archived{% endif %}">
             <td class="ps-3">
               <input type="checkbox" name="selected_ids" value="{{ s.pk }}" class="form-check-input mt-0 support-row-checkbox">
             </td>
             <td>
-              <span class="code-primary">{{ s.code }}</span>
+              <span class="code-primary dl-ref">{{ s.code }}</span>
             </td>
             <td>
               <span class="code-secondary">{{ s.code_ext|default:"—" }}</span>
             </td>
             <td>
-              <a href="{% url 'support_detail' s.uuid %}" class="support-name-link">
+              <a href="{% url 'support_detail' s.uuid %}" class="dl-support-link">
                 {{ s.nom }}
               </a>
               {% if not s.actif %}
@@ -346,23 +368,22 @@
             </td>
 
             <td class="text-end pe-3">
-              <div class="d-inline-flex gap-1">
               <div class="d-inline-flex gap-1 align-items-center">
                 {% if user.is_staff_regie_role %}
-                  <a href="{% url 'support_detail' s.uuid %}" class="btn btn-sm btn-outline-primary btn-action-icon" title="Voir le détail">
+                  <a href="{% url 'support_detail' s.uuid %}" class="dl-open" title="Voir le détail" aria-label="Voir le détail">
                     <i class="bi bi-eye"></i>
                   </a>
-                  <a href="{% url 'support_edit' s.uuid %}" class="btn btn-sm btn-outline-secondary btn-action-icon" title="Modifier" style="border-radius:8px !important;">
+                  <a href="{% url 'support_edit' s.uuid %}" class="dl-open dl-open-secondary" title="Modifier" aria-label="Modifier">
                     <i class="bi bi-pencil"></i>
                   </a>
                 {% endif %}
                 {% if user.is_technicien_role or user.is_staff_regie_role %}
-                  <a href="{% url 'maintenance_create' s.pk %}" class="btn btn-sm btn-outline-warning btn-action-icon" title="Créer une maintenance" style="border-radius:8px !important;">
+                  <a href="{% url 'maintenance_create' s.pk %}" class="dl-open dl-open-warning" title="Créer une maintenance" aria-label="Créer une maintenance">
                     <i class="bi bi-tools"></i>
                   </a>
                 {% endif %}
                 {% if not request.user.is_technicien %}
-                  <a href="{% url 'preview_support_pdf' s.pk %}" class="btn btn-sm btn-outline-view btn-action-icon" title="Aperçu Rapport Web" style="border-radius:8px !important;">
+                  <a href="{% url 'preview_support_pdf' s.pk %}" class="dl-open dl-open-secondary" title="Aperçu Rapport Web" aria-label="Aperçu Rapport Web">
                     <i class="bi bi-download"></i>
                   </a>
                 {% endif %}
@@ -372,18 +393,18 @@
 
         {% empty %}
           <tr>
-            <td colspan="{% if is_type_filtered %}6{% else %}7{% endif %}" class="text-center py-5 text-muted">
-              <div class="py-4">
-                <i class="bi bi-geo-alt text-muted d-block mb-3" style="font-size: 2.5rem; opacity: 0.4;"></i>
-                <h6 class="fw-bold text-dark mb-1">Aucun support trouvé</h6>
-                <p class="text-muted small mb-3">Aucun résultat ne correspond aux filtres sélectionnés.</p>
+            <td colspan="{% if is_type_filtered %}7{% else %}8{% endif %}">
+              <div class="dl-empty">
+                <i class="bi bi-geo-alt"></i>
+                <h2>Aucun support trouvé</h2>
+                <p>Aucun résultat ne correspond aux filtres sélectionnés.</p>
                 {% if q or type_f or category_f or ville_f or etat_f or occupation_f or type_panneau_f %}
                   <a href="{% url 'support_list' %}" class="btn btn-outline-primary btn-sm px-3">
                     <i class="bi bi-arrow-counterclockwise me-1"></i>Réinitialiser les filtres
                   </a>
                 {% else %}
                   {% if not request.user.is_technicien %}
-                    <a href="{% url 'support_create' %}" class="btn btn-primary btn-sm px-3">
+                    <a href="{% url 'support_create' %}" class="btn btn-primary btn-sm px-3 mt-3">
                       <i class="bi bi-plus-lg me-1"></i>Créer le premier support
                     </a>
                   {% endif %}
@@ -398,7 +419,7 @@
   <div class="m-4">
     <div data-client-pagination-controls></div>
   </div>
-</div>
+</section>
 </div>
 </form>
 
@@ -432,26 +453,30 @@
       </div>
     </div>
   {% endif %}
+  </div>
 {% endblock %}
 
 {% block extra_js %}
 <script>
-  const supportCategoryFilter = document.querySelector('select[name="categorie"]');
-  const supportFormatFilter = document.querySelector('select[name="type_panneau"]');
-  const supportCityFilter = document.querySelector('select[name="ville"]');
+  const supportFilterForm = document.querySelector('.dl-support-filter-form');
 
-  if (supportCategoryFilter) {
-    supportCategoryFilter.addEventListener('change', function () {
-      if (supportFormatFilter) supportFormatFilter.value = '';
-      supportCategoryFilter.form.submit();
-    });
+  function clearSupportRadioFilter(name) {
+    const allOption = supportFilterForm.querySelector(`input[type="radio"][name="${name}"][value=""]`);
+    if (allOption) allOption.checked = true;
   }
 
-  if (supportCityFilter) {
-    supportCityFilter.addEventListener('change', function () {
-      if (supportCategoryFilter) supportCategoryFilter.value = '';
-      if (supportFormatFilter) supportFormatFilter.value = '';
-      supportCityFilter.form.submit();
+  if (supportFilterForm) {
+    supportFilterForm.addEventListener('change', function (event) {
+      if (!(event.target instanceof HTMLInputElement) || event.target.type !== 'radio') return;
+
+      if (event.target.name === 'categorie') {
+        clearSupportRadioFilter('type_panneau');
+        supportFilterForm.submit();
+      } else if (event.target.name === 'ville') {
+        clearSupportRadioFilter('categorie');
+        clearSupportRadioFilter('type_panneau');
+        supportFilterForm.submit();
+      }
     });
   }
 

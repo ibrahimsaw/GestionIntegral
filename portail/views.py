@@ -1739,7 +1739,7 @@ class DemandePartageEtape1View(DemandePartageWizardBase):
     """Le client peut modifier uniquement les faces demandées."""
     template_name = 'portail/reserver_etape1.html'
 
-    def render_step(self, request, token, form, state, faces):
+    def render_step(self, request, token, form, state, faces, demande):
         initial_selected_faces = [
             {
                 'id': str(face.pk),
@@ -1763,6 +1763,9 @@ class DemandePartageEtape1View(DemandePartageWizardBase):
                 'format': request.GET.get('format', '').strip(),
             },
             shared_edit_mode=True,
+            availability_share_token=token,
+            panneaux_confreres=demande.panneaux_confreres,
+            nombre_faces_confreres=demande.nombre_faces_confreres,
         ))
 
     def get(self, request, token):
@@ -1779,7 +1782,7 @@ class DemandePartageEtape1View(DemandePartageWizardBase):
             'date_debut': state['date_debut'],
             'date_fin': state['date_fin'],
         })
-        return self.render_step(request, token, form, state, faces)
+        return self.render_step(request, token, form, state, faces, demande)
 
     def post(self, request, token):
         demande = self.get_draft(token)
@@ -1797,9 +1800,10 @@ class DemandePartageEtape1View(DemandePartageWizardBase):
             post_data,
             is_edit_mode=True,
             exclude_demande_id=demande.pk,
+            has_external_panel=bool(demande.panneau_confrere),
         )
         if not form.is_valid():
-            return self.render_step(request, token, form, state, faces)
+            return self.render_step(request, token, form, state, faces, demande)
 
         data = form.cleaned_data
         selected_faces = FacePanneau.objects.filter(
@@ -1827,7 +1831,7 @@ class DemandePartageEtape1View(DemandePartageWizardBase):
                 "Vous ne pouvez sélectionner que des faces de la catégorie "
                 "initialement demandée.",
             )
-            return self.render_step(request, token, form, state, faces)
+            return self.render_step(request, token, form, state, faces, demande)
 
         state['allowed_categories'] = sorted(allowed_categories)
 
@@ -1845,7 +1849,8 @@ class DemandePartageEtape2View(DemandePartageWizardBase):
 
     def build_context(self, request, demande, token):
         state, faces, supports = self.get_selections(request, demande, token)
-        if (not faces and not supports) or not state.get('date_debut') or not state.get('date_fin'):
+        panneaux_confreres = demande.panneaux_confreres
+        if (not faces and not supports and not panneaux_confreres) or not state.get('date_debut') or not state.get('date_fin'):
             return None
         days = (
             date.fromisoformat(state['date_fin'])
@@ -1856,7 +1861,8 @@ class DemandePartageEtape2View(DemandePartageWizardBase):
             state=state,
             faces=faces,
             supports=supports,
-            nombre_emplacements=len(faces) + len(supports),
+            panneaux_confreres=panneaux_confreres,
+            nombre_emplacements=len(faces) + len(supports) + demande.nombre_faces_confreres,
             periode={
                 'date_debut': state['date_debut'],
                 'date_fin': state['date_fin'],
@@ -1895,7 +1901,7 @@ class DemandePartageEtape2View(DemandePartageWizardBase):
         supports = context['supports']
         debut = date.fromisoformat(state['date_debut'])
         fin = date.fromisoformat(state['date_fin'])
-        if any(not face.is_disponibles(debut, fin) for face in faces):
+        if any(not face.is_disponibles(debut, fin, exclude_demande_id=demande.pk) for face in faces):
             messages.error(
                 request,
                 "Un emplacement sélectionné n'est plus disponible sur cette période. "

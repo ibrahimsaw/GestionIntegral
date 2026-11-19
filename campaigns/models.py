@@ -483,6 +483,14 @@ class EcranBilanMensuel(models.Model):
 # Modèles de Réservations (Ordre de dépendance strict : 1. Reservation -> 2. Lignes)
 # ══════════════════════════════════════════════════════════════════════════════
 
+def frais_unitaires_format(frais, cle, prix_affichage=0, prix_impression=0):
+    ligne = frais.get(cle, {})
+    return (
+        Decimal(ligne.get('prix_affichage', prix_affichage) or 0),
+        Decimal(ligne.get('prix_impression', prix_impression) or 0),
+    )
+
+
 class Reservation(models.Model):
     """Groupe de réservation globale pour un client."""
     uuid = models.UUIDField(
@@ -520,6 +528,15 @@ class Reservation(models.Model):
         blank=True,
         verbose_name="Tarifs mensuels par format",
     )
+    prix_affichage = models.DecimalField(max_digits=14, decimal_places=2, default=0, blank=True)
+    prix_impression = models.DecimalField(max_digits=14, decimal_places=2, default=0, blank=True)
+    frais_faces_par_format = models.JSONField(default=dict, blank=True)
+
+    def frais_pour_format(self, code):
+        return frais_unitaires_format(
+            self.frais_faces_par_format, f"parc:{code or ''}",
+            self.prix_affichage, self.prix_impression,
+        )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.SET_NULL,
@@ -578,10 +595,9 @@ class Reservation(models.Model):
         mois = self.nombre_mois_factures()
         total = Decimal('0.00')
         for ligne in self.lignes.select_related('support'):
-            tarif = self.prix_faces_par_format.get(ligne.support.format)
-            if tarif in (None, ''):
-                continue
-            total += Decimal(str(tarif)) * mois
+            code = ligne.support.format
+            tarif = self.prix_faces_par_format.get(code)
+            total += sum(self.frais_pour_format(code)) + Decimal(str(tarif or 0)) * mois
         return total.quantize(Decimal('0.01'))
 
     def is_active(self) -> bool:
@@ -635,10 +651,12 @@ class ReservationLigne(models.Model):
 
     @property
     def montant_total(self):
-        if self.tarif_mensuel is None:
+        tarif = self.tarif_mensuel
+        frais = sum(self.reservation.frais_pour_format(self.support.format))
+        if tarif is None and not frais:
             return None
         return (
-            self.tarif_mensuel * self.reservation.nombre_mois_factures()
+            (tarif or 0) * self.reservation.nombre_mois_factures() + frais
         ).quantize(Decimal('0.01'))
 
     def clean(self):
@@ -716,6 +734,12 @@ def tarif_mensuel_net(prix, remise):
     return max(prix - reduction, Decimal('0')).quantize(
         Decimal('0.01'), rounding=ROUND_HALF_UP
     )
+
+
+def normaliser_panneaux_confreres(valeur):
+    if isinstance(valeur, dict):
+        return [valeur] if valeur else []
+    return valeur or []
 
 
 class DemandeReservation(models.Model):
@@ -829,6 +853,18 @@ class DemandeReservation(models.Model):
         blank=True,
         verbose_name="Remises mensuelles par face et par format",
     )
+    panneau_confrere = models.JSONField(default=dict, blank=True)
+    prix_affichage = models.DecimalField(max_digits=14, decimal_places=2, default=0, blank=True)
+    prix_impression = models.DecimalField(max_digits=14, decimal_places=2, default=0, blank=True)
+    frais_faces_par_format = models.JSONField(default=dict, blank=True)
+
+    @property
+    def panneaux_confreres(self):
+        return normaliser_panneaux_confreres(self.panneau_confrere)
+
+    @property
+    def nombre_faces_confreres(self):
+        return sum(panneau['nombre_faces'] for panneau in self.panneaux_confreres)
 
     @property
     def prix_nets_faces_par_format(self):
@@ -1217,11 +1253,16 @@ class DemandeReservation(models.Model):
             parties.append(f"{face.support.code} Face {face.label}")
         for support in self.supports_souhaites.all():
             parties.append(f"{support.code} (Écran)")
+        for panneau in self.panneaux_confreres:
+            parties.append(f"{panneau['nom']} · {panneau['emplacement']}")
         return ", ".join(parties) if parties else "Aucun emplacement"
 
     def nb_emplacements(self) -> int:
-        """Nombre total d'emplacements demandés (faces + écrans)."""
-        return self.faces_souhaitees.count() + self.supports_souhaites.count()
+        """Nombre total d'emplacements demandés."""
+        return (
+            self.faces_souhaitees.count() + self.supports_souhaites.count()
+            + self.nombre_faces_confreres
+        )
 # ══════════════════════════════════════════════════════════════════════════════
 # Modèles de Campagnes (Écrans & Panneaux)
 # ══════════════════════════════════════════════════════════════════════════════
@@ -1257,6 +1298,7 @@ class Campagne(models.Model):
     prix         = models.DecimalField(max_digits=14, decimal_places=2, default=0, verbose_name="Prix unitaire face",blank=True)
     prix_affichage = models.DecimalField(max_digits=14, decimal_places=2, default=0, verbose_name="Prix unitaire affichage",blank=True)
     prix_impression = models.DecimalField(max_digits=14, decimal_places=2, default=0, verbose_name="Prix unitaire impression",blank=True)
+    frais_faces_par_format = models.JSONField(default=dict, blank=True)
     prix_faces_par_format = models.JSONField(
         default=dict,
         blank=True,
@@ -1407,6 +1449,12 @@ class Campagne(models.Model):
         faces = self.nombre_faces() * self.nombre_mois_factures()
         return (prix * Decimal(faces)).quantize(Decimal('0.01'))
     
+    def frais_pour_format(self, code):
+        return frais_unitaires_format(
+            self.frais_faces_par_format, f"parc:{code or ''}",
+            self.prix_affichage, self.prix_impression,
+        )
+
     def montant_total_affichage(self):
         prix = self.prix_affichage or Decimal('0.00')
 
@@ -1424,6 +1472,13 @@ class Campagne(models.Model):
             emplacements = self.nombre_emplacements()
             return (prix * Decimal(emplacements)).quantize(Decimal('0.01'))
 
+        if self.frais_faces_par_format:
+            total = sum(
+                (self.frais_pour_format(ligne.face.support.format)[0]
+                 for ligne in self.lignes.filter(face__isnull=False).select_related('face__support')),
+                Decimal('0.00'),
+            )
+            return total.quantize(Decimal('0.01'))
         faces = self.nombre_faces()
         return (prix * Decimal(faces)).quantize(Decimal('0.01'))
     
@@ -1448,6 +1503,13 @@ class Campagne(models.Model):
             emplacements = self.nombre_emplacements()
             return (prix * Decimal(emplacements)).quantize(Decimal('0.01'))
 
+        if self.frais_faces_par_format:
+            total = sum(
+                (self.frais_pour_format(ligne.face.support.format)[1]
+                 for ligne in self.lignes.filter(face__isnull=False).select_related('face__support')),
+                Decimal('0.00'),
+            )
+            return total.quantize(Decimal('0.01'))
         faces = self.nombre_faces()
         return (prix * Decimal(faces)).quantize(Decimal('0.01'))
     

@@ -13,6 +13,7 @@ from django.utils import timezone
 from django.utils.text import slugify
 from django.urls import reverse
 from django.views import View
+from django.views.decorators.cache import never_cache
 from django.views.generic import TemplateView, DetailView, ListView, CreateView, UpdateView, DeleteView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ValidationError
@@ -41,6 +42,8 @@ from .forms import (
     EcranBilanMensuelForm,
     PackageEcranForm,
     DemandeGestionContactForm,
+    PanneauConfrereForm,
+    FraisDiffusionForm,
     normaliser_categorie_format,
 )
 from piges.models import PigeFichier
@@ -4199,8 +4202,6 @@ def build_support_rows(campagne, lignes):
             grouped[support.pk]['lignes'].append(ligne)
 
     prix_u_defaut = campagne.prix or Decimal('0.00')
-    aff_u = campagne.prix_affichage or Decimal('0.00')
-    imp_u = campagne.prix_impression or Decimal('0.00')
     mois_factures = 1 if campagne.type_support == 'ecran' else campagne.nombre_mois_factures()
 
     rows = []
@@ -4223,6 +4224,7 @@ def build_support_rows(campagne, lignes):
             quantite = Decimal(len(group_lignes))
             faces_labels = [l.face.label for l in group_lignes if l.face]
         support_format = getattr(support, 'format', None)
+        aff_u, imp_u = campagne.frais_pour_format(support_format)
         prix_u = (
             Decimal(str(campagne.prix_faces_par_format[support_format]))
             if support_format in campagne.prix_faces_par_format
@@ -4572,6 +4574,8 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
                 'lieu': self._demande_lieu(demande),
                 'reservation_reference': demande.reference,
                 'type_support': self._demande_categorie(demande),
+                'prix_affichage': demande.prix_affichage,
+                'prix_impression': demande.prix_impression,
             })
         # Utilisation de .get() pour éviter les erreurs si la clé n'existe pas
         if client_id := self.request.GET.get('client'):
@@ -4678,12 +4682,14 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
         self.object = form.save()
         if demande:
             self.object.prix_faces_par_format = demande.prix_nets_faces_par_format
-            self.object.save(update_fields=['prix_faces_par_format'])
+            self.object.frais_faces_par_format = demande.frais_faces_par_format
+            self.object.save(update_fields=['prix_faces_par_format', 'frais_faces_par_format'])
         elif form.reservation_source:
             self.object.prix_faces_par_format = (
                 form.reservation_source.prix_faces_par_format
             )
-            self.object.save(update_fields=['prix_faces_par_format'])
+            self.object.frais_faces_par_format = form.reservation_source.frais_faces_par_format
+            self.object.save(update_fields=['prix_faces_par_format', 'frais_faces_par_format'])
         transaction.on_commit(lambda: cache.delete('dashboard_alertes'))
 
         faces_importees = 0
@@ -6456,9 +6462,11 @@ def verifier_dispo_faces_api(request, client_pk=None):
 
 
 
+@never_cache
 def api_check_dispo(request, client_pk):
     """
     Retourne le statut de chaque face sur une période donnée.
+    Les informations sur l'occupant sont réservées aux agents de la régie.
     
     GET /gestion/campaigns/api/check-dispo/<client_pk>/?date_debut=...&date_fin=...
     
@@ -6474,8 +6482,6 @@ def api_check_dispo(request, client_pk):
     }
     """
     from django.utils.timezone import make_aware, datetime as dt
-    from django.core.exceptions import ValidationError
-
     date_debut_str = request.GET.get('date_debut', '').strip()
     date_fin_str   = request.GET.get('date_fin',   '').strip()
 
@@ -6512,10 +6518,22 @@ def api_check_dispo(request, client_pk):
 
     # ── Faces bloquées par une demande de réservation en attente/traitement ─
     faces_demandes = {}
-    edit_uuid = request.session.get('gestion_demande_edit_uuid')
+    is_regie = request.user.is_authenticated and request.user.is_staff_regie_role
+    show_occupant = is_regie and request.GET.get('statuts_seuls') != '1'
+    edit_uuid = request.session.get('gestion_demande_edit_uuid') if show_occupant else None
     edit_demande_id = None
     if edit_uuid:
         edit_demande_id = DemandeReservation.objects.filter(uuid=edit_uuid).values_list('pk', flat=True).first()
+    share_token = request.GET.get('demande_partage')
+    if share_token:
+        try:
+            token = uuid.UUID(share_token)
+        except ValueError:
+            return JsonResponse({'error': 'Lien de demande invalide.'}, status=400)
+        if f'demande_partage_{token.hex}' in request.session:
+            edit_demande_id = DemandeReservation.objects.filter(
+                token_partage=token, statut=DemandeReservation.STATUT_BROUILLON,
+            ).values_list('pk', flat=True).first()
 
     demandes_qs = DemandeReservation.objects.filter(
             statut__in=[
@@ -6538,7 +6556,7 @@ def api_check_dispo(request, client_pk):
         for face in demande.faces_souhaitees.all():
             faces_demandes.setdefault(face.pk, {
                 'statut': 'occupe',
-                'info': f"Demande {demande.reference} · blocage temporaire",
+                'info': f"Demande {demande.reference} · {demande.societe or 'Blocage temporaire'}",
             })
 
     # ── Faces occupées par une campagne ────────────────────────────────────
@@ -6613,6 +6631,11 @@ def api_check_dispo(request, client_pk):
         else:
             result[fid] = {'statut': 'libre', 'info': ''}
 
+    if not show_occupant:
+        for face_status in result.values():
+            if face_status['statut'] not in ('libre', 'panne'):
+                face_status.update(statut='occupe', info='Occupé à cette période')
+
     return JsonResponse({'faces': result})
 
 
@@ -6674,6 +6697,7 @@ from campaigns.models import (
     STATUT_EN_ATTENTE,
     STATUT_CONFIRMEE,
     tarif_mensuel_net,
+    frais_unitaires_format,
 )
 from inventory.models import FacePanneau, Support
 
@@ -6993,6 +7017,9 @@ class StaffDemandeWizardBase(StaffRequiredMixin, View):
     session_period_key = 'gestion_demande_periode'
     session_prices_key = 'gestion_demande_prix_faces'
     session_discounts_key = 'gestion_demande_remises_faces'
+    session_confrere_key = 'gestion_demande_panneau_confrere'
+    session_frais_key = 'gestion_demande_frais_diffusion'
+    session_frais_format_key = 'gestion_demande_frais_formats'
     session_project_key = 'gestion_demande_projet'
     session_contact_key = 'gestion_demande_contact'
     session_edit_key = 'gestion_demande_edit_uuid'
@@ -7028,6 +7055,9 @@ class StaffDemandeWizardBase(StaffRequiredMixin, View):
             self.session_period_key,
             self.session_prices_key,
             self.session_discounts_key,
+            self.session_confrere_key,
+            self.session_frais_key,
+            self.session_frais_format_key,
             self.session_project_key,
             self.session_contact_key,
             self.session_edit_key,
@@ -7125,6 +7155,10 @@ class DemandeCreationView(StaffDemandeWizardBase):
 
     def _render_step(self, request, selection_form, contact_form):
         contact_form.apply_staff_widget_attrs('form-etape1')
+        panneaux_confreres = normaliser_panneaux_confreres(request.session.get(self.session_confrere_key))
+        confrere_form = PanneauConfrereForm(prefix='confrere')
+        for field in confrere_form.fields.values():
+            field.widget.attrs['class'] = 'nd-in'
         faces, _ = self.get_selections(request)
         formats = {
             item.code: item
@@ -7200,6 +7234,11 @@ class DemandeCreationView(StaffDemandeWizardBase):
             request,
             form=selection_form,
             contact_form=contact_form,
+            confrere_form=confrere_form,
+            frais_defaut=request.session.get(self.session_frais_key, {}),
+            frais_par_format=request.session.get(self.session_frais_format_key, {}),
+            panneaux_confreres=panneaux_confreres,
+            show_confrere=bool(panneaux_confreres),
             panier=faces,
             initial_selected_faces=initial_selected_faces,
             initial_tarifs_faces=request.session.get(self.session_prices_key, {}),
@@ -7246,18 +7285,68 @@ class DemandeCreationView(StaffDemandeWizardBase):
         edit_demande_id = None
         if edit_uuid:
             edit_demande_id = DemandeReservation.objects.filter(uuid=edit_uuid).values_list('pk', flat=True).first()
+        panneaux_confreres = []
+        try:
+            lignes_confreres = json.loads(request.POST.get('panneaux_confreres', '[]'))
+            if not isinstance(lignes_confreres, list):
+                raise ValueError
+            for ligne in lignes_confreres:
+                if not isinstance(ligne, dict):
+                    raise ValueError
+                form_confrere = PanneauConfrereForm(ligne)
+                if not form_confrere.is_valid() or not form_confrere.has_changed():
+                    raise ValueError
+                panneaux_confreres.append(form_confrere.cleaned_data)
+        except (TypeError, ValueError):
+            confrere_valid = False
+        else:
+            confrere_valid = True
+            request.session[self.session_confrere_key] = panneaux_confreres
         selection_form = Etape1Form(
             request.POST,
             exclude_demande_id=edit_demande_id,
             is_edit_mode=bool(edit_demande_id),
+            has_external_panel=bool(panneaux_confreres),
         )
         contact_form = DemandeGestionContactForm(
             request.POST,
             ignore_account_pks=self.editing_account_pks(request),
         )
+        frais_valid = True
+        if 'frais_faces_par_format' in request.POST:
+            try:
+                frais_postes = json.loads(request.POST['frais_faces_par_format'])
+                if not isinstance(frais_postes, dict):
+                    raise ValueError
+                frais_par_format = {}
+                for cle, ligne in frais_postes.items():
+                    if not isinstance(ligne, dict):
+                        raise ValueError
+                    frais_form = FraisDiffusionForm(ligne)
+                    if not frais_form.is_valid():
+                        raise ValueError
+                    frais_par_format[cle] = {
+                        champ: str(montant or 0)
+                        for champ, montant in frais_form.cleaned_data.items()
+                    }
+            except (TypeError, ValueError):
+                frais_valid = False
+            else:
+                request.session[self.session_frais_format_key] = frais_par_format
+        else:
+            frais_form = FraisDiffusionForm(request.POST)
+            frais_valid = frais_form.is_valid()
+            if frais_valid:
+                request.session[self.session_frais_key] = {
+                    field: str(value or 0) for field, value in frais_form.cleaned_data.items()
+                }
         selection_valid = selection_form.is_valid()
+        if not confrere_valid:
+            selection_form.add_error(None, "Vérifiez les champs de chaque panneau du réseau confrère.")
+        if not frais_valid:
+            selection_form.add_error(None, "Vérifiez les frais d’affichage et d’impression par format.")
         contact_valid = contact_form.is_valid()
-        forms_valid = selection_valid and contact_valid
+        forms_valid = selection_valid and contact_valid and confrere_valid and frais_valid
         selection = selection_form.cleaned_data
         if 'faces_uuids' in selection and 'supports_uuids' in selection:
             request.session[self.session_faces_key] = selection['faces_uuids']
@@ -7270,6 +7359,7 @@ class DemandeCreationView(StaffDemandeWizardBase):
                 face.support.format for face in selected_faces
                 if face.support.format
             }
+            formats_attendus.update(f"confrere:{panneau['format']}" for panneau in panneaux_confreres)
             try:
                 posted_tarifs = json.loads(
                     request.POST.get('tarifs_faces_par_format', '').strip() or '{}'
@@ -7371,7 +7461,9 @@ class DemandeCreationEtape2View(StaffDemandeWizardBase):
         periode = request.session.get(self.session_period_key, {})
         date_debut = periode.get('date_debut')
         date_fin = periode.get('date_fin')
-        if not date_debut or not date_fin or (not faces and not supports):
+        panneaux_confreres = normaliser_panneaux_confreres(request.session.get(self.session_confrere_key))
+        nombre_faces = len(faces) + sum(p['nombre_faces'] for p in panneaux_confreres)
+        if not date_debut or not date_fin or (not faces and not supports and not panneaux_confreres):
             messages.warning(request, "Veuillez compléter l'étape de sélection.")
             return None
         contact_data = request.session.get(self.session_contact_key)
@@ -7403,35 +7495,79 @@ class DemandeCreationEtape2View(StaffDemandeWizardBase):
             )
         }
         tarifs_lignes = []
+        total_brut = Decimal('0.00')
         total_faces = Decimal('0.00')
         mois_factures = (days + 29) // 30
+        formats_confreres = {}
+        for panneau in panneaux_confreres:
+            libelle = panneau['format']
+            cle = f'confrere:{libelle}'
+            groupe = formats_confreres.setdefault(cle, {'quantite': 0, 'libelle': libelle, 'confreres': {}})
+            groupe['quantite'] += panneau['nombre_faces']
+            groupe['confreres'][f"{panneau['nom']} · {panneau['ville']}"] = None
         for code, prix in tarifs.items():
-            faces_format = [
-                face for face in faces if face.support.format == code
-            ]
-            if not faces_format:
-                continue
-            try:
-                prix_net = tarif_mensuel_net(prix, remises.get(code))
-                montant = prix_net * len(faces_format) * mois_factures
-            except (InvalidOperation, ValueError):
-                montant = Decimal('0.00')
-            total_faces += montant
             format_support = formats.get(code)
+            if code in formats_confreres:
+                groupe = formats_confreres[code]
+                quantite, libelle = groupe['quantite'], groupe['libelle']
+                categorie = ' / '.join(groupe['confreres'])
+            else:
+                quantite = sum(face.support.format == code for face in faces)
+                libelle = format_support.dimensions if format_support and format_support.dimensions else code
+                categorie = (format_support.categorie if format_support else '') or 'Autres'
+            if not quantite:
+                continue
+            remise = remises.get(code)
+            try:
+                prix_brut = tarif_mensuel_net(prix, None)
+                prix_net = tarif_mensuel_net(prix_brut, remise)
+            except (InvalidOperation, ValueError):
+                prix_brut = prix_net = Decimal('0.00')
+            montant = prix_net * quantite * mois_factures
+            total_brut += prix_brut * quantite * mois_factures
+            total_faces += montant
             tarifs_lignes.append({
                 'code': code,
-                'label': (
-                    format_support.dimensions
-                    if format_support and format_support.dimensions else code
-                ),
-                'categorie': (
-                    format_support.categorie
-                    if format_support and format_support.categorie else 'Autres'
-                ),
-                'prix': prix,
-                'quantite': len(faces_format),
-                'remise': remises.get(code),
+                'label': libelle,
+                'categorie': categorie,
+                'prix': prix_brut,
+                'prix_net': prix_net,
+                'quantite': quantite,
+                'remise': remise,
                 'total': montant,
+            })
+        frais = request.session.get(self.session_frais_key, {})
+        prix_affichage = Decimal(frais.get('prix_affichage', '0'))
+        prix_impression = Decimal(frais.get('prix_impression', '0'))
+        quantites_frais = {}
+        for face in faces:
+            code = face.support.format or ''
+            cle = f'parc:{code}'
+            libelle = face.support.get_format_display() or code or 'Format non renseigné'
+            quantite, _ = quantites_frais.get(cle, (0, libelle))
+            quantites_frais[cle] = (quantite + 1, libelle)
+        for cle, groupe in formats_confreres.items():
+            confreres = ' / '.join(groupe['confreres'])
+            quantites_frais[cle] = (groupe['quantite'], f"{confreres} — {groupe['libelle']}")
+        frais_par_format = {
+            cle: ligne for cle, ligne in request.session.get(self.session_frais_format_key, {}).items()
+            if cle in quantites_frais
+        }
+        frais_lignes = []
+        total_affichage = total_impression = Decimal('0.00')
+        for cle, (quantite, libelle) in quantites_frais.items():
+            affichage, impression = frais_unitaires_format(
+                frais_par_format, cle, prix_affichage, prix_impression,
+            )
+            if not affichage and not impression:
+                continue
+            total_affichage += affichage * quantite
+            total_impression += impression * quantite
+            frais_lignes.append({
+                'label': libelle, 'quantite': quantite,
+                'affichage': affichage, 'impression': impression,
+                'total_affichage': affichage * quantite,
+                'total_impression': impression * quantite,
             })
         return self.step_context(
             request,
@@ -7440,7 +7576,8 @@ class DemandeCreationEtape2View(StaffDemandeWizardBase):
             periode=periode,
             contact=contact_form.cleaned_data,
             project=project,
-            nombre_emplacements=len(faces) + len(supports),
+            panneaux_confreres=panneaux_confreres,
+            nombre_emplacements=nombre_faces + len(supports),
             duree_jours=days,
             comptes=comptes_pour_recap(contact_form.cleaned_data),
             faces_lignes=[
@@ -7464,6 +7601,16 @@ class DemandeCreationEtape2View(StaffDemandeWizardBase):
             tarifs_lignes=tarifs_lignes,
             mois_factures=mois_factures,
             total_faces=total_faces,
+            total_brut=total_brut,
+            total_remises=total_brut - total_faces,
+            nombre_faces=nombre_faces,
+            prix_affichage=prix_affichage,
+            prix_impression=prix_impression,
+            total_affichage=total_affichage,
+            total_impression=total_impression,
+            total_estimatif=total_faces + total_affichage + total_impression,
+            frais_lignes=frais_lignes,
+            frais_faces_par_format=frais_par_format,
         )
 
     @staticmethod
@@ -7559,6 +7706,10 @@ class DemandeCreationEtape2View(StaffDemandeWizardBase):
                 demande.remises_faces_par_format = request.session.get(
                     self.session_discounts_key, {}
                 )
+                demande.panneau_confrere = context['panneaux_confreres']
+                demande.prix_affichage = context['prix_affichage']
+                demande.prix_impression = context['prix_impression']
+                demande.frais_faces_par_format = context['frais_faces_par_format']
                 # Coordonnées facultatives à l'étape 1 : on ne les exige pas ici.
                 demande.full_clean(exclude=['reference', 'nom_contact', 'email', 'telephone'])
                 demande.save()
@@ -7731,6 +7882,12 @@ class DemandeModifierView(StaffRequiredMixin, View):
         request.session[StaffDemandeWizardBase.session_discounts_key] = (
             demande.remises_faces_par_format or {}
         )
+        request.session[StaffDemandeWizardBase.session_confrere_key] = demande.panneau_confrere
+        request.session[StaffDemandeWizardBase.session_frais_key] = {
+            'prix_affichage': str(demande.prix_affichage),
+            'prix_impression': str(demande.prix_impression),
+        }
+        request.session[StaffDemandeWizardBase.session_frais_format_key] = demande.frais_faces_par_format
         request.session[StaffDemandeWizardBase.session_project_key] = {
             'nom_campagne': demande.nom_campagne,
             'message': demande.message,
@@ -7808,6 +7965,10 @@ class DemandeValiderView(LoginRequiredMixin, View):
             messages.error(request, "Cette demande a déjà été traitée.")
             return redirect('demande_detail', uuid=uuid)
 
+        if demande.panneau_confrere:
+            messages.error(request, "Cette demande comprend un panneau d’un confrère et doit être traitée manuellement.")
+            return redirect('demande_detail', uuid=uuid)
+
         if demande.supports_souhaites.exists():
             messages.error(
                 request,
@@ -7866,6 +8027,9 @@ class DemandeValiderView(LoginRequiredMixin, View):
                     date_debut=date_debut_dt,
                     date_fin=date_fin_dt,
                     prix_faces_par_format=demande.prix_nets_faces_par_format,
+                    prix_affichage=demande.prix_affichage,
+                    prix_impression=demande.prix_impression,
+                    frais_faces_par_format=demande.frais_faces_par_format,
                     created_by=request.user,
                     notes=(
                         f"Créée depuis la demande {demande.reference}.\n{demande.message}"

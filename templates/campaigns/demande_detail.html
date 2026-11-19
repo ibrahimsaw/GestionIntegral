@@ -394,7 +394,7 @@
         <div class="dr-panel-body">
           {% if demande.nb_emplacements == 0 %}
             <div class="dr-empty"><i class="bi bi-inbox"></i>Aucun emplacement enregistré.</div>
-          {% else %}
+          {% elif demande.faces_souhaitees.exists or demande.supports_souhaites.exists %}
           <div class="dr-table-head" aria-hidden="true">
             <span>Code</span><span>Support &amp; lieu</span><span>Type</span>
           </div>
@@ -435,6 +435,10 @@
             </div>
             {% endfor %}
           </div>
+          {% endif %}
+          {% if demande.panneau_confrere %}
+            <h3 class="h6 mt-3">Réseau Confrère</h3>
+            {% include "portail/_panneau_confrere.html" with panneaux_confreres=demande.panneaux_confreres only %}
           {% endif %}
         </div>
       </section>
@@ -496,7 +500,9 @@
             <form method="post" action="{% url 'demande_valider' demande.uuid %}"
                   onsubmit="return confirm('Confirmer la création d’une réservation pour cette demande ?');">
               {% csrf_token %}
-              {% if demande.supports_souhaites.exists %}
+              {% if demande.panneau_confrere %}
+                <div class="dr-warn"><i class="bi bi-exclamation-triangle-fill"></i><span>Le panneau du réseau confrère doit être réservé auprès du confrère.</span></div>
+              {% elif demande.supports_souhaites.exists %}
                 <div class="dr-warn"><i class="bi bi-exclamation-triangle-fill"></i><span>Cette demande comprend un écran numérique. Son traitement doit être fait manuellement.</span></div>
               {% else %}
                 <a href="{% url 'campagne_create' %}?demande={{ demande.uuid }}" class="dr-btn dr-btn-back">

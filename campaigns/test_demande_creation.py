@@ -164,14 +164,46 @@ class DemandHoldTests(TestCase):
         )
         demande.faces_souhaitees.add(self.face)
 
-        response = self.client.get(
-            reverse('api_check_dispo', args=[0]),
-            {'date_debut': self.start.isoformat(), 'date_fin': self.end.isoformat()},
-        )
+        url = reverse('api_check_dispo', args=[0])
+        dates = {'date_debut': self.start.isoformat(), 'date_fin': self.end.isoformat()}
+        response = self.client.get(url, dates)
 
         self.assertEqual(response.status_code, 200)
-        face_status = response.json()['faces'][str(self.face.pk)]['statut']
-        self.assertEqual(face_status, 'occupe')
+        public_status = {'statut': 'occupe', 'info': 'Occupé à cette période'}
+        self.assertEqual(response.json()['faces'][str(self.face.pk)], public_status)
+
+        staff = get_user_model().objects.create_user(username='dispo-staff', role='staff')
+        self.client.force_login(staff)
+        response = self.client.get(url, dates)
+        self.assertIn(demande.societe, response.json()['faces'][str(self.face.pk)]['info'])
+        response = self.client.get(url, {**dates, 'statuts_seuls': '1'})
+        self.assertEqual(response.json()['faces'][str(self.face.pk)], public_status)
+
+    def test_api_check_dispo_excludes_own_hold_for_the_shared_request(self):
+        token = uuid.uuid4()
+        demande = DemandeReservation.objects.create(
+            nom_contact='Prospect',
+            societe='Société',
+            email='prospect@example.com',
+            telephone='70000004',
+            date_debut_souhaitee=self.start,
+            date_fin_souhaitee=self.end,
+            statut=DemandeReservation.STATUT_BROUILLON,
+            token_partage=token,
+        )
+        demande.faces_souhaitees.add(self.face)
+        url = reverse('api_check_dispo', args=[0])
+        params = {
+            'date_debut': self.start.isoformat(),
+            'date_fin': self.end.isoformat(),
+            'demande_partage': str(token),
+        }
+        response = self.client.get(url, params)
+        self.assertEqual(response.json()['faces'][str(self.face.pk)]['statut'], 'occupe')
+
+        self.client.get(reverse('portail:demande_partage', kwargs={'token': token}))
+        response = self.client.get(url, params)
+        self.assertEqual(response.json()['faces'][str(self.face.pk)]['statut'], 'libre')
 
 
 class DemandeCreationViewTests(TestCase):
@@ -465,14 +497,23 @@ class DemandeCreationViewTests(TestCase):
             geant.code: {'unite': 'fcfa', 'valeur': '2000'},
         }
 
+        frais = {
+            f'parc:{standard.code}': {'prix_affichage': '1500', 'prix_impression': '2000'},
+            f'parc:{geant.code}': {'prix_affichage': '2500', 'prix_impression': '3500'},
+        }
         response = self.complete_step_one(
             faces_selectionnees=json.dumps([self.face.pk, other_face.pk]),
             tarifs_faces_par_format=json.dumps(tarifs),
             remises_faces_par_format=json.dumps(remises),
+            date_fin=(self.start + datetime.timedelta(days=44)).isoformat(),
+            frais_faces_par_format=json.dumps(frais),
         )
         self.assertRedirects(response, reverse('demande_creation_etape2'))
         recap = self.client.get(reverse('demande_creation_etape2'))
-        self.assertEqual(recap.context['total_faces'], 30250)
+        self.assertEqual(recap.context['total_faces'], 60500)
+        self.assertEqual(recap.context['total_affichage'], 4000)
+        self.assertEqual(recap.context['total_impression'], 5500)
+        self.assertEqual(recap.context['total_estimatif'], 70000)
         self.assertRedirects(
             self.complete_step_two(),
             reverse(
@@ -483,6 +524,7 @@ class DemandeCreationViewTests(TestCase):
         demande = DemandeReservation.objects.get()
         self.assertEqual(demande.prix_faces_par_format, tarifs)
         self.assertEqual(demande.remises_faces_par_format, remises)
+        self.assertEqual(demande.frais_faces_par_format, frais)
 
         response = self.client.post(
             reverse('demande_valider', kwargs={'uuid': demande.uuid}),
@@ -496,8 +538,9 @@ class DemandeCreationViewTests(TestCase):
             standard.code: '11250.00',
             geant.code: '19000.00',
         })
-        self.assertEqual(reservation.nombre_mois_factures(), 1)
-        self.assertEqual(reservation.montant_total(), 30250)
+        self.assertEqual(reservation.nombre_mois_factures(), 2)
+        self.assertEqual(reservation.montant_total(), 70000)
+        self.assertEqual(reservation.frais_faces_par_format, frais)
         detail_response = self.client.get(
             reverse(
                 'reservation_detail',
@@ -1224,6 +1267,53 @@ class DemandeCreationViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'id="filter-ville"')
         self.assertContains(response, 'id="list-filter-ville"')
+
+    def test_staff_can_save_a_request_without_contact_details(self):
+        response = self.complete_step_one(
+            contact='', societe='', telephone='', email='', whatsapp='',
+        )
+        self.assertRedirects(response, reverse('demande_creation_etape2'))
+
+        response = self.complete_step_two()
+        demande = DemandeReservation.objects.get()
+        self.assertRedirects(response, reverse('demande_detail', kwargs={'uuid': demande.uuid}))
+        self.assertEqual((demande.nom_contact, demande.telephone, demande.email, demande.whatsapp), ('', '', '', ''))
+
+    def test_staff_can_save_a_request_with_a_partner_panel_only(self):
+        panneau = {
+            'nom': 'Régie partenaire',
+            'ville': 'Koudougou',
+            'emplacement': 'Avenue principale',
+            'format': '4 × 3 m',
+            'nombre_faces': 2,
+        }
+        panneaux = [panneau, {**panneau, 'format': '8 × 4 m', 'nombre_faces': 1}]
+        tarifs = {'confrere:4 × 3 m': '10000', 'confrere:8 × 4 m': '15000'}
+        remises = {
+            'confrere:4 × 3 m': {'unite': 'pourcentage', 'valeur': '10'},
+            'confrere:8 × 4 m': {'unite': 'fcfa', 'valeur': '2000'},
+        }
+        response = self.complete_step_one(
+            faces_selectionnees='[]', panneaux_confreres=json.dumps(panneaux),
+            tarifs_faces_par_format=json.dumps(tarifs),
+            remises_faces_par_format=json.dumps(remises),
+        )
+        self.assertRedirects(response, reverse('demande_creation_etape2'))
+        recap = self.client.get(reverse('demande_creation_etape2'))
+        self.assertContains(recap, panneau['emplacement'])
+        self.assertEqual(recap.context['total_estimatif'], 31000)
+        self.assertEqual(self.client.get(reverse('demande_creation')).context['panneaux_confreres'], panneaux)
+
+        response = self.complete_step_two()
+        demande = DemandeReservation.objects.get()
+        self.assertRedirects(response, reverse('demande_detail', kwargs={'uuid': demande.uuid}))
+        self.assertEqual(demande.panneaux_confreres, panneaux)
+        self.assertEqual(demande.prix_faces_par_format, tarifs)
+        self.assertEqual(demande.remises_faces_par_format, remises)
+        self.assertEqual(demande.nb_emplacements(), 3)
+        self.assertFalse(demande.faces_souhaitees.exists())
+        demande.panneau_confrere = panneau
+        self.assertEqual(demande.panneaux_confreres, [panneau])
 
     def test_invalid_contact_keeps_the_user_on_the_combined_first_step(self):
         response = self.complete_step_one(email='adresse-invalide')

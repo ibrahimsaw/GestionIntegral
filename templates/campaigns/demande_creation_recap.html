@@ -233,9 +233,13 @@
     border-radius: var(--dr-radius); background: var(--dr-brand-soft); color: var(--dr-brand-deep);
     font-size: .8rem; font-weight: 800;
   }
-  .dr-tarif { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; padding: 9px 0; border-bottom: 1px dashed var(--dr-line); font-size: .78rem; }
-  .dr-tarif span small { display: block; color: var(--dr-muted); font-size: .68rem; }
-  .dr-tarif strong { white-space: nowrap; font-size: .8rem; }
+  .dr-tarif { padding: 12px 0; border-bottom: 1px dashed var(--dr-line); font-size: .8rem; }
+  .dr-tarif h3 { margin: 0 0 4px; font-size: .86rem; font-weight: 800; }
+  .dr-tarif p { margin: 0 0 8px; color: var(--dr-muted); }
+  .dr-tarif-values { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; margin: 0; }
+  .dr-tarif-values dt { font-weight: 500; color: var(--dr-muted); }
+  .dr-tarif-values dd { margin: 0; text-align: right; font-weight: 700; }
+  .dr-tarif-summary { margin-top: 12px; font-size: .8rem; }
   .dr-total {
     display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-top: 12px; padding: 12px 14px;
     border-radius: var(--dr-radius); background: var(--dr-brand); color: #fff; font-weight: 800;
@@ -363,7 +367,7 @@
       <span class="dr-kpi-icon"><i class="bi bi-cash-coin"></i></span>
       <div>
         <span class="dr-kpi-label">Tarifs renseignés</span>
-        <span class="dr-kpi-value">{% if tarifs_lignes %}{{ total_faces|floatformat:0 }} <small>FCFA</small>{% else %}<small>Non renseignés</small>{% endif %}</span>
+        <span class="dr-kpi-value">{% if tarifs_lignes or total_affichage or total_impression %}{{ total_estimatif|floatformat:"-2g" }} <small>FCFA</small>{% else %}<small>Non renseignés</small>{% endif %}</span>
       </div>
     </div>
   </section>
@@ -527,6 +531,10 @@
               </div>
             {% endfor %}
           </div>
+          {% if panneaux_confreres %}
+            <h3 class="h6 mt-3">Réseau Confrère</h3>
+            {% include "portail/_panneau_confrere.html" %}
+          {% endif %}
         </div>
       </section>
     </div>
@@ -562,27 +570,67 @@
         </div>
       </section>
 
-      {% if tarifs_lignes %}
+      {% if tarifs_lignes or total_affichage or total_impression %}
       <section class="dr-panel">
         <div class="dr-panel-head">
           <div class="dr-panel-heading">
             <span class="dr-panel-icon"><i class="bi bi-cash-coin"></i></span>
             <div>
-              <h2 class="dr-panel-title">Tarifs unitaires renseignés</h2>
-              <p class="dr-panel-caption">Par face et par mois · {{ mois_factures }} mois facturé{{ mois_factures|pluralize }}</p>
+              <h2 class="dr-panel-title">Tarification et remises</h2>
+              <p class="dr-panel-caption">{{ duree_jours }} jour{{ duree_jours|pluralize }} de diffusion · {{ mois_factures }} mois facturé{{ mois_factures|pluralize }}</p>
             </div>
           </div>
         </div>
         <div class="dr-panel-body">
           {% for tarif in tarifs_lignes %}
             <div class="dr-tarif">
-              <span>{{ tarif.categorie }} — {{ tarif.label }}<small>{{ tarif.quantite }} face{{ tarif.quantite|pluralize }}{% if tarif.remise %} · Remise de {{ tarif.remise.valeur|floatformat:"-2" }} {% if tarif.remise.unite == 'fcfa' %}FCFA{% else %}%{% endif %} par face et par mois{% endif %}</small></span>
-              <strong>{{ tarif.prix|floatformat:0 }} FCFA</strong>
+              <h3>{{ tarif.categorie }} — {{ tarif.label }}</h3>
+              <p>{{ tarif.quantite }} face{{ tarif.quantite|pluralize }}</p>
+              <dl class="dr-tarif-values">
+                <dt>Tarif initial par face et par mois</dt>
+                <dd>{{ tarif.prix|floatformat:"-2g" }} FCFA</dd>
+                <dt>Remise</dt>
+                <dd>{% if tarif.remise %}{{ tarif.remise.valeur|floatformat:"-2g" }} {% if tarif.remise.unite == 'fcfa' %}FCFA / face / mois{% else %}%{% endif %}{% else %}Aucune{% endif %}</dd>
+                <dt>Tarif net par face et par mois</dt>
+                <dd>{{ tarif.prix_net|floatformat:"-2g" }} FCFA</dd>
+                <dt>Montant net pour la période</dt>
+                <dd>{{ tarif.total|floatformat:"-2g" }} FCFA</dd>
+              </dl>
             </div>
           {% endfor %}
+          {% for frais in frais_lignes %}
+            <div class="dr-tarif">
+              <h3>Affichage et impression · {{ frais.label }}</h3>
+              <dl class="dr-tarif-values">
+                {% if frais.affichage %}
+                  <dt>Affichage · {{ frais.affichage|floatformat:"-2g" }} FCFA × {{ frais.quantite }} face{{ frais.quantite|pluralize }}</dt>
+                  <dd>{{ frais.total_affichage|floatformat:"-2g" }} FCFA</dd>
+                {% endif %}
+                {% if frais.impression %}
+                  <dt>Impression · {{ frais.impression|floatformat:"-2g" }} FCFA × {{ frais.quantite }} face{{ frais.quantite|pluralize }}</dt>
+                  <dd>{{ frais.total_impression|floatformat:"-2g" }} FCFA</dd>
+                {% endif %}
+              </dl>
+            </div>
+          {% endfor %}
+          <dl class="dr-tarif-values dr-tarif-summary">
+            {% if tarifs_lignes %}
+              <dt>Diffusion avant remises</dt><dd>{{ total_brut|floatformat:"-2g" }} FCFA</dd>
+              <dt>Réduction totale</dt><dd>{{ total_remises|floatformat:"-2g" }} FCFA</dd>
+              <dt>Diffusion après remises</dt><dd>{{ total_faces|floatformat:"-2g" }} FCFA</dd>
+            {% endif %}
+            {% if total_affichage %}
+              <dt>Total affichage</dt>
+              <dd>{{ total_affichage|floatformat:"-2g" }} FCFA</dd>
+            {% endif %}
+            {% if total_impression %}
+              <dt>Total impression</dt>
+              <dd>{{ total_impression|floatformat:"-2g" }} FCFA</dd>
+            {% endif %}
+          </dl>
           <div class="dr-total">
-            <span>Total estimatif<small>Durée de facturation et remises incluses</small></span>
-            <b>{{ total_faces|floatformat:0 }} FCFA</b>
+            <span>Total estimatif</span>
+            <b>{{ total_estimatif|floatformat:"-2g" }} FCFA</b>
           </div>
         </div>
       </section>

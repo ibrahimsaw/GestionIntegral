@@ -1107,6 +1107,30 @@ class DemandeCampagneForm(forms.Form):
             self.initial['campagne'] = demande.campagne_id
 
 
+class FraisDiffusionForm(forms.Form):
+    prix_affichage = forms.DecimalField(label="Affichage par face (FCFA)", required=False, min_value=0, max_digits=14, decimal_places=2)
+    prix_impression = forms.DecimalField(label="Impression par face (FCFA)", required=False, min_value=0, max_digits=14, decimal_places=2)
+
+
+class PanneauConfrereForm(forms.Form):
+    nom = forms.CharField(label="Nom du confrère", max_length=150, required=False)
+    ville = forms.CharField(label="Ville / localité", max_length=150, required=False)
+    emplacement = forms.CharField(label="Emplacement du panneau", max_length=250, required=False)
+    format = forms.CharField(
+        label="Format", max_length=80, required=False,
+        widget=forms.TextInput(attrs={'placeholder': 'Ex. 4 × 3 m'}),
+    )
+    nombre_faces = forms.IntegerField(label="Nombre de faces", min_value=1, required=False)
+
+    def clean(self):
+        data = super().clean()
+        if self.has_changed():
+            for field in self.fields:
+                if field not in self.errors and data.get(field) in (None, ''):
+                    self.add_error(field, "Renseignez ce champ pour le panneau du confrère.")
+        return data
+
+
 class DemandeGestionContactForm(forms.Form):
     """
     Étape « Client et agence » de la création d'une demande (staff).
@@ -1114,7 +1138,7 @@ class DemandeGestionContactForm(forms.Form):
     Formulaire à plat :
       - client (facultatif) : compte existant de type « client »
       - agence (facultative) : compte existant de type « agence »
-      - contact principal, téléphone et e-mail (obligatoires)
+      - coordonnées du demandeur (facultatives)
     Si aucun compte n'est sélectionné, les informations saisies permettent de créer
     automatiquement un nouveau compte client lors de l'enregistrement de la demande.
     """
@@ -1130,8 +1154,7 @@ class DemandeGestionContactForm(forms.Form):
         widget=forms.Select(attrs={'class': 'form-control-e3'}),
     )
     contact = forms.CharField(
-        max_length=150, required=True, label="Contact principal",
-        error_messages={'required': "Renseignez le contact principal."},
+        max_length=150, required=False, label="Contact principal",
         widget=forms.TextInput(attrs={'class': 'form-control-e3'}),
     )
     societe = forms.CharField(
@@ -1139,13 +1162,11 @@ class DemandeGestionContactForm(forms.Form):
         widget=forms.TextInput(attrs={'class': 'form-control-e3'}),
     )
     telephone = forms.CharField(
-        max_length=30, required=True, label="Téléphone",
-        error_messages={'required': "Renseignez le téléphone."},
+        max_length=30, required=False, label="Téléphone",
         widget=forms.TextInput(attrs={'class': 'form-control-e3', 'type': 'tel'}),
     )
     email = forms.EmailField(
-        required=True, label="E-mail",
-        error_messages={'required': "Renseignez l'e-mail."},
+        required=False, label="E-mail",
         widget=forms.EmailInput(attrs={'class': 'form-control-e3'}),
     )
     whatsapp = forms.CharField(

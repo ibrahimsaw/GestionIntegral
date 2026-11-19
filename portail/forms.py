@@ -28,6 +28,7 @@ class Etape1Form(forms.Form):
     def __init__(self, *args, **kwargs):
         self.is_edit_mode = kwargs.pop('is_edit_mode', False)
         self.exclude_demande_id = kwargs.pop('exclude_demande_id', None)
+        self.has_external_panel = kwargs.pop('has_external_panel', False)
         super().__init__(*args, **kwargs)
 
     faces_selectionnees = forms.CharField(
@@ -70,7 +71,7 @@ class Etape1Form(forms.Form):
         faces_ids    = cleaned.get('faces_selectionnees') or []
         supports_ids = cleaned.get('supports_selectionnees') or []
 
-        if not faces_ids and not supports_ids:
+        if not faces_ids and not supports_ids and not self.has_external_panel:
             raise forms.ValidationError(
                 "Veuillez sélectionner au moins un emplacement sur la carte."
             )

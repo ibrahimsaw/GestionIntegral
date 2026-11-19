@@ -1,7 +1,7 @@
 import datetime
 import math
 import uuid
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.validators import FileExtensionValidator, MaxValueValidator, MinValueValidator
@@ -706,6 +706,18 @@ class ReservationLigne(models.Model):
 # ══════════════════════════════════════════════════════════════════════════════
 # DemandeReservation — Demande publique (visiteur non connecté)
 # ══════════════════════════════════════════════════════════════════════════════
+def tarif_mensuel_net(prix, remise):
+    """Applique une remise au tarif mensuel d'une face."""
+    prix = Decimal(str(prix).replace(',', '.'))
+    if not remise:
+        return prix
+    valeur = Decimal(remise['valeur'])
+    reduction = prix * valeur / 100 if remise['unite'] == 'pourcentage' else valeur
+    return max(prix - reduction, Decimal('0')).quantize(
+        Decimal('0.01'), rounding=ROUND_HALF_UP
+    )
+
+
 class DemandeReservation(models.Model):
     """
     Demande de réservation soumise depuis le portail public par un visiteur
@@ -811,6 +823,20 @@ class DemandeReservation(models.Model):
         blank=True,
         verbose_name="Tarifs mensuels par format",
     )
+
+    remises_faces_par_format = models.JSONField(
+        default=dict,
+        blank=True,
+        verbose_name="Remises mensuelles par face et par format",
+    )
+
+    @property
+    def prix_nets_faces_par_format(self):
+        return {
+            code: str(tarif_mensuel_net(prix, self.remises_faces_par_format[code]))
+            if code in self.remises_faces_par_format else prix
+            for code, prix in self.prix_faces_par_format.items()
+        }
 
     # ── Type de client (NOUVEAU) ─────────────────────────────────────────────
     type_client = models.CharField(

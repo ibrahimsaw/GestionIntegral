@@ -430,7 +430,7 @@ class DemandeCreationViewTests(TestCase):
         self.assertTrue(agency_only_form.is_valid(), agency_only_form.errors)
         self.assertEqual(agency_only_form.cleaned_data['societe'], 'Client entreprise SA')
 
-    def test_format_prices_are_saved_on_demand_and_copied_to_reservation(self):
+    def test_format_prices_and_discounts_flow_from_demand_to_reservation(self):
         standard = FormatSupport.objects.create(
             code='DEMANDE-PRICE-STANDARD',
             categorie='Standard',
@@ -460,12 +460,19 @@ class DemandeCreationViewTests(TestCase):
             standard.code: '12500',
             geant.code: '21000',
         }
+        remises = {
+            standard.code: {'unite': 'pourcentage', 'valeur': '10'},
+            geant.code: {'unite': 'fcfa', 'valeur': '2000'},
+        }
 
         response = self.complete_step_one(
             faces_selectionnees=json.dumps([self.face.pk, other_face.pk]),
             tarifs_faces_par_format=json.dumps(tarifs),
+            remises_faces_par_format=json.dumps(remises),
         )
         self.assertRedirects(response, reverse('demande_creation_etape2'))
+        recap = self.client.get(reverse('demande_creation_etape2'))
+        self.assertEqual(recap.context['total_faces'], 30250)
         self.assertRedirects(
             self.complete_step_two(),
             reverse(
@@ -475,6 +482,7 @@ class DemandeCreationViewTests(TestCase):
         )
         demande = DemandeReservation.objects.get()
         self.assertEqual(demande.prix_faces_par_format, tarifs)
+        self.assertEqual(demande.remises_faces_par_format, remises)
 
         response = self.client.post(
             reverse('demande_valider', kwargs={'uuid': demande.uuid}),
@@ -484,9 +492,12 @@ class DemandeCreationViewTests(TestCase):
             reverse('demande_detail', kwargs={'uuid': demande.uuid}),
         )
         reservation = Reservation.objects.get()
-        self.assertEqual(reservation.prix_faces_par_format, tarifs)
+        self.assertEqual(reservation.prix_faces_par_format, {
+            standard.code: '11250.00',
+            geant.code: '19000.00',
+        })
         self.assertEqual(reservation.nombre_mois_factures(), 1)
-        self.assertEqual(reservation.montant_total(), 33500)
+        self.assertEqual(reservation.montant_total(), 30250)
         detail_response = self.client.get(
             reverse(
                 'reservation_detail',

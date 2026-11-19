@@ -47,23 +47,16 @@
   .cf {
     --ink: #121a17;
     --ink-2: #3c4843;
-    --muted: #7a847f;
+    --muted: #58675f;
     --line: #e6e4dd;
     --line-strong: #d3d0c6;
     --paper: #ffffff;
     --wash: #f8f7f3;
-    --brand: #1d5a47;
-    --brand-ink: #0f3a2d;
-    --tone: #1d5a47;
-    --tone-wash: #e8f1ec;
-
-    /* Couleur primaire du portail : vert de la nouvelle charte.
-       Pour revenir à la couleur du site : 
-    */
-    --color-primary: {{ DESIGN.COLOR_PRIMARY }}; 
-    --brand-ink: {{ DESIGN.COLOR_PRIMARY }};
-    --brand: {{ DESIGN.COLOR_PRIMARY }};
-    --tone: {{ DESIGN.COLOR_PRIMARY }};
+    --color-primary: {{ DESIGN.COLOR_PRIMARY|default:'#932e2b' }};
+    --brand: var(--color-primary);
+    --brand-ink: color-mix(in srgb, var(--brand) 78%, black);
+    --tone: var(--brand);
+    --tone-wash: color-mix(in srgb, var(--brand) 9%, white);
     --color-secondary: {{ DESIGN.COLOR_SECONDARY }};
 
     /* alias pour le HTML / JS existant */
@@ -80,7 +73,7 @@
     --c-reserve:  #7c3aed;
 
     --radius: 8px;
-    --radius-sm: 6px;
+    --panel-shadow: 0 2px 4px rgba(18,26,23,.04), 0 10px 28px rgba(18,26,23,.06);
     --serif: 'Fraunces', Georgia, serif;
     --sans: 'Inter', system-ui, -apple-system, sans-serif;
     --mono: 'JetBrains Mono', ui-monospace, monospace;
@@ -101,16 +94,19 @@
   /* ==========================================================
      HERO
      ========================================================== */
-  .cf-hero { padding-top: 34px; padding-bottom: 8px; margin-bottom: 30px; }
+  .cf-hero { padding-top: 20px; margin-bottom: 24px; }
 
   .cf-hero-top {
     display: flex;
-    align-items: flex-end;
+    align-items: center;
     justify-content: space-between;
     gap: 32px;
     flex-wrap: wrap;
-    padding-bottom: 30px;
-    border-bottom: 1px solid var(--line-strong);
+    padding: clamp(18px, 4vw, 36px);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    background: linear-gradient(120deg, var(--paper) 35%, var(--tone-wash));
+    box-shadow: var(--panel-shadow);
   }
   .cf-hero-main { flex: 1 1 460px; min-width: 0; }
 
@@ -133,7 +129,6 @@
     height: 8px;
     border-radius: 50%;
     background: var(--tone);
-    animation: cf-ping 2.2s ease-out infinite;
   }
   .cf-title {
     margin: 0 0 14px;
@@ -148,8 +143,8 @@
 
   .cf-ticket {
     flex: 0 0 auto;
-    min-width: 200px;
-    padding: 18px 22px;
+    min-width: 96px;
+    padding: 12px 18px;
     background: var(--paper);
     border: 1px solid var(--line-strong);
     border-radius: var(--radius);
@@ -199,7 +194,7 @@
   .cf-track li small { display: block; margin-top: 1px; color: var(--muted); font-size: .7rem; font-weight: 500; }
   .cf-track li.current { color: var(--ink); }
   .cf-track li.current::before { background: linear-gradient(90deg, var(--brand) 0 35%, var(--line-strong) 35%); }
-  .cf-track li.current::after  { border-color: var(--brand); box-shadow: 0 0 0 4px rgba(29,90,71,.16); }
+  .cf-track li.current::after  { border-color: var(--brand); box-shadow: 0 0 0 4px color-mix(in srgb, var(--brand) 16%, transparent); }
 
   /* ==========================================================
      SECTIONS & TITRES
@@ -226,7 +221,7 @@
     padding: 13px 18px;
     border: 1px solid #efd3cf;
     border-left: 3px solid #a4392e;
-    border-radius: 10px;
+    border-radius: var(--radius);
     background: #faeceb;
     color: #7d3029;
     font-size: .88rem;
@@ -274,7 +269,7 @@
     min-height: 44px;
     padding: 10px 14px;
     border: 1px solid var(--line-strong);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius);
     background-color: var(--paper);
     color: var(--ink);
     font-family: var(--sans);
@@ -284,7 +279,7 @@
   .staff-field-control:focus {
     border-color: var(--brand);
     outline: 0;
-    box-shadow: 0 0 0 3px rgba(29,90,71,.14);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 14%, transparent);
   }
   textarea.staff-field-control { min-height: 80px; resize: vertical; }
   div.staff-field-control { display: flex; align-items: center; background: var(--wash); border-color: var(--line); font-weight: 600; }
@@ -297,7 +292,7 @@
     min-height: 50px;
     padding: 10px 14px;
     border: 1px solid var(--line-strong);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius);
     background: var(--paper);
     color: var(--ink-2);
     font-size: .86rem;
@@ -310,7 +305,7 @@
     border-color: var(--brand);
     background: var(--tone-wash);
     color: var(--brand-ink);
-    box-shadow: 0 0 0 3px rgba(29,90,71,.1);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 10%, transparent);
   }
   .staff-client-type-option input { margin: 0; accent-color: var(--brand); }
   .staff-client-type-option i { font-size: 1rem; color: var(--brand); }
@@ -323,22 +318,22 @@
     padding: 20px; border: 1px solid var(--line-strong); border-radius: var(--radius);
     background: var(--paper); transition: border-color .15s, box-shadow .15s, background .15s;
   }
-  .and-acc:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(29,90,71,.1); }
+  .and-acc:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 10%, transparent); }
   .and-acc.is-off { background: var(--wash); }
   .and-head { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
   .and-head b { display: block; font-family: var(--serif); font-size: 1.1rem; font-weight: 500; color: var(--ink); }
   .and-head small { display: block; color: var(--muted); font-size: .78rem; }
   .acc-ico {
     display: grid; place-items: center; width: 40px; height: 40px; flex: 0 0 auto;
-    border-radius: var(--radius-sm); background: var(--tone-wash); color: var(--brand); font-size: 1.15rem;
+    border-radius: var(--radius); background: var(--tone-wash); color: var(--brand); font-size: 1.15rem;
   }
   .acc-modes {
     display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px; padding: 4px; margin-bottom: 16px;
-    background: var(--wash); border: 1px solid var(--line); border-radius: var(--radius-sm);
+    background: var(--wash); border: 1px solid var(--line); border-radius: var(--radius);
   }
   .acc-mode {
     display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 40px; padding: 6px 8px;
-    border-radius: calc(var(--radius-sm) - 2px); color: var(--ink-2); font-size: .82rem; font-weight: 650;
+    border-radius: var(--radius); color: var(--ink-2); font-size: .82rem; font-weight: 650;
     cursor: pointer; transition: background .15s, color .15s, box-shadow .15s; user-select: none;
   }
   .acc-mode input { position: absolute; opacity: 0; pointer-events: none; }
@@ -348,12 +343,12 @@
   .acc-mode:has(input:focus-visible) { outline: 2px solid var(--brand); outline-offset: 1px; }
   .acc-pane[hidden] { display: none !important; }
   .acc-pane .staff-client-select-wrap { margin-top: 0; }
-  .acc-none p { margin: 0; padding: 14px 16px; border: 1px dashed var(--line-strong); border-radius: var(--radius-sm); color: var(--muted); font-size: .85rem; text-align: center; }
+  .acc-none p { margin: 0; padding: 14px 16px; border: 1px dashed var(--line-strong); border-radius: var(--radius); color: var(--muted); font-size: .85rem; text-align: center; }
   .acc-req { color: #c0392b; }
   .acc-note { margin: 12px 0 0; color: var(--muted); font-size: .78rem; display: flex; gap: 6px; align-items: center; }
   .acc-summary {
     display: flex; align-items: center; gap: 10px; margin-top: 18px; padding: 12px 16px;
-    border-radius: var(--radius-sm); background: var(--tone-wash); color: var(--brand-ink); font-size: .86rem; font-weight: 600;
+    border-radius: var(--radius); background: var(--tone-wash); color: var(--brand-ink); font-size: .86rem; font-weight: 600;
   }
   .acc-summary.is-empty { background: var(--wash); color: var(--muted); font-weight: 500; }
   .acc-summary i { font-size: 1.1rem; }
@@ -376,7 +371,7 @@
     min-height: 42px;
     padding: 6px 12px;
     border: 1px solid var(--line-strong);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius);
     background: var(--paper);
     color: var(--ink);
     box-shadow: none;
@@ -384,7 +379,7 @@
   .staff-client-select-wrap .ts-control:focus,
   .staff-client-select-wrap .ts-wrapper.focus .ts-control {
     border-color: var(--brand);
-    box-shadow: 0 0 0 3px rgba(29,90,71,.14);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 14%, transparent);
   }
   .staff-client-select-wrap .ts-control .item {
     padding: 2px 0;
@@ -393,7 +388,7 @@
   }
   .staff-client-select-wrap .ts-dropdown {
     border: 1px solid var(--line-strong);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius);
     box-shadow: 0 12px 30px rgba(18, 26, 23, 0.12);
     background: var(--paper);
     color: var(--ink);
@@ -420,7 +415,7 @@
     margin-top: 20px;
     padding: 13px 16px 13px 38px;
     border: 1px solid var(--line);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius);
     background: var(--wash);
     color: var(--ink-2);
     font-size: .86rem;
@@ -453,7 +448,6 @@
     border: 1px solid var(--line);
     border-radius: var(--radius);
   }
-  .dates-bar-sep { color: var(--muted); font-size: .82rem; font-weight: 600; white-space: nowrap; }
   .date-input-wrap {
     display: flex;
     align-items: center;
@@ -462,13 +456,13 @@
     padding: 6px 14px;
     background: var(--paper);
     border: 1px solid var(--line-strong);
-    border-radius: var(--radius-sm);
+    border-radius: var(--radius);
     transition: border-color .15s, box-shadow .15s;
   }
-  .date-input-wrap:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(29,90,71,.14); }
+  .date-input-wrap:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 14%, transparent); }
   .date-input-wrap i { flex-shrink: 0; font-size: .85rem; }
   .date-input-wrap input {
-    width: 150px;
+    width: 100%;
     min-width: 0;
     border: none;
     background: transparent;
@@ -478,16 +472,14 @@
     font-weight: 600;
     outline: none;
   }
-  #wrap-duree-jours input { width: 80px; }
   .date-input-wrap input:disabled { color: var(--muted); cursor: not-allowed; }
 
   #dates-status {
     display: flex;
     align-items: center;
     gap: 7px;
-    margin-left: auto;
-    padding: 7px 14px;
-    border-radius: 999px;
+    padding: 9px 12px;
+    border-radius: var(--radius);
     font-size: .76rem;
     font-weight: 700;
     line-height: 1.3;
@@ -522,6 +514,7 @@
     background: var(--paper);
     border: 1px solid var(--line-strong);
     border-radius: var(--radius);
+    box-shadow: var(--panel-shadow);
   }
 
   .section-header {
@@ -543,7 +536,7 @@
     padding: 3px;
     background: var(--paper);
     border: 1px solid var(--line);
-    border-radius: 10px;
+    border-radius: var(--radius);
   }
   #btn-vue-carte { display: none !important; }
   .vt-btn {
@@ -568,7 +561,7 @@
   .mf-select, .list-search {
     padding: 8px 12px;
     border: 1px solid var(--line-strong);
-    border-radius: 10px;
+    border-radius: var(--radius);
     background: var(--paper);
     color: var(--ink);
     font-family: var(--sans);
@@ -588,7 +581,7 @@
   .mf-select:focus, .list-search:focus {
     outline: none;
     border-color: var(--brand);
-    box-shadow: 0 0 0 3px rgba(29,90,71,.14);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 14%, transparent);
   }
 
   /* ---------- carte ---------- */
@@ -616,23 +609,22 @@
   /* ---------- vue liste ---------- */
   #view-liste { display: none; flex: 1; overflow-y: auto; background: var(--paper); }
   #view-liste::-webkit-scrollbar { width: 6px; }
-  #view-liste::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 6px; }
+  #view-liste::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: var(--radius); }
   .liste-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
     gap: 10px;
-    padding: 6px 16px 18px;
+    padding: 8px;
   }
   .liste-empty { grid-column: 1/-1; padding: 70px 20px; text-align: center; color: var(--muted); }
   .liste-empty i { display: block; margin-bottom: 10px; font-size: 2.2rem; opacity: .3; }
   .liste-empty p { margin: 0; font-size: .86rem; }
 
-  /* groupes ville / format / quartier (sticky empilés — hauteurs fixes) */
+  /* Groupes de la liste des emplacements */
   .liste-group-ville {
     grid-column: 1 / -1;
-    position: sticky; top: 0; z-index: 3;
     display: flex; align-items: center; gap: 10px;
-    height: 46px;
+    min-height: 46px;
     margin-bottom: 2px;
     background: var(--paper);
     border-bottom: 2px solid var(--brand);
@@ -646,9 +638,8 @@
 
   .liste-group-format {
     grid-column: 1 / -1;
-    position: sticky; top: 46px; z-index: 2;
     display: flex; align-items: center; gap: 8px;
-    height: 34px;
+    min-height: 34px;
     padding-left: 10px;
     background: var(--paper);
     border-bottom: 1px dashed var(--line-strong);
@@ -660,9 +651,8 @@
 
   .liste-group-quartier {
     grid-column: 1 / -1;
-    position: sticky; top: 80px; z-index: 1;
     display: flex; align-items: center; gap: 7px;
-    height: 30px;
+    min-height: 30px;
     padding-left: 14px;
     background: var(--paper);
     font-size: .68rem;
@@ -695,12 +685,12 @@
     align-items: stretch;
     background: var(--paper);
     border: 1px solid var(--line);
-    border-radius: 12px;
+    border-radius: var(--radius);
     overflow: hidden;
     transition: border-color .18s, box-shadow .18s, transform .18s;
   }
   .support-card:hover { border-color: #cfc7ad; box-shadow: 0 10px 26px rgba(20,37,31,.08); transform: translateY(-1px); }
-  .support-card.has-selected { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(29,90,71,.12); background: #fbfdfb; }
+  .support-card.has-selected { border-color: var(--brand); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 12%, transparent); background: #fbfdfb; }
 
   .sc-header {
     grid-area: header;
@@ -762,7 +752,7 @@
     width: 100%;
     padding: 8px 12px;
     border: 1.5px solid;
-    border-radius: 10px;
+    border-radius: var(--radius);
     background: transparent;
     font-family: var(--sans);
     font-size: .78rem;
@@ -792,7 +782,7 @@
     width: 34px; height: 34px;
     display: flex; align-items: center; justify-content: center;
     border: 1px solid var(--line);
-    border-radius: 10px;
+    border-radius: var(--radius);
     background: var(--wash);
     color: var(--ink-2);
     cursor: pointer;
@@ -830,14 +820,14 @@
   }
   .panier-body { flex: 1; overflow-y: auto; padding: 12px; }
   .panier-body::-webkit-scrollbar { width: 6px; }
-  .panier-body::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 6px; }
+  .panier-body::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: var(--radius); }
 
   .panier-item {
     display: flex; align-items: center; gap: 10px;
     margin-bottom: 7px;
     padding: 10px 12px;
     border: 1px solid var(--line);
-    border-radius: 12px;
+    border-radius: var(--radius);
     background: var(--wash);
     transition: all .15s;
   }
@@ -845,7 +835,7 @@
   .pi-icon {
     width: 30px; height: 30px; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
-    border-radius: 9px;
+    border-radius: var(--radius);
     background: var(--paper);
     border: 1px solid var(--line);
     font-size: .8rem;
@@ -859,7 +849,7 @@
     width: 24px; height: 24px; flex-shrink: 0;
     display: flex; align-items: center; justify-content: center;
     border: 1px solid var(--line-strong);
-    border-radius: 7px;
+    border-radius: var(--radius);
     background: var(--paper);
     color: var(--muted);
     font-size: .75rem;
@@ -882,7 +872,7 @@
     align-items: center; gap: 8px;
     margin-bottom: 12px;
     padding: 8px 12px;
-    border-radius: 10px;
+    border-radius: var(--radius);
     background: rgba(255,255,255,.1);
     border: 1px solid rgba(255,255,255,.2);
     color: #f3e2b6;
@@ -896,7 +886,7 @@
     min-height: 48px;
     padding: 11px 18px;
     border: 0;
-    border-radius: 10px;
+    border-radius: var(--radius);
     background: #fff;
     color: var(--brand-ink);
     font-family: var(--sans);
@@ -913,7 +903,7 @@
      POPUP LEAFLET
      ========================================================== */
   .rl-popup { min-width: 210px; padding: 12px 14px; font-family: var(--sans, inherit); }
-  .rl-popup-code { margin-bottom: 2px; color: #1d5a47; font-family: 'JetBrains Mono', monospace; font-size: .64rem; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
+  .rl-popup-code { margin-bottom: 2px; color: var(--brand); font-family: 'JetBrains Mono', monospace; font-size: .64rem; font-weight: 600; letter-spacing: 1px; text-transform: uppercase; }
   .rl-popup-nom  { margin-bottom: 3px; font-size: .86rem; font-weight: 700; }
   .rl-popup-addr { display: flex; align-items: center; gap: 4px; margin-bottom: 9px; color: #64748b; font-size: .72rem; }
   .rl-popup-faces { display: flex; flex-direction: column; gap: 5px; }
@@ -922,7 +912,7 @@
     width: 100%;
     padding: 7px 11px;
     border: 1.5px solid;
-    border-radius: 9px;
+    border-radius: var(--radius);
     background: transparent;
     font-size: .76rem;
     font-weight: 700;
@@ -934,20 +924,16 @@
   .rl-face-btn.occupe   { border-color: #ef4444; color: #ef4444; cursor: not-allowed; opacity: .55; }
   .rl-face-btn.reserve  { border-color: #7c3aed; color: #7c3aed; cursor: not-allowed; opacity: .55; }
   .rl-face-btn.panne    { border-color: #94a3b8; color: #94a3b8; cursor: not-allowed; opacity: .55; }
-  .rl-face-btn.selected { background: #1d5a47; border-color: #1d5a47; color: #fff; }
+  .rl-face-btn.selected { background: var(--brand); border-color: var(--brand); color: #fff; }
   .rl-face-btn.need-dates { border-color: #cbd5e1; color: #94a3b8; cursor: not-allowed; opacity: .7; }
   .rl-popup-photo-wrap { width: 100%; height: 120px; margin-bottom: 8px; border-radius: 8px; overflow: hidden; }
   .rl-popup-photo-wrap img { width: 100%; height: 100%; object-fit: contain; }
 
-  .cf a:focus-visible, .cf button:focus-visible { outline: 3px solid rgba(29,90,71,.4); outline-offset: 3px; }
+  .cf a:focus-visible, .cf button:focus-visible { outline: 3px solid color-mix(in srgb, var(--brand) 40%, transparent); outline-offset: 3px; }
 
   /* ==========================================================
      ANIMATIONS
      ========================================================== */
-  @keyframes cf-ping {
-    0%   { box-shadow: 0 0 0 0 color-mix(in srgb, var(--tone) 45%, transparent); }
-    80%, 100% { box-shadow: 0 0 0 9px transparent; }
-  }
   @keyframes cf-in { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
   .cf-hero-main, .cf-ticket, .cf-track, .cf-sec, .resa-grid { animation: cf-in .5s ease both; }
   .cf-ticket { animation-delay: .08s; }
@@ -967,21 +953,19 @@
     .staff-client-type-options { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .section-header { flex-direction: column; align-items: stretch; }
     .view-toggle { flex-direction: row !important; align-self: flex-start; }
-    #dates-status { margin-left: 0; width: 100%; justify-content: center; }
   }
   @media (max-width: 640px) {
     .cf { padding: 0 16px 40px; font-size: 14.5px; }
     .cf-hero { padding-top: 24px; margin-bottom: 24px; }
-    .cf-hero-top { gap: 22px; padding-bottom: 24px; }
-    .cf-ticket { width: 100%; }
+    .cf-hero-top { gap: 16px; }
+    .cf-ticket { display: flex; align-items: center; gap: 8px; padding: 6px 12px; }
+    .cf-ticket-label { margin: 0; }
+    .cf-ticket-ref { font-size: .85rem; }
     .cf-track li { font-size: .7rem; padding-right: 4px; }
     .cf-track li small { display: none; }
     .cf-form { padding: 18px; }
     .staff-client-type-options { grid-template-columns: 1fr; }
     .dates-bar { padding: 14px; }
-    .date-input-wrap { width: 100%; }
-    .date-input-wrap input { width: 100%; }
-    .dates-bar-sep { width: 100%; text-align: center; }
     .support-card {
       grid-template-columns: minmax(0, 1fr);
       grid-template-rows: auto auto auto;
@@ -993,9 +977,6 @@
     .cf *, .cf *::before, .cf *::after { animation: none !important; transition-duration: .01ms !important; }
   }
 
-  .staff-v2 .nd-aside {
-    z-index: 1021;
-  }
   .staff-v2 .panier-section,
   .staff-v2 .nd-recap {
     max-height: none !important;
@@ -1017,7 +998,7 @@
     display: none;
     width: 260px;
     background: #fff;
-    border-radius: 12px;
+    border-radius: 8px;
     overflow: hidden;
     box-shadow: 0 18px 40px rgba(18,26,23,.24), 0 2px 8px rgba(18,26,23,.12);
     border: 1px solid #e6e4dd;
@@ -1140,7 +1121,7 @@
   }
   .dr-kpi-icon {
     display: grid; place-items: center; width: 40px; height: 40px; flex: 0 0 40px;
-    border-radius: 10px; background: var(--dr-brand-soft); color: var(--brand); font-size: 1.05rem;
+    border-radius: var(--radius); background: var(--dr-brand-soft); color: var(--brand); font-size: 1.05rem;
   }
   .dr-kpi-label { display: block; color: var(--muted); font-size: .66rem; font-weight: 750; letter-spacing: .06em; text-transform: uppercase; }
   .dr-kpi-value { display: block; color: var(--ink); font-size: 1.05rem; font-weight: 800; letter-spacing: -.02em; line-height: 1.25; overflow-wrap: anywhere; }
@@ -1155,7 +1136,7 @@
   }
   .cf-h-ico {
     display: grid; place-items: center; width: 34px; height: 34px; flex: 0 0 34px;
-    border-radius: 9px; background: var(--dr-brand-soft); color: var(--brand); font-size: .95rem;
+    border-radius: var(--radius); background: var(--dr-brand-soft); color: var(--brand); font-size: .95rem;
   }
   .cf-h-note { margin-left: auto; color: var(--muted); font-size: .72rem; font-weight: 600; }
   .staff-demande-page .cf-sub {
@@ -1182,7 +1163,7 @@
     margin: -20px -20px 16px; padding: 13px 16px; border-bottom: 1px solid var(--line);
     background: linear-gradient(100deg, #f6f7f5, #fff); border-radius: var(--radius) var(--radius) 0 0;
   }
-  .staff-demande-page .acc-ico { background: var(--brand); color: #fff; border-radius: 12px; width: 42px; height: 42px; }
+  .staff-demande-page .acc-ico { background: var(--brand); color: #fff; border-radius: var(--radius); width: 42px; height: 42px; }
   .staff-demande-page .and-acc[data-slot="agence"] .acc-ico { background: #3d5a80; }
   .staff-demande-page .and-head b { font-family: var(--sans); font-weight: 800; font-size: 1rem; }
   .staff-demande-page .acc-mode:has(input:checked) { box-shadow: 0 1px 4px rgba(18,26,23,.14), 0 0 0 1px var(--brand); color: var(--brand); }
@@ -1235,19 +1216,17 @@
     border-radius: 50%; background: var(--brand); color: #fff; font-size: .78rem; font-weight: 800;
   }
   .cf-block-n::before { content: counter(cfb); }
-  .cf-block-where {
-    background: linear-gradient(135deg, var(--dr-brand-soft), #fff 70%); border-color: var(--dr-brand-line);
-    box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 6%, transparent);
-  }
-  .cf-block-where #filtres-carte, .cf-block-where #filtres-liste { gap: 12px !important; }
+  .diffusion-filters, .cf-block .dates-bar { gap: 12px; flex-wrap: wrap; align-items: end; }
+  .diffusion-field { display: block; flex: 1 1 150px; min-width: 0; }
+  .dates-bar .diffusion-field { flex-basis: 175px; }
+  .diffusion-label { display: block; margin-bottom: 5px; color: var(--ink-2); font-size: .8rem; font-weight: 700; }
   .cf-block-where .mf-select {
-    flex: 1 1 220px; min-width: 0; height: 46px; padding: 0 14px; font-size: .92rem; font-weight: 700;
-    border: 1.5px solid var(--dr-brand-line); border-radius: var(--radius); background-color: #fff;
+    width: 100%; min-width: 0; height: 46px; padding: 0 12px; font-size: .88rem;
+    border: 1.5px solid var(--line-strong); border-radius: var(--radius); background-color: #fff;
   }
   .cf-block-where .mf-select:focus { outline: 0; border-color: var(--brand); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 14%, transparent); }
-  .cf-block-where #filter-format-wrap, .cf-block-where #list-filter-format-wrap { flex: 1 1 200px; }
-  .cf-block-where #filter-format-wrap .mf-select, .cf-block-where #list-filter-format-wrap .mf-select { width: 100%; }
   .cf-block .dates-bar { margin: 0; padding: 0; border: 0; background: none; box-shadow: none; }
+  .dates-bar #dates-status { flex: 1 0 100%; }
   .cf-block #tarification-faces { margin-top: 14px; background: #fcfcfb; }
   .emp-search {
     display: flex; align-items: center; gap: 10px; flex: 1 1 260px; min-width: 0; margin: 0; padding: 0 14px; height: 40px;
@@ -1284,32 +1263,24 @@
 
 
   .cc-input { position: relative; }
-  .cc-input input:not([type=checkbox]):not([type=radio]), .cc-input select, .cc-input textarea {
-    width:                                                                                                                                 100%; min-height: 44px; padding: 0 14px; border: 1.5px solid var(--line-strong); border-radius: 10px;
+  .cc-input input:not([type=checkbox]):not([type=radio]), .cc-input select, .cc-input textarea,
+  .cc-field > select:not(.tomselected) {
+    width: 100%; min-height: 44px; padding: 0 14px; border: 1.5px solid var(--line-strong); border-radius: var(--radius);
     background: #fff; color: var(--ink); font-size: .92rem; box-shadow: none;
 
   }
-  .cc-input input:focus, .cc-input select:focus { outline: 0; border-color: var(--brand); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 12%, transparent); }
+  .cc-input input:focus, .cc-input select:focus, .cc-field > select:focus { outline: 0; border-color: var(--brand); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 12%, transparent); }
   .cc-field.has-ico .cc-ico { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font-size: 1.15rem; pointer-events: none; z-index: 1; }
   .cc-field.has-ico .cc-input input { padding-left: 46px; }
-  .cc-field .ts-wrapper { width: 100%; }
-  .cc-field .ts-control { min-height: 44px; padding: 8px 14px; border: 1.5px solid var(--line-strong); border-radius: 10px; font-size: .92rem; }
+  .cc-field.staff-client-select-wrap { min-width: 0; margin-top: 0; }
+  .cc-field .ts-control { min-height: 44px; padding: 8px 14px; border: 1.5px solid var(--line-strong); border-radius: var(--radius); font-size: .92rem; }
   @media (max-width: 991.98px) { .cc-grid-3 { grid-template-columns: 1fr; } }
   @media (max-width: 767.98px) { .cc-grid-2 { grid-template-columns: 1fr; } .nd-body { padding: 14px; } }
 
 
-  /* ═══ Nouvelle demande (staff) : accordéon + récapitulatif collant ═══ */
-  .staff-v2 .cf-ticket, .staff-v2 .cf-track { display: none; }
-  .staff-v2 .cf-hero-top { padding: 20px 26px; }
-  .nd-layout { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 18px; align-items: start; }
-  .nd-main { min-width: 0; }
-  .staff-v2 .nd-aside {
-    position: sticky;
-    top: 80px;
-    align-self: start;
-    max-height: none;
-    overflow: visible;
-  }
+  /* Dossier de campagne */
+  .staff-v2 .cf-ticket { display: none; }
+  .staff-v2 .nd-layout, .staff-v2 .nd-main { display: grid; gap: 20px; min-width: 0; align-items: start; }
   .staff-v2 .nd-recap { overflow: visible; }
   .nd-acc { margin-bottom: 12px; }
   .nd-recap { border: 1px solid var(--line); border-radius: var(--radius); background: #fff; box-shadow: var(--dr-shadow); overflow: hidden; }
@@ -1326,8 +1297,13 @@
   .nd-rval i { color: var(--muted); width: 18px; text-align: center; margin-right: 4px; }
   .nd-acc .cf-block-n { display: none; }
   .nd-acc .cf-block { margin: 0 0 14px; }
-  .nd-acc .resa-grid { display: block; height: auto; margin-top: 4px; }
-  .nd-acc .main-section { height: clamp(520px, 75vh, 780px); border-radius: var(--radius); }
+  .nd-acc .resa-grid { display: block; height: auto; animation: none; }
+  .nd-acc .main-section {
+    height: clamp(520px, 75vh, 780px);
+    border: 1px solid var(--line);
+    border-radius: var(--radius);
+    box-shadow: none;
+  }
   .nd-acc .nd-textarea { width: 100%; min-height: 110px; resize: vertical; }
   .nd-acc .cf-project.nd-one { grid-template-columns: 1fr; }
   .nd-acc .cf-project.nd-one input { width: 100%; }
@@ -1339,16 +1315,10 @@
   .staff-v2 .panier-title { font-family: var(--sans); font-size: 1rem; font-weight: 800; letter-spacing: -.01em; }
   .staff-v2 .panier-body { max-height: 260px; padding: 10px 14px; }
   .staff-v2 .panier-empty { padding: 22px 12px; }
-  .staff-v2 .panier-footer { background: #fff; color: var(--ink); border-top: 1px solid var(--line); }
   .staff-v2 .dates-hint { background: #fffbeb; border-color: #fde68a; color: #92400e; }
   .staff-v2 .btn-continuer { background: var(--brand); color: #fff; box-shadow: 0 6px 14px color-mix(in srgb, var(--brand) 28%, transparent); }
   .staff-v2 .btn-continuer:hover:not(:disabled) { background: var(--dr-brand-deep); color: #fff; }
   .staff-v2 .btn-continuer:disabled { background: #e5e7eb; color: #9ca3af; box-shadow: none; }
-  .staff-v2 .cf-foot-note { color: var(--muted); }
-  @media (max-width: 1199.98px) {
-    .nd-layout { grid-template-columns: 1fr; }
-    .nd-aside { position: static; max-height: none; overflow: visible; }
-  }
 
   @media (max-width: 1199.98px) { .dr-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
   @media (max-width: 767.98px) {
@@ -1361,107 +1331,123 @@
   }
   @media (max-width: 575.98px) { .dr-kpis { grid-template-columns: 1fr; } }
 
-  /* ═══════════════════════════════════════════════════════════
-     NOUVELLE DEMANDE (staff) — design « Integral » (rouge bordeaux)
-     Scopé sur .staff-v2 : les autres écrans ne changent pas.
-     Pour reprendre la couleur du site, remplacer #8a1c1c par {{ DESIGN.COLOR_PRIMARY }}.
-     ═══════════════════════════════════════════════════════════ */
   .staff-v2 {
-    --brand: #8a1c1c; --brand-ink: #6a1313; --tone: #8a1c1c; --color-primary: #8a1c1c;
-    --tone-wash: #fbe9eb; --dr-brand-line: #efd3d7; --dr-brand-deep: #6a1313;
-    --nd-line: #ecd5d9; --nd-pink: #fbe3e6; --nd-pink-soft: #f8eef0; --nd-gold: #fbf0c9;
+    --ink: #172e3a; --ink-2: #344d59; --muted: #516976;
+    --wash: #edf2f5; --line: #d5e0e6; --line-strong: #b7cbd3;
+    container-type: inline-size;
     font-size: 14px;
   }
   .nd-banner-ico { display: none; }
   .staff-v2 .cf-hero { padding-top: 6px; margin-bottom: 14px; }
   .staff-v2 .cf-hero-top {
-    display: flex; align-items: center; gap: 16px; padding: 16px 22px; border: 0; border-radius: 12px;
-    background: linear-gradient(90deg, #7d1414 0%, #9a1f1f 100%); color: #fff;
+    gap: 16px; padding: clamp(16px, 3vw, 28px);
+    border-radius: var(--radius); background: linear-gradient(115deg, var(--brand-ink), var(--brand));
+    box-shadow: var(--panel-shadow);
   }
-  .staff-v2 .cf-hero-main { flex: 1 1 auto; }
+  .staff-v2 .cf-hero-main { flex: 1 1 0; }
   .staff-v2 .nd-banner-ico {
-    display: grid; place-items: center; flex: 0 0 46px; height: 46px; border-radius: 10px;
-    background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.28); font-size: 1.4rem;
+    display: grid; place-items: center; flex: 0 0 46px; height: 46px; border-radius: var(--radius);
+    background: rgba(255,255,255,.15); color: #fff; font-size: 1.4rem;
   }
   .staff-v2 .cf-pill { display: none; }
-  .staff-v2 .cf-title { margin: 0 0 2px; font-family: var(--sans); font-size: 1.15rem; font-weight: 800; letter-spacing: -.01em; color: #fff; }
-  .staff-v2 .cf-lead { max-width: none; margin: 0; font-size: .84rem; line-height: 1.4; color: rgba(255,255,255,.86); }
+  .staff-v2 .cf-title { margin: 0 0 4px; font-size: clamp(1.35rem, 3vw, 2rem); }
+  .staff-v2 .cf-track li small { display: none; }
 
-  .staff-v2 .nd-acc { border: 1px solid var(--nd-line); border-radius: 10px; box-shadow: none; margin-bottom: 10px; }
-  .staff-v2 .nd-head { padding: 10px 16px; gap: 10px; background: linear-gradient(90deg, var(--nd-pink), var(--nd-pink-soft)); border-bottom: 1px solid var(--nd-line); }
-  .staff-v2 .nd-head-ico { font-size: 1.15rem; color: var(--brand); }
+  .staff-v2 .nd-acc { box-shadow: var(--panel-shadow); margin: 0; }
+  .staff-v2 .nd-head { padding: 12px 16px; gap: 12px; background: #fff; border-bottom: 1px solid var(--line); }
+  .staff-v2 .nd-acc[open] .nd-head,
+  .staff-v2 .nd-head:hover { background: var(--tone-wash); }
+  .staff-v2 .nd-acc:not([open]) .nd-head { border-bottom: 0; }
+  .staff-v2 .nd-head-ico {
+    flex: 0 0 36px; height: 36px; border-radius: var(--radius);
+    background: var(--tone-wash); color: var(--brand); font-size: 1.1rem;
+  }
+  .staff-v2 .nd-acc[open] .nd-head-ico { background: var(--brand); color: #fff; }
   .staff-v2 .nd-head-title { font-size: .98rem; font-weight: 800; }
   .staff-v2 .nd-chevron { font-size: .95rem; color: var(--ink-2); }
   .staff-v2 .nd-body { padding: 14px 16px 16px; }
 
-  .nd-grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+  .nd-campaign-fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 190px), 1fr));
+    gap: 14px;
+  }
   .nd-fld > label { display: block; margin-bottom: 4px; font-size: .72rem; font-weight: 700; color: var(--ink-2); }
   .nd-in {
-    width: 100%; height: 36px; padding: 0 10px; border: 1px solid #e3d9db; border-radius: 8px;
+    width: 100%; min-height: 42px; padding: 6px; border: 1px solid var(--line-strong); border-radius: var(--radius);
     background: #fff; color: var(--ink); font-size: .85rem;
   }
   .nd-in:focus { outline: 0; border-color: var(--brand); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 14%, transparent); }
 
   /* Tarification : tableau */
-  .nd-tarif-panel {
-    padding: 18px; border: 1px solid #f0dfe2; border-radius: 18px; background: linear-gradient(180deg, #fffdfd 0%, #fff9fb 100%);
-    box-shadow: 0 10px 28px rgba(147, 46, 43, 0.06);
-  }
-  .nd-tarif-wrap { overflow-x: auto; border: 1px solid #f1dfe4; border-radius: 12px; background: #fff; }
+  .nd-tarif-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: #fff; }
   .nd-tarif { width: 100%; min-width: 700px; border-collapse: collapse; font-size: .85rem; }
   .nd-tarif thead th {
-    padding: 12px 14px; background: linear-gradient(180deg, #fef1f3 0%, #f9eef0 100%); color: var(--ink-2); font-size: .72rem; font-weight: 800;
+    padding: 8px; background: var(--wash); color: var(--ink-2); font-size: .72rem; font-weight: 800;
     text-align: left; letter-spacing: .02em; white-space: nowrap; text-transform: uppercase;
   }
   .nd-tarif th small { font-weight: 600; color: var(--muted); }
   .nd-tarif tbody td {
-    padding: 12px 14px; border-top: 1px solid #f3e8eb; vertical-align: middle; background: rgba(255,255,255,0.6);
+    padding: 8px; border-top: 1px solid var(--line); vertical-align: middle;
   }
   .nd-tarif .num { text-align: right; }
   .nd-tarif .num-cell { font-weight: 700; color: var(--ink-2); }
   .nd-tarif td .nd-in {
-    width: 138px; height: 38px; padding: 0 12px; border: 1px solid #e9d8dc; border-radius: 10px; background: #fff; color: var(--ink);
-    font-size: .85rem; text-align: right; font-weight: 700; transition: all .2s ease;
+    width: 138px; min-height: 38px; text-align: right;
+    font-weight: 700;
   }
-  .nd-tarif td .nd-in:focus { border-color: var(--brand); box-shadow: 0 0 0 3px rgba(147,46,43,.12); }
-  .nd-tarif td .nd-in-sm {
-    width: 86px; height: 38px; padding: 0 10px; border: 1px solid #e9d8dc; border-radius: 10px; background: #fff; color: var(--ink);
-    font-size: .85rem; text-align: right; font-weight: 700;
-  }
+  .nd-tarif td .nd-in-sm { width: 104px; }
+  .nd-remise { display: flex; align-items: center; gap: 6px; }
+  .nd-remise select.nd-in { width: auto; text-align: left; }
   .nd-tarif td .nd-unit { margin-left: 8px; color: var(--muted); font-size: .76rem; font-weight: 700; }
-  .nd-tarif-support {
-    display: flex; align-items: center; justify-content: space-between; gap: 12px, 0;
-  }
   .nd-support-name { display: flex; flex-direction: column; gap: 3px; }
   .nd-support-name strong { color: var(--ink); font-size: .82rem; }
   .nd-support-name span { color: var(--muted); font-size: .72rem; }
-  .nd-pill {
-    display: inline-flex; align-items: center; justify-content: center; min-width: 42px; padding: 4px 8px; border-radius: 99px;
-    background: #fff1f2; color: var(--brand); font-size: .7rem; font-weight: 800; border: 1px solid #f3c7ce;
-  }
   .nd-montant {
-    display: inline-block; min-width: 140px; padding: 8px 12px; border-radius: 10px; background: linear-gradient(180deg, #fff4f5 0%, #fbe4e8 100%);
-    color: var(--brand); font-weight: 800; text-align: right; border: 1px solid #f3dfe4;
+    display: inline-block; min-width: 140px; padding: 8px 12px; border-radius: var(--radius); background: var(--tone-wash);
+    color: var(--brand); font-weight: 800; text-align: right; border: 1px solid var(--dr-brand-line);
   }
   .nd-tarif-total {
     display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; padding: 14px 16px;
-    border: 1px solid #f5d998; border-radius: 12px; background: linear-gradient(135deg, #fff7db 0%, #f8f0d7 100%);
+    border: 1px solid #f5d998; border-radius: var(--radius); background: linear-gradient(135deg, #fff7db 0%, #f8f0d7 100%);
     font-weight: 800; color: var(--ink-2);
   }
   .nd-tarif-total .v { color: var(--brand); font-size: 1.2rem; }
   .nd-tarif-note { margin-top: 10px; color: var(--muted); font-size: .78rem; }
 
   /* Récapitulatif */
-  .staff-v2 .nd-recap { border-color: var(--nd-line); border-radius: 10px; box-shadow: none; }
-  .staff-v2 .nd-recap-head { border-bottom: 0; padding: 14px 16px 8px; }
+  .staff-v2 .nd-recap { box-shadow: var(--panel-shadow); }
+  .staff-v2 .nd-recap-head {
+    border-radius: var(--radius) var(--radius) 0 0;
+    background: var(--tone-wash); padding: 14px 16px;
+  }
   .staff-v2 .nd-recap-head h2 { font-size: 1rem; }
-  .staff-v2 .nd-rrow { padding: 12px 16px; border-bottom: 0; border-top: 1px solid #f1e7e9; }
+  .staff-v2 .nd-rrow { padding: 12px 16px; border-bottom: 0; border-top: 1px solid var(--line); }
   .staff-v2 .nd-rrow b { font-size: .92rem; }
   .nd-total { color: var(--brand); font-weight: 800; }
   .staff-v2 .btn-continuer { border-radius: 8px; font-weight: 800; }
+  .staff-v2 .nd-actions {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px;
+    margin-top: 16px; padding: 12px 16px; background: #fff;
+    border: 1px solid var(--line); border-radius: var(--radius);
+    box-shadow: var(--panel-shadow);
+  }
+  .staff-v2 .nd-actions form { margin: 0; }
+  .staff-v2 .nd-period { color: var(--muted); font-size: .8rem; }
+  .staff-v2 .nd-actions .dates-hint { margin: 4px 0 0; }
 
-  @media (max-width: 991.98px) { .nd-grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-  @media (max-width: 575.98px) { .nd-grid-4 { grid-template-columns: 1fr; } }
+  @container (min-width: 960px) {
+    .staff-v2 .nd-layout { grid-template-columns: minmax(0, 1fr) minmax(290px, 26%); }
+    .staff-v2 .nd-aside {
+      position: sticky;
+      top: calc(var(--topbar-h, 68px) + 16px);
+      max-height: calc(100dvh - var(--topbar-h, 68px) - 32px);
+      overflow-y: auto;
+    }
+  }
+  @media (max-width: 575.98px) {
+    .staff-v2 .nd-actions form { width: 100%; }
+  }
 </style>
 {% endblock %}
 
@@ -1482,8 +1468,8 @@
             <p class="cf-lead">Ajustez les informations de votre demande avant de passer à la vérification.</p>
           {% elif staff_mode %}
             <span class="cf-pill">Demande client</span>
-            <h1 class="cf-title">Créer une demande.</h1>
-            <p class="cf-lead">Renseignez les informations, sélectionnez les emplacements et définissez la tarification.</p>
+            <h1 class="cf-title">Créer une demande</h1>
+            <p class="cf-lead">Renseignez le client, la période de diffusion et les emplacements de la campagne.</p>
           {% elif shared_request_mode %}
             <span class="cf-pill">Vérification</span>
             <h1 class="cf-title">Vérifiez votre demande.</h1>
@@ -1502,11 +1488,11 @@
 
       <ol class="cf-track{% if not staff_mode and not shared_edit_mode %} is-3{% endif %}" aria-label="Étapes de création de la demande">
         <li class="current" aria-current="step">
-          {% if staff_mode or shared_edit_mode %}Client, période &amp; emplacements{% else %}Sélection des emplacements &amp; Période{% endif %}
+          {% if staff_mode %}1. Saisie de la demande{% elif shared_edit_mode %}Client, période &amp; emplacements{% else %}Sélection des emplacements &amp; Période{% endif %}
           <small>En cours</small>
         </li>
         <li>
-          {% if staff_mode or shared_edit_mode %}Récapitulatif &amp; validation{% else %}Informations sur votre campagne{% endif %}
+          {% if staff_mode %}2. Récapitulatif et validation{% elif shared_edit_mode %}Récapitulatif &amp; validation{% else %}Informations sur votre campagne{% endif %}
           <small>À venir</small>
         </li>
         {% if not staff_mode and not shared_edit_mode %}
@@ -1546,12 +1532,12 @@
         <div class="cc-grid cc-grid-2">
           <div class="cc-field staff-client-select-wrap">
             <label for="{{ contact_form.client.id_for_label }}">Client</label>
-            <div class="cc-input">{{ contact_form.client }}</div>
+            {{ contact_form.client }}
             {% for error in contact_form.client.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
           </div>
           <div class="cc-field staff-client-select-wrap">
             <label for="{{ contact_form.agence.id_for_label }}">Agence</label>
-            <div class="cc-input">{{ contact_form.agence }}</div>
+            {{ contact_form.agence }}
             {% for error in contact_form.agence.errors %}<div class="text-danger small mt-1">{{ error }}</div>{% endfor %}
           </div>
           <div class="cc-field ">
@@ -1603,29 +1589,43 @@
           <i class="bi bi-chevron-up nd-chevron" aria-hidden="true"></i>
         </summary>
         <div class="nd-body">
-          <div class="cf-block">
-            <div class=""><b>Où diffuser ?</b><small>Ville, catégorie et format</small></div>
-            <div id="filtres-carte" style="display:none;gap:6px;flex-wrap:wrap">
-              <select class="mf-select" id="filter-ville">
-              </select>
+          <div class="cf-block cf-block-where">
+            <div class="cf-block-h"><b>Où diffuser ?</b></div>
+            <div id="filtres-carte" class="diffusion-filters" style="display:none">
+              <div class="diffusion-field">
+                <label class="diffusion-label" for="filter-ville">Ville</label>
+                <select class="mf-select" id="filter-ville">
+                </select>
+              </div>
               {% if not shared_edit_mode %}
-              <select class="mf-select" id="filter-categorie" {% if staff_mode %}aria-required="true"{% endif %}>
-              </select>
+              <div class="diffusion-field">
+                <label class="diffusion-label" for="filter-categorie">Catégorie</label>
+                <select class="mf-select" id="filter-categorie" {% if staff_mode %}aria-required="true"{% endif %}>
+                </select>
+              </div>
               {% endif %}
-              <div id="filter-format-wrap" class="{% if staff_mode or shared_edit_mode %}staff-format-filter{% endif %}">
+              <div id="filter-format-wrap" class="diffusion-field {% if staff_mode or shared_edit_mode %}staff-format-filter{% endif %}">
+                <label class="diffusion-label" for="filter-format">Format</label>
                 <select class="mf-select" id="filter-format">
                   <option value="">Tous formats</option>
                 </select>
               </div>
             </div>
-            <div id="filtres-liste" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-              <select class="mf-select" id="list-filter-ville">
-              </select>
+            <div id="filtres-liste" class="diffusion-filters" style="display:flex">
+              <div class="diffusion-field">
+                <label class="diffusion-label" for="list-filter-ville">Ville</label>
+                <select class="mf-select" id="list-filter-ville">
+                </select>
+              </div>
               {% if not shared_edit_mode %}
-              <select class="mf-select" id="list-filter-categorie" {% if staff_mode %}aria-required="true"{% endif %}>
-              </select>
+              <div class="diffusion-field">
+                <label class="diffusion-label" for="list-filter-categorie">Catégorie</label>
+                <select class="mf-select" id="list-filter-categorie" {% if staff_mode %}aria-required="true"{% endif %}>
+                </select>
+              </div>
               {% endif %}
-              <div id="list-filter-format-wrap" class="{% if staff_mode or shared_edit_mode %}staff-format-filter{% endif %}">
+              <div id="list-filter-format-wrap" class="diffusion-field {% if staff_mode or shared_edit_mode %}staff-format-filter{% endif %}">
+                <label class="diffusion-label" for="list-filter-format">Format</label>
                 <select class="mf-select" id="list-filter-format">
                   <option value="">Tous formats</option>
                 </select>
@@ -1634,24 +1634,30 @@
           </div>
 
           <div class="cf-block">
-            <div class="cf-block-h"><b>Quand ?</b><small>Dates de diffusion</small></div>
-            <div class="dates-bar" style="margin-top:0;">
-              <div class="date-input-wrap">
-                <i class="bi bi-calendar-plus" style="color:#10b981"></i>
-                <input type="date" id="date-debut" value="{{ form.date_debut.value|default:'' }}" min="{% now 'Y-m-d' %}" required>
+            <div class="cf-block-h"><b>Quand ?</b></div>
+            <div class="dates-bar">
+              <div class="diffusion-field">
+                <label class="diffusion-label" for="date-debut">Date de début</label>
+                <div class="date-input-wrap">
+                  <i class="bi bi-calendar-plus" style="color:#10b981"></i>
+                  <input type="date" id="date-debut" value="{{ form.date_debut.value|default:'' }}" min="{% now 'Y-m-d' %}" required>
+                </div>
               </div>
-              <span class="dates-bar-sep">→</span>
-              <div class="date-input-wrap" id="wrap-date-fin">
-                <i class="bi bi-calendar-minus" style="color:#ef4444"></i>
-                <input type="date" id="date-fin" value="{{ form.date_fin.value|default:'' }}" min="{% now 'Y-m-d' %}" required>
+              <div class="diffusion-field">
+                <label class="diffusion-label" for="date-fin">Date de fin</label>
+                <div class="date-input-wrap" id="wrap-date-fin">
+                  <i class="bi bi-calendar-minus" style="color:#ef4444"></i>
+                  <input type="date" id="date-fin" value="{{ form.date_fin.value|default:'' }}" min="{% now 'Y-m-d' %}" required>
+                </div>
               </div>
-              <span class="dates-bar-sep">ou</span>
-              <div class="date-input-wrap" id="wrap-duree-jours">
-                <i class="bi bi-hourglass-split" style="color:#f59e0b"></i>
-                <input type="number" id="duree-jours" min="1" step="1" placeholder="Nombre">
-                <span style="font-size:.76rem;color:var(--muted);white-space:nowrap;">jour(s)</span>
+              <div class="diffusion-field">
+                <label class="diffusion-label" for="duree-jours">Durée en jours</label>
+                <div class="date-input-wrap" id="wrap-duree-jours">
+                  <i class="bi bi-hourglass-split" style="color:#f59e0b"></i>
+                  <input type="number" id="duree-jours" min="1" step="1" placeholder="Ex. 30">
+                </div>
               </div>
-              <div id="dates-status" class="waiting">
+              <div id="dates-status" class="waiting" role="status">
                 <i class="bi bi-info-circle"></i>
                 Saisissez les dates pour voir les disponibilités
               </div>
@@ -1680,7 +1686,7 @@
                   <span class="leg-item"><span class="leg-dot" style="background:#10b981"></span>Disponible</span>
                   <span class="leg-item"><span class="leg-dot" style="background:#f59e0b"></span>Partiel</span>
                   <span class="leg-item"><span class="leg-dot" style="background:#ef4444"></span>Occupé</span>
-                  <span class="leg-item"><span class="leg-dot" style="background:#0f3a2d"></span>Sélectionné</span>
+                  <span class="leg-item"><span class="leg-dot" style="background:var(--brand)"></span>Sélectionné</span>
                 </div>
               </div>
 
@@ -1700,7 +1706,7 @@
           <i class="bi bi-chevron-up nd-chevron" aria-hidden="true"></i>
         </summary>
         <div class="nd-body">
-          <div class="nd-grid-5">
+          <div class="nd-campaign-fields">
             <div class="nd-fld">
               <label for="nom_campagne">Nom de la campagne</label>
               <input type="text" id="nom_campagne" name="nom_campagne" form="form-etape1" class="nd-in"
@@ -1739,26 +1745,24 @@
         </summary>
         <div class="nd-body">
           <div id="tarification-faces" style="display:none">
-            <div class="nd-tarif-panel">
-              <div class="nd-tarif-wrap">
-                <table class="nd-tarif">
-                  <thead>
-                    <tr>
-                      <th>Support</th>
-                      <th class="num">Nb faces</th>
-                      <th>Tarif unitaire / face / mois</th>
-                      <th>Remise</th>
-                      <th class="num">Montant</th>
-                    </tr>
-                  </thead>
-                  <tbody id="tarifs-formats-champs"></tbody>
-                </table>
-              </div>
-              <div class="nd-tarif-total"><span>Montant total estimatif</span><span class="v" id="tarifs-total-value">0 FCFA</span></div>
-              <div id="tarifs-estimation" class="nd-tarif-note"></div>
-              <div class="nd-tarif-note">Un tarif est appliqué à toutes les faces du même format. Facturation par périodes de 30 jours commencées. Tarif facultatif.</div>
-              <div id="tarifs-recap" hidden></div>
+            <div class="nd-tarif-wrap">
+              <table class="nd-tarif">
+                <thead>
+                  <tr>
+                    <th>Support</th>
+                    <th class="num">Nb faces</th>
+                    <th>Tarif unitaire / face / mois</th>
+                    <th>Remise</th>
+                    <th class="num">Montant</th>
+                  </tr>
+                </thead>
+                <tbody id="tarifs-formats-champs"></tbody>
+              </table>
             </div>
+            <div class="nd-tarif-total"><span>Montant total estimatif</span><span class="v" id="tarifs-total-value">0 FCFA</span></div>
+            <div id="tarifs-estimation" class="nd-tarif-note"></div>
+            <div class="nd-tarif-note">Le tarif et la remise s’appliquent par face et par mois facturé. Chaque période de 30 jours commencée est facturée.</div>
+            <div id="tarifs-recap" hidden></div>
           </div>
           <div class="nd-tarif-empty"><i class="bi bi-info-circle me-1"></i>Sélectionnez des emplacements et des dates pour renseigner les tarifs.</div>
         </div>
@@ -1797,26 +1801,28 @@
               <p>Cliquez sur une face libre pour l'ajouter.</p>
             </div>
           </div>
-          <div class="panier-footer">
-            <div class="dates-hint" id="dates-hint"><i class="bi bi-calendar-event"></i>Saisissez les dates pour continuer</div>
-            <form method="post" id="form-etape1">
-              {% csrf_token %}
-              <input type="hidden" name="faces_selectionnees"    id="faces-input"    value="">
-              <input type="hidden" name="supports_selectionnees" id="supports-input" value="[]">
-              <input type="hidden" name="date_debut" id="hidden-date-debut" value="{{ form.date_debut.value|default:'' }}">
-              <input type="hidden" name="date_fin"   id="hidden-date-fin"   value="{{ form.date_fin.value|default:'' }}">
-              <input type="hidden" name="tarifs_faces_par_format" id="tarifs-faces-input" value="">
-              <input type="hidden" name="remises_faces_par_format" id="remises-faces-input" value="{}">
-              <button type="submit" class="btn-continuer" id="btn-continuer" disabled>
-                <i class="bi bi-arrow-right-circle-fill"></i>
-                Continuer — <span id="btn-count">0</span> face(s)
-              </button>
-            </form>
-            <div class="cf-foot-note"><i class="bi bi-shield-check me-1"></i>Aucun engagement — demande sans frais</div>
-          </div>
         </div>
       </div>
     </aside>
+    </div>
+    <div class="nd-actions">
+      <div>
+        <strong aria-live="polite"><span id="btn-count">0</span> face(s) sélectionnée(s)</strong>
+        <div class="nd-period" id="nd-period">Période à définir</div>
+        <div class="dates-hint" id="dates-hint"><i class="bi bi-calendar-event"></i>Saisissez les dates pour continuer</div>
+      </div>
+      <form method="post" id="form-etape1">
+        {% csrf_token %}
+        <input type="hidden" name="faces_selectionnees" id="faces-input" value="">
+        <input type="hidden" name="supports_selectionnees" id="supports-input" value="[]">
+        <input type="hidden" name="date_debut" id="hidden-date-debut" value="{{ form.date_debut.value|default:'' }}">
+        <input type="hidden" name="date_fin" id="hidden-date-fin" value="{{ form.date_fin.value|default:'' }}">
+        <input type="hidden" name="tarifs_faces_par_format" id="tarifs-faces-input" value="">
+        <input type="hidden" name="remises_faces_par_format" id="remises-faces-input" value="{}">
+        <button type="submit" class="btn-continuer" id="btn-continuer" disabled>
+          Voir le récapitulatif <i class="bi bi-arrow-right" aria-hidden="true"></i>
+        </button>
+      </form>
     </div>
     {% else %}
     {% if shared_edit_mode %}
@@ -1868,28 +1874,42 @@
       {% if staff_mode or shared_edit_mode %}<h2 class="cf-h"><span class="cf-h-ico"><i class="bi bi-calendar-range"></i></span>{% if staff_mode %}Campagne et période de diffusion{% else %}Période de diffusion{% endif %}</h2>
       <p class="cf-sub">{% if staff_mode %}Choisissez d'abord la catégorie, puis les dates.{% else %}Choisissez la catégorie, puis les dates.{% endif %}</p>{% endif %}
       <div class="cf-block cf-block-where">
-        <div class="cf-block-h"><span class="cf-block-n"></span><b>Où diffuser ?</b><small>Ville, catégorie et format</small></div>
-      <div id="filtres-carte" style="display:none;gap:6px;flex-wrap:wrap">
-        <select class="mf-select" id="filter-ville">
-        </select>
+        <div class="cf-block-h"><span class="cf-block-n"></span><b>Où diffuser ?</b></div>
+      <div id="filtres-carte" class="diffusion-filters" style="display:none">
+        <div class="diffusion-field">
+          <label class="diffusion-label" for="filter-ville">Ville</label>
+          <select class="mf-select" id="filter-ville">
+          </select>
+        </div>
         {% if not shared_edit_mode %}
-        <select class="mf-select" id="filter-categorie" {% if staff_mode %}aria-required="true"{% endif %}>
-        </select>
+        <div class="diffusion-field">
+          <label class="diffusion-label" for="filter-categorie">Catégorie</label>
+          <select class="mf-select" id="filter-categorie" {% if staff_mode %}aria-required="true"{% endif %}>
+          </select>
+        </div>
         {% endif %}
-        <div id="filter-format-wrap" class="{% if staff_mode or shared_edit_mode %}staff-format-filter{% endif %}">
+        <div id="filter-format-wrap" class="diffusion-field {% if staff_mode or shared_edit_mode %}staff-format-filter{% endif %}">
+          <label class="diffusion-label" for="filter-format">Format</label>
           <select class="mf-select" id="filter-format">
             <option value="">Tous formats</option>
           </select>
         </div>
       </div>
-      <div id="filtres-liste" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center">
-        <select class="mf-select" id="list-filter-ville">
-        </select>
+      <div id="filtres-liste" class="diffusion-filters" style="display:flex">
+        <div class="diffusion-field">
+          <label class="diffusion-label" for="list-filter-ville">Ville</label>
+          <select class="mf-select" id="list-filter-ville">
+          </select>
+        </div>
         {% if not shared_edit_mode %}
-        <select class="mf-select" id="list-filter-categorie" {% if staff_mode %}aria-required="true"{% endif %}>
-        </select>
+        <div class="diffusion-field">
+          <label class="diffusion-label" for="list-filter-categorie">Catégorie</label>
+          <select class="mf-select" id="list-filter-categorie" {% if staff_mode %}aria-required="true"{% endif %}>
+          </select>
+        </div>
         {% endif %}
-        <div id="list-filter-format-wrap" class="{% if staff_mode or shared_edit_mode %}staff-format-filter{% endif %}">
+        <div id="list-filter-format-wrap" class="diffusion-field {% if staff_mode or shared_edit_mode %}staff-format-filter{% endif %}">
+          <label class="diffusion-label" for="list-filter-format">Format</label>
           <select class="mf-select" id="list-filter-format">
             <option value="">Tous formats</option>
           </select>
@@ -1915,42 +1935,48 @@
       </div>
       {% endif %}
       <div class="cf-block">
-        <div class="cf-block-h"><span class="cf-block-n"></span><b>Quand ?</b><small>Dates de diffusion</small></div>
-      <div class="dates-bar" style="margin-top:0;">
-        <div class="date-input-wrap">
-          <i class="bi bi-calendar-plus" style="color:#10b981"></i>
-          <input type="date" id="date-debut"
-                value="{{ form.date_debut.value|default:'' }}"
-                min="{% now 'Y-m-d' %}" required {% if shared_edit_mode %}disabled aria-label="Date de début non modifiable"{% endif %}>
+        <div class="cf-block-h"><span class="cf-block-n"></span><b>Quand ?</b></div>
+      <div class="dates-bar">
+        <div class="diffusion-field">
+          <label class="diffusion-label" for="date-debut">Date de début</label>
+          <div class="date-input-wrap">
+            <i class="bi bi-calendar-plus" style="color:#10b981"></i>
+            <input type="date" id="date-debut"
+                  value="{{ form.date_debut.value|default:'' }}"
+                  min="{% now 'Y-m-d' %}" required {% if shared_edit_mode %}disabled{% endif %}>
+          </div>
         </div>
 
-        <span class="dates-bar-sep">→</span>
 
-        <div class="date-input-wrap" id="wrap-date-fin">
-          <i class="bi bi-calendar-minus" style="color:#ef4444"></i>
-          <input type="date" id="date-fin"
-                value="{{ form.date_fin.value|default:'' }}"
-                min="{% now 'Y-m-d' %}" required {% if shared_edit_mode %}disabled aria-label="Date de fin non modifiable"{% endif %}>
+        <div class="diffusion-field">
+          <label class="diffusion-label" for="date-fin">Date de fin</label>
+          <div class="date-input-wrap" id="wrap-date-fin">
+            <i class="bi bi-calendar-minus" style="color:#ef4444"></i>
+            <input type="date" id="date-fin"
+                  value="{{ form.date_fin.value|default:'' }}"
+                  min="{% now 'Y-m-d' %}" required {% if shared_edit_mode %}disabled{% endif %}>
+          </div>
         </div>
 
         {% if not shared_edit_mode %}
-        <span class="dates-bar-sep">ou</span>
 
-        <div class="date-input-wrap" id="wrap-duree-jours">
-          <i class="bi bi-hourglass-split" style="color:#f59e0b"></i>
-          <input type="number" id="duree-jours" min="1" step="1" placeholder="Nombre">
-          <span style="font-size:.76rem;color:var(--muted);white-space:nowrap;">jour(s)</span>
+        <div class="diffusion-field">
+          <label class="diffusion-label" for="duree-jours">Durée en jours</label>
+          <div class="date-input-wrap" id="wrap-duree-jours">
+            <i class="bi bi-hourglass-split" style="color:#f59e0b"></i>
+            <input type="number" id="duree-jours" min="1" step="1" placeholder="Ex. 30">
+          </div>
         </div>
         {% endif %}
 
-        <div id="dates-status" class="waiting">
+        <div id="dates-status" class="waiting" role="status">
           <i class="bi bi-info-circle"></i>
           Saisissez les dates pour voir les disponibilités
         </div>
       </div>
 
       {% if staff_mode %}
-      <div id="tarification-faces" style="display:none;margin-top:14px;padding:12px;border:1px solid var(--line);border-radius:10px">
+      <div id="tarification-faces" style="display:none;margin-top:14px;padding:12px;border:1px solid var(--line);border-radius:var(--radius)">
         <strong style="font-size:.84rem">Tarif unitaire par face et par mois (facultatif)</strong>
         <div class="small text-muted mb-2">Un tarif est appliqué à toutes les faces du même format. Facturation par périodes de 30 jours commencées.</div>
         <div id="tarifs-formats-champs"></div>
@@ -2006,7 +2032,7 @@
               <span class="leg-item"><span class="leg-dot" style="background:#10b981"></span>Disponible</span>
               <span class="leg-item"><span class="leg-dot" style="background:#f59e0b"></span>Partiel</span>
               <span class="leg-item"><span class="leg-dot" style="background:#ef4444"></span>Occupé</span>
-              <span class="leg-item"><span class="leg-dot" style="background:#0f3a2d"></span>Sélectionné</span>
+              <span class="leg-item"><span class="leg-dot" style="background:var(--brand)"></span>Sélectionné</span>
             </div>
           </div>
 
@@ -2078,6 +2104,7 @@
   {% endif %}
   {{ initial_selected_faces|json_script:"initial-selected-faces" }}
   {{ initial_tarifs_faces|default_if_none:'{}'|json_script:"initial-tarifs-faces" }}
+  {% if staff_mode %}{{ initial_remises_faces|json_script:"initial-remises-faces" }}{% endif %}
   {% endif %}
 {% endblock %}
 
@@ -2096,7 +2123,7 @@
       ? JSON.parse(document.getElementById('initial-selected-faces').textContent)
       : [];
     const tarifsInitiaux = JSON.parse(
-      document.getElementById('initial-tarifs-faces').textContent
+      document.getElementById('initial-tarifs-faces')?.textContent || '{}'
     );
     const INITIAL_TARIFS_FACES = tarifsInitiaux && typeof tarifsInitiaux === 'object'
       ? tarifsInitiaux
@@ -2130,6 +2157,7 @@
     let checkDispoTimer = null;
 
     const COLORS = {
+      selected: getComputedStyle(document.querySelector('.reservation-page')).getPropertyValue('--color-primary').trim(),
       libre:   '#10b981',
       partiel: '#f59e0b',
       occupe:  '#ef4444',
@@ -2298,7 +2326,7 @@
       features.forEach(f => {
         const p = f.properties;
         const isSelected = isPanierContainsSupport(p.id);
-        const color = isSelected ? '#0f3a2d' : getColor(p);
+        const color = isSelected ? COLORS.selected : getColor(p);
         const marker = L.marker(
           [f.geometry.coordinates[1], f.geometry.coordinates[0]],
           { icon: makeIcon(color, p.type, isSelected) }
@@ -2309,8 +2337,9 @@
       });
     }
 
-    let remisesSaisies = {};
-    let tarifFormats = new Map();
+    const remisesSaisies = JSON.parse(
+      document.getElementById('initial-remises-faces')?.textContent || '{}'
+    ) || {};
     const fmtFcfa = n => new Intl.NumberFormat('fr-FR').format(Math.round(n));
     const toNum = v => { const n = Number(String(v == null ? '' : v).trim().replace(',', '.')); return Number.isFinite(n) ? n : 0; };
     const escHtml = s => { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
@@ -2336,7 +2365,6 @@
         current.count += 1;
         formats.set(item.format_code, current);
       });
-      tarifFormats = formats;
 
       const fields = document.getElementById('tarifs-formats-champs');
       fields.replaceChildren();
@@ -2373,28 +2401,35 @@
         const remise = document.createElement('input');
         remise.type = 'number';
         remise.min = '0';
-        remise.max = '100';
-        remise.step = '1';
+        remise.step = '0.01';
         remise.className = 'nd-in nd-in-sm';
         remise.placeholder = '0';
         remise.setAttribute('aria-label', `Remise ${format.label}`);
-        remise.value = remisesSaisies[code] || '';
-        remise.addEventListener('input', () => {
-          remisesSaisies[code] = remise.value;
+        remise.value = remisesSaisies[code]?.valeur || '';
+        remise.setAttribute('form', 'form-etape1');
+
+        const uniteRemise = document.createElement('select');
+        uniteRemise.className = 'nd-in';
+        uniteRemise.setAttribute('aria-label', `Unité de remise ${format.label}`);
+        uniteRemise.append(new Option('%', 'pourcentage'), new Option('FCFA', 'fcfa'));
+        uniteRemise.value = remisesSaisies[code]?.unite || 'pourcentage';
+        function syncRemise() {
+          remise.max = uniteRemise.value === 'pourcentage' ? '100' : '999999999999.99';
+          remisesSaisies[code] = { valeur: remise.value, unite: uniteRemise.value };
           syncTarifsHidden();
           updateTarifsEstimation();
-        });
+        }
+        remise.max = uniteRemise.value === 'pourcentage' ? '100' : '999999999999.99';
+        remise.addEventListener('input', syncRemise);
+        uniteRemise.addEventListener('change', syncRemise);
 
         const tr = document.createElement('tr');
         tr.dataset.format = code;
         const cName = document.createElement('td');
         cName.innerHTML = `
-          <div class="nd-tarif-support">
-            <div class="nd-support-name">
-              <strong>${escHtml(format.categorie || 'Autres')}</strong>
-              <span>${escHtml(format.label || code)}</span>
-            </div>
-            <span class="nd-pill">${format.count} face${format.count > 1 ? 's' : ''}</span>
+          <div class="nd-support-name">
+            <strong>${escHtml(format.categorie || 'Autres')}</strong>
+            <span>${escHtml(format.label || code)}</span>
           </div>
         `;
         const cCount = document.createElement('td');
@@ -2406,10 +2441,10 @@
         unit.textContent = 'FCFA';
         cPrice.append(input, unit);
         const cRemise = document.createElement('td');
-        const pct = document.createElement('span');
-        pct.className = 'nd-unit';
-        pct.textContent = '%';
-        cRemise.append(remise, pct);
+        const remiseControl = document.createElement('div');
+        remiseControl.className = 'nd-remise';
+        remiseControl.append(remise, uniteRemise);
+        cRemise.appendChild(remiseControl);
         const cMontant = document.createElement('td');
         cMontant.className = 'num';
         const montant = document.createElement('span');
@@ -2443,8 +2478,12 @@
 
       let total = 0;
       Object.keys(counts).forEach(code => {
-        const remise = Math.min(100, Math.max(0, toNum(remisesSaisies[code])));
-        const montant = months ? toNum(tarifsSaisis[code]) * counts[code] * months * (1 - remise / 100) : 0;
+        const prix = toNum(tarifsSaisis[code]);
+        const remise = remisesSaisies[code];
+        const valeur = Math.max(0, toNum(remise?.valeur));
+        const reduction = remise?.unite === 'fcfa' ? valeur : prix * Math.min(100, valeur) / 100;
+        const prixNet = Math.round(Math.max(0, prix - reduction) * 100) / 100;
+        const montant = prixNet * counts[code] * months;
         total += montant;
         const row = document.querySelector(`#tarifs-formats-champs tr[data-format="${code}"] [data-montant]`);
         if (row) row.textContent = `${fmtFcfa(montant)} FCFA`;
@@ -2460,13 +2499,8 @@
       if (totalEl) totalEl.textContent = `${fmtFcfa(total)} FCFA`;
 
       if (recap) {
-        const lines = [];
-        tarifFormats.forEach(format => {
-          lines.push(`${escHtml(format.label)} : ${format.count} face${format.count > 1 ? 's' : ''}`);
-        });
-        recap.innerHTML = lines.length
-          ? `Pour ${lines.join(', ')}`
-          : 'Aucune face sélectionnée';
+        const hasPrices = Object.keys(counts).some(code => tarifsSaisis[code]);
+        recap.textContent = hasPrices && months ? `${fmtFcfa(total)} FCFA` : '';
       }
     }
 
@@ -2506,7 +2540,7 @@
       });
 
       const noteDate = !SHARED_EDIT_MODE && !datesOk
-        ? `<div style="margin-top:8px;padding:5px 8px;background:#fef9c3;border-radius:5px;
+        ? `<div style="margin-top:8px;padding:5px 8px;background:#fef9c3;border-radius:var(--radius);
                       font-size:.68rem;color:#854d0e;display:flex;align-items:center;gap:5px;">
             <i class="bi bi-calendar-event"></i>Saisissez la période pour valider la disponibilité.
           </div>` : '';
@@ -2966,6 +3000,15 @@
       const hf = document.getElementById('hidden-date-fin');
       if (hd) hd.value = elDateDebut ? elDateDebut.value : '';
       if (hf) hf.value = elDateFin   ? elDateFin.value   : '';
+      {% if staff_mode %}
+      const period = document.getElementById('nd-period');
+      const start = elDateDebut.valueAsDate;
+      const end = elDateFin.valueAsDate;
+      period.textContent = start && end && end > start
+        ? 'Du ' + start.toLocaleDateString('fr-FR', { timeZone: 'UTC' }) +
+          ' au ' + end.toLocaleDateString('fr-FR', { timeZone: 'UTC' })
+        : 'Période à définir';
+      {% endif %}
     }
 
     function setDatesStatus(state, text) {
@@ -3015,6 +3058,7 @@
     // ⭐ NOUVEAU : revalide des dates déjà présentes (retour arrière depuis étape 2/3)
     // SANS vider le panier pré-chargé depuis le serveur, contrairement à onDatesChange().
     function initDatesFromServer() {
+      {% if staff_mode %}syncHiddenDates();{% endif %}
       const d1 = elDateDebut ? elDateDebut.value : '';
       const d2 = elDateFin   ? elDateFin.value   : '';
       if (!d1 || !d2) return;
@@ -3045,7 +3089,8 @@
           datesOk = true;
           const nbTotal  = allFeatures.filter(f => f.properties.type === 'panneau').reduce((acc, f) => acc + (f.properties.faces || []).length, 0);
           const nbLibres = nbTotal - facesOccupees.size;
-          setDatesStatus('ok', `${nbLibres} face${nbLibres > 1 ? 's' : ''} disponible${nbLibres > 1 ? 's' : ''} sur cette période`);
+          const plural = nbLibres === 1 ? '' : 's';
+          setDatesStatus('ok', `${nbLibres.toLocaleString('fr-FR')} face${plural} disponible${plural} pour les dates choisies`);
           refreshAll();
         })
         .catch(err => {
@@ -3141,7 +3186,7 @@
         const marker = markersMap[String(p.id)];
         if (!marker) return;
         const isSel = isPanierContainsSupport(p.id);
-        marker.setIcon(makeIcon(isSel ? '#0f3a2d' : getColor(p), 'panneau', isSel));
+        marker.setIcon(makeIcon(isSel ? COLORS.selected : getColor(p), 'panneau', isSel));
       });
     }
 
@@ -3279,7 +3324,7 @@
   function initAccountSelect(id, placeholder, emptyText) {
     const select = document.getElementById(id);
     if (!select || typeof TomSelect === 'undefined' || select.tomselect) return;
-    new TomSelect(select, {
+    const control = new TomSelect(select, {
       create: false,
       maxItems: 1,
       allowEmptyOption: true,
@@ -3307,6 +3352,7 @@
         }
       }
     });
+    control.wrapper.classList.remove('form-control-e3', 'staff-field-control');
   }
 
   initAccountSelect('id_client', 'Rechercher un client…', 'Aucun client trouvé pour');

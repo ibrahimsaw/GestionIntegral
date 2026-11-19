@@ -4677,7 +4677,7 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
         
         self.object = form.save()
         if demande:
-            self.object.prix_faces_par_format = demande.prix_faces_par_format
+            self.object.prix_faces_par_format = demande.prix_nets_faces_par_format
             self.object.save(update_fields=['prix_faces_par_format'])
         elif form.reservation_source:
             self.object.prix_faces_par_format = (
@@ -6673,6 +6673,7 @@ from campaigns.models import (
     ReservationLigne,
     STATUT_EN_ATTENTE,
     STATUT_CONFIRMEE,
+    tarif_mensuel_net,
 )
 from inventory.models import FacePanneau, Support
 
@@ -6991,6 +6992,7 @@ class StaffDemandeWizardBase(StaffRequiredMixin, View):
     session_supports_key = 'gestion_demande_supports'
     session_period_key = 'gestion_demande_periode'
     session_prices_key = 'gestion_demande_prix_faces'
+    session_discounts_key = 'gestion_demande_remises_faces'
     session_project_key = 'gestion_demande_projet'
     session_contact_key = 'gestion_demande_contact'
     session_edit_key = 'gestion_demande_edit_uuid'
@@ -7025,6 +7027,7 @@ class StaffDemandeWizardBase(StaffRequiredMixin, View):
             self.session_supports_key,
             self.session_period_key,
             self.session_prices_key,
+            self.session_discounts_key,
             self.session_project_key,
             self.session_contact_key,
             self.session_edit_key,
@@ -7200,6 +7203,7 @@ class DemandeCreationView(StaffDemandeWizardBase):
             panier=faces,
             initial_selected_faces=initial_selected_faces,
             initial_tarifs_faces=request.session.get(self.session_prices_key, {}),
+            initial_remises_faces=request.session.get(self.session_discounts_key, {}),
             filtres=filtres,
             nom_campagne=request.session.get(self.session_project_key, {}).get('nom_campagne', ''),
             client_contact_data=json.dumps(client_contact_data),
@@ -7291,6 +7295,38 @@ class DemandeCreationView(StaffDemandeWizardBase):
                 except (InvalidOperation, ValueError):
                     tarifs_valides = False
             request.session[self.session_prices_key] = tarifs
+            try:
+                posted_remises = json.loads(request.POST.get('remises_faces_par_format') or '{}')
+                if not isinstance(posted_remises, dict):
+                    raise ValueError
+                remises = {}
+                for code in formats_attendus & posted_remises.keys():
+                    remise = posted_remises[code]
+                    if not isinstance(remise, dict):
+                        raise ValueError
+                    value = str(remise.get('valeur', '')).strip()
+                    if not value:
+                        continue
+                    unite = remise.get('unite')
+                    valeur = Decimal(value.replace(',', '.'))
+                    maximum = Decimal('100') if unite == 'pourcentage' else Decimal('999999999999.99')
+                    if (
+                        unite not in ('pourcentage', 'fcfa')
+                        or not valeur.is_finite()
+                        or not 0 <= valeur <= maximum
+                        or valeur.as_tuple().exponent < -2
+                        or (valeur and code not in tarifs)
+                    ):
+                        raise ValueError
+                    remises[code] = {'unite': unite, 'valeur': str(valeur)}
+            except (InvalidOperation, TypeError, ValueError):
+                selection_form.add_error(
+                    None,
+                    "Renseignez un tarif et une remise valide pour chaque format concerné (0 à 100 % ou un montant positif en FCFA).",
+                )
+                forms_valid = False
+            else:
+                request.session[self.session_discounts_key] = remises
             if not tarifs_valides:
                 selection_form.add_error(
                     None,
@@ -7359,6 +7395,7 @@ class DemandeCreationEtape2View(StaffDemandeWizardBase):
         days = (date.fromisoformat(date_fin) - date.fromisoformat(date_debut)).days + 1
         project = request.session.get(self.session_project_key, {})
         tarifs = request.session.get(self.session_prices_key, {})
+        remises = request.session.get(self.session_discounts_key, {})
         formats = {
             item.code: item
             for item in FormatSupport.objects.filter(
@@ -7375,7 +7412,8 @@ class DemandeCreationEtape2View(StaffDemandeWizardBase):
             if not faces_format:
                 continue
             try:
-                montant = Decimal(str(prix)) * len(faces_format) * mois_factures
+                prix_net = tarif_mensuel_net(prix, remises.get(code))
+                montant = prix_net * len(faces_format) * mois_factures
             except (InvalidOperation, ValueError):
                 montant = Decimal('0.00')
             total_faces += montant
@@ -7392,6 +7430,7 @@ class DemandeCreationEtape2View(StaffDemandeWizardBase):
                 ),
                 'prix': prix,
                 'quantite': len(faces_format),
+                'remise': remises.get(code),
                 'total': montant,
             })
         return self.step_context(
@@ -7516,6 +7555,9 @@ class DemandeCreationEtape2View(StaffDemandeWizardBase):
                 demande.message = context['project'].get('message', '')
                 demande.prix_faces_par_format = request.session.get(
                     self.session_prices_key, {}
+                )
+                demande.remises_faces_par_format = request.session.get(
+                    self.session_discounts_key, {}
                 )
                 # Coordonnées facultatives à l'étape 1 : on ne les exige pas ici.
                 demande.full_clean(exclude=['reference', 'nom_contact', 'email', 'telephone'])
@@ -7686,6 +7728,9 @@ class DemandeModifierView(StaffRequiredMixin, View):
         request.session[StaffDemandeWizardBase.session_prices_key] = (
             demande.prix_faces_par_format or {}
         )
+        request.session[StaffDemandeWizardBase.session_discounts_key] = (
+            demande.remises_faces_par_format or {}
+        )
         request.session[StaffDemandeWizardBase.session_project_key] = {
             'nom_campagne': demande.nom_campagne,
             'message': demande.message,
@@ -7820,7 +7865,7 @@ class DemandeValiderView(LoginRequiredMixin, View):
                     client=client,
                     date_debut=date_debut_dt,
                     date_fin=date_fin_dt,
-                    prix_faces_par_format=demande.prix_faces_par_format,
+                    prix_faces_par_format=demande.prix_nets_faces_par_format,
                     created_by=request.user,
                     notes=(
                         f"Créée depuis la demande {demande.reference}.\n{demande.message}"

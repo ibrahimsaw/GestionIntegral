@@ -35,10 +35,14 @@ def catalogue_confreres():
     for support in supports:
         confrere = catalogue.get(support.confrere_id)
         if confrere:
+            ligne = ligne_support_confrere(support, list(support.codes_faces))
+            format_support = support.format
+            mesure = f' ({format_support.superficie:g} m²)' if format_support and format_support.superficie else ''
             confrere['supports'].append({
-                **ligne_support_confrere(support, list(support.codes_faces)),
+                **ligne,
                 'categorie': support.categorie_affichee,
-                'format_code': support.format.code if support.format_id else '',
+                'format_code': format_support.code if format_support else '',
+                'format_filtre': ligne['format'] + mesure,
             })
     return list(catalogue.values())
 
@@ -60,6 +64,19 @@ def verifier_supports_confreres(demande, lignes):
     ).order_by('pk')
     if set(supports.values_list('pk', flat=True)) != nouveaux_supports:
         raise ValidationError("Un support confrère a été retiré. Revenez à l'étape 1 pour modifier la sélection.")
+
+
+def lignes_recap_confreres(panneaux, tarifs=None):
+    tarifs = tarifs or {}
+    return [
+        {
+            **panneau,
+            'face': face,
+            'tarif': tarifs.get(f"confrere:{panneau['format']}"),
+        }
+        for panneau in panneaux
+        for face in (panneau.get('faces') or [None])
+    ]
 
 
 def statut_validation_confreres(demande):

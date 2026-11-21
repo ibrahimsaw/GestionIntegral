@@ -1242,6 +1242,11 @@
   }
   .confrere-actions .confrere-add { border-color: var(--brand); background: var(--brand); color: white; }
   .confrere-status { color: var(--brand); font-size: .82rem; font-weight: 700; }
+  #catalogue-supports[hidden], #catalogue-format-wrap[hidden],
+  #catalogue-recherche-wrap[hidden], #catalogue-recherche-vide[hidden] { display: none; }
+  #catalogue-supports .face-btn.confrere-choice { border-color: var(--line-strong); color: var(--ink); }
+  #catalogue-supports .face-btn.confrere-choice:hover { border-color: var(--brand); }
+  #catalogue-supports .confrere-choice .fb-badge { background: var(--wash); color: var(--muted); }
   #parc-integral-list[hidden], #confrere-panel[hidden] { display: none; }
   .cf-block #tarification-faces { margin-top: 14px; background: #fcfcfb; }
   .emp-search {
@@ -1687,14 +1692,18 @@
             <p class="cf-sub">La disponibilité de ce panneau se confirme auprès du confrère.</p>
             {% if catalogue_confreres %}
             <div class="nd-campaign-fields mb-3">
-              <div class="nd-fld"><label for="catalogue-confrere">Confrère enregistré</label><select id="catalogue-confrere" class="form-select"><option value="">Choisir un confrère</option></select></div>
+              <div class="nd-fld"><label for="catalogue-ville">Ville / localité</label><select id="catalogue-ville" class="form-select"><option value="">Choisir une ville</option></select></div>
+              <div class="nd-fld"><label for="catalogue-confrere">Confrère</label><select id="catalogue-confrere" class="form-select" disabled><option value="">Choisir un confrère</option></select></div>
               <div class="nd-fld"><label for="catalogue-categorie">Catégorie</label><select id="catalogue-categorie" class="form-select" disabled><option value="">Choisir une catégorie</option></select></div>
-              <div class="nd-fld"><label for="catalogue-format">Format</label><select id="catalogue-format" class="form-select" disabled><option value="">Choisir un format</option></select></div>
-              <div class="nd-fld"><label for="catalogue-support">Support</label><select id="catalogue-support" class="form-select" disabled><option value="">Choisir un support</option></select></div>
+              <div id="catalogue-format-wrap" class="nd-fld" hidden><label for="catalogue-format">Format</label><select id="catalogue-format" class="form-select" disabled><option value="">Tous formats</option></select></div>
             </div>
-            <p id="catalogue-confrere-vide" class="cf-sub" hidden>Aucun support enregistré pour ce confrère.</p>
-            <fieldset id="catalogue-faces" hidden><legend class="fs-6">Faces à ajouter</legend><div class="d-flex flex-wrap gap-3"></div></fieldset>
-            <div class="confrere-actions"><button type="button" id="catalogue-ajouter" class="diffusion-source confrere-add" disabled>Ajouter les faces choisies</button></div>
+            <p id="catalogue-couverture" class="cf-sub" role="status">Choisis une ville pour voir les confrères qui y ont des supports.</p>
+            <div id="catalogue-recherche-wrap" class="emp-search mb-3" hidden>
+              <i class="bi bi-search" aria-hidden="true"></i>
+              <input type="search" class="list-search" id="catalogue-recherche" placeholder="Rechercher une référence ou un emplacement…" aria-label="Rechercher un support confrère par référence ou emplacement">
+            </div>
+            <p id="catalogue-recherche-vide" class="cf-sub" role="status" hidden>Aucun support ne correspond à cette recherche.</p>
+            <div id="catalogue-supports" class="liste-grid mb-3" aria-label="Supports du confrère" hidden></div>
             {% endif %}
             <details id="confrere-saisie-manuelle" class="mt-3">
             <summary class="fw-semibold mb-2">Saisie manuelle</summary>
@@ -1730,7 +1739,6 @@
             </div>
             </details>
             <div id="confrere-status" class="confrere-status" role="status"></div>
-            <ul id="confrere-list" class="list-unstyled mb-0"></ul>
           </div>
 
           <div id="parc-integral-list" class="resa-grid"{% if show_confrere %} hidden{% endif %}>
@@ -1871,6 +1879,7 @@
               <i class="bi bi-map"></i>
               <p>Cliquez sur une face libre pour l'ajouter.</p>
             </div>
+            <ul id="confrere-list" class="list-unstyled mb-0" aria-label="Emplacements du Réseau Confrère"></ul>
           </div>
         </div>
       </div>
@@ -2189,6 +2198,7 @@
   {% if staff_mode %}
     {{ panneaux_confreres|json_script:"initial-confreres" }}
     {{ catalogue_confreres|json_script:"catalogue-confreres-data" }}
+    {{ villes_parc_integral|json_script:"catalogue-villes-integral" }}
   {% endif %}
   {% endif %}
 {% endblock %}
@@ -2813,6 +2823,12 @@
       return ordreCategories.get(cle) ?? ordreCategories.size;
     }
 
+    function compareCategories(first, second, counts) {
+      return rangCategorie(first) - rangCategorie(second) ||
+        counts.get(second) - counts.get(first) ||
+        String(first).localeCompare(String(second), 'fr', { sensitivity: 'base' });
+    }
+
     function refreshFacetSelects(prefix) {
       const elVille     = document.getElementById(prefix + 'ville');
       const elCategorie = document.getElementById(prefix + 'categorie');
@@ -2849,10 +2865,9 @@
         Array.from(values.entries())
           .sort((a, b) => {
             if (field === 'categorie') {
-              const difference = rangCategorie(a[1]) - rangCategorie(b[1]);
-              if (difference) return difference;
+              return compareCategories(a[0], b[0], counts);
             }
-            if (field === 'ville' || field === 'categorie') {
+            if (field === 'ville') {
               return counts.get(b[0]) - counts.get(a[0])
                 || String(a[1]).localeCompare(String(b[1]), 'fr', { sensitivity: 'base' });
             }
@@ -3108,6 +3123,9 @@
       document.getElementById('parc-integral-list').hidden = showConfrere;
       confrerePanel.hidden = !showConfrere;
     });
+    let clearConfrereSelection;
+    let refreshConfrereAvailability;
+    let occupationsConfreres = {};
     if (confrerePanel) {
       const saisieManuelle = document.getElementById('confrere-saisie-manuelle');
       const add = document.getElementById('confrere-add');
@@ -3159,128 +3177,253 @@
         list.replaceChildren();
         panneauxConfreres.forEach((panneau, index) => {
           const ligne = document.createElement('li');
-          ligne.className = 'border-top mt-3 pt-2';
-          const libelle = document.createElement('strong');
-          libelle.textContent = `${panneau.format} · ${panneau.nombre_faces} face${panneau.nombre_faces === 1 ? '' : 's'}`;
+          ligne.className = 'panier-item';
+          const faceIcon = document.createElement('div');
+          faceIcon.className = 'pi-icon';
+          faceIcon.textContent = panneau.nombre_faces;
+          faceIcon.setAttribute('aria-hidden', 'true');
+          const info = document.createElement('div');
+          info.className = 'pi-info';
+          const libelle = document.createElement('div');
+          libelle.className = 'pi-code';
+          libelle.textContent = [panneau.reference || panneau.nom, panneau.format].filter(Boolean).join(' · ');
           const lieu = document.createElement('div');
-          lieu.textContent = [panneau.nom, panneau.reference, panneau.ville, panneau.emplacement, panneau.faces?.join(', ')].filter(Boolean).join(' · ');
+          lieu.className = 'pi-addr';
+          lieu.textContent = [panneau.reference ? panneau.nom : '', panneau.ville, panneau.emplacement].filter(Boolean).join(' · ');
+          lieu.title = lieu.textContent;
+          const faces = document.createElement('div');
+          faces.className = 'pi-addr';
+          faces.textContent = panneau.faces?.length ? `Faces ${panneau.faces.join(', ')}`
+            : `${panneau.nombre_faces} face${panneau.nombre_faces === 1 ? '' : 's'}`;
+          info.append(libelle, lieu, faces);
           const actions = document.createElement('div');
-          actions.className = 'confrere-actions';
+          actions.className = 'd-flex gap-1';
           const edit = document.createElement('button');
           edit.type = 'button';
-          edit.className = 'diffusion-source';
-          edit.textContent = 'Modifier';
+          edit.className = 'pi-remove';
+          edit.innerHTML = '<i class="bi bi-pencil" aria-hidden="true"></i>';
+          edit.title = 'Modifier';
+          edit.setAttribute('aria-label', `Modifier ${panneau.nom}`);
           edit.addEventListener('click', () => {
+            confrerePanel.closest('details')?.setAttribute('open', '');
+            document.querySelector('[data-source="confrere"]')?.click();
             loadConfrereEditor(index);
             identityInputs[0].focus();
           });
           const remove = document.createElement('button');
           remove.type = 'button';
-          remove.className = 'diffusion-source';
-          remove.textContent = 'Retirer';
+          remove.className = 'pi-remove';
+          remove.innerHTML = '<i class="bi bi-x" aria-hidden="true"></i>';
+          remove.title = 'Retirer';
+          remove.setAttribute('aria-label', `Retirer ${panneau.reference || panneau.nom}`);
           remove.addEventListener('click', () => {
             panneauxConfreres.splice(index, 1);
             if (editing === index) loadConfrereEditor(null);
             else if (editing !== null && editing > index) editing -= 1;
             renderConfreres();
-            status.textContent = 'Format retiré';
-            (saisieManuelle.open ? add : saisieManuelle.querySelector('summary')).focus();
+            status.textContent = 'Emplacement retiré';
+            (list.querySelector('button') || document.querySelector('[data-source="confrere"]'))?.focus();
           });
           if (!panneau.support_id) actions.append(edit);
           actions.append(remove);
-          ligne.append(libelle, lieu, actions);
+          ligne.append(faceIcon, info, actions);
           list.append(ligne);
         });
         hidden.value = JSON.stringify(panneauxConfreres);
         renderTarifsFaces();
-        updateContinueButton(Object.keys(panier).length);
-        refreshCatalogueFaces();
-      }
-
-      const catalogue = JSON.parse(document.getElementById('catalogue-confreres-data')?.textContent || '[]');
-      const confrereSelect = document.getElementById('catalogue-confrere');
-      const categorySelect = document.getElementById('catalogue-categorie');
-      const formatSelect = document.getElementById('catalogue-format');
-      const supportSelect = document.getElementById('catalogue-support');
-      const facePicker = document.getElementById('catalogue-faces');
-      const addCatalogue = document.getElementById('catalogue-ajouter');
-      const noSupports = document.getElementById('catalogue-confrere-vide');
-      const confreresById = new Map(catalogue.map(confrere => [String(confrere.id), confrere]));
-      const availableSupports = () => confreresById.get(confrereSelect.value)?.supports || [];
-      const categoryKey = support => support.categorie || 'Sans catégorie';
-      const formatKey = support => support.format_code ? 'code:' + support.format_code : 'libelle:' + support.format;
-      const categorySupports = () => availableSupports().filter(support => categoryKey(support) === categorySelect.value);
-      const formatSupports = () => categorySupports().filter(support => formatKey(support) === formatSelect.value);
-      const selectedSupport = () => formatSupports().find(item => String(item.support_id) === supportSelect.value);
-
-      function populateCatalogueSelect(select, placeholder, options) {
-        select.replaceChildren(new Option(placeholder, ''));
-        for (const [value, label] of options) select.add(new Option(label, value));
-        select.disabled = select.options.length === 1;
-      }
-
-      function refreshCatalogueSupports() {
-        populateCatalogueSelect(supportSelect, 'Choisir un support', formatSupports().map(support => [
-          support.support_id, [support.reference, support.nom_support || support.emplacement].filter(Boolean).join(' · ')
-        ]));
-        refreshCatalogueFaces();
-      }
-
-      function refreshCatalogueFormats() {
-        const formats = new Map(categorySupports().map(support => [formatKey(support), support.format]));
-        populateCatalogueSelect(formatSelect, 'Choisir un format', formats);
+        updatePanierCount(Object.keys(panier).length);
         refreshCatalogueSupports();
       }
 
-      function refreshCatalogueFaces() {
-        if (!facePicker) return;
-        const support = selectedSupport();
-        facePicker.hidden = !support;
-        const options = facePicker.querySelector('div');
-        options.replaceChildren();
-        addCatalogue.disabled = true;
-        if (!support) return;
-        const added = new Set(panneauxConfreres.filter(item => item.support_id === support.support_id).flatMap(item => item.faces));
-        for (const face of support.faces) {
-          const label = document.createElement('label');
-          const checkbox = document.createElement('input');
-          checkbox.type = 'checkbox';
-          checkbox.value = face;
-          checkbox.disabled = added.has(face);
-          label.append(checkbox, ` Face ${face}`);
-          options.append(label);
+      clearConfrereSelection = () => {
+        panneauxConfreres.length = 0;
+        loadConfrereEditor(null);
+        renderConfreres();
+      };
+
+      refreshConfrereAvailability = () => {
+        let removed = 0;
+        for (let index = panneauxConfreres.length - 1; index >= 0; index--) {
+          const support = panneauxConfreres[index];
+          if (!support.support_id) continue;
+          const faces = support.faces.filter(face => !occupationsConfreres[`${support.support_id}:${face}`]);
+          removed += support.faces.length - faces.length;
+          if (faces.length) {
+            Object.assign(support, { faces, nombre_faces: faces.length });
+          } else {
+            panneauxConfreres.splice(index, 1);
+            if (editing !== null && editing > index) editing -= 1;
+          }
+        }
+        if (removed) renderConfreres();
+        else refreshCatalogueSupports();
+        return removed;
+      };
+
+      const catalogue = JSON.parse(document.getElementById('catalogue-confreres-data')?.textContent || '[]');
+      const citySelect = document.getElementById('catalogue-ville');
+      const confrereSelect = document.getElementById('catalogue-confrere');
+      const categorySelect = document.getElementById('catalogue-categorie');
+      const formatSelect = document.getElementById('catalogue-format');
+      const formatWrap = document.getElementById('catalogue-format-wrap');
+      const supportGrid = document.getElementById('catalogue-supports');
+      const searchWrap = document.getElementById('catalogue-recherche-wrap');
+      const searchInput = document.getElementById('catalogue-recherche');
+      const noSearchResult = document.getElementById('catalogue-recherche-vide');
+      const coverage = document.getElementById('catalogue-couverture');
+      const cityKey = value => String(value || '').normalize('NFKD').replace(/\p{M}/gu, '')
+        .toLocaleLowerCase('fr').replace(/[\s\-–‑]+/g, ' ').trim();
+      const integralCities = new Set(
+        JSON.parse(document.getElementById('catalogue-villes-integral')?.textContent || '[]').map(cityKey)
+      );
+      const cities = new Map();
+      for (const confrere of catalogue) {
+        for (const support of confrere.supports) {
+          const key = cityKey(support.ville);
+          if (!key) continue;
+          if (!cities.has(key)) cities.set(key, { label: support.ville.trim(), confreres: new Map() });
+          const partenaires = cities.get(key).confreres;
+          const id = String(confrere.id);
+          if (!partenaires.has(id)) partenaires.set(id, { nom: confrere.nom, supports: [] });
+          partenaires.get(id).supports.push(support);
         }
       }
+      const selectedCity = () => cities.get(citySelect.value);
+      const availableSupports = () => selectedCity()?.confreres.get(confrereSelect.value)?.supports || [];
+      const categoryKey = support => support.categorie || 'Sans catégorie';
+      const formatKey = support => support.format_code ? 'code:' + support.format_code : 'libelle:' + support.format;
+      const categorySupports = () => availableSupports().filter(support => categoryKey(support) === categorySelect.value);
+      const formatSupports = () => categorySupports().filter(support => !formatSelect.value || formatKey(support) === formatSelect.value);
 
-      if (confrereSelect) {
-        catalogue.forEach(confrere => confrereSelect.add(new Option(confrere.nom, confrere.id)));
-        confrereSelect.addEventListener('change', () => {
+      function populateCatalogueSelect(select, placeholder, options) {
+        select.replaceChildren(...(placeholder ? [new Option(placeholder, '')] : []));
+        for (const [value, label] of options) select.add(new Option(label, value));
+        select.disabled = options.length === 0;
+      }
+
+      function refreshCatalogueSupports() {
+        if (!supportGrid) return;
+        const available = formatSupports();
+        const words = cityKey(searchInput.value).split(' ').filter(Boolean);
+        const supports = words.length ? available.filter(support => {
+          const searchable = cityKey([support.reference, support.nom_support, support.emplacement].filter(Boolean).join(' '));
+          return words.every(word => searchable.includes(word));
+        }) : available;
+        searchWrap.hidden = available.length === 0;
+        noSearchResult.hidden = !available.length || supports.length > 0;
+        supportGrid.hidden = supports.length === 0;
+        supportGrid.replaceChildren(...supports.map(buildCatalogueCard));
+      }
+
+      function refreshCatalogueFormats() {
+        const formats = new Map(categorySupports().map(support => [formatKey(support), support.format_filtre || support.format]));
+        const options = [...formats].sort((a, b) => compareFormatLabels(a[1], b[1]));
+        formatWrap.hidden = options.length <= 1;
+        populateCatalogueSelect(formatSelect, 'Tous formats', options);
+        refreshCatalogueSupports();
+      }
+
+      function buildCatalogueCard(support) {
+        const selected = panneauxConfreres.find(item => item.support_id === support.support_id);
+        const card = document.createElement('article');
+        card.className = 'support-card' + (selected ? ' has-selected' : '');
+        const header = document.createElement('div');
+        header.className = 'sc-header sc-info';
+        const fields = [
+          ['sc-code', support.reference], ['sc-format', support.format],
+          ['sc-nom', support.nom_support], ['sc-quartier', support.emplacement]
+        ];
+        for (const [className, value] of fields) {
+          if (!value) continue;
+          const element = document.createElement('div');
+          element.className = className;
+          element.textContent = value;
+          header.append(element);
+        }
+        const buttons = document.createElement('div');
+        buttons.className = 'sc-faces';
+        for (const face of support.faces) {
+          const isSelected = selected?.faces.includes(face) || false;
+          const occupation = occupationsConfreres[`${support.support_id}:${face}`];
+          const button = document.createElement('button');
+          button.type = 'button';
+          button.id = `catalogue-face-${support.support_id}-${face}`;
+          button.className = 'face-btn ' + (isSelected ? 'selected' : occupation?.statut || 'confrere-choice');
+          button.disabled = Boolean(occupation && !isSelected);
+          if (occupation?.info) button.title = occupation.info;
+          button.setAttribute('aria-pressed', String(isSelected));
+          button.setAttribute('aria-label', `Face ${face} · ${support.reference}`);
+          const name = document.createElement('span');
+          name.className = 'fb-left';
+          name.textContent = `Face ${face}`;
+          const badge = document.createElement('span');
+          badge.className = 'fb-badge';
+          badge.textContent = isSelected ? 'Sélectionnée' : (occupation?.info || 'À confirmer');
+          button.append(name, badge);
+          button.addEventListener('click', () => {
+            const index = panneauxConfreres.findIndex(item => item.support_id === support.support_id);
+            const previous = index < 0 ? [] : panneauxConfreres[index].faces;
+            const faces = previous.includes(face) ? previous.filter(code => code !== face) : [...previous, face];
+            if (index < 0) {
+              panneauxConfreres.push({ ...support, faces, nombre_faces: faces.length });
+            } else if (faces.length) {
+              Object.assign(panneauxConfreres[index], { faces, nombre_faces: faces.length });
+            } else {
+              panneauxConfreres.splice(index, 1);
+              if (editing !== null && editing > index) editing -= 1;
+            }
+            status.textContent = isSelected ? 'Face retirée de la demande' : 'Face ajoutée à la demande';
+            renderConfreres();
+            document.getElementById(button.id)?.focus();
+          });
+          buttons.append(button);
+        }
+        card.append(header, buttons);
+        return card;
+      }
+
+      if (citySelect) {
+        function refreshCatalogueCategories() {
           const supports = availableSupports();
-          const categories = [...new Set(supports.map(categoryKey))].sort((a, b) => a.localeCompare(b, 'fr'));
-          noSupports.hidden = !confrereSelect.value || supports.length > 0;
-          populateCatalogueSelect(categorySelect, 'Choisir une catégorie', categories.map(category => [category, category]));
+          const counts = new Map();
+          for (const support of supports) {
+            const category = categoryKey(support);
+            counts.set(category, (counts.get(category) || 0) + 1);
+          }
+          const categories = [...counts.keys()].sort((a, b) => compareCategories(a, b, counts));
+          populateCatalogueSelect(categorySelect, categories.length ? null : 'Choisir une catégorie',
+            categories.map(category => [category, category]));
           refreshCatalogueFormats();
-        });
+        }
+
+        function refreshCataloguePartners() {
+          searchInput.value = '';
+          const city = selectedCity();
+          const partners = city ? [...city.confreres] : [];
+          populateCatalogueSelect(confrereSelect, 'Choisir un confrère', partners.map(([id, item]) => [
+            id, `${item.nom} · ${item.supports.length} support${item.supports.length === 1 ? '' : 's'}`
+          ]));
+          if (partners.length === 1) confrereSelect.value = partners[0][0];
+          if (city) {
+            const count = partners.reduce((sum, [, item]) => sum + item.supports.length, 0);
+            coverage.textContent = `${partners.length} confrère${partners.length === 1 ? '' : 's'} · ${count} support${count === 1 ? '' : 's'} à ${city.label}`;
+          } else {
+            coverage.textContent = cities.size ? 'Choisis une ville pour voir les confrères qui y ont des supports.'
+              : 'Aucun support confrère avec une ville renseignée.';
+          }
+          refreshCatalogueCategories();
+        }
+
+        const cityOptions = [...cities].sort(([a, first], [b, second]) =>
+          Number(integralCities.has(a)) - Number(integralCities.has(b)) || first.label.localeCompare(second.label, 'fr')
+        ).map(([key, city]) => [key, city.label + (integralCities.has(key) ? '' : ' · Réseau Confrère uniquement')]);
+        populateCatalogueSelect(citySelect, 'Choisir une ville', cityOptions);
+        citySelect.addEventListener('change', refreshCataloguePartners);
+        confrereSelect.addEventListener('change', refreshCatalogueCategories);
         categorySelect.addEventListener('change', refreshCatalogueFormats);
         formatSelect.addEventListener('change', refreshCatalogueSupports);
-        supportSelect.addEventListener('change', refreshCatalogueFaces);
-        facePicker.addEventListener('change', () => {
-          addCatalogue.disabled = !facePicker.querySelector('input:checked');
-        });
-        addCatalogue.addEventListener('click', () => {
-          const support = selectedSupport();
-          const faces = Array.from(facePicker.querySelectorAll('input:checked'), checkbox => checkbox.value);
-          if (!support || !faces.length) return;
-          const existing = panneauxConfreres.find(item => item.support_id === support.support_id);
-          if (existing) {
-            existing.faces.push(...faces);
-            existing.nombre_faces = existing.faces.length;
-          } else {
-            panneauxConfreres.push({ ...support, faces, nombre_faces: faces.length });
-          }
-          status.textContent = 'Faces ajoutées à la demande';
-          renderConfreres();
-        });
+        searchInput.addEventListener('input', refreshCatalogueSupports);
+        refreshCataloguePartners();
       }
 
       add.addEventListener('click', () => {
@@ -3410,6 +3553,8 @@
       datesOk = false;
       facesOccupees.clear();
       facesInfo = {};
+      occupationsConfreres = {};
+      refreshConfrereAvailability?.();
       syncHiddenDates();
       const d1 = elDateDebut ? elDateDebut.value : '';
       const d2 = elDateFin   ? elDateFin.value   : '';
@@ -3459,6 +3604,8 @@
             }
           }
           datesOk = true;
+          occupationsConfreres = data.faces_confreres || {};
+          removed += refreshConfrereAvailability?.() || 0;
           const nbLibres = facesData.filter(([, info]) => info?.statut === 'libre').length;
           const plural = nbLibres === 1 ? '' : 's';
           const retrait = removed === 1 ? ' · 1 face occupée retirée de la sélection'
@@ -3509,13 +3656,25 @@
       const externalCount = nombreFacesConfreres();
       const hasExternalPanel = externalCount > 0;
       const datesEntered = elDateDebut?.value && elDateFin?.value && elDateDebut.value < elDateFin.value;
-      const canContinue = count ? datesOk : hasExternalPanel && datesEntered;
+      const hasCatalogueFaces = panneauxConfreres.some(panneau => panneau.support_id);
+      const canContinue = count || hasCatalogueFaces ? datesOk : hasExternalPanel && datesEntered;
       const btnCount = document.getElementById('btn-count');
       const btnCont = document.getElementById('btn-continuer');
       const datesHint = document.getElementById('dates-hint');
       if (btnCount) btnCount.textContent = count + Math.max(0, externalCount);
       if (btnCont) btnCont.disabled = !canContinue;
       if (datesHint) datesHint.classList.toggle('show', Boolean((count || hasExternalPanel) && !datesEntered));
+    }
+
+    function updatePanierCount(count) {
+      const total = count + (clearConfrereSelection ? nombreFacesConfreres() : 0);
+      const countEl = document.getElementById('panier-count');
+      const emptyEl = document.getElementById('panier-empty');
+      const btnVider = document.getElementById('btn-vider-panier');
+      if (countEl) countEl.textContent = total;
+      if (emptyEl) emptyEl.style.display = total ? 'none' : '';
+      if (btnVider) btnVider.style.display = total ? 'flex' : 'none';
+      updateContinueButton(count);
     }
 
     function updatePanier() {
@@ -3526,23 +3685,15 @@
       const emptyEl = document.getElementById('panier-empty');
       if (!bodyEl) return;
 
-      bodyEl.querySelectorAll('.panier-item').forEach(el => el.remove());
-
-      const countEl    = document.getElementById('panier-count');
-      const btnVider   = document.getElementById('btn-vider-panier');
+      bodyEl.querySelectorAll(':scope > .panier-item').forEach(el => el.remove());
       const facesInput = document.getElementById('faces-input');
       renderTarifsFaces();
 
-      if (countEl)    countEl.textContent  = count;
       if (facesInput) facesInput.value     = JSON.stringify(Object.keys(panier));
 
-      updateContinueButton(count);
-      if (btnVider) btnVider.style.display = count > 0 ? 'flex' : 'none';
+      updatePanierCount(count);
 
-      if (count === 0) {
-        if (emptyEl) emptyEl.style.display = '';
-      } else {
-        if (emptyEl) emptyEl.style.display = 'none';
+      if (count) {
         items.forEach(([uuid, item]) => {
           const el = document.createElement('div');
           el.className = 'panier-item';
@@ -3583,7 +3734,9 @@
     }
 
     document.getElementById('btn-vider-panier').addEventListener('click', () => {
-      panier = {}; updatePanier();
+      panier = {};
+      clearConfrereSelection?.();
+      updatePanier();
       if (currentView === 'liste') renderListe();
     });
 

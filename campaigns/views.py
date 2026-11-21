@@ -27,9 +27,10 @@ from accounts.decorators import *
 from accounts.audit import log_action
 from inventory.sorting import cle_code_naturelle, cle_code_support
 from inventory.confrere_catalogue import (
-    catalogue_confreres, ligne_support_confrere, statut_validation_confreres, synchroniser_dossiers_confreres,
+    catalogue_confreres, ligne_support_confrere, lignes_recap_confreres, statut_validation_confreres, synchroniser_dossiers_confreres,
     verifier_supports_confreres,
 )
+from campaigns.confrere_disponibilite import occupations_confreres, verifier_disponibilite_confreres
 from inventory.models import SupportConfrere
 from .models import *
 from inventory.models import (
@@ -4702,6 +4703,21 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
             if not eligible or statut_validation_confreres(demande) != 'confirme':
                 form.add_error(None, 'Cette demande ne peut plus être utilisée pour créer la campagne.')
                 return self.form_invalid(form)
+        lignes_confreres = demande.panneaux_confreres if demande else (
+            self.object.panneaux_confreres if self.object else []
+        )
+        if lignes_confreres:
+            try:
+                verifier_disponibilite_confreres(
+                    lignes_confreres, form.cleaned_data['date_debut'], form.cleaned_data['date_fin'],
+                    demande_id=demande.pk if demande else None,
+                    reservation_id=demande.reservation_id if demande else self.object.demandes_suivi
+                    .exclude(reservation_id=None).values_list('reservation_id', flat=True).first(),
+                    campagne_id=self.object.pk if self.object else None,
+                )
+            except ValidationError as exc:
+                form.add_error(None, exc)
+                return self.form_invalid(form)
         faces_auto_selectionnees = []
         previous_values = {}
         if not is_create:
@@ -5926,7 +5942,7 @@ class ReservationUpdateView(StaffRequiredMixin, View):
             messages.error(request, e.message)
             return redirect(request.path)
 
-        if not face_ids:
+        if not face_ids and not reservation.panneaux_confreres_reserves:
             messages.error(request, "Veuillez sélectionner au moins une face.")
             return redirect(request.path)
 
@@ -5969,6 +5985,12 @@ class ReservationUpdateView(StaffRequiredMixin, View):
         try:
             with transaction.atomic():
                 # Mise à jour des dates de la réservation
+                verifier_disponibilite_confreres(
+                    reservation.panneaux_confreres_reserves, date_debut.date(), date_fin.date(),
+                    reservation_id=reservation.pk,
+                    campagne_id=reservation.demande_origine.exclude(campagne_id=None)
+                    .values_list('campagne_id', flat=True).first(),
+                )
                 reservation.date_debut = date_debut
                 reservation.date_fin   = date_fin
                 reservation.save(update_fields=['date_debut', 'date_fin', 'updated_at'])
@@ -6708,7 +6730,12 @@ def api_check_dispo(request, client_pk):
             if face_status['statut'] not in ('libre', 'panne'):
                 face_status.update(statut='occupe', info='Occupé à cette période')
 
-    return JsonResponse({'faces': result})
+    payload = {'faces': result}
+    if show_occupant:
+        payload['faces_confreres'] = occupations_confreres(
+            date_debut.date(), date_fin.date(), demande_id=edit_demande_id,
+        )
+    return JsonResponse(payload)
 
 
 
@@ -7293,6 +7320,10 @@ class DemandeCreationView(StaffDemandeWizardBase):
             contact_form=contact_form,
             confrere_form=confrere_form,
             catalogue_confreres=catalogue_confreres(),
+            villes_parc_integral=list(
+                Support.objects.filter(actif=True).exclude(ville='').order_by()
+                .values_list('ville', flat=True).distinct()
+            ),
             frais_defaut=request.session.get(self.session_frais_key, {}),
             frais_par_format=request.session.get(self.session_frais_format_key, {}),
             panneaux_confreres=panneaux_confreres,
@@ -7653,6 +7684,7 @@ class DemandeCreationEtape2View(StaffDemandeWizardBase):
             contact=contact_form.cleaned_data,
             project=project,
             panneaux_confreres=panneaux_confreres,
+            confreres_lignes=lignes_recap_confreres(panneaux_confreres, tarifs),
             nombre_emplacements=nombre_faces + len(supports),
             duree_jours=days,
             comptes=comptes_pour_recap(contact_form.cleaned_data),
@@ -7738,6 +7770,12 @@ class DemandeCreationEtape2View(StaffDemandeWizardBase):
                         traite_le=timezone.now(),
                         token_partage=uuid.uuid4(),
                     )
+                verifier_disponibilite_confreres(
+                    context['panneaux_confreres'],
+                    date.fromisoformat(context['periode']['date_debut']),
+                    date.fromisoformat(context['periode']['date_fin']),
+                    demande_id=demande.pk,
+                )
                 verifier_supports_confreres(demande, context['panneaux_confreres'])
                 # En modification d'un prospect, on met à jour sa fiche plutôt
                 # que d'en créer une seconde (compte principal uniquement).
@@ -7846,6 +7884,7 @@ class DemandeDetailView(LoginRequiredMixin, View):
             'demande': demande,
             'campagne_form': DemandeCampagneForm(demande=demande),
             'statut_validation_confreres': statut_validation_confreres(demande),
+            'confreres_lignes': lignes_recap_confreres(demande.panneaux_confreres),
         }
         client_reservations = (
             demande.client
@@ -8068,6 +8107,10 @@ class DemandeValiderView(LoginRequiredMixin, View):
                 if not faces and not panneaux_confreres:
                     messages.error(request, "Impossible de valider : aucune face n'est associée à cette demande.")
                     return redirect('demande_detail', uuid=uuid)
+                verifier_disponibilite_confreres(
+                    panneaux_confreres, demande.date_debut_souhaitee, demande.date_fin_souhaitee,
+                    demande_id=demande.pk,
+                )
 
                 # ── Client ────────────────────────────────────────────────
                 # On ne réutilise un client existant que si son email n'est

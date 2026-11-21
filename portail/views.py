@@ -4,6 +4,8 @@ import logging
 from datetime import date, timedelta
 
 from django.conf import settings
+from inventory.confrere_catalogue import lignes_recap_confreres
+from campaigns.confrere_disponibilite import verifier_disponibilite_confreres
 from django.contrib import messages
 from django.core.cache import cache
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -1862,6 +1864,7 @@ class DemandePartageEtape2View(DemandePartageWizardBase):
             faces=faces,
             supports=supports,
             panneaux_confreres=panneaux_confreres,
+            confreres_lignes=lignes_recap_confreres(panneaux_confreres),
             nombre_emplacements=len(faces) + len(supports) + demande.nombre_faces_confreres,
             periode={
                 'date_debut': state['date_debut'],
@@ -1916,6 +1919,7 @@ class DemandePartageEtape2View(DemandePartageWizardBase):
                     .select_for_update()
                     .get(pk=demande.pk, statut=DemandeReservation.STATUT_BROUILLON)
                 )
+                verifier_disponibilite_confreres(demande.panneaux_confreres, debut, fin, demande_id=demande.pk)
                 reference = data.get('reference_client_saisie', '').strip()
                 client = None
                 if data['type_client'] == DemandeReservation.TYPE_CLIENT_EXISTANT:

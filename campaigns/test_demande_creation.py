@@ -1362,6 +1362,21 @@ class DemandeCreationViewTests(TestCase):
         self.assertEqual(dossier.lignes[0]['nom'], confrere.nom)
         self.assertEqual(dossier.lignes[0]['faces'], ['C'])
         self.assertEqual(demande.nb_emplacements(), 1)
+        disponibilite_url = reverse('api_check_dispo', args=[0])
+        dates = {'date_debut': self.start.isoformat(), 'date_fin': self.end.isoformat()}
+        face_key = f'{support.pk}:C'
+        occupations = self.client.get(disponibilite_url, dates).json()['faces_confreres']
+        self.assertIn(demande.reference, occupations[face_key]['info'])
+        self.assertNotIn(f'{support.pk}:A', occupations)
+        future = self.end + datetime.timedelta(days=40)
+        dates_sans_conflit = {'date_debut': future.isoformat(), 'date_fin': (future + datetime.timedelta(days=2)).isoformat()}
+        self.assertNotIn(face_key, self.client.get(disponibilite_url, dates_sans_conflit).json()['faces_confreres'])
+        self.assertRedirects(self.complete_step_one(
+            faces_selectionnees='[]',
+            panneaux_confreres=json.dumps([{'support_id': support.pk, 'faces': ['C']}]),
+        ), reverse('demande_creation_etape2'))
+        self.complete_step_two()
+        self.assertEqual(DemandeReservation.objects.count(), 1)
         self.assertEqual(dossier.reponse_confrere, 'automatique')
         self.assertIsNotNone(dossier.repondu_le)
         demande.statut = DemandeReservation.STATUT_EN_COURS
@@ -1439,6 +1454,8 @@ class DemandeCreationViewTests(TestCase):
         self.assertEqual(reservation.nb_faces(), 1)
         self.assertFalse(reservation.lignes.exists())
         self.assertEqual(reservation.panneaux_confreres_reserves, dossier.lignes)
+        occupations = self.client.get(disponibilite_url, dates).json()['faces_confreres']
+        self.assertIn(reservation.reference, occupations[face_key]['info'])
         self.assertContains(
             self.client.get(reverse('reservation_detail', args=[reservation.client_id, reservation.pk])),
             support.reference,
@@ -1460,6 +1477,8 @@ class DemandeCreationViewTests(TestCase):
         demande.refresh_from_db()
         self.assertEqual(demande.reservation_id, reservation.pk)
         self.assertEqual(demande.campagne.panneaux_confreres, dossier.lignes)
+        occupations = self.client.get(disponibilite_url, dates).json()['faces_confreres']
+        self.assertIn(demande.campagne.reference, occupations[face_key]['info'])
         self.assertContains(self.client.get(response.url), support.reference)
         support_url = reverse('confrere_support_detail', args=[confrere.pk, support.pk])
         self.assertContains(self.client.get(fiche_url), support_url)
@@ -1493,6 +1512,10 @@ class DemandeCreationViewTests(TestCase):
             ]),
         )
         self.assertRedirects(response, reverse('demande_creation_etape2'))
+        recap = self.client.get(reverse('demande_creation_etape2'))
+        self.assertContains(recap, support_a.reference)
+        self.assertContains(recap, support_b.reference)
+        self.assertEqual([ligne['face'] for ligne in recap.context['confreres_lignes']], ['A', 'A'])
         self.complete_step_two()
         demande = DemandeReservation.objects.get()
         self.assertEqual(demande.nb_emplacements(), 2)

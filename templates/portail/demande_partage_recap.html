@@ -555,9 +555,10 @@
               </div>
             </li>
           {% endfor %}
+          {% with nb_faces=faces|length nb_supports=supports|length %}
           {% for support in supports %}
             <li class="cf-row">
-              <span class="cf-row-idx">{{ forloop.counter|stringformat:"02d" }}</span>
+              <span class="cf-row-idx">{{ forloop.counter|add:nb_faces|stringformat:"02d" }}</span>
               <span class="cf-row-ico"><i class="bi bi-tv"></i></span>
               <div class="cf-row-txt">
                 <div class="cf-row-t">{{ support.code }}</div>
@@ -565,11 +566,21 @@
               </div>
             </li>
           {% endfor %}
+            {% for ligne in confreres_lignes %}
+              <li class="cf-row">
+                <span class="cf-row-idx">{{ forloop.counter|add:nb_faces|add:nb_supports|stringformat:"02d" }}</span>
+                <span class="cf-row-ico"><i class="bi bi-layout-sidebar-inset" aria-hidden="true"></i></span>
+                <div class="cf-row-txt">
+                  <div class="cf-row-t">{{ ligne.reference|default:ligne.nom }} · {% if ligne.face %}Face {{ ligne.face }}{% else %}{{ ligne.nombre_faces }} face{{ ligne.nombre_faces|pluralize }}{% endif %}</div>
+                  <div class="cf-row-m">{{ ligne.nom_support|default:ligne.nom }} · {{ ligne.format }}</div>
+                  {% if ligne.ville or ligne.emplacement %}
+                    <div class="cf-row-m">{{ ligne.emplacement }}{% if ligne.emplacement and ligne.ville %} · {% endif %}{{ ligne.ville }}</div>
+                  {% endif %}
+                </div>
+              </li>
+            {% endfor %}
+          {% endwith %}
         </ul>
-        {% if panneaux_confreres %}
-          <h3 class="h6 mt-3">Réseau Confrère</h3>
-          {% include "portail/_panneau_confrere.html" %}
-        {% endif %}
       </section>
 
     </div>

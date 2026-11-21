@@ -440,6 +440,13 @@
             <h3 class="h6 mt-3">Réseau Confrère</h3>
             {% include "portail/_panneau_confrere.html" with panneaux_confreres=demande.panneaux_confreres only %}
           {% endif %}
+          {% if user.is_staff_regie_role %}
+            {% for dossier in demande.dossiers_confreres.all %}
+              <a class="btn btn-sm btn-outline-secondary mt-2" href="{% url 'confrere_dossier' dossier.pk %}">
+                <i class="bi bi-folder2-open" aria-hidden="true"></i> Dossier {{ dossier.confrere.nom }}{% if not dossier.actif %} (retiré){% endif %}
+              </a>
+            {% endfor %}
+          {% endif %}
         </div>
       </section>
 
@@ -500,11 +507,18 @@
             <form method="post" action="{% url 'demande_valider' demande.uuid %}"
                   onsubmit="return confirm('Confirmer la création d’une réservation pour cette demande ?');">
               {% csrf_token %}
-              {% if demande.panneau_confrere %}
-                <div class="dr-warn"><i class="bi bi-exclamation-triangle-fill"></i><span>Le panneau du réseau confrère doit être réservé auprès du confrère.</span></div>
+              {% if statut_validation_confreres == 'attente' %}
+                <div class="dr-warn"><i class="bi bi-exclamation-triangle-fill"></i><span>En attente de la confirmation de tous les confrères.</span></div>
+              {% elif statut_validation_confreres == 'refuse' %}
+                <div class="dr-warn"><i class="bi bi-exclamation-triangle-fill"></i><span>Un confrère a refusé la demande. Modifiez la sélection avant de continuer.</span></div>
+              {% elif statut_validation_confreres == 'manuel' %}
+                <div class="dr-warn"><i class="bi bi-exclamation-triangle-fill"></i><span>Les supports saisis manuellement doivent être traités auprès du confrère.</span></div>
               {% elif demande.supports_souhaites.exists %}
                 <div class="dr-warn"><i class="bi bi-exclamation-triangle-fill"></i><span>Cette demande comprend un écran numérique. Son traitement doit être fait manuellement.</span></div>
               {% else %}
+                {% if statut_validation_confreres == 'confirme' %}
+                <p class="text-success mb-2"><i class="bi bi-check-circle"></i> Disponibilité confirmée pour les supports confrères.</p>
+                {% endif %}
                 <a href="{% url 'campagne_create' %}?demande={{ demande.uuid }}" class="dr-btn dr-btn-back">
                   <i class="bi bi-megaphone"></i>Créer une campagne
                 </a>
@@ -539,6 +553,11 @@
           <a href="{% url 'reservation_detail_direct' pk=demande.reservation.pk %}" class="dr-btn dr-btn-back dr-btn-sm">
             <i class="bi bi-arrow-up-right-square"></i>Voir la réservation {{ demande.reservation.reference }}
           </a>
+          {% if statut_validation_confreres == 'confirme' and not demande.campagne_id and demande.statut == 'validee' and user.is_staff_regie_role %}
+          <a href="{% url 'campagne_create' %}?demande={{ demande.uuid }}" class="dr-btn dr-btn-back dr-btn-sm">
+            <i class="bi bi-megaphone"></i>Créer une campagne
+          </a>
+          {% endif %}
           {% endif %}
           {% if demande.campagne %}
           <a href="{% url 'campagne_detail' pk=demande.campagne.pk %}" class="dr-btn dr-btn-back dr-btn-sm">

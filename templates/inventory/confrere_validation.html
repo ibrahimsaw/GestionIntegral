@@ -1,0 +1,34 @@
+{% load static %}
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Validation – {{ dossier.demande.reference }}</title>
+  <link rel="stylesheet" href="{% static 'css/reseau-confrere.css' %}?v=3">
+</head>
+<body class="rc-validation">
+  <main class="confrere-page">
+    <header class="rc-banner">
+      <div class="rc-identity"><div><h1>Demande à {{ dossier.confrere.nom }}</h1><p>{{ dossier.demande.reference }}</p></div></div>
+      <span class="rc-category">{{ dossier.get_reponse_confrere_display }}</span>
+    </header>
+    <section class="rc-panel">
+      <div class="rc-panel-head">
+        <h2>Supports demandés</h2>
+        <span>{{ dossier.demande.date_debut_souhaitee|date:"d/m/Y" }} – {{ dossier.demande.date_fin_souhaitee|date:"d/m/Y" }}</span>
+      </div>
+      <div class="rc-validation-table">{% include 'inventory/includes/confrere_dossier_supports.html' %}</div>
+      {% if not dossier.repondu_le %}
+        <form method="post" class="rc-form-actions">
+          {% csrf_token %}
+          <button type="submit" name="decision" value="refusee">Refuser</button>
+          <button type="submit" name="decision" value="confirmee">Confirmer la disponibilité</button>
+        </form>
+      {% else %}
+        <p class="rc-validation-receipt">{% if dossier.reponse_confrere == 'automatique' %}La demande a été confirmée automatiquement le{% else %}Votre réponse a été enregistrée le{% endif %} {{ dossier.repondu_le|date:"d/m/Y à H:i" }}.</p>
+      {% endif %}
+    </section>
+  </main>
+</body>
+</html>

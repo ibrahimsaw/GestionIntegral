@@ -1,0 +1,113 @@
+{% extends 'inventory/confrere_base.html' %}
+{% block title %}{{ view.page_title }} — Réseau Confrère{% endblock %}
+{% block confrere_content %}
+  <div class="rc-editor{% if view.show_support_reference %} rc-support-editor{% endif %}">
+    <a href="{{ view.back_url }}" class="rc-back"><i class="bi bi-arrow-left" aria-hidden="true"></i> {% if confrere %}{{ confrere.nom }}{% else %}Tous les confrères{% endif %}</a>
+    <header class="rc-editor-heading">
+      <div class="rc-identity">
+        <span class="rc-icon" aria-hidden="true"><i class="bi {% if view.show_support_reference %}bi-signpost-2{% else %}bi-building{% endif %}"></i></span>
+        <div><h1>{{ view.page_title }}</h1>{% if confrere %}<p>{{ confrere.nom }}</p>{% endif %}</div>
+      </div>
+      {% if view.show_support_reference %}
+        <div class="rc-reference-field">
+          <label for="confrere-support-reference"><i class="bi bi-hash" aria-hidden="true"></i> Référence</label>
+          <input id="confrere-support-reference" type="text"
+                 value="{% if reference_apercu %}{{ reference_apercu }}{% else %}{{ object.reference }}{% endif %}"
+                 {% if reference_apercu %}data-reference-apercu aria-describedby="confrere-reference-help"{% endif %} readonly>
+          {% if reference_apercu %}<div id="confrere-reference-help">Aperçu avant enregistrement</div>{% endif %}
+        </div>
+      {% endif %}
+    </header>
+
+    <form method="post" class="rc-form rc-panel">
+      {% csrf_token %}
+      {% if form.non_field_errors %}<div class="rc-form-errors">{{ form.non_field_errors }}</div>{% endif %}
+      {% if view.show_support_reference %}
+        <section class="rc-form-section" aria-labelledby="rc-support-info">
+          <h2 id="rc-support-info"><i class="bi bi-signpost-2" aria-hidden="true"></i> Support</h2>
+          <div class="rc-fields">
+            {% include 'inventory/includes/confrere_field.html' with field=form.nom wide=True only %}
+            {% include 'inventory/includes/confrere_field.html' with field=form.categorie only %}
+            {% include 'inventory/includes/confrere_field.html' with field=form.format only %}
+          </div>
+        </section>
+        <section class="rc-form-section" aria-labelledby="rc-support-location">
+          <h2 id="rc-support-location"><i class="bi bi-geo-alt" aria-hidden="true"></i> Localisation</h2>
+          <div class="rc-fields">
+            {% include 'inventory/includes/confrere_field.html' with field=form.ville only %}
+            {% include 'inventory/includes/confrere_field.html' with field=form.emplacement only %}
+          </div>
+        </section>
+        <div class="rc-form-section">
+          <fieldset class="rc-face-field">
+            <legend><i class="bi bi-grid" aria-hidden="true"></i> Faces{% if form.faces.field.required %} <span aria-hidden="true">*</span>{% endif %}</legend>
+            <div class="rc-face-options">
+              {% for choice in form.faces %}
+                <label class="rc-face-choice" for="{{ choice.id_for_label }}">
+                  {{ choice.tag }} <span>{{ choice.choice_label }}</span>
+                </label>
+              {% endfor %}
+            </div>
+            {% if form.faces.errors %}<div class="rc-form-errors">{{ form.faces.errors }}</div>{% endif %}
+          </fieldset>
+        </div>
+        <div class="rc-form-section">
+          {% include 'inventory/includes/confrere_field.html' with field=form.notes only %}
+        </div>
+      {% else %}
+        <section class="rc-form-section" aria-labelledby="rc-company">
+          <h2 id="rc-company"><i class="bi bi-building" aria-hidden="true"></i> Société</h2>
+          {% include 'inventory/includes/confrere_field.html' with field=form.nom only %}
+        </section>
+        <section class="rc-form-section" aria-labelledby="rc-contact">
+          <h2 id="rc-contact"><i class="bi bi-person-lines-fill" aria-hidden="true"></i> Coordonnées du contact</h2>
+          <div class="rc-fields">
+            {% include 'inventory/includes/confrere_field.html' with field=form.nom_contact only %}
+            {% include 'inventory/includes/confrere_field.html' with field=form.prenom_contact only %}
+            {% include 'inventory/includes/confrere_field.html' with field=form.telephone only %}
+            {% include 'inventory/includes/confrere_field.html' with field=form.whatsapp only %}
+            {% include 'inventory/includes/confrere_field.html' with field=form.email wide=True only %}
+          </div>
+        </section>
+      {% endif %}
+      <div class="rc-form-actions">
+        <a href="{{ view.back_url }}" class="btn btn-outline-secondary rc-btn">Annuler</a>
+        <button type="submit" class="btn btn-primary rc-btn"><i class="bi bi-check-lg" aria-hidden="true"></i> Enregistrer</button>
+      </div>
+    </form>
+  </div>
+  {% if view.show_support_reference %}
+  <script>
+    (() => {
+      const category = document.getElementById('id_categorie');
+      const format = document.getElementById('id_format');
+
+      function filterFormats() {
+        for (const option of format.options) {
+          option.hidden = Boolean(option.value && category.value && option.dataset.categorie !== category.value);
+          option.disabled = option.hidden;
+        }
+        if (!format.selectedOptions.length || format.selectedOptions[0].disabled) {
+          const firstAvailable = Array.from(format.options).find(option => !option.disabled);
+          format.value = firstAvailable?.value ?? '';
+        }
+      }
+
+      category.addEventListener('change', filterFormats);
+      filterFormats();
+
+      const reference = document.querySelector('[data-reference-apercu]');
+      if (reference) {
+        const ville = document.getElementById('id_ville');
+        const [prefixe, suffixe] = reference.value.split('-');
+        function updateReference() {
+          const codeVille = ville.value.normalize('NFKD').replace(/[^a-z0-9]/gi, '').toUpperCase().slice(0, 3);
+          reference.value = [prefixe, codeVille, suffixe].filter(Boolean).join('-');
+        }
+        ville.addEventListener('input', updateReference);
+        updateReference();
+      }
+    })();
+  </script>
+  {% endif %}
+{% endblock %}

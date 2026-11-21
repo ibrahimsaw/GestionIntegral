@@ -3,7 +3,9 @@ import json
 import uuid
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.conf import settings
+from django.core.files.uploadedfile import SimpleUploadedFile
+from django.test import Client as TestClient, TestCase
 from django.urls import reverse
 from django.utils import timezone
 
@@ -17,7 +19,7 @@ from campaigns.models import (
     ReservationLigne,
     STATUT_CONFIRMEE,
 )
-from inventory.models import FacePanneau, FormatSupport, Support
+from inventory.models import Confrere, FacePanneau, FormatSupport, Support
 from portail.forms import Etape1Form
 
 
@@ -1329,6 +1331,136 @@ class DemandeCreationViewTests(TestCase):
             session['gestion_demande_periode']['date_debut'],
             self.start.isoformat(),
         )
+
+    def test_catalogue_confrere_creates_a_private_dossier_with_the_selected_faces(self):
+        confrere = Confrere.objects.create(nom='Faso Affichage')
+        format_support = FormatSupport.objects.create(code='cf-4x3', dimensions='4 × 3 m', categorie='12m²')
+        support = confrere.supports.create(
+            nom='Zone du Bois', ville='Ouagadougou', nombre_faces=2, format=format_support,
+            faces_selectionnees=['A', 'C'],
+        )
+        for invalid_faces in (['B'], ['A', 'A']):
+            response = self.complete_step_one(
+                faces_selectionnees='[]',
+                panneaux_confreres=json.dumps([{'support_id': support.pk, 'faces': invalid_faces}]),
+            )
+            self.assertEqual(response.status_code, 200)
+            self.assertTrue(response.context['form'].non_field_errors())
+
+        response = self.complete_step_one(
+            faces_selectionnees='[]',
+            panneaux_confreres=json.dumps([{
+                'support_id': support.pk, 'faces': ['C'], 'nom': 'Nom modifié côté navigateur',
+            }]),
+        )
+        self.assertRedirects(response, reverse('demande_creation_etape2'))
+        self.complete_step_two()
+
+        demande = DemandeReservation.objects.get()
+        dossier = demande.dossiers_confreres.get()
+        self.assertEqual(dossier.confrere, confrere)
+        self.assertEqual(dossier.lignes[0]['nom'], confrere.nom)
+        self.assertEqual(dossier.lignes[0]['faces'], ['C'])
+        self.assertEqual(demande.nb_emplacements(), 1)
+        self.assertEqual(dossier.reponse_confrere, 'automatique')
+        self.assertIsNotNone(dossier.repondu_le)
+        demande.statut = DemandeReservation.STATUT_EN_COURS
+        demande.save(update_fields=['statut'])
+        detail_url = reverse('demande_detail', args=[demande.uuid])
+        approval_url = reverse('demande_valider', args=[demande.uuid])
+        self.assertContains(self.client.get(detail_url), 'Créer une réservation')
+        dossier_url = reverse('confrere_dossier', args=[dossier.pk])
+        mode_url = reverse('confrere_mode_confirmation', args=[dossier.pk])
+        fiche_url = reverse('confrere_detail', args=[confrere.pk])
+        mode_fiche_url = reverse('confrere_fiche_mode_confirmation', args=[confrere.pk])
+        self.assertContains(self.client.get(fiche_url), mode_fiche_url)
+        self.assertRedirects(self.client.post(mode_fiche_url, {'mode': 'lien'}), fiche_url)
+        confrere.refresh_from_db()
+        self.assertFalse(confrere.confirmation_automatique)
+        dossier.refresh_from_db()
+        self.assertFalse(dossier.confirmation_automatique)
+        self.assertEqual(dossier.reponse_confrere, 'en_attente')
+        old_token = dossier.token_validation
+        self.assertRedirects(self.client.post(mode_url, {'mode': 'automatique'}), dossier_url)
+        dossier.refresh_from_db()
+        self.assertTrue(dossier.confirmation_automatique)
+        self.assertEqual(dossier.reponse_confrere, 'automatique')
+        self.assertNotEqual(dossier.token_validation, old_token)
+        self.assertRedirects(self.client.post(mode_url, {'mode': 'lien'}), dossier_url)
+        dossier.refresh_from_db()
+        self.assertContains(self.client.get(detail_url), 'En attente de la confirmation de tous les confrères')
+        self.assertRedirects(self.client.post(approval_url), detail_url)
+        self.assertFalse(Reservation.objects.exists())
+        self.assertContains(self.client.get(reverse('confrere_detail', args=[confrere.pk])), dossier_url)
+        self.assertContains(self.client.get(dossier_url), support.reference)
+
+        response = self.client.post(
+            dossier_url, {'document': SimpleUploadedFile('devis.txt', b'Devis confrere')},
+        )
+        self.assertRedirects(response, dossier_url)
+        document = dossier.documents.get()
+        document_url = reverse('confrere_document', args=[dossier.pk, document.pk])
+        response = self.client.get(document_url)
+        self.assertEqual(response.content, b'Devis confrere')
+        self.assertIn('attachment', response.headers['Content-Disposition'])
+        bon_url = reverse('confrere_bon_commande', args=[dossier.pk])
+        self.assertContains(self.client.get(bon_url), support.reference)
+        validation_url = reverse('confrere_validation', args=[dossier.token_validation])
+        self.assertContains(self.client.get(dossier_url), validation_url)
+        self.client.logout()
+        for url in (dossier_url, document_url, bon_url):
+            self.assertEqual(self.client.get(url).status_code, 302)
+        partner_browser = TestClient(enforce_csrf_checks=True)
+        validation = partner_browser.get(validation_url)
+        self.assertContains(validation, support.reference)
+        self.assertNotContains(validation, document.nom)
+        self.assertEqual(validation.headers['Referrer-Policy'], 'same-origin')
+        csrf_token = partner_browser.cookies[settings.CSRF_COOKIE_NAME].value
+        data = {'decision': 'confirmee', 'csrfmiddlewaretoken': csrf_token}
+        self.assertEqual(partner_browser.post(validation_url, data, HTTP_ORIGIN='null').status_code, 403)
+        self.assertRedirects(
+            partner_browser.post(validation_url, data, HTTP_ORIGIN='http://testserver'),
+            validation_url,
+        )
+        dossier.refresh_from_db()
+        self.assertEqual(dossier.reponse_confrere, 'confirmee')
+        self.assertIsNotNone(dossier.repondu_le)
+        self.client.post(validation_url, {'decision': 'refusee'})
+        dossier.refresh_from_db()
+        self.assertEqual(dossier.reponse_confrere, 'confirmee')
+        self.client.force_login(self.staff)
+        confirmed = self.client.get(detail_url)
+        self.assertContains(confirmed, 'Disponibilité confirmée')
+        self.assertContains(confirmed, 'Créer une réservation')
+        self.assertRedirects(self.client.post(approval_url), detail_url)
+        demande.refresh_from_db()
+        self.assertEqual(demande.statut, DemandeReservation.STATUT_VALIDEE)
+        reservation = demande.reservation
+        self.assertEqual(reservation.nb_faces(), 1)
+        self.assertFalse(reservation.lignes.exists())
+        self.assertEqual(reservation.panneaux_confreres_reserves, dossier.lignes)
+        self.assertContains(
+            self.client.get(reverse('reservation_detail', args=[reservation.client_id, reservation.pk])),
+            support.reference,
+        )
+        campaign_url = f"{reverse('campagne_create')}?demande={demande.uuid}"
+        self.assertContains(self.client.get(detail_url), campaign_url)
+        self.assertEqual(self.client.get(campaign_url).status_code, 200)
+        response = self.client.post(campaign_url, {
+            'demande_uuid': str(demande.uuid),
+            'client': str(reservation.client_id),
+            'nom': 'Campagne confrère',
+            'date_debut': self.start.isoformat(),
+            'date_fin': self.end.isoformat(),
+            'type_support': format_support.categorie,
+            'nombre_visuels': '1',
+            'reservation_reference': demande.reference,
+        })
+        self.assertEqual(response.status_code, 302, response.context['form'].errors if response.status_code == 200 else '')
+        demande.refresh_from_db()
+        self.assertEqual(demande.reservation_id, reservation.pk)
+        self.assertEqual(demande.campagne.panneaux_confreres, dossier.lignes)
+        self.assertContains(self.client.get(response.url), support.reference)
 
     def test_invalid_dates_keep_selected_faces_for_correction(self):
         response = self.complete_step_one(date_fin=self.start.isoformat())

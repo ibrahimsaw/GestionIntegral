@@ -106,6 +106,10 @@
 
   window.refreshClientPagination = function (container, resetPage) {
     const state = container && states.get(container);
-    if (state) state.render(Boolean(resetPage));
+    if (state) {
+      state.render(Boolean(resetPage));
+    } else if (container?.matches(selector)) {
+      initialize(container);
+    }
   };
 })();

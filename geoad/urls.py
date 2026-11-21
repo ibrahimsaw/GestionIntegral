@@ -4,8 +4,10 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.views.generic import RedirectView
 from core.media_views import protected_media
+from inventory.confrere_views import ValidationConfrereView
 
 urlpatterns = [
+    path('confrere/validation/<uuid:token>/', ValidationConfrereView.as_view(), name='confrere_validation'),
     path('protected-media/<path:media_path>', protected_media, name='protected_media'),
     path('favicon.ico', RedirectView.as_view(url=settings.STATIC_URL + 'img/logo.png', permanent=True)),
     path('gestion/admin/', admin.site.urls),
@@ -22,5 +24,3 @@ urlpatterns = [
 handler403 = 'core.error_views.permission_denied'
 handler404 = 'core.error_views.page_not_found'
 handler500 = 'core.error_views.server_error'
-
-    

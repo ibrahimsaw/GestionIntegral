@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load duree_filters %}
+{% load duree_filters static %}
 
 {% block title %}{{ campagne.nom }} — Integral{% endblock %}
 
@@ -9,765 +9,92 @@
 {% endblock %}
 
 {% block topbar_actions %}
-  <div class="d-flex gap-2">
+  {% if user.is_staff_regie_role %}
+  <div class="d-flex flex-wrap gap-2">
+    <a href="{% url 'campagne_edit' campagne.pk %}" class="btn btn-outline-warning btn-sm shadow-sm px-3 d-flex align-items-center gap-1">
+      <i class="bi bi-calculator-fill me-1"></i>
+      <span class="d-none d-md-inline">Modifier</span>
+    </a>
+    <a href="{% url 'campagne_create' %}" class="btn btn-primary btn-sm shadow-sm px-3 d-flex align-items-center gap-1">
+      <i class="bi bi-plus-lg me-1"></i>
+      <span class="d-none d-md-inline">Nouvelle Campagne</span>
+    </a>
+  </div>
+  {% endif %}
+{% endblock %}
+
+{% block extra_head %}
+  <link rel="stylesheet" href="{% static 'css/campagne-detail.css' %}?v=20261120">
+{% endblock %}
+{% block contentbouton %}
     {% if not user.is_client %}
-      <a href="{% url 'campagne_create' %}" class="btn btn-outline-primary btn-sm shadow-sm">
-        <i class="bi bi-plus me-1"></i>
-        <span class="d-none d-md-inline ms-1">Nouvelle campagne</span>
-      </a>
-      <a href="{% url 'campagne_edit' campagne.pk %}" class="btn btn-outline-secondary btn-sm shadow-sm">
-        <i class="bi bi-pencil me-1"></i>
-        <span class="d-none d-md-inline ms-1">Modifier</span>
-      </a>
-      <a href="{% url 'campagne_delete' campagne.pk %}" class="btn btn-outline-danger btn-sm shadow-sm">
-        <i class="bi bi-trash me-1"></i>
-        <span class="d-none d-md-inline ms-1">Supprimer</span>
-      </a>
-      {% if user.is_staff_regie_role %}
-        <form method="post" action="{% url 'campagne_archive_toggle' campagne.pk %}" class="d-inline">
+    <div class="cpd-command-actions" role="group" aria-label="Actions de la campagne">
+      {% if campagne.statut == 'brouillon' %}
+        <form method="post" action="{% url 'campagne_lancer' campagne.pk %}">
           {% csrf_token %}
-          {% if campagne.actif %}
-            <input type="hidden" name="action" value="archiver">
-            <button type="submit" class="btn btn-outline-warning btn-sm shadow-sm">
-              <i class="bi bi-archive me-1"></i>
-              <span class="d-none d-md-inline ms-1">Archiver</span>
-            </button>
-          {% else %}
-            <input type="hidden" name="action" value="desarchiver">
-            <button type="submit" class="btn btn-success btn-sm shadow-sm">
-              <i class="bi bi-archive me-1"></i>
-              <span class="d-none d-md-inline ms-1">Désarchiver</span>
-            </button>
-          {% endif %}
+          <button type="submit" class="btn btn-primary"><i class="bi bi-play-fill" aria-hidden="true"></i> Lancer</button>
         </form>
+      {% endif %}
+      {% if user.is_staff_regie_role %}
         {% if campagne.statut == 'en_cours' or campagne.statut == 'a_venir' or campagne.statut == 'en_pause' %}
-          <button type="button" class="btn btn-outline-primary btn-sm shadow-sm"
-                  data-bs-toggle="modal" data-bs-target="#modalGestionCampagne">
-            <i class="bi bi-sliders me-1"></i>
-            <span class="d-none d-md-inline ms-1">Gérer le statut</span>
-          </button>
+        <button type="button" class="btn btn-outline-secondary" data-bs-toggle="modal" data-bs-target="#modalGestionCampagne">
+          <i class="bi bi-sliders" aria-hidden="true"></i> Gérer le statut
+        </button>
         {% endif %}
       {% endif %}
-      {% if campagne.statut == 'brouillon' %}
-        <form method="post" action="{% url 'campagne_lancer' campagne.pk %}" class="d-inline">
-          {% csrf_token %}
-          <button type="submit" class="btn btn-primary btn-sm shadow-sm">
-            <i class="bi bi-play-fill me-1"></i>
-            <span class="d-none d-md-inline ms-1">Lancer</span>
-          </button>
-        </form>
-      {% endif %}
 
-      <a href="{% url 'reports_index' %}" class="btn btn-sm btn-soft-success border-success-subtle">
-        <i class="bi bi-download me-1"></i>
-        <span class="d-none d-md-inline ms-1">Exporter</span>
-      </a>
+      <div class="dropdown">
+        <button class="btn btn-outline-secondary cpd-more" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Autres actions">
+          <i class="bi bi-three-dots" aria-hidden="true"></i>
+        </button>
+        <ul class="dropdown-menu dropdown-menu-end">
+          <li><a class="dropdown-item" href="{% url 'campagne_create' %}"><i class="bi bi-plus-lg" aria-hidden="true"></i> Nouvelle campagne</a></li>
+          <li><a class="dropdown-item" href="{% url 'reports_index' %}"><i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i> Centre des rapports</a></li>
+          {% if user.is_staff_regie_role %}
+          <li>
+            <form method="post" action="{% url 'campagne_archive_toggle' campagne.pk %}">
+              {% csrf_token %}
+              <input type="hidden" name="action" value="{% if campagne.actif %}archiver{% else %}desarchiver{% endif %}">
+              <button type="submit" class="dropdown-item"><i class="bi bi-archive" aria-hidden="true"></i> {% if campagne.actif %}Archiver{% else %}Désarchiver{% endif %}</button>
+            </form>
+          </li>
+          {% endif %}
+          <li><hr class="dropdown-divider"></li>
+          <li><a class="dropdown-item text-danger" href="{% url 'campagne_delete' campagne.pk %}"><i class="bi bi-trash" aria-hidden="true"></i> Supprimer</a></li>
+        </ul>
+      </div>
+    </div>
     {% endif %}
-  </div>
 {% endblock %}
 
 {% block content %}
-<style>
-  /* ── Hero Banner ── */
-  .cpd-hero {
-    background: linear-gradient(135deg, #932e2b 0%, #1e40af 100%);
-    border-radius: 8px;
-    padding: 1.8rem 2.2rem;
-    color: #ffffff;
-    position: relative;
-    overflow: hidden;
-    margin-bottom: 1.5rem;
-    box-shadow: 0 10px 30px rgba(147, 46, 43, 0.15);
-  }
-  .cpd-hero::before {
-    content: '';
-    position: absolute;
-    top: -40%;
-    right: -10%;
-    width: 320px;
-    height: 320px;
-    background: rgba(255,255,255,0.06);
-    border-radius: 8px;
-    transform: rotate(45deg);
-    pointer-events: none;
-  }
-  .cpd-hero-title { font-size: 1.5rem; font-weight: 800; margin-bottom: 0.25rem; letter-spacing: -0.3px; }
-  .cpd-hero-sub { opacity: 0.9; font-size: 0.84rem; }
-  .cpd-hero-ref {
-    display: inline-block;
-    background: rgba(255,255,255,0.18);
-    border: 1px solid rgba(255,255,255,0.28);
-    border-radius: 8px;
-    padding: 2px 10px;
-    font-family: 'SFMono-Regular', monospace;
-    font-size: 0.72rem;
-    color: #fff;
-  }
-  .cpd-hero-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    padding: 4px 14px;
-    border-radius: 8px;
-    font-size: 0.72rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.4px;
-  }
-  .cpd-badge-brouillon { background: rgba(108,117,125,0.25); color: #e2e8f0; }
-  .cpd-badge-en_cours  { background: rgba(34,197,94,0.28); color: #bbf7d0; }
-  .cpd-badge-en_pause  { background: rgba(245,158,11,0.28); color: #fde68a; }
-  .cpd-badge-a_venir   { background: rgba(56,189,248,0.28); color: #bae6fd; }
-  .cpd-badge-terminee  { background: rgba(255,255,255,0.22); color: #e2e8f0; }
-  .cpd-badge-annulee   { background: rgba(239,68,68,0.28); color: #fecaca; }
-  .cpd-hero-avatar {
-    width: 58px; height: 58px;
-    border-radius: 8px;
-    background: rgba(255,255,255,0.15);
-    border: 2px solid rgba(255,255,255,0.3);
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
-    overflow: hidden;
-  }
-  .cpd-hero-avatar img { width: 100%; height: 100%; object-fit: contain; }
+<div class="cpd-page">
 
-  /* ── Cards ── */
-  .cpd-card {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    overflow: hidden;
-    transition: box-shadow 0.2s ease;
-  }
-  .cpd-card:hover { box-shadow: 0 8px 24px rgba(0,0,0,0.06); }
-  .cpd-card-header {
-    padding: 1rem 1.25rem;
-    border-bottom: 1px solid #e2e8f0;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    font-weight: 700;
-    font-size: 0.88rem;
-    color: #0f172a;
-    background: #ffffff;
-  }
-  .cpd-card-header i { color: #932e2b; }
-  .cpd-card-body { padding: 1.25rem; }
-
-  /* ── Stat Tiles ── */
-  .cpd-stat {
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    padding: 0.9rem;
-    text-align: center;
-    height: 100%;
-  }
-  .cpd-stat-label {
-    font-size: 0.6rem;
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    color: #64748b;
-    font-family: 'SFMono-Regular', monospace;
-    margin-bottom: 0.35rem;
-  }
-  .cpd-stat-value {
-    font-size: 0.95rem;
-    font-weight: 800;
-    color: #0f172a;
-    font-family: 'SFMono-Regular', monospace;
-  }
-  .cpd-stat-accent {
-    background: linear-gradient(135deg, rgba(147,46,43,0.08), rgba(147,46,43,0.03));
-    border-color: rgba(147,46,43,0.18);
-  }
-  .cpd-stat-accent .cpd-stat-value { color: #932e2b; }
-
-  /* ── Workflow Stepper ── */
-  .cpd-wf-step {
-    display: flex;
-    align-items: center;
-    gap: 0.75rem;
-    padding: 0.85rem 1.25rem;
-    border-bottom: 1px solid #f1f5f9;
-    font-size: 0.82rem;
-  }
-  .cpd-wf-step:last-child { border-bottom: none; }
-  .cpd-wf-active {
-    background: linear-gradient(90deg, rgba(147,46,43,0.08), transparent);
-    border-left: 3px solid #932e2b;
-  }
-  .cpd-wf-active .cpd-wf-label { color: #932e2b; font-weight: 700; }
-  .cpd-wf-done .cpd-wf-label { color: #94a3b8; text-decoration: line-through; }
-  .cpd-wf-pending .cpd-wf-label { color: #cbd5e1; }
-  .cpd-wf-badge {
-    font-size: 0.6rem;
-    font-weight: 700;
-    background: #932e2b;
-    color: #fff;
-    padding: 2px 8px;
-    border-radius: 8px;
-    margin-left: auto;
-    text-transform: uppercase;
-  }
-
-  /* ── Metric rows ── */
-  .cpd-metric-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0.65rem 1.25rem;
-    border-bottom: 1px solid #f1f5f9;
-    font-size: 0.8rem;
-  }
-  .cpd-metric-row:last-child { border-bottom: none; }
-  .cpd-metric-label { font-weight: 600; color: #334155; }
-  .cpd-metric-val {
-    font-family: 'SFMono-Regular', monospace;
-    font-weight: 700;
-    font-size: 0.75rem;
-    background: #932e2b;
-    color: #fff;
-    padding: 3px 10px;
-    border-radius: 8px;
-  }
-
-  /* ── Tables ── */
-  .cpd-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
-  .cpd-table thead th {
-    background-color: #f8fafc !important;
-    color: var(--text-muted, #64748b) !important;
-    --bs-table-bg: #f8fafc !important;
-    --bs-table-color: #64748b !important;
-    padding: 12px 16px;
-    font-size: 0.72rem;
-    text-transform: uppercase;
-    letter-spacing: 0.6px;
-    font-weight: 800;
-    white-space: nowrap;
-    border-bottom: 2px solid var(--border, #e2e8f0) !important;
-    border-top: none !important;
-  }
-  .cpd-table tbody td {
-    padding: 12px 16px;
-    border-bottom: 1px solid var(--border, #e2e8f0);
-    vertical-align: middle;
-  }
-  .cpd-table tbody tr:hover { background: rgba(147, 46, 43, 0.02) !important; }
-  .cpd-table tfoot td {
-    padding: 12px 16px;
-    background: #f8fafc;
-    font-weight: 800;
-    border-top: 2px solid var(--border, #e2e8f0);
-    border-bottom: none;
-    color: #0f172a;
-  }
-
-  /* ── DETAILED SUPPORT CARD (GRID) ── */
-  .cpd-sup-card {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    overflow: hidden;
-    height: 100%;
-    display: flex;
-    flex-direction: column;
-    transition: all 0.2s ease;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.02);
-  }
-  .cpd-sup-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 12px 28px rgba(0,0,0,0.08);
-    border-color: #932e2b;
-  }
-  .cpd-sup-head {
-    padding: 1rem 1.2rem 0.8rem;
-    border-bottom: 1px solid #f1f5f9;
-    display: flex;
-    align-items: flex-start;
-    gap: 0.75rem;
-  }
-  .cpd-sup-icon {
-    width: 44px; height: 44px;
-    border-radius: 8px;
-    display: flex; align-items: center; justify-content: center;
-    flex-shrink: 0;
-    font-size: 1.25rem;
-  }
-  .cpd-sup-body {
-    padding: 1rem 1.2rem;
-    flex-grow: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 0.75rem;
-  }
-  .cpd-sup-foot {
-    padding: 0.75rem 1.2rem;
-    background: #f8fafc;
-    border-top: 1px solid #f1f5f9;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-  }
-
-  /* ── Tech specs badge block ── */
-  .cpd-spec-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 6px;
-    font-size: 0.72rem;
-  }
-  .cpd-spec-pill {
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    padding: 6px 8px;
-  }
-  .cpd-spec-pill-label {
-    font-size: 0.58rem;
-    text-transform: uppercase;
-    color: #64748b;
-    font-weight: 700;
-    font-family: 'SFMono-Regular', monospace;
-    display: block;
-    margin-bottom: 2px;
-  }
-  .cpd-spec-pill-val {
-    font-weight: 700;
-    color: #0f172a;
-    font-family: 'SFMono-Regular', monospace;
-  }
-
-  /* ── Face Detail Card inside support ── */
-  .cpd-face-box {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    padding: 0.6rem 0.8rem;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 0.5rem;
-  }
-
-  /* ── Total box ── */
-  .cpd-total-box {
-    background: linear-gradient(135deg, #932e2b, #7c2522);
-    color: #ffffff;
-    border-radius: 8px;
-    padding: 1.25rem;
-    text-align: center;
-    margin-top: 1rem;
-  }
-  .cpd-total-label {
-    font-size: 0.7rem;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-    opacity: 0.85;
-    margin-bottom: 0.25rem;
-  }
-  .cpd-total-value {
-    font-size: 1.5rem;
-    font-weight: 800;
-    font-family: 'SFMono-Regular', monospace;
-  }
-
-  /* ── Visuels gallery ── */
-  .cpd-visuel-card {
-    border-radius: 8px;
-    overflow: hidden;
-    border: 1px solid #e2e8f0;
-    position: relative;
-    transition: transform 0.2s ease;
-  }
-  .cpd-visuel-card:hover { transform: scale(1.02); }
-  .cpd-visuel-card img,
-  .cpd-visuel-card video { width: 100%; display: block; max-height: 260px; object-fit: cover; }
-  .cpd-visuel-del {
-    position: absolute; top: 8px; right: 8px;
-    background: rgba(220,53,69,0.9);
-    color: #fff; border: none;
-    border-radius: 8px;
-    width: 30px; height: 30px;
-    display: flex; align-items: center; justify-content: center;
-    cursor: pointer;
-    opacity: 0;
-    transition: opacity 0.2s ease;
-  }
-  .cpd-visuel-card:hover .cpd-visuel-del { opacity: 1; }
-  .cpd-visuel-ext {
-    position: absolute; top: 8px; left: 8px;
-    background: rgba(0,0,0,0.65);
-    color: #fff;
-    font-size: 0.6rem;
-    font-weight: 700;
-    padding: 2px 8px;
-    border-radius: 8px;
-    font-family: 'SFMono-Regular', monospace;
-    text-transform: uppercase;
-  }
-
-  /* ── Notes ── */
-  .cpd-notes {
-    background: #fffbeb;
-    border-left: 4px solid #f59e0b;
-    border-radius: 0 8px 8px 0;
-    padding: 1rem 1.25rem;
-  }
-
-  /* ── Badges ── */
-  .cpd-badge-type-ecran { background: #dbeafe; color: #1e40af; border: 1px solid #bfdbfe; }
-  .cpd-badge-type-panneau { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
-  .cpd-badge-type-marche { background: #dcfce7; color: #166534; border: 1px solid #bbf7d0; }
-  .cpd-badge-sub {
-    font-size: 0.65rem;
-    font-weight: 700;
-    padding: 2px 8px;
-    border-radius: 8px;
-    font-family: 'SFMono-Regular', monospace;
-  }
-
-  /* ── Export section ── */
-  .cpd-export-section {
-    background: linear-gradient(135deg, #f8fafc, #f1f5f9);
-    border: 1px solid #e2e8f0;
-    border-radius: 8px;
-    padding: 2rem;
-    text-align: center;
-  }
-  .cpd-btn-export {
-    padding: 0.5rem 1.5rem;
-    border-radius: 8px;
-    font-weight: 600;
-    font-size: 0.82rem;
-    text-decoration: none;
-    display: inline-flex;
-    align-items: center;
-    gap: 0.4rem;
-    transition: all 0.2s ease;
-  }
-  .cpd-btn-pdf { background: rgba(147,46,43,0.1); color: #932e2b; border: 1px solid rgba(147,46,43,0.2); }
-  .cpd-btn-pdf:hover { background: #932e2b; color: #fff; }
-  .cpd-btn-view { background: rgba(30,64,175,0.1); color: #1e40af; border: 1px solid rgba(30,64,175,0.2); }
-  .cpd-btn-view:hover { background: #1e40af; color: #fff; }
-
-  /* ── Section header ── */
-  .cpd-sec-head {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 1.25rem;
-    flex-wrap: wrap;
-    gap: 0.75rem;
-  }
-  .cpd-sec-title {
-    font-size: 1.15rem;
-    font-weight: 800;
-    color: #0f172a;
-    display: flex;
-    align-items: center;
-    gap: 0.5rem;
-    margin: 0;
-  }
-  .cpd-sec-title i { color: #932e2b; }
-  .cpd-sec-sub { font-size: 0.78rem; color: #64748b; margin: 0; }
-
-  .cpd-link { color: #932e2b; text-decoration: none; font-weight: 600; }
-  .cpd-link:hover { text-decoration: underline; }
-  .cpd-muted { color: #64748b; font-size: 0.78rem; }
-  .cpd-mono { font-family: 'SFMono-Regular', monospace; }
-
-  /* Harmonisation avec les formulaires Integral et adaptations responsive. */
-  .cpd-page {
-    --cpd-accent: var(--color-primary, #932e2b);
-    max-width: 1760px;
-    margin-inline: auto;
-    padding: 1.25rem !important;
-    color: #172033;
-    background: #f4f6fa;
-    border-radius: 1.25rem;
-  }
-  .cpd-page .cpd-hero {
-    min-height: 190px;
-    display: flex;
-    align-items: center;
-    padding: clamp(1.35rem, 3vw, 2.25rem);
-    border: 1px solid rgba(255,255,255,.22);
-    border-radius: 1.25rem;
-    background:
-      radial-gradient(circle at 85% 20%, rgba(255,255,255,.17), transparent 22rem),
-      linear-gradient(115deg, #5e1c1a 0%, #8f2926 48%, #c05245 100%);
-    box-shadow: 0 1.2rem 2.5rem rgba(92, 35, 32, .22);
-  }
-  .cpd-page .cpd-hero::before {
-    top: -5rem;
-    right: -2rem;
-    width: 15rem;
-    height: 15rem;
-    border: 1px solid rgba(255,255,255,.18);
-    border-radius: 50%;
-    background: transparent;
-    box-shadow: 0 0 0 2rem rgba(255,255,255,.05), 0 0 0 4rem rgba(255,255,255,.035);
-    transform: none;
-  }
-  .cpd-page .cpd-hero-title {
-    font-size: clamp(1.4rem, 3vw, 2rem);
-    line-height: 1.2;
-    overflow-wrap: anywhere;
-    text-shadow: 0 2px 12px rgba(0,0,0,.12);
-  }
-  .cpd-page .cpd-hero-avatar {
-    width: 68px;
-    height: 68px;
-    border: 2px solid rgba(255,255,255,.55);
-    border-radius: 1.1rem;
-    background: rgba(255,255,255,.18);
-    box-shadow: 0 .5rem 1.25rem rgba(0,0,0,.12);
-  }
-  .cpd-page .cpd-hero-ref,
-  .cpd-page .cpd-hero-badge {
-    border-radius: 999px;
-  }
-  .cpd-page .cpd-hero-badge {
-    padding: .5rem .9rem;
-    border: 1px solid rgba(255,255,255,.28);
-    background-color: rgba(255,255,255,.16);
-    backdrop-filter: blur(8px);
-  }
-  .cpd-page .cpd-card,
-  .cpd-page .card {
-    border: 1px solid #e3e8f0;
-    border-radius: 8px !important;
-    box-shadow: 0 .55rem 1.5rem rgba(25, 35, 55, .07);
-    transition: box-shadow .2s ease, transform .2s ease;
-  }
-  .cpd-page .cpd-card:hover,
-  .cpd-page .table-custom-card:hover { box-shadow: 0 .85rem 2rem rgba(25, 35, 55, .11); }
-  .cpd-page .cpd-card-header {
-    min-height: 3.5rem;
-    padding: 1rem 1.35rem;
-    border-color: #e9edf3;
-    background: linear-gradient(100deg, #fff, #fafbfe);
-    font-size: .9rem;
-  }
-  .cpd-page .cpd-card-header i {
-    width: 2rem;
-    height: 2rem;
-    display: inline-grid;
-    place-items: center;
-    border-radius: .65rem;
-    background: #fff0ee;
-  }
-  .cpd-page .cpd-card-header i,
-  .cpd-page .cpd-sec-title i { color: var(--cpd-accent); }
-  .cpd-page .cpd-card-body { padding: clamp(1rem, 2.5vw, 1.5rem); }
-  .cpd-page .cpd-stat {
-    position: relative;
-    min-height: 86px;
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    padding: 1rem .75rem;
-    border-color: #e6eaf1;
-    border-radius: 8px !important;
-    background: linear-gradient(145deg, #fff, #f8f9fc);
-    overflow-wrap: anywhere;
-    box-shadow: inset 0 3px 0 #dce3ed;
-  }
-  .cpd-page .cpd-stat-label {
-    font-family: inherit;
-    font-size: .64rem;
-    letter-spacing: .07em;
-  }
-  .cpd-page .cpd-stat-value {
-    font-family: inherit;
-    font-size: 1rem !important;
-    line-height: 1.4;
-    overflow-wrap: anywhere;
-  }
-  .cpd-page .cpd-stat-accent {
-    border-color: rgba(147,46,43,.24);
-    background: linear-gradient(145deg, #fff7f5, #fff);
-    box-shadow: inset 0 3px 0 var(--cpd-accent), 0 .35rem .8rem rgba(147,46,43,.06);
-  }
-  .cpd-page .cpd-stat-accent .cpd-stat-value { color: var(--cpd-accent); }
-  .cpd-page .cpd-wf-step {
-    min-height: 3.4rem;
-    margin: .35rem .65rem;
-    padding-inline: .85rem;
-    border: 1px solid #edf0f4;
-    border-radius: .7rem;
-    background: #fff;
-  }
-  .cpd-page .cpd-wf-active {
-    border-color: rgba(147,46,43,.25);
-    border-left: 3px solid var(--cpd-accent);
-    background: linear-gradient(100deg, #fff3f1, #fff);
-  }
-  .cpd-page .cpd-wf-pending .cpd-wf-label { color: #64748b; }
-  .cpd-page .cpd-wf-done .cpd-wf-label { color: #8490a0; }
-  .cpd-page .cpd-metric-row { gap: .75rem; padding-block: .85rem; }
-  .cpd-page .cpd-metric-label { line-height: 1.4; }
-  .cpd-page .cpd-metric-val {
-    flex: 0 0 auto;
-    border-radius: 999px;
-    background: var(--cpd-accent);
-    text-align: center;
-  }
-  .cpd-page .cpd-sup-card {
-    position: relative;
-    border-color: #e3e8f0;
-    border-radius: 1rem;
-    box-shadow: 0 .45rem 1.25rem rgba(25,35,55,.07);
-  }
-  .cpd-page .cpd-sup-card:hover {
-    transform: translateY(-4px);
-    border-color: rgba(147,46,43,.55);
-    box-shadow: 0 1rem 2rem rgba(25,35,55,.13);
-  }
-  .cpd-page .cpd-sup-head {
-    padding: 1.2rem;
-    background: linear-gradient(110deg, #fff, #f8f9fc);
-  }
-  .cpd-page .cpd-sup-icon {
-    width: 48px;
-    height: 48px;
-    border-radius: 8px !important;
-    box-shadow: 0 .25rem .65rem rgba(25,35,55,.08);
-  }
-  .cpd-page .cpd-sup-body { padding: 1rem 1.2rem 1.1rem; }
-  .cpd-page .cpd-sup-foot {
-    gap: .75rem;
-    padding: .85rem 1.2rem;
-    background: #fafbfc;
-  }
-  .cpd-page .cpd-spec-pill {
-    min-width: 0;
-    border-radius: .65rem;
-    background: #f7f8fb;
-    overflow-wrap: anywhere;
-  }
-  .cpd-page .cpd-face-box {
-    border-color: #e7ebf1;
-    border-radius: .7rem;
-    background: #fbfcfe;
-  }
-  .cpd-page .cpd-total-box {
-    border-radius: 8px !important;
-    background: linear-gradient(120deg, #762321, var(--cpd-accent), #b64a40);
-  }
-  .cpd-page .cpd-visuel-card { border-radius: 8px !important; }
-  .cpd-page .cpd-visuel-del {
-    border-radius: .65rem;
-    opacity: 1;
-  }
-  .cpd-page .cpd-notes {
-    border-radius: .25rem .9rem .9rem .25rem;
-  }
-  .cpd-page .cpd-badge-sub { border-radius: 999px; }
-  .cpd-page .cpd-sec-head {
-    align-items: flex-start;
-    padding: 1.1rem 1.25rem;
-    border: 1px solid #e4e8ef;
-    border-left: 4px solid var(--cpd-accent);
-    border-radius: 8px !important;
-    background: linear-gradient(110deg, #fff, #f7f8fb);
-    box-shadow: 0 .3rem .9rem rgba(25,35,55,.04);
-  }
-  .cpd-page .cpd-sec-title {
-    font-size: clamp(1.02rem, 2vw, 1.2rem);
-    line-height: 1.4;
-  }
-  .cpd-page .cpd-sec-sub { margin-top: .35rem; line-height: 1.5; }
-  .cpd-page .cpd-export-section {
-    padding: clamp(1.4rem, 4vw, 2.5rem);
-    border: 1px solid #e1e6ed;
-    border-radius: 1rem;
-    background:
-      radial-gradient(circle at 50% 0%, rgba(147,46,43,.08), transparent 20rem),
-      linear-gradient(135deg, #fff, #f2f4f8);
-    box-shadow: 0 .6rem 1.5rem rgba(25,35,55,.06);
-  }
-  .cpd-page .cpd-btn-export {
-    min-height: 2.75rem;
-    justify-content: center;
-    border-radius: .7rem;
-    box-shadow: 0 .25rem .65rem rgba(25,35,55,.07);
-  }
-  .cpd-page #piges .card-header { padding: 1.15rem 1.35rem; border-bottom: 1px solid #edf0f4; }
-  .cpd-page #piges .card-body { padding: clamp(1rem, 2.5vw, 1.5rem); }
-  .cpd-page #piges article {
-    border-color: #e3e8f0 !important;
-    border-radius: .9rem !important;
-    background: #fff;
-    box-shadow: 0 .35rem 1rem rgba(25,35,55,.06);
-    transition: transform .2s ease, box-shadow .2s ease;
-  }
-  .cpd-page #piges article:hover { transform: translateY(-3px); box-shadow: 0 .8rem 1.6rem rgba(25,35,55,.12); }
-  .cpd-page .table-custom-card { overflow: hidden; background: #fff; }
-  .cpd-page .cpd-table { min-width: 850px; }
-  .cpd-page .cpd-table thead th { letter-spacing: .045em; }
-  .cpd-page .cpd-table tbody tr:nth-child(even) { background: #fafbfc; }
-  .cpd-page .cpd-table tbody tr:hover { background: #fff5f3 !important; }
-  .cpd-page .cpd-table tfoot td { background: #f5f6f9; }
-
-  @media (max-width: 767.98px) {
-    .cpd-page .row.g-4 { --bs-gutter-y: 1.15rem; }
-    .cpd-page .cpd-hero-avatar { width: 50px; height: 50px; }
-    .cpd-page .cpd-card-body .row > .col-4 { width: 50%; }
-    .cpd-page .cpd-card-body .row > .col-4:last-child:nth-child(odd) { width: 100%; }
-    .cpd-page .cpd-sec-head { align-items: stretch; }
-    .cpd-page .cpd-sec-head > div:last-child { width: 100%; }
-    .cpd-page .cpd-sec-head .btn { flex: 1 1 auto; }
-    .cpd-page .cpd-sup-foot { align-items: flex-start; flex-direction: column; }
-  }
-  @media (max-width: 575.98px) {
-    .cpd-page { padding: .6rem !important; border-radius: 8px !important; }
-    .cpd-page .cpd-hero { min-height: 0; border-radius: 8px !important; }
-    .cpd-page .cpd-hero > .d-flex { gap: .85rem !important; }
-    .cpd-page .cpd-hero > .d-flex > div:last-child { align-items: flex-start !important; }
-    .cpd-page .cpd-card-header,
-    .cpd-page #piges .card-header { padding: 1rem; }
-    .cpd-page .cpd-stat { padding: .8rem .55rem; }
-    .cpd-page .cpd-stat-label { font-size: .58rem; }
-    .cpd-page .cpd-metric-row { align-items: flex-start; padding-inline: 1rem; }
-    .cpd-page .cpd-metric-val { max-width: 48%; white-space: normal; }
-    .cpd-page .cpd-spec-grid { grid-template-columns: 1fr; }
-    .cpd-page .cpd-sup-head,
-    .cpd-page .cpd-sup-body { padding-inline: 1rem; }
-    .cpd-page .cpd-export-section .d-flex { gap: .65rem !important; }
-    .cpd-page .cpd-btn-export { justify-content: center; flex: 1 1 100%; }
-  }
-</style>
-
-<div class="container-fluid py-3 cpd-page">
   {# ═══════════════════════════════════════════ #}
   {# ── BANNIÈRE HÉRO ── #}
   {# ═══════════════════════════════════════════ #}
-  <div class="cpd-hero">
-    <div class="d-flex align-items-start gap-3 flex-wrap">
+  <header class="cpd-hero">
+    <div class="cpd-hero-grid">
       <div class="cpd-hero-avatar">
         {% if campagne.client.logo %}
           <img src="{{ campagne.client.logo.url }}" alt="{{ campagne.client.nom }}">
         {% else %}
-          <i class="bi bi-building fs-4" style="color:rgba(255,255,255,0.7)"></i>
+          <i class="bi bi-building" aria-hidden="true"></i>
         {% endif %}
       </div>
-      <div class="flex-grow-1" style="min-width: 0;">
-        <div class="cpd-hero-title">{{ campagne.nom }}</div>
+      <div class="cpd-hero-summary">
+        <span class="cpd-hero-ref">{{ campagne.reference }}</span>
+        <h1 class="cpd-hero-title">{{ campagne.nom }}</h1>
         <div class="d-flex align-items-center gap-2 flex-wrap mt-1">
-          <a href="{% url 'client_detail' campagne.client.pk %}" style="color:#e2e8f0; text-decoration:none; font-size:0.82rem; font-weight:600;">
+          <a href="{% url 'client_detail' campagne.client.pk %}" class="cpd-hero-link">
             <i class="bi bi-person-fill me-1"></i>{{ campagne.client.nom }}
           </a>
           {% if campagne.agence %}
             <span style="opacity:0.5">•</span>
-            <a href="{% url 'client_detail' campagne.agence.pk %}" style="color:#e2e8f0; text-decoration:none; font-size:0.82rem; font-weight:600;">
+            <a href="{% url 'client_detail' campagne.agence.pk %}" class="cpd-hero-link">
               <i class="bi bi-building me-1"></i>{{ campagne.agence.nom }}
             </a>
           {% endif %}
-          <span style="opacity:0.5">•</span>
-          <span class="cpd-hero-ref">{{ campagne.reference }}</span>
         </div>
         {% if campagne.campagne_parente %}
         <div class="mt-2">
@@ -776,7 +103,7 @@
           </span>
           <span class="cpd-hero-sub ms-2">
             Mère :
-            <a href="{% url 'campagne_detail' campagne.campagne_parente.pk %}" style="color:#e2e8f0;">
+            <a href="{% url 'campagne_detail' campagne.campagne_parente.pk %}" class="cpd-hero-link">
               {{ campagne.campagne_parente.nom }}
             </a>
           </span>
@@ -790,9 +117,9 @@
         </div>
         {% endif %}
       </div>
-      <div class="d-flex flex-column align-items-end gap-2 mt-1">
+      <div class="cpd-hero-status">
         <span class="cpd-hero-badge cpd-badge-{{ campagne.statut }}">
-          <i class="bi bi-circle-fill" style="font-size:6px;"></i>
+          <i class="bi bi-circle-fill" aria-hidden="true"></i>
           {{ campagne.get_statut_display }}
         </span>
         {% if not campagne.actif %}
@@ -809,15 +136,23 @@
         {% endif %}
       </div>
     </div>
-  </div>
+  </header>
+
+  <nav class="cpd-section-nav" aria-label="Sections de la campagne">
+    <a href="#campagne-informations"><i class="bi bi-layout-text-sidebar" aria-hidden="true"></i> Informations</a>
+    <a href="#campagne-supports"><i class="bi bi-grid" aria-hidden="true"></i> Supports</a>
+    <a href="#campagne-finances"><i class="bi bi-cash-coin" aria-hidden="true"></i> Finances</a>
+    <a href="#piges"><i class="bi bi-camera" aria-hidden="true"></i> Preuves de diffusion</a>
+    <a href="#campagne-rapports"><i class="bi bi-file-earmark-pdf" aria-hidden="true"></i> Rapports</a>
+  </nav>
 
   {# ═══════════════════════════════════════════ #}
   {# ── SECTION 1: INFOS CLÉS & FINANCES ── #}
   {# ═══════════════════════════════════════════ #}
-  <div class="row g-4 mb-4">
+  <div class="cpd-overview" id="campagne-informations">
 
     {# ── Gauche : Info + Stats + Finances + Visuels ── #}
-    <div class="col-lg-8">
+    <div class="cpd-overview-main">
 
       {# ── CARTE D'INFORMATIONS CLÉS ── #}
       <div class="cpd-card mb-4">
@@ -829,27 +164,27 @@
             <div class="col-6 col-md-3">
               <div class="cpd-stat">
                 <div class="cpd-stat-label">Date début</div>
-                <div class="cpd-stat-value" style="font-size:0.88rem;">{{ campagne.date_debut|date:"d/m/Y" }}</div>
+                <div class="cpd-stat-value">{{ campagne.date_debut|date:"d/m/Y" }}</div>
               </div>
             </div>
             <div class="col-6 col-md-3">
               <div class="cpd-stat">
                 <div class="cpd-stat-label">Date fin</div>
-                <div class="cpd-stat-value" style="font-size:0.88rem;">{{ campagne.date_fin|date:"d/m/Y" }}</div>
+                <div class="cpd-stat-value">{{ campagne.date_fin|date:"d/m/Y" }}</div>
               </div>
             </div>
             {% if campagne.contrat.get_detail %}
             <div class="col-6 col-md-3">
               <div class="cpd-stat">
                 <div class="cpd-stat-label">Contrat</div>
-                <div class="cpd-stat-value" style="font-size:0.82rem;">{{ campagne.contrat.get_detail }}</div>
+                <div class="cpd-stat-value">{{ campagne.contrat.get_detail }}</div>
               </div>
             </div>
             {% endif %}
             <div class="col-6 col-md-3">
               <div class="cpd-stat">
                 <div class="cpd-stat-label">Format / Type</div>
-                <div class="cpd-stat-value" style="font-size:0.82rem;">
+                <div class="cpd-stat-value">
                   {% if campagne.est_mere %}
                     <i class="bi bi-diagram-3" style="color:#f59e0b"></i> Campagne Mère
                   {% elif campagne.type_support == 'ecran' %}
@@ -880,7 +215,7 @@
             <div class="col-6 col-md-3">
               <div class="cpd-stat">
                 <div class="cpd-stat-label">Zone / Ville</div>
-                <div class="cpd-stat-value" style="font-size:0.88rem;">{{ campagne.lieu|default:"National" }}</div>
+                <div class="cpd-stat-value">{{ campagne.lieu|default:"National" }}</div>
               </div>
             </div>
             <div class="col-6 col-md-3">
@@ -895,19 +230,19 @@
             <div class="col-6 col-md-3">
               <div class="cpd-stat">
                 <div class="cpd-stat-label">Fréquence</div>
-                <div class="cpd-stat-value" style="font-size:0.82rem;">{{ campagne.get_frequence_display }}</div>
+                <div class="cpd-stat-value">{{ campagne.get_frequence_display }}</div>
               </div>
             </div>
             <div class="col-6 col-md-3">
               <div class="cpd-stat">
                 <div class="cpd-stat-label">Durée spot</div>
-                <div class="cpd-stat-value" style="font-size:0.82rem;">{{ campagne.get_duree_passage_display }}s</div>
+                <div class="cpd-stat-value">{{ campagne.get_duree_passage_display }}s</div>
               </div>
             </div>
             <div class="col-6 col-md-3">
               <div class="cpd-stat">
                 <div class="cpd-stat-label">Tranches horaires</div>
-                <div class="cpd-stat-value" style="font-size:0.82rem;">{{ campagne.tranches_horaires|truncatechars:15 }}</div>
+                <div class="cpd-stat-value">{{ campagne.tranches_horaires|truncatechars:15 }}</div>
               </div>
             </div>
             {% endif %}
@@ -937,19 +272,19 @@
             <div class="row g-3">
               {% if campagne.prix or totaux_campagne.prix %}
               <div class="col-6 col-md-4 d-grid align-content-start gap-2">
-                {% if campagne.prix %}<div class="cpd-stat"><div class="cpd-stat-label">Prix unit. {% if campagne.type_support == 'ecran' %}spot{% elif campagne.type_support == 'marche' %}emplacement / mois{% else %}face / mois{% endif %}</div><div class="cpd-stat-value" style="font-size:0.88rem;">{{ campagne.prix|format_number_fr }}</div></div>{% endif %}
+                {% if campagne.prix %}<div class="cpd-stat"><div class="cpd-stat-label">Prix unit. {% if campagne.type_support == 'ecran' %}spot{% elif campagne.type_support == 'marche' %}emplacement / mois{% else %}face / mois{% endif %}</div><div class="cpd-stat-value">{{ campagne.prix|format_number_fr }}</div></div>{% endif %}
                 {% if totaux_campagne.prix %}<div class="cpd-stat cpd-stat-accent"><div class="cpd-stat-label">Prix total {% if campagne.type_support == 'ecran' %}des spots{% elif campagne.type_support == 'marche' %}des emplacements{% else %}des faces{% endif %}{% if campagne.type_support != 'ecran' %} ({{ campagne.nombre_mois_factures }} mois){% endif %}</div><div class="cpd-stat-value">{{ totaux_campagne.prix|format_number_fr }}</div></div>{% endif %}
               </div>
               {% endif %}
               {% if campagne.prix_affichage or totaux_campagne.affichage %}
               <div class="col-6 col-md-4 d-grid align-content-start gap-2">
-                {% if campagne.prix_affichage %}<div class="cpd-stat"><div class="cpd-stat-label">Prix unit. affichage (1 fois)</div><div class="cpd-stat-value" style="font-size:0.88rem;">{{ campagne.prix_affichage|format_number_fr }}</div></div>{% endif %}
+                {% if campagne.prix_affichage %}<div class="cpd-stat"><div class="cpd-stat-label">Prix unit. affichage (1 fois)</div><div class="cpd-stat-value">{{ campagne.prix_affichage|format_number_fr }}</div></div>{% endif %}
                 {% if totaux_campagne.affichage %}<div class="cpd-stat cpd-stat-accent"><div class="cpd-stat-label">Prix total affichage (1 fois)</div><div class="cpd-stat-value">{{ totaux_campagne.affichage|format_number_fr }}</div></div>{% endif %}
               </div>
               {% endif %}
               {% if campagne.prix_impression or totaux_campagne.impression %}
               <div class="col-6 col-md-4 d-grid align-content-start gap-2">
-                {% if campagne.prix_impression %}<div class="cpd-stat"><div class="cpd-stat-label">Prix unit. impression (1 fois)</div><div class="cpd-stat-value" style="font-size:0.88rem;">{{ campagne.prix_impression|format_number_fr }}</div></div>{% endif %}
+                {% if campagne.prix_impression %}<div class="cpd-stat"><div class="cpd-stat-label">Prix unit. impression (1 fois)</div><div class="cpd-stat-value">{{ campagne.prix_impression|format_number_fr }}</div></div>{% endif %}
                 {% if totaux_campagne.impression %}<div class="cpd-stat cpd-stat-accent"><div class="cpd-stat-label">Prix total impression (1 fois)</div><div class="cpd-stat-value">{{ totaux_campagne.impression|format_number_fr }}</div></div>{% endif %}
               </div>
               {% endif %}
@@ -1003,7 +338,7 @@
                   <form method="post" action="{% url 'supprimer_visuel' visuel.pk %}"
                         onsubmit="return confirm('Supprimer ce visuel ?')">
                     {% csrf_token %}
-                    <button type="submit" class="cpd-visuel-del">
+                    <button type="submit" class="cpd-visuel-del" aria-label="Supprimer le visuel">
                       <i class="bi bi-trash-fill" style="font-size:0.75rem;"></i>
                     </button>
                   </form>
@@ -1028,7 +363,7 @@
     </div>
 
     {# ── Droite : Workflow + Métriques ── #}
-    <div class="col-lg-4">
+    <aside class="cpd-overview-aside" aria-label="Suivi de la campagne">
 
       {# ── WORKFLOW STEPPER ── #}
       <div class="cpd-card mb-4">
@@ -1038,10 +373,10 @@
         <div>
           {% for step, label in campagne.STATUT_CHOICES %}
             {% if campagne.statut == step %}
-              <div class="cpd-wf-step cpd-wf-active">
+              <div class="cpd-wf-step cpd-wf-active" aria-current="step">
                 <i class="bi bi-play-circle-fill" style="color:#932e2b; font-size:1.1rem;"></i>
                 <span class="cpd-wf-label">{{ label }}</span>
-                <span class="cpd-wf-badge">ACTIF</span>
+                <span class="cpd-wf-badge">Statut actuel</span>
               </div>
             {% elif step == 'terminee' and campagne.statut == 'terminee' or step != 'terminee' and step in 'en_cours,terminee,a_venir' and campagne.statut != 'brouillon' %}
               <div class="cpd-wf-step cpd-wf-done">
@@ -1088,33 +423,39 @@
         </div>
       </div>
       {% endif %}
-    </div>
+    </aside>
   </div>
 
   {# ═══════════════════════════════════════════════════════════════ #}
   {# ── SECTION 2: INVENTAIRE & DÉTAIL DES SUPPORTS ── #}
   {# ═══════════════════════════════════════════════════════════════ #}
-  <div class="cpd-sec-head mt-4">
+  <div class="cpd-sec-head" id="campagne-supports">
     <div>
-      <h4 class="cpd-sec-title">
+      <h2 class="cpd-sec-title">
         <i class="bi bi-grid-fill"></i> Inventaire & Spécifications des Supports
-      </h4>
+      </h2>
       <p class="cpd-sec-sub">Données techniques des écrans, dimensions et spécifications des faces engagées.</p>
     </div>
     <div class="d-flex gap-2 align-items-center flex-wrap">
       {% if not request.user.is_client %}
         {% if campagne.est_mere %}
-          <a href="{% url 'campagne_create' %}?client={{ campagne.client.pk }}&campagne_parente={{ campagne.pk }}" class="btn btn-sm" style="background:#932e2b; color:#fff; border-radius:8px; font-weight:600;">
+          <a href="{% url 'campagne_create' %}?client={{ campagne.client.pk }}&campagne_parente={{ campagne.pk }}" class="btn btn-primary btn-sm">
             <i class="bi bi-plus-lg me-1"></i>Ajouter sous-campagne
           </a>
         {% else %}
-          <a href="{% url 'supports_edit_bulk' campagne.pk %}?type_support={{ campagne.type_support }}&ville={{ campagne.lieu }}" class="btn btn-sm" style="background:#932e2b; color:#fff; border-radius:8px; font-weight:600;">
+          <a href="{% url 'supports_edit_bulk' campagne.pk %}?type_support={{ campagne.type_support }}&ville={{ campagne.lieu }}" class="btn btn-primary btn-sm">
             <i class="bi bi-pencil-square me-1"></i>Modifier les supports
           </a>
         {% endif %}
       {% endif %}
     </div>
   </div>
+  {% if campagne.panneaux_confreres %}
+    <section class="cpd-card mb-4 p-3">
+      <h3 class="h6">Réseau Confrère</h3>
+      {% include "portail/_panneau_confrere.html" with panneaux_confreres=campagne.panneaux_confreres only %}
+    </section>
+  {% endif %}
 
   {# ═══════════════════════════════════════════ #}
   {# ── SECTION 3: FICHES SUPPORTS DÉTAILLÉES ── #}
@@ -1187,9 +528,9 @@
         {% endfor %}
       {% else %}
         <div class="col-12">
-          <div class="cpd-card" style="text-align:center; padding:2.5rem;">
-            <i class="bi bi-shop" style="font-size:2.5rem; color:#cbd5e1;"></i>
-            <h6 style="font-weight:700; margin-top:1rem; color:#64748b;">Aucun emplacement de marché associé</h6>
+          <div class="cpd-card cpd-empty">
+            <i class="bi bi-shop" aria-hidden="true"></i>
+            <h3>Aucun emplacement de marché associé</h3>
             <p class="cpd-muted">Ajoutez des emplacements à votre campagne pour afficher leurs spécifications.</p>
           </div>
         </div>
@@ -1235,12 +576,12 @@
               <!--
               {# PHOTO / VISUEL DU SUPPORT #}
               {% if row.support.photo_principale or row.lignes.0.visuel %}
-              <div style="height:110px; border-radius:8px; overflow:hidden; border:1px solid #e2e8f0; position:relative;">
+              <div class="cpd-support-media">
                 {% if row.lignes.0.visuel %}
-                  <img src="{{ row.lignes.0.visuel.url }}" style="width:100%; height:100%; object-fit:cover;">
+                  <img src="{{ row.lignes.0.visuel.url }}" class="cpd-support-image" loading="lazy" alt="">
                   <span class="cpd-visuel-ext" style="font-size:0.55rem; padding:1px 6px;">Visuel Campagne</span>
                 {% elif row.support.photo_principale %}
-                  <img src="{{ row.support.photo_principale.url }}" style="width:100%; height:100%; object-fit:cover;">
+                  <img src="{{ row.support.photo_principale.url }}" class="cpd-support-image" loading="lazy" alt="">
                 {% endif %}
               </div>
               {% endif %}
@@ -1335,12 +676,12 @@
         {% endfor %}
       {% else %}
         <div class="col-12">
-          <div class="cpd-card" style="text-align:center; padding:2.5rem;">
-            <i class="bi bi-display" style="font-size:2.5rem; color:#cbd5e1;"></i>
-            <h6 style="font-weight:700; margin-top:1rem; color:#64748b;">Aucun support associé à cette campagne</h6>
+          <div class="cpd-card cpd-empty">
+            <i class="bi bi-display" aria-hidden="true"></i>
+            <h3>Aucun support associé à cette campagne</h3>
             <p class="cpd-muted">Ajoutez des supports pour afficher leurs caractéristiques techniques et tarifs.</p>
             {% if not request.user.is_client %}
-            <a href="{% url 'supports_add_bulk' campagne.pk %}?type_support={{ campagne.type_support }}&ville={{ campagne.lieu }}" class="btn btn-sm mt-2" style="background:#932e2b; color:#fff; border-radius:8px; font-weight:600;">
+            <a href="{% url 'supports_add_bulk' campagne.pk %}?type_support={{ campagne.type_support }}&ville={{ campagne.lieu }}" class="btn btn-primary btn-sm mt-2">
               <i class="bi bi-plus-lg me-1"></i>Ajouter des supports
             </a>
             {% endif %}
@@ -1355,17 +696,17 @@
   {# ═══════════════════════════════════════════ #}
   {% if campagne.est_mere %}
     {# ── CAS CAMPAGNE MÈRE : TABLEAUX PAR SOUS-CAMPAGNE ── #}
-    <div class="cpd-sec-head mt-5">
+    <div class="cpd-sec-head mt-4" id="campagne-finances">
       <div>
-        <h4 class="cpd-sec-title">
+        <h2 class="cpd-sec-title">
           <i class="bi bi-diagram-3"></i> Détail par Campagne Fille
-        </h4>
+        </h2>
         <p class="cpd-sec-sub">Ventilation financière et supports assignés à chaque sous-campagne.</p>
       </div>
     </div>
 
     {% for ed in enfants_data %}
-    <div class="card table-custom-card mb-4">
+    <div class="card cpd-finance-panel mb-4">
       <div class="card-header bg-white py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-2 border-bottom">
         <div class="d-flex align-items-center gap-2 flex-grow-1" style="min-width:0;">
           <i class="bi bi-megaphone" style="color:#932e2b;"></i>
@@ -1375,11 +716,11 @@
         </div>
         <div class="d-flex align-items-center gap-2">
           <span class="cpd-muted">{{ ed.campagne.contrat.get_detail|default:"—" }} • {{ ed.campagne.date_debut|date:"d/m/Y" }} → {{ ed.campagne.date_fin|date:"d/m/Y" }}</span>
-          <span class="cpd-hero-ref" style="color:#334155; background:#f1f5f9; border-color:#e2e8f0;">{{ ed.campagne.reference }}</span>
+          <span class="cpd-hero-ref">{{ ed.campagne.reference }}</span>
         </div>
       </div>
       <div class="table-responsive">
-        <table class="cpd-table table table-hover align-middle mb-0">
+        <table class="cpd-finance-table">
           <thead>
             <tr>
               <th>Support</th>
@@ -1420,7 +761,7 @@
               <td class="text-end cpd-mono" style="font-weight:700;">{{ row.affichage_total|format_number_fr }}</td>
               <td class="text-end cpd-mono">{{ row.impression_unitaire|format_number_fr }}</td>
               <td class="text-end cpd-mono" style="font-weight:700;">{{ row.impression_total|format_number_fr }}</td>
-              <td class="text-end cpd-mono" style="font-weight:700; color:#932e2b;">{{ row.total_support|format_number_fr }}</td>
+              <td class="text-end cpd-mono cpd-table-total">{{ row.total_support|format_number_fr }}</td>
             </tr>
             {% empty %}
             <tr><td colspan="9" class="text-center cpd-muted py-3">Aucun support</td></tr>
@@ -1435,7 +776,7 @@
               <td class="text-end cpd-mono">{{ ed.totaux.affichage|format_number_fr }}</td>
               <td></td>
               <td class="text-end cpd-mono">{{ ed.totaux.impression|format_number_fr }}</td>
-              <td class="text-end cpd-mono" style="color:#932e2b;">{{ ed.totaux.total|format_number_fr }}</td>
+              <td class="text-end cpd-mono cpd-table-total">{{ ed.totaux.total|format_number_fr }}</td>
             </tr>
           </tfoot>
         </table>
@@ -1445,7 +786,7 @@
 
   {% else %}
     {# ── CAS CAMPAGNE SIMPLE : TABLEAU FINANCIER DÉTAILLÉ ── #}
-    <div class="card table-custom-card mb-4 mt-5">
+    <div class="card cpd-finance-panel mb-4 mt-4" id="campagne-finances">
       <div class="card-header bg-white py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-2 border-bottom">
         <div class="d-flex align-items-center gap-2">
           <i class="bi bi-cash-coin" style="color:#932e2b;"></i>
@@ -1453,7 +794,7 @@
         </div>
       </div>
       <div class="table-responsive">
-        <table class="cpd-table table table-hover align-middle mb-0">
+        <table class="cpd-finance-table">
           <thead>
             <tr>
               <th>Support</th>
@@ -1494,7 +835,7 @@
               <td class="text-end cpd-mono" style="font-weight:700;">{{ row.affichage_total|format_number_fr }}</td>
               <td class="text-end cpd-mono">{{ row.impression_unitaire|format_number_fr }}</td>
               <td class="text-end cpd-mono" style="font-weight:700;">{{ row.impression_total|format_number_fr }}</td>
-              <td class="text-end cpd-mono" style="font-weight:700; color:#932e2b;">{{ row.total_support|format_number_fr }}</td>
+              <td class="text-end cpd-mono cpd-table-total">{{ row.total_support|format_number_fr }}</td>
             </tr>
             {% empty %}
             <tr><td colspan="9" class="text-center cpd-muted py-4">Aucun support</td></tr>
@@ -1509,7 +850,7 @@
               <td class="text-end cpd-mono">{{ totaux_campagne.affichage|format_number_fr }}</td>
               <td></td>
               <td class="text-end cpd-mono">{{ totaux_campagne.impression|format_number_fr }}</td>
-              <td class="text-end cpd-mono" style="color:#932e2b;">{{ totaux_campagne.total|format_number_fr }}</td>
+              <td class="text-end cpd-mono cpd-table-total">{{ totaux_campagne.total|format_number_fr }}</td>
             </tr>
           </tfoot>
         </table>
@@ -1517,7 +858,7 @@
     </div>
   {% endif %}
 
-  <section class="card border-0 shadow-sm mt-4" id="piges">
+  <section class="card cpd-proof-panel mt-4" id="piges">
     <div class="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
       <div>
         <h5 class="mb-1 fw-bold"><i class="bi bi-camera-fill text-primary me-2"></i>Preuves de diffusion</h5>
@@ -1536,10 +877,9 @@
         <div class="row g-3">
           {% for preuve in preuves_diffusion %}
             <div class="col-12 col-md-6 col-xl-4">
-              <article class="border rounded-3 h-100 overflow-hidden">
+              <article class="cpd-proof-card h-100 overflow-hidden">
                 <a href="{{ preuve.photo.url }}" target="_blank" rel="noopener">
-                  <img src="{{ preuve.photo.url }}" alt="Preuve de diffusion" class="w-100"
-                       loading="lazy" style="height:220px; object-fit:cover;">
+                  <img src="{{ preuve.photo.url }}" alt="Preuve de diffusion" class="cpd-proof-image" loading="lazy">
                 </a>
                 <div class="p-3">
                   {% if campagne.est_mere %}<div class="small text-primary fw-semibold mb-1">{{ preuve.campagne.nom }}</div>{% endif %}
@@ -1570,11 +910,10 @@
           {% endfor %}
           {% for pige in pige_fichiers_drive %}
             <div class="col-12 col-md-6 col-xl-4">
-              <article class="border rounded-3 h-100 overflow-hidden">
+              <article class="cpd-proof-card h-100 overflow-hidden">
                 <a href="https://drive.google.com/file/d/{{ pige.drive_file_id }}/view" target="_blank" rel="noopener noreferrer">
                   <img src="https://drive.google.com/thumbnail?id={{ pige.drive_file_id }}&amp;sz=w1000"
-                       alt="Photo de pige : {{ pige.nom_fichier }}" class="w-100"
-                       loading="lazy" style="height:220px; object-fit:cover;">
+                       alt="Photo de pige : {{ pige.nom_fichier }}" class="cpd-proof-image" loading="lazy">
                 </a>
                 <div class="p-3">
                   {% if campagne.est_mere %}<div class="small text-primary fw-semibold mb-1">{{ pige.campagne.nom }}</div>{% endif %}
@@ -1620,11 +959,15 @@
   {# ═══════════════════════════════════════════ #}
   {# ── SECTION 5: EXPORTS & RAPPORTS ── #}
   {# ═══════════════════════════════════════════ #}
-  <div class="cpd-export-section mt-4">
-    <i class="bi bi-file-earmark-arrow-down" style="font-size:2.2rem; color:#932e2b;"></i>
-    <h6 style="font-weight:800; margin-top:0.75rem; margin-bottom:0.5rem; color:#0f172a;">Générer les documents & Preuves de diffusion</h6>
-    <p class="cpd-muted mb-3" style="max-width:500px; margin:0 auto 1rem;">Exportez le dossier complet au format PDF certifié ou visualisez le rapport en ligne avec les photos d'exécution.</p>
-    <div class="d-flex gap-3 justify-content-center flex-wrap">
+  <section class="cpd-export-section mt-4" id="campagne-rapports" aria-labelledby="campagne-rapports-titre">
+    <div class="cpd-export-copy">
+      <span class="cpd-export-icon"><i class="bi bi-file-earmark-arrow-down" aria-hidden="true"></i></span>
+      <div>
+        <h2 id="campagne-rapports-titre">Rapports de campagne</h2>
+        <p>Consultez ou téléchargez le rapport avec les preuves de diffusion.</p>
+      </div>
+    </div>
+    <div class="cpd-export-links">
       <a href="{% url 'campagne_preview' campagne.pk %}" class="cpd-btn-export cpd-btn-view">
         <i class="bi bi-eye"></i> Aperçu Rapport
       </a>
@@ -1632,7 +975,7 @@
         <i class="bi bi-file-earmark-pdf-fill"></i> Télécharger PDF
       </a>
     </div>
-  </div>
+  </section>
 
 </div>
 
@@ -1640,7 +983,7 @@
 {% if campagne.statut == 'en_pause' or campagne.statut == 'en_cours' or campagne.statut == 'a_venir' %}
 <div class="modal fade" id="modalGestionCampagne" tabindex="-1" aria-labelledby="modalGestionCampagneLabel" aria-hidden="true">
   <div class="modal-dialog modal-dialog-centered">
-    <div class="modal-content border-0 shadow">
+    <div class="modal-content cpd-status-dialog">
       <form method="post" action="{% url 'campagne_state_change' campagne.pk %}">
         {% csrf_token %}
         <div class="modal-header">
@@ -1655,7 +998,7 @@
         <div class="modal-body">
           {% if campagne.statut == 'en_pause' %}
             <p class="mb-3">Choisissez comment reprendre cette campagne :</p>
-            <div class="form-check border rounded-3 p-3 ps-5 mb-2">
+            <div class="form-check cpd-status-option">
               <input class="form-check-input" type="radio" name="action" id="repriseProlonger"
                      value="reprendre_prolonger" required>
               <label class="form-check-label fw-semibold" for="repriseProlonger">
@@ -1663,7 +1006,7 @@
                 <span class="d-block small text-muted fw-normal">La durée de la pause sera ajoutée à la date de fin.</span>
               </label>
             </div>
-            <div class="form-check border rounded-3 p-3 ps-5">
+            <div class="form-check cpd-status-option">
               <input class="form-check-input" type="radio" name="action" id="repriseGarder"
                      value="reprendre_garder" required>
               <label class="form-check-label fw-semibold" for="repriseGarder">
@@ -1673,7 +1016,7 @@
             </div>
           {% else %}
             <p class="mb-3">Choisissez l’action à effectuer :</p>
-            <div class="form-check border rounded-3 p-3 ps-5 mb-2">
+            <div class="form-check cpd-status-option">
               <input class="form-check-input" type="radio" name="action" id="actionPause"
                      value="mettre_en_pause" required>
               <label class="form-check-label fw-semibold" for="actionPause">
@@ -1681,7 +1024,7 @@
                 <span class="d-block small text-muted fw-normal">Les supports restent réservés et la campagne pourra reprendre.</span>
               </label>
             </div>
-            <div class="form-check border border-danger-subtle rounded-3 p-3 ps-5">
+            <div class="form-check cpd-status-option cpd-status-danger">
               <input class="form-check-input" type="radio" name="action" id="actionAnnuler"
                      value="annuler" required>
               <label class="form-check-label fw-semibold text-danger" for="actionAnnuler">

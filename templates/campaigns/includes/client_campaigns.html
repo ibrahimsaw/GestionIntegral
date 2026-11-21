@@ -1,0 +1,277 @@
+    <div class="cld-dashboard-main" id="section-campagnes" data-selected-contract="{{ filters.contrat }}" data-selected-contract-name="{% if selected_contrat_obj %}{{ selected_contrat_obj.nom|default:selected_contrat_obj.get_type_contrat_display }}{% endif %}">
+
+      <div class="card cld-panel mb-4">
+        <div class="card-header bg-white py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-2 border-bottom">
+          <div class="d-flex align-items-center gap-2 flex-wrap">
+            <i class="bi bi-megaphone" style="color:#932e2b;"></i>
+            <h2 class="fw-bold mb-0">Campagnes</h2>
+            <span class="badge bg-light text-dark border ms-1" style="font-size:0.68rem; border-radius: 8px;">
+              {{ total_campagnes_count }} affichée{{ total_campagnes_count|pluralize }} / {{ total_campagnes_all }}
+            </span>
+          </div>
+          {% if user.is_staff_regie_role %}
+          <a href="{% url 'campagne_create' %}?client={{ client.pk }}{% if filters.contrat %}&contrat={{ filters.contrat }}{% endif %}" class="btn btn-sm btn-primary py-1 px-2" style="font-size:0.72rem; border-radius: 8px; font-weight:600;">
+            <i class="bi bi-plus-lg me-1"></i>Nouvelle Campagne
+          </a>
+          {% endif %}
+        </div>
+
+        {# ── BARRE DE FILTRES DYNAMIQUES ── #}
+        <div class="cld-campaign-filters">
+          <form id="client-campaign-filters" method="get" action="#section-campagnes" class="row g-2 align-items-center">
+            
+            {# Recherche textuelle #}
+            <div class="col-12 col-md-5">
+              <div class="input-group input-group-sm">
+                <span class="input-group-text bg-light text-muted border-end-0" style="border-radius:8px 0 0 8px !important; border-color:#cbd5e1;">
+                  <i class="bi bi-search"></i>
+                </span>
+                <input type="text" name="q" value="{{ filters.q }}" class="form-control form-control-sm border-start-0" aria-label="Rechercher par nom ou référence" placeholder="Nom ou référence" style="border-radius: 0 8px 8px 0 !important;">
+              </div>
+            </div>
+
+            {% if show_campaign_contract_filter %}
+            <div class="col-6 col-md-auto">
+              <select name="contrat" class="form-select form-select-sm" aria-label="Contrat" style="border-radius: 8px;">
+                <option value="">Tous les contrats</option>
+                {% if filters.contrat and not campaign_contract_choice_selected %}
+                  <option value="{{ filters.contrat }}" selected hidden>{{ selected_contrat_obj|default:filters.contrat }}</option>
+                {% endif %}
+                {% for c in campaign_contract_choices %}
+                  <option value="{{ c.pk }}" {% if filters.contrat == c.pk|stringformat:'s' %}selected{% endif %}>
+                    {{ c.nom|default:c.get_type_contrat_display }} ({{ c.date_debut|date:"d/m/y" }})
+                  </option>
+                {% endfor %}
+                {% if campaign_no_contract_count %}
+                  <option value="hors_contrat" {% if filters.contrat == 'hors_contrat' %}selected{% endif %}>
+                    Hors contrat ({{ campaign_no_contract_count }})
+                  </option>
+                {% endif %}
+              </select>
+            </div>
+            {% elif filters.contrat %}
+              <input type="hidden" name="contrat" value="{{ filters.contrat }}">
+            {% endif %}
+
+            {% if campaign_status_choices|length > 1 %}
+            <div class="col-6 col-md-auto">
+              <select name="statut" class="form-select form-select-sm" aria-label="Statut" style="border-radius: 8px;">
+                <option value="">Tous les statuts</option>
+                {% if filters.statut and not campaign_status_choice_selected %}
+                  <option value="{{ filters.statut }}" selected hidden>{{ filters.statut }}</option>
+                {% endif %}
+                {% for value, label in campaign_status_choices %}
+                  <option value="{{ value }}" {% if filters.statut == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            {% elif filters.statut %}
+              <input type="hidden" name="statut" value="{{ filters.statut }}">
+            {% endif %}
+
+            {% if campaign_type_choices|length > 1 %}
+            <div class="col-6 col-md-auto">
+              <select name="type_support" class="form-select form-select-sm" aria-label="Type de support" style="border-radius: 8px;">
+                <option value="">Tous les types</option>
+                {% if filters.type_support and not campaign_type_choice_selected %}
+                  <option value="{{ filters.type_support }}" selected hidden>{{ filters.type_support }}</option>
+                {% endif %}
+                {% for value, label in campaign_type_choices %}
+                  <option value="{{ value }}" {% if filters.type_support == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+              </select>
+            </div>
+            {% elif filters.type_support %}
+              <input type="hidden" name="type_support" value="{{ filters.type_support }}">
+            {% endif %}
+
+            <noscript><button type="submit" class="btn btn-sm btn-primary">Appliquer les filtres</button></noscript>
+          </form>
+
+          {# Tags des filtres actifs #}
+          {% if has_active_filters %}
+            <div class="d-flex align-items-center gap-1.5 flex-wrap mt-2 pt-2 border-top" style="font-size:0.72rem;">
+              <span class="text-muted"><i class="bi bi-funnel me-1"></i>Filtres actifs :</span>
+              {% if filters.q %}
+                <span class="cld-filter-tag">Mot-clé: "{{ filters.q }}"</span>
+              {% endif %}
+              {% if selected_contrat_obj %}
+                <span class="cld-filter-tag cld-filter-tag-contrat">Contrat: {{ selected_contrat_obj.nom|default:selected_contrat_obj.get_type_contrat_display }}</span>
+              {% elif filters.contrat == 'hors_contrat' %}
+                <span class="cld-filter-tag cld-filter-tag-contrat">Hors Contrat</span>
+              {% endif %}
+              {% if filters.statut %}
+                <span class="cld-filter-tag">Statut: {{ filters.statut }}</span>
+              {% endif %}
+              {% if filters.type_support %}
+                <span class="cld-filter-tag">Type: {{ filters.type_support }}</span>
+              {% endif %}
+              <a href="{% url 'client_detail' client.pk %}#section-campagnes" data-campaign-filter-link class="cld-link ms-auto" style="font-size:0.72rem;">Effacer tout</a>
+            </div>
+          {% endif %}
+        </div>
+
+        {# ── TABLE DES CAMPAGNES ── #}
+        <div data-client-pagination data-page-size="20">
+        {% if user.is_staff_regie_role %}
+        <form method="post" id="client-campaign-bulk-form">
+          {% csrf_token %}
+          <input type="hidden" name="action" id="client-campaign-action-input">
+          <div class="px-3 py-2 border-bottom d-flex align-items-center justify-content-between flex-wrap gap-2">
+            <div class="d-flex align-items-center gap-2">
+              <input type="checkbox" id="client-campaign-select-all" class="form-check-input mt-0" title="Tout sélectionner">
+              <span id="client-campaign-selection-count" class="small text-muted">
+                {{ campagnes|length }} campagne{{ campagnes|length|pluralize }}
+              </span>
+            </div>
+            <div id="client-campaign-actions-bar" class="d-flex align-items-center gap-2" style="display:none !important;">
+              <select id="client-campaign-action-select" class="form-select form-select-sm" style="width:auto;">
+                <option value="">Sélectionner une action</option>
+                <option value="archiver">Archiver</option>
+                <option value="desarchiver">Désarchiver</option>
+                <option value="mettre_en_pause">Mettre en pause</option>
+                <option value="annuler">Annuler définitivement</option>
+                <option value="reprendre_prolonger">Reprendre et prolonger la fin</option>
+                <option value="reprendre_garder">Reprendre sans prolonger la fin</option>
+                <option value="supprimer">Supprimer</option>
+              </select>
+              <button type="button" class="btn btn-sm btn-primary" onclick="confirmerActionCampagnesClient()">
+                <i class="bi bi-check-lg me-1"></i>Appliquer
+              </button>
+            </div>
+          </div>
+        {% endif %}
+        <div class="table-responsive">
+          <table class="cld-dashboard-table">
+            <thead>
+              <tr>
+                {% if user.is_staff_regie_role %}<th class="text-center" style="width: 42px;"></th>{% endif %}
+                <th class="text-center" style="width: 48px;">Type</th>
+                <th>Référence</th>
+                <th>Campagne</th>
+                <th>Période</th>
+                <th class="text-center">Supports</th>
+                <th class="text-center">Nb. Spots</th>
+                <th class="text-center">Statut</th>
+                <th class="text-end pe-3">Action</th>
+              </tr>
+            </thead>
+            <tbody data-client-pagination-group>
+              {% for c in campagnes %}
+              <tr data-client-page-item>
+                {% if user.is_staff_regie_role %}
+                <td class="text-center">
+                  <input type="checkbox" name="selected_ids" value="{{ c.pk }}" class="form-check-input mt-0 client-campaign-row-checkbox">
+                </td>
+                {% endif %}
+                <td class="text-center">
+                  {% if c.est_mere %}
+                    <span class="cld-badge-sub cld-badge-mere" title="Campagne Mère"><i class="bi bi-diagram-3"></i></span>
+                  {% elif c.type_support == 'ecran' %}
+                    <span class="cld-badge-sub cld-badge-ecran" title="Écran LED"><i class="bi bi-display"></i></span>
+                  {% elif c.type_support == 'marche' %}
+                    <span class="cld-badge-sub cld-badge-marche" title="Marché"><i class="bi bi-shop"></i></span>
+                  {% else %}
+                    <span class="cld-badge-sub cld-badge-panneau" title="Panneau Statique"><i class="bi bi-sign-merge-right"></i></span>
+                  {% endif %}
+                </td>
+                <td class="cld-mono" style="font-size:0.72rem; color:var(--color-primary);">
+                  {{ c.reference }}
+                </td>
+                <td>
+                  <a href="{% url 'campagne_detail' c.pk %}" class="fw-bold text-dark text-decoration-none d-block">
+                    {{ c.nom }}
+                  </a>
+                  <div class="d-flex align-items-center gap-1.5 flex-wrap mt-0.5">
+                    {% if client.type_entite == 'agence' %}
+                      <a href="{% url 'client_detail' c.client.pk %}" class="badge bg-primary-subtle text-primary border text-decoration-none mb-1" style="font-size:0.62rem; border-radius:8px;" title="Client de cette campagne">
+                        <i class="bi bi-person me-1"></i>{{ c.client.nom }}
+                      </a>
+                    {% endif %}
+                    {% if client.type_entite == 'client' and c.agence %}
+                      <a href="{% url 'client_detail' c.agence.pk %}" class="badge bg-secondary-subtle text-secondary border text-decoration-none mb-1" style="font-size:0.62rem; border-radius:8px;" title="Agence de cette campagne">
+                        <i class="bi bi-building me-1"></i>{{ c.agence.nom }}
+                      </a>
+                    {% endif %}
+                    {% if c.contrat %}
+                      <a href="{% url 'client_detail' client.pk %}?contrat={{ c.contrat.pk }}#section-campagnes" data-campaign-filter-link class="badge bg-light text-primary border text-decoration-none" style="font-size:0.62rem; border-radius:8px;" title="Filtrer ce contrat">
+                        <i class="bi bi-file-earmark-text me-1"></i>{{ c.contrat.nom|default:c.contrat.get_type_contrat_display }}
+                      </a>
+                    {% else %}
+                      <span class="badge badge-contrat-attente bg-danger-subtle text-danger border border-danger" style="font-size:0.62rem; border-radius:8px;">
+                        Contrat en attente
+                      </span>
+                    {% endif %}
+                    {% if c.campagne_parente %}
+                      <span class="cld-muted" style="font-size:0.66rem;">
+                        <i class="bi bi-diagram-2 me-0.5"></i>de <a href="{% url 'campagne_detail' c.campagne_parente.pk %}" class="cld-link">{{ c.campagne_parente.nom }}</a>
+                      </span>
+                    {% elif c.est_mere %}
+                      <span class="cld-muted" style="font-size:0.66rem;">
+                        <i class="bi bi-diagram-3 me-0.5"></i>Mère ({{ c.sous_campagnes.count }} sous-camp.)
+                      </span>
+                    {% endif %}
+                  </div>
+                </td>
+                <td class="cld-mono" style="font-size:0.72rem; white-space:nowrap;">
+                  <div>{{ c.date_debut|date:"d/m/Y" }}</div>
+                  <div class="text-muted">→ {{ c.date_fin|date:"d/m/Y" }}</div>
+                </td>
+                <td class="text-center cld-mono">
+                  <span class="badge bg-light text-dark border" style="border-radius: 8px;">{{ c.nb_supports|default:"0" }}</span>
+                </td>
+                <td class="text-center cld-mono fw-bold" style="font-size:0.78rem;">
+                  {{ c.calculer_nombre_spots|floatformat:0 }}
+                </td>
+                <td class="text-center">
+                  <span class="cld-status-pill cld-status-{{ c.statut }}">
+                    {% if c.statut == 'en_cours' %}<span class="cld-status-dot-active" aria-hidden="true"></span>{% else %}<i class="bi bi-circle-fill" style="font-size:5px;"></i>{% endif %}
+                    {{ c.get_statut_display }}
+                  </span>
+                </td>
+                <td class="text-end m-3">
+                  <a href="{% url 'campagne_detail' c.pk %}" class="btn btn-sm btn-outline-primary py-1 px-2" style="font-size:0.75rem; border-radius: 8px;" title="Détail campagne">
+                    <i class="bi bi-eye"></i>
+                  </a>
+                  {% if user.is_staff_regie_role %}
+                  <a href="{% url 'campagne_edit' c.pk %}" class="btn btn-sm btn-outline-secondary py-1 px-2" style="font-size:0.75rem; border-radius: 8px;" title="Modifier la campagne">
+                    <i class="bi bi-pencil"></i>
+                  </a>
+                  <a href="{% url 'campagne_delete' c.pk %}" class="btn btn-sm btn-outline-danger py-1 px-2" style="font-size:0.75rem; border-radius: 8px;" title="Supprimer la campagne">
+                    <i class="bi bi-trash"></i>
+                  </a>
+                  {% endif %}
+                  <a href="{% url 'campagne_preview' c.pk %}" class="btn btn-sm btn-outline-view py-1 px-2" style="font-size:0.75rem; border-radius: 8px;" title="Aperçu du rapport">
+                    <i class="bi bi-download"></i>
+                  </a>
+                </td>
+              </tr>
+              {% empty %}
+              <tr>
+                <td colspan="{% if user.is_staff_regie_role %}9{% else %}8{% endif %}" class="text-center py-4 cld-muted">
+                  <i class="bi bi-megaphone-fill d-block mb-1 fs-3 text-muted"></i>
+                  {% if has_active_filters %}
+                    Aucune campagne ne correspond aux critères de filtre sélectionnés.
+                    <div class="mt-2">
+                      <a href="{% url 'client_detail' client.pk %}#section-campagnes" data-campaign-filter-link class="btn btn-sm btn-outline-secondary" style="border-radius:8px;">
+                        Réinitialiser les filtres
+                      </a>
+                    </div>
+                  {% else %}
+                    Aucune campagne enregistrée pour ce client.
+                  {% endif %}
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% if user.is_staff_regie_role %}
+        </form>
+        {% endif %}
+
+        <div class="p-3 border-top" data-client-pagination-controls></div>
+        </div>
+      </div>
+
+    </div>

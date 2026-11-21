@@ -1,21 +1,23 @@
 {% extends 'base.html' %}
 {% load static sort_tags %}
 {% block title %}Supports — Integral{% endblock %}
-{% block topbar_title %}<i class="bi bi-geo-alt me-2" style="color:var(--color-primary)"></i>Inventaire des Supports{% endblock %}
+{% block topbar_title %}<i class="bi bi-geo-alt me-2 d-none d-sm-inline" style="color:var(--color-primary)" aria-hidden="true"></i><span class="d-none d-sm-inline">Inventaire des supports</span><span class="d-sm-none">Supports</span>{% endblock %}
+{% block topbar_actions_classes %}support-topbar-slot{% endblock %}
 {% block topbar_actions %}
   {% if user.is_staff_regie_role %}
-  <div class="d-flex gap-2">
-    <a href="{% url 'support_deletion_requests' %}" class="btn btn-outline-warning btn-sm shadow-sm px-3">
-      <i class="bi bi-shield-check me-1"></i>
-      <span class="d-none d-md-inline">Demandes à approuver</span>
+  <div class="support-topbar-actions" role="group" aria-label="Actions sur les supports">
+    <a href="{% url 'support_deletion_requests' %}" class="support-topbar-action{% if pending_deletion_count %} has-pending{% endif %}" aria-label="Demandes à approuver{% if pending_deletion_count %} ({{ pending_deletion_count }}){% endif %}" title="Demandes à approuver">
+      <i class="bi bi-shield-check" aria-hidden="true"></i>
+      <span class="support-topbar-label">Approbations</span>
+      {% if pending_deletion_count %}<span class="support-topbar-count" aria-hidden="true">{{ pending_deletion_count }}</span>{% endif %}
     </a>
-    <a href="{% url 'supports_report' %}" class="btn btn-outline-secondary btn-sm shadow-sm px-3">
-      <i class="bi bi-file-earmark-bar-graph me-1"></i>
-      <span class="d-none d-md-inline">Report Panneaux</span>
+    <a href="{% url 'supports_report' %}" class="support-topbar-action" aria-label="Rapport des supports" title="Rapport des supports">
+      <i class="bi bi-file-earmark-bar-graph" aria-hidden="true"></i>
+      <span class="support-topbar-label">Rapport des supports</span>
     </a>
-    <a href="{% url 'support_create' %}{% if category_f == 'Marché' or type_panneau_f == 'Marché' or type_panneau_f == 'marche' %}?type=marche{% elif category_f == 'Ecran' or type_f == 'ecran' %}?type=ecran{% else %}?type=panneau{% endif %}" class="btn btn-primary btn-sm shadow-sm px-3">
-      <i class="bi bi-plus-lg me-1"></i>
-      <span class="d-none d-md-inline">{% if category_f == 'Marché' or type_panneau_f == 'Marché' or type_panneau_f == 'marche' %}Ajouter un marché{% elif category_f == 'Ecran' or type_f == 'ecran' %}Ajouter un écran{% elif type_f == 'panneau' %}Ajouter un panneau{% else %}Ajouter un support{% endif %}</span>
+    <a href="{% url 'support_create' %}{% if category_f == 'Marché' or type_panneau_f == 'Marché' or type_panneau_f == 'marche' %}?type=marche{% elif category_f == 'Ecran' or type_f == 'ecran' %}?type=ecran{% else %}?type=panneau{% endif %}" class="support-topbar-action support-topbar-primary" title="Ajouter un support">
+      <i class="bi bi-plus-lg" aria-hidden="true"></i>
+      <span class="support-topbar-label">{% if category_f == 'Marché' or type_panneau_f == 'Marché' or type_panneau_f == 'marche' %}Ajouter un marché{% elif category_f == 'Ecran' or type_f == 'ecran' %}Ajouter un écran{% elif type_f == 'panneau' %}Ajouter un panneau{% else %}Ajouter un support{% endif %}</span>
     </a>
   </div>
   {% endif %}
@@ -23,7 +25,7 @@
 {% block page_toolbar %}{% endblock %}
 
 {% block extra_head %}
-<link rel="stylesheet" href="{% static 'css/gestion-listes.css' %}?v=20261118-support-buttons">
+<link rel="stylesheet" href="{% static 'css/gestion-listes.css' %}?v=20261120-support-actions">
 {% endblock %}
 
 {% block content %}
@@ -46,127 +48,29 @@
         <span class="dl-total-label">support{{ supports|length|pluralize }} affiché{{ supports|length|pluralize }}</span>
       </div>
     </div>
-    {% if user.is_staff_regie_role %}
-    <div class=" d-flex gap-2 flex-wrap d-inline d-md-none align-items-center">
-      <a href="{% url 'support_deletion_requests' %}" class="btn btn-outline-light shadow-sm d-flex align-items-center gap-1" style="font-weight: 600;">
-        <i class="bi bi-shield-check me-1"></i>
-        <span>Demandes à approuver</span>
-      </a>
-      <a href="{% url 'supports_report' %}" class="btn btn-outline-light shadow-sm d-flex align-items-center gap-1" style="font-weight: 600;">
-        <i class="bi bi-file-earmark-bar-graph me-1"></i>
-        <span>Report Panneaux</span>
-      </a>
-      <a href="{% url 'support_create' %}{% if category_f == 'Marché' or type_panneau_f == 'Marché' or type_panneau_f == 'marche' %}?type=marche{% elif category_f == 'Ecran' or type_f == 'ecran' %}?type=ecran{% else %}?type=panneau{% endif %}" class="btn btn-light shadow-sm d-flex align-items-center gap-1" style="font-weight: 700; color: #932e2b;">
-        <i class="bi bi-plus-lg me-1"></i>
-        <span>{% if category_f == 'Marché' or type_panneau_f == 'Marché' or type_panneau_f == 'marche' %}Nouveau Marché{% elif category_f == 'Ecran' or type_f == 'ecran' %}Nouvel Écran{% elif type_f == 'panneau' %}Nouveau Panneau{% else %}Nouveau Support{% endif %}</span>
-      </a>
-    </div>
-    {% endif %}
   </header>
 
 {# ── Déterminer si le type est filtré ── #}
 {% with is_type_filtered=type_f|default:category_f|default:type_panneau_f %}
 
 {# ── SECTION FILTRES ── #}
-<div class="dl-card dl-support-filter-card">
-  <div class="dl-support-filter-body">
-    <form method="get" class="dl-support-filter-form">
-      
-      {# Recherche textuelle #}
-      <div class="dl-support-filter-search">
-        <label for="support-search" class="form-label">Rechercher</label>
-        <div class="input-group">
-          <span class="input-group-text"><i class="bi bi-search"></i></span>
-          <input id="support-search" type="search" name="q" value="{{ q }}" class="form-control" placeholder="Code, nom, ancien nom, adresse..." autocomplete="off">
-        </div>
-      </div>
-
-      {# Ville #}
-      {% if villes and desactif != 'ville' %}
+    <form method="get" id="support-filter-form" class="dl-support-filter-form">
+      {% for nom, valeur in filtres_supports_masques.items %}
+      <input type="hidden" name="{{ nom }}" value="{{ valeur }}">
+      {% endfor %}
+      {% for filtre in filtres_supports %}
       <div class="dl-support-filter-group">
-        <span id="support-city-label" class="dl-support-filter-label">Ville</span>
-        <div class="dl-support-filter-options" role="radiogroup" aria-labelledby="support-city-label">
-          <input class="btn-check" type="radio" name="ville" id="support-city-all" value="" {% if not ville_f %}checked{% endif %}>
-          <label class="dl-support-filter-option" for="support-city-all">Toutes</label>
-          {% for ville in villes %}
-            <input class="btn-check" type="radio" name="ville" id="support-city-{{ forloop.counter }}" value="{{ ville }}" {% if ville_f == ville %}checked{% endif %}>
-            <label class="dl-support-filter-option" for="support-city-{{ forloop.counter }}">{{ ville }}</label>
+        <span id="support-filter-{{ filtre.nom }}-label" class="dl-support-filter-label">{{ filtre.titre }}</span>
+        <div class="dl-tabs dl-support-filter-tabs" role="radiogroup" aria-labelledby="support-filter-{{ filtre.nom }}-label">
+          {% for valeur, libelle, compte in filtre.onglets %}
+          <input class="btn-check" type="radio" name="{{ filtre.nom }}" id="support-{{ filtre.identifiant }}-{{ forloop.counter }}" value="{{ valeur }}" {% if filtre.actif == valeur %}checked{% endif %}>
+          <label class="dl-tab" for="support-{{ filtre.identifiant }}-{{ forloop.counter }}">
+            {{ libelle }} <span class="dl-tab-count">{{ compte }}</span>
+          </label>
           {% endfor %}
         </div>
       </div>
-      {% endif %}
-
-      {# Catégorie de support #}
-      {% if category_choices and type_panneau_f != '1x2' and desactif != 'ecran' and desactif != 'panneau' %}
-      <div class="dl-support-filter-group">
-        <span id="support-category-label" class="dl-support-filter-label">Catégorie</span>
-        <div class="dl-support-filter-options" role="radiogroup" aria-labelledby="support-category-label">
-          <input class="btn-check" type="radio" name="categorie" id="support-category-all" value="" {% if not category_f %}checked{% endif %}>
-          <label class="dl-support-filter-option" for="support-category-all">Toutes</label>
-          {% for categorie in category_choices %}
-            <input class="btn-check" type="radio" name="categorie" id="support-category-{{ forloop.counter }}" value="{{ categorie }}" {% if category_f == categorie %}checked{% endif %}>
-            <label class="dl-support-filter-option" for="support-category-{{ forloop.counter }}">{{ categorie }}</label>
-          {% endfor %}
-        </div>
-      </div>
-      {% endif %}
-
-      {# Format #}
-      {% if type_panneau_choices and type_panneau_f != '1x2' %}
-      <div class="dl-support-filter-group dl-support-filter-format">
-        <span id="support-format-label" class="dl-support-filter-label">Format</span>
-        <div class="dl-support-filter-options" role="radiogroup" aria-labelledby="support-format-label">
-          <input class="btn-check" type="radio" name="type_panneau" id="support-format-all" value="" {% if not type_panneau_f %}checked{% endif %}>
-          <label class="dl-support-filter-option" for="support-format-all">Tous</label>
-          {% for code, libelle in type_panneau_choices %}
-            <input class="btn-check" type="radio" name="type_panneau" id="support-format-{{ forloop.counter }}" value="{{ code }}" {% if type_panneau_f == code %}checked{% endif %}>
-            <label class="dl-support-filter-option" for="support-format-{{ forloop.counter }}">{{ libelle }}</label>
-          {% endfor %}
-        </div>
-      </div>
-      {% endif %}
-
-      {# État technique #}
-      {% if etat_choices %}
-      <div class="dl-support-filter-group">
-        <span id="support-state-label" class="dl-support-filter-label">État</span>
-        <div class="dl-support-filter-options" role="radiogroup" aria-labelledby="support-state-label">
-          <input class="btn-check" type="radio" name="etat" id="support-state-all" value="" {% if not etat_f %}checked{% endif %}>
-          <label class="dl-support-filter-option" for="support-state-all">Tous</label>
-          {% for value, label in etat_choices %}
-            <input class="btn-check" type="radio" name="etat" id="support-state-{{ forloop.counter }}" value="{{ value }}" {% if etat_f == value %}checked{% endif %}>
-            <label class="dl-support-filter-option" for="support-state-{{ forloop.counter }}">{{ label }}</label>
-          {% endfor %}
-        </div>
-      </div>
-      {% endif %}
-
-      {# Occupation commerciale #}
-      {% if occupation_choices %}
-      <div class="dl-support-filter-group">
-        <span id="support-occupation-label" class="dl-support-filter-label">Occupation</span>
-        <div class="dl-support-filter-options" role="radiogroup" aria-labelledby="support-occupation-label">
-          <input class="btn-check" type="radio" name="occupation" id="support-occupation-all" value="" {% if not occupation_f %}checked{% endif %}>
-          <label class="dl-support-filter-option" for="support-occupation-all">Toutes</label>
-          {% for value, label in occupation_choices.items %}
-            <input class="btn-check" type="radio" name="occupation" id="support-occupation-{{ forloop.counter }}" value="{{ value }}" {% if occupation_f == value %}checked{% endif %}>
-            <label class="dl-support-filter-option" for="support-occupation-{{ forloop.counter }}">{{ label }}</label>
-          {% endfor %}
-        </div>
-      </div>
-      {% endif %}
-
-      {# Boutons Filtrer / Réinitialiser #}
-      <div class="dl-support-filter-actions dl-support-filter-submit">
-        <button type="submit" class="btn btn-primary btn-sm">
-          <i class="bi bi-funnel me-1"></i>Filtrer
-        </button>
-        {% if q or type_f or category_f or ville_f or etat_f or occupation_f or type_panneau_f %}
-        <a href="{% url 'support_list' %}" class="dl-open" title="Réinitialiser tous les filtres" aria-label="Réinitialiser tous les filtres">
-          <i class="bi bi-x-lg"></i>
-        </a>
-        {% endif %}
-      </div>
+      {% endfor %}
 
     </form>
 
@@ -201,9 +105,6 @@
     </div>
     {% endif %}
 
-  </div>
-</div>
-
 {# ── SECTION TABLEAU DES SUPPORTS ── #}
 <div data-client-pagination data-page-size="20">
 <form method="post" id="support-actions-form" action="{% url 'support_bulk_action' %}">
@@ -213,7 +114,7 @@
   <div class="dl-card-head dl-support-table-head">
     <div class="d-flex align-items-center gap-3">
       <input type="checkbox" id="support-select-all" class="form-check-input mt-0" title="Tout sélectionner">
-      <span><i class="bi bi-table"></i>Résultats</span>
+      <span><i class="bi bi-table"></i>Supports recensés</span>
       <span id="support-selection-count" class="dl-count">
         {{ supports|length }} support{{ supports|length|pluralize }}
       </span>
@@ -250,6 +151,11 @@
     </a>
   </div>
 
+  <div class="d-flex justify-content-end align-items-center gap-2 p-3">
+    <label class="form-label mb-0 small" for="support-search">Rechercher</label>
+    <input id="support-search" name="q" form="support-filter-form" class="form-control form-control-sm dl-support-search" type="search"
+           value="{{ q }}" placeholder="Code, nom, adresse…" autocomplete="off">
+  </div>
   <div class="table-responsive">
     <table id="tableSupports" class="table dl-table table-supports mb-0 align-middle">
       <thead>
@@ -323,11 +229,11 @@
             {# Cellule Type : affichée UNIQUEMENT si non filtré #}
             {% if not is_type_filtered %}
             <td>
-              <span class="badge {% if s.type_panneau == 'Marché' %} bs-maintenance {% elif s.type_support == 'panneau' %}bs-bientot{% else %}bs-en_cours{% endif %}">
-                {% if s.type_panneau == 'Marché'  %}
-                  <i class="bi bi-shop me-1"></i>{{ s.type_panneau }}
+              <span class="badge {% if s.categorie_liste == 'Marché' %} bs-maintenance {% elif s.type_support == 'panneau' %}bs-bientot{% else %}bs-en_cours{% endif %}">
+                {% if s.categorie_liste == 'Marché' %}
+                  <i class="bi bi-shop me-1"></i>{{ s.categorie_liste }}
                 {% elif s.type_support == 'panneau' %}
-                  <i class="bi bi-sign-merge-right me-1"></i>{% if s.type_panneau == 'Standard' %}12m²{% else %}{{ s.type_panneau|default:"Panneau" }}{% endif %}
+                  <i class="bi bi-sign-merge-right me-1"></i>{% if s.categorie_liste == 'Standard' %}12m²{% else %}{{ s.categorie_liste|default:"Panneau" }}{% endif %}
                 {% else %}
                   <i class="bi bi-display me-1"></i>{{ s.get_type_support_display }}
                 {% endif %}
@@ -343,7 +249,7 @@
 
             <td>
               {% if s.type_support == 'ecran' %}
-                {% if s.is_occupe %}
+                {% if s.occupe_liste %}
                   <span class="badge bs-occupe"><i class="bi bi-broadcast me-1"></i>Occupé {{ s.taux_occupation_pourcentage }}%</span>
                 {% else %}
                   <span class="badge bs-disponible"><i class="bi bi-check2 me-1"></i>Libre</span>
@@ -351,11 +257,11 @@
               {% else %}
                 <div class="d-flex flex-wrap gap-1">
                   {% for face in s.faces.all %}
-                    {% if face.get_statut == 'libre' %}
+                    {% if face.statut_liste == 'libre' %}
                       <span class="badge bs-disponible" title="Face {{ face.label }} : Libre"><i class="bi bi-check2 me-1"></i>{{ face.label }}</span>
-                    {% elif face.get_statut == 'occupe' %}
+                    {% elif face.statut_liste == 'occupe' %}
                       <span class="badge bs-occupe" title="Face {{ face.label }} : Occupée"><i class="bi bi-broadcast me-1"></i>{{ face.label }}</span>
-                    {% elif face.get_statut == 'reserve' %}
+                    {% elif face.statut_liste == 'reserve' %}
                       <span class="badge bs-reserve" title="Face {{ face.label }} : Réservée"><i class="bi bi-clock me-1"></i>{{ face.label }}</span>
                     {% else %}
                       <span class="badge bs-panne" title="Face {{ face.label }} : En Panne"><i class="bi bi-exclamation-triangle me-1"></i>{{ face.label }}</span>
@@ -463,6 +369,8 @@
   function clearSupportRadioFilter(name) {
     const allOption = supportFilterForm.querySelector(`input[type="radio"][name="${name}"][value=""]`);
     if (allOption) allOption.checked = true;
+    const hiddenFilter = supportFilterForm.querySelector(`input[type="hidden"][name="${name}"]`);
+    if (hiddenFilter) hiddenFilter.value = '';
   }
 
   if (supportFilterForm) {
@@ -471,12 +379,13 @@
 
       if (event.target.name === 'categorie') {
         clearSupportRadioFilter('type_panneau');
-        supportFilterForm.submit();
+        clearSupportRadioFilter('occupation');
       } else if (event.target.name === 'ville') {
         clearSupportRadioFilter('categorie');
         clearSupportRadioFilter('type_panneau');
-        supportFilterForm.submit();
+        clearSupportRadioFilter('occupation');
       }
+      supportFilterForm.requestSubmit();
     });
   }
 

@@ -21,6 +21,7 @@ from inventory.models import (
     Support,
     FacePanneau,
     FormatSupport,
+    SupportConfrere,
     normaliser_categorie_format,
 )
 
@@ -381,6 +382,13 @@ class CampagneForm(forms.ModelForm):
             'supports_souhaites',
         ).order_by('-created_at')
         self.demandes_existantes = list(demandes_qs)
+        if self.demande_source and all(demande.pk != self.demande_source.pk for demande in self.demandes_existantes):
+            self.demandes_existantes.append(self.demande_source)
+        ids_supports_confreres = {
+            ligne['support_id'] for demande in self.demandes_existantes
+            for ligne in demande.panneaux_confreres if ligne.get('support_id')
+        }
+        supports_confreres = SupportConfrere.objects.select_related('format').in_bulk(ids_supports_confreres)
         for demande in self.demandes_existantes:
             demande.client_formulaire = (
                 demande.client
@@ -395,12 +403,13 @@ class CampagneForm(forms.ModelForm):
                 .order_by('pk')
                 .first()
             )
-            villes = sorted({
+            villes = {
                 face.support.ville
                 for face in demande.faces_souhaitees.select_related('support')
                 if face.support.ville
-            })
-            demande.lieu_formulaire = villes[0] if len(villes) == 1 else ''
+            }
+            villes.update(ligne['ville'] for ligne in demande.panneaux_confreres if ligne.get('ville'))
+            demande.lieu_formulaire = next(iter(villes)) if len(villes) == 1 else ''
             formats_par_categorie = {}
             for face in demande.faces_souhaitees.select_related('support'):
                 format_code = face.support.format
@@ -409,6 +418,13 @@ class CampagneForm(forms.ModelForm):
                 )
                 if categorie:
                     formats_par_categorie.setdefault(categorie, set()).add(format_code)
+            for ligne in demande.panneaux_confreres:
+                support = supports_confreres.get(ligne.get('support_id'))
+                if support and support.categorie_affichee:
+                    categorie = normaliser_categorie_format(support.categorie_affichee)
+                    codes = formats_par_categorie.setdefault(categorie, set())
+                    if support.format_id:
+                        codes.add(support.format.code)
             demande.categories_pour_formulaire = [
                 {'nom': categorie, 'formats': sorted(codes)}
                 for categorie, codes in sorted(formats_par_categorie.items())
@@ -494,7 +510,10 @@ class CampagneForm(forms.ModelForm):
             .distinct()
             .order_by('ville')
         )
-        lieu_choices = [('', '--- Sélectionner une ville ---')] + [(v, v) for v in villes]
+        villes = set(villes)
+        if self.demande_source:
+            villes.update(ligne['ville'] for ligne in self.demande_source.panneaux_confreres if ligne.get('ville'))
+        lieu_choices = [('', '--- Sélectionner une ville ---')] + [(v, v) for v in sorted(villes)]
         self.fields['lieu'].choices = lieu_choices
 
     def clean_visuels_multiples(self):
@@ -633,18 +652,18 @@ class CampagneForm(forms.ModelForm):
                 type_support,
                 normaliser_categorie_format(type_support),
             )
-            if not faces_demande:
+            if not faces_demande and not self.demande_source.panneau_confrere:
                 self.add_error(
                     'reservation_reference',
                     "Cette demande ne contient aucune face à importer dans la campagne.",
                 )
-            elif categorie_selectionnee not in categories_demande:
+            elif faces_demande and categorie_selectionnee not in categories_demande:
                 self.add_error(
                     'type_support',
                     "Choisissez une catégorie présente parmi les faces de cette demande.",
                 )
             else:
-                self.demande_formats = categories_demande[categorie_selectionnee]
+                self.demande_formats = categories_demande.get(categorie_selectionnee, set())
             cleaned['reservation_reference'] = ''
 
         elif reservation_reference:

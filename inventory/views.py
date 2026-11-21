@@ -2,6 +2,7 @@ import io
 import json
 import re
 import unicodedata
+from collections import Counter
 from datetime import date, datetime, time, timedelta
 from typing import cast
 
@@ -24,7 +25,8 @@ from core.mixins import ClientSidePaginationMixin, SortableListMixin, all_record
 from .forms import *
 from .models import *
 from accounts.models import User
-from django.db.models import Q
+from django.db.models import Q, prefetch_related_objects
+from django.utils.functional import cached_property
 from django.utils.safestring import mark_safe
 from django.core.exceptions import PermissionDenied
 from django.db.models.deletion import ProtectedError
@@ -1279,7 +1281,7 @@ class SupportListView(TechnicienStaffRequiredMixin, ClientSidePaginationMixin, S
         for filter_name in excluded_filters:
             query_params[filter_name] = ''
 
-        queryset = Support.objects.prefetch_related('faces').select_related('ecran_info').all()
+        queryset = Support.objects.select_related('ecran_info').all()
         q = query_params.get('q', '')
         type_f = query_params.get('type', '')
         category_f = query_params.get('categorie', '')
@@ -1315,7 +1317,7 @@ class SupportListView(TechnicienStaffRequiredMixin, ClientSidePaginationMixin, S
                 formats_categorie = FormatSupport.hors_ecran().filter(
                     Q(categorie__isnull=True) | Q(categorie=''),
                 ).values('code')
-            elif category_f.casefold() == '12m2':
+            elif category_f.casefold() in ('12m2', '12m²'):
                 formats_categorie = FormatSupport.objects.filter(
                     Q(categorie__iexact='Standard')
                     | Q(categorie__iexact='12m2')
@@ -1362,26 +1364,86 @@ class SupportListView(TechnicienStaffRequiredMixin, ClientSidePaginationMixin, S
         return queryset
 
     def _get_occupation_flags(self, support):
-        if not hasattr(self, '_occupation_flags_cache'):
-            self._occupation_flags_cache = {}
-        if support.pk not in self._occupation_flags_cache:
-            self._occupation_flags_cache[support.pk] = (
-                support.is_occupe(),
-                support.is_reserve(),
-                support.is_libre(),
-            )
-        return self._occupation_flags_cache[support.pk]
+        occupes, reserves, libres, _, _ = self._occupation_liste
+        return support.pk in occupes, support.pk in reserves, support.pk in libres
+
+    @cached_property
+    def _occupation_liste(self):
+        maintenant = timezone.now()
+        jour = maintenant.date()
+        campagnes = LigneCampagne.objects.filter(
+            Q(campagne__statut__in=('en_cours', 'a_venir'),
+              campagne__date_debut__lte=jour, campagne__date_fin__gte=jour)
+            | (Q(campagne__statut='en_pause', campagne__date_debut__lte=jour)
+               & (Q(campagne__date_fin__gte=jour)
+                  | Q(campagne__date_mise_en_pause__lte=jour)))
+        )
+        occupes, faces_occupees = set(), set()
+        for face_id, panneau_id, support_id, type_support in campagnes.values_list(
+            'face_id', 'face__support_id', 'support_id', 'support__type_support',
+        ):
+            if face_id:
+                faces_occupees.add(face_id)
+                occupes.add(panneau_id)
+            if support_id and type_support != Support.TYPE_PANNEAU:
+                occupes.add(support_id)
+
+        reservations = ReservationLigne.objects.filter(
+            reservation__statut='confirmee', reservation__date_fin__gte=maintenant,
+        )
+        reserves, faces_reservees = set(), set()
+        for debut, fin, face_id, panneau_id, support_id, type_support in reservations.values_list(
+            'reservation__date_debut', 'reservation__date_fin', 'face_id',
+            'face__support_id', 'support_id', 'support__type_support',
+        ):
+            if face_id:
+                reserves.add(panneau_id)
+                if debut < maintenant < fin:
+                    faces_reservees.add(face_id)
+            if support_id and type_support != Support.TYPE_PANNEAU:
+                reserves.add(support_id)
+
+        blocages = DemandeReservation.objects.filter(
+            statut__in=(
+                DemandeReservation.STATUT_BROUILLON,
+                DemandeReservation.STATUT_NOUVELLE,
+                DemandeReservation.STATUT_EN_COURS,
+            ),
+            faces_souhaitees__isnull=False,
+        ).filter(
+            Q(date_debut_blocage__lte=jour, date_fin_blocage__gte=jour)
+            | Q(date_debut_souhaitee__lte=jour, date_fin_souhaitee__gte=jour)
+        ).values('faces_souhaitees')
+        libres = set(FacePanneau.objects.exclude(pk__in=campagnes.exclude(face_id=None).values('face_id'))
+                    .exclude(pk__in=blocages).values_list('support_id', flat=True).distinct())
+        return occupes, reserves, libres, faces_occupees, faces_reservees
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        supports = context['supports'].object_list
+        prefetch_related_objects(supports, 'faces')
+        categories_par_format = dict(FormatSupport.objects.values_list('code', 'categorie'))
+        occupes, _, _, faces_occupees, faces_reservees = self._occupation_liste
+        for support in supports:
+            support.categorie_liste = categories_par_format.get(support.format, '')
+            support.occupe_liste = support.pk in occupes
+            for face in support.faces.all():
+                if face.etat == Support.ETAT_PANNE:
+                    face.statut_liste = 'panne'
+                elif face.pk in faces_occupees:
+                    face.statut_liste = 'occupe'
+                elif face.pk in faces_reservees:
+                    face.statut_liste = 'reserve'
+                else:
+                    face.statut_liste = 'libre'
         type_f = self.request.GET.get('type', '')
         ville_f = self.request.GET.get('ville', '').strip()
         category_f = self.request.GET.get('categorie', '')
         city_supports = list(self._get_filtered_queryset(
-            excluded_filters=('ville', 'categorie', 'type_panneau'),
+            excluded_filters=('ville', 'categorie', 'type_panneau', 'occupation', 'etat', 'q'),
         ))
         category_supports = list(self._get_filtered_queryset(
-            excluded_filters=('categorie', 'type_panneau'),
+            excluded_filters=('categorie', 'type_panneau', 'occupation', 'etat', 'q'),
         ))
         format_supports = list(self._get_filtered_queryset(
             excluded_filters=('type_panneau',),
@@ -1468,30 +1530,98 @@ class SupportListView(TechnicienStaffRequiredMixin, ClientSidePaginationMixin, S
         if Support.ETAT_PANNE in state_values:
             etat_choices.append((Support.ETAT_PANNE, 'En panne'))
 
-        available_occupations = set()
+        occupation_counts = Counter()
         for support in occupation_supports:
             occupied, reserved, physically_free = self._get_occupation_flags(support)
             if occupied:
-                available_occupations.add('occupe')
+                occupation_counts['occupe'] += 1
             if not occupied and not reserved:
-                available_occupations.add('libre')
+                occupation_counts['libre'] += 1
             if reserved:
-                available_occupations.add('reserve')
+                occupation_counts['reserve'] += 1
             if occupied and not physically_free:
-                available_occupations.add('total_occupe')
+                occupation_counts['total_occupe'] += 1
             if reserved and not physically_free and not occupied:
-                available_occupations.add('total_reserve')
+                occupation_counts['total_reserve'] += 1
             if not reserved:
-                available_occupations.add('non_reserve')
+                occupation_counts['non_reserve'] += 1
             if occupied or reserved:
-                available_occupations.add('occupe_ou_reserve')
+                occupation_counts['occupe_ou_reserve'] += 1
         occupation_choices = {
             value: label
             for value, label in self.occupation.items()
-            if value in available_occupations
+            if occupation_counts[value]
         }
 
+        def compter_formats(supports):
+            compteurs = Counter()
+            for support in supports:
+                if support.type_support == Support.TYPE_PANNEAU:
+                    compteurs[support.format] += 1
+                elif support.type_support == Support.TYPE_ECRAN:
+                    info = getattr(support, 'ecran_info', None)
+                    compteurs[info.cellule if info else ''] += 1
+            return compteurs
+
+        categories_counts = Counter()
+        for support in category_supports:
+            if support.type_support == Support.TYPE_ECRAN:
+                categories_counts['ecran'] += 1
+            elif support.type_support == Support.TYPE_PANNEAU:
+                fmt = formats_by_code.get(support.format)
+                if fmt:
+                    categorie = (fmt.categorie or 'Autre').casefold()
+                    categories_counts[categorie] += 1
+                    if categorie in ('standard', '12m2'):
+                        categories_counts['12m²'] += 1
+                    if categorie in ('standard', '12m²'):
+                        categories_counts['12m2'] += 1
+        state_counts = Counter(support.etat for support in state_supports)
+        state_counts[Support.ETAT_BON] = sum(state_counts[etat] for etat in Support.ETATS_OPERATIONNELS)
+
+        filtres = []
+        identifiants = {
+            'ville': 'city', 'categorie': 'category', 'type_panneau': 'format',
+            'etat': 'state', 'occupation': 'occupation',
+        }
+
+        def ajouter_filtre(nom, titre, tous, choix, compteurs, effectif, actif):
+            filtres.append({
+                'nom': nom,
+                'identifiant': identifiants[nom],
+                'titre': titre,
+                'actif': actif,
+                'onglets': [('', tous, effectif), *((valeur, libelle, compteurs[valeur]) for valeur, libelle in choix)],
+            })
+
+        desactif = self.request.GET.get('desactif', '')
+        format_actif = self.request.GET.get('type_panneau', '')
+        if villes and desactif != 'ville':
+            ajouter_filtre('ville', 'Ville', 'Toutes', ((ville, ville) for ville in villes),
+                           Counter((support.ville or '').strip() for support in city_supports), len(city_supports), ville_f)
+        if category_choices and desactif not in ('ecran', 'panneau'):
+            ajouter_filtre('categorie', 'Catégorie', 'Toutes', ((cat, cat) for cat in category_choices),
+                           {cat: categories_counts[cat.casefold()] for cat in category_choices}, len(category_supports), category_f)
+        if type_panneau_choices:
+            ajouter_filtre('type_panneau', 'Format', 'Tous', type_panneau_choices,
+                           compter_formats(format_supports), len(format_supports), format_actif)
+        if etat_choices:
+            ajouter_filtre('etat', 'État', 'Tous', etat_choices, state_counts,
+                           len(state_supports), self.request.GET.get('etat', ''))
+        if occupation_choices:
+            ajouter_filtre('occupation', 'Occupation', 'Toutes', occupation_choices.items(),
+                           occupation_counts, len(occupation_supports), self.request.GET.get('occupation', ''))
+
+        filtres_visibles = [filtre for filtre in filtres if len(filtre['onglets']) > 2]
+        noms_visibles = {filtre['nom'] for filtre in filtres_visibles}
+        filtres_masques = {
+            nom: self.request.GET[nom]
+            for nom in (*identifiants, 'type', 'desactif')
+            if nom not in noms_visibles and self.request.GET.get(nom)
+        }
         context.update({
+            'filtres_supports': filtres_visibles,
+            'filtres_supports_masques': filtres_masques,
             'q': self.request.GET.get('q', ''),
             'type_f': type_f,
             'ville_f': ville_f,

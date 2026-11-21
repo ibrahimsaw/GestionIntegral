@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Bon de commande – {{ dossier.demande.reference }} – {{ dossier.confrere.nom }}</title>
+  <style>
+    :root { font: 15px system-ui, sans-serif; color: #252020; }
+    body { max-width: 960px; margin: 2rem auto; padding-inline: 1rem; }
+    h1 { border-bottom: 3px solid #932e2b; padding-bottom: .75rem; }
+    h2 { font-size: 1rem; }
+    .commandes { display: flex; gap: 1rem; justify-content: space-between; flex-wrap: wrap; }
+    button { padding: .5rem .85rem; cursor: pointer; }
+    dl { display: grid; grid-template-columns: max-content 1fr; gap: .4rem 1.2rem; }
+    dt { font-weight: 650; }
+    dd { margin: 0; }
+    table { width: 100%; border-collapse: collapse; margin-block: 1rem; }
+    th, td { border: 1px solid #ccc; padding: .5rem; text-align: left; overflow-wrap: anywhere; }
+    small { display: block; }
+    .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-top: 2rem; }
+    .signatures div { border-top: 1px solid #777; padding-top: .5rem; }
+    @media print { .commandes { display: none; } body { margin: 0; padding: 0; } tr { break-inside: avoid; } }
+  </style>
+</head>
+<body>
+  <div class="commandes"><a href="{% url 'confrere_dossier' dossier.pk %}">Retour au dossier</a><button type="button" onclick="window.print()">Imprimer / Enregistrer en PDF</button></div>
+  <h1>Bon de commande</h1>
+  <dl>
+    <dt>Référence</dt><dd>BC-{{ dossier.demande.reference }}-{{ dossier.pk }}</dd>
+    <dt>Donneur d’ordre</dt><dd>Integral</dd>
+    <dt>Fournisseur</dt><dd>{{ dossier.confrere.nom }}</dd>
+    {% if dossier.confrere.nom_complet_contact %}<dt>Contact fournisseur</dt><dd>{{ dossier.confrere.nom_complet_contact }}</dd>{% endif %}
+    {% if dossier.confrere.telephone %}<dt>Téléphone</dt><dd>{{ dossier.confrere.telephone }}</dd>{% endif %}
+    {% if dossier.confrere.email %}<dt>E-mail</dt><dd>{{ dossier.confrere.email }}</dd>{% endif %}
+    <dt>Demande</dt><dd>{{ dossier.demande.reference }}{% if dossier.demande.nom_campagne %} · {{ dossier.demande.nom_campagne }}{% endif %}</dd>
+    <dt>Période</dt><dd>{{ dossier.demande.date_debut_souhaitee|date:"d/m/Y" }} – {{ dossier.demande.date_fin_souhaitee|date:"d/m/Y" }}</dd>
+  </dl>
+  <h2>Supports et faces commandés</h2>
+  {% include 'inventory/includes/confrere_dossier_supports.html' %}
+  <div class="signatures"><div>Signature du donneur d’ordre</div><div>Signature du fournisseur</div></div>
+</body>
+</html>

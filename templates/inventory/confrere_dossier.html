@@ -1,0 +1,80 @@
+{% extends 'inventory/confrere_base.html' %}
+{% block title %}Dossier {{ dossier.demande.reference }} — Réseau Confrère{% endblock %}
+{% block confrere_content %}
+  <a class="rc-back" href="{% url 'confrere_detail' dossier.confrere_id %}"><i class="bi bi-arrow-left" aria-hidden="true"></i> {{ dossier.confrere.nom }}</a>
+  <header class="rc-banner">
+    <div class="rc-identity">
+      <span class="rc-icon" aria-hidden="true"><i class="bi bi-folder2-open"></i></span>
+      <div><h1>Dossier {{ dossier.demande.reference }}</h1><p>{{ dossier.confrere.nom }}</p></div>
+    </div>
+    {% if dossier.actif %}
+      <a href="{% url 'confrere_bon_commande' dossier.pk %}" class="btn btn-primary rc-btn"><i class="bi bi-printer" aria-hidden="true"></i> Bon de commande</a>
+    {% endif %}
+  </header>
+  <div class="rc-detail">
+    <section class="rc-panel">
+      <div class="rc-panel-head"><h2>Informations de la demande</h2></div>
+      <dl class="rc-contacts">
+        <div><dt>Campagne</dt><dd>{{ dossier.demande.nom_campagne|default:"—" }}</dd></div>
+        <div><dt>Client</dt><dd>{{ dossier.demande.client|default:dossier.demande.societe|default:dossier.demande.nom_contact|default:"—" }}</dd></div>
+        <div><dt>Période</dt><dd>{{ dossier.demande.date_debut_souhaitee|date:"d/m/Y" }} – {{ dossier.demande.date_fin_souhaitee|date:"d/m/Y" }}</dd></div>
+        <div><dt>Statut</dt><dd>{% if dossier.actif %}{{ dossier.demande.get_statut_display }}{% else %}Retiré de la demande{% endif %}</dd></div>
+      </dl>
+      <div class="p-3"><a class="rc-card-link" href="{% url 'demande_detail' dossier.demande.uuid %}">Voir la demande complète <i class="bi bi-arrow-right" aria-hidden="true"></i></a></div>
+    </section>
+    <div>
+      {% if dossier.actif %}
+      <section class="rc-panel mb-3">
+        <div class="rc-panel-head"><h2>Validation du confrère</h2><span class="rc-category">{{ dossier.get_reponse_confrere_display }}</span></div>
+        <div class="p-3">
+          {% if dossier.mode_confirmation_modifiable %}
+            <form method="post" action="{% url 'confrere_mode_confirmation' dossier.pk %}" class="mb-3">
+              {% csrf_token %}
+              <button type="submit" name="mode" value="{% if dossier.confirmation_automatique %}lien{% else %}automatique{% endif %}"
+                      class="btn {% if dossier.confirmation_automatique %}btn-primary{% else %}btn-outline-secondary{% endif %} rc-btn"
+                      aria-pressed="{{ dossier.confirmation_automatique|yesno:'true,false' }}">
+                <i class="bi {% if dossier.confirmation_automatique %}bi-toggle-on{% else %}bi-toggle-off{% endif %}" aria-hidden="true"></i>
+                Confirmation automatique <span aria-hidden="true">· {{ dossier.confirmation_automatique|yesno:'Activée,Désactivée' }}</span>
+              </button>
+            </form>
+          {% endif %}
+          {% if dossier.repondu_le %}
+            <p class="mb-0">{% if dossier.reponse_confrere == 'automatique' %}Confirmation automatique du{% else %}Réponse du{% endif %} {{ dossier.repondu_le|date:"d/m/Y à H:i" }}</p>
+          {% else %}
+            <label for="confrere-validation-link" class="form-label">Lien à transmettre au confrère</label>
+            <div class="d-flex flex-wrap gap-2">
+              <input id="confrere-validation-link" type="url" class="form-control flex-grow-1 w-auto" value="{{ lien_validation }}" readonly onfocus="this.select()">
+              <a href="{{ lien_validation }}" class="btn btn-outline-secondary rc-btn">Ouvrir le lien</a>
+            </div>
+          {% endif %}
+        </div>
+      </section>
+      {% endif %}
+      <section class="rc-panel mb-3">
+        <div class="rc-panel-head"><h2>Supports demandés</h2></div>
+        <div class="table-responsive">{% include 'inventory/includes/confrere_dossier_supports.html' %}</div>
+      </section>
+      <section class="rc-panel">
+        <div class="rc-panel-head"><h2>Documents</h2></div>
+        <div class="p-3">
+          {% if documents %}
+            <ul class="list-unstyled mb-3">
+              {% for document in documents %}
+                <li class="py-2 border-bottom"><a href="{% url 'confrere_document' dossier.pk document.pk %}" class="rc-card-link"><i class="bi bi-download" aria-hidden="true"></i> {{ document.nom }}</a> <small class="text-muted">{{ document.ajoute_le|date:"d/m/Y" }} · {{ document.taille|filesizeformat }}</small></li>
+              {% endfor %}
+            </ul>
+          {% else %}
+            <p class="text-muted">Aucun document joint.</p>
+          {% endif %}
+          <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+            <label for="{{ form.document.id_for_label }}" class="form-label">Joindre un document</label>
+            {{ form.document }}
+            {% if form.document.errors %}<div class="rc-form-errors">{{ form.document.errors }}</div>{% endif %}
+            <button type="submit" class="btn btn-primary rc-btn mt-2"><i class="bi bi-paperclip" aria-hidden="true"></i> Ajouter le document</button>
+          </form>
+        </div>
+      </section>
+    </div>
+  </div>
+{% endblock %}

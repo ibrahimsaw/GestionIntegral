@@ -81,18 +81,29 @@
             {% endif %}
             
             <div class="nav-label">Inventaire</div>
-            <a href="{% url 'support_list' %}" class="nav-link {% if request.resolver_match.url_name == 'support_list' and not request.GET.type and not request.GET.categorie and not request.GET.type_panneau and not request.GET.ville %}active{% endif %}">
-              <i class="bi bi-collection"></i>Tous les Supports
-            </a>
-            <a href="{% url 'marche_list' %}" class="nav-link {% if request.resolver_match.url_name == 'marche_list' %}active{% endif %}">
-              <i class="bi bi-cart"></i>Marchés
-            </a>
+            {% if user.is_staff_regie_role %}
+              <a href="{% url 'confrere_list' %}" class="nav-link {% if request.resolver_match.url_name|slice:':9' == 'confrere_' %}active{% endif %}">
+                <i class="bi bi-diagram-3" aria-hidden="true"></i>Réseau Confrère
+              </a>
+            {% endif %}
             {% if not request.user.is_technicien %}
               <a href="{% url 'format_list' %}" class="nav-link {% if request.resolver_match.url_name == 'format_list' %}active{% endif %}">
                 <i class="bi bi-grid-1x2 me-1"></i>Formats
               </a>
             {% endif %}
+            <a href="{% url 'support_list' %}" class="nav-link {% if request.resolver_match.url_name == 'support_list' and not request.GET.type and not request.GET.categorie and not request.GET.type_panneau and not request.GET.ville %}active{% endif %}">
+              <i class="bi bi-collection"></i>Tous les Supports
+            </a>
+
+
             {% for ville_data in inventory_categories %}
+              {% if ville_data.categories|length == 1 and ville_data.categories.0.formats|length == 1 %}
+                {% with category=ville_data.categories.0 format=ville_data.categories.0.formats.0 %}
+                  <a href="{% url 'support_list' %}?ville={{ ville_data.ville|urlencode }}&categorie={{ category.label|urlencode }}&type_panneau={{ format.code|urlencode }}&desactif=ville" class="nav-link {% if request.GET.ville == ville_data.ville %}active{% endif %}">
+                    <i class="bi bi-pin-map"></i><span>{{ ville_data.ville }}</span>
+                  </a>
+                {% endwith %}
+              {% else %}
               <details class="nav-submenu" {% if request.GET.ville == ville_data.ville %}open{% endif %}>
                 <summary class="nav-link nav-submenu-header {% if request.GET.ville == ville_data.ville %}parent-active{% endif %}">
                   <i class="bi bi-pin-map"></i><span class="nav-submenu-label">{{ ville_data.ville }}</span>
@@ -103,16 +114,18 @@
                     {% if category.formats|length == 1 %}
                       {% with format=category.formats.0 %}
                         <a href="{% url 'support_list' %}?ville={{ ville_data.ville|urlencode }}&categorie={{ category.label|urlencode }}&type_panneau={{ format.code|urlencode }}&desactif=ville" class="nav-link {% if request.GET.ville == ville_data.ville and request.GET.categorie == category.label and request.GET.type_panneau == format.code %}active{% endif %}">
-                          <i class="bi bi-grid"></i><span>{{ category.label }} · {{ format.label }}</span>
+                          <i class="bi bi-grid"></i><span>{% if category.label == '12m²' %}12 m²{% else %}{{ category.label }}{% if category.label|lower != 'sucette' %} · {{ format.label }}{% endif %}{% endif %}</span>
                         </a>
                       {% endwith %}
                     {% else %}
+                      {% if ville_data.categories|length > 1 %}
                       <details class="nav-submenu" {% if request.GET.ville == ville_data.ville and request.GET.categorie == category.label %}open{% endif %}>
                         <summary class="nav-link nav-submenu-header {% if request.GET.ville == ville_data.ville and request.GET.categorie == category.label %}parent-active{% endif %}">
-                          <i class="bi bi-grid"></i><span class="nav-submenu-label">{{ category.label }}</span>
+                          <i class="bi bi-grid"></i><span class="nav-submenu-label">{% if category.label == '12m²' %}12 m²{% else %}{{ category.label }}{% endif %}</span>
                           <i class="bi bi-chevron-down submenu-chevron"></i>
                         </summary>
                         <div class="nav-submenu-items">
+                      {% endif %}
                           <a href="{% url 'support_list' %}?ville={{ ville_data.ville|urlencode }}&categorie={{ category.label|urlencode }}&desactif=ville" class="nav-link {% if request.GET.ville == ville_data.ville and request.GET.categorie == category.label and not request.GET.type_panneau %}active{% endif %}">
                             <i class="bi bi-collection"></i>Tous les formats
                           </a>
@@ -121,24 +134,30 @@
                               <i class="bi bi-aspect-ratio"></i>{{ format.label }}
                             </a>
                           {% endfor %}
+                      {% if ville_data.categories|length > 1 %}
                         </div>
                       </details>
+                      {% endif %}
                     {% endif %}
                   {% endfor %}
                 </div>
               </details>
+              {% endif %}
             {% endfor %}
+            <a href="{% url 'marche_list' %}" class="nav-link {% if request.resolver_match.url_name == 'marche_list' %}active{% endif %}">
+              <i class="bi bi-cart"></i>Marchés
+            </a>
             {% for category in inventory_global_categories %}
               {% if category.formats|length == 1 %}
                 {% with format=category.formats.0 %}
                   <a href="{% url 'support_list' %}?categorie={{ category.label|urlencode }}&type_panneau={{ format.code|urlencode }}" class="nav-link {% if not request.GET.ville and request.GET.categorie == category.label and request.GET.type_panneau == format.code %}active{% endif %}">
-                    <i class="bi {% if category.label == 'Ecran' %}bi-display{% else %}bi-aspect-ratio{% endif %}"></i><span>{{ category.label }} · {{ format.label }}</span>
+                    <i class="bi {% if category.label == 'Ecran' %}bi-display{% else %}bi-aspect-ratio{% endif %}"></i><span>{% if category.label == '12m²' %}12 m²{% else %}{{ category.label }}{% if category.label|lower != 'sucette' %} · {{ format.label }}{% endif %}{% endif %}</span>
                   </a>
                 {% endwith %}
               {% else %}
                 <details class="nav-submenu" {% if not request.GET.ville and request.GET.categorie == category.label %}open{% endif %}>
                   <summary class="nav-link nav-submenu-header {% if not request.GET.ville and request.GET.categorie == category.label %}parent-active{% endif %}">
-                    <i class="bi {% if category.label == 'Ecran' %}bi-display{% else %}bi-aspect-ratio{% endif %}"></i><span class="nav-submenu-label">{{ category.label }}</span>
+                    <i class="bi {% if category.label == 'Ecran' %}bi-display{% else %}bi-aspect-ratio{% endif %}"></i><span class="nav-submenu-label">{% if category.label == '12m²' %}12 m²{% else %}{{ category.label }}{% endif %}</span>
                     <i class="bi bi-chevron-down submenu-chevron"></i>
                   </summary>
                   <div class="nav-submenu-items">
@@ -169,22 +188,9 @@
               <a href="{% url 'reservation_list' %}" class="nav-link {% if request.resolver_match.url_name == 'reservation_list' %}active{% endif %}">
                 <i class="bi bi-calendar-event"></i>Réservations
               </a>
-              <details class="nav-submenu" {% if 'campagne' in request.resolver_match.url_name %}open{% endif %}>
-                <summary class="nav-link nav-submenu-header {% if 'campagne' in request.resolver_match.url_name %}parent-active{% endif %}">
-                  <i class="bi bi-megaphone-fill"></i><span class="nav-submenu-label">Campagnes</span>
-                  <i class="bi bi-chevron-down submenu-chevron"></i>
-                </summary>
-                <div class="nav-submenu-items">
-                  <a href="{% url 'campagne_list' %}" class="nav-link {% if request.resolver_match.url_name == 'campagne_list' and not request.GET.categorie %}active{% endif %}">
-                    <i class="bi bi-grid"></i>Toutes les campagnes
-                  </a>
-                  {% for category in campaign_category_nav %}
-                  <a href="{% url 'campagne_list' %}?categorie={{ category.value|urlencode }}" class="nav-link {% if request.resolver_match.url_name == 'campagne_list' and request.GET.categorie == category.value %}active{% endif %}">
-                    <i class="bi bi-tag"></i>{{ category.label }}
-                  </a>
-                  {% endfor %}
-                </div>
-              </details>
+              <a href="{% url 'campagne_list' %}" class="nav-link {% if 'campagne' in request.resolver_match.url_name %}active{% endif %}">
+                <i class="bi bi-megaphone-fill"></i>Campagnes
+              </a>
 
               <div class="nav-label">Réparation</div>
               <!--
@@ -217,22 +223,9 @@
             <a href="{% url 'client_detail' user.client_profile.pk %}" class="nav-link {% if 'client_detail' in request.resolver_match.url_name %}active{% endif %}">
               <i class="bi bi-people-fill"></i>Client
             </a>
-            <details class="nav-submenu" {% if 'campagne' in request.resolver_match.url_name %}open{% endif %}>
-              <summary class="nav-link nav-submenu-header {% if 'campagne' in request.resolver_match.url_name %}parent-active{% endif %}">
-                <i class="bi bi-megaphone-fill"></i><span class="nav-submenu-label">Campagnes</span>
-                <i class="bi bi-chevron-down submenu-chevron"></i>
-              </summary>
-              <div class="nav-submenu-items">
-                <a href="{% url 'campagne_list' %}" class="nav-link {% if request.resolver_match.url_name == 'campagne_list' and not request.GET.categorie %}active{% endif %}">
-                  <i class="bi bi-grid"></i>Toutes les campagnes
-                </a>
-                {% for category in campaign_category_nav %}
-                <a href="{% url 'campagne_list' %}?categorie={{ category.value|urlencode }}" class="nav-link {% if request.resolver_match.url_name == 'campagne_list' and request.GET.categorie == category.value %}active{% endif %}">
-                  <i class="bi bi-tag"></i>{{ category.label }}
-                </a>
-                {% endfor %}
-              </div>
-            </details>
+            <a href="{% url 'campagne_list' %}" class="nav-link {% if 'campagne' in request.resolver_match.url_name %}active{% endif %}">
+              <i class="bi bi-megaphone-fill"></i>Campagnes
+            </a>
 
             <div class="nav-label">Rapports</div>
             <a href="{% url 'preview_client_pdf' user.client_profile.pk %}" class="nav-link {% if request.resolver_match.url_name == 'preview_client_pdf' %}active{% endif %}">
@@ -315,7 +308,7 @@
         <div class="topbar-title">
           {% block topbar_title %}Integral{% endblock %}
         </div>
-        <div class="d-none d-md-inline ms-1">
+        <div class="{% block topbar_actions_classes %}d-none d-md-inline ms-1{% endblock %}">
           {% block topbar_actions %}{% endblock %}
         </div>
         
@@ -470,7 +463,7 @@
         if (e.key === 'Escape') closeSidebar();
       });
     </script>
-    <script src="{% static 'js/client_pagination.js' %}"></script>
+    <script src="{% static 'js/client_pagination.js' %}?v=20261120"></script>
     {% block extra_js %}{% endblock %}
   </body>
 </html>

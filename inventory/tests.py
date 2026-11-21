@@ -2580,9 +2580,10 @@ class SupportListCategoryFilterTests(TestCase):
             longitude=-1.52,
         )
 
-        view = self.get_view({'categorie': '12m2'})
-
-        self.assertEqual(list(view.get_queryset()), [standard])
+        for categorie in ('12m2', '12m²'):
+            with self.subTest(categorie=categorie):
+                view = self.get_view({'categorie': categorie})
+                self.assertEqual(list(view.get_queryset()), [standard])
 
     def test_screen_category_filters_by_screen_cell_format(self):
         legacy_screen = Support.objects.create(
@@ -2645,6 +2646,37 @@ class SupportListCategoryFilterTests(TestCase):
             {'libre': 'Libre', 'non_reserve': 'Non réservé'},
         )
 
+    def test_format_and_occupation_do_not_restrict_cities_or_categories(self):
+        view = self.get_view({
+            'ville': 'Ouagadougou',
+            'type_panneau': self.geant_format.code,
+            'occupation': 'occupe',
+        })
+        context = view.get_context_data(object_list=view.get_queryset())
+
+        self.assertEqual(context['villes'], ['Bobo-Dioulasso', 'Ouagadougou'])
+        self.assertEqual(context['category_choices'], ['Ecran', 'Géant'])
+        self.assertEqual(context['type_panneau_choices'], [])
+        occupation = next(f for f in context['filtres_supports'] if f['nom'] == 'occupation')
+        self.assertEqual(occupation['onglets'][0], ('', 'Toutes', 1))
+
+    def test_occupation_filter_preserves_city_menu_scope(self):
+        self.geant.ville = 'Koudougou'
+        self.geant.save(update_fields=['ville'])
+        scope = {
+            'ville': 'Koudougou', 'categorie': 'Géant',
+            'type_panneau': self.geant_format.code, 'desactif': 'ville',
+        }
+        view = self.get_view(scope)
+        context = view.get_context_data(object_list=view.get_queryset())
+
+        self.assertEqual(context['filtres_supports_masques'], scope)
+        self.assertEqual([f['nom'] for f in context['filtres_supports']], ['occupation'])
+        view = self.get_view({**context['filtres_supports_masques'], 'occupation': 'libre'})
+        context = view.get_context_data(object_list=view.get_queryset())
+        self.assertEqual(list(context['supports']), [self.geant])
+        self.assertEqual([f['nom'] for f in context['filtres_supports']], ['occupation'])
+
     def test_category_choices_and_formats_are_exposed_to_filter(self):
         view = self.get_view({'categorie': 'Géant'})
         queryset = view.get_queryset()
@@ -2668,6 +2700,7 @@ class SupportListCategoryFilterTests(TestCase):
             r'type="radio" name="categorie" id="support-category-\d+" value="Géant" checked',
         )
         self.assertNotIn('<select id="support-category"', rendered)
+        self.assertNotIn('id="support-filter-type_panneau-label"', rendered)
         self.assertNotIn('Tous les types', rendered)
 
 
@@ -2779,9 +2812,9 @@ class InventoryNavigationTests(TestCase):
             for category in ouagadougou['categories']
         }
 
-        self.assertEqual(set(categories), {'12m2', 'Géant'})
+        self.assertEqual(set(categories), {'12m²', 'Géant'})
         self.assertEqual(
-            categories['12m2'],
+            categories['12m²'],
             [{'code': 'MENU-STANDARD', 'label': '4m × 3m (12 m²)'}],
         )
         self.assertEqual(
@@ -2820,17 +2853,20 @@ class InventoryNavigationTests(TestCase):
             rendered_menu,
         )
         self.assertIn(
-            '?ville=Ouagadougou&categorie=12m2&type_panneau=MENU-STANDARD&desactif=ville',
+            '?ville=Ouagadougou&categorie=12m%C2%B2&type_panneau=MENU-STANDARD&desactif=ville',
             rendered_menu,
         )
         self.assertIn(
-            '12m2 · 4m × 3m (12 m²)',
+            '<span>12 m²</span>',
             rendered_menu,
         )
+        self.assertNotIn('12m2 · 4m × 3m (12 m²)', rendered_menu)
         self.assertNotIn(
             '<span class="nav-submenu-label">12m2</span>',
             rendered_menu,
         )
+        self.assertIn('<span>Sucette</span>', rendered_menu)
+        self.assertNotIn('Sucette ·', rendered_menu)
         self.assertIn(
             '?categorie=Ecran&type_panneau=MENU-ECRAN',
             rendered_menu,

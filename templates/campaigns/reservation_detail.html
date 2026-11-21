@@ -135,7 +135,7 @@
     <div class="rd-facts">
       <div class="rd-fact"><span>Période</span><strong>{{ reservation.date_debut|date:"d/m/Y" }} → {{ reservation.date_fin|date:"d/m/Y" }}</strong></div>
       <div class="rd-fact"><span>Durée</span><strong>{{ reservation.duree_jours }} jour{{ reservation.duree_jours|pluralize }}</strong></div>
-      <div class="rd-fact"><span>Faces réservées</span><strong>{{ reservation.lignes.count }}</strong></div>
+      <div class="rd-fact"><span>Faces réservées</span><strong>{{ reservation.nb_faces }}</strong></div>
       <div class="rd-fact"><span>Durée facturée</span><strong>{{ reservation.nombre_mois_factures }} mois</strong></div>
       {% if reservation.prix_faces_par_format or reservation.frais_faces_par_format or reservation.prix_affichage or reservation.prix_impression %}<div class="rd-fact"><span>Total des faces</span><strong>{{ reservation.montant_total|floatformat:"-2g" }} FCFA</strong></div>{% endif %}
       <div class="rd-fact"><span>Créée le</span><strong>{{ reservation.created_at|date:"d/m/Y à H:i" }}</strong></div>
@@ -174,7 +174,7 @@
 
       <section class="rd-panel">
         <div class="rd-panel-head">
-          <h2 class="rd-panel-title"><i class="bi bi-grid-3x3-gap-fill"></i>Faces et panneaux réservés</h2>
+          <h2 class="rd-panel-title"><i class="bi bi-grid-3x3-gap-fill"></i>Faces réservées du Parc Integral</h2>
           <span class="rd-count">{{ reservation.lignes.count }} face{{ reservation.lignes.count|pluralize }}</span>
         </div>
         <div class="table-responsive">
@@ -197,13 +197,21 @@
                 <td class="text-end"><a href="{% url 'support_detail' ligne.support.uuid %}" class="btn btn-sm btn-outline-secondary" style="border-radius:8px" title="Voir le panneau"><i class="bi bi-box-arrow-up-right"></i></a></td>
               </tr>
               {% empty %}
-              <tr><td colspan="7" class="text-center py-4 text-muted"><i class="bi bi-inbox d-block mb-1 fs-3 opacity-50"></i>Aucune face n'est associée à cette réservation.</td></tr>
+              <tr><td colspan="7" class="text-center py-4 text-muted"><i class="bi bi-inbox d-block mb-1 fs-3 opacity-50"></i>Aucune face du Parc Integral dans cette réservation.</td></tr>
               {% endfor %}
             </tbody>
           </table>
         </div>
       </section>
 
+      {% if reservation.panneaux_confreres_reserves %}
+      <section class="rd-panel">
+        <div class="rd-panel-head"><h2 class="rd-panel-title"><i class="bi bi-diagram-3"></i>Faces réservées du Réseau Confrère</h2></div>
+        <div class="rd-panel-body">
+          {% include "portail/_panneau_confrere.html" with panneaux_confreres=reservation.panneaux_confreres_reserves only %}
+        </div>
+      </section>
+      {% endif %}
       <section class="rd-panel">
         <div class="rd-panel-head"><h2 class="rd-panel-title"><i class="bi bi-journal-text"></i>Notes et observations</h2></div>
         <div class="rd-panel-body">

@@ -531,6 +531,7 @@ class Reservation(models.Model):
     prix_affichage = models.DecimalField(max_digits=14, decimal_places=2, default=0, blank=True)
     prix_impression = models.DecimalField(max_digits=14, decimal_places=2, default=0, blank=True)
     frais_faces_par_format = models.JSONField(default=dict, blank=True)
+    panneaux_confreres_reserves = models.JSONField(default=list, blank=True)
 
     def frais_pour_format(self, code):
         return frais_unitaires_format(
@@ -585,7 +586,7 @@ class Reservation(models.Model):
         return 0
 
     def nb_faces(self) -> int:
-        return self.lignes.count()
+        return self.lignes.count() + sum(ligne['nombre_faces'] for ligne in self.panneaux_confreres_reserves)
 
     def nombre_mois_factures(self):
         jours = self.duree_jours()
@@ -598,6 +599,13 @@ class Reservation(models.Model):
             code = ligne.support.format
             tarif = self.prix_faces_par_format.get(code)
             total += sum(self.frais_pour_format(code)) + Decimal(str(tarif or 0)) * mois
+        for ligne in self.panneaux_confreres_reserves:
+            code = f"confrere:{ligne['format']}"
+            tarif = self.prix_faces_par_format.get(code)
+            frais = frais_unitaires_format(
+                self.frais_faces_par_format, code, self.prix_affichage, self.prix_impression,
+            )
+            total += (sum(frais) + Decimal(str(tarif or 0)) * mois) * ligne['nombre_faces']
         return total.quantize(Decimal('0.01'))
 
     def is_active(self) -> bool:
@@ -1269,6 +1277,8 @@ class DemandeReservation(models.Model):
 
 class Campagne(models.Model):
     """Campagne publicitaire globale."""
+
+    panneaux_confreres = models.JSONField(default=list, blank=True)
     STATUT_BROUILLON = STATUT_BROUILLON
     STATUT_A_VENIR   = STATUT_A_VENIR
     STATUT_EN_COURS  = STATUT_EN_COURS

@@ -12,31 +12,31 @@
 <link href="https://cdn.jsdelivr.net/npm/tom-select@2.4.3/dist/css/tom-select.css" rel="stylesheet">
 
 <style>
-.staff-client-select-wrap .ts-wrapper {
-    width: 100%;
-}
+  .staff-client-select-wrap .ts-wrapper {
+      width: 100%;
+  }
 
-.staff-client-select-wrap .ts-control {
-    min-height: 46px;
-    padding: 10px 14px;
-    font-size: .9rem;
-    border-radius: 8px;
-}
+  .staff-client-select-wrap .ts-control {
+      min-height: 46px;
+      padding: 10px 14px;
+      font-size: .9rem;
+      border-radius: 8px;
+  }
 
-.staff-client-select-wrap .ts-dropdown {
-    z-index: 1055;
-    max-height: 300px;
-    overflow-y: auto;
-}
+  .staff-client-select-wrap .ts-dropdown {
+      z-index: 1055;
+      max-height: 300px;
+      overflow-y: auto;
+  }
 
-.staff-client-select-wrap .ts-dropdown .option {
-    padding: 11px 14px;
-}
+  .staff-client-select-wrap .ts-dropdown .option {
+      padding: 11px 14px;
+  }
 
-.staff-client-select-wrap .ts-dropdown .active {
-    background: var(--tone-wash);
-    color: var(--brand-ink);
-}
+  .staff-client-select-wrap .ts-dropdown .active {
+      background: var(--tone-wash);
+      color: var(--brand-ink);
+  }
 
 
   /* ==========================================================
@@ -1685,7 +1685,16 @@
           <div id="confrere-panel" class="cf-block"{% if not show_confrere %} hidden{% endif %}>
             <div class="cf-block-h"><b>Panneau du réseau confrère</b></div>
             <p class="cf-sub">La disponibilité de ce panneau se confirme auprès du confrère.</p>
-            <div class="nd-campaign-fields">
+            {% if catalogue_confreres %}
+            <div class="nd-campaign-fields mb-3">
+              <div class="nd-fld"><label for="catalogue-confrere">Confrère enregistré</label><select id="catalogue-confrere" class="form-select"><option value="">Choisir un confrère</option></select></div>
+              <div class="nd-fld"><label for="catalogue-support">Support</label><select id="catalogue-support" class="form-select" disabled><option value="">Choisir un support</option></select></div>
+            </div>
+            <fieldset id="catalogue-faces" hidden><legend class="fs-6">Faces à ajouter</legend><div class="d-flex flex-wrap gap-3"></div></fieldset>
+            <div class="confrere-actions"><button type="button" id="catalogue-ajouter" class="diffusion-source confrere-add" disabled>Ajouter les faces choisies</button></div>
+            <h3 class="h6 mt-3">Saisie manuelle</h3>
+            {% endif %}
+            <div class="nd-campaign-fields" id="confrere-identity">
               {% for champ in confrere_form %}
               {% if forloop.counter <= 3 %}
                 <div class="nd-fld">
@@ -2172,7 +2181,10 @@
   {{ initial_tarifs_faces|default_if_none:'{}'|json_script:"initial-tarifs-faces" }}
   {% if staff_mode %}{{ initial_remises_faces|json_script:"initial-remises-faces" }}{% endif %}
   {% if staff_mode %}{{ frais_defaut|json_script:"frais-defaut" }}{{ frais_par_format|json_script:"frais-par-format" }}{% endif %}
-  {% if staff_mode %}{{ panneaux_confreres|json_script:"initial-confreres" }}{% endif %}
+  {% if staff_mode %}
+    {{ panneaux_confreres|json_script:"initial-confreres" }}
+    {{ catalogue_confreres|json_script:"catalogue-confreres-data" }}
+  {% endif %}
   {% endif %}
 {% endblock %}
 
@@ -2785,6 +2797,17 @@
       });
     }
 
+    const ordreCategories = new Map([
+      ['12m2', 0], ['geant', 1], ['sucette', 2],
+      ['grandsucette', 3], ['grandesucette', 3], ['sucettegrand', 3], ['sucettegrande', 3],
+      ['marche', 4],
+    ]);
+
+    function rangCategorie(label) {
+      const cle = String(label).normalize('NFKD').toLowerCase().replace(/[^a-z0-9]/g, '');
+      return ordreCategories.get(cle) ?? ordreCategories.size;
+    }
+
     function refreshFacetSelects(prefix) {
       const elVille     = document.getElementById(prefix + 'ville');
       const elCategorie = document.getElementById(prefix + 'categorie');
@@ -2820,6 +2843,10 @@
 
         Array.from(values.entries())
           .sort((a, b) => {
+            if (field === 'categorie') {
+              const difference = rangCategorie(a[1]) - rangCategorie(b[1]);
+              if (difference) return difference;
+            }
             if (field === 'ville' || field === 'categorie') {
               return counts.get(b[0]) - counts.get(a[0])
                 || String(a[1]).localeCompare(String(b[1]), 'fr', { sensitivity: 'base' });
@@ -3081,7 +3108,7 @@
       const addRow = document.getElementById('confrere-add-row');
       const formatRows = document.getElementById('confrere-format-rows');
       const firstRow = formatRows.firstElementChild;
-      const identityInputs = [...confrerePanel.querySelectorAll('input')].filter(input => !formatRows.contains(input));
+      const identityInputs = [...document.querySelectorAll('#confrere-identity input')];
       const cancel = document.getElementById('confrere-cancel');
       const status = document.getElementById('confrere-status');
       const list = document.getElementById('confrere-list');
@@ -3129,7 +3156,7 @@
           const libelle = document.createElement('strong');
           libelle.textContent = `${panneau.format} · ${panneau.nombre_faces} face${panneau.nombre_faces === 1 ? '' : 's'}`;
           const lieu = document.createElement('div');
-          lieu.textContent = `${panneau.nom} · ${panneau.ville} · ${panneau.emplacement}`;
+          lieu.textContent = [panneau.nom, panneau.reference, panneau.ville, panneau.emplacement, panneau.faces?.join(', ')].filter(Boolean).join(' · ');
           const actions = document.createElement('div');
           actions.className = 'confrere-actions';
           const edit = document.createElement('button');
@@ -3152,13 +3179,72 @@
             status.textContent = 'Format retiré';
             add.focus();
           });
-          actions.append(edit, remove);
+          if (!panneau.support_id) actions.append(edit);
+          actions.append(remove);
           ligne.append(libelle, lieu, actions);
           list.append(ligne);
         });
         hidden.value = JSON.stringify(panneauxConfreres);
         renderTarifsFaces();
         updateContinueButton(Object.keys(panier).length);
+        refreshCatalogueFaces();
+      }
+
+      const catalogue = JSON.parse(document.getElementById('catalogue-confreres-data')?.textContent || '[]');
+      const confrereSelect = document.getElementById('catalogue-confrere');
+      const supportSelect = document.getElementById('catalogue-support');
+      const facePicker = document.getElementById('catalogue-faces');
+      const addCatalogue = document.getElementById('catalogue-ajouter');
+
+      function refreshCatalogueFaces() {
+        if (!facePicker) return;
+        const support = catalogue[confrereSelect.value - 1]?.find(item => String(item.support_id) === supportSelect.value);
+        facePicker.hidden = !support;
+        const options = facePicker.querySelector('div');
+        options.replaceChildren();
+        addCatalogue.disabled = true;
+        if (!support) return;
+        const added = new Set(panneauxConfreres.filter(item => item.support_id === support.support_id).flatMap(item => item.faces));
+        for (const face of support.faces) {
+          const label = document.createElement('label');
+          const checkbox = document.createElement('input');
+          checkbox.type = 'checkbox';
+          checkbox.value = face;
+          checkbox.disabled = added.has(face);
+          label.append(checkbox, ` Face ${face}`);
+          options.append(label);
+        }
+      }
+
+      if (confrereSelect) {
+        catalogue.forEach((supports, index) => confrereSelect.add(new Option(supports[0].nom, index + 1)));
+        confrereSelect.addEventListener('change', () => {
+          const supports = catalogue[confrereSelect.value - 1] || [];
+          supportSelect.replaceChildren(new Option('Choisir un support', ''));
+          supports.forEach(support => {
+            supportSelect.add(new Option([support.reference, support.nom_support, support.ville, support.format].filter(Boolean).join(' · '), support.support_id));
+          });
+          supportSelect.disabled = !supports.length;
+          refreshCatalogueFaces();
+        });
+        supportSelect.addEventListener('change', refreshCatalogueFaces);
+        facePicker.addEventListener('change', () => {
+          addCatalogue.disabled = !facePicker.querySelector('input:checked');
+        });
+        addCatalogue.addEventListener('click', () => {
+          const support = catalogue[confrereSelect.value - 1]?.find(item => String(item.support_id) === supportSelect.value);
+          const faces = Array.from(facePicker.querySelectorAll('input:checked'), checkbox => checkbox.value);
+          if (!support || !faces.length) return;
+          const existing = panneauxConfreres.find(item => item.support_id === support.support_id);
+          if (existing) {
+            existing.faces.push(...faces);
+            existing.nombre_faces = existing.faces.length;
+          } else {
+            panneauxConfreres.push({ ...support, faces, nombre_faces: faces.length });
+          }
+          status.textContent = 'Faces ajoutées à la demande';
+          renderConfreres();
+        });
       }
 
       add.addEventListener('click', () => {

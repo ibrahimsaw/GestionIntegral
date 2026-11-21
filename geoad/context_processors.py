@@ -52,7 +52,7 @@ def inventory_villes(request):
 
         source_category = (format_support.categorie or '').casefold()
         if source_category in ('standard', '12m2', '12m²'):
-            category = '12m2'
+            category = '12m²'
         elif source_category in ('geant', 'géant'):
             category = 'Géant'
         else:
@@ -68,7 +68,7 @@ def inventory_villes(request):
     inventory_categories = []
     for ville in inventory_villes:
         categories = []
-        for label in ('12m2', 'Géant'):
+        for label in ('12m²', 'Géant'):
             if label not in villes[ville]:
                 continue
             format_codes = sorted(

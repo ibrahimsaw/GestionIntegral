@@ -5,7 +5,7 @@ import uuid
 from datetime import date, datetime, time, timedelta
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from django.http import JsonResponse
+from django.http import Http404, JsonResponse
 from django.db.models import Q, Count, Sum, DecimalField, Value, Max
 from django.db.models.deletion import ProtectedError
 from django.db.models.functions import Coalesce
@@ -25,6 +25,11 @@ from django.urls import reverse_lazy
 from accounts.models import AuditLog
 from accounts.decorators import *
 from accounts.audit import log_action
+from inventory.sorting import cle_code_naturelle, cle_code_support
+from inventory.confrere_catalogue import (
+    catalogue_confreres, ligne_support_confrere, statut_validation_confreres, synchroniser_dossiers_confreres,
+)
+from inventory.models import SupportConfrere
 from .models import *
 from inventory.models import (
     Support, FacePanneau, EcranNumerique, FormatSupport, Emplacement, Marche,
@@ -3299,10 +3304,14 @@ class ClientDetailView(ClientStaffRequiredMixin, DetailView):
             client_pk=self.object.pk,
         )
 
+    def get_template_names(self):
+        if self.request.GET.get('_fragment') == 'campagnes':
+            return ['campaigns/includes/client_campaigns.html']
+        return super().get_template_names()
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         client = self.object
-        today = timezone.now().date()
 
         # Une agence est rattachée aux campagnes, tandis que les contrats et
         # les réservations restent rattachés au client.
@@ -3323,6 +3332,114 @@ class ClientDetailView(ClientStaffRequiredMixin, DetailView):
             if not contrats_qs.exists():
                 contrats_qs = client.contrats.all().order_by('-date_debut')
             campagnes_all_qs = client.campagnes.filter(actif=True).select_related('client', 'agence', 'contrat', 'campagne_parente').order_by('-date_debut')
+        req = self.request.GET
+        contrat_filter = req.get('contrat', '').strip()
+        statut_filter = req.get('statut', '').strip()
+        type_filter = req.get('type_support', '').strip()
+        search_query = req.get('q', '').strip()
+        d1_str = req.get('date_debut', '').strip()
+        d2_str = req.get('date_fin', '').strip()
+
+        contract_condition = Q()
+        selected_contrat_obj = None
+        if contrat_filter in ('hors_contrat', 'sans_contrat', 'none'):
+            contract_condition = Q(contrat__isnull=True)
+        elif contrat_filter:
+            try:
+                contract_id = int(contrat_filter)
+            except ValueError:
+                pass
+            else:
+                contract_condition = Q(contrat_id=contract_id)
+                selected_contrat_obj = contrats_qs.filter(pk=contract_id).first()
+
+        status_condition = Q(statut=statut_filter) if statut_filter else Q()
+        type_condition = Q()
+        if type_filter == 'mere':
+            type_condition = Q(est_mere=True)
+        elif type_filter:
+            type_condition = Q(type_support=type_filter, est_mere=False)
+
+        campaigns_for_choices = campagnes_all_qs
+        if search_query:
+            campaigns_for_choices = campaigns_for_choices.filter(
+                Q(nom__icontains=search_query) | Q(reference__icontains=search_query)
+            )
+
+        if d1_str:
+            try:
+                d1 = datetime.strptime(d1_str, '%Y-%m-%d').date()
+                campaigns_for_choices = campaigns_for_choices.filter(date_fin__gte=d1)
+            except ValueError:
+                pass
+        if d2_str:
+            try:
+                d2 = datetime.strptime(d2_str, '%Y-%m-%d').date()
+                campaigns_for_choices = campaigns_for_choices.filter(date_debut__lte=d2)
+            except ValueError:
+                pass
+
+        campagnes_filtered = campaigns_for_choices.filter(contract_condition, status_condition, type_condition)
+        contract_groups = dict(
+            campaigns_for_choices.filter(status_condition, type_condition).order_by()
+            .values_list('contrat_id').annotate(count=Count('pk'))
+        )
+        contract_choices = [contract for contract in contrats_qs if contract.pk in contract_groups]
+        statuses = set(
+            campaigns_for_choices.filter(contract_condition, type_condition).order_by()
+            .values_list('statut', flat=True).distinct()
+        )
+        types = {
+            'mere' if is_parent else support_type
+            for is_parent, support_type in campaigns_for_choices.filter(contract_condition, status_condition)
+            .order_by().values_list('est_mere', 'type_support').distinct()
+        }
+        status_choices = [(code, label) for code, label in Campagne.STATUT_CHOICES if code in statuses]
+        type_choices = [
+            (code, label) for code, label in (
+                ('ecran', 'Écran DOOH'), ('panneau', 'Panneau OOH'),
+                ('marche', 'Marché'), ('mere', 'Campagne mère'),
+            ) if code in types
+        ]
+        no_contract_count = contract_groups.get(None, 0)
+
+        campagnes_page = all_records_page(campagnes_filtered)
+
+        has_active_filters = bool(contrat_filter or statut_filter or type_filter or search_query or d1_str or d2_str)
+
+        context.update({
+            'campagnes': campagnes_page,
+            'page_obj': campagnes_page,
+            'paginator': campagnes_page.paginator,
+            'is_paginated': False,
+            'total_campagnes_count': campagnes_filtered.count(),
+            'total_campagnes_all': campagnes_all_qs.count(),
+            'contrats': contrats_qs,
+            'campaign_contract_choices': contract_choices,
+            'campaign_no_contract_count': no_contract_count,
+            'show_campaign_contract_filter': len(contract_choices) + bool(no_contract_count) > 1,
+            'campaign_contract_choice_selected': (
+                (contrat_filter == 'hors_contrat' and bool(no_contract_count))
+                or any(str(contract.pk) == contrat_filter for contract in contract_choices)
+            ),
+            'campaign_status_choices': status_choices,
+            'campaign_status_choice_selected': statut_filter in statuses,
+            'campaign_type_choices': type_choices,
+            'campaign_type_choice_selected': type_filter in types,
+            'filters': {
+                'contrat': contrat_filter,
+                'statut': statut_filter,
+                'type_support': type_filter,
+                'q': search_query,
+                'date_debut': d1_str,
+                'date_fin': d2_str,
+            },
+            'has_active_filters': has_active_filters,
+            'selected_contrat_obj': selected_contrat_obj,
+        })
+        if self.request.GET.get('_fragment') == 'campagnes':
+            return context
+
         campagnes_avec_agence = (
             campagnes_all_qs.filter(agence__isnull=False).select_related('agence')
             if client.type_entite == Client.TYPE_CLIENT
@@ -3364,58 +3481,6 @@ class ClientDetailView(ClientStaffRequiredMixin, DetailView):
                 'is_active': is_active_now,
             })
 
-        campagnes_sans_contrat_count = campagnes_all_qs.filter(contrat__isnull=True).count()
-
-        # ── FILTRAGE DYNAMIQUE DES CAMPAGNES ──
-        req = self.request.GET
-        contrat_filter = req.get('contrat', '').strip()
-        statut_filter = req.get('statut', '').strip()
-        type_filter = req.get('type_support', '').strip()
-        search_query = req.get('q', '').strip()
-        d1_str = req.get('date_debut', '').strip()
-        d2_str = req.get('date_fin', '').strip()
-
-        campagnes_filtered = campagnes_all_qs
-
-        selected_contrat_obj = None
-        if contrat_filter:
-            if contrat_filter in ['hors_contrat', 'sans_contrat', 'none']:
-                campagnes_filtered = campagnes_filtered.filter(contrat__isnull=True)
-            else:
-                try:
-                    c_id = int(contrat_filter)
-                    campagnes_filtered = campagnes_filtered.filter(contrat_id=c_id)
-                    selected_contrat_obj = contrats_qs.filter(pk=c_id).first()
-                except ValueError:
-                    pass
-
-        if statut_filter:
-            campagnes_filtered = campagnes_filtered.filter(statut=statut_filter)
-
-        if type_filter:
-            if type_filter == 'mere':
-                campagnes_filtered = campagnes_filtered.filter(est_mere=True)
-            else:
-                campagnes_filtered = campagnes_filtered.filter(type_support=type_filter, est_mere=False)
-
-        if search_query:
-            campagnes_filtered = campagnes_filtered.filter(
-                Q(nom__icontains=search_query) | Q(reference__icontains=search_query)
-            )
-
-        if d1_str:
-            try:
-                d1 = datetime.strptime(d1_str, '%Y-%m-%d').date()
-                campagnes_filtered = campagnes_filtered.filter(date_fin__gte=d1)
-            except ValueError:
-                pass
-        if d2_str:
-            try:
-                d2 = datetime.strptime(d2_str, '%Y-%m-%d').date()
-                campagnes_filtered = campagnes_filtered.filter(date_debut__lte=d2)
-            except ValueError:
-                pass
-
         reservations = (
             client.reservations_globales
             .filter(statut__in=[STATUT_EN_ATTENTE, STATUT_CONFIRMEE], date_fin__gte=timezone.now())
@@ -3423,32 +3488,10 @@ class ClientDetailView(ClientStaffRequiredMixin, DetailView):
             .order_by('date_debut')
         )
 
-        campagnes_page = all_records_page(campagnes_filtered)
-
-        has_active_filters = bool(contrat_filter or statut_filter or type_filter or search_query or d1_str or d2_str)
-
         context.update({
-            'campagnes': campagnes_page,
-            'page_obj': campagnes_page,
-            'paginator': campagnes_page.paginator,
-            'is_paginated': False,
-            'total_campagnes_count': campagnes_filtered.count(),
-            'total_campagnes_all': campagnes_all_qs.count(),
-            'contrats': contrats_qs,
             'contrats_enrichis': contrats_enrichis,
             'campagnes_avec_agence': campagnes_avec_agence,
-            'campagnes_sans_contrat_count': campagnes_sans_contrat_count,
             'reservations': reservations,
-            'filters': {
-                'contrat': contrat_filter,
-                'statut': statut_filter,
-                'type_support': type_filter,
-                'q': search_query,
-                'date_debut': d1_str,
-                'date_fin': d2_str,
-            },
-            'has_active_filters': has_active_filters,
-            'selected_contrat_obj': selected_contrat_obj,
         })
         return context
 
@@ -4519,10 +4562,16 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
                         statut__in=(
                             DemandeReservation.STATUT_NOUVELLE,
                             DemandeReservation.STATUT_EN_COURS,
+                            DemandeReservation.STATUT_VALIDEE,
                         ),
                     ),
                     uuid=demande_uuid,
                 )
+                demande = self._source_demande
+                if demande.statut == DemandeReservation.STATUT_VALIDEE and (
+                    not demande.reservation_id or demande.campagne_id or not demande.panneau_confrere
+                ):
+                    raise Http404
             elif not self.kwargs.get('pk'):
                 reference = self.request.POST.get('reservation_reference', '').strip()
                 if reference:
@@ -4533,6 +4582,9 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
                         ),
                         reference__iexact=reference,
                     ).first()
+            if self._source_demande and self._source_demande.panneau_confrere:
+                if statut_validation_confreres(self._source_demande) != 'confirme':
+                    raise Http404
         return self._source_demande
 
     def get_object(self, queryset=None):
@@ -4614,7 +4666,8 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
             .values_list('support__ville', flat=True)
             .distinct()
         )
-        return villes[0] if len(villes) == 1 else ''
+        villes = set(villes) | {ligne['ville'] for ligne in demande.panneaux_confreres if ligne.get('ville')}
+        return next(iter(villes)) if len(villes) == 1 else ''
 
     @staticmethod
     def _demande_categorie(demande):
@@ -4625,12 +4678,28 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
             if face.support.format in formats
             and formats[face.support.format].categorie
         }
+        if not categories and demande.panneau_confrere:
+            supports = SupportConfrere.objects.filter(
+                pk__in=[ligne.get('support_id') for ligne in demande.panneaux_confreres],
+            ).select_related('format')
+            categories = {
+                normaliser_categorie_format(support.categorie_affichee)
+                for support in supports if support.categorie_affichee
+            }
         return next(iter(categories)) if len(categories) == 1 else ''
 
     @transaction.atomic
     def form_valid(self, form):
         is_create = self.object is None
         demande = self.get_source_demande()
+        if demande and demande.panneau_confrere:
+            demande = DemandeReservation.objects.select_for_update().get(pk=demande.pk)
+            eligible = demande.peut_etre_traitee or (
+                demande.est_validee and demande.reservation_id and not demande.campagne_id
+            )
+            if not eligible or statut_validation_confreres(demande) != 'confirme':
+                form.add_error(None, 'Cette demande ne peut plus être utilisée pour créer la campagne.')
+                return self.form_invalid(form)
         faces_auto_selectionnees = []
         previous_values = {}
         if not is_create:
@@ -4683,7 +4752,8 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
         if demande:
             self.object.prix_faces_par_format = demande.prix_nets_faces_par_format
             self.object.frais_faces_par_format = demande.frais_faces_par_format
-            self.object.save(update_fields=['prix_faces_par_format', 'frais_faces_par_format'])
+            self.object.panneaux_confreres = demande.panneaux_confreres
+            self.object.save(update_fields=['prix_faces_par_format', 'frais_faces_par_format', 'panneaux_confreres'])
         elif form.reservation_source:
             self.object.prix_faces_par_format = (
                 form.reservation_source.prix_faces_par_format
@@ -4718,7 +4788,7 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
         if demande:
             demande.marquer_validee(
                 client=self.object.client,
-                reservation=None,
+                reservation=demande.reservation,
                 campagne=self.object,
                 user=self.request.user,
             )
@@ -7088,21 +7158,6 @@ class StaffDemandeWizardBase(StaffRequiredMixin, View):
         return context
 
 
-def _cle_code_naturelle(code):
-    """Clé de tri « naturelle » : OUA-10 passe après OUA-9."""
-    return [
-        (0, int(part)) if part.isdigit() else (1, part.casefold())
-        for part in re.split(r'(\d+)', str(code or '')) if part != ''
-    ]
-
-
-def _cle_code_support(code):
-    """Tri par numéro croissant (001, 002 … 034, 037), puis par préfixe."""
-    match = re.search(r'(\d+)\s*$', str(code or ''))
-    numero = int(match.group(1)) if match else float('inf')
-    return (numero, _cle_code_naturelle(code))
-
-
 def comptes_pour_recap(contact):
     """Fiche détaillée (client, agence) pour le récapitulatif."""
     comptes = []
@@ -7235,6 +7290,7 @@ class DemandeCreationView(StaffDemandeWizardBase):
             form=selection_form,
             contact_form=contact_form,
             confrere_form=confrere_form,
+            catalogue_confreres=catalogue_confreres(),
             frais_defaut=request.session.get(self.session_frais_key, {}),
             frais_par_format=request.session.get(self.session_frais_format_key, {}),
             panneaux_confreres=panneaux_confreres,
@@ -7286,6 +7342,7 @@ class DemandeCreationView(StaffDemandeWizardBase):
         if edit_uuid:
             edit_demande_id = DemandeReservation.objects.filter(uuid=edit_uuid).values_list('pk', flat=True).first()
         panneaux_confreres = []
+        faces_catalogue = set()
         try:
             lignes_confreres = json.loads(request.POST.get('panneaux_confreres', '[]'))
             if not isinstance(lignes_confreres, list):
@@ -7293,6 +7350,23 @@ class DemandeCreationView(StaffDemandeWizardBase):
             for ligne in lignes_confreres:
                 if not isinstance(ligne, dict):
                     raise ValueError
+                if 'support_id' in ligne:
+                    support_id = ligne['support_id']
+                    faces = ligne.get('faces')
+                    if type(support_id) is not int or not isinstance(faces, list) or not faces:
+                        raise ValueError
+                    if any(not isinstance(face, str) for face in faces):
+                        raise ValueError
+                    support = SupportConfrere.objects.select_related('confrere', 'format').filter(pk=support_id).first()
+                    if not support:
+                        raise ValueError
+                    codes = list(support.codes_faces)
+                    identifiants = {(support_id, face) for face in faces}
+                    if len(identifiants) != len(faces) or set(faces) - set(codes) or faces_catalogue & identifiants:
+                        raise ValueError
+                    faces_catalogue.update(identifiants)
+                    panneaux_confreres.append(ligne_support_confrere(support, [code for code in codes if code in faces]))
+                    continue
                 form_confrere = PanneauConfrereForm(ligne)
                 if not form_confrere.is_valid() or not form_confrere.has_changed():
                     raise ValueError
@@ -7455,9 +7529,9 @@ class DemandeCreationEtape2View(StaffDemandeWizardBase):
         faces, supports = self.get_selections(request)
         # Ordre croissant du code de la face (support, puis face).
         faces.sort(
-            key=lambda f: (_cle_code_support(f.support.code), _cle_code_naturelle(f.label)),
+            key=lambda f: (cle_code_support(f.support.code), cle_code_naturelle(f.label)),
         )
-        supports.sort(key=lambda s: _cle_code_support(s.code))
+        supports.sort(key=lambda s: cle_code_support(s.code))
         periode = request.session.get(self.session_period_key, {})
         date_debut = periode.get('date_debut')
         date_fin = periode.get('date_fin')
@@ -7715,6 +7789,7 @@ class DemandeCreationEtape2View(StaffDemandeWizardBase):
                 demande.save()
                 demande.faces_souhaitees.set(context['faces'])
                 demande.supports_souhaites.set(context['supports'])
+                synchroniser_dossiers_confreres(demande)
         except DemandeReservation.DoesNotExist:
             messages.error(
                 request,
@@ -7767,6 +7842,7 @@ class DemandeDetailView(LoginRequiredMixin, View):
         context = {
             'demande': demande,
             'campagne_form': DemandeCampagneForm(demande=demande),
+            'statut_validation_confreres': statut_validation_confreres(demande),
         }
         client_reservations = (
             demande.client
@@ -7959,35 +8035,37 @@ class DemandeValiderView(LoginRequiredMixin, View):
     """
 
     def post(self, request, uuid):
-        demande = get_object_or_404(DemandeReservation, uuid=uuid)
-
-        if not demande.peut_etre_traitee:
-            messages.error(request, "Cette demande a déjà été traitée.")
-            return redirect('demande_detail', uuid=uuid)
-
-        if demande.panneau_confrere:
-            messages.error(request, "Cette demande comprend un panneau d’un confrère et doit être traitée manuellement.")
-            return redirect('demande_detail', uuid=uuid)
-
-        if demande.supports_souhaites.exists():
-            messages.error(
-                request,
-                "Cette demande comprend un écran numérique et doit être traitée "
-                "manuellement. Aucune réservation n'a été créée.",
-            )
-            return redirect('demande_detail', uuid=uuid)
-
-        faces = list(demande.faces_souhaitees.select_related('support').all())
-        if not faces:
-            messages.error(
-                request,
-                "Impossible de valider : aucune face n'est associée à cette demande "
-                "(cas des écrans numériques non géré automatiquement — traiter manuellement)."
-            )
-            return redirect('demande_detail', uuid=uuid)
-
         try:
             with transaction.atomic():
+                demande = get_object_or_404(DemandeReservation.objects.select_for_update(), uuid=uuid)
+                if not demande.peut_etre_traitee:
+                    messages.error(request, "Cette demande a déjà été traitée.")
+                    return redirect('demande_detail', uuid=uuid)
+
+                partenaire = statut_validation_confreres(demande)
+                blocages_confreres = {
+                    'manuel': "Les supports confrères saisis manuellement doivent être traités à part.",
+                    'attente': "Attendez la confirmation de chaque confrère avant de créer la réservation.",
+                    'refuse': "Un confrère a refusé la demande. Modifiez la sélection avant de continuer.",
+                }
+                if partenaire in blocages_confreres:
+                    messages.error(request, blocages_confreres[partenaire])
+                    return redirect('demande_detail', uuid=uuid)
+
+                if demande.supports_souhaites.exists():
+                    messages.error(
+                        request,
+                        "Cette demande comprend un écran numérique et doit être traitée "
+                        "manuellement. Aucune réservation n'a été créée.",
+                    )
+                    return redirect('demande_detail', uuid=uuid)
+
+                faces = list(demande.faces_souhaitees.select_related('support'))
+                panneaux_confreres = demande.panneaux_confreres
+                if not faces and not panneaux_confreres:
+                    messages.error(request, "Impossible de valider : aucune face n'est associée à cette demande.")
+                    return redirect('demande_detail', uuid=uuid)
+
                 # ── Client ────────────────────────────────────────────────
                 # On ne réutilise un client existant que si son email n'est
                 # pas vide (évite de matcher tous les clients avec email='')
@@ -8030,6 +8108,7 @@ class DemandeValiderView(LoginRequiredMixin, View):
                     prix_affichage=demande.prix_affichage,
                     prix_impression=demande.prix_impression,
                     frais_faces_par_format=demande.frais_faces_par_format,
+                    panneaux_confreres_reserves=panneaux_confreres,
                     created_by=request.user,
                     notes=(
                         f"Créée depuis la demande {demande.reference}.\n{demande.message}"
@@ -8050,15 +8129,18 @@ class DemandeValiderView(LoginRequiredMixin, View):
 
                 demande.marquer_validee(client=client, reservation=reservation, user=request.user)
 
+            total_faces = len(faces) + sum(ligne['nombre_faces'] for ligne in panneaux_confreres)
             messages.success(
                 request,
                 f"Demande {demande.reference} validée. Réservation {reservation.reference} créée "
-                f"({len(faces)} face{'s' if len(faces) > 1 else ''})."
+                f"({total_faces} face{'s' if total_faces > 1 else ''})."
             )
 
             # ── Email STAFF UNIQUEMENT (pas de mail au client à la validation) ──
             self._send_email_staff_validation(demande, reservation, faces, request)
 
+        except Http404:
+            raise
         except ValidationError as e:
             # Regroupe les messages d'erreur (peut contenir un conflit de face)
             detail = "; ".join(e.messages) if hasattr(e, 'messages') else str(e)
@@ -8069,9 +8151,12 @@ class DemandeValiderView(LoginRequiredMixin, View):
         return redirect('demande_detail', uuid=uuid)
 
     def _send_email_staff_validation(self, demande, reservation, faces, request):
-        recap_emplacements = '\n'.join(
-            f"  - {f.support.code} · Face {f.label} · {f.support.quartier}" for f in faces
-        ) or '  (aucun)'
+        emplacements = [f"  - {f.support.code} · Face {f.label} · {f.support.quartier}" for f in faces]
+        emplacements.extend(
+            f"  - {ligne['nom']} · {ligne['reference']} · Faces {', '.join(ligne['faces'])}"
+            for ligne in reservation.panneaux_confreres_reserves
+        )
+        recap_emplacements = '\n'.join(emplacements) or '  (aucun)'
 
         corps_staff = (
             f"Demande validée : {demande.reference}\n\n"

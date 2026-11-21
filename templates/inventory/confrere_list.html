@@ -1,0 +1,38 @@
+{% extends 'inventory/confrere_base.html' %}
+{% block confrere_content %}
+  <header class="rc-banner">
+    <div class="rc-identity">
+      <span class="rc-icon" aria-hidden="true"><i class="bi bi-diagram-3"></i></span>
+      <div>
+        <h1>Réseau Confrère</h1>
+        <p>{{ confreres|length }} société{{ confreres|length|pluralize }}</p>
+      </div>
+    </div>
+    <a href="{% url 'confrere_create' %}" class="btn btn-primary rc-btn"><i class="bi bi-plus-lg" aria-hidden="true"></i> Ajouter un confrère</a>
+  </header>
+
+  {% if confreres %}
+    <ul class="rc-directory">
+      {% for confrere in confreres %}
+        <li class="rc-partner">
+          <div class="rc-identity">
+            <span class="rc-avatar" aria-hidden="true">{{ confrere.nom|slice:":2"|upper }}</span>
+            <div>
+              <h2><a href="{% url 'confrere_detail' confrere.pk %}">{{ confrere.nom }}</a></h2>
+              {% with contact=confrere.nom_complet_contact|default:confrere.telephone|default:confrere.email %}
+                {% if contact %}<p>{{ contact }}</p>{% endif %}
+              {% endwith %}
+            </div>
+          </div>
+          <dl class="rc-totals">
+            <div><dt>Supports</dt><dd>{{ confrere.total_supports }}</dd></div>
+            <div><dt>Faces</dt><dd>{{ confrere.total_faces }}</dd></div>
+          </dl>
+          <a href="{% url 'confrere_detail' confrere.pk %}" class="rc-card-link" aria-label="Voir le parc de {{ confrere.nom }}">Voir le parc <i class="bi bi-arrow-right" aria-hidden="true"></i></a>
+        </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <div class="rc-empty"><i class="bi bi-buildings" aria-hidden="true"></i><p>Aucun confrère enregistré.</p></div>
+  {% endif %}
+{% endblock %}

@@ -17,10 +17,11 @@ from openpyxl.utils import get_column_letter
 from weasyprint import HTML
 
 from accounts.decorators import ClientStaffRequiredMixin
-from campaigns.models import Campagne, Client, ReservationLigne,STATUT_EN_ATTENTE, STATUT_CONFIRMEE
+from campaigns.models import Client, LigneCampagne, ReservationLigne, STATUT_CONFIRMEE
 from inventory.models import *
+from inventory.sorting import cle_code_support
 from django.utils import timezone
-from django.db.models import Q
+from django.db.models import Case, CharField, Exists, OuterRef, Prefetch, Q, Subquery, Value, When
 
 
 # ══════════════════════════════════════════════════════════════════
@@ -28,13 +29,9 @@ from django.db.models import Q
 # ══════════════════════════════════════════════════════════════════
 
 OCCUPATION_CHOICES = {
-    'occupe'          : 'Occupé (au moins une face avec campagne)',
-    'libre'           : 'Libre (aucune face occupée ni réservée)',
-    'reserve'         : 'Réservé (au moins une face réservée)',
-    'total_occupe'    : 'Totalement occupé (toutes faces avec campagne)',
-    'total_reserve'   : 'Totalement réservé (toutes faces réservées)',
-    'non_reserve'     : 'Non réservé (aucune réservation)',
-    'occupe_ou_reserve': 'Occupé ou réservé',
+    'libre': 'Libre',
+    'occupe': 'Occupé',
+    'reserve': 'Réservé',
 }
 
 
@@ -85,7 +82,6 @@ def _match_filter(occupation_label, filter_occupation):
 
 def _group_supports_by_quartier(panneaux):
     grouped = {}
-    category_order = {"Panneau": 0, "Écran": 1, "Marché": 2, "Sucette": 3}
     for panneau in panneaux:
         ville = (panneau.get("ville") or "").strip()
         quartier = (panneau.get("quartier") or "").strip()
@@ -101,11 +97,7 @@ def _group_supports_by_quartier(panneaux):
         section["nom"] = f'{section["ville"]} · {section["quartier"]}'
         section["total"] = len(section["items"])
         section["unites"] = sum(item["nb_faces"] for item in section["items"])
-        section["items"].sort(key=lambda item: (
-            category_order.get(item["type"], 99),
-            item["nom"] or "",
-            item["code"] or "",
-        ))
+        section["items"].sort(key=lambda item: cle_code_support(item["code"]))
 
     return sorted(sections, key=lambda section: (
         section["ville"].casefold(),
@@ -121,10 +113,48 @@ def _build_context_panneaux(filters: dict) -> dict:
     today = date.today()
     now   = timezone.now()
 
+    jour = timezone.localdate(now)
+    campagne_active = (
+        Q(campagne__statut__in=('en_cours', 'a_venir'),
+          campagne__date_debut__lte=jour, campagne__date_fin__gte=jour)
+        | (Q(campagne__statut='en_pause', campagne__date_debut__lte=jour)
+           & (Q(campagne__date_fin__gte=jour) | Q(campagne__date_mise_en_pause__lte=jour)))
+    )
+    lignes_actives = LigneCampagne.objects.filter(campagne_active)
+    reservations_actives = ReservationLigne.objects.filter(
+        face_id=OuterRef('pk'), reservation__statut=STATUT_CONFIRMEE,
+        reservation__date_debut__lt=now, reservation__date_fin__gt=now,
+    )
+    afficher_client = filters.get('afficher_client', '1') == '1'
+    faces_rapport = FacePanneau.objects.annotate(
+        statut_rapport=Case(
+            When(etat=Support.ETAT_PANNE, then=Value('panne')),
+            When(Exists(lignes_actives.filter(face_id=OuterRef('pk'))), then=Value('occupe')),
+            When(Exists(reservations_actives), then=Value('reserve')),
+            default=Value('libre'),
+            output_field=CharField(),
+        ),
+    )
+    if afficher_client:
+        reservation_rapport = reservations_actives.order_by('pk')
+        faces_rapport = faces_rapport.annotate(
+            client_reservation_rapport=Subquery(
+                reservation_rapport.values('reservation__client__nom')[:1],
+            ),
+            debut_reservation_rapport=Subquery(reservation_rapport.values('reservation__date_debut')[:1]),
+            fin_reservation_rapport=Subquery(reservation_rapport.values('reservation__date_fin')[:1]),
+        ).prefetch_related(Prefetch(
+            'lignes_campagne',
+            queryset=LigneCampagne.objects.filter(campagne__date_fin__gte=today)
+                .select_related('campagne__client').order_by('campagne__date_debut', 'campagne_id'),
+            to_attr='lignes_rapport',
+        ))
+
     # ── Base queryset ────────────────────────────────────────────
     qs = (
         Support.objects.filter(actif=True)
-        .prefetch_related("faces__lignes_campagne__campagne__client")
+        .annotate(ecran_occupe_rapport=Exists(lignes_actives.filter(support_id=OuterRef('pk'))))
+        .prefetch_related(Prefetch('faces', queryset=faces_rapport, to_attr='faces_rapport'))
         .order_by("ville", "quartier", "nom")
     )
 
@@ -212,16 +242,6 @@ def _build_context_panneaux(filters: dict) -> dict:
             Q(faces__lignes_reservation__reservation__client_id=client_pk)       # faces réservées directement
         ).distinct()
 
-    # ── Pré-chargement des faces réservées (1 seule requête SQL) ─
-    faces_reservees_ids = set(
-        ReservationLigne.objects
-        .filter(
-            reservation__date_fin__gte=now,
-            reservation__statut__in=[STATUT_EN_ATTENTE, STATUT_CONFIRMEE],
-        )
-        .values_list('face_id', flat=True)
-    )
-
     # ── Construction des lignes ──────────────────────────────────
     filter_occupation = filters.get("occupation", "").strip()
 
@@ -235,9 +255,8 @@ def _build_context_panneaux(filters: dict) -> dict:
     for support in qs:
         faces_data = []
 
-        support_faces = list(support.faces.all())
         if support.type_support == Support.TYPE_ECRAN:
-            statut_ecran = 'panne' if support.etat == Support.ETAT_PANNE else 'occupe' if support.is_occupe() else 'libre'
+            statut_ecran = 'panne' if support.etat == Support.ETAT_PANNE else 'occupe' if support.ecran_occupe_rapport else 'libre'
             faces_data.append({
                 "face": None,
                 "label": "Écran",
@@ -248,15 +267,9 @@ def _build_context_panneaux(filters: dict) -> dict:
                 "campagnes": [],
             })
 
-        for face in support_faces:
-            campagnes_list = list(
-                Campagne.objects
-                .filter(lignes__face=face, date_fin__gte=today)
-                .select_related("client")
-                .distinct()
-                .order_by("date_debut")
-            )
-            statut_face = face.get_statut()
+        for face in support.faces_rapport:
+            campagnes = {ligne.campagne_id: ligne.campagne for ligne in getattr(face, 'lignes_rapport', ())}
+            statut_face = face.statut_rapport
 
             faces_data.append({
                 "face"     : face,
@@ -265,7 +278,10 @@ def _build_context_panneaux(filters: dict) -> dict:
                 "occupee"  : statut_face == 'occupe',
                 "reservee" : statut_face == 'reserve',
                 "en_panne" : statut_face == 'panne',
-                "campagnes": campagnes_list,
+                "campagnes": list(campagnes.values()),
+                "client_reservation": getattr(face, 'client_reservation_rapport', ''),
+                "debut_reservation": getattr(face, 'debut_reservation_rapport', None),
+                "fin_reservation": getattr(face, 'fin_reservation_rapport', None),
             })
 
         nb_faces_total = len(faces_data)
@@ -310,16 +326,29 @@ def _build_context_panneaux(filters: dict) -> dict:
     # Un marché peut exister avant l'installation de son premier support.
     # On le garde visible dans le rapport pour suivre aussi les emplacements
     # encore disponibles à développer.
-    marches = Marche.objects.filter(actif=True).prefetch_related("emplacements__support_installe__faces")
+    emplacements = Emplacement.objects.select_related('support_installe').annotate(
+        occupe_rapport=Exists(LigneCampagne.objects.filter(
+            emplacement_id=OuterRef('pk'), campagne__date_fin__gte=now.date(),
+        ).exclude(campagne__statut__in=('brouillon', 'annulee'))),
+    )
+    marches = Marche.objects.filter(actif=True).prefetch_related(
+        Prefetch('emplacements', queryset=emplacements, to_attr='emplacements_rapport'),
+    )
     if marche_pk:
         marches = marches.filter(pk=marche_pk)
     elif not include_markets:
         marches = marches.none()
+    if ville:
+        marches = marches.filter(ville__iexact=ville)
+    if quartier:
+        marches = marches.filter(quartier__iexact=quartier)
+    if statut and statut != Support.ETAT_BON:
+        marches = marches.none()
     for marche in marches:
         faces_marche = []
-        for emplacement in marche.emplacements.all():
+        for emplacement in marche.emplacements_rapport:
             support_installe = getattr(emplacement, "support_installe", None)
-            statut_emplacement = "occupe" if emplacement.est_dans_campagne else "libre"
+            statut_emplacement = "occupe" if emplacement.occupe_rapport else "libre"
             faces_marche.append({
                 "face": None,
                 "label": emplacement.code,
@@ -335,10 +364,11 @@ def _build_context_panneaux(filters: dict) -> dict:
             continue
         marche_occupees = sum(1 for face in faces_marche if face["occupee"])
         marche_libres = sum(1 for face in faces_marche if face["statut"] == "libre")
-        supports_connectes = Support.objects.filter(
-            actif=True,
-            emplacement__marche=marche,
-        ).count()
+        supports_connectes = sum(
+            emplacement.support_installe.actif
+            for emplacement in marche.emplacements_rapport
+            if getattr(emplacement, 'support_installe', None) is not None
+        )
         total_faces += len(faces_marche)
         total_occupees += marche_occupees
         total_libres += marche_libres
@@ -412,18 +442,23 @@ def _build_context_panneaux(filters: dict) -> dict:
         for categorie in sorted(formats_par_categorie, key=str.casefold)
         if categorie not in categories_rapport
     )
+    afficher_etat = filters.get("afficher_etat", "1") == "1"
+    afficher_type = len({panneau["type"] for panneau in panneaux}) > 1
 
     return {
         "panneaux"          : panneaux,
         "today"             : today,
         "filters"           : filters,
         "categories_selectionnees": categories,
-        "afficher_etat": filters.get("afficher_etat", "1") == "1",
-        "afficher_client": filters.get("afficher_client", "1") == "1",
+        "afficher_etat": afficher_etat,
+        "afficher_type": afficher_type,
+        "nombre_colonnes_tableau": 4 + int(afficher_etat) + int(afficher_type),
+        "afficher_client": afficher_client,
         "afficher_faces_libres": filters.get("afficher_faces_libres", "1") == "1",
         "afficher_faces_reservees": filters.get("afficher_faces_reservees", "1") == "1",
         "afficher_faces_occupees": filters.get("afficher_faces_occupees", "1") == "1",
         "categories_rapport": categories_rapport,
+        "categories_par_format": {item.code: item.categorie for item in formats_supports},
         "categories_sections": categories_sections,
         "quartier_sections": _group_supports_by_quartier(panneaux),
         "villes"            : villes,
@@ -470,6 +505,76 @@ class SupportsReportView(ClientStaffRequiredMixin, View):
     def get(self, request):
         filters = _filters_from_request(request)
         context = _build_context_panneaux(filters)
+        supports_ville = Support.objects.filter(actif=True)
+        marches_ville = Marche.objects.filter(actif=True)
+        villes = set(context['villes'])
+        villes.update(ville.strip() for ville in marches_ville.values_list('ville', flat=True) if ville and ville.strip())
+        if filters['ville']:
+            supports_ville = supports_ville.filter(ville__iexact=filters['ville'].strip())
+            marches_ville = marches_ville.filter(ville__iexact=filters['ville'].strip())
+
+        quartiers = set()
+        categories = set()
+        for quartier, type_support, code_format, emplacement_id in supports_ville.values_list(
+            'quartier', 'type_support', 'format', 'emplacement_id',
+        ):
+            if quartier and quartier.strip():
+                quartiers.add(quartier.strip())
+            if type_support == Support.TYPE_ECRAN:
+                categories.add('Écran')
+            elif type_support == Support.TYPE_PANNEAU:
+                categorie = context['categories_par_format'].get(code_format)
+                if code_format == '1x2' and not emplacement_id:
+                    categories.add('Sucette')
+                elif categorie and categorie.casefold() != 'panneau':
+                    categories.add(categorie)
+        quartiers_marches = list(marches_ville.values_list('quartier', flat=True))
+        if quartiers_marches:
+            categories.add('Marché')
+            quartiers.update(quartier.strip() for quartier in quartiers_marches if quartier and quartier.strip())
+        context['categories_rapport'] = [
+            categorie for categorie in context['categories_rapport'] if categorie in categories
+        ]
+        context['categories_rapport_masquees'] = [
+            categorie for categorie in filters['categories']
+            if len(context['categories_rapport']) <= 1 or categorie not in categories
+        ]
+
+        filtres_inferieurs = ('format', 'statut', 'occupation')
+        if any(filters[nom] for nom in filtres_inferieurs):
+            candidats = _build_context_panneaux({
+                **filters, **dict.fromkeys(filtres_inferieurs, ''), 'afficher_client': '0',
+            })['panneaux']
+        else:
+            candidats = context['panneaux']
+        codes_disponibles = {item['support'].format for item in candidats if item['support']}
+        etats_disponibles = {item['etat_raw'] for item in candidats}
+        occupations_disponibles = {item['occupation'] for item in candidats}
+        groupes = (
+            ('ville', 'Ville', 'Toutes', [(ville, ville) for ville in sorted(villes)]),
+            ('quartier', 'Quartier', 'Tous', [(quartier, quartier) for quartier in sorted(quartiers)]),
+            ('format', 'Format', 'Tous', [
+                (item['code'], item['label']) for item in context['formats_rapport']
+                if item['code'] in codes_disponibles
+            ]),
+            ('statut', 'État', 'Tous', [
+                (etat, label) for etat, label in Support._meta.get_field('etat').choices
+                if etat in etats_disponibles
+            ]),
+            ('occupation', 'Occupation', 'Toutes', [
+                (key, label) for key, label in context['occupation_choices'].items()
+                if any(_match_filter(occupation, key) for occupation in occupations_disponibles)
+            ]),
+        )
+        context['onglets_rapport'] = [
+            {'nom': nom, 'titre': titre, 'actif': filters.get(nom, ''), 'options': [('', tous), *options]}
+            for nom, titre, tous, options in groupes
+            if len(options) > 1
+        ]
+        context['filtres_rapport_masques'] = {
+            nom: filters[nom] for nom, _, _, options in groupes
+            if filters.get(nom) and (len(options) <= 1 or filters[nom] not in dict(options))
+        }
         return render(request, "reports/apercu_supports.html", context)
 
 
@@ -595,13 +700,7 @@ class ExportSupportsExcelView(ClientStaffRequiredMixin, View):
                 elif statut == "reserve":
                     contenu = "◈ Réservée"
                     if context["afficher_client"]:
-                        resa = (
-                            face_data["face"].lignes_client
-                            .filter(date_fin__gte=now)
-                            .select_related("client")
-                            .first()
-                        )
-                        client_nom = resa.client.nom if resa and resa.client else ""
+                        client_nom = face_data.get("client_reservation")
                         if client_nom:
                             contenu = f"◈ Réservée\n{client_nom}"
                             clients_data.setdefault(client_nom, []).append({
@@ -613,8 +712,8 @@ class ExportSupportsExcelView(ClientStaffRequiredMixin, View):
                                 "Face"    : lettre,
                                 "Statut"  : "Réservée",
                                 "Campagne": "— (Réservation)",
-                                "Début"   : resa.date_debut.strftime("%d/%m/%Y"),
-                                "Fin"     : resa.date_fin.strftime("%d/%m/%Y"),
+                                "Début"   : face_data["debut_reservation"].strftime("%d/%m/%Y"),
+                                "Fin"     : face_data["fin_reservation"].strftime("%d/%m/%Y"),
                             })
 
                 else:

@@ -1,4 +1,4 @@
-from django.db import models
+from django.db import models, router, transaction
 from django.db.models import Q
 from django.utils import timezone
 from django.conf import settings
@@ -10,6 +10,141 @@ from datetime import datetime
 from typing import Optional
 import uuid
 from django.conf import settings
+
+
+class Confrere(models.Model):
+    nom = models.CharField("Nom de la société", max_length=150, unique=True)
+    ville = models.CharField("Ville / localité", max_length=150, blank=True)
+    nom_contact = models.CharField("Nom du contact", max_length=150, blank=True)
+    prenom_contact = models.CharField("Prénom du contact", max_length=150, blank=True)
+    telephone = models.CharField("Numéro de téléphone", max_length=40, blank=True)
+    whatsapp = models.CharField("Numéro WhatsApp", max_length=40, blank=True)
+    email = models.EmailField("Adresse e-mail", blank=True)
+    confirmation_automatique = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['nom', 'pk']
+        verbose_name = 'confrère'
+
+    def __str__(self):
+        return self.nom
+
+    @property
+    def nom_complet_contact(self):
+        return ' '.join(part for part in (self.prenom_contact, self.nom_contact) if part)
+
+
+class SupportConfrere(models.Model):
+    confrere = models.ForeignKey(Confrere, on_delete=models.PROTECT, related_name='supports')
+    nom = models.CharField("Nom du support", max_length=150, blank=True)
+    reference = models.CharField("Référence", max_length=80, editable=False)
+    ville = models.CharField("Ville", max_length=150, blank=True)
+    emplacement = models.CharField("Emplacement précis", max_length=250, blank=True)
+    categorie = models.CharField("Catégorie", max_length=50, blank=True)
+    format_libre = models.CharField("Ancien format", max_length=80, blank=True, editable=False)
+    format = models.ForeignKey('FormatSupport', on_delete=models.PROTECT, blank=True, null=True, verbose_name="Format")
+    notes = models.TextField("Notes", blank=True)
+    nombre_faces = models.PositiveIntegerField("Nombre de faces", default=1)
+    faces_selectionnees = models.JSONField(default=list, blank=True)
+
+    class Meta:
+        ordering = ['ville', 'emplacement', 'pk']
+        verbose_name = 'support confrère'
+        constraints = [
+            models.CheckConstraint(condition=Q(nombre_faces__gte=1), name='inv_confrere_support_positive_faces'),
+        ]
+
+    def __str__(self):
+        return self.nom or self.reference
+
+    @property
+    def categorie_affichee(self):
+        return self.format.categorie if self.format_id else self.categorie
+
+    @property
+    def codes_faces(self):
+        if self.faces_selectionnees:
+            return self.faces_selectionnees
+        return self.generer_codes_faces(self.nombre_faces)
+
+    @staticmethod
+    def generer_codes_faces(nombre):
+        for position in range(1, nombre + 1):
+            code = ''
+            while position:
+                position, index = divmod(position - 1, 26)
+                code = chr(ord('A') + index) + code
+            yield code
+
+    @staticmethod
+    def construire_reference(societe, ville, numero):
+        def mots(texte):
+            ascii_text = unicodedata.normalize('NFKD', texte).encode('ascii', 'ignore').decode()
+            return re.findall(r'[A-Z0-9]+', ascii_text.upper())
+
+        mots_societe = mots(societe)
+        if len(mots_societe) > 1:
+            prefixe = ''.join(mot[0] for mot in mots_societe[:12])
+        else:
+            prefixe = mots_societe[0][:3] if mots_societe else 'SUP'
+        mots_ville = mots(ville)
+        code_ville = ''.join(mots_ville)[:3]
+        return '-'.join(part for part in (prefixe, code_ville, f'{numero:03d}') if part)
+
+    def save(self, *args, **kwargs):
+        if self.reference:
+            return super().save(*args, **kwargs)
+        database = kwargs.get('using') or router.db_for_write(type(self), instance=self)
+        with transaction.atomic(using=database):
+            super().save(*args, **kwargs)
+            self.reference = self.construire_reference(self.confrere.nom, self.ville, self.pk)
+            super().save(using=database, update_fields=['reference'])
+
+
+class DossierConfrere(models.Model):
+    class Reponse(models.TextChoices):
+        EN_ATTENTE = 'en_attente', 'En attente du confrère'
+        CONFIRMEE = 'confirmee', 'Confirmée par le confrère'
+        REFUSEE = 'refusee', 'Refusée par le confrère'
+        AUTOMATIQUE = 'automatique', 'Confirmée automatiquement'
+
+    confrere = models.ForeignKey(Confrere, on_delete=models.PROTECT, related_name='dossiers')
+    demande = models.ForeignKey('campaigns.DemandeReservation', on_delete=models.CASCADE, related_name='dossiers_confreres')
+    lignes = models.JSONField(default=list)
+    actif = models.BooleanField(default=True)
+    token_validation = models.UUIDField(default=uuid.uuid4, unique=True, editable=False)
+    periode_validation = models.CharField(max_length=21, blank=True, editable=False)
+    reponse_confrere = models.CharField(max_length=12, choices=Reponse.choices, default=Reponse.EN_ATTENTE)
+    repondu_le = models.DateTimeField(null=True, blank=True)
+    confirmation_automatique = models.BooleanField(default=True)
+
+    @property
+    def mode_confirmation_modifiable(self):
+        return self.actif and (
+            self.demande.peut_etre_traitee or self.demande.statut == self.demande.STATUT_BROUILLON
+        ) and self.reponse_confrere in (self.Reponse.AUTOMATIQUE, self.Reponse.EN_ATTENTE)
+
+    def appliquer_mode_confirmation(self, automatique):
+        if self.confirmation_automatique == automatique:
+            return
+        self.confirmation_automatique = automatique
+        self.reponse_confrere = self.Reponse.AUTOMATIQUE if automatique else self.Reponse.EN_ATTENTE
+        self.repondu_le = timezone.now() if automatique else None
+        self.token_validation = uuid.uuid4()
+        self.save(update_fields=['confirmation_automatique', 'reponse_confrere', 'repondu_le', 'token_validation'])
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(fields=['confrere', 'demande'], name='inv_dossier_confrere_demande_unique'),
+        ]
+
+
+class DocumentDossierConfrere(models.Model):
+    dossier = models.ForeignKey(DossierConfrere, on_delete=models.CASCADE, related_name='documents')
+    nom = models.CharField(max_length=255)
+    contenu = models.BinaryField()
+    taille = models.PositiveIntegerField()
+    ajoute_le = models.DateTimeField(auto_now_add=True)
 
 
 def calculer_duree_tranches(tranches: str) -> float:

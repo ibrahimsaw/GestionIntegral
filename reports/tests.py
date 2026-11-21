@@ -253,9 +253,9 @@ class CampagnePdfPreuvesTests(TestCase):
 class GroupSupportsByQuartierTests(SimpleTestCase):
     def test_groups_supports_by_city_and_quartier_and_sorts_groups(self):
         supports = [
-            {"ville": "Ouagadougou", "quartier": "Dapoya", "type": "Panneau", "nom": "Support B", "code": "B", "nb_faces": 2},
+            {"ville": "Ouagadougou", "quartier": "Dapoya", "type": "Panneau", "nom": "Support B", "code": "OUA-10", "nb_faces": 2},
             {"ville": "Bobo-Dioulasso", "quartier": "Dapoya", "type": "Écran", "nom": "Écran A", "code": "A", "nb_faces": 1},
-            {"ville": "Ouagadougou", "quartier": "Dapoya", "type": "Écran", "nom": "Écran A", "code": "A", "nb_faces": 1},
+            {"ville": "Ouagadougou", "quartier": "Dapoya", "type": "Écran", "nom": "Écran A", "code": "OUA-9", "nb_faces": 1},
             {"ville": "", "quartier": "", "type": "Marché", "nom": "Marché sans zone", "code": "M", "nb_faces": 3},
         ]
 
@@ -273,7 +273,7 @@ class GroupSupportsByQuartierTests(SimpleTestCase):
         self.assertEqual(sections[1]["unites"], 3)
         self.assertEqual(
             [item["code"] for item in sections[1]["items"]],
-            ["B", "A"],
+            ["OUA-9", "OUA-10"],
         )
 
 
@@ -317,9 +317,10 @@ class SupportsReportFormatFilterTests(TestCase):
             )
 
     def test_format_filter_updates_report_totals_and_keeps_legend(self):
+        filtres = {"categorie": "Panneau", "format": "REPORT-FORMAT-SMALL"}
         response = self.client.get(
             reverse("supports_report"),
-            {"categorie": "Panneau", "format": "REPORT-FORMAT-SMALL"},
+            filtres,
         )
 
         self.assertEqual(response.status_code, 200)
@@ -329,15 +330,43 @@ class SupportsReportFormatFilterTests(TestCase):
         self.assertEqual(response.context["total_libres"], 1)
         self.assertEqual(response.context["total_reservees"], 0)
         self.assertEqual(response.context["total_occupees"], 0)
-        self.assertContains(response, "REPORT-SUPPORT-SMALL")
-        self.assertContains(response, "(Ancien panneau test)")
         self.assertIn("12m²", response.context["categories_rapport"])
         self.assertIn("Géant", response.context["categories_rapport"])
         self.assertContains(response, 'name="format"')
         self.assertContains(response, "Supports")
         self.assertContains(response, "Faces totales")
-        self.assertContains(response, "Légende :")
-        self.assertContains(response, "En panne")
+        self.assertContains(response, 'class="network-report-table"')
+        self.assertNotContains(response, '<th scope="col">Adresse</th>')
+        self.assertNotContains(response, '<th scope="col">Type</th>')
+        self.assertNotContains(response, '<iframe')
+        self.assertContains(response, 'format=REPORT-FORMAT-SMALL')
+        with patch("reports.supports_report_view.HTML") as pdf_renderer:
+            pdf_renderer.return_value.write_pdf.return_value = b"%PDF-test"
+            pdf_response = self.client.get(reverse("supports_export_pdf"), filtres)
+        self.assertEqual(pdf_response.content, b"%PDF-test")
+        self.assertEqual(pdf_response["Content-Type"], "application/pdf")
+        pdf_html = pdf_renderer.call_args.kwargs["string"]
+        for texte in ("REPORT-SUPPORT-SMALL", "(Ancien panneau test)", "Légende :", "En panne"):
+            self.assertIn(texte, pdf_html)
+            self.assertContains(response, texte)
+        shared_styles = render_to_string("reports/_supports_report_table_styles.html")
+        self.assertIn(shared_styles, pdf_html)
+        self.assertContains(response, shared_styles)
+
+    def test_type_column_is_visible_when_the_report_contains_different_types(self):
+        Support.objects.create(
+            code="REPORT-SUCETTE",
+            nom="Sucette de test",
+            type_support=Support.TYPE_PANNEAU,
+            format="1x2",
+            latitude=12.34,
+            longitude=-1.52,
+            ville="Ouagadougou",
+        )
+        response = self.client.get(reverse("supports_report"), {"afficher_etat": "0"})
+        self.assertTrue(response.context["afficher_type"])
+        self.assertContains(response, '<th scope="col">Type</th>')
+        self.assertEqual(response.context["nombre_colonnes_tableau"], 5)
 
     def test_format_categories_filter_supports_by_their_registered_category(self):
         for category, expected_format in (
@@ -356,6 +385,28 @@ class SupportsReportFormatFilterTests(TestCase):
                     response.context["panneaux"][0]["support"].format,
                     expected_format,
                 )
+
+    def test_report_filter_options_follow_city_neighborhood_and_category(self):
+        Support.objects.filter(code="REPORT-SUPPORT-SMALL").update(quartier="Dapoya")
+        Support.objects.filter(code="REPORT-SUPPORT-LARGE").update(
+            ville="Bobo-Dioulasso", quartier="Sarfalao", etat=Support.ETAT_PANNE,
+        )
+        response = self.client.get(reverse("supports_report"), {
+            "ville": "Ouagadougou", "quartier": "Dapoya", "categorie": "12m²",
+        })
+        self.assertEqual(response.status_code, 200)
+        options = {
+            groupe["nom"]: {valeur for valeur, _ in groupe["options"] if valeur}
+            for groupe in response.context["onglets_rapport"]
+        }
+        self.assertEqual(options["ville"], {"Ouagadougou", "Bobo-Dioulasso"})
+        self.assertEqual(set(options), {"ville"})
+        self.assertEqual(response.context["filtres_rapport_masques"], {"quartier": "Dapoya"})
+        self.assertEqual(response.context["categories_rapport"], ["12m²"])
+        self.assertEqual(response.context["categories_rapport_masquees"], ["12m²"])
+        self.assertEqual(response.context["occupation_choices"], {
+            "libre": "Libre", "occupe": "Occupé", "reserve": "Réservé",
+        })
 
     def test_archived_support_is_excluded_from_report_filters_and_excel(self):
         archived = Support.objects.create(
@@ -402,14 +453,18 @@ class SupportsReportFormatFilterTests(TestCase):
         self.assertFalse(response.context["afficher_faces_libres"])
         self.assertFalse(response.context["afficher_faces_reservees"])
         self.assertFalse(response.context["afficher_faces_occupees"])
-        self.assertContains(response, '<div class="cl-kpi-lbl">Total Supports</div>')
-        self.assertContains(response, '<div class="cl-kpi-lbl">Faces Totales</div>')
-        self.assertNotContains(response, '<div class="cl-kpi-lbl">Faces Libres</div>')
-        self.assertNotContains(response, '<div class="cl-kpi-lbl">Faces Réservées</div>')
-        self.assertNotContains(response, '<div class="cl-kpi-lbl">Faces Occupées</div>')
-        self.assertNotContains(response, '<div class="kpi-label">Faces libres</div>')
-        self.assertNotContains(response, '<div class="kpi-label">Faces réservées</div>')
-        self.assertNotContains(response, '<div class="kpi-label">Faces occupées</div>')
+        self.assertContains(response, '<div class="dl-report-stat-label">Total supports</div>')
+        self.assertContains(response, '<div class="dl-report-stat-label">Faces totales</div>')
+        self.assertNotContains(response, '<div class="dl-report-stat-label">Faces libres</div>')
+        self.assertNotContains(response, '<div class="dl-report-stat-label">Faces réservées</div>')
+        self.assertNotContains(response, '<div class="dl-report-stat-label">Faces occupées</div>')
+        pdf_html = render_to_string("reports/supports_report_pdf_export.html", {
+            option: response.context[option]
+            for option in ('afficher_faces_libres', 'afficher_faces_reservees', 'afficher_faces_occupees')
+        })
+        self.assertNotIn('<div class="kpi-label">Faces libres</div>', pdf_html)
+        self.assertNotIn('<div class="kpi-label">Faces réservées</div>', pdf_html)
+        self.assertNotIn('<div class="kpi-label">Faces occupées</div>', pdf_html)
 
     def test_excel_export_uses_filters_and_selected_display_options(self):
         response = self.client.get(

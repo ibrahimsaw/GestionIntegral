@@ -1,0 +1,97 @@
+{% extends 'inventory/confrere_base.html' %}
+{% block title %}{{ confrere.nom }} — Réseau Confrère{% endblock %}
+{% block confrere_content %}
+  <a href="{% url 'confrere_list' %}" class="rc-back"><i class="bi bi-arrow-left" aria-hidden="true"></i> Tous les confrères</a>
+  <header class="rc-banner">
+    <div class="rc-identity">
+      <span class="rc-avatar rc-avatar-large" aria-hidden="true">{{ confrere.nom|slice:":2"|upper }}</span>
+      <div><h1>{{ confrere.nom }}</h1>{% if confrere.ville %}<p>{{ confrere.ville }}</p>{% endif %}</div>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      <form method="post" action="{% url 'confrere_fiche_mode_confirmation' confrere.pk %}">
+        {% csrf_token %}
+        <button type="submit" name="mode" value="{% if confrere.confirmation_automatique %}lien{% else %}automatique{% endif %}"
+                aria-pressed="{{ confrere.confirmation_automatique|yesno:'true,false' }}"
+                class="btn {% if confrere.confirmation_automatique %}btn-primary{% else %}btn-outline-secondary{% endif %} rc-btn">
+          <i class="bi {% if confrere.confirmation_automatique %}bi-toggle-on{% else %}bi-toggle-off{% endif %}" aria-hidden="true"></i>
+          Confirmation automatique <span aria-hidden="true">· {{ confrere.confirmation_automatique|yesno:'Activée,Désactivée' }}</span>
+        </button>
+      </form>
+      <a href="{% url 'confrere_edit' confrere.pk %}" class="btn btn-outline-secondary rc-btn"><i class="bi bi-pencil" aria-hidden="true"></i> Modifier la fiche</a>
+    </div>
+  </header>
+  <div class="rc-detail">
+  <section class="rc-panel">
+    <div class="rc-panel-head"><h2>Coordonnées</h2></div>
+    <dl class="rc-contacts">
+      <div><dt><i class="bi bi-person" aria-hidden="true"></i> Contact</dt><dd>{{ confrere.nom_complet_contact|default:"—" }}</dd></div>
+      <div><dt><i class="bi bi-telephone" aria-hidden="true"></i> Téléphone</dt><dd>{% if confrere.telephone %}<a href="tel:{{ confrere.telephone }}">{{ confrere.telephone }}</a>{% else %}—{% endif %}</dd></div>
+      <div><dt><i class="bi bi-whatsapp" aria-hidden="true"></i> WhatsApp</dt><dd>{{ confrere.whatsapp|default:"—" }}</dd></div>
+      <div><dt><i class="bi bi-envelope" aria-hidden="true"></i> E-mail</dt><dd>{% if confrere.email %}<a href="mailto:{{ confrere.email }}">{{ confrere.email }}</a>{% else %}—{% endif %}</dd></div>
+    </dl>
+  </section>
+  <section class="rc-panel">
+    <div class="rc-panel-head">
+      <h2>Parc de supports <span class="rc-count">{{ confrere.supports.all|length }}</span></h2>
+      <a href="{% url 'confrere_support_create' confrere.pk %}" class="btn btn-primary rc-btn"><i class="bi bi-plus-lg" aria-hidden="true"></i> Ajouter un support</a>
+    </div>
+    <div class="table-responsive">
+      <table class="rc-table">
+        <thead><tr>
+          <th scope="col">Support</th><th scope="col">Catégorie</th><th scope="col">Ville / emplacement</th><th scope="col">Format</th>
+          <th scope="col" class="text-end">Faces</th><th scope="col" class="text-end">Actions</th>
+        </tr></thead>
+        <tbody>
+          {% for support in confrere.supports.all %}
+            <tr>
+              <td>
+                <strong>{{ support.nom|default:support.reference }}</strong>
+                {% if support.nom %}<small class="rc-reference">{{ support.reference }}</small>{% endif %}
+                {% if support.notes %}<details><summary>Notes</summary>{{ support.notes|linebreaksbr }}</details>{% endif %}
+              </td>
+              <td>{% if support.categorie_affichee %}<span class="rc-category">{{ support.categorie_affichee }}</span>{% else %}—{% endif %}</td>
+              <td>
+                {{ support.ville|default_if_none:"" }}
+                {% if support.emplacement %}<small class="d-block">{{ support.emplacement }}</small>{% elif not support.ville %}—{% endif %}
+              </td>
+              <td>
+                {% if support.format %}{{ support.format.dimensions|default:support.format.code }}
+                {% else %}{{ support.format_libre|default:"—" }}{% endif %}
+              </td>
+              <td class="text-end">
+                {% for code in support.codes_faces %}
+                  <span class="rc-face">{{ code }}</span>
+                {% endfor %}
+              </td>
+              <td class="text-end"><a href="{% url 'confrere_support_edit' confrere.pk support.pk %}" class="btn btn-sm btn-outline-secondary rc-btn" aria-label="Modifier {{ support }}"><i class="bi bi-pencil" aria-hidden="true"></i> Modifier</a></td>
+            </tr>
+          {% empty %}
+            <tr><td colspan="6" class="text-center text-muted py-4">Aucun support enregistré pour ce confrère.</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </section>
+  </div>
+  <section class="rc-panel mt-3">
+    <div class="rc-panel-head"><h2>Historique des demandes <span class="rc-count">{{ dossiers|length }}</span></h2></div>
+    {% if dossiers %}
+      <div class="table-responsive"><table class="rc-table">
+        <thead><tr><th>Demande</th><th>Campagne</th><th>Période</th><th>Réponse du confrère</th><th>Dossier</th></tr></thead>
+        <tbody>
+          {% for dossier in dossiers %}
+          <tr>
+            <td><strong>{{ dossier.demande.reference }}</strong></td>
+            <td>{{ dossier.demande.nom_campagne|default:"—" }}</td>
+            <td>{{ dossier.demande.date_debut_souhaitee|date:"d/m/Y" }} – {{ dossier.demande.date_fin_souhaitee|date:"d/m/Y" }}</td>
+            <td>{% if dossier.actif %}{{ dossier.get_reponse_confrere_display }}{% else %}Retiré de la demande{% endif %}</td>
+            <td><a class="rc-card-link" href="{% url 'confrere_dossier' dossier.pk %}">Ouvrir <i class="bi bi-arrow-right" aria-hidden="true"></i></a></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table></div>
+    {% else %}
+      <p class="text-muted text-center m-3">Aucune demande liée à ce confrère.</p>
+    {% endif %}
+  </section>
+{% endblock %}

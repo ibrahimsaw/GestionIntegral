@@ -1,0 +1,95 @@
+  <table class="network-report-table" aria-label="Supports du réseau">
+    <colgroup>
+      {% if afficher_type %}<col class="c-type">{% endif %}
+      <col class="c-code">
+      <col class="c-mairie">
+      <col class="c-nom">
+      {% if afficher_etat %}<col class="c-statut">{% endif %}
+      <col class="c-faces">
+    </colgroup>
+    <thead>
+      <tr>
+        {% if afficher_type %}<th scope="col">Type</th>{% endif %}
+        <th scope="col">Code</th>
+        <th scope="col">Mairie</th>
+        <th scope="col">Support</th>
+        {% if afficher_etat %}<th scope="col">État</th>{% endif %}
+        <th scope="col">Faces / emplacements</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for section in quartier_sections %}
+      {% ifchanged section.ville %}
+      <tr class="ville-separator-row">
+        <td colspan="{{ nombre_colonnes_tableau|default:4 }}">
+          {{ section.ville }}
+        </td>
+      </tr>
+      {% endifchanged %}
+      <tr class="quartier-separator-row">
+        <td colspan="{{ nombre_colonnes_tableau|default:4 }}">
+          {{ section.quartier }}
+        </td>
+      </tr>
+      {% for panneau in section.items %}
+      <tr class="{% if panneau.etat_raw == 'panne' %}row-panne{% else %}row-normal{% endif %}">
+        {% if afficher_type %}<td><span class="report-table-type">{{ panneau.type }}</span></td>{% endif %}
+        <td><strong class="report-table-reference">{{ panneau.code }}</strong></td>
+        <td class="report-table-code">{{ panneau.code_ext }}</td>
+        <td class="left">
+          <strong class="report-table-name">{{ panneau.nom }}</strong>
+          {% if panneau.ancien_nom %}<span class="report-table-previous-name">({{ panneau.ancien_nom }})</span>{% endif %}
+        </td>
+        {% if afficher_etat %}<td>
+          {% if panneau.etat_raw == 'panne' %}<span class="badge-panne">En panne</span>
+          {% else %}<span class="badge-bon">Bon état</span>{% endif %}
+        </td>{% endif %}
+        <td class="left">
+          {% if panneau.type == "Écran" %}
+            {% for face in panneau.faces %}
+              {% if afficher_etat %}
+                {% if face.statut == 'panne' %}<span class="face-tag panne">⚠ Écran en panne</span>
+                {% elif face.statut == 'occupe' %}<span class="face-tag occupe">● Écran occupé</span>
+                {% else %}<span class="face-tag libre">○ Écran libre</span>{% endif %}
+              {% else %}<span class="face-tag libre">Écran</span>{% endif %}
+            {% endfor %}
+          {% elif panneau.type == "Marché" %}
+            {% for emplacement in panneau.faces %}
+              {% if emplacement.occupee %}<span class="face-tag occupe">● {{ emplacement.label }}{% if emplacement.support_code %} — {{ emplacement.support_code }}{% endif %}{% if afficher_etat %} — Occupé{% endif %}</span>
+              {% else %}<span class="face-tag libre">○ {{ emplacement.label }}{% if emplacement.support_code %} — {{ emplacement.support_code }}{% endif %}{% if afficher_etat %} — Libre{% endif %}</span>{% endif %}
+            {% empty %}<span class="face-tag libre">Aucun emplacement enregistré</span>
+            {% endfor %}
+          {% elif panneau.etat_raw == 'panne' %}
+            <span class="face-tag panne">⚠ Inactif</span>
+          {% else %}
+            {% for face in panneau.faces %}
+              {% if face.statut == 'occupe' %}
+                {% if afficher_client %}
+                  {% for camp in face.campagnes %}<span class="face-tag occupe">● Face {{ face.label }} — {{ camp.client.nom }}{% if afficher_etat %} — occupée{% endif %}</span>
+                  {% empty %}<span class="face-tag occupe">● Face {{ face.label }}{% if afficher_etat %} — occupée{% endif %}</span>{% endfor %}
+                {% else %}<span class="face-tag occupe">● Face {{ face.label }}{% if afficher_etat %} — occupée{% endif %}</span>{% endif %}
+              {% elif face.statut == 'reserve' %}<span class="face-tag reserve">◷ Face {{ face.label }}{% if afficher_client and face.client_reservation %} — {{ face.client_reservation }}{% endif %}{% if afficher_etat %} — Réservée{% endif %}</span>
+              {% elif face.statut == 'panne' %}<span class="face-tag panne">⚠ Face {{ face.label }}{% if afficher_etat %} — En Panne{% endif %}</span>
+              {% else %}<span class="face-tag libre">○ Face {{ face.label }}{% if afficher_etat %} — Libre{% endif %}</span>{% endif %}
+            {% empty %}<span style="color:#94a3b8;">—</span>
+            {% endfor %}
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+      {% empty %}
+      <tr><td colspan="{{ nombre_colonnes_tableau|default:4 }}" class="empty-report">Aucun support trouvé.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- ══ LÉGENDE ══ -->
+  <table class="legend-table">
+    <tr>
+      <td><span class="legend-title">Légende :</span></td>
+      <td><span class="face-tag libre">○ Libre</span></td>
+      <td><span class="face-tag reserve">◷ Réservée</span></td>
+      <td><span class="face-tag occupe">● Occupée</span></td>
+      <td><span class="face-tag panne">⚠ En panne</span></td>
+    </tr>
+  </table>

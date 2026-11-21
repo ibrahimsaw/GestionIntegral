@@ -1,7 +1,19 @@
 from django.urls import path
 from .views import *
+from . import confrere_views
 
 urlpatterns = [
+    path('confreres/dossiers/<int:pk>/', confrere_views.DossierConfrereView.as_view(), name='confrere_dossier'),
+    path('confreres/dossiers/<int:pk>/mode-confirmation/', confrere_views.ConfirmationAutomatiqueConfrereView.as_view(), name='confrere_mode_confirmation'),
+    path('confreres/dossiers/<int:pk>/documents/<int:document_pk>/', confrere_views.DocumentDossierConfrereView.as_view(), name='confrere_document'),
+    path('confreres/dossiers/<int:pk>/bon-de-commande/', confrere_views.BonCommandeConfrereView.as_view(), name='confrere_bon_commande'),
+    path('confreres/', confrere_views.ConfrereListView.as_view(), name='confrere_list'),
+    path('confreres/ajouter/', confrere_views.ConfrereCreateView.as_view(), name='confrere_create'),
+    path('confreres/<int:pk>/', confrere_views.ConfrereDetailView.as_view(), name='confrere_detail'),
+    path('confreres/<int:pk>/mode-confirmation/', confrere_views.ModeConfirmationConfrereView.as_view(), name='confrere_fiche_mode_confirmation'),
+    path('confreres/<int:pk>/modifier/', confrere_views.ConfrereUpdateView.as_view(), name='confrere_edit'),
+    path('confreres/<int:confrere_pk>/supports/ajouter/', confrere_views.SupportConfrereCreateView.as_view(), name='confrere_support_create'),
+    path('confreres/<int:confrere_pk>/supports/<int:pk>/modifier/', confrere_views.SupportConfrereUpdateView.as_view(), name='confrere_support_edit'),
     # API
     path('api/geojson/', api_geojson, name='api_geojson'),
     path('api/support/<int:pk>/popup/', api_support_popup, name='api_support_popup'),

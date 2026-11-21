@@ -1,0 +1,52 @@
+{% extends 'inventory/confrere_base.html' %}
+{% block title %}{{ support }} — Réseau Confrère{% endblock %}
+{% block topbar_actions %}
+  <div class="support-topbar-actions" role="group" aria-label="Actions sur le support">
+    <a href="{% url 'confrere_support_edit' support.confrere_id support.pk %}" class="support-topbar-action" title="Modifier le support">
+      <i class="bi bi-pencil" aria-hidden="true"></i><span class="support-topbar-label">Modifier le support</span>
+    </a>
+    <a href="{% url 'confrere_support_retirer' support.confrere_id support.pk %}" class="support-topbar-action"
+       title="{% if support.archive %}Restaurer le support{% else %}Supprimer ou archiver le support{% endif %}">
+      <i class="bi {% if support.archive %}bi-arrow-counterclockwise{% else %}bi-trash{% endif %}" aria-hidden="true"></i>
+      <span class="support-topbar-label">{% if support.archive %}Restaurer{% else %}Supprimer / archiver{% endif %}</span>
+    </a>
+  </div>
+{% endblock %}
+{% block confrere_content %}
+  {% with confrere=support.confrere %}
+  <a href="{% url 'confrere_detail' confrere.pk %}" class="rc-back"><i class="bi bi-arrow-left" aria-hidden="true"></i> {{ confrere.nom }}</a>
+  <header class="rc-banner">
+    <div class="rc-identity">
+      <span class="rc-icon" aria-hidden="true"><i class="bi bi-signpost-2"></i></span>
+      <div>
+        <h1>{{ support }}</h1>
+        {% if support.nom %}<p>{{ support.reference }}</p>{% endif %}
+        {% if support.archive or confrere.archive %}<span class="rc-category">Archivé</span>{% endif %}
+      </div>
+    </div>
+  </header>
+  <div class="row g-3">
+    <div class="col-12 col-lg-7">
+      <section class="rc-panel h-100">
+        <div class="rc-panel-head"><h2>Informations du support</h2></div>
+        <dl class="rc-contacts">
+          <div><dt>Catégorie</dt><dd>{{ support.categorie_affichee|default:"—" }}</dd></div>
+          <div><dt>Format</dt><dd>{% if support.format %}{{ support.format.dimensions|default:support.format.code }}{% else %}{{ support.format_libre|default:"—" }}{% endif %}</dd></div>
+          <div><dt>Ville</dt><dd>{{ support.ville|default:"—" }}</dd></div>
+          <div><dt>Emplacement précis</dt><dd>{{ support.emplacement|default:"—" }}</dd></div>
+        </dl>
+      </section>
+    </div>
+    <div class="col-12 col-lg-5">
+      <section class="rc-panel h-100">
+        <div class="rc-panel-head"><h2>Faces et notes</h2></div>
+        <div class="p-3">
+          {% for code in support.codes_faces %}<span class="rc-face">Face {{ code }}</span>{% endfor %}
+          {% if support.notes %}<p class="mt-3 mb-0">{{ support.notes|linebreaksbr }}</p>{% endif %}
+        </div>
+      </section>
+    </div>
+  </div>
+  {% include 'inventory/includes/confrere_historique.html' %}
+  {% endwith %}
+{% endblock %}

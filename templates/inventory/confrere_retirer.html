@@ -1,0 +1,29 @@
+{% extends 'inventory/confrere_base.html' %}
+{% block title %}{{ action|capfirst }} — Réseau Confrère{% endblock %}
+{% block confrere_content %}
+  <div class="rc-editor">
+    <a href="{% url 'confrere_detail' confrere.pk %}" class="rc-back"><i class="bi bi-arrow-left" aria-hidden="true"></i> {{ confrere.nom }}</a>
+    <header class="rc-banner">
+      <div class="rc-identity">
+        <span class="rc-icon" aria-hidden="true"><i class="bi {% if action == 'supprimer' %}bi-trash{% else %}bi-archive{% endif %}"></i></span>
+        <div><h1>{{ action|capfirst }} {% if support %}le support{% else %}le confrère{% endif %}</h1><p>{{ objet }}</p></div>
+      </div>
+    </header>
+    <form method="post" class="rc-form rc-panel">
+      {% csrf_token %}
+      <div class="rc-form-section">
+        {% if action == 'supprimer' %}
+          <p class="mb-0">La suppression est définitive.{% if not support %} Les supports du parc seront également supprimés.{% endif %}</p>
+        {% elif action == 'archiver' %}
+          <p class="mb-0">L’archivage retire cet élément des nouvelles sélections et conserve les demandes et leurs documents.</p>
+        {% else %}
+          <p class="mb-0">Cet élément sera de nouveau disponible pour les nouvelles demandes{% if support and confrere.archive %} dès que le confrère aura aussi été restauré{% endif %}.</p>
+        {% endif %}
+      </div>
+      <div class="rc-form-actions">
+        <a href="{% url 'confrere_detail' confrere.pk %}" class="btn btn-outline-secondary rc-btn">Annuler</a>
+        <button type="submit" name="action" value="{{ action }}" class="btn {% if action == 'supprimer' %}btn-danger{% else %}btn-primary{% endif %} rc-btn">{{ action|capfirst }}</button>
+      </div>
+    </form>
+  </div>
+{% endblock %}

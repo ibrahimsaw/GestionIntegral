@@ -1,6 +1,6 @@
 from django import forms
 from django.contrib import messages
-from django.http import HttpResponse
+from django.http import Http404, HttpResponse
 from django.utils.http import content_disposition_header
 from django.utils import timezone
 from django.views.decorators.cache import never_cache
@@ -12,7 +12,7 @@ from django.urls import reverse, reverse_lazy
 from django.views.generic import CreateView, DetailView, ListView, UpdateView, View
 
 from campaigns.mixins import StaffRequiredMixin
-from campaigns.models import DemandeReservation
+from campaigns.models import Campagne, DemandeReservation, Reservation
 
 from .models import Confrere, DocumentDossierConfrere, DossierConfrere, FormatSupport, SupportConfrere
 
@@ -120,8 +120,124 @@ class ConfrereDetailView(StaffRequiredMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['dossiers'] = self.object.dossiers.select_related('demande').order_by('-demande__created_at')
+        context.update(historique_parc_confrere(self.object))
         return context
+
+
+class SupportConfrereDetailView(StaffRequiredMixin, DetailView):
+    queryset = SupportConfrere.objects.select_related('confrere', 'format')
+    template_name = 'inventory/confrere_support_detail.html'
+    context_object_name = 'support'
+
+    def get_queryset(self):
+        return super().get_queryset().filter(confrere_id=self.kwargs['confrere_pk'])
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(historique_parc_confrere(self.object.confrere, self.object))
+        return context
+
+
+def historique_parc_confrere(confrere, support=None):
+    def lignes_correspondantes(lignes):
+        identifiant = 'support_id' if support else 'confrere_id'
+        pk = support.pk if support else confrere.pk
+        return [ligne for ligne in lignes if ligne.get(identifiant) == pk]
+
+    dossiers = []
+    for dossier in confrere.dossiers.select_related('demande').order_by('-demande__created_at'):
+        lignes = lignes_correspondantes(dossier.lignes) if support else dossier.lignes
+        if lignes or not support:
+            dossiers.append({'objet': dossier, 'faces': sum(ligne['nombre_faces'] for ligne in lignes)})
+
+    def lister_operations(model, champ):
+        historique = []
+        operations = (
+            model.objects.exclude(**{champ: []})
+            .only('pk', 'reference', 'nom', 'statut', 'date_debut', 'date_fin', champ)
+            .order_by('-date_debut', '-pk')
+        )
+        for operation in operations.iterator():
+            lignes = lignes_correspondantes(getattr(operation, champ))
+            if lignes:
+                historique.append({'objet': operation, 'faces': sum(ligne['nombre_faces'] for ligne in lignes)})
+        return historique
+
+    return {
+        'dossiers': dossiers,
+        'reservations_confreres': lister_operations(Reservation, 'panneaux_confreres_reserves'),
+        'campagnes_confreres': lister_operations(Campagne, 'panneaux_confreres'),
+    }
+
+
+def historique_confrere_existe(confrere, support=None):
+    dossiers = confrere.dossiers
+    if support is None and dossiers.exists():
+        return True
+    if support and any(
+        ligne.get('support_id') == support.pk
+        for lignes in dossiers.values_list('lignes', flat=True).iterator()
+        for ligne in lignes
+    ):
+        return True
+
+    identifiant = 'support_id' if support else 'confrere_id'
+    pk = support.pk if support else confrere.pk
+    for model, field in (
+        (Reservation, 'panneaux_confreres_reserves'),
+        (Campagne, 'panneaux_confreres'),
+    ):
+        lignes_archivees = model.objects.exclude(**{field: []}).values_list(field, flat=True).iterator()
+        if any(ligne.get(identifiant) == pk for lignes in lignes_archivees for ligne in lignes):
+            return True
+    return False
+
+
+class RetirerConfrereView(StaffRequiredMixin, View):
+    def get_objets(self, pk, confrere_pk=None, verrouiller=False):
+        confreres = Confrere.objects.select_for_update() if verrouiller else Confrere.objects
+        confrere = get_object_or_404(confreres, pk=confrere_pk or pk)
+        support = None
+        if confrere_pk is not None:
+            supports = confrere.supports.select_for_update() if verrouiller else confrere.supports
+            support = get_object_or_404(supports, pk=pk)
+        return confrere, support
+
+    def get(self, request, pk, confrere_pk=None):
+        confrere, support = self.get_objets(pk, confrere_pk)
+        objet = support or confrere
+        return render(request, 'inventory/confrere_retirer.html', {
+            'confrere': confrere,
+            'support': support,
+            'objet': objet,
+            'action': self.action_disponible(confrere, support),
+        })
+
+    def action_disponible(self, confrere, support):
+        if (support or confrere).archive:
+            return 'restaurer'
+        return 'archiver' if historique_confrere_existe(confrere, support) else 'supprimer'
+
+    @transaction.atomic
+    def post(self, request, pk, confrere_pk=None):
+        confrere, support = self.get_objets(pk, confrere_pk, verrouiller=True)
+        objet = support or confrere
+        action = self.action_disponible(confrere, support)
+        if request.POST.get('action') != action:
+            messages.error(request, 'L’action disponible a changé. Vérifiez-la avant de confirmer.')
+            return redirect(request.path)
+        if action == 'supprimer':
+            if support is None:
+                confrere.supports.all().delete()
+            objet.delete()
+            messages.success(request, 'Suppression effectuée.')
+            if support is None:
+                return redirect('confrere_list')
+        else:
+            objet.archive = action == 'archiver'
+            objet.save(update_fields=['archive'])
+            messages.success(request, 'Archivage effectué.' if objet.archive else 'Élément restauré.')
+        return redirect('confrere_detail', pk=confrere.pk)
 
 
 class ModeConfirmationConfrereView(StaffRequiredMixin, View):
@@ -332,6 +448,12 @@ class SupportConfrereFormMixin(StaffRequiredMixin):
 
 class SupportConfrereCreateView(SupportConfrereFormMixin, CreateView):
     page_title = 'Ajouter un support'
+
+    def get_confrere(self):
+        confrere = super().get_confrere()
+        if confrere.archive:
+            raise Http404
+        return confrere
 
     def get_initial(self):
         return {**super().get_initial(), 'ville': self.get_confrere().ville}

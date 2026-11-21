@@ -12,8 +12,11 @@ urlpatterns = [
     path('confreres/<int:pk>/', confrere_views.ConfrereDetailView.as_view(), name='confrere_detail'),
     path('confreres/<int:pk>/mode-confirmation/', confrere_views.ModeConfirmationConfrereView.as_view(), name='confrere_fiche_mode_confirmation'),
     path('confreres/<int:pk>/modifier/', confrere_views.ConfrereUpdateView.as_view(), name='confrere_edit'),
+    path('confreres/<int:pk>/retirer/', confrere_views.RetirerConfrereView.as_view(), name='confrere_retirer'),
     path('confreres/<int:confrere_pk>/supports/ajouter/', confrere_views.SupportConfrereCreateView.as_view(), name='confrere_support_create'),
+    path('confreres/<int:confrere_pk>/supports/<int:pk>/', confrere_views.SupportConfrereDetailView.as_view(), name='confrere_support_detail'),
     path('confreres/<int:confrere_pk>/supports/<int:pk>/modifier/', confrere_views.SupportConfrereUpdateView.as_view(), name='confrere_support_edit'),
+    path('confreres/<int:confrere_pk>/supports/<int:pk>/retirer/', confrere_views.RetirerConfrereView.as_view(), name='confrere_support_retirer'),
     # API
     path('api/geojson/', api_geojson, name='api_geojson'),
     path('api/support/<int:pk>/popup/', api_support_popup, name='api_support_popup'),

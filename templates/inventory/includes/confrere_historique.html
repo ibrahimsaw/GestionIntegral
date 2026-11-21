@@ -1,0 +1,31 @@
+<section class="rc-panel mt-3">
+  <div class="rc-panel-head"><h2>Demandes <span class="rc-count">{{ dossiers|length }}</span></h2></div>
+  {% if dossiers %}
+    <div class="table-responsive">
+      <table class="rc-table">
+        <thead><tr>
+          <th scope="col">Demande</th><th scope="col">Projet</th><th scope="col">Période</th><th scope="col">Faces</th><th scope="col">Réponse du confrère</th><th scope="col">Dossier</th>
+        </tr></thead>
+        <tbody>
+          {% for entree in dossiers %}
+            {% with dossier=entree.objet %}
+            <tr>
+              <td><a class="fw-bold" href="{% url 'demande_detail' dossier.demande.uuid %}">{{ dossier.demande.reference }}</a></td>
+              <td>{{ dossier.demande.nom_campagne|default:"—" }}</td>
+              <td>{{ dossier.demande.date_debut_souhaitee|date:"d/m/Y" }} – {{ dossier.demande.date_fin_souhaitee|date:"d/m/Y" }}</td>
+              <td>{{ entree.faces }}</td>
+              <td>{% if dossier.actif %}{{ dossier.get_reponse_confrere_display }}{% else %}Retiré de la demande{% endif %}</td>
+              <td><a class="rc-card-link" href="{% url 'confrere_dossier' dossier.pk %}">Ouvrir <i class="bi bi-arrow-right" aria-hidden="true"></i></a></td>
+            </tr>
+            {% endwith %}
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% else %}
+    <p class="text-muted text-center m-3">Aucune demande liée.</p>
+  {% endif %}
+</section>
+
+{% include 'inventory/includes/confrere_operations.html' with titre="Réservations" resultats=reservations_confreres route="reservation_detail_direct" message_vide="Aucune réservation liée." only %}
+{% include 'inventory/includes/confrere_operations.html' with titre="Campagnes" resultats=campagnes_confreres route="campagne_detail" message_vide="Aucune campagne liée." only %}

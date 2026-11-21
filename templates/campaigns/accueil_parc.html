@@ -1555,39 +1555,6 @@
   <div class="pg-two pg-section">
 
     <div class="pg-stack">
-      <section class="pg-panel" aria-labelledby="pg-alerts-title">
-        <div class="pg-panelhead">
-          <div>
-            <h2 id="pg-alerts-title">Alertes</h2>
-            <p class="pg-desc">Campagnes sans document commercial ou bon de commande en attente.</p>
-          </div>
-          <span class="badge {% if alertes %}text-bg-warning{% else %}text-bg-success{% endif %}">{{ alertes|length }}</span>
-        </div>
-        {% if alertes %}
-          <div class="pg-alerts">
-            {% for alerte in alertes %}
-              {% if not request.user.is_technicien %}
-                <a href="{{ alerte.url }}" class="pg-alert is-{{ alerte.type }}">
-                  <i class="bi {% if alerte.type == 'danger' %}bi-exclamation-octagon-fill{% else %}bi-exclamation-triangle-fill{% endif %}"></i>
-                  <span>{{ alerte.msg }}</span>
-                  <i class="bi bi-arrow-up-right pg-alert-arrow"></i>
-                </a>
-              {% else %}
-                <div class="pg-alert is-{{ alerte.type }}">
-                  <i class="bi {% if alerte.type == 'danger' %}bi-exclamation-octagon-fill{% else %}bi-exclamation-triangle-fill{% endif %}"></i>
-                  <span>{{ alerte.msg }}</span>
-                </div>
-              {% endif %}
-            {% endfor %}
-          </div>
-        {% else %}
-          <div class="pg-ok">
-            <i class="bi bi-check-circle-fill"></i>
-            <span>Aucune alerte : les campagnes actives ou à venir ont leurs documents.</span>
-          </div>
-        {% endif %}
-      </section>
-
       <section class="pg-panel" aria-labelledby="pg-campaign-types-title">
         <div class="pg-panelhead">
           <div>
@@ -1627,6 +1594,39 @@
             </div>
           {% endif %}
         </div>
+      </section>
+      
+      <section class="pg-panel" aria-labelledby="pg-alerts-title">
+        <div class="pg-panelhead">
+          <div>
+            <h2 id="pg-alerts-title">Alertes</h2>
+            <p class="pg-desc">Campagnes sans document commercial ou bon de commande en attente.</p>
+          </div>
+          <span class="badge {% if alertes %}text-bg-warning{% else %}text-bg-success{% endif %}">{{ alertes|length }}</span>
+        </div>
+        {% if alertes %}
+          <div class="pg-alerts">
+            {% for alerte in alertes %}
+              {% if not request.user.is_technicien %}
+                <a href="{{ alerte.url }}" class="pg-alert is-{{ alerte.type }}">
+                  <i class="bi {% if alerte.type == 'danger' %}bi-exclamation-octagon-fill{% else %}bi-exclamation-triangle-fill{% endif %}"></i>
+                  <span>{{ alerte.msg }}</span>
+                  <i class="bi bi-arrow-up-right pg-alert-arrow"></i>
+                </a>
+              {% else %}
+                <div class="pg-alert is-{{ alerte.type }}">
+                  <i class="bi {% if alerte.type == 'danger' %}bi-exclamation-octagon-fill{% else %}bi-exclamation-triangle-fill{% endif %}"></i>
+                  <span>{{ alerte.msg }}</span>
+                </div>
+              {% endif %}
+            {% endfor %}
+          </div>
+        {% else %}
+          <div class="pg-ok">
+            <i class="bi bi-check-circle-fill"></i>
+            <span>Aucune alerte : les campagnes actives ou à venir ont leurs documents.</span>
+          </div>
+        {% endif %}
       </section>
     </div>
 
@@ -1885,6 +1885,11 @@
     }
     function fmt(n) { return Number(n).toFixed(1).replace('.', ','); }
     function faceName(f) { return f.code + '-' + f.label; }
+    function locationNames(f) {
+      const ancien = (f.ancien_nom || '').trim();
+      const actuel = (f.nom || '').trim();
+      return ancien && actuel && ancien !== actuel ? [ancien, '(' + actuel + ')'] : [ancien || actuel];
+    }
     function libreText(f) {
       if (f.statut !== 'libre' && f.statut !== 'reservee') return '—';
       if (f.libre_depuis === null || f.libre_depuis === undefined) return 'Jamais occupée';
@@ -1946,7 +1951,9 @@
     });
 
     function openModal(f, cat) {
-      document.getElementById('pg-mtitle').textContent = 'FACE ' + faceName(f) + ' — ' + f.nom;
+      var noms = locationNames(f);
+      document.getElementById('pg-mtitle').innerHTML = 'FACE ' + esc(faceName(f)) +
+        (noms[0] ? ' — ' + noms.map(esc).join('<br>') : '');
       document.getElementById('pg-msub').textContent =
         cat.categorie + (f.format ? ' · ' + f.format : '') + (f.lieu ? ' · ' + f.lieu : '');
       var items = [
@@ -2171,7 +2178,7 @@
         var rows = cat.faces.filter(function (f) {
           if (!matches(f, statusFilter)) return false;
           if (!q) return true;
-          return (faceName(f) + ' ' + f.nom + ' ' + f.lieu + ' ' + f.format).toLowerCase().indexOf(q) !== -1;
+          return (faceName(f) + ' ' + locationNames(f).join(' ') + ' ' + f.lieu + ' ' + f.format).toLowerCase().indexOf(q) !== -1;
         });
         if (sortBy === 'code') {
           rows.sort(function (a, b) {
@@ -2215,7 +2222,7 @@
         tbody.innerHTML = shown.map(function (f, i) {
           return '<tr data-i="' + i + '" tabindex="0">' +
             '<td><span class="pg-face-code"><i class="bi bi-aspect-ratio"></i>' + esc(faceName(f)) + '</span></td>' +
-            '<td><span class="pg-location-name">' + esc(f.nom) + '</span>' + (f.lieu ? '<span class="pg-sub">' + esc(f.lieu) + '</span>' : '') + '</td>' +
+            '<td><span class="pg-location-name">' + locationNames(f).map(esc).join('<br>') + '</span>' + (f.lieu ? '<span class="pg-sub">' + esc(f.lieu) + '</span>' : '') + '</td>' +
             '<td><span class="pg-pill is-' + esc(f.statut) + '">' + esc(STATUS[f.statut] || f.statut) + '</span></td>' +
             '<td class="num"><strong class="pg-days">' + f.jours + '</strong><small class="pg-days-unit">jours</small></td>' +
             '<td><span class="pg-rate"><span class="pg-progress" role="img" aria-label="Taux cumulé ' + fmt(f.taux) + ' pour cent"><i style="width:' + Math.min(f.taux, 100) + '%"></i></span><strong>' + fmt(f.taux) + ' %</strong></span></td>' +

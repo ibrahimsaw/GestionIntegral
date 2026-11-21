@@ -1688,12 +1688,16 @@
             {% if catalogue_confreres %}
             <div class="nd-campaign-fields mb-3">
               <div class="nd-fld"><label for="catalogue-confrere">Confrère enregistré</label><select id="catalogue-confrere" class="form-select"><option value="">Choisir un confrère</option></select></div>
+              <div class="nd-fld"><label for="catalogue-categorie">Catégorie</label><select id="catalogue-categorie" class="form-select" disabled><option value="">Choisir une catégorie</option></select></div>
+              <div class="nd-fld"><label for="catalogue-format">Format</label><select id="catalogue-format" class="form-select" disabled><option value="">Choisir un format</option></select></div>
               <div class="nd-fld"><label for="catalogue-support">Support</label><select id="catalogue-support" class="form-select" disabled><option value="">Choisir un support</option></select></div>
             </div>
+            <p id="catalogue-confrere-vide" class="cf-sub" hidden>Aucun support enregistré pour ce confrère.</p>
             <fieldset id="catalogue-faces" hidden><legend class="fs-6">Faces à ajouter</legend><div class="d-flex flex-wrap gap-3"></div></fieldset>
             <div class="confrere-actions"><button type="button" id="catalogue-ajouter" class="diffusion-source confrere-add" disabled>Ajouter les faces choisies</button></div>
-            <h3 class="h6 mt-3">Saisie manuelle</h3>
             {% endif %}
+            <details id="confrere-saisie-manuelle" class="mt-3">
+            <summary class="fw-semibold mb-2">Saisie manuelle</summary>
             <div class="nd-campaign-fields" id="confrere-identity">
               {% for champ in confrere_form %}
               {% if forloop.counter <= 3 %}
@@ -1723,8 +1727,9 @@
             <div class="confrere-actions">
               <button type="button" id="confrere-add" class="diffusion-source confrere-add">Ajouter à la demande</button>
               <button type="button" id="confrere-cancel" class="diffusion-source" hidden>Annuler la modification</button>
-              <span id="confrere-status" class="confrere-status" role="status"></span>
             </div>
+            </details>
+            <div id="confrere-status" class="confrere-status" role="status"></div>
             <ul id="confrere-list" class="list-unstyled mb-0"></ul>
           </div>
 
@@ -3104,6 +3109,7 @@
       confrerePanel.hidden = !showConfrere;
     });
     if (confrerePanel) {
+      const saisieManuelle = document.getElementById('confrere-saisie-manuelle');
       const add = document.getElementById('confrere-add');
       const addRow = document.getElementById('confrere-add-row');
       const formatRows = document.getElementById('confrere-format-rows');
@@ -3139,6 +3145,7 @@
       function loadConfrereEditor(index) {
         editing = index;
         const panneau = panneauxConfreres[index];
+        if (panneau) saisieManuelle.open = true;
         formatRows.replaceChildren(firstRow);
         [...identityInputs, ...firstRow.querySelectorAll('input')].forEach(input => {
           input.value = panneau?.[fieldName(input)] ?? '';
@@ -3177,7 +3184,7 @@
             else if (editing !== null && editing > index) editing -= 1;
             renderConfreres();
             status.textContent = 'Format retiré';
-            add.focus();
+            (saisieManuelle.open ? add : saisieManuelle.querySelector('summary')).focus();
           });
           if (!panneau.support_id) actions.append(edit);
           actions.append(remove);
@@ -3192,13 +3199,42 @@
 
       const catalogue = JSON.parse(document.getElementById('catalogue-confreres-data')?.textContent || '[]');
       const confrereSelect = document.getElementById('catalogue-confrere');
+      const categorySelect = document.getElementById('catalogue-categorie');
+      const formatSelect = document.getElementById('catalogue-format');
       const supportSelect = document.getElementById('catalogue-support');
       const facePicker = document.getElementById('catalogue-faces');
       const addCatalogue = document.getElementById('catalogue-ajouter');
+      const noSupports = document.getElementById('catalogue-confrere-vide');
+      const confreresById = new Map(catalogue.map(confrere => [String(confrere.id), confrere]));
+      const availableSupports = () => confreresById.get(confrereSelect.value)?.supports || [];
+      const categoryKey = support => support.categorie || 'Sans catégorie';
+      const formatKey = support => support.format_code ? 'code:' + support.format_code : 'libelle:' + support.format;
+      const categorySupports = () => availableSupports().filter(support => categoryKey(support) === categorySelect.value);
+      const formatSupports = () => categorySupports().filter(support => formatKey(support) === formatSelect.value);
+      const selectedSupport = () => formatSupports().find(item => String(item.support_id) === supportSelect.value);
+
+      function populateCatalogueSelect(select, placeholder, options) {
+        select.replaceChildren(new Option(placeholder, ''));
+        for (const [value, label] of options) select.add(new Option(label, value));
+        select.disabled = select.options.length === 1;
+      }
+
+      function refreshCatalogueSupports() {
+        populateCatalogueSelect(supportSelect, 'Choisir un support', formatSupports().map(support => [
+          support.support_id, [support.reference, support.nom_support || support.emplacement].filter(Boolean).join(' · ')
+        ]));
+        refreshCatalogueFaces();
+      }
+
+      function refreshCatalogueFormats() {
+        const formats = new Map(categorySupports().map(support => [formatKey(support), support.format]));
+        populateCatalogueSelect(formatSelect, 'Choisir un format', formats);
+        refreshCatalogueSupports();
+      }
 
       function refreshCatalogueFaces() {
         if (!facePicker) return;
-        const support = catalogue[confrereSelect.value - 1]?.find(item => String(item.support_id) === supportSelect.value);
+        const support = selectedSupport();
         facePicker.hidden = !support;
         const options = facePicker.querySelector('div');
         options.replaceChildren();
@@ -3217,22 +3253,22 @@
       }
 
       if (confrereSelect) {
-        catalogue.forEach((supports, index) => confrereSelect.add(new Option(supports[0].nom, index + 1)));
+        catalogue.forEach(confrere => confrereSelect.add(new Option(confrere.nom, confrere.id)));
         confrereSelect.addEventListener('change', () => {
-          const supports = catalogue[confrereSelect.value - 1] || [];
-          supportSelect.replaceChildren(new Option('Choisir un support', ''));
-          supports.forEach(support => {
-            supportSelect.add(new Option([support.reference, support.nom_support, support.ville, support.format].filter(Boolean).join(' · '), support.support_id));
-          });
-          supportSelect.disabled = !supports.length;
-          refreshCatalogueFaces();
+          const supports = availableSupports();
+          const categories = [...new Set(supports.map(categoryKey))].sort((a, b) => a.localeCompare(b, 'fr'));
+          noSupports.hidden = !confrereSelect.value || supports.length > 0;
+          populateCatalogueSelect(categorySelect, 'Choisir une catégorie', categories.map(category => [category, category]));
+          refreshCatalogueFormats();
         });
+        categorySelect.addEventListener('change', refreshCatalogueFormats);
+        formatSelect.addEventListener('change', refreshCatalogueSupports);
         supportSelect.addEventListener('change', refreshCatalogueFaces);
         facePicker.addEventListener('change', () => {
           addCatalogue.disabled = !facePicker.querySelector('input:checked');
         });
         addCatalogue.addEventListener('click', () => {
-          const support = catalogue[confrereSelect.value - 1]?.find(item => String(item.support_id) === supportSelect.value);
+          const support = selectedSupport();
           const faces = Array.from(facePicker.querySelectorAll('input:checked'), checkbox => checkbox.value);
           if (!support || !faces.length) return;
           const existing = panneauxConfreres.find(item => item.support_id === support.support_id);

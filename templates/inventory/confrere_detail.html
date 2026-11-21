@@ -1,23 +1,37 @@
 {% extends 'inventory/confrere_base.html' %}
 {% block title %}{{ confrere.nom }} — Réseau Confrère{% endblock %}
+{% block topbar_actions %}
+    <div class="support-topbar-actions" role="group" aria-label="Actions sur le confrère">
+      <form method="post" action="{% url 'confrere_fiche_mode_confirmation' confrere.pk %}">
+        {% csrf_token %}
+        <button type="submit" name="mode" value="{% if confrere.confirmation_automatique %}lien{% else %}automatique{% endif %}"
+                aria-pressed="{{ confrere.confirmation_automatique|yesno:'true,false' }}"
+                title="Confirmation automatique · {{ confrere.confirmation_automatique|yesno:'Activée,Désactivée' }}"
+                class="support-topbar-action{% if confrere.confirmation_automatique %} support-topbar-primary{% endif %}">
+          <i class="bi {% if confrere.confirmation_automatique %}bi-toggle-on{% else %}bi-toggle-off{% endif %}" aria-hidden="true"></i>
+          <span class="support-topbar-label">Confirmation automatique</span>
+        </button>
+      </form>
+      <a href="{% url 'confrere_edit' confrere.pk %}" class="support-topbar-action" title="Modifier la fiche">
+        <i class="bi bi-pencil" aria-hidden="true"></i><span class="support-topbar-label">Modifier la fiche</span>
+      </a>
+      <a href="{% url 'confrere_retirer' confrere.pk %}" class="support-topbar-action" title="{% if confrere.archive %}Restaurer le confrère{% else %}Supprimer ou archiver le confrère{% endif %}">
+        <i class="bi {% if confrere.archive %}bi-arrow-counterclockwise{% else %}bi-trash{% endif %}" aria-hidden="true"></i>
+        <span class="support-topbar-label">{% if confrere.archive %}Restaurer{% else %}Supprimer / archiver{% endif %}</span>
+      </a>
+      {% if not confrere.archive %}
+        <a href="{% url 'confrere_support_create' confrere.pk %}" class="support-topbar-action support-topbar-primary" title="Ajouter un support">
+          <i class="bi bi-plus-lg" aria-hidden="true"></i><span class="support-topbar-label">Ajouter un support</span>
+        </a>
+      {% endif %}
+    </div>
+{% endblock %}
 {% block confrere_content %}
   <a href="{% url 'confrere_list' %}" class="rc-back"><i class="bi bi-arrow-left" aria-hidden="true"></i> Tous les confrères</a>
   <header class="rc-banner">
     <div class="rc-identity">
       <span class="rc-avatar rc-avatar-large" aria-hidden="true">{{ confrere.nom|slice:":2"|upper }}</span>
-      <div><h1>{{ confrere.nom }}</h1>{% if confrere.ville %}<p>{{ confrere.ville }}</p>{% endif %}</div>
-    </div>
-    <div class="d-flex flex-wrap gap-2">
-      <form method="post" action="{% url 'confrere_fiche_mode_confirmation' confrere.pk %}">
-        {% csrf_token %}
-        <button type="submit" name="mode" value="{% if confrere.confirmation_automatique %}lien{% else %}automatique{% endif %}"
-                aria-pressed="{{ confrere.confirmation_automatique|yesno:'true,false' }}"
-                class="btn {% if confrere.confirmation_automatique %}btn-primary{% else %}btn-outline-secondary{% endif %} rc-btn">
-          <i class="bi {% if confrere.confirmation_automatique %}bi-toggle-on{% else %}bi-toggle-off{% endif %}" aria-hidden="true"></i>
-          Confirmation automatique <span aria-hidden="true">· {{ confrere.confirmation_automatique|yesno:'Activée,Désactivée' }}</span>
-        </button>
-      </form>
-      <a href="{% url 'confrere_edit' confrere.pk %}" class="btn btn-outline-secondary rc-btn"><i class="bi bi-pencil" aria-hidden="true"></i> Modifier la fiche</a>
+      <div><h1>{{ confrere.nom }}</h1>{% if confrere.archive %}<span class="rc-category">Archivé</span>{% endif %}{% if confrere.ville %}<p>{{ confrere.ville }}</p>{% endif %}</div>
     </div>
   </header>
   <div class="rc-detail">
@@ -33,7 +47,6 @@
   <section class="rc-panel">
     <div class="rc-panel-head">
       <h2>Parc de supports <span class="rc-count">{{ confrere.supports.all|length }}</span></h2>
-      <a href="{% url 'confrere_support_create' confrere.pk %}" class="btn btn-primary rc-btn"><i class="bi bi-plus-lg" aria-hidden="true"></i> Ajouter un support</a>
     </div>
     <div class="table-responsive">
       <table class="rc-table">
@@ -45,8 +58,9 @@
           {% for support in confrere.supports.all %}
             <tr>
               <td>
-                <strong>{{ support.nom|default:support.reference }}</strong>
+                <a class="fw-bold" href="{% url 'confrere_support_detail' confrere.pk support.pk %}">{{ support.nom|default:support.reference }}</a>
                 {% if support.nom %}<small class="rc-reference">{{ support.reference }}</small>{% endif %}
+                {% if support.archive %}<span class="rc-category">Archivé</span>{% endif %}
                 {% if support.notes %}<details><summary>Notes</summary>{{ support.notes|linebreaksbr }}</details>{% endif %}
               </td>
               <td>{% if support.categorie_affichee %}<span class="rc-category">{{ support.categorie_affichee }}</span>{% else %}—{% endif %}</td>
@@ -63,7 +77,16 @@
                   <span class="rc-face">{{ code }}</span>
                 {% endfor %}
               </td>
-              <td class="text-end"><a href="{% url 'confrere_support_edit' confrere.pk support.pk %}" class="btn btn-sm btn-outline-secondary rc-btn" aria-label="Modifier {{ support }}"><i class="bi bi-pencil" aria-hidden="true"></i> Modifier</a></td>
+              <td class="text-end">
+                <div class="d-flex flex-wrap justify-content-end gap-1">
+                  <a href="{% url 'confrere_support_detail' confrere.pk support.pk %}" class="btn btn-sm btn-outline-secondary rc-btn" aria-label="Voir {{ support }}">Voir</a>
+                  <a href="{% url 'confrere_support_edit' confrere.pk support.pk %}" class="btn btn-sm btn-outline-secondary rc-btn" aria-label="Modifier {{ support }}"><i class="bi bi-pencil" aria-hidden="true"></i> Modifier</a>
+                  <a href="{% url 'confrere_support_retirer' confrere.pk support.pk %}" class="btn btn-sm {% if support.archive %}btn-outline-secondary{% else %}btn-outline-danger{% endif %} rc-btn"
+                     aria-label="{% if support.archive %}Restaurer{% else %}Supprimer ou archiver{% endif %} {{ support }}">
+                    {% if support.archive %}Restaurer{% else %}Supprimer / archiver{% endif %}
+                  </a>
+                </div>
+              </td>
             </tr>
           {% empty %}
             <tr><td colspan="6" class="text-center text-muted py-4">Aucun support enregistré pour ce confrère.</td></tr>
@@ -73,25 +96,5 @@
     </div>
   </section>
   </div>
-  <section class="rc-panel mt-3">
-    <div class="rc-panel-head"><h2>Historique des demandes <span class="rc-count">{{ dossiers|length }}</span></h2></div>
-    {% if dossiers %}
-      <div class="table-responsive"><table class="rc-table">
-        <thead><tr><th>Demande</th><th>Campagne</th><th>Période</th><th>Réponse du confrère</th><th>Dossier</th></tr></thead>
-        <tbody>
-          {% for dossier in dossiers %}
-          <tr>
-            <td><strong>{{ dossier.demande.reference }}</strong></td>
-            <td>{{ dossier.demande.nom_campagne|default:"—" }}</td>
-            <td>{{ dossier.demande.date_debut_souhaitee|date:"d/m/Y" }} – {{ dossier.demande.date_fin_souhaitee|date:"d/m/Y" }}</td>
-            <td>{% if dossier.actif %}{{ dossier.get_reponse_confrere_display }}{% else %}Retiré de la demande{% endif %}</td>
-            <td><a class="rc-card-link" href="{% url 'confrere_dossier' dossier.pk %}">Ouvrir <i class="bi bi-arrow-right" aria-hidden="true"></i></a></td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table></div>
-    {% else %}
-      <p class="text-muted text-center m-3">Aucune demande liée à ce confrère.</p>
-    {% endif %}
-  </section>
+  {% include 'inventory/includes/confrere_historique.html' %}
 {% endblock %}

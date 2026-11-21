@@ -1,6 +1,7 @@
 from collections import defaultdict
 from uuid import uuid4
 
+from django.core.exceptions import ValidationError
 from django.utils import timezone
 
 from .models import Confrere, DossierConfrere, SupportConfrere
@@ -24,11 +25,41 @@ def ligne_support_confrere(support, faces):
 
 
 def catalogue_confreres():
-    catalogue = {}
-    supports = SupportConfrere.objects.select_related('confrere', 'format').order_by('confrere__nom', 'reference')
+    catalogue = {
+        pk: {'id': pk, 'nom': nom, 'supports': []}
+        for pk, nom in Confrere.objects.filter(archive=False).values_list('pk', 'nom')
+    }
+    supports = SupportConfrere.objects.filter(archive=False, confrere__archive=False).select_related(
+        'confrere', 'format',
+    ).order_by('confrere__nom', 'reference')
     for support in supports:
-        catalogue.setdefault(support.confrere_id, []).append(ligne_support_confrere(support, list(support.codes_faces)))
+        confrere = catalogue.get(support.confrere_id)
+        if confrere:
+            confrere['supports'].append({
+                **ligne_support_confrere(support, list(support.codes_faces)),
+                'categorie': support.categorie_affichee,
+                'format_code': support.format.code if support.format_id else '',
+            })
     return list(catalogue.values())
+
+
+def verifier_supports_confreres(demande, lignes):
+    faces_existantes = defaultdict(set)
+    for ligne in demande.panneaux_confreres:
+        if ligne.get('support_id'):
+            faces_existantes[ligne['support_id']].update(ligne['faces'])
+
+    nouveaux_supports = {
+        ligne['support_id'] for ligne in lignes
+        if ligne.get('support_id') and not set(ligne['faces']).issubset(faces_existantes[ligne['support_id']])
+    }
+    if not nouveaux_supports:
+        return
+    supports = SupportConfrere.objects.select_for_update().filter(
+        pk__in=nouveaux_supports, archive=False, confrere__archive=False,
+    ).order_by('pk')
+    if set(supports.values_list('pk', flat=True)) != nouveaux_supports:
+        raise ValidationError("Un support confrère a été retiré. Revenez à l'étape 1 pour modifier la sélection.")
 
 
 def statut_validation_confreres(demande):

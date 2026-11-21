@@ -28,6 +28,7 @@ from accounts.audit import log_action
 from inventory.sorting import cle_code_naturelle, cle_code_support
 from inventory.confrere_catalogue import (
     catalogue_confreres, ligne_support_confrere, statut_validation_confreres, synchroniser_dossiers_confreres,
+    verifier_supports_confreres,
 )
 from inventory.models import SupportConfrere
 from .models import *
@@ -766,6 +767,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 'code': support.code,
                 'label': face.label,
                 'nom': support.nom,
+                'ancien_nom': support.ancien_nom,
                 'lieu': lieu,
                 'format_code': support.format,
                 'format': (fmt.dimensions if fmt else '') or support.format or '',
@@ -7736,6 +7738,7 @@ class DemandeCreationEtape2View(StaffDemandeWizardBase):
                         traite_le=timezone.now(),
                         token_partage=uuid.uuid4(),
                     )
+                verifier_supports_confreres(demande, context['panneaux_confreres'])
                 # En modification d'un prospect, on met à jour sa fiche plutôt
                 # que d'en créer une seconde (compte principal uniquement).
                 prospect_existant = (

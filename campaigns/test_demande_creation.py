@@ -1461,6 +1461,42 @@ class DemandeCreationViewTests(TestCase):
         self.assertEqual(demande.reservation_id, reservation.pk)
         self.assertEqual(demande.campagne.panneaux_confreres, dossier.lignes)
         self.assertContains(self.client.get(response.url), support.reference)
+        support_url = reverse('confrere_support_detail', args=[confrere.pk, support.pk])
+        self.assertContains(self.client.get(fiche_url), support_url)
+        for historique_url in (fiche_url, support_url):
+            historique = self.client.get(historique_url)
+            self.assertContains(historique, dossier_url)
+            self.assertContains(historique, reservation.reference)
+            self.assertContains(historique, demande.campagne.reference)
+        autre_support = confrere.supports.create(nom='Autre support')
+        autre_historique = self.client.get(reverse('confrere_support_detail', args=[confrere.pk, autre_support.pk]))
+        self.assertNotContains(autre_historique, reservation.reference)
+        self.assertNotContains(autre_historique, demande.campagne.reference)
+
+    def test_confrere_catalogue_groups_formats_and_keeps_multiple_partners_in_one_request(self):
+        standard = FormatSupport.objects.create(code='standard-test', dimensions='4 × 3 m', categorie='12m²')
+        geant = FormatSupport.objects.create(code='geant-test', dimensions='8 × 4 m', categorie='Géant')
+        premier = Confrere.objects.create(nom='Premier confrère')
+        second = Confrere.objects.create(nom='Second confrère')
+        support_a = premier.supports.create(format=standard, ville='Ouagadougou')
+        support_b = second.supports.create(format=geant, ville='Bobo-Dioulasso')
+        catalogue = self.client.get(reverse('demande_creation')).context['catalogue_confreres']
+        self.assertEqual(
+            [(item['id'], [(s['support_id'], s['categorie'], s['format_code']) for s in item['supports']]) for item in catalogue],
+            [(premier.pk, [(support_a.pk, '12m²', standard.code)]), (second.pk, [(support_b.pk, 'Géant', geant.code)])],
+        )
+        response = self.complete_step_one(
+            faces_selectionnees='[]',
+            panneaux_confreres=json.dumps([
+                {'support_id': support_a.pk, 'faces': ['A']},
+                {'support_id': support_b.pk, 'faces': ['A']},
+            ]),
+        )
+        self.assertRedirects(response, reverse('demande_creation_etape2'))
+        self.complete_step_two()
+        demande = DemandeReservation.objects.get()
+        self.assertEqual(demande.nb_emplacements(), 2)
+        self.assertEqual(set(demande.dossiers_confreres.values_list('confrere_id', flat=True)), {premier.pk, second.pk})
 
     def test_invalid_dates_keep_selected_faces_for_correction(self):
         response = self.complete_step_one(date_fin=self.start.isoformat())

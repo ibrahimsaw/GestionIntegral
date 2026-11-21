@@ -21,6 +21,7 @@ class Confrere(models.Model):
     whatsapp = models.CharField("Numéro WhatsApp", max_length=40, blank=True)
     email = models.EmailField("Adresse e-mail", blank=True)
     confirmation_automatique = models.BooleanField(default=True)
+    archive = models.BooleanField(default=False)
 
     class Meta:
         ordering = ['nom', 'pk']
@@ -46,6 +47,7 @@ class SupportConfrere(models.Model):
     notes = models.TextField("Notes", blank=True)
     nombre_faces = models.PositiveIntegerField("Nombre de faces", default=1)
     faces_selectionnees = models.JSONField(default=list, blank=True)
+    archive = models.BooleanField(default=False)
 
     class Meta:
         ordering = ['ville', 'emplacement', 'pk']

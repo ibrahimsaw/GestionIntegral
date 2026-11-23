@@ -129,6 +129,19 @@ class DemandHoldTests(TestCase):
 
         self.assertFalse(self.face.is_disponibles(self.start, self.end))
 
+    def test_past_start_date_is_allowed_only_when_editing_a_request(self):
+        previous = timezone.localdate() - datetime.timedelta(days=3)
+        data = {'date_debut': previous.isoformat(), 'date_fin': self.end.isoformat()}
+        creation = Etape1Form(data=data, has_external_panel=True)
+        self.assertIn('date_debut', creation.errors)
+        edition = Etape1Form(data=data, is_edit_mode=True, has_external_panel=True)
+        self.assertTrue(edition.is_valid(), edition.errors)
+        edition = Etape1Form(
+            data={**data, 'date_fin': previous.isoformat()},
+            is_edit_mode=True, has_external_panel=True,
+        )
+        self.assertIn('date_fin', edition.errors)
+
     def test_edit_mode_invalid_selection_mentions_modification(self):
         demande = DemandeReservation.objects.create(
             nom_contact='Prospect E',

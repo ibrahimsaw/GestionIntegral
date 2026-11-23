@@ -82,7 +82,7 @@ class Etape1Form(forms.Form):
         if date_debut and date_fin:
             if date_fin <= date_debut:
                 self.add_error('date_fin', "La date de fin doit être postérieure à la date de début.")
-            if date_debut < timezone.now().date():
+            if not self.is_edit_mode and date_debut < timezone.localdate():
                 self.add_error('date_debut', "La date de début ne peut pas être dans le passé.")
 
         # ── Vérification d'existence ───────────────────────────────────────

@@ -81,7 +81,9 @@
 
     
     margin: 0 auto;
+    /*
     padding: 0 22px 56px;
+    */
     color: var(--ink);
     font-family: var(--sans);
     font-size: 15px;
@@ -703,6 +705,7 @@
   .sc-quartier { display: flex; align-items: center; gap: 5px; margin-top: 3px; font-size: .74rem; color: var(--muted); }
   .sc-quartier i { color: var(--brand); font-size: .72rem; }
   .sc-nom  { font-size: .95rem; font-weight: 650; color: var(--ink); white-space: normal; overflow-wrap: anywhere; line-height: 1.4; }
+  .sc-nom-actuel { color: var(--muted); font-size: .70rem; font-weight: 400; }
   .sc-addr { font-size: .76rem; color: var(--muted); white-space: normal; overflow-wrap: anywhere; line-height: 1.4; }
   .sc-format {
     display: inline-block;
@@ -843,6 +846,10 @@
     color: var(--brand);
   }
   .pi-info { flex: 1; overflow: hidden; }
+  .pi-support-link { display: block; width: 100%; padding: 0; border: 0; background: transparent; text-align: start; }
+  .pi-support-link:hover .pi-code { color: var(--brand); text-decoration: underline; }
+  .support-card { scroll-margin-top: calc(var(--topbar-h, 64px) + 12px); }
+  .support-card:focus { outline: 2px solid var(--brand); outline-offset: 2px; }
   .pi-code { font-size: .82rem; font-weight: 700; color: var(--ink); }
   .pi-addr { font-size: .72rem; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   .pi-remove {
@@ -1256,6 +1263,10 @@
   .emp-search:focus-within { border-color: var(--brand); box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 12%, transparent); }
   .emp-search > i { color: var(--muted); }
   .emp-search .list-search { flex: 1; min-width: 0; height: 100%; border: 0 !important; background: transparent !important; box-shadow: none !important; outline: 0; font-size: .92rem; padding: 0; width: auto; }
+  .list-location-tools { display: flex; align-items: center; flex: 1 1 290px; min-width: 0; gap: 8px; }
+  .list-location-tools .emp-search { flex: 1 1 0; }
+  .list-location-tools .quartier-select { flex: 0 1 190px; width: min(44%, 190px); min-width: 0; height: 40px; border-radius: var(--radius); }
+  @media (max-width: 767.98px) { .list-location-tools { flex-basis: auto; } }
   @media (max-width: 767.98px) { .cf-block { margin: 0 12px 12px; padding: 14px; } }
 
 
@@ -1664,14 +1675,14 @@
                 <label class="diffusion-label" for="date-debut">Date de début</label>
                 <div class="date-input-wrap">
                   <i class="bi bi-calendar-plus" style="color:#10b981"></i>
-                  <input type="date" id="date-debut" value="{{ form.date_debut.value|default:'' }}" min="{% now 'Y-m-d' %}" required>
+                  <input type="date" id="date-debut" value="{{ form.date_debut.value|default:'' }}"{% if not editing_request %} min="{% now 'Y-m-d' %}"{% endif %} required>
                 </div>
               </div>
               <div class="diffusion-field">
                 <label class="diffusion-label" for="date-fin">Date de fin</label>
                 <div class="date-input-wrap" id="wrap-date-fin">
                   <i class="bi bi-calendar-minus" style="color:#ef4444"></i>
-                  <input type="date" id="date-fin" value="{{ form.date_fin.value|default:'' }}" min="{% now 'Y-m-d' %}" required>
+                  <input type="date" id="date-fin" value="{{ form.date_fin.value|default:'' }}"{% if not editing_request %} min="{% now 'Y-m-d' %}"{% endif %} required>
                 </div>
               </div>
               <div class="diffusion-field">
@@ -1689,7 +1700,7 @@
           </div>
           <div id="confrere-panel" class="cf-block"{% if not show_confrere %} hidden{% endif %}>
             <div class="cf-block-h"><b>Panneau du réseau confrère</b></div>
-            <p class="cf-sub">La disponibilité de ce panneau se confirme auprès du confrère.</p>
+            {% comment %} <p class="cf-sub">La disponibilité de ce panneau se confirme auprès du confrère.</p> {% endcomment %}
             {% if catalogue_confreres %}
             <div class="nd-campaign-fields mb-3">
               <div class="nd-fld"><label for="catalogue-ville">Ville / localité</label><select id="catalogue-ville" class="form-select"><option value="">Choisir une ville</option></select></div>
@@ -1748,9 +1759,14 @@
                   <button type="button" class="vt-btn active" id="btn-vue-liste" onclick="switchView('liste')"><i class="bi bi-list-ul"></i> Liste</button>
                   <button type="button" class="vt-btn" id="btn-vue-carte" onclick="switchView('carte')"><i class="bi bi-map-fill"></i> Carte</button>
                 </div>
-                <div class="emp-search" id="emp-search">
-                  <i class="bi bi-search"></i>
-                  <input type="search" class="list-search" id="list-search" placeholder="Rechercher un code, une avenue…" aria-label="Rechercher un support">
+                <div class="list-location-tools" id="emp-search">
+                  <div class="emp-search">
+                    <i class="bi bi-search" aria-hidden="true"></i>
+                    <input type="search" class="list-search" id="list-search" placeholder="Rechercher un code, une avenue…" aria-label="Rechercher un support">
+                  </div>
+                  <select id="list-filter-quartier" class="form-select quartier-select" aria-label="Filtrer par quartier" disabled>
+                    <option value="">Tous les quartiers</option>
+                  </select>
                 </div>
               </div>
 
@@ -2032,7 +2048,7 @@
             <i class="bi bi-calendar-plus" style="color:#10b981"></i>
             <input type="date" id="date-debut"
                   value="{{ form.date_debut.value|default:'' }}"
-                  min="{% now 'Y-m-d' %}" required {% if shared_edit_mode %}disabled{% endif %}>
+                  {% if shared_edit_mode %}disabled{% else %}min="{% now 'Y-m-d' %}"{% endif %} required>
           </div>
         </div>
 
@@ -2043,7 +2059,7 @@
             <i class="bi bi-calendar-minus" style="color:#ef4444"></i>
             <input type="date" id="date-fin"
                   value="{{ form.date_fin.value|default:'' }}"
-                  min="{% now 'Y-m-d' %}" required {% if shared_edit_mode %}disabled{% endif %}>
+                  {% if shared_edit_mode %}disabled{% else %}min="{% now 'Y-m-d' %}"{% endif %} required>
           </div>
         </div>
 
@@ -2093,9 +2109,14 @@
               </button>
             </div>
 
-            <div class="emp-search" id="emp-search">
-              <i class="bi bi-search"></i>
-              <input type="search" class="list-search" id="list-search" placeholder="Rechercher un support par code ou nom…" aria-label="Rechercher un support">
+            <div class="list-location-tools" id="emp-search">
+              <div class="emp-search">
+                <i class="bi bi-search" aria-hidden="true"></i>
+                <input type="search" class="list-search" id="list-search" placeholder="Rechercher un support par code ou nom…" aria-label="Rechercher un support">
+              </div>
+              <select id="list-filter-quartier" class="form-select quartier-select" aria-label="Filtrer par quartier" disabled>
+                <option value="">Tous les quartiers</option>
+              </select>
             </div>
             <div id="dates-status" class="waiting">
               <i class="bi bi-info-circle"></i>
@@ -2730,11 +2751,6 @@
       const ville = document.getElementById(prefix + 'ville')?.value || '';
       if (REQUIRE_CATEGORY && !categorie) return [];
 
-      let q = '';
-      if (isListeView) {
-        q = (document.getElementById('list-search').value || '').toLowerCase().trim();
-      }
-
       return allFeatures.filter(f => {
         const p = f.properties;
 
@@ -2744,9 +2760,6 @@
         if (categorie && p.categorie !== categorie) return false;
         if (fmt && p.format !== fmt) return false;
         if (ville && p.ville !== ville) return false;
-        if (q && !String(p.code||'').toLowerCase().includes(q)
-              && !(p.quartier||'').toLowerCase().includes(q)
-              && !(p.nom||'').toLowerCase().includes(q)) return false;
         return true;
       });
     }
@@ -2967,25 +2980,61 @@
 
     function renderListe() {
       const grid = document.getElementById('liste-grid');
+      const select = document.getElementById('list-filter-quartier');
+      const supports = getFilteredFeatures(true);
+      const quartierKey = nom => (nom || '').trim().toLocaleLowerCase('fr');
+      const options = new Map();
+      for (const { properties } of supports) {
+        const key = quartierKey(properties.quartier);
+        if (key && !options.has(key)) options.set(key, properties.quartier.trim());
+      }
+      const selected = select.value;
+      select.replaceChildren(new Option('Tous les quartiers', ''), ...[...options]
+        .sort((a, b) => compareCodes(a[1], b[1]))
+        .map(([value, label]) => new Option(label, value)));
+      select.disabled = options.size === 0;
+      select.value = options.has(selected) ? selected : '';
+
       if (REQUIRE_CATEGORY && !document.getElementById('list-filter-categorie').value) {
         grid.innerHTML = `<div class="liste-empty"><i class="bi bi-funnel"></i><p>Choisissez une catégorie pour afficher les supports.</p></div>`;
         return;
       }
-      const filtered = getFilteredFeatures(true).slice()
+      const q = document.getElementById('list-search').value.trim().toLocaleLowerCase('fr');
+      const filtered = supports.filter(({ properties: p }) => {
+        if (select.value && quartierKey(p.quartier) !== select.value) return false;
+        return !q || [p.code, p.quartier, p.nom, p.ancien_nom]
+          .some(value => String(value || '').toLocaleLowerCase('fr').includes(q));
+      })
         .sort((x, y) => compareSupportCodes(x.properties.code, y.properties.code));
       if (!filtered.length) {
         grid.innerHTML = `<div class="liste-empty"><i class="bi bi-inbox"></i><p>Aucun panneau ne correspond aux filtres.</p></div>`;
         return;
       }
 
-      // ── Liste à plat, triée par code croissant (support, puis face) ────
-      const total = filtered.length;
-      const html = `<div class="liste-group-ville">
-          <i class="bi bi-sort-numeric-down"></i> Triés par code croissant
-          <span class="count-badge">${total} panneau${total > 1 ? 'x' : ''}</span>
-        </div>` + filtered.map(f => buildSupportCard(f.properties)).join('');
+      const quartiers = new Map();
+      for (const { properties } of filtered) {
+        const quartier = (properties.quartier || '').trim();
+        const ville = (properties.ville || '').trim();
+        const key = JSON.stringify([ville.toLocaleLowerCase('fr'), quartier.toLocaleLowerCase('fr')]);
+        if (!quartiers.has(key)) quartiers.set(key, { quartier, ville, supports: [] });
+        quartiers.get(key).supports.push(properties);
+      }
 
-      grid.innerHTML = html;
+      grid.replaceChildren();
+      const groupes = Array.from(quartiers.values()).sort((a, b) =>
+        Number(!a.quartier) - Number(!b.quartier) ||
+        compareCodes(a.quartier, b.quartier) || compareCodes(a.ville, b.ville)
+      );
+      for (const groupe of groupes) {
+        const titre = document.createElement('h3');
+        titre.className = 'liste-group-ville';
+        const icone = document.createElement('i');
+        icone.className = 'bi bi-geo-alt';
+        icone.setAttribute('aria-hidden', 'true');
+        titre.append(icone, groupe.quartier || 'Quartier non renseigné');
+        grid.append(titre);
+        grid.insertAdjacentHTML('beforeend', groupe.supports.map(buildSupportCard).join(''));
+      }
     }
 
     function buildSupportCard(p) {
@@ -3017,14 +3066,25 @@
       }).join('');
 
       const formatBadge = p.format_display ? `<span class="sc-format">${p.format_display}</span>` : '';
+      const ancienNom = (p.ancien_nom || '').trim();
+      const nomActuel = (p.nom || '').trim();
+      const noms = ancienNom && nomActuel && ancienNom !== nomActuel
+        ? [ancienNom, '(' + nomActuel + ')'] : [ancienNom || nomActuel];
+      const nomHtml = noms.map((nom, index) => {
+        const element = document.createElement('span');
+        element.textContent = nom;
+        if (!index) return element.innerHTML;
+        element.className = 'sc-nom-actuel';
+        return element.outerHTML;
+      }).join('<br>');
 
       return `<div class="support-card ${hasSelected ? 'has-selected' : ''}" id="sc-${p.id}">
         <div class="sc-header">
           <div class="sc-info">
             <div class="sc-code">${p.code}</div>
             ${formatBadge}
-            <div class="sc-nom">${p.nom}</div>
-            <div class="sc-quartier"><i class="bi bi-geo-alt"></i> ${p.quartier || 'Quartier non renseigné'}${p.ville ? ' · ' + p.ville : ''}</div>
+            <div class="sc-nom">${nomHtml}</div>
+            ${p.ville ? `<div class="sc-quartier"><i class="bi bi-geo-alt" aria-hidden="true"></i> ${p.ville}</div>` : ''}
           </div>
         </div>
         <div class="sc-faces">
@@ -3092,6 +3152,7 @@
     document.getElementById('list-filter-format').addEventListener('change', onListeFilterChange);
     document.getElementById('list-filter-ville').addEventListener('change', onListeFilterChange);
     document.getElementById('list-search').addEventListener('input', renderListe);
+    document.getElementById('list-filter-quartier').addEventListener('change', renderListe);
 
 
     // ── DATES ─────────────────────────────────────────────────────────────────
@@ -3125,6 +3186,7 @@
     });
     let clearConfrereSelection;
     let refreshConfrereAvailability;
+    let afficherSupportConfrere;
     let occupationsConfreres = {};
     if (confrerePanel) {
       const saisieManuelle = document.getElementById('confrere-saisie-manuelle');
@@ -3182,17 +3244,22 @@
           faceIcon.className = 'pi-icon';
           faceIcon.textContent = panneau.nombre_faces;
           faceIcon.setAttribute('aria-hidden', 'true');
-          const info = document.createElement('div');
-          info.className = 'pi-info';
-          const libelle = document.createElement('div');
-          libelle.className = 'pi-code';
+          const navigable = supportsById.has(panneau.support_id);
+          const info = document.createElement(navigable ? 'button' : 'div');
+          info.className = 'pi-info' + (navigable ? ' pi-support-link' : '');
+          if (navigable) {
+            info.type = 'button';
+            info.addEventListener('click', () => afficherSupportConfrere(panneau));
+          }
+          const libelle = document.createElement('span');
+          libelle.className = 'pi-code d-block';
           libelle.textContent = [panneau.reference || panneau.nom, panneau.format].filter(Boolean).join(' · ');
-          const lieu = document.createElement('div');
-          lieu.className = 'pi-addr';
+          const lieu = document.createElement('span');
+          lieu.className = 'pi-addr d-block';
           lieu.textContent = [panneau.reference ? panneau.nom : '', panneau.ville, panneau.emplacement].filter(Boolean).join(' · ');
           lieu.title = lieu.textContent;
-          const faces = document.createElement('div');
-          faces.className = 'pi-addr';
+          const faces = document.createElement('span');
+          faces.className = 'pi-addr d-block';
           faces.textContent = panneau.faces?.length ? `Faces ${panneau.faces.join(', ')}`
             : `${panneau.nombre_faces} face${panneau.nombre_faces === 1 ? '' : 's'}`;
           info.append(libelle, lieu, faces);
@@ -3277,10 +3344,12 @@
         JSON.parse(document.getElementById('catalogue-villes-integral')?.textContent || '[]').map(cityKey)
       );
       const cities = new Map();
+      const supportsById = new Map();
       for (const confrere of catalogue) {
         for (const support of confrere.supports) {
           const key = cityKey(support.ville);
           if (!key) continue;
+          supportsById.set(support.support_id, support);
           if (!cities.has(key)) cities.set(key, { label: support.ville.trim(), confreres: new Map() });
           const partenaires = cities.get(key).confreres;
           const id = String(confrere.id);
@@ -3326,6 +3395,7 @@
       function buildCatalogueCard(support) {
         const selected = panneauxConfreres.find(item => item.support_id === support.support_id);
         const card = document.createElement('article');
+        card.id = `catalogue-support-${support.support_id}`;
         card.className = 'support-card' + (selected ? ' has-selected' : '');
         const header = document.createElement('div');
         header.className = 'sc-header sc-info';
@@ -3424,6 +3494,22 @@
         formatSelect.addEventListener('change', refreshCatalogueSupports);
         searchInput.addEventListener('input', refreshCatalogueSupports);
         refreshCataloguePartners();
+        afficherSupportConfrere = panneau => {
+          const support = supportsById.get(panneau.support_id);
+          if (!support) return;
+          const key = cityKey(support.ville);
+          document.getElementById('sec-diffusion').open = true;
+          document.querySelector('[data-source="confrere"]').click();
+          if (!document.getElementById(`catalogue-support-${panneau.support_id}`)) {
+            citySelect.value = key;
+            refreshCataloguePartners();
+            confrereSelect.value = String(support.confrere_id);
+            refreshCatalogueCategories();
+            categorySelect.value = categoryKey(support);
+            refreshCatalogueFormats();
+          }
+          pointerVersSupport(`catalogue-support-${panneau.support_id}`);
+        };
       }
 
       add.addEventListener('click', () => {
@@ -3677,6 +3763,40 @@
       updateContinueButton(count);
     }
 
+    function pointerVersSupport(id) {
+      const card = document.getElementById(id);
+      if (!card) return;
+      card.tabIndex = -1;
+      card.focus({ preventScroll: true });
+      card.scrollIntoView({ block: 'start', behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
+    }
+
+    function afficherSupportIntegral(supportId) {
+      const support = allFeatures.find(({ properties }) => String(properties.id) === String(supportId))?.properties;
+      if (!support) return;
+      const diffusion = document.getElementById('sec-diffusion');
+      if (diffusion) diffusion.open = true;
+      document.querySelector('[data-source="parc"]')?.click();
+      if (currentView !== 'liste') switchView('liste');
+      const id = `sc-${supportId}`;
+      if (!document.getElementById(id)) {
+        const filtres = { ville: support.ville, categorie: support.categorie, format: '' };
+        for (const [nom, valeur] of Object.entries(filtres)) {
+          const select = document.getElementById('list-filter-' + nom);
+          if (!select) continue;
+          if (valeur && !Array.from(select.options).some(option => option.value === valeur)) {
+            select.add(new Option(valeur, valeur));
+          }
+          select.value = valeur || '';
+          refreshFacetSelects('list-filter-');
+        }
+        document.getElementById('list-search').value = '';
+        document.getElementById('list-filter-quartier').value = '';
+        renderListe();
+      }
+      pointerVersSupport(id);
+    }
+
     function updatePanier() {
       const items   = Object.entries(panier).sort((x, y) =>
         compareSupportCodes(x[1].code, y[1].code) || compareCodes(x[1].label, y[1].label));
@@ -3699,14 +3819,18 @@
           el.className = 'panier-item';
           const faceLabel = item.label.replace(/^Face\s+/i, '');
           el.innerHTML = `
-            <div class="pi-icon">${faceLabel}</div>
-            <div class="pi-info">
-              <div class="pi-code">${item.code} · ${item.format_display}</div>
-              <div class="pi-addr"> ${item.quartier || ''}</div>
-            </div>
+            <div class="pi-icon"></div>
+            <button type="button" class="pi-info pi-support-link">
+              <span class="pi-code d-block"></span>
+              <span class="pi-addr d-block"></span>
+            </button>
             <button class="pi-remove" onclick="removePanierItem('${uuid}')" title="Retirer">
               <i class="bi bi-x"></i>
             </button>`;
+          el.querySelector('.pi-icon').textContent = faceLabel;
+          el.querySelector('.pi-code').textContent = [item.code, item.format_display].filter(Boolean).join(' · ');
+          el.querySelector('.pi-addr').textContent = item.quartier || '';
+          el.querySelector('.pi-support-link').addEventListener('click', () => afficherSupportIntegral(item.support_id));
           if (emptyEl) bodyEl.insertBefore(el, emptyEl);
           else bodyEl.appendChild(el);
         });

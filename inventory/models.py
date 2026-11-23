@@ -628,6 +628,7 @@ class Support(models.Model):
             'id': self.pk,
             'code': self.code,
             'nom': self.nom,
+            'ancien_nom': self.ancien_nom,
             'type': self.type_support,
             'etat': self.etat,
             'adresse': self.adresse,

@@ -20,8 +20,6 @@ from .models import (
 from inventory.models import (
     Support,
     FacePanneau,
-    FormatSupport,
-    SupportConfrere,
     normaliser_categorie_format,
 )
 
@@ -195,8 +193,7 @@ class CampagneForm(forms.ModelForm):
         label="Nombre de faces à sélectionner automatiquement",
         widget=forms.NumberInput(attrs={**W, 'min': 1, 'step': 1}),
         help_text=(
-            "Les faces seront choisies au hasard parmi celles disponibles pour "
-            "la catégorie, la ville et la période. Ce nombre n’est pas enregistré."
+            "Les faces seront choisies au hasard parmi les panneaux disponibles sur la période."
         ),
     )
 
@@ -210,25 +207,16 @@ class CampagneForm(forms.ModelForm):
             'autocomplete': 'off',
         }),
         help_text=(
-            "Une réservation importe ses faces par catégorie. Une demande remplit "
-            "automatiquement l’agence, le lieu, la catégorie et les dates."
+            "Toutes les faces de la réservation ou de la demande sélectionnée seront importées."
         ),
     )
 
     # Champ de choix dynamique pour le type / format de campagne
     type_support = forms.ChoiceField(
         required=False,
-        choices=[],
+        choices=[('', 'Choisir un type'), ('panneau', 'Panneau'), ('ecran', 'Écran')],
         widget=forms.Select(attrs=S),
-        label="Type / format"
-    )
-
-    # Champ de choix dynamique pour le lieu (villes des supports existants)
-    lieu = forms.ChoiceField(
-        required=False,
-        choices=[],
-        widget=forms.Select(attrs=S),
-        label="Lieu"
+        label="Type de support"
     )
 
     # Ajout du champ virtuel pour la sélection multiple
@@ -247,7 +235,7 @@ class CampagneForm(forms.ModelForm):
         model = Campagne
         fields = [
             'client', 'agence', 'nom', 'prix', 'prix_affichage', 'prix_impression', 'campagne_parente', 'est_mere',
-            'date_debut', 'date_fin', 'statut', 'lieu',
+            'date_debut', 'date_fin', 'statut',
             'type_support', 'nombre_faces_temporaire',
             'duree_passage', 'frequence', 'nombre_visuels',
             'tranches_horaires', 'notes', 'contrat', 'bon_commande_en_attente'
@@ -260,7 +248,6 @@ class CampagneForm(forms.ModelForm):
             'prix_affichage': forms.TextInput(attrs={**W, 'inputmode': 'decimal', 'data-currency-input': 'true'}),
             'prix_impression': forms.TextInput(attrs={**W, 'inputmode': 'decimal', 'data-currency-input': 'true'}),
             'campagne_parente': forms.Select(attrs=S),
-            # 'lieu' géré par le ChoiceField explicite ci-dessus
             'est_mere': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'date_debut': forms.DateInput(attrs=D),
             'date_fin': forms.DateInput(attrs=D),
@@ -283,7 +270,10 @@ class CampagneForm(forms.ModelForm):
             data = (submitted_data if submitted_data is not None else args[0]).copy()
             value = data.get('type_support')
             if value:
-                data['type_support'] = normaliser_categorie_format(value)
+                value = normaliser_categorie_format(value)
+                if value not in ('panneau', 'ecran') and value in dict(Campagne.get_type_support_choices()):
+                    value = 'panneau'
+                data['type_support'] = value
             for field_name in ('prix', 'prix_affichage', 'prix_impression'):
                 price = data.get(field_name)
                 if isinstance(price, str):
@@ -297,6 +287,8 @@ class CampagneForm(forms.ModelForm):
                 args = (data, *args[1:])
 
         super().__init__(*args, **kwargs)
+        if self.initial.get('type_support') not in ('', None, 'panneau', 'ecran'):
+            self.initial['type_support'] = 'panneau'
         self.fields['client'].queryset = Client.objects.filter(
             type_entite=Client.TYPE_CLIENT
         )
@@ -334,10 +326,8 @@ class CampagneForm(forms.ModelForm):
             )
         reservations_qs = (
             Reservation.objects
-            .filter(
-                statut__in=[STATUT_EN_ATTENTE, STATUT_CONFIRMEE],
-                lignes__face__isnull=False,
-            )
+            .filter(statut__in=[STATUT_EN_ATTENTE, STATUT_CONFIRMEE])
+            .filter(Q(lignes__face__isnull=False) | ~Q(panneaux_confreres_reserves=[]))
             .select_related('client')
             .distinct()
             .order_by('client__nom', '-created_at')
@@ -352,25 +342,6 @@ class CampagneForm(forms.ModelForm):
             else:
                 reservations_qs = reservations_qs.none()
         reservations = list(reservations_qs)
-        categories_par_format = dict(FormatSupport.objects.values_list('code', 'categorie'))
-        for reservation in reservations:
-            categories = {}
-            for ligne in reservation.lignes.select_related('face__support').all():
-                support = ligne.face.support if ligne.face_id else None
-                format_code = support.format if support else ''
-                categorie = normaliser_categorie_format(
-                    categories_par_format.get(format_code, '')
-                )
-                if categorie:
-                    categories.setdefault(categorie, set()).add(format_code)
-            reservation.categories_pour_formulaire = [
-                {
-                    'nom': categorie,
-                    'formats': sorted(codes),
-                }
-                for categorie, codes in sorted(categories.items())
-            ]
-            reservation.categories_json = json.dumps(reservation.categories_pour_formulaire)
         self.reservations_existantes = reservations
         demandes_qs = DemandeReservation.objects.filter(
             statut__in=(
@@ -384,61 +355,10 @@ class CampagneForm(forms.ModelForm):
         self.demandes_existantes = list(demandes_qs)
         if self.demande_source and all(demande.pk != self.demande_source.pk for demande in self.demandes_existantes):
             self.demandes_existantes.append(self.demande_source)
-        ids_supports_confreres = {
-            ligne['support_id'] for demande in self.demandes_existantes
-            for ligne in demande.panneaux_confreres if ligne.get('support_id')
-        }
-        supports_confreres = SupportConfrere.objects.select_related('format').in_bulk(ids_supports_confreres)
         for demande in self.demandes_existantes:
-            demande.client_formulaire = (
-                demande.client
-                if demande.client
-                and demande.client.type_entite == Client.TYPE_CLIENT
-                else None
-            ) or (
-                Client.objects.filter(
-                    email__iexact=demande.email or '\0',
-                    type_entite=Client.TYPE_CLIENT,
-                )
-                .order_by('pk')
-                .first()
-            )
-            villes = {
-                face.support.ville
-                for face in demande.faces_souhaitees.select_related('support')
-                if face.support.ville
-            }
-            villes.update(ligne['ville'] for ligne in demande.panneaux_confreres if ligne.get('ville'))
-            demande.lieu_formulaire = next(iter(villes)) if len(villes) == 1 else ''
-            formats_par_categorie = {}
-            for face in demande.faces_souhaitees.select_related('support'):
-                format_code = face.support.format
-                categorie = normaliser_categorie_format(
-                    categories_par_format.get(format_code, '')
-                )
-                if categorie:
-                    formats_par_categorie.setdefault(categorie, set()).add(format_code)
-            for ligne in demande.panneaux_confreres:
-                support = supports_confreres.get(ligne.get('support_id'))
-                if support and support.categorie_affichee:
-                    categorie = normaliser_categorie_format(support.categorie_affichee)
-                    codes = formats_par_categorie.setdefault(categorie, set())
-                    if support.format_id:
-                        codes.add(support.format.code)
-            demande.categories_pour_formulaire = [
-                {'nom': categorie, 'formats': sorted(codes)}
-                for categorie, codes in sorted(formats_par_categorie.items())
-            ]
-            demande.categories_json = json.dumps(demande.categories_pour_formulaire)
-            demande.categorie_formulaire = (
-                demande.categories_pour_formulaire[0]['nom']
-                if len(demande.categories_pour_formulaire) == 1
-                else ''
-            )
-        self.categories_par_format = {
-            code: normaliser_categorie_format(categorie)
-            for code, categorie in categories_par_format.items()
-        }
+            demande.client_formulaire = demande.client or Client.objects.filter(
+                email__iexact=demande.email or '\0', type_entite=Client.TYPE_CLIENT,
+            ).order_by('pk').first()
         statuts_geres_par_actions = {
             Campagne.STATUT_EN_PAUSE,
             Campagne.STATUT_ANNULEE,
@@ -458,10 +378,7 @@ class CampagneForm(forms.ModelForm):
         else:
             self.fields['client'].help_text = ""
         self.reservation_source = None
-        self.reservation_categorie = None
-        self.reservation_formats = set()
         self.demande_reference_selected = False
-        self.demande_formats = set()
 
         # 1. Déterminer le client à utiliser pour filtrer contrat / campagne_parente
         #    Ordre de priorité :
@@ -489,53 +406,10 @@ class CampagneForm(forms.ModelForm):
             self.fields['contrat'].queryset = Contrat.objects.none()
             self.fields['campagne_parente'].queryset = Campagne.objects.none()
 
-        categories = {
-            normaliser_categorie_format(format_support.categorie) or 'Autre'
-            for format_support in FormatSupport.hors_ecran().only('categorie')
-        }
-        support_choices = [('', '--- Sélectionner une catégorie ---')]
-        support_choices += [('ecran', 'Écran Numérique LED')]
-        support_choices += [(category, category) for category in sorted(categories)]
-        support_choices += [
-            choice for choice in Campagne.get_type_support_choices()
-            if choice[0] not in categories and choice[0] != 'ecran'
-        ]
-        self.fields['type_support'].choices = support_choices
-
-        # 2. Choix dynamique du lieu (villes distinctes présentes dans les supports)
-        villes = (
-            Support.objects
-            .exclude(ville__exact='')
-            .values_list('ville', flat=True)
-            .distinct()
-            .order_by('ville')
-        )
-        villes = set(villes)
-        if self.demande_source:
-            villes.update(ligne['ville'] for ligne in self.demande_source.panneaux_confreres if ligne.get('ville'))
-        lieu_choices = [('', '--- Sélectionner une ville ---')] + [(v, v) for v in sorted(villes)]
-        self.fields['lieu'].choices = lieu_choices
-
     def clean_visuels_multiples(self):
         return self.cleaned_data.get('visuels_multiples', [])
 
-    def faces_disponibles_pour_selection(self, type_support, lieu, date_debut, date_fin):
-        categorie = self.categories_par_format.get(
-            type_support,
-            normaliser_categorie_format(type_support),
-        )
-        formats = [
-            code
-            for code, format_categorie in self.categories_par_format.items()
-            if format_categorie == categorie
-        ]
-        formats_hors_ecran = set(
-            FormatSupport.hors_ecran().values_list('code', flat=True)
-        )
-        formats = [code for code in formats if code in formats_hors_ecran]
-        if not formats:
-            return FacePanneau.objects.none()
-
+    def faces_disponibles_pour_selection(self, date_debut, date_fin):
         campagnes_en_conflit = LigneCampagne.objects.filter(
             face_id=OuterRef('pk'),
         ).filter(
@@ -564,12 +438,13 @@ class CampagneForm(forms.ModelForm):
             reservation__date_debut__date__lte=date_fin,
             reservation__date_fin__date__gte=date_debut,
         )
+        demandes_en_conflit = DemandeReservation.blocages_sur_periode(date_debut, date_fin).filter(
+            faces_souhaitees=OuterRef('pk'),
+        )
         return (
             FacePanneau.objects
             .filter(
                 support__type_support=Support.TYPE_PANNEAU,
-                support__format__in=formats,
-                support__ville__iexact=lieu,
                 support__actif=True,
                 support__etat__in=Support.ETATS_OPERATIONNELS,
                 etat__in=Support.ETATS_OPERATIONNELS,
@@ -577,10 +452,12 @@ class CampagneForm(forms.ModelForm):
             .annotate(
                 _campagne_en_conflit=Exists(campagnes_en_conflit),
                 _reservation_en_conflit=Exists(reservations_en_conflit),
+                _demande_en_conflit=Exists(demandes_en_conflit),
             )
             .filter(
                 _campagne_en_conflit=False,
                 _reservation_en_conflit=False,
+                _demande_en_conflit=False,
             )
             .select_related('support')
         )
@@ -638,32 +515,10 @@ class CampagneForm(forms.ModelForm):
                 )
 
         if demande_reference_selected:
-            faces_demande = list(
-                self.demande_source.faces_souhaitees.select_related('support')
-            )
-            categories_demande = {}
-            for face in faces_demande:
-                format_code = face.support.format
-                categorie = self.categories_par_format.get(format_code, '')
-                if categorie:
-                    categories_demande.setdefault(categorie, set()).add(format_code)
-
-            categorie_selectionnee = self.categories_par_format.get(
-                type_support,
-                normaliser_categorie_format(type_support),
-            )
-            if not faces_demande and not self.demande_source.panneau_confrere:
-                self.add_error(
-                    'reservation_reference',
-                    "Cette demande ne contient aucune face à importer dans la campagne.",
-                )
-            elif faces_demande and categorie_selectionnee not in categories_demande:
-                self.add_error(
-                    'type_support',
-                    "Choisissez une catégorie présente parmi les faces de cette demande.",
-                )
-            else:
-                self.demande_formats = categories_demande.get(categorie_selectionnee, set())
+            if type_support != 'panneau':
+                self.add_error('type_support', "La reprise des faces de la demande requiert le type Panneau.")
+            elif not self.demande_source.faces_souhaitees.exists() and not self.demande_source.panneau_confrere:
+                self.add_error('reservation_reference', "Cette demande ne contient aucune face de panneau.")
             cleaned['reservation_reference'] = ''
 
         elif reservation_reference:
@@ -708,36 +563,13 @@ class CampagneForm(forms.ModelForm):
                         'reservation_reference',
                         "Aucune réservation active ne correspond à cette référence pour le client sélectionné.",
                     )
-                elif not reservation.lignes.filter(face__isnull=False).exists():
+                elif not reservation.lignes.filter(face__isnull=False).exists() and not reservation.panneaux_confreres_reserves:
                     self.add_error(
                         'reservation_reference',
                         "Cette réservation ne contient aucune face de panneau à importer.",
                     )
                 else:
                     self.reservation_source = reservation
-                    categorie_par_type = {
-                        code: categorie
-                        for code, categorie in self.categories_par_format.items()
-                    }
-                    categorie_selectionnee = categorie_par_type.get(
-                        type_support,
-                        normaliser_categorie_format(type_support),
-                    )
-                    categories_reservation = {}
-                    for ligne in reservation.lignes.select_related('face__support').all():
-                        support = ligne.face.support if ligne.face_id else None
-                        format_code = support.format if support else ''
-                        categorie = self.categories_par_format.get(format_code, '')
-                        if categorie:
-                            categories_reservation.setdefault(categorie, set()).add(format_code)
-                    if categorie_selectionnee not in categories_reservation:
-                        self.add_error(
-                            'type_support',
-                            "Choisissez une catégorie présente parmi les faces de cette réservation.",
-                        )
-                    else:
-                        self.reservation_categorie = categorie_selectionnee
-                        self.reservation_formats = categories_reservation[categorie_selectionnee]
                     reservation_debut = timezone.localdate(reservation.date_debut)
                     reservation_fin = timezone.localdate(reservation.date_fin)
                     if d1 and d1 < reservation_debut:
@@ -760,10 +592,6 @@ class CampagneForm(forms.ModelForm):
             )
 
         if nombre_faces_temporaire:
-            categorie = self.categories_par_format.get(
-                type_support,
-                normaliser_categorie_format(type_support),
-            )
             if self.instance.pk:
                 self.add_error(
                     'nombre_faces_temporaire',
@@ -787,12 +615,7 @@ class CampagneForm(forms.ModelForm):
             elif not type_support:
                 self.add_error(
                     'type_support',
-                    "Choisissez une catégorie de panneaux pour sélectionner automatiquement des faces.",
-                )
-            elif not cleaned.get('lieu'):
-                self.add_error(
-                    'lieu',
-                    "Choisissez une ville pour limiter la sélection automatique.",
+                    "Choisissez le type Panneau pour sélectionner automatiquement des faces.",
                 )
             elif not d1 or not d2:
                 self.add_error(
@@ -801,10 +624,7 @@ class CampagneForm(forms.ModelForm):
                 )
             elif d1 <= d2:
                 faces_disponibles = self.faces_disponibles_pour_selection(
-                    type_support,
-                    cleaned['lieu'],
-                    d1,
-                    d2,
+                    d1, d2,
                 )
                 nombre_disponible = faces_disponibles.count()
                 if nombre_disponible < nombre_faces_temporaire:
@@ -858,6 +678,8 @@ class CampagneForm(forms.ModelForm):
                         f"({contrat.date_debut.strftime('%d/%m/%Y')} au {contrat.date_fin.strftime('%d/%m/%Y')})."
                     )
 
+        if self.instance.pk and self.instance.type_support == 'marche' and type_support == 'panneau':
+            cleaned['type_support'] = 'marche'
         return cleaned
 class LigneCampagneForm(forms.ModelForm):
     TYPE_SUPPORT_CHOICES = [

@@ -281,8 +281,9 @@
   .dr-actions-stack form { margin: 0; }
   .dr-action-note { display: flex; gap: 8px; margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--dr-brand-line); color: var(--dr-muted); font-size: .72rem; line-height: 1.5; }
   .dr-action-note i { flex: 0 0 auto; color: var(--dr-ok); }
-  .dr-extend { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
-  .dr-extend .dr-btn { width: auto; min-height: 34px; padding: 0 14px; font-size: .74rem; margin: 0; }
+  .dr-extend { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)) minmax(0, 2fr); gap: 5px; margin-top: 12px; }
+  .dr-extend .dr-btn { min-height: 34px; padding: 4px; font-size: .72rem; margin: 0; line-height: 1.15; }
+  .dr-hold-countdown { color: var(--dr-brand); font-variant-numeric: tabular-nums; text-align: right; }
   .dr-copy { display: flex; gap: 8px; }
   .dr-copy input { flex: 1; min-width: 0; height: 42px; padding: 0 12px; border: 1px solid var(--dr-line); border-radius: var(--dr-radius); background: #fff; font-size: .78rem; color: var(--dr-ink-2); }
   .dr-copy .dr-btn { width: auto; padding: 0 16px; margin: 0; }
@@ -565,29 +566,36 @@
         {% endif %}
       </section>
 
-      {% if demande.date_debut_blocage and demande.date_fin_blocage %}
-      <section class="dr-panel">
+      {% if user.is_staff_regie_role and demande.statut != 'validee' and demande.statut != 'refusee' %}
+      <section class="dr-panel" id="blocage-temporaire">
         <div class="dr-panel-head">
           <div class="dr-panel-heading">
             <span class="dr-panel-icon"><i class="bi bi-shield-lock"></i></span>
             <div>
               <h2 class="dr-panel-title">Blocage temporaire</h2>
-              <p class="dr-panel-caption">Emplacements retenus pour le client</p>
             </div>
           </div>
         </div>
         <div class="dr-panel-body">
-          <div class="dr-line"><span><i class="bi bi-calendar-check"></i>Début</span><strong>{{ demande.date_debut_blocage|date:"d/m/Y" }}</strong></div>
-          <div class="dr-line"><span><i class="bi bi-calendar-x"></i>Fin</span><strong>{{ demande.date_fin_blocage|date:"d/m/Y" }}</strong></div>
-          {% if user.is_staff_regie_role and demande.statut != 'validee' and demande.statut != 'refusee' %}
-          <p class="dr-hint" style="margin-top:14px">Le blocage est actif tant que les échanges avec le client ne sont pas terminés.</p>
-          <form method="post" action="{% url 'demande_prolonger_blocage' demande.uuid %}" class="dr-extend">
+          <div class="dr-line"><span>Début du blocage</span><strong>{{ demande.date_debut_blocage|date:"d/m/Y"|default:"—" }}</strong></div>
+          <div class="dr-line"><span>Fin du blocage</span><strong>{% if demande.expiration_blocage %}{{ demande.expiration_blocage|date:"d/m/Y à H:i" }}{% else %}{{ demande.date_fin_blocage|date:"d/m/Y"|default:"—" }}{% endif %}</strong></div>
+          {% with jours=demande.jours_blocage_restants expiration=demande.echeance_blocage %}
+          <div class="dr-line">
+            <span>Temps restant</span>
+            <strong class="dr-hold-countdown" id="dr-hold-countdown"{% if jours and expiration %} data-expiration="{{ expiration|date:'c' }}"{% endif %}>{{ jours }} jour{{ jours|pluralize }}</strong>
+          </div>
+          {% endwith %}
+          <form method="post" action="{% url 'demande_prolonger_blocage' demande.uuid %}">
             {% csrf_token %}
-            <button type="submit" name="jours" value="3" class="dr-btn dr-btn-back">+3 jours</button>
-            <button type="submit" name="jours" value="5" class="dr-btn dr-btn-back">+5 jours</button>
-            <button type="submit" name="jours" value="7" class="dr-btn dr-btn-back">+7 jours</button>
+            <div class="dr-extend">
+              <button type="submit" name="jours" value="3" class="dr-btn dr-btn-back">+3 jours</button>
+              <button type="submit" name="jours" value="5" class="dr-btn dr-btn-back">+5 jours</button>
+              <button type="submit" name="jours" value="7" class="dr-btn dr-btn-back">+7 jours</button>
+              <button type="submit" name="action" value="lever" class="dr-btn dr-btn-danger" {% if not demande.date_debut_blocage %}disabled{% endif %}>
+                Lever le blocage
+              </button>
+            </div>
           </form>
-          {% endif %}
         </div>
       </section>
       {% endif %}
@@ -758,6 +766,27 @@
 {% endblock %}
 
 {% block extra_js %}
+<script>
+  (() => {
+    const compteur = document.getElementById('dr-hold-countdown');
+    if (!compteur?.dataset.expiration) return;
+    const expiration = Date.parse(compteur.dataset.expiration);
+
+    function actualiser() {
+      const minutesRestantes = Math.max(0, Math.ceil((expiration - Date.now()) / 60000));
+      const jours = Math.floor(minutesRestantes / 1440);
+      const heures = Math.floor(minutesRestantes % 1440 / 60);
+      const minutes = minutesRestantes % 60;
+      const unite = (valeur, nom) => `${valeur} ${nom}${valeur > 1 ? 's' : ''}`;
+      compteur.textContent = minutesRestantes
+        ? [unite(jours, 'jour'), unite(heures, 'heure'), unite(minutes, 'minute')].join(' ')
+        : '0 jour';
+      if (minutesRestantes) setTimeout(actualiser, 1000);
+    }
+
+    if (Number.isFinite(expiration)) actualiser();
+  })();
+</script>
 {% if share_url %}
 <script>
   document.getElementById('copy-demande-link').addEventListener('click', async function () {

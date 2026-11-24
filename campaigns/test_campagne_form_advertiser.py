@@ -268,66 +268,15 @@ class CampagneReservationImportTests(TestCase):
             "reservations-agence",
         )
         self.assertIn(reservation, form.reservations_existantes)
-        self.assertEqual(form.reservation_categorie, "Standard")
-        self.assertEqual(
-            form.reservation_formats,
-            {format_support.code, second_standard_format.code},
-        )
-        self.assertEqual(
-            {
-                category["nom"]
-                for category in next(
-                    item for item in form.reservations_existantes
-                    if item.pk == reservation.pk
-                ).categories_pour_formulaire
-            },
-            {"Standard", "Géant"},
-        )
         campagne = form.save()
+        self.assertEqual(campagne.type_support, 'panneau')
+        self.assertEqual(_importer_faces_reservation(campagne, form.reservation_source), 3)
         self.assertEqual(
-            _importer_faces_reservation(
-                campagne,
-                form.reservation_source,
-                form.reservation_formats,
-            ),
-            2,
+            set(LigneCampagne.objects.filter(campagne=campagne).values_list('face_id', flat=True)),
+            {face.pk, other_face.pk, second_standard_face.pk},
         )
-        ligne = LigneCampagne.objects.get(campagne=campagne, face=face)
-        self.assertEqual(ligne.face, face)
-        self.assertEqual(ligne.support, support)
-        self.assertFalse(LigneCampagne.objects.filter(campagne=campagne, face=other_face).exists())
-        self.assertTrue(
-            LigneCampagne.objects.filter(
-                campagne=campagne,
-                face=second_standard_face,
-            ).exists()
-        )
-        self.assertEqual(
-            _importer_faces_reservation(campagne, reservation, form.reservation_formats),
-            0,
-        )
+        self.assertEqual(_importer_faces_reservation(campagne, reservation), 0)
 
-        data["type_support"] = other_format.code
-        other_category_form = CampagneForm(data=data)
-        self.assertTrue(other_category_form.is_valid(), other_category_form.errors)
-        campagne_geant = other_category_form.save()
-        self.assertEqual(other_category_form.reservation_categorie, "Géant")
-        self.assertEqual(
-            _importer_faces_reservation(
-                campagne_geant,
-                other_category_form.reservation_source,
-                other_category_form.reservation_formats,
-            ),
-            1,
-        )
-        self.assertTrue(
-            LigneCampagne.objects.filter(campagne=campagne_geant, face=other_face).exists()
-        )
-        self.assertFalse(
-            LigneCampagne.objects.filter(campagne=campagne_geant, face=face).exists()
-        )
-
-        data["type_support"] = format_support.code
         data["client"] = str(other_agency.pk)
         wrong_agency_form = CampagneForm(data=data)
         self.assertFalse(wrong_agency_form.is_valid())

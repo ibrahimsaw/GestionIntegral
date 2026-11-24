@@ -10,17 +10,9 @@ from .models import (
 
 
 def occupations_confreres(debut, fin, *, demande_id=None, reservation_id=None, campagne_id=None):
-    demandes = (
-        DemandeReservation.objects.filter(statut__in=[
-            DemandeReservation.STATUT_BROUILLON, DemandeReservation.STATUT_NOUVELLE,
-            DemandeReservation.STATUT_EN_COURS,
-        ])
-        .filter(
-            Q(date_debut_blocage__lte=fin, date_fin_blocage__gte=debut)
-            | Q(date_debut_souhaitee__lte=fin, date_fin_souhaitee__gte=debut)
-        )
-        .exclude(pk=demande_id).exclude(panneau_confrere__in=[{}, []])
-    )
+    demandes = DemandeReservation.blocages_sur_periode(debut, fin).exclude(
+        pk=demande_id,
+    ).exclude(panneau_confrere__in=[{}, []])
     reservations = Reservation.objects.filter(
         statut__in=[STATUT_EN_ATTENTE, STATUT_CONFIRMEE], date_debut__date__lte=fin, date_fin__date__gte=debut,
     ).exclude(pk=reservation_id).exclude(panneaux_confreres_reserves=[])

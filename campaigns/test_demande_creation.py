@@ -1,6 +1,7 @@
 import datetime
 import json
 import uuid
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.conf import settings
@@ -19,7 +20,8 @@ from campaigns.models import (
     ReservationLigne,
     STATUT_CONFIRMEE,
 )
-from inventory.models import Confrere, FacePanneau, FormatSupport, Support
+from inventory.confrere_catalogue import ligne_support_confrere
+from inventory.models import Confrere, FacePanneau, FormatSupport, Support, SupportConfrere
 from portail.forms import Etape1Form
 
 
@@ -48,6 +50,8 @@ class DemandHoldTests(TestCase):
             telephone='70000000',
             date_debut_souhaitee=self.start,
             date_fin_souhaitee=self.end,
+            date_debut_blocage=timezone.localdate(),
+            date_fin_blocage=timezone.localdate() + datetime.timedelta(days=3),
             statut=DemandeReservation.STATUT_EN_COURS,
         )
         demande.faces_souhaitees.add(self.face)
@@ -74,6 +78,8 @@ class DemandHoldTests(TestCase):
             telephone='70000001',
             date_debut_souhaitee=self.start,
             date_fin_souhaitee=self.end,
+            date_debut_blocage=timezone.localdate(),
+            date_fin_blocage=timezone.localdate() + datetime.timedelta(days=3),
             statut=DemandeReservation.STATUT_EN_COURS,
         )
         demande.faces_souhaitees.add(self.face)
@@ -84,7 +90,7 @@ class DemandHoldTests(TestCase):
         self.assertGreater(demande.date_fin_blocage, original_end)
         self.assertTrue(demande.is_hold_active_on(original_end + datetime.timedelta(days=1)))
 
-    def test_staff_can_prolong_hold_from_demand_detail(self):
+    def test_staff_can_enable_extend_and_release_hold_from_demand_detail(self):
         staff = get_user_model().objects.create_user(
             username='hold-staff',
             password='test-password',
@@ -102,20 +108,36 @@ class DemandHoldTests(TestCase):
             statut=DemandeReservation.STATUT_EN_COURS,
         )
         demande.faces_souhaitees.add(self.face)
+        self.assertTrue(self.face.is_disponibles(self.start, self.end))
+        url = reverse('demande_prolonger_blocage', kwargs={'uuid': demande.uuid})
+        self.client.post(url, {'jours': '3'})
+        demande.refresh_from_db()
+        self.assertEqual(demande.date_debut_blocage, timezone.localdate())
+        self.assertEqual(demande.jours_blocage_restants, 3)
+        self.assertFalse(self.face.is_disponibles(self.start, self.end))
+        jour_suivant = self.end + datetime.timedelta(days=1)
+        self.assertTrue(self.face.is_disponibles(jour_suivant, jour_suivant))
         original_end = demande.date_fin_blocage
 
-        response = self.client.post(
-            reverse('demande_prolonger_blocage', kwargs={'uuid': demande.uuid}),
-            {'jours': '4'},
-            follow=True,
-        )
+        response = self.client.post(url, {'jours': '5'}, follow=True)
 
         demande.refresh_from_db()
         self.assertEqual(response.status_code, 200)
-        self.assertGreater(demande.date_fin_blocage, original_end)
-        self.assertTrue(demande.is_hold_active_on(original_end + datetime.timedelta(days=1)))
+        for jours in (3, 5, 7):
+            self.assertContains(response, f'+{jours} jours')
+        self.assertEqual(demande.date_fin_blocage, original_end + datetime.timedelta(days=5))
+        self.assertEqual(demande.jours_blocage_restants, 8)
+        with patch('campaigns.models.timezone.now', return_value=demande.expiration_blocage):
+            self.assertFalse(demande.is_hold_active_on())
+            self.assertEqual(demande.jours_blocage_restants, 0)
+        self.assertContains(response, '8 jours')
+        self.client.post(url, {'action': 'lever'})
+        demande.refresh_from_db()
+        self.assertIsNone(demande.date_fin_blocage)
+        self.assertEqual(demande.jours_blocage_restants, 0)
+        self.assertTrue(self.face.is_disponibles(self.start, self.end))
 
-    def test_pending_draft_request_also_blocks_the_face(self):
+    def test_pending_draft_request_has_no_hold_by_default(self):
         demande = DemandeReservation.objects.create(
             nom_contact='Prospect D',
             societe='Société D',
@@ -127,7 +149,10 @@ class DemandHoldTests(TestCase):
         )
         demande.faces_souhaitees.add(self.face)
 
-        self.assertFalse(self.face.is_disponibles(self.start, self.end))
+        self.assertIsNone(demande.date_debut_blocage)
+        self.assertIsNone(demande.date_fin_blocage)
+        self.assertEqual(demande.jours_blocage_restants, 0)
+        self.assertTrue(self.face.is_disponibles(self.start, self.end))
 
     def test_past_start_date_is_allowed_only_when_editing_a_request(self):
         previous = timezone.localdate() - datetime.timedelta(days=3)
@@ -175,6 +200,8 @@ class DemandHoldTests(TestCase):
             telephone='70000004',
             date_debut_souhaitee=self.start,
             date_fin_souhaitee=self.end,
+            date_debut_blocage=timezone.localdate(),
+            date_fin_blocage=timezone.localdate() + datetime.timedelta(days=3),
             statut=DemandeReservation.STATUT_NOUVELLE,
         )
         demande.faces_souhaitees.add(self.face)
@@ -203,6 +230,8 @@ class DemandHoldTests(TestCase):
             telephone='70000004',
             date_debut_souhaitee=self.start,
             date_fin_souhaitee=self.end,
+            date_debut_blocage=timezone.localdate(),
+            date_fin_blocage=timezone.localdate() + datetime.timedelta(days=3),
             statut=DemandeReservation.STATUT_BROUILLON,
             token_partage=token,
         )
@@ -243,6 +272,34 @@ class DemandeCreationViewTests(TestCase):
         )
         self.start = datetime.date.today() + datetime.timedelta(days=10)
         self.end = self.start + datetime.timedelta(days=5)
+
+    def test_reconduire_campagne_prefills_new_request_without_dates(self):
+        annonceur = Client.objects.create(nom='Annonceur')
+        agence = Client.objects.create(nom='Agence', type_entite=Client.TYPE_AGENCE)
+        confrere = Confrere.objects.create(nom='Réseau test')
+        support = SupportConfrere.objects.create(confrere=confrere, ville='Banfora', nombre_faces=2)
+        panneau = ligne_support_confrere(support, ['B'])
+        campagne = Campagne.objects.create(
+            client=annonceur, agence=agence, nom='Campagne à reconduire',
+            date_debut=self.start, date_fin=self.end, type_support='panneau',
+            panneaux_confreres=[panneau],
+        )
+        LigneCampagne.objects.create(campagne=campagne, face=self.face)
+        renew_url = reverse('campagne_reconduire', args=[campagne.pk])
+        self.assertContains(self.client.get(reverse('campagne_detail', args=[campagne.pk])), renew_url)
+
+        response = self.client.post(renew_url, follow=True)
+
+        self.assertRedirects(response, reverse('demande_creation'))
+        form = response.context['form']
+        self.assertIsNone(form.initial['date_debut'])
+        self.assertIsNone(form.initial['date_fin'])
+        self.assertEqual(json.loads(form.initial['faces_selectionnees']), [self.face.pk])
+        self.assertEqual(response.context['panneaux_confreres'], [panneau])
+        self.assertEqual(response.context['nom_campagne'], campagne.nom)
+        self.assertEqual(response.context['contact_form'].initial['client'], str(annonceur.pk))
+        self.assertEqual(response.context['contact_form'].initial['agence'], str(agence.pk))
+        self.assertFalse(DemandeReservation.objects.exists())
 
     def complete_step_one(self, **overrides):
         data = {
@@ -525,10 +582,10 @@ class DemandeCreationViewTests(TestCase):
         )
         self.assertRedirects(response, reverse('demande_creation_etape2'))
         recap = self.client.get(reverse('demande_creation_etape2'))
-        self.assertEqual(recap.context['total_faces'], 60500)
+        self.assertEqual(recap.context['total_faces'], 30250)
         self.assertEqual(recap.context['total_affichage'], 4000)
         self.assertEqual(recap.context['total_impression'], 5500)
-        self.assertEqual(recap.context['total_estimatif'], 70000)
+        self.assertEqual(recap.context['total_estimatif'], 39750)
         self.assertRedirects(
             self.complete_step_two(),
             reverse(
@@ -540,6 +597,13 @@ class DemandeCreationViewTests(TestCase):
         self.assertEqual(demande.prix_faces_par_format, tarifs)
         self.assertEqual(demande.remises_faces_par_format, remises)
         self.assertEqual(demande.frais_faces_par_format, frais)
+        campagne_form = self.client.get(f"{reverse('campagne_create')}?demande={demande.uuid}")
+        self.assertContains(campagne_form, 'Tarifs repris de la demande par format')
+        self.assertIsNone(campagne_form.context['form'].initial['prix'])
+        self.assertEqual(
+            {ligne['prix'] for ligne in campagne_form.context['tarifs_demande_par_format']},
+            {11250, 19000},
+        )
 
         response = self.client.post(
             reverse('demande_valider', kwargs={'uuid': demande.uuid}),
@@ -554,7 +618,8 @@ class DemandeCreationViewTests(TestCase):
             geant.code: '19000.00',
         })
         self.assertEqual(reservation.nombre_mois_factures(), 2)
-        self.assertEqual(reservation.montant_total(), 70000)
+        self.assertTrue(reservation.tarif_faces_par_periode)
+        self.assertEqual(reservation.montant_total(), 39750)
         self.assertEqual(reservation.frais_faces_par_format, frais)
         detail_response = self.client.get(
             reverse(
@@ -566,7 +631,7 @@ class DemandeCreationViewTests(TestCase):
             )
         )
         self.assertEqual(detail_response.status_code, 200)
-        self.assertContains(detail_response, 'Tarif / mois')
+        self.assertContains(detail_response, 'Tarif / face')
 
     def test_format_price_is_optional_and_retained_when_contact_is_invalid(self):
         format_support = FormatSupport.objects.create(
@@ -1346,6 +1411,7 @@ class DemandeCreationViewTests(TestCase):
         )
 
     def test_catalogue_confrere_creates_a_private_dossier_with_the_selected_faces(self):
+        self.end = self.start + datetime.timedelta(days=44)
         confrere = Confrere.objects.create(nom='Faso Affichage')
         format_support = FormatSupport.objects.create(code='cf-4x3', dimensions='4 × 3 m', categorie='12m²')
         support = confrere.supports.create(
@@ -1365,6 +1431,10 @@ class DemandeCreationViewTests(TestCase):
             panneaux_confreres=json.dumps([{
                 'support_id': support.pk, 'faces': ['C'], 'nom': 'Nom modifié côté navigateur',
             }]),
+            tarifs_faces_par_format=json.dumps({f'confrere:{format_support.dimensions}': '100000'}),
+            frais_faces_par_format=json.dumps({
+                f'confrere:{format_support.dimensions}': {'prix_affichage': '5000', 'prix_impression': '2500'},
+            }),
         )
         self.assertRedirects(response, reverse('demande_creation_etape2'))
         self.complete_step_two()
@@ -1378,6 +1448,10 @@ class DemandeCreationViewTests(TestCase):
         disponibilite_url = reverse('api_check_dispo', args=[0])
         dates = {'date_debut': self.start.isoformat(), 'date_fin': self.end.isoformat()}
         face_key = f'{support.pk}:C'
+        occupations = self.client.get(disponibilite_url, dates).json()['faces_confreres']
+        self.assertNotIn(face_key, occupations)
+        hold_url = reverse('demande_prolonger_blocage', args=[demande.uuid])
+        self.client.post(hold_url, {'jours': '3'})
         occupations = self.client.get(disponibilite_url, dates).json()['faces_confreres']
         self.assertIn(demande.reference, occupations[face_key]['info'])
         self.assertNotIn(f'{support.pk}:A', occupations)
@@ -1465,6 +1539,7 @@ class DemandeCreationViewTests(TestCase):
         self.assertEqual(demande.statut, DemandeReservation.STATUT_VALIDEE)
         reservation = demande.reservation
         self.assertEqual(reservation.nb_faces(), 1)
+        self.assertEqual(reservation.montant_total(), 107500)
         self.assertFalse(reservation.lignes.exists())
         self.assertEqual(reservation.panneaux_confreres_reserves, dossier.lignes)
         occupations = self.client.get(disponibilite_url, dates).json()['faces_confreres']
@@ -1475,7 +1550,11 @@ class DemandeCreationViewTests(TestCase):
         )
         campaign_url = f"{reverse('campagne_create')}?demande={demande.uuid}"
         self.assertContains(self.client.get(detail_url), campaign_url)
-        self.assertEqual(self.client.get(campaign_url).status_code, 200)
+        formulaire = self.client.get(campaign_url)
+        self.assertEqual(formulaire.status_code, 200)
+        self.assertEqual(formulaire.context['form'].initial['prix'], 100000)
+        self.assertEqual(formulaire.context['form'].initial['prix_affichage'], 5000)
+        self.assertEqual(formulaire.context['form'].initial['prix_impression'], 2500)
         response = self.client.post(campaign_url, {
             'demande_uuid': str(demande.uuid),
             'client': str(reservation.client_id),
@@ -1490,6 +1569,7 @@ class DemandeCreationViewTests(TestCase):
         demande.refresh_from_db()
         self.assertEqual(demande.reservation_id, reservation.pk)
         self.assertEqual(demande.campagne.panneaux_confreres, dossier.lignes)
+        self.assertEqual(demande.campagne.montant_total(), 100000)
         occupations = self.client.get(disponibilite_url, dates).json()['faces_confreres']
         self.assertIn(demande.campagne.reference, occupations[face_key]['info'])
         self.assertContains(self.client.get(response.url), support.reference)
@@ -1817,13 +1897,24 @@ class DemandeCreationViewTests(TestCase):
             date_fin_souhaitee=self.end,
             statut=DemandeReservation.STATUT_EN_COURS,
         )
-        demande.faces_souhaitees.add(face)
+        format_marche = FormatSupport.objects.create(code='DREF-MARCHE', categorie='Marché')
+        panneau_marche = Support.objects.create(
+            code='DREF-MARCHE-OUA', nom='Panneau du marche',
+            type_support=Support.TYPE_PANNEAU, format=format_marche.code,
+            latitude=12.34, longitude=-1.52, ville='Ouagadougou',
+        )
+        face_marche = FacePanneau.objects.create(support=panneau_marche, label=FacePanneau.LABEL_A)
+        demande.faces_souhaitees.add(face, face_marche)
 
         campaign_url = reverse('campagne_create')
         form_response = self.client.get(campaign_url)
         self.assertContains(form_response, demande.reference)
-        self.assertContains(form_response, 'data-lieu="Bobo-Dioulasso"')
-        self.assertContains(form_response, 'data-categorie="Standard"')
+        self.assertNotContains(form_response, 'id_lieu')
+        self.assertNotContains(form_response, 'id_categorie_support')
+        self.assertEqual(
+            list(form_response.context['form'].fields['type_support'].choices),
+            [('', 'Choisir un type'), ('panneau', 'Panneau'), ('ecran', 'Écran')],
+        )
 
         response = self.client.post(
             campaign_url,
@@ -1832,10 +1923,9 @@ class DemandeCreationViewTests(TestCase):
                 'client': str(agency.pk),
                 'annonceur': agency.nom,
                 'nom': demande.nom_campagne,
-                'lieu': 'Bobo-Dioulasso',
                 'date_debut': self.start.isoformat(),
                 'date_fin': self.end.isoformat(),
-                'type_support': format_support.code,
+                'type_support': 'panneau',
                 'nombre_visuels': '1',
             },
         )
@@ -1848,12 +1938,13 @@ class DemandeCreationViewTests(TestCase):
         campagne = Campagne.objects.get(nom=demande.nom_campagne)
         demande.refresh_from_db()
         self.assertEqual(campagne.client, agency)
-        self.assertEqual(campagne.lieu, 'Bobo-Dioulasso')
+        self.assertEqual(campagne.lieu, '')
         self.assertEqual(campagne.date_debut, self.start)
         self.assertEqual(campagne.date_fin, self.end)
-        self.assertEqual(campagne.type_support, format_support.code)
+        self.assertEqual(campagne.type_support, 'panneau')
         self.assertEqual(demande.campagne, campagne)
         self.assertEqual(demande.statut, DemandeReservation.STATUT_VALIDEE)
-        self.assertTrue(
-            LigneCampagne.objects.filter(campagne=campagne, face=face).exists()
+        self.assertEqual(
+            set(LigneCampagne.objects.filter(campagne=campagne).values_list('face_id', flat=True)),
+            {face.pk, face_marche.pk},
         )

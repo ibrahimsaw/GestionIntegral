@@ -15,6 +15,15 @@
       <i class="bi bi-calculator-fill me-1"></i>
       <span class="d-none d-md-inline">Modifier</span>
     </a>
+    {% if peut_reconduire %}
+      <form method="post" action="{% url 'campagne_reconduire' campagne.pk %}">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-outline-primary btn-sm shadow-sm px-3 d-flex align-items-center gap-2">
+          <i class="bi bi-arrow-repeat" aria-hidden="true"></i>
+          Reconduire via une demande
+        </button>
+      </form>
+    {% endif %}
     <a href="{% url 'campagne_create' %}" class="btn btn-primary btn-sm shadow-sm px-3 d-flex align-items-center gap-1">
       <i class="bi bi-plus-lg me-1"></i>
       <span class="d-none d-md-inline">Nouvelle Campagne</span>
@@ -24,7 +33,8 @@
 {% endblock %}
 
 {% block extra_head %}
-  <link rel="stylesheet" href="{% static 'css/campagne-detail.css' %}?v=20261120">
+  <link rel="stylesheet" href="{% static 'css/gestion-listes.css' %}?v=20261118">
+  <link rel="stylesheet" href="{% static 'css/campagne-detail.css' %}?v=20261124">
 {% endblock %}
 {% block contentbouton %}
     {% if not user.is_client %}
@@ -68,14 +78,14 @@
 {% endblock %}
 
 {% block content %}
-<div class="cpd-page">
+<div class="dl cpd-page">
 
   {# ═══════════════════════════════════════════ #}
   {# ── BANNIÈRE HÉRO ── #}
   {# ═══════════════════════════════════════════ #}
-  <header class="cpd-hero">
-    <div class="cpd-hero-grid">
-      <div class="cpd-hero-avatar">
+  <header class="dl-intro">
+    <div class="dl-intro-main">
+      <div class="dl-intro-icon cpd-hero-avatar">
         {% if campagne.client.logo %}
           <img src="{{ campagne.client.logo.url }}" alt="{{ campagne.client.nom }}">
         {% else %}
@@ -83,7 +93,7 @@
         {% endif %}
       </div>
       <div class="cpd-hero-summary">
-        <span class="cpd-hero-ref">{{ campagne.reference }}</span>
+        <span class="dl-intro-eyebrow">{{ campagne.reference }}</span>
         <h1 class="cpd-hero-title">{{ campagne.nom }}</h1>
         <div class="d-flex align-items-center gap-2 flex-wrap mt-1">
           <a href="{% url 'client_detail' campagne.client.pk %}" class="cpd-hero-link">
@@ -117,8 +127,9 @@
         </div>
         {% endif %}
       </div>
-      <div class="cpd-hero-status">
-        <span class="cpd-hero-badge cpd-badge-{{ campagne.statut }}">
+    </div>
+    <div class="cpd-hero-status">
+        <span class="dl-pill dl-campagne-row-{{ campagne.statut }}">
           <i class="bi bi-circle-fill" aria-hidden="true"></i>
           {{ campagne.get_statut_display }}
         </span>
@@ -134,16 +145,15 @@
             En pause depuis le {{ campagne.date_mise_en_pause|date:"d/m/Y" }}
           </span>
         {% endif %}
-      </div>
     </div>
   </header>
 
-  <nav class="cpd-section-nav" aria-label="Sections de la campagne">
-    <a href="#campagne-informations"><i class="bi bi-layout-text-sidebar" aria-hidden="true"></i> Informations</a>
-    <a href="#campagne-supports"><i class="bi bi-grid" aria-hidden="true"></i> Supports</a>
-    <a href="#campagne-finances"><i class="bi bi-cash-coin" aria-hidden="true"></i> Finances</a>
-    <a href="#piges"><i class="bi bi-camera" aria-hidden="true"></i> Preuves de diffusion</a>
-    <a href="#campagne-rapports"><i class="bi bi-file-earmark-pdf" aria-hidden="true"></i> Rapports</a>
+  <nav class="dl-tabs cpd-section-nav" aria-label="Sections de la campagne">
+    <a class="dl-tab" href="#campagne-informations"><i class="bi bi-layout-text-sidebar" aria-hidden="true"></i> Informations</a>
+    <a class="dl-tab" href="#campagne-supports"><i class="bi bi-grid" aria-hidden="true"></i> Supports</a>
+    <a class="dl-tab" href="#campagne-finances"><i class="bi bi-cash-coin" aria-hidden="true"></i> Finances</a>
+    <a class="dl-tab" href="#piges"><i class="bi bi-camera" aria-hidden="true"></i> Preuves de diffusion</a>
+    <a class="dl-tab" href="#campagne-rapports"><i class="bi bi-file-earmark-pdf" aria-hidden="true"></i> Rapports</a>
   </nav>
 
   {# ═══════════════════════════════════════════ #}
@@ -155,8 +165,8 @@
     <div class="cpd-overview-main">
 
       {# ── CARTE D'INFORMATIONS CLÉS ── #}
-      <div class="cpd-card mb-4">
-        <div class="cpd-card-header">
+      <div class="dl-card mb-4">
+        <div class="dl-card-head cpd-card-header">
           <i class="bi bi-bar-chart-line-fill"></i> Informations générales
         </div>
         <div class="cpd-card-body">
@@ -253,8 +263,8 @@
       {# ── RÉSUMÉ FINANCIER ── #}
       {% if campagne.est_mere %}
         {% if total_campagne.prix or total_campagne.affichage or total_campagne.impression or total_campagne.total %}
-        <div class="cpd-card mb-4">
-          <div class="cpd-card-header"><i class="bi bi-cash-coin"></i>Résumé financier consolidé — {{ nombre_sous_campagnes }} sous-campagne{{ nombre_sous_campagnes|pluralize }}</div>
+        <div class="dl-card mb-4">
+          <div class="dl-card-head cpd-card-header"><i class="bi bi-cash-coin"></i>Résumé financier consolidé — {{ nombre_sous_campagnes }} sous-campagne{{ nombre_sous_campagnes|pluralize }}</div>
           <div class="cpd-card-body">
             <div class="row g-3">
               {% if total_campagne.prix %}<div class="col-4"><div class="cpd-stat"><div class="cpd-stat-label">Total faces/spots</div><div class="cpd-stat-value">{{ total_campagne.prix|format_number_fr }}</div></div></div>{% endif %}
@@ -266,14 +276,14 @@
         </div>
         {% endif %}
       {% elif campagne.prix or campagne.prix_affichage or campagne.prix_impression or totaux_campagne.prix or totaux_campagne.affichage or totaux_campagne.impression or totaux_campagne.total %}
-        <div class="cpd-card mb-4">
-          <div class="cpd-card-header"><i class="bi bi-cash-coin"></i>Résumé financier</div>
+        <div class="dl-card mb-4">
+          <div class="dl-card-head cpd-card-header"><i class="bi bi-cash-coin"></i>Résumé financier</div>
           <div class="cpd-card-body">
             <div class="row g-3">
               {% if campagne.prix or totaux_campagne.prix %}
               <div class="col-6 col-md-4 d-grid align-content-start gap-2">
-                {% if campagne.prix %}<div class="cpd-stat"><div class="cpd-stat-label">Prix unit. {% if campagne.type_support == 'ecran' %}spot{% elif campagne.type_support == 'marche' %}emplacement / mois{% else %}face / mois{% endif %}</div><div class="cpd-stat-value">{{ campagne.prix|format_number_fr }}</div></div>{% endif %}
-                {% if totaux_campagne.prix %}<div class="cpd-stat cpd-stat-accent"><div class="cpd-stat-label">Prix total {% if campagne.type_support == 'ecran' %}des spots{% elif campagne.type_support == 'marche' %}des emplacements{% else %}des faces{% endif %}{% if campagne.type_support != 'ecran' %} ({{ campagne.nombre_mois_factures }} mois){% endif %}</div><div class="cpd-stat-value">{{ totaux_campagne.prix|format_number_fr }}</div></div>{% endif %}
+                {% if campagne.prix %}<div class="cpd-stat"><div class="cpd-stat-label">Prix unit. {% if campagne.type_support == 'ecran' %}spot{% elif campagne.type_support == 'marche' %}emplacement{% else %}face{% endif %}{% if campagne.type_support != 'ecran' and not campagne.tarif_faces_par_periode %} / mois{% endif %}</div><div class="cpd-stat-value">{{ campagne.prix|format_number_fr }}</div></div>{% endif %}
+                {% if totaux_campagne.prix %}<div class="cpd-stat cpd-stat-accent"><div class="cpd-stat-label">Prix total {% if campagne.type_support == 'ecran' %}des spots{% elif campagne.type_support == 'marche' %}des emplacements{% else %}des faces{% endif %}{% if campagne.type_support != 'ecran' and not campagne.tarif_faces_par_periode %} ({{ campagne.nombre_mois_factures }} mois){% endif %}</div><div class="cpd-stat-value">{{ totaux_campagne.prix|format_number_fr }}</div></div>{% endif %}
               </div>
               {% endif %}
               {% if campagne.prix_affichage or totaux_campagne.affichage %}
@@ -296,10 +306,10 @@
 
       {# ── VISUELS ── #}
       {% if campagne.visuels.exists %}
-      <div class="cpd-card mb-4">
-        <div class="cpd-card-header">
+      <div class="dl-card mb-4">
+        <div class="dl-card-head cpd-card-header">
           <i class="bi bi-image"></i> Visuels de la campagne
-          <span style="background:#f1f5f9; color:#64748b; font-size:0.7rem; font-weight:700; padding:2px 8px; border-radius:8px; margin-left:auto;">
+          <span class="dl-count ms-auto">
             {{ campagne.visuels.count }} média{{ campagne.visuels.count|pluralize }}
           </span>
         </div>
@@ -366,8 +376,8 @@
     <aside class="cpd-overview-aside" aria-label="Suivi de la campagne">
 
       {# ── WORKFLOW STEPPER ── #}
-      <div class="cpd-card mb-4">
-        <div class="cpd-card-header">
+      <div class="dl-card mb-4">
+        <div class="dl-card-head cpd-card-header">
           <i class="bi bi-diagram-3"></i> Cycle de vie de la campagne
         </div>
         <div>
@@ -395,8 +405,8 @@
 
       {# ── BROADCAST METRICS (écran only) ── #}
       {% if campagne.type_support == 'ecran' %}
-      <div class="cpd-card mb-4">
-        <div class="cpd-card-header">
+      <div class="dl-card mb-4">
+        <div class="dl-card-head cpd-card-header">
           <i class="bi bi-broadcast"></i> Métriques de diffusion
         </div>
         <div>
@@ -451,9 +461,47 @@
     </div>
   </div>
   {% if campagne.panneaux_confreres %}
-    <section class="cpd-card mb-4 p-3">
-      <h3 class="h6">Réseau Confrère</h3>
-      {% include "portail/_panneau_confrere.html" with panneaux_confreres=campagne.panneaux_confreres only %}
+    <section class="dl-card mb-4" aria-labelledby="campagne-confreres">
+      <div class="dl-card-head cpd-card-header">
+        <h3 class="h6 mb-0" id="campagne-confreres"><i class="bi bi-diagram-3 me-1" aria-hidden="true"></i> Réseau Confrère</h3>
+      </div>
+      <div class="table-responsive">
+        <table class="dl-table cpd-finance-table">
+          <thead>
+            <tr>
+              <th scope="col">Support</th>
+              <th scope="col">Confrère</th>
+              <th scope="col">Ville et emplacement</th>
+              <th scope="col">Format</th>
+              <th scope="col">Faces</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for panneau in campagne.panneaux_confreres %}
+              <tr>
+                <th scope="row">
+                  {% if user.is_staff_regie_role and panneau.confrere_id and panneau.support_id %}
+                    <a href="{% url 'confrere_support_detail' panneau.confrere_id panneau.support_id %}" class="fw-semibold">{{ panneau.reference }}</a>
+                  {% else %}
+                    {{ panneau.reference|default:"—" }}
+                  {% endif %}
+                  {% if panneau.nom_support %}<small class="d-block text-muted">{{ panneau.nom_support }}</small>{% endif %}
+                </th>
+                <td>{{ panneau.nom }}</td>
+                <td>{{ panneau.ville|default:"—" }}{% if panneau.emplacement %}<small class="d-block text-muted">{{ panneau.emplacement }}</small>{% endif %}</td>
+                <td>{{ panneau.format|default:"—" }}</td>
+                <td>
+                  {% for face in panneau.faces %}
+                    <span class="cpd-badge-sub cpd-badge-type-panneau me-1">Face {{ face }}</span>
+                  {% empty %}
+                    {{ panneau.nombre_faces }} face{{ panneau.nombre_faces|pluralize }}
+                  {% endfor %}
+                </td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </section>
   {% endif %}
 
@@ -469,7 +517,7 @@
         {% for group in marche_list %}
           {% with marche=group.grouper %}
           <div class="col-md-6 col-xl-4">
-            <div class="cpd-sup-card">
+            <div class="dl-card cpd-sup-card">
               <div class="cpd-sup-head">
                 <div class="cpd-sup-icon cpd-badge-type-marche">
                   <i class="bi bi-shop"></i>
@@ -541,7 +589,7 @@
       {% if support_rows %}
         {% for row in support_rows %}
         <div class="col-md-6 col-xl-4">
-          <div class="cpd-sup-card">
+          <div class="dl-card cpd-sup-card">
             
             {# En-tête de la fiche #}
             <div class="cpd-sup-head">
@@ -557,7 +605,7 @@
                   <span class="cpd-badge-sub {% if row.support.type_support == 'ecran' %}cpd-badge-type-ecran{% else %}cpd-badge-type-panneau{% endif %}">
                     {% if row.support.type_support == 'ecran' %}ÉCRAN LED{% else %}{{ row.support.get_format_display|default:"PANNEAU" }}{% endif %}
                   </span>
-                  <span class="cpd-mono" style="font-size:0.75rem; font-weight:700; color:#932e2b;">{{ row.support.code }}</span>
+                  <span class="dl-ref">{{ row.support.code }}</span>
                 </div>
                 <h6 style="font-weight:700; font-size:0.9rem; margin:0;" class="text-truncate">
                   <a href="{% if row.support.uuid %}{% url 'support_detail' row.support.uuid %}{% else %}#{% endif %}" class="text-dark text-decoration-none">
@@ -706,8 +754,8 @@
     </div>
 
     {% for ed in enfants_data %}
-    <div class="card cpd-finance-panel mb-4">
-      <div class="card-header bg-white py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-2 border-bottom">
+    <div class="dl-card mb-4">
+      <div class="dl-card-head flex-wrap">
         <div class="d-flex align-items-center gap-2 flex-grow-1" style="min-width:0;">
           <i class="bi bi-megaphone" style="color:#932e2b;"></i>
           <a href="{% url 'campagne_detail' ed.campagne.pk %}" class="text-decoration-none" style="color:#0f172a; font-weight:700;">
@@ -716,16 +764,16 @@
         </div>
         <div class="d-flex align-items-center gap-2">
           <span class="cpd-muted">{{ ed.campagne.contrat.get_detail|default:"—" }} • {{ ed.campagne.date_debut|date:"d/m/Y" }} → {{ ed.campagne.date_fin|date:"d/m/Y" }}</span>
-          <span class="cpd-hero-ref">{{ ed.campagne.reference }}</span>
+          <span class="dl-intro-eyebrow">{{ ed.campagne.reference }}</span>
         </div>
       </div>
       <div class="table-responsive">
-        <table class="cpd-finance-table">
+        <table class="dl-table cpd-finance-table">
           <thead>
             <tr>
               <th>Support</th>
               <th>{% if ed.campagne.type_support == 'ecran' %}Spots{% elif ed.campagne.type_support == 'marche' %}Emplacements{% else %}Faces{% endif %}</th>
-              <th class="text-end">{% if ed.campagne.type_support == 'ecran' %}Prix unit. / spot{% else %}Prix unit. / mois{% endif %}</th>
+              <th class="text-end">{% if ed.campagne.type_support == 'ecran' %}Prix unit. / spot{% elif ed.campagne.tarif_faces_par_periode %}Prix unitaire{% else %}Prix unit. / mois{% endif %}</th>
               <th class="text-end">Prix total</th>
               <th class="text-end">Affich. unit. (1 fois)</th>
               <th class="text-end">Affich. total (1 fois)</th>
@@ -764,8 +812,9 @@
               <td class="text-end cpd-mono cpd-table-total">{{ row.total_support|format_number_fr }}</td>
             </tr>
             {% empty %}
-            <tr><td colspan="9" class="text-center cpd-muted py-3">Aucun support</td></tr>
+              {% if not ed.totaux.lignes_confreres %}<tr><td colspan="9" class="text-center cpd-muted py-3">Aucun support</td></tr>{% endif %}
             {% endfor %}
+            {% include 'campaigns/includes/finance_confrere.html' with lignes=ed.totaux.lignes_confreres only %}
           </tbody>
           <tfoot>
             <tr>
@@ -786,20 +835,20 @@
 
   {% else %}
     {# ── CAS CAMPAGNE SIMPLE : TABLEAU FINANCIER DÉTAILLÉ ── #}
-    <div class="card cpd-finance-panel mb-4 mt-4" id="campagne-finances">
-      <div class="card-header bg-white py-3 px-4 d-flex align-items-center justify-content-between flex-wrap gap-2 border-bottom">
+    <div class="dl-card mb-4 mt-4" id="campagne-finances">
+      <div class="dl-card-head flex-wrap">
         <div class="d-flex align-items-center gap-2">
           <i class="bi bi-cash-coin" style="color:#932e2b;"></i>
           <span class="fw-bold text-dark">Détail financier par support</span>
         </div>
       </div>
       <div class="table-responsive">
-        <table class="cpd-finance-table">
+        <table class="dl-table cpd-finance-table">
           <thead>
             <tr>
               <th>Support</th>
               <th>{% if campagne.type_support == 'ecran' %}Spots{% elif campagne.type_support == 'marche' %}Emplacements{% else %}Faces{% endif %}</th>
-              <th class="text-end">{% if campagne.type_support == 'ecran' %}Prix unit. / spot{% else %}Prix unit. / mois{% endif %}</th>
+              <th class="text-end">{% if campagne.type_support == 'ecran' and not totaux_campagne.lignes_confreres %}Prix unit. / spot{% elif campagne.tarif_faces_par_periode %}Prix unitaire{% else %}Prix unit. / mois{% endif %}</th>
               <th class="text-end">Prix total</th>
               <th class="text-end">Affich. unit. (1 fois)</th>
               <th class="text-end">Affich. total (1 fois)</th>
@@ -838,8 +887,9 @@
               <td class="text-end cpd-mono cpd-table-total">{{ row.total_support|format_number_fr }}</td>
             </tr>
             {% empty %}
-            <tr><td colspan="9" class="text-center cpd-muted py-4">Aucun support</td></tr>
+              {% if not totaux_campagne.lignes_confreres %}<tr><td colspan="9" class="text-center cpd-muted py-4">Aucun support</td></tr>{% endif %}
             {% endfor %}
+            {% include 'campaigns/includes/finance_confrere.html' with lignes=totaux_campagne.lignes_confreres only %}
           </tbody>
           <tfoot>
             <tr>
@@ -858,8 +908,8 @@
     </div>
   {% endif %}
 
-  <section class="card cpd-proof-panel mt-4" id="piges">
-    <div class="card-header bg-white d-flex align-items-center justify-content-between flex-wrap gap-2">
+  <section class="dl-card cpd-proof-panel mt-4" id="piges">
+    <div class="dl-card-head flex-wrap">
       <div>
         <h5 class="mb-1 fw-bold"><i class="bi bi-camera-fill text-primary me-2"></i>Preuves de diffusion</h5>
         <p class="text-muted small mb-0">Photos relevées sur les supports pendant la campagne.</p>
@@ -959,7 +1009,7 @@
   {# ═══════════════════════════════════════════ #}
   {# ── SECTION 5: EXPORTS & RAPPORTS ── #}
   {# ═══════════════════════════════════════════ #}
-  <section class="cpd-export-section mt-4" id="campagne-rapports" aria-labelledby="campagne-rapports-titre">
+  <section class="dl-card cpd-export-section mt-4" id="campagne-rapports" aria-labelledby="campagne-rapports-titre">
     <div class="cpd-export-copy">
       <span class="cpd-export-icon"><i class="bi bi-file-earmark-arrow-down" aria-hidden="true"></i></span>
       <div>
@@ -968,10 +1018,10 @@
       </div>
     </div>
     <div class="cpd-export-links">
-      <a href="{% url 'campagne_preview' campagne.pk %}" class="cpd-btn-export cpd-btn-view">
+      <a href="{% url 'campagne_preview' campagne.pk %}" class="btn btn-outline-primary btn-sm">
         <i class="bi bi-eye"></i> Aperçu Rapport
       </a>
-      <a href="{% url 'export_campagne_pdf' campagne.pk %}" class="cpd-btn-export cpd-btn-pdf">
+      <a href="{% url 'export_campagne_pdf' campagne.pk %}" class="btn btn-primary btn-sm">
         <i class="bi bi-file-earmark-pdf-fill"></i> Télécharger PDF
       </a>
     </div>

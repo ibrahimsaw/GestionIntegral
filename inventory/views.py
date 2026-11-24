@@ -1403,16 +1403,8 @@ class SupportListView(TechnicienStaffRequiredMixin, ClientSidePaginationMixin, S
             if support_id and type_support != Support.TYPE_PANNEAU:
                 reserves.add(support_id)
 
-        blocages = DemandeReservation.objects.filter(
-            statut__in=(
-                DemandeReservation.STATUT_BROUILLON,
-                DemandeReservation.STATUT_NOUVELLE,
-                DemandeReservation.STATUT_EN_COURS,
-            ),
+        blocages = DemandeReservation.blocages_sur_periode(jour, jour).filter(
             faces_souhaitees__isnull=False,
-        ).filter(
-            Q(date_debut_blocage__lte=jour, date_fin_blocage__gte=jour)
-            | Q(date_debut_souhaitee__lte=jour, date_fin_souhaitee__gte=jour)
         ).values('faces_souhaitees')
         libres = set(FacePanneau.objects.exclude(pk__in=campagnes.exclude(face_id=None).values('face_id'))
                     .exclude(pk__in=blocages).values_list('support_id', flat=True).distinct())

@@ -9,6 +9,31 @@ from campaigns.models import Campagne, CampagnePause, Client, LigneCampagne
 from inventory.models import Support
 
 
+class CampaignListPaginationTests(TestCase):
+    def test_filtered_campaign_list_paginates_and_keeps_total(self):
+        account = Client.objects.create(nom='Client pagination')
+        Campagne.objects.bulk_create([
+            Campagne(
+                client=account, nom=f'Campagne {index:02}', reference=f'PAGE-{index:02}',
+                type_support='panneau', date_debut=datetime.date(2026, 11, 1),
+                date_fin=datetime.date(2026, 11, 30),
+            )
+            for index in range(21)
+        ])
+        staff = get_user_model().objects.create_user(username='pagination-staff', role='staff')
+        self.client.force_login(staff)
+        url = reverse('campagne_list')
+        filters = {'categorie': 'Panneau', 'sort': 'nom', 'q': 'Campagne'}
+
+        first_page = self.client.get(url, filters)
+        second_page = self.client.get(url, {**filters, 'page': 2})
+
+        self.assertEqual(first_page.context['paginator'].count, 21)
+        self.assertEqual(len(first_page.context['campagnes']), 20)
+        self.assertContains(first_page, 'categorie=Panneau&amp;sort=nom&amp;q=Campagne&amp;page=2')
+        self.assertEqual([campaign.nom for campaign in second_page.context['campagnes']], ['Campagne 20'])
+
+
 class CampaignArchiveActionsTests(TestCase):
     def setUp(self):
         self.client_obj = Client.objects.create(

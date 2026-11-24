@@ -89,8 +89,8 @@ TYPE_DOCUMENT_CONTRAT_CHOICES = [
 ]
 
 def get_type_support_choices():
-    choix = [('ecran', 'Écran')]
-    valeurs = {'ecran'}
+    choix = [('panneau', 'Panneau'), ('ecran', 'Écran'), ('marche', 'Marché')]
+    valeurs = {'panneau', 'ecran', 'marche'}
     categories = sorted({
         normaliser_categorie_format(categorie)
         for categorie in FormatSupport.hors_ecran().values_list('categorie', flat=True)
@@ -532,6 +532,7 @@ class Reservation(models.Model):
     prix_impression = models.DecimalField(max_digits=14, decimal_places=2, default=0, blank=True)
     frais_faces_par_format = models.JSONField(default=dict, blank=True)
     panneaux_confreres_reserves = models.JSONField(default=list, blank=True)
+    tarif_faces_par_periode = models.BooleanField(default=False)
 
     def frais_pour_format(self, code):
         return frais_unitaires_format(
@@ -592,20 +593,23 @@ class Reservation(models.Model):
         jours = self.duree_jours()
         return math.ceil(jours / 30) if jours else 0
 
+    def multiplicateur_tarif_faces(self):
+        return 1 if self.tarif_faces_par_periode else self.nombre_mois_factures()
+
     def montant_total(self):
-        mois = self.nombre_mois_factures()
+        multiplicateur = self.multiplicateur_tarif_faces()
         total = Decimal('0.00')
         for ligne in self.lignes.select_related('support'):
             code = ligne.support.format
             tarif = self.prix_faces_par_format.get(code)
-            total += sum(self.frais_pour_format(code)) + Decimal(str(tarif or 0)) * mois
+            total += sum(self.frais_pour_format(code)) + Decimal(str(tarif or 0)) * multiplicateur
         for ligne in self.panneaux_confreres_reserves:
             code = f"confrere:{ligne['format']}"
             tarif = self.prix_faces_par_format.get(code)
             frais = frais_unitaires_format(
                 self.frais_faces_par_format, code, self.prix_affichage, self.prix_impression,
             )
-            total += (sum(frais) + Decimal(str(tarif or 0)) * mois) * ligne['nombre_faces']
+            total += (sum(frais) + Decimal(str(tarif or 0)) * multiplicateur) * ligne['nombre_faces']
         return total.quantize(Decimal('0.01'))
 
     def is_active(self) -> bool:
@@ -664,7 +668,7 @@ class ReservationLigne(models.Model):
         if tarif is None and not frais:
             return None
         return (
-            (tarif or 0) * self.reservation.nombre_mois_factures() + frais
+            (tarif or 0) * self.reservation.multiplicateur_tarif_faces() + frais
         ).quantize(Decimal('0.01'))
 
     def clean(self):
@@ -862,6 +866,7 @@ class DemandeReservation(models.Model):
         verbose_name="Remises mensuelles par face et par format",
     )
     panneau_confrere = models.JSONField(default=dict, blank=True)
+    tarif_faces_par_periode = models.BooleanField(default=False)
     prix_affichage = models.DecimalField(max_digits=14, decimal_places=2, default=0, blank=True)
     prix_impression = models.DecimalField(max_digits=14, decimal_places=2, default=0, blank=True)
     frais_faces_par_format = models.JSONField(default=dict, blank=True)
@@ -941,6 +946,7 @@ class DemandeReservation(models.Model):
         verbose_name="Fin du blocage temporaire",
         help_text="Date jusqu'à laquelle les faces restent bloquées avant relance/validation.",
     )
+    expiration_blocage = models.DateTimeField(null=True, blank=True)
 
     # ── Traitement staff ──────────────────────────────────────────────────────
     statut = models.CharField(
@@ -1032,17 +1038,6 @@ class DemandeReservation(models.Model):
     def save(self, *args, **kwargs):
         if not self.reference:
             self.reference = f"DEM-{timezone.now().year}-{str(uuid.uuid4())[:6].upper()}"
-
-        if (
-            (self.pk is None or (not self.date_debut_blocage and not self.date_fin_blocage))
-            and self.date_debut_souhaitee
-            and self.date_fin_souhaitee
-        ):
-            self.date_debut_blocage = self.date_debut_souhaitee
-            self.date_fin_blocage = max(
-                self.date_fin_souhaitee,
-                self.date_debut_souhaitee + datetime.timedelta(days=7),
-            )
 
         # ── NOUVEAU : rapprochement automatique du Client existant ──────────
         # Si le visiteur se déclare "client existant" avec une référence, et
@@ -1220,35 +1215,57 @@ class DemandeReservation(models.Model):
             'notes_staff', 'updated_at',
         ])
 
-    def set_hold(self, jours=7):
-        """Bloque temporairement les faces sélectionnées pour la période demandée."""
-        if not self.date_debut_souhaitee or not self.date_fin_souhaitee:
-            return self.date_debut_blocage
-
-        start = self.date_debut_souhaitee
-        end = self.date_fin_souhaitee
-        self.date_debut_blocage = start
-        self.date_fin_blocage = max(
-            end,
-            start + datetime.timedelta(days=max(3, min(int(jours), 7))),
+    @classmethod
+    def blocages_sur_periode(cls, debut, fin):
+        maintenant = timezone.now()
+        aujourd_hui = timezone.localdate(maintenant)
+        return cls.objects.filter(
+            Q(expiration_blocage__gt=maintenant)
+            | Q(expiration_blocage__isnull=True, date_fin_blocage__gt=aujourd_hui),
+            statut__in=[cls.STATUT_BROUILLON, cls.STATUT_NOUVELLE, cls.STATUT_EN_COURS],
+            date_debut_blocage__lte=aujourd_hui,
+            date_debut_souhaitee__lte=fin,
+            date_fin_souhaitee__gte=debut,
         )
-        return self.date_fin_blocage
 
-    def prolonger_blocage(self, jours=3):
-        """Prolonge le blocage actuel pour poursuivre les échanges client."""
-        if not self.date_debut_blocage:
-            self.date_debut_blocage = timezone.localdate()
-        if not self.date_fin_blocage:
-            self.date_fin_blocage = self.date_debut_blocage
-        self.date_fin_blocage = self.date_fin_blocage + datetime.timedelta(days=max(1, int(jours)))
+    def prolonger_blocage(self, jours):
+        """Ajoute des jours au blocage actif ou démarre un nouveau blocage."""
+        maintenant = timezone.now()
+        aujourd_hui = timezone.localdate(maintenant)
+        expiration = self.echeance_blocage
+        if not expiration or expiration <= maintenant or not self.date_debut_blocage or self.date_debut_blocage > aujourd_hui:
+            self.date_debut_blocage = aujourd_hui
+            expiration = maintenant
+        self.expiration_blocage = expiration + datetime.timedelta(days=max(1, int(jours)))
+        self.date_fin_blocage = timezone.localdate(self.expiration_blocage)
         return self.date_fin_blocage
 
     def is_hold_active_on(self, target_date=None):
         """Vrai si les faces de cette demande sont encore bloquées à la date donnée."""
         if not self.date_debut_blocage or not self.date_fin_blocage:
             return False
-        target_date = target_date or timezone.localdate()
-        return self.date_debut_blocage <= target_date <= self.date_fin_blocage
+        if target_date is None:
+            maintenant = timezone.now()
+            return self.date_debut_blocage <= timezone.localdate(maintenant) and self.echeance_blocage > maintenant
+        if self.expiration_blocage:
+            fin = timezone.localtime(self.expiration_blocage)
+            if fin.time() != datetime.time.min:
+                return self.date_debut_blocage <= target_date <= fin.date()
+        return self.date_debut_blocage <= target_date < self.date_fin_blocage
+
+    @property
+    def echeance_blocage(self):
+        if self.expiration_blocage:
+            return self.expiration_blocage
+        if self.date_fin_blocage:
+            return timezone.make_aware(datetime.datetime.combine(self.date_fin_blocage, datetime.time.min))
+        return None
+
+    @property
+    def jours_blocage_restants(self):
+        if not self.is_hold_active_on():
+            return 0
+        return math.ceil(max(0, (self.echeance_blocage - timezone.now()).total_seconds()) / 86400)
 
     def get_resume_emplacements(self) -> str:
         """
@@ -1279,6 +1296,7 @@ class Campagne(models.Model):
     """Campagne publicitaire globale."""
 
     panneaux_confreres = models.JSONField(default=list, blank=True)
+    tarif_faces_par_periode = models.BooleanField(default=False)
     STATUT_BROUILLON = STATUT_BROUILLON
     STATUT_A_VENIR   = STATUT_A_VENIR
     STATUT_EN_COURS  = STATUT_EN_COURS
@@ -1415,12 +1433,15 @@ class Campagne(models.Model):
         jours = (self.date_fin - self.date_debut).days + 1
         return math.ceil(jours / 30)
 
+    def multiplicateur_tarif_faces(self):
+        return 1 if self.tarif_faces_par_periode else self.nombre_mois_factures()
+
     def montant_total(self):
         """Montant total de la campagne.
 
         Pour une campagne mère, on somme les montants des sous-campagnes.
-        Le tarif des faces et emplacements est mensuel; celui des spots écran
-        s'applique à chaque spot diffusé sur toute la période.
+        Le tarif des faces suit le mode de facturation de la campagne.
+        Le tarif des spots écran s'applique à chaque spot diffusé.
         """
         if self.est_mere:
             total = Decimal('0.00')
@@ -1428,15 +1449,24 @@ class Campagne(models.Model):
                 total += enfant.montant_total() or Decimal('0.00')
             return total
 
+        multiplicateur = self.multiplicateur_tarif_faces()
+        total_confreres = sum(
+            (
+                Decimal(str(self.prix_faces_par_format.get(f"confrere:{ligne['format']}", 0) or 0))
+                * ligne['nombre_faces'] * multiplicateur
+                for ligne in self.panneaux_confreres
+            ),
+            Decimal('0.00'),
+        )
         if self.type_support == 'ecran':
             prix = self.prix or Decimal('0.00')
             spots = self.calculer_nombre_spots()
-            return (prix * Decimal(str(spots))).quantize(Decimal('0.01'))
+            return (prix * Decimal(str(spots)) + total_confreres).quantize(Decimal('0.01'))
 
         if self.type_support == 'marche':
             prix = self.prix or Decimal('0.00')
-            emplacements = self.nombre_emplacements() * self.nombre_mois_factures()
-            return (prix * Decimal(emplacements)).quantize(Decimal('0.01'))
+            emplacements = self.nombre_emplacements() * multiplicateur
+            return (prix * Decimal(emplacements) + total_confreres).quantize(Decimal('0.01'))
 
         if self.prix_faces_par_format:
             total = sum(
@@ -1453,11 +1483,11 @@ class Campagne(models.Model):
                 ),
                 Decimal('0.00'),
             )
-            return (total * self.nombre_mois_factures()).quantize(Decimal('0.01'))
+            return (total * multiplicateur + total_confreres).quantize(Decimal('0.01'))
 
         prix = self.prix or Decimal('0.00')
-        faces = self.nombre_faces() * self.nombre_mois_factures()
-        return (prix * Decimal(faces)).quantize(Decimal('0.01'))
+        faces = self.nombre_faces() * multiplicateur
+        return (prix * Decimal(faces) + total_confreres).quantize(Decimal('0.01'))
     
     def frais_pour_format(self, code):
         return frais_unitaires_format(

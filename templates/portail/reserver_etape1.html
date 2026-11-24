@@ -1324,6 +1324,9 @@
   .nd-rrow b small { font-weight: 600; color: var(--muted); }
   .nd-rval { color: var(--ink-2); line-height: 1.55; overflow-wrap: anywhere; }
   .nd-rval strong { color: var(--ink); font-weight: 800; }
+  .nd-rval .nd-recap-total { color: var(--brand); font-size: 1.05rem; }
+  .nd-recap-tarif-total { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 12px; margin-top: .4rem; }
+  .nd-recap-tarif-total[hidden] { display: none; }
   .nd-rval.is-empty { color: var(--muted); }
   .nd-rval i { color: var(--muted); width: 18px; text-align: center; margin-right: 4px; }
   .nd-acc .cf-block-n { display: none; }
@@ -1844,7 +1847,7 @@
                   <tr>
                     <th>Support</th>
                     <th class="num">Nb faces</th>
-                    <th>Tarif unitaire / face / mois</th>
+                    <th>Tarif unitaire / face</th>
                     <th>Affichage<br><small>FCFA / face</small></th>
                     <th>Impression<br><small>FCFA / face</small></th>
                     <th>Remise</th>
@@ -1857,7 +1860,7 @@
             <p class="nd-tarif-note mb-0">L’affichage et l’impression sont facturés une seule fois par face.</p>
             <div class="nd-tarif-total"><span>Montant total estimatif</span><span class="v" id="tarifs-total-value">0 FCFA</span></div>
             <div id="tarifs-estimation" class="nd-tarif-note"></div>
-            <div class="nd-tarif-note">Le tarif et la remise s’appliquent par face et par mois facturé. Chaque période de 30 jours commencée est facturée.</div>
+            <div class="nd-tarif-note">Le tarif et la remise s’appliquent à chaque face pour toute la période choisie.</div>
           </div>
           <div class="nd-tarif-empty"><i class="bi bi-info-circle me-1"></i>Sélectionnez des emplacements et des dates pour renseigner les tarifs.</div>
         </div>
@@ -1880,7 +1883,16 @@
         <div class="nd-recap-head"><i class="bi bi-clipboard"></i><h2>Récapitulatif de la demande</h2></div>
         <div class="nd-rrow"><i class="bi bi-person"></i><div><b>Client &amp; agence</b><div class="nd-rval" id="rc-compte">Non renseigné</div></div></div>
         <div class="nd-rrow"><i class="bi bi-megaphone"></i><div><b>Campagne</b><div class="nd-rval" id="rc-campagne">Non renseignée</div></div></div>
-        <div class="nd-rrow"><i class="bi bi-coin"></i><div><b>Tarifs nets <small>(par face et par mois)</small></b><div class="nd-rval is-empty" id="rc-tarif">Non renseignés</div></div></div>
+        <div class="nd-rrow">
+          <i class="bi bi-coin" aria-hidden="true"></i>
+          <div>
+            <b>Tarification</b>
+            <div class="nd-rval is-empty" id="rc-tarif">Tarifs par face non renseignés</div>
+            <div class="nd-rval nd-recap-tarif-total" aria-live="polite" hidden>
+              <span>Total estimatif</span><strong class="nd-recap-total" id="rc-tarif-total">0 FCFA</strong>
+            </div>
+          </div>
+        </div>
 
         <div class="panier-section">
           <div class="panier-header">
@@ -2082,7 +2094,7 @@
 
       {% if staff_mode %}
       <div id="tarification-faces" style="display:none;margin-top:14px;padding:12px;border:1px solid var(--line);border-radius:var(--radius)">
-        <strong style="font-size:.84rem">Tarif unitaire par face et par mois (facultatif)</strong>
+        <strong style="font-size:.84rem">Tarif unitaire par face (facultatif)</strong>
         <div class="small text-muted mb-2">Un tarif est appliqué à toutes les faces du même format. Facturation par périodes de 30 jours commencées.</div>
         <div id="tarifs-formats-champs"></div>
         <div id="tarifs-estimation" class="small fw-semibold mt-2"></div>
@@ -2465,9 +2477,44 @@
     ) || {};
     const fraisDefaut = JSON.parse(document.getElementById('frais-defaut')?.textContent || '{}');
     const fraisSaisis = JSON.parse(document.getElementById('frais-par-format')?.textContent || '{}');
-    const fmtFcfa = n => new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 2 }).format(n);
+    const formatMontant = new Intl.NumberFormat('fr-FR', { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+    const fmtFcfa = n => formatMontant.format(n);
     const toNum = v => { const n = Number(String(v == null ? '' : v).trim().replace(',', '.')); return Number.isFinite(n) ? n : 0; };
     const escHtml = s => { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; };
+
+    function saisieMontant(input, valeur, onChange, maximum = () => 999999999999.99) {
+      const normaliser = value => String(value ?? '').replace(/\s/g, '').replace(',', '.');
+      const afficher = (raw, final) => {
+        const [entier, decimal] = raw.split('.');
+        const partieEntiere = entier.replace(/\B(?=(\d{3})+(?!\d))/g, '\u202f');
+        const fraction = final ? decimal?.replace(/0+$/, '') : decimal;
+        return partieEntiere + (fraction || (!final && decimal !== undefined) ? ',' + fraction : '');
+      };
+      input.type = 'text';
+      input.inputMode = 'decimal';
+      input.setAttribute('form', 'form-etape1');
+      input.value = afficher(normaliser(valeur), true);
+
+      function synchroniser(final = false) {
+        const position = normaliser(input.value.slice(0, input.selectionStart ?? input.value.length)).length;
+        const raw = normaliser(input.value);
+        const valide = /^\d*(?:\.\d{0,2})?$/.test(raw) && raw !== '.' && Number(raw) <= maximum();
+        input.setCustomValidity(valide ? '' : 'Saisissez un montant positif valide, avec deux décimales au maximum.');
+        if (!valide) return;
+
+        input.value = afficher(raw, final);
+        if (!final) {
+          let caret = 0;
+          while (caret < input.value.length && normaliser(input.value.slice(0, caret)).length < position) caret += 1;
+          input.setSelectionRange(caret, caret);
+        }
+        const valeurBrute = raw ? String(Number(raw)) : '';
+        onChange(valeurBrute);
+      }
+      input.addEventListener('input', () => synchroniser());
+      input.addEventListener('blur', () => synchroniser(true));
+      return synchroniser;
+    }
 
     function syncTarifsHidden() {
       const hidden = document.getElementById('tarifs-faces-input');
@@ -2494,9 +2541,10 @@
       });
       panneauxConfreres.forEach(item => {
         const cle = `confrere:${item.format}`;
-        const current = formats.get(cle) || { code: cle, label: item.format, confreres: new Set(), count: 0 };
+        const current = formats.get(cle) || { code: cle, label: item.format, confreres: new Set(), nomsConfreres: new Set(), count: 0 };
         current.count += Number(item.nombre_faces);
         current.confreres.add(`${item.nom} · ${item.ville}`);
+        current.nomsConfreres.add(item.nom);
         formats.set(cle, current);
       });
       return formats;
@@ -2515,13 +2563,9 @@
       formats.forEach((format, cle) => {
         const code = format.code;
         const input = document.createElement('input');
-        input.type = 'number';
-        input.min = '0';
-        input.step = '1';
-        input.setAttribute('aria-label', `Tarif mensuel ${format.label}`);
-        input.value = tarifsSaisis[code] || '';
-        input.addEventListener('input', () => {
-          tarifsSaisis[code] = input.value;
+        input.setAttribute('aria-label', `Tarif par face ${format.label}`);
+        saisieMontant(input, tarifsSaisis[code], valeur => {
+          tarifsSaisis[code] = valeur;
           syncTarifsHidden();
           updateTarifsEstimation();
         });
@@ -2541,29 +2585,21 @@
         input.className = 'nd-in';
         input.placeholder = '0';
         const remise = document.createElement('input');
-        remise.type = 'number';
-        remise.min = '0';
-        remise.step = '0.01';
         remise.className = 'nd-in nd-in-sm';
         remise.placeholder = '0';
         remise.setAttribute('aria-label', `Remise ${format.label}`);
-        remise.value = remisesSaisies[code]?.valeur || '';
-        remise.setAttribute('form', 'form-etape1');
 
         const uniteRemise = document.createElement('select');
         uniteRemise.className = 'nd-in';
         uniteRemise.setAttribute('aria-label', `Unité de remise ${format.label}`);
         uniteRemise.append(new Option('%', 'pourcentage'), new Option('FCFA', 'fcfa'));
         uniteRemise.value = remisesSaisies[code]?.unite || 'pourcentage';
-        function syncRemise() {
-          remise.max = uniteRemise.value === 'pourcentage' ? '100' : '999999999999.99';
-          remisesSaisies[code] = { valeur: remise.value, unite: uniteRemise.value };
+        const syncRemise = saisieMontant(remise, remisesSaisies[code]?.valeur, valeur => {
+          remisesSaisies[code] = { valeur, unite: uniteRemise.value };
           syncTarifsHidden();
           updateTarifsEstimation();
-        }
-        remise.max = uniteRemise.value === 'pourcentage' ? '100' : '999999999999.99';
-        remise.addEventListener('input', syncRemise);
-        uniteRemise.addEventListener('change', syncRemise);
+        }, () => uniteRemise.value === 'pourcentage' ? 100 : 999999999999.99);
+        uniteRemise.addEventListener('change', () => syncRemise(true));
 
         const tr = document.createElement('tr');
         tr.dataset.tarifKey = cle;
@@ -2595,17 +2631,11 @@
           const cellule = document.createElement('td');
           const frais = document.createElement('input');
           const champ = `prix_${type}`;
-          frais.type = 'number';
-          frais.min = '0';
-          frais.max = '999999999999.99';
-          frais.step = '0.01';
           frais.className = 'nd-in nd-in-sm';
           frais.placeholder = '0';
           frais.setAttribute('aria-label', `${type} par face pour ${format.label}`);
-          frais.setAttribute('form', 'form-etape1');
-          frais.value = fraisSaisis[cle]?.[champ] ?? fraisDefaut[champ] ?? '';
-          frais.addEventListener('input', () => {
-            fraisSaisis[cle] = { ...fraisDefaut, ...fraisSaisis[cle], [champ]: frais.value || '0' };
+          saisieMontant(frais, fraisSaisis[cle]?.[champ] ?? fraisDefaut[champ], valeur => {
+            fraisSaisis[cle] = { ...fraisDefaut, ...fraisSaisis[cle], [champ]: valeur || '0' };
             syncTarifsHidden();
             updateTarifsEstimation();
           });
@@ -2631,11 +2661,11 @@
       const target = document.getElementById('tarifs-estimation');
       const totalEl = document.getElementById('tarifs-total-value');
       const recap = document.getElementById('rc-tarif');
+      const recapTotal = document.getElementById('rc-tarif-total');
       if (!target) return;
       const start = elDateDebut ? elDateDebut.value : '';
       const end = elDateFin ? elDateFin.value : '';
       const days = start && end && start <= end ? diffDaysInclusive(start, end) : 0;
-      const months = days ? Math.ceil(days / 30) : 0;
 
       const formats = formatsTarification();
       const lignesMontant = new Map([...document.querySelectorAll('#tarifs-formats-champs tr[data-tarif-key]')]
@@ -2652,28 +2682,35 @@
         const prixNet = Math.round(Math.max(0, prix - reduction) * 100) / 100;
         const frais = { ...fraisDefaut, ...fraisSaisis[cle] };
         const fraisParFace = Math.max(0, toNum(frais.prix_affichage)) + Math.max(0, toNum(frais.prix_impression));
-        const montant = (prixNet * months + fraisParFace) * format.count;
+        const montant = (prixNet + fraisParFace) * format.count;
         total += montant;
         if (recap && tarifsSaisis[code] !== undefined && tarifsSaisis[code] !== '') {
           const ligne = document.createElement('div');
-          ligne.textContent = `${format.label} — ${prixNet.toLocaleString('fr-FR')} FCFA`;
+          const source = format.nomsConfreres ? [...format.nomsConfreres].join(', ') : 'Parc Integral';
+          ligne.textContent = `${format.label} · ${source} — ${fmtFcfa(prixNet)} FCFA / face`;
           lignesTarif.push(ligne);
         }
         const row = lignesMontant.get(cle);
         if (row) row.textContent = `${fmtFcfa(montant)} FCFA`;
       });
 
-      if (!months) {
-        target.textContent = 'Saisissez une période pour calculer le total estimé.';
+      if (!days) {
+        target.textContent = 'Saisissez les dates de diffusion.';
       } else if (totalEl) {
-        target.textContent = `Durée facturée : ${months} mois`;
+        target.textContent = `Durée de diffusion : ${days} jour${days === 1 ? '' : 's'}`;
       } else {
-        target.textContent = `Durée facturée : ${months} mois — Total des tarifs saisis : ${fmtFcfa(total)} FCFA`;
+        target.textContent = `Total des tarifs saisis : ${fmtFcfa(total)} FCFA`;
       }
-      if (totalEl) totalEl.textContent = `${fmtFcfa(total)} FCFA`;
+      const montantFormate = fmtFcfa(total);
+      const totalAffiche = `${montantFormate} FCFA`;
+      if (totalEl) totalEl.textContent = totalAffiche;
+      if (recapTotal) {
+        recapTotal.parentElement.hidden = montantFormate === fmtFcfa(0);
+        if (recapTotal.textContent !== totalAffiche) recapTotal.textContent = totalAffiche;
+      }
 
       if (recap) {
-        recap.replaceChildren(...(lignesTarif.length ? lignesTarif : ['Non renseignés']));
+        recap.replaceChildren(...(lignesTarif.length ? lignesTarif : ['Tarifs par face non renseignés']));
         recap.classList.toggle('is-empty', lignesTarif.length === 0);
       }
     }

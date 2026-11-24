@@ -239,12 +239,11 @@ class DashboardParcGroupingTests(TestCase):
         request.user = AnonymousUser()
         return request
 
-    def test_campaign_form_accepts_support_category_without_specific_format(self):
+    def test_campaign_form_offers_only_panel_and_screen_types(self):
         form = CampagneForm()
 
-        self.assertEqual(form.fields['type_support'].clean('Géant'), 'Géant')
-        self.assertEqual(form.fields['type_support'].clean('Marché'), 'Marché')
-        self.assertEqual(form.fields['type_support'].clean('ecran'), 'ecran')
+        self.assertEqual(list(form.fields['type_support'].choices)[1:], [('panneau', 'Panneau'), ('ecran', 'Écran')])
+        self.assertNotIn('lieu', form.fields)
 
     def test_campaign_form_normalizes_format_category_before_choice_validation(self):
         FormatSupport.objects.create(
@@ -255,15 +254,14 @@ class DashboardParcGroupingTests(TestCase):
 
         form = CampagneForm(data={'type_support': 'Ge\u0301ant '})
 
-        self.assertEqual(form.data.get('type_support'), 'Géant')
-        self.assertIn(('Géant', 'Géant'), form.fields['type_support'].choices)
+        self.assertEqual(form.data.get('type_support'), 'panneau')
         self.assertIn(('Géant', 'Géant'), Campagne.get_type_support_choices())
         self.assertEqual(
             Campagne._meta.get_field('type_support').clean('Géant', None),
             'Géant',
         )
         self.assertNotIn('type_support', form.errors)
-        self.assertEqual(form.cleaned_data['type_support'], 'Géant')
+        self.assertEqual(form.cleaned_data['type_support'], 'panneau')
 
     def create_support(self, code, format_code, ville='Ouagadougou'):
         return Support.objects.create(

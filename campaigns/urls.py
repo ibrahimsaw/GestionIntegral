@@ -51,6 +51,7 @@ urlpatterns = [
     path('campaigns/', views.CampagneListView.as_view(), name='campagne_list'),
     path('campaigns/creer/', views.CampagneCreateUpdateView.as_view(), name='campagne_create'),
     path('campaigns/<int:pk>/', views.CampagneDetailView.as_view(), name='campagne_detail'),
+    path('campaigns/<int:pk>/reconduire/', views.CampagneReconduireView.as_view(), name='campagne_reconduire'),
     path('campaigns/<int:pk>/state/', views.CampagneStateChangeView.as_view(), name='campagne_state_change'),
     path('campaigns/<int:pk>/archive/', views.CampagneArchiveToggleView.as_view(), name='campagne_archive_toggle'),
     path('campaigns/<int:pk>/modifier/', views.CampagneCreateUpdateView.as_view(), name='campagne_edit'),

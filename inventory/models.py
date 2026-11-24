@@ -1059,17 +1059,7 @@ class FacePanneau(models.Model):
         if hasattr(date_fin, 'date'):
             date_fin = date_fin.date()
 
-        qs = DemandeReservation.objects.filter(
-            statut__in=[
-                DemandeReservation.STATUT_BROUILLON,
-                DemandeReservation.STATUT_NOUVELLE,
-                DemandeReservation.STATUT_EN_COURS,
-            ],
-            faces_souhaitees=self,
-        ).filter(
-            Q(date_debut_blocage__lte=date_fin, date_fin_blocage__gte=date_debut)
-            | Q(date_debut_souhaitee__lte=date_fin, date_fin_souhaitee__gte=date_debut)
-        )
+        qs = DemandeReservation.blocages_sur_periode(date_debut, date_fin).filter(faces_souhaitees=self)
         if exclude_demande_id is not None:
             qs = qs.exclude(pk=exclude_demande_id)
         blocage_actif = qs.exists()
@@ -1108,17 +1098,7 @@ class FacePanneau(models.Model):
         if hasattr(date_fin, 'date'):
             date_fin = date_fin.date()
  
-        qs = DemandeReservation.objects.filter(
-            statut__in=[
-                DemandeReservation.STATUT_BROUILLON,
-                DemandeReservation.STATUT_NOUVELLE,
-                DemandeReservation.STATUT_EN_COURS,
-            ],
-            faces_souhaitees=self,
-        ).filter(
-            Q(date_debut_blocage__lte=date_fin, date_fin_blocage__gte=date_debut)
-            | Q(date_debut_souhaitee__lte=date_fin, date_fin_souhaitee__gte=date_debut)
-        )
+        qs = DemandeReservation.blocages_sur_periode(date_debut, date_fin).filter(faces_souhaitees=self)
         if exclude_demande_id is not None:
             qs = qs.exclude(pk=exclude_demande_id)
         blocage_actif = qs.exists()

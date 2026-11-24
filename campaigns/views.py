@@ -6,6 +6,7 @@ from datetime import date, datetime, time, timedelta
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
 from django.http import Http404, JsonResponse
+from django.utils.functional import cached_property
 from django.db.models import Q, Count, Sum, DecimalField, Value, Max
 from django.db.models.deletion import ProtectedError
 from django.db.models.functions import Coalesce
@@ -3793,7 +3794,7 @@ def _apply_selected_campaign_action(
     return redirect(redirect_url)
 
 
-class CampagneListView(ClientStaffRequiredMixin, ClientSidePaginationMixin, SortableListMixin, ListView):
+class CampagneListView(ClientStaffRequiredMixin, SortableListMixin, ListView):
     model = Campagne
     template_name = 'campaigns/campagne_list.html'
     context_object_name = 'campagnes'
@@ -3814,13 +3815,15 @@ class CampagneListView(ClientStaffRequiredMixin, ClientSidePaginationMixin, Sort
 
     @staticmethod
     def _category_for_campaign(
-        campagne,
+        type_support,
+        est_mere,
         formats_par_code,
         categories_existantes,
     ):
-        if campagne.est_mere:
+        if est_mere:
             return 'Campagnes mères'
-        type_support = normaliser_categorie_format(campagne.type_support)
+        code = type_support
+        type_support = normaliser_categorie_format(code)
         if type_support.casefold() in ('ecran', 'écran'):
             return 'Écran'
         if type_support.casefold() in ('marche', 'marché'):
@@ -3828,14 +3831,14 @@ class CampagneListView(ClientStaffRequiredMixin, ClientSidePaginationMixin, Sort
         if type_support.casefold() == 'panneau':
             return 'Panneau'
         categorie = normaliser_categorie_format(
-            formats_par_code.get(campagne.type_support)
+            formats_par_code.get(code)
         )
         if categorie:
             return categorie
         return categories_existantes.get(type_support.casefold())
 
     def get_queryset(self):
-        qs = super().get_queryset().select_related('client', 'agence')
+        qs = super().get_queryset().select_related('client', 'agence', 'campagne_parente')
 
         if self.request.user.is_client:
             qs = qs.filter(client=self.request.user.client_profile)
@@ -3878,10 +3881,14 @@ class CampagneListView(ClientStaffRequiredMixin, ClientSidePaginationMixin, Sort
                 category_filter |= Q(type_support__in=category_codes)
             qs = qs.filter(category_filter)
 
-        qs = qs.annotate(nb_supports_annotate=Count('lignes__support', distinct=True))
+        qs = qs.annotate(
+            nb_supports_annotate=Count('lignes__support', distinct=True),
+            nombre_lignes=Count('lignes', distinct=True),
+            nombre_sous_campagnes=Count('sous_campagnes', distinct=True),
+        )
         qs = self.apply_sort(qs)
 
-        return qs
+        return qs.order_by(*qs.query.order_by, 'pk')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)  # ne touche plus à context['campagnes']
@@ -3910,12 +3917,14 @@ class CampagneListView(ClientStaffRequiredMixin, ClientSidePaginationMixin, Sort
                 category_filter |= Q(type_support__in=category_codes)
             base_qs = base_qs.filter(category_filter)
 
-        context['kpi_total'] = base_qs.count()
-        context['kpi_en_cours'] = base_qs.filter(statut='en_cours').count()
-        context['kpi_en_pause'] = base_qs.filter(statut='en_pause').count()
-        context['kpi_a_venir'] = base_qs.filter(statut='a_venir').count()
-        context['kpi_terminee'] = base_qs.filter(statut='terminee').count()
-        context['kpi_brouillon'] = base_qs.filter(statut='brouillon').count()
+        context.update(base_qs.aggregate(
+            kpi_total=Count('pk'),
+            kpi_en_cours=Count('pk', filter=Q(statut='en_cours')),
+            kpi_en_pause=Count('pk', filter=Q(statut='en_pause')),
+            kpi_a_venir=Count('pk', filter=Q(statut='a_venir')),
+            kpi_terminee=Count('pk', filter=Q(statut='terminee')),
+            kpi_brouillon=Count('pk', filter=Q(statut='brouillon')),
+        ))
 
         context['q']                    = self.request.GET.get('q', '')
         context['statut']               = self.request.GET.get('statut', '')
@@ -3924,12 +3933,13 @@ class CampagneListView(ClientStaffRequiredMixin, ClientSidePaginationMixin, Sort
         context['type_support_choices'] = get_type_support_choices()
         context['actif']                = self.request.GET.get('actif', '')
 
+        types_campagnes = self.category_options_queryset.order_by().values_list(
+            'type_support', 'est_mere',
+        ).distinct()
         formats_par_code = dict(
             FormatSupport.objects.filter(
                 code__in={
-                    campagne.type_support
-                    for campagne in self.category_options_queryset
-                    if campagne.type_support
+                    type_support for type_support, _ in types_campagnes if type_support
                 }
             ).values_list('code', 'categorie')
         )
@@ -3943,9 +3953,10 @@ class CampagneListView(ClientStaffRequiredMixin, ClientSidePaginationMixin, Sort
         }
         categories = {
             categorie
-            for campagne in self.category_options_queryset
+            for type_support, est_mere in types_campagnes
             if (categorie := self._category_for_campaign(
-                campagne,
+                type_support,
+                est_mere,
                 formats_par_code,
                 categories_existantes,
             ))
@@ -3954,13 +3965,12 @@ class CampagneListView(ClientStaffRequiredMixin, ClientSidePaginationMixin, Sort
         current_params.pop('page', None)
         current_params.pop('type_support', None)
         category_filters = []
-        all_count = self.category_base_queryset.count()
         all_params = current_params.copy()
         all_params.pop('categorie', None)
+        counts = {'total': Count('pk')}
         category_filters.append({
             'label': 'Toutes',
             'value': '',
-            'count': all_count,
             'url': f"{reverse('campagne_list')}?{all_params.urlencode()}" if all_params else reverse('campagne_list'),
         })
         for categorie in sorted(categories, key=str.casefold):
@@ -3971,12 +3981,16 @@ class CampagneListView(ClientStaffRequiredMixin, ClientSidePaginationMixin, Sort
                 if categorie == 'Campagnes mères'
                 else self._category_query(categorie, formats_par_code)
             )
+            counts[f'categorie_{len(category_filters)}'] = Count('pk', filter=category_query)
             category_filters.append({
                 'label': categorie,
                 'value': categorie,
-                'count': self.category_base_queryset.filter(category_query).count(),
                 'url': f"{reverse('campagne_list')}?{params.urlencode()}",
             })
+        category_counts = self.category_base_queryset.aggregate(**counts)
+        category_filters[0]['count'] = category_counts['total']
+        for index, category in enumerate(category_filters[1:], start=1):
+            category['count'] = category_counts[f'categorie_{index}']
         context['campaign_category_filters'] = category_filters
         context['categorie_active'] = categorie_active
 
@@ -4248,7 +4262,7 @@ def build_support_rows(campagne, lignes):
             grouped[support.pk]['lignes'].append(ligne)
 
     prix_u_defaut = campagne.prix or Decimal('0.00')
-    mois_factures = 1 if campagne.type_support == 'ecran' else campagne.nombre_mois_factures()
+    mois_factures = 1 if campagne.type_support == 'ecran' else campagne.multiplicateur_tarif_faces()
 
     rows = []
     totaux = {
@@ -4303,6 +4317,28 @@ def build_support_rows(campagne, lignes):
         totaux['affichage'] += aff_total
         totaux['impression'] += imp_total
         totaux['total'] += total_support
+
+    totaux['lignes_confreres'] = []
+    for ligne in campagne.panneaux_confreres:
+        cle = f"confrere:{ligne['format']}"
+        quantite = ligne['nombre_faces']
+        prix_unitaire = Decimal(str(campagne.prix_faces_par_format.get(cle) or 0))
+        prix = prix_unitaire * quantite * campagne.multiplicateur_tarif_faces()
+        affichage, impression = frais_unitaires_format(
+            campagne.frais_faces_par_format, cle, campagne.prix_affichage, campagne.prix_impression,
+        )
+        total = prix + (affichage + impression) * quantite
+        totaux['lignes_confreres'].append({
+            **ligne, 'prix_unitaire': prix_unitaire, 'prix_total': prix,
+            'affichage_unitaire': affichage, 'affichage_total': affichage * quantite,
+            'impression_unitaire': impression, 'impression_total': impression * quantite,
+            'total_support': total,
+        })
+        totaux['quantite'] += quantite
+        totaux['prix'] += prix
+        totaux['affichage'] += affichage * quantite
+        totaux['impression'] += impression * quantite
+        totaux['total'] += total
 
     return rows, totaux
 
@@ -4425,6 +4461,10 @@ class CampagneDetailView(ClientStaffRequiredMixin, DetailView):
                 ligne.spots_calcules = 0
 
         context['lignes'] = lignes
+        context['peut_reconduire'] = (
+            not campagne.est_mere and campagne.type_support != 'ecran'
+            and (any(ligne.face_id for ligne in lignes) or bool(campagne.panneaux_confreres))
+        )
         context['sous_campagnes'] = campagne.sous_campagnes.all()
         campagne_ids = [campagne.pk]
         if campagne.est_mere:
@@ -4502,13 +4542,10 @@ class CampagneDetailView(ClientStaffRequiredMixin, DetailView):
 
 
 
-def _importer_faces_reservation(campagne, reservation, formats_autorises):
+def _importer_faces_reservation(campagne, reservation):
     reservation_lignes = (
         reservation.lignes
-        .filter(
-            face__isnull=False,
-            face__support__format__in=formats_autorises,
-        )
+        .filter(face__isnull=False)
         .select_related('face__support')
     )
     face_ids_existants = set(
@@ -4530,10 +4567,8 @@ def _importer_faces_reservation(campagne, reservation, formats_autorises):
     return len(lignes_a_importer)
 
 
-def _importer_faces_demande(campagne, demande, formats_autorises):
-    faces = demande.faces_souhaitees.filter(
-        support__format__in=formats_autorises,
-    ).select_related('support')
+def _importer_faces_demande(campagne, demande):
+    faces = demande.faces_souhaitees.select_related('support')
     face_ids_existants = set(
         campagne.lignes.filter(face__isnull=False).values_list('face_id', flat=True)
     )
@@ -4602,6 +4637,47 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
             kwargs['demande'] = demande
         return kwargs
 
+    @cached_property
+    def tarification_demande(self):
+        demande = self.get_source_demande()
+        if not demande:
+            return {}
+        codes = set(demande.faces_souhaitees.values_list('support__format', flat=True))
+        formats = FormatSupport.objects.filter(code__in=codes).in_bulk(field_name='code')
+        libelles = {
+            (code, f'parc:{code}'): (formats[code].dimensions if code in formats else code) or 'Format non renseigné'
+            for code in sorted(codes)
+        }
+        for ligne in demande.panneaux_confreres:
+            cle = f"confrere:{ligne['format']}"
+            libelles[cle, cle] = f"{ligne['format']} · Réseau Confrère"
+
+        tarifs = demande.prix_nets_faces_par_format
+        lignes = []
+        for (code, cle), libelle in libelles.items():
+            tarif = tarifs.get(code)
+            affichage, impression = frais_unitaires_format(
+                demande.frais_faces_par_format, cle, demande.prix_affichage, demande.prix_impression,
+            )
+            lignes.append({
+                'format': libelle,
+                'prix': Decimal(str(tarif)) if tarif not in (None, '') else None,
+                'prix_affichage': affichage,
+                'prix_impression': impression,
+            })
+
+        valeurs = {'prix_affichage': demande.prix_affichage, 'prix_impression': demande.prix_impression}
+        if lignes:
+            for champ in ('prix', 'prix_affichage', 'prix_impression'):
+                valeurs_distinctes = {ligne[champ] for ligne in lignes}
+                valeurs[champ] = next(iter(valeurs_distinctes)) if len(valeurs_distinctes) == 1 else None
+            if len(lignes) > 1 and any(
+                len({ligne[champ] for ligne in lignes}) > 1
+                for champ in ('prix', 'prix_affichage', 'prix_impression')
+            ):
+                return {'initial': valeurs, 'lignes': lignes}
+        return {'initial': valeurs}
+
     def get_initial(self):
         initial = super().get_initial()
         demande = self.get_source_demande()
@@ -4626,11 +4702,9 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
                 'nom': demande.nom_campagne or f"Campagne {demande.reference}",
                 'date_debut': demande.date_debut_souhaitee,
                 'date_fin': demande.date_fin_souhaitee,
-                'lieu': self._demande_lieu(demande),
                 'reservation_reference': demande.reference,
-                'type_support': self._demande_categorie(demande),
-                'prix_affichage': demande.prix_affichage,
-                'prix_impression': demande.prix_impression,
+                'type_support': 'panneau',
+                **self.tarification_demande['initial'],
             })
         # Utilisation de .get() pour éviter les erreurs si la clé n'existe pas
         if client_id := self.request.GET.get('client'):
@@ -4661,36 +4735,6 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
                 initial[field] = value
         return initial
 
-    @staticmethod
-    def _demande_lieu(demande):
-        villes = list(
-            demande.faces_souhaitees
-            .exclude(support__ville='')
-            .values_list('support__ville', flat=True)
-            .distinct()
-        )
-        villes = set(villes) | {ligne['ville'] for ligne in demande.panneaux_confreres if ligne.get('ville')}
-        return next(iter(villes)) if len(villes) == 1 else ''
-
-    @staticmethod
-    def _demande_categorie(demande):
-        formats = FormatSupport.objects.in_bulk(field_name='code')
-        categories = {
-            normaliser_categorie_format(formats[face.support.format].categorie)
-            for face in demande.faces_souhaitees.select_related('support')
-            if face.support.format in formats
-            and formats[face.support.format].categorie
-        }
-        if not categories and demande.panneau_confrere:
-            supports = SupportConfrere.objects.filter(
-                pk__in=[ligne.get('support_id') for ligne in demande.panneaux_confreres],
-            ).select_related('format')
-            categories = {
-                normaliser_categorie_format(support.categorie_affichee)
-                for support in supports if support.categorie_affichee
-            }
-        return next(iter(categories)) if len(categories) == 1 else ''
-
     @transaction.atomic
     def form_valid(self, form):
         is_create = self.object is None
@@ -4704,20 +4748,31 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
                 form.add_error(None, 'Cette demande ne peut plus être utilisée pour créer la campagne.')
                 return self.form_invalid(form)
         lignes_confreres = demande.panneaux_confreres if demande else (
+            form.reservation_source.panneaux_confreres_reserves if form.reservation_source else
             self.object.panneaux_confreres if self.object else []
         )
-        if lignes_confreres:
-            try:
+        reservation_id = form.reservation_source.pk if form.reservation_source else (
+            demande.reservation_id if demande else None
+        )
+        if lignes_confreres and not reservation_id and self.object:
+            reservation_id = next(
+                (ligne['reservation_source_id'] for ligne in lignes_confreres if ligne.get('reservation_source_id')),
+                None,
+            ) or self.object.demandes_suivi.exclude(reservation_id=None).values_list('reservation_id', flat=True).first()
+        try:
+            if demande and form.demande_reference_selected and not demande.reservation_id:
+                faces = list(demande.faces_souhaitees.select_related('support'))
+                verifier_faces_parc_demande(demande, form.cleaned_data['date_debut'], form.cleaned_data['date_fin'], faces)
+            if lignes_confreres:
                 verifier_disponibilite_confreres(
                     lignes_confreres, form.cleaned_data['date_debut'], form.cleaned_data['date_fin'],
                     demande_id=demande.pk if demande else None,
-                    reservation_id=demande.reservation_id if demande else self.object.demandes_suivi
-                    .exclude(reservation_id=None).values_list('reservation_id', flat=True).first(),
+                    reservation_id=reservation_id,
                     campagne_id=self.object.pk if self.object else None,
                 )
-            except ValidationError as exc:
-                form.add_error(None, exc)
-                return self.form_invalid(form)
+        except ValidationError as exc:
+            form.add_error(None, exc)
+            return self.form_invalid(form)
         faces_auto_selectionnees = []
         previous_values = {}
         if not is_create:
@@ -4733,8 +4788,6 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
         if nombre_faces_temporaire:
             faces_auto_selectionnees = list(
                 form.faces_disponibles_pour_selection(
-                    form.cleaned_data['type_support'],
-                    form.cleaned_data['lieu'],
                     form.cleaned_data['date_debut'],
                     form.cleaned_data['date_fin'],
                 )
@@ -4752,6 +4805,10 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
             form.instance.created_by = self.request.user
 
         if demande:
+            valeurs_initiales = self.tarification_demande['initial']
+            for champ in ('prix_affichage', 'prix_impression'):
+                if valeurs_initiales[champ] is None and not self.request.POST.get(champ, '').strip():
+                    setattr(form.instance, champ, getattr(demande, champ))
             client = form.demande_client
             if client is None:
                 client = Client.objects.create(
@@ -4771,28 +4828,29 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
             self.object.prix_faces_par_format = demande.prix_nets_faces_par_format
             self.object.frais_faces_par_format = demande.frais_faces_par_format
             self.object.panneaux_confreres = demande.panneaux_confreres
-            self.object.save(update_fields=['prix_faces_par_format', 'frais_faces_par_format', 'panneaux_confreres'])
+            self.object.tarif_faces_par_periode = demande.tarif_faces_par_periode
+            self.object.save(update_fields=[
+                'prix_faces_par_format', 'frais_faces_par_format', 'panneaux_confreres', 'tarif_faces_par_periode',
+            ])
         elif form.reservation_source:
             self.object.prix_faces_par_format = (
                 form.reservation_source.prix_faces_par_format
             )
             self.object.frais_faces_par_format = form.reservation_source.frais_faces_par_format
-            self.object.save(update_fields=['prix_faces_par_format', 'frais_faces_par_format'])
+            self.object.tarif_faces_par_periode = form.reservation_source.tarif_faces_par_periode
+            self.object.panneaux_confreres = [
+                {**ligne, 'reservation_source_id': form.reservation_source.pk} for ligne in lignes_confreres
+            ]
+            self.object.save(update_fields=[
+                'prix_faces_par_format', 'frais_faces_par_format', 'tarif_faces_par_periode', 'panneaux_confreres',
+            ])
         transaction.on_commit(lambda: cache.delete('dashboard_alertes'))
 
         faces_importees = 0
         if form.demande_reference_selected and demande:
-            faces_importees = _importer_faces_demande(
-                self.object,
-                demande,
-                form.demande_formats,
-            )
+            faces_importees = _importer_faces_demande(self.object, demande)
         elif form.reservation_source:
-            faces_importees = _importer_faces_reservation(
-                self.object,
-                form.reservation_source,
-                form.reservation_formats,
-            )
+            faces_importees = _importer_faces_reservation(self.object, form.reservation_source)
         if faces_auto_selectionnees:
             LigneCampagne.objects.bulk_create([
                 LigneCampagne(
@@ -4917,7 +4975,7 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
         if faces_auto_selectionnees:
             msg_text += (
                 f" {len(faces_auto_selectionnees)} face(s) sélectionnée(s) automatiquement "
-                "selon la disponibilité, la catégorie, la ville et la période."
+                "selon la disponibilité sur la période."
             )
         if demande:
             msg_text += (
@@ -4942,25 +5000,12 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['demande_source'] = self.get_source_demande()
+        context['tarifs_demande_par_format'] = self.tarification_demande.get('lignes', [])
         # Utilisation d'une logique ternaire pour plus de clarté
         context['title'] = f"Modifier — {self.object.nom}" if self.object else "Nouvelle Campagne"
         if self.object:
             context['obj'] = self.object
 
-        # Regroupement des formats de panneaux par catégorie (Standard, Géant, Sucette, Marché...),
-        # pour le sélecteur en cascade Catégorie → Format dans campagne_form.html.
-        formats_par_categorie = {}
-        for f in formats_croissants(FormatSupport.hors_ecran()):
-            cat = normaliser_categorie_format(f.categorie) or 'Autre'
-            formats_par_categorie.setdefault(cat, []).append({
-                'code': f.code,
-                'label': f"{f.dimensions} ({f.superficie:g}m²)" if f.superficie else f.dimensions,
-            })
-        context['formats_par_categorie'] = formats_par_categorie
-        context['categories_format'] = sorted(
-            formats_par_categorie,
-            key=str.casefold,
-        )
         return context
     # def get(self, request, *args, **kwargs):
     #     self.object = self.get_object()
@@ -6629,23 +6674,12 @@ def api_check_dispo(request, client_pk):
                 token_partage=token, statut=DemandeReservation.STATUT_BROUILLON,
             ).values_list('pk', flat=True).first()
 
-    demandes_qs = DemandeReservation.objects.filter(
-            statut__in=[
-                DemandeReservation.STATUT_BROUILLON,
-                DemandeReservation.STATUT_NOUVELLE,
-                DemandeReservation.STATUT_EN_COURS,
-            ],
-        )
+    demandes_qs = DemandeReservation.blocages_sur_periode(date_debut.date(), date_fin.date())
     if edit_demande_id:
         demandes_qs = demandes_qs.exclude(pk=edit_demande_id)
 
     for demande in (
-        demandes_qs
-        .filter(
-            Q(date_debut_blocage__lte=date_fin.date(), date_fin_blocage__gte=date_debut.date())
-            | Q(date_debut_souhaitee__lte=date_fin.date(), date_fin_souhaitee__gte=date_debut.date())
-        )
-        .prefetch_related('faces_souhaitees')
+        demandes_qs.prefetch_related('faces_souhaitees')
     ):
         for face in demande.faces_souhaitees.all():
             faces_demandes.setdefault(face.pk, {
@@ -7233,6 +7267,60 @@ def contact_session_depuis_demande(demande):
     }
 
 
+class CampagneReconduireView(StaffDemandeWizardBase):
+    def post(self, request, pk):
+        campagne = get_object_or_404(Campagne.objects.select_related('client', 'agence'), pk=pk)
+        if campagne.est_mere or campagne.type_support == 'ecran':
+            messages.error(request, "La reconduction par demande est disponible pour les campagnes de panneaux.")
+            return redirect('campagne_detail', pk=pk)
+
+        lignes = campagne.lignes.filter(face__isnull=False)
+        faces = list(lignes.filter(face__support__actif=True).values_list('face_id', flat=True).distinct())
+        selection_reduite = lignes.filter(face__support__actif=False).exists()
+
+        panneaux = normaliser_panneaux_confreres(campagne.panneaux_confreres)
+        supports = SupportConfrere.objects.filter(
+            pk__in={panneau['support_id'] for panneau in panneaux if panneau.get('support_id')},
+            archive=False,
+            confrere__archive=False,
+        ).select_related('confrere', 'format').in_bulk()
+        panneaux_repris = []
+        for panneau in panneaux:
+            if 'support_id' not in panneau:
+                panneaux_repris.append(panneau)
+                continue
+            support = supports.get(panneau['support_id'])
+            anciennes_faces = set(panneau.get('faces', []))
+            faces_confrere = [code for code in support.codes_faces if code in anciennes_faces] if support else []
+            if set(faces_confrere) != anciennes_faces or not faces_confrere:
+                selection_reduite = True
+            if faces_confrere:
+                panneaux_repris.append(ligne_support_confrere(support, faces_confrere))
+
+        if not faces and not panneaux_repris:
+            messages.error(request, "Cette campagne ne contient plus de faces de panneaux à reprendre.")
+            return redirect('campagne_detail', pk=pk)
+
+        principal = campagne.client
+        principal_est_agence = principal.type_entite == Client.TYPE_AGENCE
+        agence = campagne.agence or (principal if principal_est_agence else None)
+        self.clear_wizard_session(request)
+        request.session[self.session_faces_key] = faces
+        request.session[self.session_confrere_key] = panneaux_repris
+        request.session[self.session_project_key] = {'nom_campagne': campagne.nom}
+        request.session[self.session_contact_key] = {
+            'client': str(principal.pk) if principal.actif and not principal_est_agence else '',
+            'agence': str(agence.pk) if agence and agence.actif else '',
+            'societe': campagne.annonceur or principal.nom,
+            'contact': principal.contact_nom,
+            'telephone': principal.telephone,
+            'email': principal.email,
+        }
+        if selection_reduite:
+            messages.warning(request, "Les supports archivés et les faces retirées ont été écartés de la sélection.")
+        return redirect('demande_creation')
+
+
 class DemandeCreationView(StaffDemandeWizardBase):
     """Étape 1 : coordonnées, projet, période et emplacements."""
     template_name = 'portail/reserver_etape1.html'
@@ -7604,7 +7692,6 @@ class DemandeCreationEtape2View(StaffDemandeWizardBase):
         tarifs_lignes = []
         total_brut = Decimal('0.00')
         total_faces = Decimal('0.00')
-        mois_factures = (days + 29) // 30
         formats_confreres = {}
         for panneau in panneaux_confreres:
             libelle = panneau['format']
@@ -7630,8 +7717,8 @@ class DemandeCreationEtape2View(StaffDemandeWizardBase):
                 prix_net = tarif_mensuel_net(prix_brut, remise)
             except (InvalidOperation, ValueError):
                 prix_brut = prix_net = Decimal('0.00')
-            montant = prix_net * quantite * mois_factures
-            total_brut += prix_brut * quantite * mois_factures
+            montant = prix_net * quantite
+            total_brut += prix_brut * quantite
             total_faces += montant
             tarifs_lignes.append({
                 'code': code,
@@ -7707,7 +7794,6 @@ class DemandeCreationEtape2View(StaffDemandeWizardBase):
             ],
             tarifs_faces_par_format=tarifs,
             tarifs_lignes=tarifs_lignes,
-            mois_factures=mois_factures,
             total_faces=total_faces,
             total_brut=total_brut,
             total_remises=total_brut - total_faces,
@@ -7770,11 +7856,14 @@ class DemandeCreationEtape2View(StaffDemandeWizardBase):
                         traite_le=timezone.now(),
                         token_partage=uuid.uuid4(),
                     )
+                debut = date.fromisoformat(context['periode']['date_debut'])
+                fin = date.fromisoformat(context['periode']['date_fin'])
+                if demande.jours_blocage_restants:
+                    verifier_faces_parc_demande(
+                        demande, debut, fin, context['faces'],
+                    )
                 verifier_disponibilite_confreres(
-                    context['panneaux_confreres'],
-                    date.fromisoformat(context['periode']['date_debut']),
-                    date.fromisoformat(context['periode']['date_fin']),
-                    demande_id=demande.pk,
+                    context['panneaux_confreres'], debut, fin, demande_id=demande.pk,
                 )
                 verifier_supports_confreres(demande, context['panneaux_confreres'])
                 # En modification d'un prospect, on met à jour sa fiche plutôt
@@ -7818,6 +7907,7 @@ class DemandeCreationEtape2View(StaffDemandeWizardBase):
                 demande.prix_faces_par_format = request.session.get(
                     self.session_prices_key, {}
                 )
+                demande.tarif_faces_par_periode = True
                 demande.remises_faces_par_format = request.session.get(
                     self.session_discounts_key, {}
                 )
@@ -7994,12 +8084,19 @@ class DemandeModifierView(StaffRequiredMixin, View):
             'date_debut': demande.date_debut_souhaitee.isoformat(),
             'date_fin': demande.date_fin_souhaitee.isoformat(),
         }
-        request.session[StaffDemandeWizardBase.session_prices_key] = (
-            demande.prix_faces_par_format or {}
-        )
-        request.session[StaffDemandeWizardBase.session_discounts_key] = (
-            demande.remises_faces_par_format or {}
-        )
+        tarifs = demande.prix_faces_par_format or {}
+        remises = demande.remises_faces_par_format or {}
+        if not demande.tarif_faces_par_periode:
+            jours = (demande.date_fin_souhaitee - demande.date_debut_souhaitee).days + 1
+            mois = max(1, (jours + 29) // 30)
+            tarifs = {code: str(tarif_mensuel_net(prix, None) * mois) for code, prix in tarifs.items()}
+            remises = {
+                code: {**remise, 'valeur': str(Decimal(str(remise['valeur'])) * mois)}
+                if remise.get('unite') == 'fcfa' else remise
+                for code, remise in remises.items()
+            }
+        request.session[StaffDemandeWizardBase.session_prices_key] = tarifs
+        request.session[StaffDemandeWizardBase.session_discounts_key] = remises
         request.session[StaffDemandeWizardBase.session_confrere_key] = demande.panneau_confrere
         request.session[StaffDemandeWizardBase.session_frais_key] = {
             'prix_affichage': str(demande.prix_affichage),
@@ -8036,31 +8133,55 @@ class DemandeAssocierCampagneView(StaffRequiredMixin, View):
         return redirect('demande_detail', uuid=uuid)
 
 
+def verifier_faces_parc_demande(demande, debut, fin, faces):
+    list(FacePanneau.objects.select_for_update().filter(
+        pk__in=[face.pk for face in faces],
+    ).order_by('pk').values_list('pk', flat=True))
+    indisponibles = [
+        f'{face.support.code} · Face {face.label}'
+        for face in faces if not face.is_disponibles(debut, fin, exclude_demande_id=demande.pk)
+    ]
+    if indisponibles:
+        raise ValidationError("Faces du Parc Integral indisponibles : %(faces)s.", params={
+            'faces': ', '.join(indisponibles),
+        })
+
+
 class DemandeProlongerBlocageView(StaffRequiredMixin, View):
-    """Prolonge le blocage temporaire de 3 à 7 jours pendant les échanges client."""
+    """Définit, prolonge ou lève le blocage choisi par la régie."""
 
+    @transaction.atomic
     def post(self, request, uuid):
-        demande = get_object_or_404(DemandeReservation, uuid=uuid)
+        demande = get_object_or_404(DemandeReservation.objects.select_for_update(), uuid=uuid)
+        lien_detail = reverse('demande_detail', kwargs={'uuid': uuid}) + '#blocage-temporaire'
+        if not (demande.peut_etre_traitee or demande.statut == DemandeReservation.STATUT_BROUILLON):
+            messages.error(request, "Cette demande est clôturée. Le blocage ne peut plus être modifié.")
+            return redirect(lien_detail)
 
-        if demande.statut in (DemandeReservation.STATUT_VALIDEE, DemandeReservation.STATUT_REFUSEE):
-            messages.error(request, "Cette demande est déjà clôturée. Le blocage ne peut plus être prolongé.")
-            return redirect('demande_detail', uuid=uuid)
+        action = request.POST.get('action')
+        if action == 'lever':
+            demande.date_debut_blocage = demande.date_fin_blocage = None
+            demande.expiration_blocage = None
+        else:
+            try:
+                jours = int(request.POST.get('jours', ''))
+                if action or jours not in (3, 5, 7):
+                    raise ValueError
+                debut, fin = demande.date_debut_souhaitee, demande.date_fin_souhaitee
+                faces = list(demande.faces_souhaitees.select_related('support'))
+                verifier_faces_parc_demande(demande, debut, fin, faces)
+                verifier_disponibilite_confreres(demande.panneaux_confreres, debut, fin, demande_id=demande.pk)
+                demande.prolonger_blocage(jours)
+            except ValueError:
+                messages.error(request, "Choisissez 3, 5 ou 7 jours de blocage.")
+                return redirect(lien_detail)
+            except ValidationError as exc:
+                messages.error(request, "; ".join(exc.messages))
+                return redirect(lien_detail)
 
-        try:
-            jours = int(request.POST.get('jours', '3'))
-        except (TypeError, ValueError):
-            jours = 3
-
-        jours = max(1, min(int(jours), 14))
-        demande.prolonger_blocage(jours)
-        demande.save(update_fields=['date_debut_blocage', 'date_fin_blocage', 'updated_at'])
-
-        messages.success(
-            request,
-            f"Blocage temporaire prolongé de {jours} jour{'s' if jours > 1 else ''}. "
-            f"Il est désormais actif jusqu'au {demande.date_fin_blocage:%d/%m/%Y}."
-        )
-        return redirect('demande_detail', uuid=uuid)
+        demande.save(update_fields=['date_debut_blocage', 'date_fin_blocage', 'expiration_blocage', 'updated_at'])
+        messages.success(request, "Blocage temporaire levé." if action == 'lever' else "Blocage temporaire enregistré.")
+        return redirect(lien_detail)
 
 
 class DemandeValiderView(LoginRequiredMixin, View):
@@ -8107,6 +8228,7 @@ class DemandeValiderView(LoginRequiredMixin, View):
                 if not faces and not panneaux_confreres:
                     messages.error(request, "Impossible de valider : aucune face n'est associée à cette demande.")
                     return redirect('demande_detail', uuid=uuid)
+                verifier_faces_parc_demande(demande, demande.date_debut_souhaitee, demande.date_fin_souhaitee, faces)
                 verifier_disponibilite_confreres(
                     panneaux_confreres, demande.date_debut_souhaitee, demande.date_fin_souhaitee,
                     demande_id=demande.pk,
@@ -8151,6 +8273,7 @@ class DemandeValiderView(LoginRequiredMixin, View):
                     date_debut=date_debut_dt,
                     date_fin=date_fin_dt,
                     prix_faces_par_format=demande.prix_nets_faces_par_format,
+                    tarif_faces_par_periode=demande.tarif_faces_par_periode,
                     prix_affichage=demande.prix_affichage,
                     prix_impression=demande.prix_impression,
                     frais_faces_par_format=demande.frais_faces_par_format,

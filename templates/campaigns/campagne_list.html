@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load static sort_tags %}
+{% load static sort_tags l10n %}
 
 {% block title %}Campagnes — Integral{% endblock %}
 
@@ -41,8 +41,8 @@
     <div class="dl-total">
       <span class="dl-total-icon" aria-hidden="true"><i class="bi bi-megaphone"></i></span>
       <div>
-        <strong>{{ campagnes|length }}</strong>
-        <span class="dl-total-label">campagne{{ campagnes|length|pluralize }} affichée{{ campagnes|length|pluralize }}</span>
+        <strong>{{ paginator.count }}</strong>
+        <span class="dl-total-label">campagne{{ paginator.count|pluralize }}</span>
       </div>
     </div>
   </header>
@@ -101,14 +101,14 @@
 {# ═══════════════════════════════════════════ #}
 {# ── TABLEAU DES CAMPAGNES ── #}
 {# ═══════════════════════════════════════════ #}
-<div data-client-pagination data-page-size="20">
+<div>
   <section class="dl-card">
     <div class="dl-card-head">
       <span><i class="bi bi-table"></i>Campagnes publicitaires</span>
       <div class="dl-card-head-actions">
         <input type="checkbox" id="select-all" class="form-check-input mt-0" title="Tout sélectionner">
         <span id="selection-count" class="dl-count">
-          {{ campagnes|length }} campagne{{ campagnes|length|pluralize }}
+          {{ paginator.count }} campagne{{ paginator.count|pluralize }}
         </span>
 
       <!-- Actions groupées -->
@@ -136,6 +136,8 @@
       <form method="get" id="campaign-search-form" class="dl-search-form">
         {% if categorie_active %}<input type="hidden" name="categorie" value="{{ categorie_active }}">{% endif %}
         {% if statut %}<input type="hidden" name="statut" value="{{ statut }}">{% endif %}
+        {% if type_support %}<input type="hidden" name="type_support" value="{{ type_support }}">{% endif %}
+        {% if actif %}<input type="hidden" name="actif" value="{{ actif }}">{% endif %}
         <div>
           <label for="campaign-search">Rechercher</label>
           <div class="input-group input-group-sm">
@@ -192,9 +194,9 @@
               <th class="text-end pe-4">Actions</th>
             </tr>
           </thead>
-          <tbody data-client-pagination-group>
+          <tbody>
             {% for c in campagnes %}
-              <tr data-client-page-item class="dl-row dl-campagne-row dl-campagne-row-{{ c.statut }} support-row{% if user.is_admin and not c.actif %} is-archived{% endif %}">
+              <tr class="dl-row dl-campagne-row dl-campagne-row-{{ c.statut }} support-row{% if user.is_admin and not c.actif %} is-archived{% endif %}">
               <td class="ps-3">
                 <input type="checkbox" name="selected_ids" value="{{ c.pk }}" class="form-check-input mt-0 row-checkbox">
               </td>
@@ -227,7 +229,7 @@
                 </div>
                 {% elif c.est_mere %}
                 <div class="dl-sub dl-sub-by text-primary fw-semibold">
-                  <i class="bi bi-diagram-3 me-1"></i>Campagne mère • {{ c.sous_campagnes.count }} sous-campagne{{ c.sous_campagnes.count|pluralize }}
+                  <i class="bi bi-diagram-3 me-1"></i>Campagne mère • {{ c.nombre_sous_campagnes }} sous-campagne{{ c.nombre_sous_campagnes|pluralize }}
                 </div>
                 {% endif %}
               </td>
@@ -251,11 +253,13 @@
               <td>
                 <span class="dl-places">
                   {% if c.type_support == 'ecran' %}
-                    <i class="bi bi-display"></i>{{ c.calculer_nombre_spots|default:"—" }} spots / {{ c.nb_supports }} écran{{ c.nb_supports|pluralize }}
+                    <i class="bi bi-display"></i>{{ c.calculer_nombre_spots|default:"—" }} spots / {{ c.nombre_lignes }} écran{{ c.nombre_lignes|pluralize }}
                   {% elif c.type_support == 'marche' %}
-                    <i class="bi bi-shop"></i>{{ c.nb_supports }} marché{{ c.nb_supports|pluralize }}
+                    <i class="bi bi-shop"></i>{{ c.nombre_lignes }} marché{{ c.nombre_lignes|pluralize }}
                   {% else %}
-                    <i class="bi bi-signpost-split"></i>{{ c.calculer_nombre_spots|default:"—" }} face{{ c.calculer_nombre_spots|pluralize }} / {{ c.nb_supports }} support{{ c.nb_supports|pluralize }}
+                    {% with faces=c.calculer_nombre_spots %}
+                    <i class="bi bi-signpost-split"></i>{{ faces|default:"—" }} face{{ faces|pluralize }} / {{ c.nombre_lignes }} support{{ c.nombre_lignes|pluralize }}
+                    {% endwith %}
                   {% endif %}
                 </span>
               </td>
@@ -283,15 +287,6 @@
                 </a>
               </td>
 
-              {# Spots #}
-              <!--
-              <td>
-                <span class="font-monospace fw-bold text-dark" style="font-size:0.84rem;">
-                  {{ c.calculer_nombre_spots|default:"—" }}
-                </span>
-              </td>
-              -->
-              
 
               {# Actif / Archivé #}
               {% if user.is_admin %}
@@ -347,7 +342,17 @@
     </form>
   </section>
 
-<div data-client-pagination-controls></div>
+{% if is_paginated %}
+<nav id="campaign-pages" class="d-flex align-items-center justify-content-center gap-3 py-3" aria-label="Pagination des campagnes">
+  {% if page_obj.has_previous %}
+  <a class="btn btn-sm btn-outline-secondary" href="{% querystring page=page_obj.previous_page_number %}">Précédente</a>
+  {% endif %}
+  <span>Page {{ page_obj.number }} sur {{ paginator.num_pages }}</span>
+  {% if page_obj.has_next %}
+  <a class="btn btn-sm btn-outline-secondary" href="{% querystring page=page_obj.next_page_number %}">Suivante</a>
+  {% endif %}
+</nav>
+{% endif %}
 </div>
 
 {# ── BOUTONS D'EXPORT ET APERÇU RAPPORT (EN BAS) ── #}
@@ -364,18 +369,44 @@
 </div>
 
 <script>
+const campaignCheckboxes = Array.from(document.querySelectorAll('.row-checkbox'));
+const campaignSelectionKey = 'campaign-list-selection';
+const selectedCampaignIds = new Set();
+
+try {
+  const saved = JSON.parse(sessionStorage.getItem(campaignSelectionKey));
+  sessionStorage.removeItem(campaignSelectionKey);
+  if (saved?.url === location.href) {
+    saved.ids.forEach(id => selectedCampaignIds.add(id));
+  }
+} catch {}
+
+campaignCheckboxes.forEach(checkbox => {
+  checkbox.checked = selectedCampaignIds.has(checkbox.value);
+});
+document.querySelectorAll('#campaign-pages a').forEach(link => {
+  link.addEventListener('click', event => {
+    if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    try {
+      sessionStorage.setItem(campaignSelectionKey, JSON.stringify({
+        url: link.href,
+        ids: Array.from(selectedCampaignIds),
+      }));
+    } catch {}
+  });
+});
+
 function majSelection() {
-  const checkboxes = document.querySelectorAll('.row-checkbox');
-  const visibleCheckboxes = Array.from(checkboxes).filter((checkbox) => {
-    const row = checkbox.closest('[data-client-page-item]');
-    return !row || row.style.display !== 'none';
+  campaignCheckboxes.forEach(checkbox => {
+    if (checkbox.checked) selectedCampaignIds.add(checkbox.value);
+    else selectedCampaignIds.delete(checkbox.value);
   });
   const selectAll = document.getElementById('select-all');
   const actionsBar = document.getElementById('actions-bar');
   const countLabel = document.getElementById('selection-count');
   if (!actionsBar || !countLabel) return;
-  const total = checkboxes.length;
-  const checked = document.querySelectorAll('.row-checkbox:checked').length;
+  const total = {{ paginator.count|unlocalize }};
+  const checked = selectedCampaignIds.size;
   if (checked > 0) {
     actionsBar.style.display = 'flex';
     countLabel.textContent = checked + ' sélectionné(s)';
@@ -384,24 +415,22 @@ function majSelection() {
     countLabel.textContent = total + ' campagne(s)';
   }
   if (selectAll) {
-    const checkedVisible = visibleCheckboxes.filter((checkbox) => checkbox.checked).length;
-    selectAll.indeterminate = checkedVisible > 0 && checkedVisible < visibleCheckboxes.length;
-    selectAll.checked = visibleCheckboxes.length > 0 && checkedVisible === visibleCheckboxes.length;
+    const checkedVisible = campaignCheckboxes.filter(checkbox => checkbox.checked).length;
+    selectAll.indeterminate = checkedVisible > 0 && checkedVisible < campaignCheckboxes.length;
+    selectAll.checked = campaignCheckboxes.length > 0 && checkedVisible === campaignCheckboxes.length;
   }
 }
 
 document.addEventListener('change', (event) => {
   if (event.target.matches('#select-all')) {
-    document.querySelectorAll('.row-checkbox').forEach((checkbox) => {
-      const row = checkbox.closest('[data-client-page-item]');
-      if (!row || row.style.display !== 'none') checkbox.checked = event.target.checked;
+    campaignCheckboxes.forEach((checkbox) => {
+      checkbox.checked = event.target.checked;
     });
     majSelection();
   } else if (event.target.matches('.row-checkbox')) {
     majSelection();
   }
 });
-document.addEventListener('client-pagination-page-changed', majSelection);
 majSelection();
 
 function confirmerAction() {
@@ -410,10 +439,19 @@ function confirmerAction() {
   const form = document.getElementById('form-actions');
   if (!actionSelect || !actionInput || !form) return;
   const action  = actionSelect.value;
-  const checked = document.querySelectorAll('.row-checkbox:checked').length;
+  const checked = selectedCampaignIds.size;
   if (!action) { alert('Veuillez sélectionner une action.'); return; }
   if (checked === 0) { alert('Veuillez sélectionner au moins une campagne.'); return; }
   if (!confirm(`Confirmer "${action}" sur ${checked} campagne(s) ?`)) return;
+  const visibleIds = new Set(campaignCheckboxes.map(checkbox => checkbox.value));
+  selectedCampaignIds.forEach(id => {
+    if (visibleIds.has(id)) return;
+    const input = document.createElement('input');
+    input.type = 'hidden';
+    input.name = 'selected_ids';
+    input.value = id;
+    form.appendChild(input);
+  });
   actionInput.value = action;
   form.submit();
 }

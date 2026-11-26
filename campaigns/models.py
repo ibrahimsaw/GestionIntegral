@@ -10,6 +10,8 @@ from django.db.models import Q
 from django.utils import timezone
 from django.utils.translation import gettext_lazy as _
 
+from campaigns.tarification import tarif_par_ville
+
 from inventory.models import (
     FormatSupport,
     calculer_heures_chevauchement,
@@ -483,8 +485,8 @@ class EcranBilanMensuel(models.Model):
 # Modèles de Réservations (Ordre de dépendance strict : 1. Reservation -> 2. Lignes)
 # ══════════════════════════════════════════════════════════════════════════════
 
-def frais_unitaires_format(frais, cle, prix_affichage=0, prix_impression=0):
-    ligne = frais.get(cle, {})
+def frais_unitaires_format(frais, cle, prix_affichage=0, prix_impression=0, *, ville=None):
+    ligne = tarif_par_ville(frais, ville, cle, {})
     return (
         Decimal(ligne.get('prix_affichage', prix_affichage) or 0),
         Decimal(ligne.get('prix_impression', prix_impression) or 0),
@@ -534,10 +536,10 @@ class Reservation(models.Model):
     panneaux_confreres_reserves = models.JSONField(default=list, blank=True)
     tarif_faces_par_periode = models.BooleanField(default=False)
 
-    def frais_pour_format(self, code):
+    def frais_pour_format(self, code, ville=None):
         return frais_unitaires_format(
             self.frais_faces_par_format, f"parc:{code or ''}",
-            self.prix_affichage, self.prix_impression,
+            self.prix_affichage, self.prix_impression, ville=ville,
         )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
@@ -601,13 +603,13 @@ class Reservation(models.Model):
         total = Decimal('0.00')
         for ligne in self.lignes.select_related('support'):
             code = ligne.support.format
-            tarif = self.prix_faces_par_format.get(code)
-            total += sum(self.frais_pour_format(code)) + Decimal(str(tarif or 0)) * multiplicateur
+            tarif = tarif_par_ville(self.prix_faces_par_format, ligne.support.ville, code)
+            total += sum(self.frais_pour_format(code, ligne.support.ville)) + Decimal(str(tarif or 0)) * multiplicateur
         for ligne in self.panneaux_confreres_reserves:
             code = f"confrere:{ligne['format']}"
-            tarif = self.prix_faces_par_format.get(code)
+            tarif = tarif_par_ville(self.prix_faces_par_format, ligne.get('ville'), code)
             frais = frais_unitaires_format(
-                self.frais_faces_par_format, code, self.prix_affichage, self.prix_impression,
+                self.frais_faces_par_format, code, self.prix_affichage, self.prix_impression, ville=ligne.get('ville'),
             )
             total += (sum(frais) + Decimal(str(tarif or 0)) * multiplicateur) * ligne['nombre_faces']
         return total.quantize(Decimal('0.01'))
@@ -658,13 +660,13 @@ class ReservationLigne(models.Model):
 
     @property
     def tarif_mensuel(self):
-        tarif = self.reservation.prix_faces_par_format.get(self.support.format)
+        tarif = tarif_par_ville(self.reservation.prix_faces_par_format, self.support.ville, self.support.format)
         return Decimal(str(tarif)) if tarif not in (None, '') else None
 
     @property
     def montant_total(self):
         tarif = self.tarif_mensuel
-        frais = sum(self.reservation.frais_pour_format(self.support.format))
+        frais = sum(self.reservation.frais_pour_format(self.support.format, self.support.ville))
         if tarif is None and not frais:
             return None
         return (
@@ -1452,7 +1454,7 @@ class Campagne(models.Model):
         multiplicateur = self.multiplicateur_tarif_faces()
         total_confreres = sum(
             (
-                Decimal(str(self.prix_faces_par_format.get(f"confrere:{ligne['format']}", 0) or 0))
+                Decimal(str(tarif_par_ville(self.prix_faces_par_format, ligne.get('ville'), f"confrere:{ligne['format']}", 0) or 0))
                 * ligne['nombre_faces'] * multiplicateur
                 for ligne in self.panneaux_confreres
             ),
@@ -1472,8 +1474,8 @@ class Campagne(models.Model):
             total = sum(
                 (
                     Decimal(str(
-                        self.prix_faces_par_format.get(
-                            ligne.face.support.format,
+                        tarif_par_ville(
+                            self.prix_faces_par_format, ligne.face.support.ville, ligne.face.support.format,
                             self.prix or 0,
                         ) or 0
                     ))
@@ -1489,10 +1491,10 @@ class Campagne(models.Model):
         faces = self.nombre_faces() * multiplicateur
         return (prix * Decimal(faces) + total_confreres).quantize(Decimal('0.01'))
     
-    def frais_pour_format(self, code):
+    def frais_pour_format(self, code, ville=None):
         return frais_unitaires_format(
             self.frais_faces_par_format, f"parc:{code or ''}",
-            self.prix_affichage, self.prix_impression,
+            self.prix_affichage, self.prix_impression, ville=ville,
         )
 
     def montant_total_affichage(self):
@@ -1514,7 +1516,7 @@ class Campagne(models.Model):
 
         if self.frais_faces_par_format:
             total = sum(
-                (self.frais_pour_format(ligne.face.support.format)[0]
+                (self.frais_pour_format(ligne.face.support.format, ligne.face.support.ville)[0]
                  for ligne in self.lignes.filter(face__isnull=False).select_related('face__support')),
                 Decimal('0.00'),
             )
@@ -1545,7 +1547,7 @@ class Campagne(models.Model):
 
         if self.frais_faces_par_format:
             total = sum(
-                (self.frais_pour_format(ligne.face.support.format)[1]
+                (self.frais_pour_format(ligne.face.support.format, ligne.face.support.ville)[1]
                  for ligne in self.lignes.filter(face__isnull=False).select_related('face__support')),
                 Decimal('0.00'),
             )

@@ -3,14 +3,18 @@ import re
 import json
 import uuid
 from datetime import date, datetime, time, timedelta
+from pathlib import Path
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from django.http import Http404, JsonResponse
+from django.contrib.staticfiles import finders
+from django.http import Http404, HttpResponse, JsonResponse
+from django.template.loader import render_to_string
 from django.utils.functional import cached_property
 from django.db.models import Q, Count, Sum, DecimalField, Value, Max
 from django.db.models.deletion import ProtectedError
 from django.db.models.functions import Coalesce
 from django.utils import timezone
+from django.utils.dateparse import parse_time
 from django.utils.text import slugify
 from django.urls import reverse
 from django.views import View
@@ -31,6 +35,7 @@ from inventory.confrere_catalogue import (
     catalogue_confreres, ligne_support_confrere, lignes_recap_confreres, statut_validation_confreres, synchroniser_dossiers_confreres,
     verifier_supports_confreres,
 )
+from campaigns.tarification import cle_tarif_ville, tarif_par_ville
 from campaigns.confrere_disponibilite import occupations_confreres, verifier_disponibilite_confreres
 from inventory.models import SupportConfrere
 from .models import *
@@ -252,6 +257,66 @@ from .models import (
 
 class DashboardView(LoginRequiredMixin, TemplateView):
     template_name = 'campaigns/accueil_parc.html'
+
+    def render_to_response(self, context, **response_kwargs):
+        export = self.request.GET.get('export')
+        if export not in ('planning_preview', 'planning_pdf'):
+            return super().render_to_response(context, **response_kwargs)
+
+        reference = context['ecran_date_selectionnee']
+        lundi = reference - timedelta(days=reference.weekday())
+        ecran_id = context['ecran_id_selectionne']
+        ecrans = []
+        for ecran in context['ecran_dashboard_data']['ecran_dashboard_screens']:
+            if export == 'planning_pdf' and ecran_id not in ('', 'all', str(ecran['id'])):
+                continue
+            jours = []
+            for jour in ecran['semaine_horaire']:
+                occupes = {int(slot['heure'][:2]) for slot in jour['programmation_horaire']}
+                ouverts = set(jour['heures_ouverture'])
+                jours.append({
+                    'date': date.fromisoformat(jour['date']),
+                    'passages': sorted(jour['passages'], key=lambda passage: (passage['debut'], passage['nom'])),
+                    'etats': [
+                        'programme' if heure in occupes else 'libre' if heure in ouverts else 'ferme'
+                        for heure in range(24)
+                    ],
+                })
+            ecrans.append({
+                **ecran, 'jours': jours,
+                'visible': (
+                    (not context['ville_active'] or ecran['ville'].casefold() == context['ville_active'].casefold())
+                    and ecran_id in ('', 'all', str(ecran['id']))
+                ),
+            })
+        document = {
+            'lundi': lundi,
+            'dimanche': lundi + timedelta(days=6),
+            'ville': context['ville_active'],
+            'ecrans': ecrans,
+            'nombre_ecrans': sum(ecran['visible'] for ecran in ecrans),
+            'heures': range(24),
+            'date_reference': reference,
+            'ecran_id': ecran_id,
+            'afficher_tableaux_campagnes': self.request.GET.get('tableaux_campagnes') != 'masquer',
+        }
+        if export == 'planning_preview':
+            document['apercu'] = True
+            document['villes'] = EcranNumerique.objects.exclude(
+                support__ville='',
+            ).order_by('support__ville').values_list('support__ville', flat=True).distinct()
+            document['options_ecrans'] = context['ecran_dashboard_data']['ecran_dashboard_screens']
+            return render(self.request, 'campaigns/planning_ecrans_apercu.html', document)
+
+        from weasyprint import HTML
+
+        logo = finders.find('img/logo.png')
+        if logo:
+            document['logo_document'] = Path(logo).resolve().as_uri()
+        html = render_to_string('campaigns/planning_ecrans_pdf.html', document)
+        response = HttpResponse(HTML(string=html).write_pdf(), content_type='application/pdf')
+        response['Content-Disposition'] = f'attachment; filename="planning-ecrans-{lundi.isoformat()}.pdf"'
+        return response
 
     def post(self, request, *args, **kwargs):
         if not request.user.is_staff_regie_role:
@@ -1201,7 +1266,7 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         ]
 
     @classmethod
-    def _build_led_dashboard_data(cls, ville_active, reference_date, stats_by_screen):
+    def _build_led_dashboard_data(cls, ville_active, reference_date, stats_by_screen, *, planning_only=False):
         """Prépare les vues LED à partir des campagnes, contrats et logs enregistrés."""
         year_start = date(reference_date.year, 1, 1)
         year_end = date(reference_date.year, 12, 31)
@@ -1212,9 +1277,37 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             screens = screens.filter(support__ville__iexact=ville_active)
         screen_rows = list(screens.order_by('support__code'))
         screen_ids = [screen.support_id for screen in screen_rows]
-        screen_objects_by_id = {
-            screen.support_id: screen for screen in screen_rows
-        }
+        debut_semaine = reference_date - timedelta(days=reference_date.weekday())
+        jours_semaine = [debut_semaine + timedelta(days=offset) for offset in range(7)]
+        heures = [
+            (time(hour), time(hour + 1) if hour < 23 else time.max)
+            for hour in range(24)
+        ]
+        plages_horaires = {}
+        semaines_par_ecran = {}
+        for screen in screen_rows:
+            semaine = {}
+            for jour in jours_semaine:
+                plages = []
+                for debut, fin in screen.plages_actives(jour):
+                    if debut < fin:
+                        plages.append((debut, fin))
+                    else:
+                        plages.extend(((debut, time.max), (time.min, fin)))
+                plages_par_heure = {
+                    hour: [(max(debut, debut_heure), min(fin, fin_heure))
+                           for debut, fin in plages
+                           if max(debut, debut_heure) < min(fin, fin_heure)]
+                    for hour, (debut_heure, fin_heure) in enumerate(heures)
+                }
+                plages_horaires[screen.support_id, jour] = plages_par_heure
+                semaine[jour] = {
+                    'date': jour.isoformat(),
+                    'heures_ouverture': [hour for hour, plages in plages_par_heure.items() if plages],
+                    'programmation_horaire': [],
+                    'passages': [],
+                }
+            semaines_par_ecran[screen.support_id] = semaine
         bilan_rows = EcranBilanMensuel.objects.filter(
             ecran_id__in=[screen.pk for screen in screen_rows],
             annee=reference_date.year,
@@ -1229,6 +1322,12 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                          'Juil', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc']
         for screen in screen_rows:
             support = screen.support
+            if planning_only:
+                screen_data.append({
+                    'id': screen.support_id, 'code': support.code, 'nom': support.nom,
+                    'ville': support.ville, 'semaine_horaire': list(semaines_par_ecran[screen.support_id].values()),
+                })
+                continue
             exploitation = getattr(screen, 'parametres_exploitation', None)
             metrics = stats_by_screen.get(screen.support_id, {})
             monthly_by_screen[screen.support_id] = [0] * 12
@@ -1263,6 +1362,8 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 * EcranNumerique.SPOTS_PAR_MINUTE
                 // 60
             )
+            semaine = semaines_par_ecran[screen.support_id]
+            jour_selectionne = semaine[reference_date]
             screen_data.append({
                 'id': screen.support_id,
                 'code': support.code,
@@ -1302,7 +1403,9 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 'mensuel_capacite': monthly_capacity,
                 'mensuel_taux_diffusion': [None] * 12,
                 'mensuel_valeur_programmee': [0.0] * 12,
-                'programmation_horaire': [],
+                'programmation_horaire': jour_selectionne['programmation_horaire'],
+                'heures_ouverture': jour_selectionne['heures_ouverture'],
+                'semaine_horaire': list(semaine.values()),
                 'puissance_kw': (
                     float(exploitation.puissance_kw)
                     if exploitation and exploitation.puissance_kw is not None
@@ -1352,8 +1455,8 @@ class DashboardView(LoginRequiredMixin, TemplateView):
         lines = list(
             LigneCampagne.objects.filter(
                 support_id__in=screen_ids,
-                campagne__date_debut__lte=year_end,
-                campagne__date_fin__gte=year_start,
+                campagne__date_debut__lte=jours_semaine[-1] if planning_only else max(year_end, jours_semaine[-1]),
+                campagne__date_fin__gte=debut_semaine if planning_only else min(year_start, debut_semaine),
             ).exclude(
                 campagne__statut__in=[
                     Campagne.STATUT_BROUILLON,
@@ -1384,15 +1487,97 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             actual_line_end = min(
                 line.date_fin or campaign.date_fin, campaign.date_fin
             )
+            screen_id = line.support_id
+            frequency = line.get_frequence_effective()
+            tranches = line.get_tranches_effective()
+            plages_campagne = []
+            for tranche in (tranches or '').split(','):
+                debut, separateur, fin = tranche.partition('-')
+                if not separateur:
+                    continue
+                try:
+                    debut, fin = parse_time(debut.strip()), parse_time(fin.strip())
+                except ValueError:
+                    continue
+                if debut and fin and debut < fin:
+                    plages_campagne.append((debut, fin))
+            visuels = campaign.get_nombre_visuels_effective()
+            url_campagne = reverse('campagne_detail', args=[campaign.pk])
+            planned_today = 0
+            for jour in jours_semaine:
+                if not actual_line_start <= jour <= actual_line_end:
+                    continue
+                spots_du_jour = line.calculer_spots_sur_periode(jour, jour)
+                if jour == reference_date:
+                    planned_today = spots_du_jour
+                if not spots_du_jour or not frequency:
+                    continue
+                planning = semaines_par_ecran[screen_id][jour]
+                schedule = planning['programmation_horaire']
+                intersections = []
+                for hour, plages in plages_horaires[screen_id, jour].items():
+                    if not plages:
+                        continue
+                    overlap_hours = calculer_heures_chevauchement(plages, tranches)
+                    if not overlap_hours:
+                        continue
+                    for ouverture, fermeture in plages:
+                        for debut, fin in plages_campagne:
+                            debut_effectif, fin_effective = max(ouverture, debut), min(fermeture, fin)
+                            if debut_effectif < fin_effective:
+                                intersections.append((debut_effectif, fin_effective))
+                    hourly_spots = overlap_hours * (3600 / frequency) * visuels
+                    label = f'{hour:02d}:00'
+                    hour_row = next((row for row in schedule if row['heure'] == label), None)
+                    if hour_row is None:
+                        secondes = sum(
+                            (datetime.combine(jour, fin) - datetime.combine(jour, debut)).total_seconds()
+                            for debut, fin in plages
+                        )
+                        hour_row = {
+                            'heure': label,
+                            'spots_bruts': 0.0,
+                            'capacite': round(secondes / 60 * EcranNumerique.SPOTS_PAR_MINUTE),
+                            'campagnes': [],
+                        }
+                        schedule.append(hour_row)
+                    hour_row['spots_bruts'] += hourly_spots
+                    hour_row['campagnes'].append({
+                        'nom': campaign.nom,
+                        'client': campaign.client.nom,
+                        'spots': round(hourly_spots),
+                        'url': url_campagne,
+                    })
+                plages_effectives = []
+                for debut, fin in sorted(intersections):
+                    if plages_effectives and debut <= plages_effectives[-1][1]:
+                        plages_effectives[-1][1] = max(fin, plages_effectives[-1][1])
+                    else:
+                        plages_effectives.append([debut, fin])
+                minutes, secondes = divmod(frequency, 60)
+                frequence_affichee = ' '.join(
+                    valeur for valeur in (
+                        f'{minutes} min' if minutes else '',
+                        f'{secondes} s' if secondes else '',
+                    ) if valeur
+                )
+                for debut, fin in plages_effectives:
+                    duree = (datetime.combine(jour, fin) - datetime.combine(jour, debut)).total_seconds()
+                    planning['passages'].append({
+                        'debut': debut.strftime('%H:%M'),
+                        'fin': fin.strftime('%H:%M'),
+                        'nom': campaign.nom,
+                        'client': campaign.client.nom,
+                        'spots': round(duree / frequency * visuels),
+                        'frequence': frequence_affichee,
+                    })
+            if planning_only:
+                continue
             line_start = max(actual_line_start, year_start)
             line_end = min(actual_line_end, year_end)
             if line_start > line_end:
                 continue
             planned_spots = line.calculer_spots_sur_periode(line_start, line_end)
-            planned_today = line.calculer_spots_sur_periode(
-                reference_date, reference_date
-            )
-            screen_id = line.support_id
             screen_index = screen_data_index[screen_id]
             screen_data[screen_index]['spots_programmes_jour'] += planned_today
             unit_price = campaign.prix or 0
@@ -1402,73 +1587,6 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 float(unit_price) if unit_price else None
             )
             screen_data[screen_index]['spots_programmes_annee'] += planned_spots
-            if (
-                actual_line_start <= reference_date <= actual_line_end
-                and planned_today
-            ):
-                screen = screen_objects_by_id[screen_id]
-                active_ranges = screen.plages_actives(reference_date)
-                frequency = line.get_frequence_effective()
-                visual_count = (
-                    campaign.get_nombre_visuels_effective() or 1
-                )
-                if frequency:
-                    for hour in range(24):
-                        hour_start = time(hour, 0)
-                        hour_end = time(hour + 1, 0) if hour < 23 else time(23, 59, 59)
-                        clipped_ranges = [
-                            (max(start, hour_start), min(end, hour_end))
-                            for start, end in active_ranges
-                            if max(start, hour_start) < min(end, hour_end)
-                        ]
-                        overlap_hours = calculer_heures_chevauchement(
-                            clipped_ranges,
-                            line.get_tranches_effective(),
-                        )
-                        if not overlap_hours:
-                            continue
-                        hourly_spots = (
-                            overlap_hours * (3600 / frequency) * visual_count
-                        )
-                        schedule = screen_data[screen_index][
-                            'programmation_horaire'
-                        ]
-                        hour_row = next(
-                            (
-                                row for row in schedule
-                                if row['heure'] == f'{hour:02d}:00'
-                            ),
-                            None,
-                        )
-                        if hour_row is None:
-                            capacity = sum(
-                                (
-                                    datetime.combine(
-                                        reference_date,
-                                        min(end, hour_end),
-                                    )
-                                    - datetime.combine(
-                                        reference_date,
-                                        max(start, hour_start),
-                                    )
-                                ).total_seconds() / 60
-                                * EcranNumerique.SPOTS_PAR_MINUTE
-                                for start, end in active_ranges
-                                if max(start, hour_start) < min(end, hour_end)
-                            )
-                            hour_row = {
-                                'heure': f'{hour:02d}:00',
-                                'spots_bruts': 0.0,
-                                'capacite': round(capacity),
-                                'campagnes': [],
-                            }
-                            schedule.append(hour_row)
-                        hour_row['spots_bruts'] += hourly_spots
-                        hour_row['campagnes'].append({
-                            'nom': campaign.nom,
-                            'client': campaign.client.nom,
-                            'spots': round(hourly_spots),
-                        })
             selected_month_spots = 0
             for month in range(1, 13):
                 month_start = date(reference_date.year, month, 1)
@@ -1560,6 +1678,9 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 'spots_diffuses': 0,
             })
 
+        if planning_only:
+            return {'ecran_dashboard_screens': screen_data}
+
         logs = list(
             LogDiffusion.objects.filter(
                 ecran__support_id__in=screen_ids,
@@ -1618,8 +1739,9 @@ class DashboardView(LoginRequiredMixin, TemplateView):
                 )
                 if capacity else None
             )
-            for hour_row in screen['programmation_horaire']:
-                hour_row['spots'] = round(hour_row.pop('spots_bruts'))
+            for jour in screen['semaine_horaire']:
+                for hour_row in jour['programmation_horaire']:
+                    hour_row['spots'] = round(hour_row.pop('spots_bruts'))
             screen['valeur_programmee'] = round(value_by_screen.get(screen['id'], 0), 2)
             screen['valeur_diffusee_estimee'] = round(sum(
                 price * logs_by_campaign_screen.get((screen['id'], campaign_id), 0)
@@ -1765,11 +1887,25 @@ class DashboardView(LoginRequiredMixin, TemplateView):
             )
         except ValueError:
             selected_screen_date = current_date
+        if raw_screen_date and 'ecran_annee' not in self.request.GET and 2000 <= selected_screen_date.year <= 2100:
+            selected_screen_year = selected_screen_date.year
         if not raw_screen_date and selected_screen_year != current_date.year:
             selected_screen_date = date(selected_screen_year, 1, 1)
         elif selected_screen_date.year != selected_screen_year:
             selected_screen_date = date(selected_screen_year, 1, 1)
         ville_active = self.request.GET.get("ville", "").strip()
+        export = self.request.GET.get('export')
+        if export in ('planning_preview', 'planning_pdf'):
+            context.update({
+                'ville_active': ville_active,
+                'ecran_date_selectionnee': selected_screen_date,
+                'ecran_id_selectionne': self.request.GET.get('ecran_id', ''),
+                'ecran_dashboard_data': self._build_led_dashboard_data(
+                    ville_active if export == 'planning_pdf' else '',
+                    selected_screen_date, {}, planning_only=True,
+                ),
+            })
+            return context
         supports_classes = Support.objects.filter(
             actif=True,
         ).filter(
@@ -4284,12 +4420,10 @@ def build_support_rows(campagne, lignes):
             quantite = Decimal(len(group_lignes))
             faces_labels = [l.face.label for l in group_lignes if l.face]
         support_format = getattr(support, 'format', None)
-        aff_u, imp_u = campagne.frais_pour_format(support_format)
-        prix_u = (
-            Decimal(str(campagne.prix_faces_par_format[support_format]))
-            if support_format in campagne.prix_faces_par_format
-            else prix_u_defaut
-        )
+        aff_u, imp_u = campagne.frais_pour_format(support_format, support.ville)
+        prix_u = Decimal(str(tarif_par_ville(
+            campagne.prix_faces_par_format, support.ville, support_format, prix_u_defaut,
+        )))
 
         prix_total = (prix_u * quantite * mois_factures).quantize(Decimal('0.01'))
         aff_total = (aff_u * quantite).quantize(Decimal('0.01'))
@@ -4322,10 +4456,11 @@ def build_support_rows(campagne, lignes):
     for ligne in campagne.panneaux_confreres:
         cle = f"confrere:{ligne['format']}"
         quantite = ligne['nombre_faces']
-        prix_unitaire = Decimal(str(campagne.prix_faces_par_format.get(cle) or 0))
+        prix_unitaire = Decimal(str(tarif_par_ville(campagne.prix_faces_par_format, ligne.get('ville'), cle) or 0))
         prix = prix_unitaire * quantite * campagne.multiplicateur_tarif_faces()
         affichage, impression = frais_unitaires_format(
             campagne.frais_faces_par_format, cle, campagne.prix_affichage, campagne.prix_impression,
+            ville=ligne.get('ville'),
         )
         total = prix + (affichage + impression) * quantite
         totaux['lignes_confreres'].append({
@@ -4440,6 +4575,57 @@ class CampagneDetailView(ClientStaffRequiredMixin, DetailView):
     def get_queryset(self):
         return super().get_queryset().select_related('client', 'agence')
 
+    @staticmethod
+    def _faces_par_type_panneau(support_rows, panneaux_confreres):
+        formats = FormatSupport.objects.in_bulk(
+            {row['support'].format for row in support_rows if row['faces']},
+            field_name='code',
+        )
+        supports_confreres = SupportConfrere.objects.select_related('format').in_bulk(
+            {panneau['support_id'] for panneau in panneaux_confreres if panneau.get('support_id')}
+        )
+        compteurs = {}
+
+        def compter(ville, format_support, libelle, quantite, categorie=''):
+            if format_support:
+                categorie = format_support.categorie or categorie
+                libelle = format_support.dimensions or format_support.code
+            categorie = slugify(categorie)
+            _, superficie, _ = format_sort_key(format_support or libelle)
+            if categorie == 'geant' or slugify(libelle) in ('geant', 'geants'):
+                type_panneau = 'Géants'
+            elif (
+                superficie == 12
+                or slugify(libelle) in ('12m2', '12-m2')
+            ):
+                type_panneau = '12 m²'
+            else:
+                return
+            cle = (ville or 'Ville non renseignée', type_panneau)
+            compteurs[cle] = compteurs.get(cle, 0) + quantite
+
+        for row in support_rows:
+            if row['faces']:
+                support = row['support']
+                code = support.format
+                compter(support.ville, formats.get(code), code or '', len(row['faces']))
+        for panneau in panneaux_confreres:
+            support = supports_confreres.get(panneau.get('support_id'))
+            compter(
+                panneau.get('ville') or (support.ville if support else ''),
+                support.format if support else None,
+                panneau.get('format') or '',
+                panneau['nombre_faces'],
+                support.categorie_affichee if support else '',
+            )
+        return [
+            (ville, type_panneau, quantite)
+            for (ville, type_panneau), quantite in sorted(
+                compteurs.items(), key=lambda item: (item[0][0].casefold(), item[0][1]),
+            )
+            if quantite
+        ]
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         campagne = self.object
@@ -4536,6 +4722,10 @@ class CampagneDetailView(ClientStaffRequiredMixin, DetailView):
             context['totaux_campagne'] = totaux_campagne
             context['total_supports'] = len(support_rows)
             context['total_spots'] = campagne.calculer_nombre_spots()
+            if campagne.type_support == 'panneau':
+                context['faces_par_type_panneau'] = self._faces_par_type_panneau(
+                    support_rows, totaux_campagne['lignes_confreres'],
+                )
             context['supports_map_json'] = json.dumps(serialize_supports_for_map(lignes))
 
         return context
@@ -4642,28 +4832,49 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
         demande = self.get_source_demande()
         if not demande:
             return {}
-        codes = set(demande.faces_souhaitees.values_list('support__format', flat=True))
-        formats = FormatSupport.objects.filter(code__in=codes).in_bulk(field_name='code')
-        libelles = {
-            (code, f'parc:{code}'): (formats[code].dimensions if code in formats else code) or 'Format non renseigné'
-            for code in sorted(codes)
-        }
+        groupes = list(demande.faces_souhaitees.order_by().values_list(
+            'support__ville', 'support__format',
+        ).annotate(quantite=Count('pk')))
+        formats = FormatSupport.objects.filter(code__in={code for _, code, _ in groupes}).in_bulk(field_name='code')
+        groupes_tarifes = {}
+        for ville, code, quantite in sorted(groupes):
+            format_support = formats.get(code)
+            libelle = (format_support.dimensions if format_support else code) or 'Format non renseigné'
+            categorie = (format_support.categorie if format_support else '') or 'Autres'
+            groupes_tarifes[ville, code, f'parc:{code}', categorie, libelle] = quantite
+
+        supports_confreres = SupportConfrere.objects.select_related('format').in_bulk(
+            {ligne['support_id'] for ligne in demande.panneaux_confreres if ligne.get('support_id')}
+        )
         for ligne in demande.panneaux_confreres:
             cle = f"confrere:{ligne['format']}"
-            libelles[cle, cle] = f"{ligne['format']} · Réseau Confrère"
+            support = supports_confreres.get(ligne.get('support_id'))
+            categorie = (support.categorie_affichee if support else '') or 'Réseau Confrère'
+            groupe = (ligne.get('ville'), cle, cle, categorie, f"{ligne['format']} · Réseau Confrère")
+            groupes_tarifes[groupe] = groupes_tarifes.get(groupe, 0) + ligne['nombre_faces']
 
         tarifs = demande.prix_nets_faces_par_format
         lignes = []
-        for (code, cle), libelle in libelles.items():
-            tarif = tarifs.get(code)
+        totaux_categories = {}
+        multiplicateur = 1 if demande.tarif_faces_par_periode else max(1, (demande.duree_jours + 29) // 30)
+        for (ville, code, cle, categorie, libelle), quantite in groupes_tarifes.items():
+            tarif = tarif_par_ville(tarifs, ville, code)
+            prix = Decimal(str(tarif)) if tarif not in (None, '') else None
             affichage, impression = frais_unitaires_format(
                 demande.frais_faces_par_format, cle, demande.prix_affichage, demande.prix_impression,
+                ville=ville,
             )
+            total = ((prix or 0) * multiplicateur + affichage + impression) * quantite
+            if prix is not None or affichage or impression:
+                totaux_categories[categorie] = totaux_categories.get(categorie, Decimal('0')) + total
             lignes.append({
                 'format': libelle,
-                'prix': Decimal(str(tarif)) if tarif not in (None, '') else None,
+                'ville': ville,
+                'quantite': quantite,
+                'prix': prix,
                 'prix_affichage': affichage,
                 'prix_impression': impression,
+                'total': total,
             })
 
         valeurs = {'prix_affichage': demande.prix_affichage, 'prix_impression': demande.prix_impression}
@@ -4671,12 +4882,12 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
             for champ in ('prix', 'prix_affichage', 'prix_impression'):
                 valeurs_distinctes = {ligne[champ] for ligne in lignes}
                 valeurs[champ] = next(iter(valeurs_distinctes)) if len(valeurs_distinctes) == 1 else None
-            if len(lignes) > 1 and any(
-                len({ligne[champ] for ligne in lignes}) > 1
-                for champ in ('prix', 'prix_affichage', 'prix_impression')
-            ):
-                return {'initial': valeurs, 'lignes': lignes}
-        return {'initial': valeurs}
+        return {
+            'initial': valeurs,
+            'lignes': [ligne for ligne in lignes if ligne['prix'] is not None or ligne['prix_affichage'] or ligne['prix_impression']],
+            'totaux_categories': sorted(totaux_categories.items(), key=lambda item: item[0].casefold()),
+            'total_estimatif': sum(totaux_categories.values(), Decimal('0')),
+        }
 
     def get_initial(self):
         initial = super().get_initial()
@@ -5001,6 +5212,8 @@ class CampagneCreateUpdateView(StaffRequiredMixin, UpdateView):
         context = super().get_context_data(**kwargs)
         context['demande_source'] = self.get_source_demande()
         context['tarifs_demande_par_format'] = self.tarification_demande.get('lignes', [])
+        context['totaux_tarifs_categories'] = self.tarification_demande.get('totaux_categories', [])
+        context['total_tarifs_estimatif'] = self.tarification_demande.get('total_estimatif')
         # Utilisation d'une logique ternaire pour plus de clarté
         context['title'] = f"Modifier — {self.object.nom}" if self.object else "Nouvelle Campagne"
         if self.object:
@@ -6114,6 +6327,12 @@ class ReservationDetailView(ClientStaffRequiredMixin, DetailView):
         context['page_title'] = f'Détail réservation — {reservation.nom}'
         context['can_edit'] = self.request.user.is_staff_regie_role
         context['can_delete'] = self.request.user.is_staff_regie_role
+        context['tarification'] = recap_tarification_faces(
+            [ligne.support for ligne in reservation.lignes.all()],
+            reservation.panneaux_confreres_reserves, reservation.prix_faces_par_format, {},
+            reservation.frais_faces_par_format, reservation.prix_affichage, reservation.prix_impression,
+            multiplicateur=reservation.multiplicateur_tarif_faces(),
+        )
         return context
 
 
@@ -7344,6 +7563,7 @@ class DemandeCreationView(StaffDemandeWizardBase):
                 'code': face.support.code,
                 'label': face.get_label_display(),
                 'quartier': face.support.quartier or face.support.ville,
+                'ville': face.support.ville,
                 'support_id': str(face.support_id),
                 'format_code': face.support.format,
                 'format_display': (
@@ -7550,11 +7770,12 @@ class DemandeCreationView(StaffDemandeWizardBase):
                 pk__in=selection['faces_uuids'],
                 support__actif=True,
             ).select_related('support')
+            groupes_tarifaires = [
+                (face.support.ville, face.support.format) for face in selected_faces if face.support.format
+            ] + [(panneau.get('ville'), f"confrere:{panneau['format']}") for panneau in panneaux_confreres]
             formats_attendus = {
-                face.support.format for face in selected_faces
-                if face.support.format
+                cle for ville, code in groupes_tarifaires for cle in (code, cle_tarif_ville(ville, code))
             }
-            formats_attendus.update(f"confrere:{panneau['format']}" for panneau in panneaux_confreres)
             try:
                 posted_tarifs = json.loads(
                     request.POST.get('tarifs_faces_par_format', '').strip() or '{}'
@@ -7642,6 +7863,101 @@ class DemandeCreationView(StaffDemandeWizardBase):
         return redirect('demande_creation_etape2')
 
 
+def recap_tarification_faces(
+    supports, panneaux_confreres, tarifs, remises, frais_par_format,
+    prix_affichage, prix_impression, *, formats=None, multiplicateur=1,
+):
+    if formats is None:
+        formats = FormatSupport.objects.filter(
+            code__in={support.format for support in supports if support.format},
+        ).in_bulk(field_name='code')
+    tarifs_lignes = []
+    total_brut = Decimal('0.00')
+    total_faces = Decimal('0.00')
+    groupes = {}
+    for support in supports:
+        ville, code = support.ville, support.format or ''
+        libelle = support.get_format_display() or code or 'Format non renseigné'
+        categorie = (formats[code].categorie if code in formats else '') or 'Autres'
+        groupe = groupes.setdefault((ville, code, f'parc:{code}'), [0, libelle, {}])
+        groupe[0] += 1
+        groupe[2][categorie] = None
+    for panneau in panneaux_confreres:
+        libelle = panneau['format']
+        code = f'confrere:{libelle}'
+        groupe = groupes.setdefault((panneau.get('ville'), code, code), [0, libelle, {}])
+        groupe[0] += panneau['nombre_faces']
+        groupe[2][panneau['nom']] = None
+    for (ville, code, _), (quantite, libelle, categories) in groupes.items():
+        prix = tarif_par_ville(tarifs, ville, code)
+        if prix in (None, ''):
+            continue
+        categorie = ' / '.join(categories)
+        if ville:
+            categorie = f"{categorie} · {ville}"
+        cle = cle_tarif_ville(ville, code)
+        remise = remises.get(cle if cle in tarifs else code)
+        try:
+            prix_brut = tarif_mensuel_net(prix, None)
+            prix_net = tarif_mensuel_net(prix_brut, remise)
+        except (InvalidOperation, ValueError):
+            prix_brut = prix_net = Decimal('0.00')
+        montant = prix_net * quantite * multiplicateur
+        total_brut += prix_brut * quantite * multiplicateur
+        total_faces += montant
+        tarifs_lignes.append({
+            'code': code,
+            'ville': ville,
+            'label': libelle,
+            'categorie': categorie,
+            'prix': prix_brut,
+            'prix_net': prix_net,
+            'quantite': quantite,
+            'remise': remise,
+            'total': montant,
+        })
+    cles_frais = {
+        key for ville, _, cle in groupes for key in (cle, cle_tarif_ville(ville, cle))
+    }
+    frais_par_format = {
+        cle: ligne for cle, ligne in frais_par_format.items()
+        if cle in cles_frais
+    }
+    frais_lignes = []
+    total_affichage = total_impression = Decimal('0.00')
+    for (ville, _, cle), (quantite, libelle, categories) in groupes.items():
+        if ville:
+            libelle = f"{libelle} · {ville}"
+        if cle.startswith('confrere:'):
+            libelle = f"{' / '.join(categories)} — {libelle}"
+        affichage, impression = frais_unitaires_format(
+            frais_par_format, cle, prix_affichage, prix_impression, ville=ville,
+        )
+        if not affichage and not impression:
+            continue
+        total_affichage += affichage * quantite
+        total_impression += impression * quantite
+        frais_lignes.append({
+            'label': libelle, 'quantite': quantite,
+            'affichage': affichage, 'impression': impression,
+            'total_affichage': affichage * quantite,
+            'total_impression': impression * quantite,
+        })
+    return {
+        'tarifs_lignes': tarifs_lignes,
+        'total_faces': total_faces,
+        'total_brut': total_brut,
+        'total_remises': total_brut - total_faces,
+        'prix_affichage': prix_affichage,
+        'prix_impression': prix_impression,
+        'total_affichage': total_affichage,
+        'total_impression': total_impression,
+        'total_estimatif': total_faces + total_affichage + total_impression,
+        'frais_lignes': frais_lignes,
+        'frais_faces_par_format': frais_par_format,
+    }
+
+
 class DemandeCreationEtape2View(StaffDemandeWizardBase):
     """Étape 2 : récapitulatif et validation de la demande."""
     template_name = 'campaigns/demande_creation_recap.html'
@@ -7689,80 +8005,13 @@ class DemandeCreationEtape2View(StaffDemandeWizardBase):
                 code__in={face.support.format for face in faces if face.support.format}
             )
         }
-        tarifs_lignes = []
-        total_brut = Decimal('0.00')
-        total_faces = Decimal('0.00')
-        formats_confreres = {}
-        for panneau in panneaux_confreres:
-            libelle = panneau['format']
-            cle = f'confrere:{libelle}'
-            groupe = formats_confreres.setdefault(cle, {'quantite': 0, 'libelle': libelle, 'confreres': {}})
-            groupe['quantite'] += panneau['nombre_faces']
-            groupe['confreres'][f"{panneau['nom']} · {panneau['ville']}"] = None
-        for code, prix in tarifs.items():
-            format_support = formats.get(code)
-            if code in formats_confreres:
-                groupe = formats_confreres[code]
-                quantite, libelle = groupe['quantite'], groupe['libelle']
-                categorie = ' / '.join(groupe['confreres'])
-            else:
-                quantite = sum(face.support.format == code for face in faces)
-                libelle = format_support.dimensions if format_support and format_support.dimensions else code
-                categorie = (format_support.categorie if format_support else '') or 'Autres'
-            if not quantite:
-                continue
-            remise = remises.get(code)
-            try:
-                prix_brut = tarif_mensuel_net(prix, None)
-                prix_net = tarif_mensuel_net(prix_brut, remise)
-            except (InvalidOperation, ValueError):
-                prix_brut = prix_net = Decimal('0.00')
-            montant = prix_net * quantite
-            total_brut += prix_brut * quantite
-            total_faces += montant
-            tarifs_lignes.append({
-                'code': code,
-                'label': libelle,
-                'categorie': categorie,
-                'prix': prix_brut,
-                'prix_net': prix_net,
-                'quantite': quantite,
-                'remise': remise,
-                'total': montant,
-            })
         frais = request.session.get(self.session_frais_key, {})
-        prix_affichage = Decimal(frais.get('prix_affichage', '0'))
-        prix_impression = Decimal(frais.get('prix_impression', '0'))
-        quantites_frais = {}
-        for face in faces:
-            code = face.support.format or ''
-            cle = f'parc:{code}'
-            libelle = face.support.get_format_display() or code or 'Format non renseigné'
-            quantite, _ = quantites_frais.get(cle, (0, libelle))
-            quantites_frais[cle] = (quantite + 1, libelle)
-        for cle, groupe in formats_confreres.items():
-            confreres = ' / '.join(groupe['confreres'])
-            quantites_frais[cle] = (groupe['quantite'], f"{confreres} — {groupe['libelle']}")
-        frais_par_format = {
-            cle: ligne for cle, ligne in request.session.get(self.session_frais_format_key, {}).items()
-            if cle in quantites_frais
-        }
-        frais_lignes = []
-        total_affichage = total_impression = Decimal('0.00')
-        for cle, (quantite, libelle) in quantites_frais.items():
-            affichage, impression = frais_unitaires_format(
-                frais_par_format, cle, prix_affichage, prix_impression,
-            )
-            if not affichage and not impression:
-                continue
-            total_affichage += affichage * quantite
-            total_impression += impression * quantite
-            frais_lignes.append({
-                'label': libelle, 'quantite': quantite,
-                'affichage': affichage, 'impression': impression,
-                'total_affichage': affichage * quantite,
-                'total_impression': impression * quantite,
-            })
+        tarification = recap_tarification_faces(
+            [face.support for face in faces], panneaux_confreres, tarifs, remises,
+            request.session.get(self.session_frais_format_key, {}),
+            Decimal(frais.get('prix_affichage', '0')), Decimal(frais.get('prix_impression', '0')),
+            formats=formats,
+        )
         return self.step_context(
             request,
             faces=faces,
@@ -7788,23 +8037,13 @@ class DemandeCreationEtape2View(StaffDemandeWizardBase):
                         formats[face.support.format].categorie
                         if face.support.format in formats else ''
                     ) or 'Autres',
-                    'tarif': tarifs.get(face.support.format, ''),
+                    'tarif': tarif_par_ville(tarifs, face.support.ville, face.support.format, ''),
                 }
                 for face in faces
             ],
             tarifs_faces_par_format=tarifs,
-            tarifs_lignes=tarifs_lignes,
-            total_faces=total_faces,
-            total_brut=total_brut,
-            total_remises=total_brut - total_faces,
             nombre_faces=nombre_faces,
-            prix_affichage=prix_affichage,
-            prix_impression=prix_impression,
-            total_affichage=total_affichage,
-            total_impression=total_impression,
-            total_estimatif=total_faces + total_affichage + total_impression,
-            frais_lignes=frais_lignes,
-            frais_faces_par_format=frais_par_format,
+            **tarification,
         )
 
     @staticmethod
@@ -7974,7 +8213,13 @@ class DemandeDetailView(LoginRequiredMixin, View):
             'demande': demande,
             'campagne_form': DemandeCampagneForm(demande=demande),
             'statut_validation_confreres': statut_validation_confreres(demande),
-            'confreres_lignes': lignes_recap_confreres(demande.panneaux_confreres),
+            'confreres_lignes': lignes_recap_confreres(demande.panneaux_confreres, demande.prix_nets_faces_par_format),
+            'tarification': recap_tarification_faces(
+                [face.support for face in demande.faces_souhaitees.all()],
+                demande.panneaux_confreres, demande.prix_faces_par_format, demande.remises_faces_par_format,
+                demande.frais_faces_par_format, demande.prix_affichage, demande.prix_impression,
+                multiplicateur=1 if demande.tarif_faces_par_periode else max(1, (demande.duree_jours + 29) // 30),
+            ),
         }
         client_reservations = (
             demande.client

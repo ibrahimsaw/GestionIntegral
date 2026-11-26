@@ -4,6 +4,8 @@ from uuid import uuid4
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 
+from campaigns.tarification import tarif_par_ville
+
 from .models import Confrere, DossierConfrere, SupportConfrere
 
 
@@ -72,7 +74,7 @@ def lignes_recap_confreres(panneaux, tarifs=None):
         {
             **panneau,
             'face': face,
-            'tarif': tarifs.get(f"confrere:{panneau['format']}"),
+            'tarif': tarif_par_ville(tarifs, panneau.get('ville'), f"confrere:{panneau['format']}"),
         }
         for panneau in panneaux
         for face in (panneau.get('faces') or [None])

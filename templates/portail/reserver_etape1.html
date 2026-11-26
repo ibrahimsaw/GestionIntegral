@@ -1860,7 +1860,7 @@
             <p class="nd-tarif-note mb-0">L’affichage et l’impression sont facturés une seule fois par face.</p>
             <div class="nd-tarif-total"><span>Montant total estimatif</span><span class="v" id="tarifs-total-value">0 FCFA</span></div>
             <div id="tarifs-estimation" class="nd-tarif-note"></div>
-            <div class="nd-tarif-note">Le tarif et la remise s’appliquent à chaque face pour toute la période choisie.</div>
+            <div class="nd-tarif-note">Le tarif et la remise s’appliquent par face, pour un même format dans une même ville, sur toute la période choisie.</div>
           </div>
           <div class="nd-tarif-empty"><i class="bi bi-info-circle me-1"></i>Sélectionnez des emplacements et des dates pour renseigner les tarifs.</div>
         </div>
@@ -2095,7 +2095,7 @@
       {% if staff_mode %}
       <div id="tarification-faces" style="display:none;margin-top:14px;padding:12px;border:1px solid var(--line);border-radius:var(--radius)">
         <strong style="font-size:.84rem">Tarif unitaire par face (facultatif)</strong>
-        <div class="small text-muted mb-2">Un tarif est appliqué à toutes les faces du même format. Facturation par périodes de 30 jours commencées.</div>
+        <div class="small text-muted mb-2">Un tarif est appliqué aux faces du même format dans la même ville.</div>
         <div id="tarifs-formats-champs"></div>
         <div id="tarifs-estimation" class="small fw-semibold mt-2"></div>
       </div>
@@ -2272,6 +2272,7 @@
         code: face.code,
         label: face.label,
         quartier: face.quartier,
+        ville: face.ville,
         support_id: face.support_id,
         format_code: face.format_code,
         format_display: face.format_display,
@@ -2516,23 +2517,38 @@
       return synchroniser;
     }
 
+    function cleTarifVille(ville, code) {
+      return ville ? 'ville:' + JSON.stringify([ville, code]) : code;
+    }
+
     function syncTarifsHidden() {
+      const tarifs = {}, remises = {}, frais = {};
+      formatsTarification().forEach((format, cle) => {
+        if (format.ancienCode) {
+          tarifs[format.code] = tarifsSaisis[format.code] ?? tarifsSaisis[format.ancienCode];
+          remises[format.code] = remisesSaisies[format.code] ?? remisesSaisies[format.ancienCode];
+        }
+        frais[cle] = fraisSaisis[cle] ?? fraisSaisis[format.ancienneCle];
+      });
       const hidden = document.getElementById('tarifs-faces-input');
-      if (hidden) hidden.value = JSON.stringify(tarifsSaisis);
+      if (hidden) hidden.value = JSON.stringify(tarifs);
       const hiddenRemises = document.getElementById('remises-faces-input');
-      if (hiddenRemises) hiddenRemises.value = JSON.stringify(remisesSaisies);
+      if (hiddenRemises) hiddenRemises.value = JSON.stringify(remises);
       const hiddenFrais = document.getElementById('frais-faces-input');
-      if (hiddenFrais) hiddenFrais.value = JSON.stringify(fraisSaisis);
+      if (hiddenFrais) hiddenFrais.value = JSON.stringify(frais);
     }
 
     function formatsTarification() {
       const formats = new Map();
       Object.values(panier).forEach(item => {
-        const code = item.format_code || '';
-        const cle = `parc:${code}`;
+        const ancienCode = item.format_code || '';
+        const ancienneCle = `parc:${ancienCode}`;
+        const ville = (item.ville || '').trim();
+        const cle = cleTarifVille(ville, ancienneCle);
         const current = formats.get(cle) || {
-          code,
-          label: item.format_display || code || 'Format non renseigné',
+          code: ancienCode && cleTarifVille(ville, ancienCode),
+          ancienCode, ancienneCle, ville,
+          label: item.format_display || ancienCode || 'Format non renseign?',
           categorie: item.categorie || 'Autres',
           count: 0,
         };
@@ -2540,11 +2556,14 @@
         formats.set(cle, current);
       });
       panneauxConfreres.forEach(item => {
-        const cle = `confrere:${item.format}`;
-        const current = formats.get(cle) || { code: cle, label: item.format, confreres: new Set(), nomsConfreres: new Set(), count: 0 };
+        const ancienneCle = `confrere:${item.format}`;
+        const ville = (item.ville || '').trim();
+        const cle = cleTarifVille(ville, ancienneCle);
+        const current = formats.get(cle) || {
+          code: cle, ancienCode: ancienneCle, ancienneCle, ville, label: item.format, confreres: new Set(), count: 0,
+        };
         current.count += Number(item.nombre_faces);
-        current.confreres.add(`${item.nom} · ${item.ville}`);
-        current.nomsConfreres.add(item.nom);
+        current.confreres.add(item.nom);
         formats.set(cle, current);
       });
       return formats;
@@ -2562,9 +2581,10 @@
 
       formats.forEach((format, cle) => {
         const code = format.code;
+        const groupeLabel = [format.label, format.ville].filter(Boolean).join(' · ');
         const input = document.createElement('input');
-        input.setAttribute('aria-label', `Tarif par face ${format.label}`);
-        saisieMontant(input, tarifsSaisis[code], valeur => {
+        input.setAttribute('aria-label', `Tarif par face ${groupeLabel}`);
+        saisieMontant(input, tarifsSaisis[code] ?? tarifsSaisis[format.ancienCode], valeur => {
           tarifsSaisis[code] = valeur;
           syncTarifsHidden();
           updateTarifsEstimation();
@@ -2574,7 +2594,7 @@
           const wrapper = document.createElement('label');
           wrapper.className = 'd-flex align-items-center justify-content-between gap-2 mb-2';
           const title = document.createElement('span');
-          title.textContent = `${format.categorie} — ${format.label} (${format.count} face${format.count > 1 ? 's' : ''})`;
+          title.textContent = `${format.categorie} — ${format.label}${format.ville ? ' · ' + format.ville : ''} (${format.count} face${format.count > 1 ? 's' : ''})`;
           input.className = 'form-control form-control-sm';
           input.style.maxWidth = '150px';
           wrapper.append(title, input);
@@ -2587,14 +2607,15 @@
         const remise = document.createElement('input');
         remise.className = 'nd-in nd-in-sm';
         remise.placeholder = '0';
-        remise.setAttribute('aria-label', `Remise ${format.label}`);
+        remise.setAttribute('aria-label', `Remise ${groupeLabel}`);
 
         const uniteRemise = document.createElement('select');
         uniteRemise.className = 'nd-in';
-        uniteRemise.setAttribute('aria-label', `Unité de remise ${format.label}`);
+        uniteRemise.setAttribute('aria-label', `Unité de remise ${groupeLabel}`);
         uniteRemise.append(new Option('%', 'pourcentage'), new Option('FCFA', 'fcfa'));
-        uniteRemise.value = remisesSaisies[code]?.unite || 'pourcentage';
-        const syncRemise = saisieMontant(remise, remisesSaisies[code]?.valeur, valeur => {
+        const remiseInitiale = remisesSaisies[code] ?? remisesSaisies[format.ancienCode];
+        uniteRemise.value = remiseInitiale?.unite || 'pourcentage';
+        const syncRemise = saisieMontant(remise, remiseInitiale?.valeur, valeur => {
           remisesSaisies[code] = { valeur, unite: uniteRemise.value };
           syncTarifsHidden();
           updateTarifsEstimation();
@@ -2604,7 +2625,7 @@
         const tr = document.createElement('tr');
         tr.dataset.tarifKey = cle;
         const cName = document.createElement('td');
-        const nomSupport = format.confreres ? [...format.confreres].join(' / ') : format.categorie || 'Autres';
+        const nomSupport = [format.confreres ? [...format.confreres].join(' / ') : format.categorie, format.ville].filter(Boolean).join(' · ');
         cName.innerHTML = `
           <div class="nd-support-name">
             <strong>${escHtml(nomSupport)}</strong>
@@ -2633,9 +2654,9 @@
           const champ = `prix_${type}`;
           frais.className = 'nd-in nd-in-sm';
           frais.placeholder = '0';
-          frais.setAttribute('aria-label', `${type} par face pour ${format.label}`);
-          saisieMontant(frais, fraisSaisis[cle]?.[champ] ?? fraisDefaut[champ], valeur => {
-            fraisSaisis[cle] = { ...fraisDefaut, ...fraisSaisis[cle], [champ]: valeur || '0' };
+          frais.setAttribute('aria-label', `${type} par face pour ${groupeLabel}`);
+          saisieMontant(frais, (fraisSaisis[cle] ?? fraisSaisis[format.ancienneCle])?.[champ] ?? fraisDefaut[champ], valeur => {
+            fraisSaisis[cle] = { ...fraisDefaut, ...(fraisSaisis[cle] ?? fraisSaisis[format.ancienneCle]), [champ]: valeur || '0' };
             syncTarifsHidden();
             updateTarifsEstimation();
           });
@@ -2675,18 +2696,19 @@
       const lignesTarif = [];
       formats.forEach((format, cle) => {
         const code = format.code;
-        const prix = code ? toNum(tarifsSaisis[code]) : 0;
-        const remise = code ? remisesSaisies[code] : undefined;
+        const valeurTarif = tarifsSaisis[code] ?? tarifsSaisis[format.ancienCode];
+        const prix = code ? toNum(valeurTarif) : 0;
+        const remise = code ? (remisesSaisies[code] ?? remisesSaisies[format.ancienCode]) : undefined;
         const valeur = Math.max(0, toNum(remise?.valeur));
         const reduction = remise?.unite === 'fcfa' ? valeur : prix * Math.min(100, valeur) / 100;
         const prixNet = Math.round(Math.max(0, prix - reduction) * 100) / 100;
-        const frais = { ...fraisDefaut, ...fraisSaisis[cle] };
+        const frais = { ...fraisDefaut, ...(fraisSaisis[cle] ?? fraisSaisis[format.ancienneCle]) };
         const fraisParFace = Math.max(0, toNum(frais.prix_affichage)) + Math.max(0, toNum(frais.prix_impression));
         const montant = (prixNet + fraisParFace) * format.count;
         total += montant;
-        if (recap && tarifsSaisis[code] !== undefined && tarifsSaisis[code] !== '') {
+        if (recap && valeurTarif !== undefined && valeurTarif !== '') {
           const ligne = document.createElement('div');
-          const source = format.nomsConfreres ? [...format.nomsConfreres].join(', ') : 'Parc Integral';
+          const source = [format.confreres ? [...format.confreres].join(', ') : 'Parc Integral', format.ville].filter(Boolean).join(' · ');
           ligne.textContent = `${format.label} · ${source} — ${fmtFcfa(prixNet)} FCFA / face`;
           lignesTarif.push(ligne);
         }
@@ -2742,7 +2764,7 @@
         facesHtml += `
           <div class="rl-face-row">
             <button class="rl-face-btn ${cls}" ${disabled}
-              onclick="toggleFace('${key}','${escQ(p.code)}','${face.label}','${escQ(p.quartier||p.ville||'')}','${p.id}','${escQ(p.format||'')}','${escQ(p.format_display||p.format||'')}','${escQ(p.categorie||'Autres')}')">
+              onclick="toggleFace('${key}','${escQ(p.code)}','${face.label}','${escQ(p.quartier||p.ville||'')}','${p.id}','${escQ(p.format||'')}','${escQ(p.format_display||p.format||'')}','${escQ(p.categorie||'Autres')}','${escQ(p.ville||'')}')">
               <span><i class="bi ${icon} me-1"></i>${txt}</span>
             </button>
             ${photoTrigger}
@@ -3089,7 +3111,7 @@
         const badge = inPanier ? 'Sélectionnée' : canToggle ? 'Disponible' : occupiedFaceLabel(key);
         const disabled = (!canToggle && !inPanier) ? 'disabled' : '';
         const onclick = (canToggle || inPanier)
-          ? `onclick="toggleFace('${key}','${escQ(p.code)}','${face.label}','${escQ(p.quartier||p.ville||'')}','${p.id}','${escQ(p.format||'')}','${escQ(p.format_display||p.format||'')}','${escQ(p.categorie||'Autres')}');renderListe()"`
+          ? `onclick="toggleFace('${key}','${escQ(p.code)}','${face.label}','${escQ(p.quartier||p.ville||'')}','${p.id}','${escQ(p.format||'')}','${escQ(p.format_display||p.format||'')}','${escQ(p.categorie||'Autres')}','${escQ(p.ville||'')}');renderListe()"`
           : '';
         const photoTrigger = buildPhotoTrigger(p, face);
 
@@ -3760,12 +3782,12 @@
       return Object.values(panier).some(item => item.support_id === String(supportId));
     }
 
-    function toggleFace(faceId, code, label, quartier, supportId, formatCode, formatDisplay, categorie) {
+    function toggleFace(faceId, code, label, quartier, supportId, formatCode, formatDisplay, categorie, ville) {
       const key = String(faceId);
       if (panier[key]) delete panier[key];
       else panier[key] = {
         code, label, quartier, support_id: String(supportId),
-        format_code: formatCode, format_display: formatDisplay, categorie,
+        format_code: formatCode, format_display: formatDisplay, categorie, ville,
       };
       updatePanier();
       if (currentView === 'carte') {

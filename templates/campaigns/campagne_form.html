@@ -551,18 +551,36 @@
               {% if tarifs_demande_par_format %}
               <div class="table-responsive mt-3">
                 <table class="table table-sm align-middle mb-0">
-                  <caption class="caption-top">Tarifs repris de la demande par format</caption>
-                  <thead><tr><th scope="col">Format</th><th scope="col" class="text-end">Prix net</th><th scope="col" class="text-end">Affichage</th><th scope="col" class="text-end">Impression</th></tr></thead>
+                  <caption class="caption-top">Tarifs repris de la demande par format et par ville</caption>
+                  <thead><tr><th scope="col">Format</th><th scope="col">Ville</th><th scope="col" class="text-end">Faces</th><th scope="col" class="text-end">Prix net</th><th scope="col" class="text-end">Affichage</th><th scope="col" class="text-end">Impression</th><th scope="col" class="text-end">Sous-total</th></tr></thead>
                   <tbody>
                     {% for ligne in tarifs_demande_par_format %}
                       <tr>
                         <th scope="row">{{ ligne.format }}</th>
+                        <td>{{ ligne.ville|default:"—" }}</td>
+                        <td class="text-end">{{ ligne.quantite }}</td>
                         <td class="text-end">{% if ligne.prix is not None %}{{ ligne.prix|floatformat:"-2g" }}{% else %}—{% endif %}</td>
                         <td class="text-end">{{ ligne.prix_affichage|floatformat:"-2g" }}</td>
                         <td class="text-end">{{ ligne.prix_impression|floatformat:"-2g" }}</td>
+                        <td class="text-end">{{ ligne.total|floatformat:"-2g" }} FCFA</td>
                       </tr>
                     {% endfor %}
                   </tbody>
+                </table>
+              </div>
+              {% endif %}
+              {% if totaux_tarifs_categories %}
+              <div class="table-responsive mt-3">
+                <table class="table table-sm align-middle mb-0">
+                  <caption class="caption-top">Totaux par catégorie selon les tarifs de la demande</caption>
+                  <tbody>
+                    {% for categorie, total in totaux_tarifs_categories %}
+                    <tr><th scope="row">{{ categorie }}</th><td class="text-end">{{ total|floatformat:"-2g" }} FCFA</td></tr>
+                    {% endfor %}
+                  </tbody>
+                  <tfoot class="table-light">
+                    <tr><th scope="row">Total estimatif général</th><td class="text-end fw-bold">{{ total_tarifs_estimatif|floatformat:"-2g" }} FCFA</td></tr>
+                  </tfoot>
                 </table>
               </div>
               {% endif %}

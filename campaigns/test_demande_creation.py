@@ -11,6 +11,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from campaigns.forms import DemandeGestionContactForm
+from campaigns.tarification import cle_tarif_ville
 from campaigns.models import (
     Campagne,
     Client,
@@ -533,6 +534,71 @@ class DemandeCreationViewTests(TestCase):
         })
         self.assertTrue(agency_only_form.is_valid(), agency_only_form.errors)
         self.assertEqual(agency_only_form.cleaned_data['societe'], 'Client entreprise SA')
+
+    def test_same_format_has_distinct_prices_and_fees_by_city(self):
+        standard = FormatSupport.objects.create(code='CITY-PRICE', categorie='12m²', dimensions='4m x 3m')
+        self.panel.format = standard.code
+        self.panel.save(update_fields=['format'])
+        autre_support = Support.objects.create(
+            code='CITY-PRICE-BOBO', nom='Panneau Bobo', type_support=Support.TYPE_PANNEAU,
+            format=standard.code, latitude=11.18, longitude=-4.29, ville='Bobo-Dioulasso',
+        )
+        autre_face = FacePanneau.objects.create(support=autre_support, label=FacePanneau.LABEL_A)
+        ouaga = cle_tarif_ville(self.panel.ville, standard.code)
+        bobo = cle_tarif_ville(autre_support.ville, standard.code)
+        prix = {ouaga: '100000', bobo: '60000'}
+        frais = {
+            cle_tarif_ville(self.panel.ville, f'parc:{standard.code}'): {'prix_affichage': '5000'},
+            cle_tarif_ville(autre_support.ville, f'parc:{standard.code}'): {'prix_affichage': '2000'},
+        }
+        response = self.complete_step_one(
+            faces_selectionnees=json.dumps([self.face.pk, autre_face.pk]),
+            tarifs_faces_par_format=json.dumps(prix),
+            remises_faces_par_format=json.dumps({bobo: {'unite': 'fcfa', 'valeur': '2000'}}),
+            frais_faces_par_format=json.dumps(frais),
+        )
+        self.assertRedirects(response, reverse('demande_creation_etape2'))
+        recap = self.client.get(reverse('demande_creation_etape2'))
+        self.assertEqual(recap.context['total_estimatif'], 165000)
+        self.assertEqual({ligne['prix_net'] for ligne in recap.context['tarifs_lignes']}, {100000, 58000})
+        self.complete_step_two()
+        demande = DemandeReservation.objects.get()
+        self.assertEqual(demande.prix_faces_par_format, prix)
+        detail = self.client.get(reverse('demande_detail', kwargs={'uuid': demande.uuid}))
+        self.assertEqual(detail.context['tarification']['total_estimatif'], 165000)
+        self.assertContains(detail, 'Tarification par ville et format')
+        campagne_form = self.client.get(reverse('campagne_create'), {'demande': demande.uuid})
+        self.assertEqual(
+            {ligne['ville']: ligne['prix'] for ligne in campagne_form.context['tarifs_demande_par_format']},
+            {'Ouagadougou': 100000, 'Bobo-Dioulasso': 58000},
+        )
+        self.assertEqual(campagne_form.context['totaux_tarifs_categories'], [('12m²', 165000)])
+        self.assertEqual(campagne_form.context['total_tarifs_estimatif'], 165000)
+        self.assertContains(campagne_form, 'Total estimatif général')
+        self.client.post(reverse('demande_valider', kwargs={'uuid': demande.uuid}))
+        reservation = Reservation.objects.get()
+        self.assertEqual(reservation.montant_total(), 165000)
+        detail = self.client.get(reverse('reservation_detail', args=[reservation.client_id, reservation.pk]))
+        self.assertEqual(detail.context['tarification']['total_estimatif'], 165000)
+        response = self.client.post(reverse('campagne_create'), {
+            'reservation_reference': reservation.reference,
+            'client': str(reservation.client_id),
+            'annonceur': reservation.client.nom,
+            'nom': 'Campagne tarifs par ville',
+            'date_debut': self.start.isoformat(),
+            'date_fin': self.end.isoformat(),
+            'type_support': 'panneau',
+            'nombre_visuels': '1',
+        })
+        self.assertEqual(response.status_code, 302, response.context['form'].errors if response.status_code == 200 else '')
+        campagne = Campagne.objects.get(nom='Campagne tarifs par ville')
+        self.assertEqual(campagne.prix_faces_par_format, reservation.prix_faces_par_format)
+        detail = self.client.get(reverse('campagne_detail', args=[campagne.pk]))
+        self.assertEqual(
+            {ligne['support'].ville: ligne['prix_unitaire'] for ligne in detail.context['support_rows']},
+            {'Ouagadougou': 100000, 'Bobo-Dioulasso': 58000},
+        )
+        self.assertEqual(detail.context['totaux_campagne']['total'], 165000)
 
     def test_format_prices_and_discounts_flow_from_demand_to_reservation(self):
         standard = FormatSupport.objects.create(

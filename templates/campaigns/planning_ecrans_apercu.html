@@ -1,0 +1,142 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}Aperçu du planning des écrans — Integral{% endblock %}
+
+{% block topbar_title %}
+  <i class="bi bi-calendar-week me-2 text-primary" aria-hidden="true"></i>Aperçu du planning des écrans
+{% endblock %}
+
+{% block topbar_actions %}
+  <div class="d-flex flex-wrap gap-2">
+    <a id="planning-back" class="btn btn-sm btn-outline-secondary shadow-sm" href="{% url 'dashboard' %}{% querystring export=None %}">
+      <i class="bi bi-arrow-left me-1" aria-hidden="true"></i>Accueil du parc
+    </a>
+    <a id="planning-download" class="btn btn-sm btn-primary shadow-sm" href="{% querystring export='planning_pdf' %}">
+      <i class="bi bi-file-earmark-pdf me-1" aria-hidden="true"></i>Télécharger PDF
+    </a>
+  </div>
+{% endblock %}
+
+{% block extra_head %}
+  <link rel="stylesheet" href="{% static 'css/gestion-listes.css' %}?v=20261118">
+  <style>
+    .planning-preview { padding: clamp(12px, 3vw, 28px); background: #f8fafc; }
+    .planning-preview .planning-document section:not([hidden]) ~ section:not([hidden]) { border-top: 1px solid var(--dl-line); margin-top: 24px; padding-top: 24px; }
+    .planning-preview .planning-grid { overflow-x: auto; }
+    .planning-preview .planning-document .planning { min-width: 680px; }
+    #planning-filters [hidden], .planning-preview [hidden] { display: none !important; }
+  </style>
+{% endblock %}
+
+{% block content %}
+  <div class="dl">
+    <section class="dl-card mb-4" id="planning-filters" aria-labelledby="planning-filters-title">
+      <div class="dl-card-head">
+        <h2 class="h6 mb-0" id="planning-filters-title"><i class="bi bi-sliders2" aria-hidden="true"></i>Filtres du rapport</h2>
+      </div>
+      <div class="p-3">
+        <form method="get" id="planning-date-form" class="mb-3">
+          <input type="hidden" name="export" value="planning_preview">
+          {% if not afficher_tableaux_campagnes %}<input type="hidden" name="tableaux_campagnes" value="masquer">{% endif %}
+          {% if ville %}<input type="hidden" name="ville" value="{{ ville }}">{% endif %}
+          {% if ecran_id %}<input type="hidden" name="ecran_id" value="{{ ecran_id }}">{% endif %}
+          <label for="planning-date" class="form-label small fw-semibold">Semaine du</label>
+          <input type="date" class="form-control form-control-sm w-auto" id="planning-date" name="ecran_date" value="{{ date_reference|date:'Y-m-d' }}" required>
+          <noscript><button type="submit" class="btn btn-sm btn-primary mt-2">Appliquer la date</button></noscript>
+        </form>
+        {% if villes|length > 1 or ville %}
+          <p id="planning-ville-label" class="small fw-semibold mb-1">Ville</p>
+          <nav class="dl-tabs" aria-labelledby="planning-ville-label">
+            <a class="dl-tab{% if not ville %} is-active{% endif %}" data-filter="ville" data-value="" href="{% querystring ville=None ecran_id=None %}">Toutes</a>
+            {% for option in villes %}
+              <a class="dl-tab{% if ville == option %} is-active{% endif %}" data-filter="ville" data-value="{{ option }}" href="{% querystring ville=option ecran_id=None %}">{{ option }}</a>
+            {% endfor %}
+          </nav>
+        {% endif %}
+        {% if options_ecrans|length > 1 %}
+          <div id="planning-screen-filter">
+          <p id="planning-ecran-label" class="small fw-semibold mb-1">Écran</p>
+          <nav class="dl-tabs" aria-labelledby="planning-ecran-label">
+            <a class="dl-tab{% if not ecran_id or ecran_id == 'all' %} is-active{% endif %}" data-filter="ecran_id" data-value="" href="{% querystring ecran_id=None %}">Tous</a>
+            {% for option in options_ecrans %}
+              <a class="dl-tab{% if option.id|stringformat:'s' == ecran_id %} is-active{% endif %}" data-filter="ecran_id" data-value="{{ option.id }}" data-ville="{{ option.ville }}"{% if ville and ville|lower != option.ville|lower %} hidden{% endif %} href="{% querystring ecran_id=option.id %}">{{ option.code }} — {{ option.nom }}</a>
+            {% endfor %}
+          </nav>
+          </div>
+        {% endif %}
+        <p id="planning-tableaux-label" class="small fw-semibold mb-1">Tableaux des campagnes</p>
+        <nav class="dl-tabs mb-0" aria-labelledby="planning-tableaux-label">
+          <a class="dl-tab{% if afficher_tableaux_campagnes %} is-active{% endif %}" data-filter="tableaux_campagnes" data-value="" href="{% querystring tableaux_campagnes=None %}">Afficher</a>
+          <a class="dl-tab{% if not afficher_tableaux_campagnes %} is-active{% endif %}" data-filter="tableaux_campagnes" data-value="masquer" href="{% querystring tableaux_campagnes='masquer' %}">Masquer</a>
+        </nav>
+      </div>
+    </section>
+    <div class="dl-card planning-preview">
+      {% include 'campaigns/includes/planning_ecrans_document.html' %}
+    </div>
+  </div>
+  <script>
+    (() => {
+      const filters = document.getElementById('planning-filters');
+      const links = filters.querySelectorAll('[data-filter]');
+      const screens = document.querySelectorAll('[data-planning-screen]');
+      const tables = document.querySelectorAll('[data-planning-tables]');
+      const download = document.getElementById('planning-download');
+      const back = document.getElementById('planning-back');
+      const screenFilter = document.getElementById('planning-screen-filter');
+
+      function filterUrl(url, key, value) {
+        const next = new URL(url);
+        if (value) next.searchParams.set(key, value);
+        else next.searchParams.delete(key);
+        if (key === 'ville') next.searchParams.delete('ecran_id');
+        return next;
+      }
+
+      function update() {
+        const url = new URL(location.href);
+        const ville = url.searchParams.get('ville') || '';
+        const screen = url.searchParams.get('ecran_id') || '';
+        const matchesCity = item => !ville || item.dataset.ville.toLowerCase() === ville.toLowerCase();
+        let visible = 0;
+        let available = 0;
+        screens.forEach(item => {
+          const inCity = matchesCity(item);
+          item.hidden = !inCity || Boolean(screen && screen !== 'all' && screen !== item.dataset.planningScreen);
+          if (inCity) available++;
+          if (!item.hidden) visible++;
+        });
+        tables.forEach(item => { item.hidden = url.searchParams.get('tableaux_campagnes') === 'masquer'; });
+        links.forEach(link => {
+          const {filter, value} = link.dataset;
+          let selected = url.searchParams.get(filter) || '';
+          if (filter === 'ecran_id' && selected === 'all') selected = '';
+          link.classList.toggle('is-active', selected.toLowerCase() === value.toLowerCase());
+          link.href = filterUrl(url, filter, value);
+          if (filter === 'ecran_id' && value) link.hidden = !matchesCity(link);
+        });
+        if (screenFilter) screenFilter.hidden = available <= 1;
+        document.querySelector('[data-planning-count]').textContent = visible + (visible > 1 ? ' écrans' : ' écran');
+        document.querySelector('[data-planning-ville]').textContent = ville || 'Toutes les villes';
+        document.querySelector('[data-planning-empty]').hidden = visible > 0;
+        download.href = filterUrl(url, 'export', 'planning_pdf');
+        back.href = filterUrl(url, 'export', '');
+      }
+      filters.addEventListener('click', event => {
+        const link = event.target.closest('[data-filter]');
+        if (!link || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+        event.preventDefault();
+        history.replaceState(null, '', link.href);
+        update();
+      });
+      document.getElementById('planning-date').addEventListener('change', function () {
+        if (!this.value) return;
+        const url = filterUrl(location.href, 'ecran_date', this.value);
+        url.searchParams.delete('ecran_annee');
+        location.assign(url);
+      });
+      update();
+    })();
+  </script>
+{% endblock %}

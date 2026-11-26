@@ -170,6 +170,52 @@
           <i class="bi bi-bar-chart-line-fill"></i> Informations générales
         </div>
         <div class="cpd-card-body">
+          {% if faces_par_type_panneau %}
+          {% if campagne.contrat.get_detail %}
+          <div class="cpd-stat mb-3">
+            <div class="cpd-stat-label">Contrat</div>
+            <div class="cpd-stat-value">{{ campagne.contrat.get_detail }}</div>
+          </div>
+          {% endif %}
+          <div class="d-grid gap-3">
+            {% for ville, libelle, nombre_faces in faces_par_type_panneau %}
+            <section class="cpd-panel-group" aria-label="{{ ville }} · {{ libelle }}">
+              <div class="row row-cols-2 row-cols-lg-3 row-cols-xxl-5 g-2">
+                <div class="col">
+                  <div class="cpd-stat">
+                    <div class="cpd-stat-label">Date de début</div>
+                    <div class="cpd-stat-value">{{ campagne.date_debut|date:"d/m/Y" }}</div>
+                  </div>
+                </div>
+                <div class="col">
+                  <div class="cpd-stat">
+                    <div class="cpd-stat-label">Date de fin</div>
+                    <div class="cpd-stat-value">{{ campagne.date_fin|date:"d/m/Y" }}</div>
+                  </div>
+                </div>
+                <div class="col">
+                  <div class="cpd-stat">
+                    <div class="cpd-stat-label">Type</div>
+                    <div class="cpd-stat-value">{{ libelle }}</div>
+                  </div>
+                </div>
+                <div class="col">
+                  <div class="cpd-stat">
+                    <div class="cpd-stat-label">Zone / Ville</div>
+                    <div class="cpd-stat-value">{{ ville }}</div>
+                  </div>
+                </div>
+                <div class="col">
+                  <div class="cpd-stat cpd-stat-accent">
+                    <div class="cpd-stat-label">Nombre de faces</div>
+                    <div class="cpd-stat-value">{{ nombre_faces|format_number_fr }}</div>
+                  </div>
+                </div>
+              </div>
+            </section>
+            {% endfor %}
+          </div>
+          {% else %}
           <div class="row g-3">
             <div class="col-6 col-md-3">
               <div class="cpd-stat">
@@ -193,7 +239,7 @@
             {% endif %}
             <div class="col-6 col-md-3">
               <div class="cpd-stat">
-                <div class="cpd-stat-label">Format / Type</div>
+                <div class="cpd-stat-label">{% if campagne.type_support == 'panneau' and not campagne.est_mere %}Type{% else %}Format / Type{% endif %}</div>
                 <div class="cpd-stat-value">
                   {% if campagne.est_mere %}
                     <i class="bi bi-diagram-3" style="color:#f59e0b"></i> Campagne Mère
@@ -257,6 +303,7 @@
             </div>
             {% endif %}
           </div>
+          {% endif %}
         </div>
       </div>
 
@@ -789,6 +836,7 @@
                 <a href="{% if row.support.uuid %}{% url 'support_detail' row.support.uuid %}{% else %}#{% endif %}" class="text-decoration-none" style="font-weight:600; color:#0f172a;">
                   {{ row.support.code }} — {{ row.support.nom }}
                 </a>
+                <small class="d-block text-muted">{{ row.support.ville|default:"Ville non renseignée" }}{% if row.support.format %} · {{ row.support.get_format_display }}{% endif %}</small>
               </td>
               <td>
                 {% if ed.campagne.type_support == 'ecran' %}
@@ -848,7 +896,7 @@
             <tr>
               <th>Support</th>
               <th>{% if campagne.type_support == 'ecran' %}Spots{% elif campagne.type_support == 'marche' %}Emplacements{% else %}Faces{% endif %}</th>
-              <th class="text-end">{% if campagne.type_support == 'ecran' and not totaux_campagne.lignes_confreres %}Prix unit. / spot{% elif campagne.tarif_faces_par_periode %}Prix unitaire{% else %}Prix unit. / mois{% endif %}</th>
+              <th class="text-end">{% if campagne.type_support == 'ecran' and not totaux_campagne.lignes_confreres %}Prix unit. / spot{% elif campagne.tarif_faces_par_periode %}Prix unitaire{% else %}PU. / mois{% endif %}</th>
               <th class="text-end">Prix total</th>
               <th class="text-end">Affich. unit. (1 fois)</th>
               <th class="text-end">Affich. total (1 fois)</th>
@@ -862,8 +910,10 @@
             <tr>
               <td>
                 <a href="{% if row.support.uuid %}{% url 'support_detail' row.support.uuid %}{% else %}#{% endif %}" class="text-decoration-none" style="font-weight:600; color:#0f172a;">
-                  {{ row.support.code }} — {{ row.support.nom }}
+                  {{ row.support.code }} 
+                  {% comment %} — {{ row.support.nom }} {% endcomment %}
                 </a>
+                <small class="d-block text-muted">{{ row.support.ville|default:"Ville non renseignée" }}{% if row.support.format %} · {{ row.support.get_format_display }}{% endif %}</small>
               </td>
               <td>
                 {% if campagne.type_support == 'ecran' %}

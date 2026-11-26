@@ -1,12 +1,14 @@
 import calendar
 import datetime
 from decimal import Decimal
+from io import BytesIO
 
 from django.core.cache import cache
 from django.test import TestCase
 from django.utils import timezone
 from django.contrib.auth import get_user_model
 from django.urls import reverse
+from pypdf import PdfReader
 
 from campaigns.models import (
     Campagne,
@@ -273,6 +275,70 @@ class LedDashboardDataTests(TestCase):
         self.assertEqual(nine_am_slot['spots'], 30)
         self.assertEqual(nine_am_slot['capacite'], 180)
         self.assertEqual(nine_am_slot['campagnes'][0]['nom'], campaign.nom)
+        self.assertEqual(
+            nine_am_slot['campagnes'][0]['url'],
+            reverse('campagne_detail', args=[campaign.pk]),
+        )
+        opening_hours = data['ecran_dashboard_screens'][0]['heures_ouverture']
+        self.assertIn(10, opening_hours)
+        self.assertNotIn(0, opening_hours)
+        self.assertFalse(any(slot['heure'] == '10:00' for slot in hourly_schedule))
+        monday = today - datetime.timedelta(days=today.weekday())
+        week = data['ecran_dashboard_screens'][0]['semaine_horaire']
+        self.assertEqual(
+            [day['date'] for day in week],
+            [(monday + datetime.timedelta(days=index)).isoformat() for index in range(7)],
+        )
+        self.assertEqual(week[today.weekday()]['programmation_horaire'], hourly_schedule)
+        for day in week[today.weekday() + 1:]:
+            self.assertEqual(day['programmation_horaire'], [])
+        staff = get_user_model().objects.create_user(username='planning-pdf-staff', role='staff')
+        self.client.force_login(staff)
+        filters = {
+            'ecran_annee': today.year,
+            'ecran_date': today.isoformat(),
+            'ecran_id': support.pk,
+        }
+        preview = self.client.get(reverse('dashboard'), {**filters, 'export': 'planning_preview'})
+        self.assertTemplateUsed(preview, 'campaigns/planning_ecrans_apercu.html')
+        self.assertContains(preview, campaign.nom)
+        self.assertContains(preview, f'ecran_id={support.pk}&amp;export=planning_pdf')
+        export = self.client.get(reverse('dashboard'), {**filters, 'export': 'planning_pdf'})
+        self.assertEqual(export.status_code, 200)
+        self.assertEqual(export['Content-Type'], 'application/pdf')
+        self.assertEqual(
+            export['Content-Disposition'],
+            f'attachment; filename="planning-ecrans-{monday.isoformat()}.pdf"',
+        )
+        self.assertTrue(export.content.startswith(b'%PDF-'))
+        pages = PdfReader(BytesIO(export.content)).pages
+        content = ' '.join(page.extract_text() for page in pages)
+        self.assertIn(support.code, content)
+        self.assertIn(campaign.nom, content)
+        self.assertIn('De 09:00 à 10:00', content)
+        self.assertIn('Toutes les 2 min', content)
+        filtres_sans_tableaux = {**filters, 'tableaux_campagnes': 'masquer'}
+        preview = self.client.get(reverse('dashboard'), {**filtres_sans_tableaux, 'export': 'planning_preview'})
+        self.assertContains(preview, 'Jour / heure')
+        self.assertContains(preview, 'data-planning-tables hidden')
+        self.assertContains(preview, 'tableaux_campagnes=masquer&amp;export=planning_pdf')
+        pdf = self.client.get(reverse('dashboard'), {**filtres_sans_tableaux, 'export': 'planning_pdf'})
+        content = ' '.join(page.extract_text() for page in PdfReader(BytesIO(pdf.content)).pages)
+        self.assertIn('Jour / heure', content)
+        self.assertNotIn(campaign.nom, content)
+
+        second_support = Support.objects.create(
+            code='LED-PLANNING-2', nom='Deuxième écran', type_support=Support.TYPE_ECRAN,
+            latitude=12.34, longitude=-1.52, ville='Ouagadougou',
+        )
+        EcranNumerique.objects.create(support=second_support)
+        pdf = self.client.get(reverse('dashboard'), {
+            **filtres_sans_tableaux, 'ecran_id': 'all', 'export': 'planning_pdf',
+        })
+        pages = PdfReader(BytesIO(pdf.content)).pages
+        self.assertEqual(len(pages), 1)
+        self.assertIn(support.code, pages[0].extract_text())
+        self.assertIn(second_support.code, pages[0].extract_text())
         self.assertGreater(
             data['ecran_dashboard_screens'][0]['mensuel_programme'][today.month - 1],
             data['ecran_dashboard_screens'][0]['mensuel_diffuse'][today.month - 1],

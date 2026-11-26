@@ -392,6 +392,21 @@
   .pg-face-code { display: inline-flex; align-items: center; gap: 7px; padding: 6px 9px; border: 1px solid #e5eaf2; border-radius: 8px; background: #fff; color: #263852; font-size: 11.5px; font-weight: 750; white-space: nowrap; }
   .pg-face-code i { color: var(--blue); font-size: 12px; }
   .pg-location-name { color: #273750; font-weight: 650; }
+  .pg-hour-scroll { overflow-x: auto; padding: 4px; }
+  .pg-hour-grid { display: grid; grid-template-columns: 118px repeat(24, minmax(34px, 1fr)); gap: 2px; min-width: 980px; }
+  .pg-hour-grid + .pg-hour-grid { margin-top: 4px; }
+  .pg-hour-day { position: sticky; left: 0; z-index: 1; display: flex; align-items: center; padding: 0 8px; border-radius: 4px; background: #fff; font-size: 12px; font-weight: 650; }
+  .pg-hour { border: 1px solid transparent; border-radius: 4px; padding: 6px 0; font: inherit; font-size: 11px; cursor: pointer; }
+  .pg-hour.is-occupied, .pg-hour-legend .is-occupied { background: var(--color-primary, #932e2b); color: #fff; }
+  .pg-hour.is-free, .pg-hour-legend .is-free { background: #dcfce7; color: #166534; }
+  .pg-hour.is-closed, .pg-hour-legend .is-closed { background: #e2e8f0; color: #334155; }
+  .pg-hour:focus-visible, .pg-hour[aria-pressed="true"] { outline: 2px solid #1e293b; outline-offset: 1px; }
+  .pg-hour-legend { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+  .pg-hour-legend span { border-radius: 4px; padding: 2px 8px; font-size: 12px; }
+  .pg-hour-details { margin: 6px 4px 0; font-size: 13px; }
+  .pg-hour-tooltip { position: fixed; z-index: 2100; width: max-content; max-width: min(340px, calc(100vw - 16px)); padding: 10px 12px; border-radius: 8px; background: #1e293b; color: #fff; box-shadow: 0 6px 18px #0003; font-size: 12px; overflow-wrap: anywhere; pointer-events: none; }
+  .pg-hour-tooltip strong { display: block; margin-bottom: 4px; color: #fff; }
+  .pg-hour-tooltip div + div { margin-top: 3px; }
   .pg-sub { display: block; color: var(--muted); font-size: 10.5px; margin-top: 3px; }
   .pg-days { color: #263852; font-weight: 700; }
   .pg-days-unit { margin-left: 3px; color: #98a3b3; font-size: 10px; }
@@ -1389,8 +1404,17 @@
         </div>
       </div>
       <div class="pg-panel">
-        <h2>Détail du réseau</h2>
+        <div class="pg-panelhead">
+          <h2>Détail du réseau</h2>
+          <button class="pg-btn" type="submit" form="led-filter-form" name="export" value="planning_preview" {% if not ecran_dashboard_data.ecran_dashboard_screens %}disabled{% endif %}>
+            <i class="bi bi-eye" aria-hidden="true"></i> Aperçu du planning
+          </button>
+        </div>
         <p class="pg-desc">Taux jour, mois et année calculés à partir des programmations ; valorisation disponible uniquement si le prix unitaire est renseigné.</p>
+        <p class="pg-desc">Planning du lundi au dimanche pour la semaine de la date sélectionnée. Survolez une heure pour voir les campagnes et cliquez pour ouvrir les détails.</p>
+        <div class="pg-hour-legend">
+          <span class="is-free">Libre</span><span class="is-occupied">Campagne programmée</span><span class="is-closed">Écran fermé</span>
+        </div>
         <div class="pg-table-wrap"><table class="pg-table">
           <thead><tr><th>Écran</th><th>Jour J</th><th>Mois</th><th>Année</th><th>Valorisation annuelle estimée</th><th>Résultat</th><th>Occupation du jour</th></tr></thead>
           <tbody id="led-overview-rows"></tbody>
@@ -2499,7 +2523,7 @@
             (monthValue ? '<span class="pg-sub">Mois : ' + amount(monthValue) + '</span>' : '') +
             '</td><td>Non calculable</td><td><span class="pg-progress"><i style="width:' +
             Math.min(100, Math.max(0, screen.taux_jour || 0)) + '%"></i></span>' +
-            percent(screen.taux_jour) + '</td></tr>';
+            percent(screen.taux_jour) + '</td></tr>' + renderNetworkHours(screen);
         }).join('')
         : emptyRow(7, 'Aucun écran ne correspond au filtre.');
       updateProfile(visibleScreens);
@@ -2508,6 +2532,101 @@
       updateFinance(visibleScreens, visibleCampaigns);
       updateEnergy(visibleScreens);
     }
+    function renderNetworkHours(screen) {
+      var days = (screen.semaine_horaire || []).map(renderNetworkDay);
+      return '<tr data-screen-hours="' + screen.id + '"><td colspan="7">' +
+        '<div class="pg-hour-scroll" role="group" aria-label="' +
+        escapeHtml('Planning horaire · ' + screen.code) + '">' + days.join('') + '</div>' +
+        '<div class="pg-hour-details" aria-live="polite"></div></td></tr>';
+    }
+    function renderNetworkDay(day) {
+      var hours = new Map(day.programmation_horaire.map(function (slot) {
+        return [Number(slot.heure.slice(0, 2)), slot];
+      }));
+      var openingHours = new Set(day.heures_ouverture);
+      var dayLabel = new Intl.DateTimeFormat('fr-FR', {
+        weekday: 'short', day: '2-digit', month: '2-digit', timeZone: 'UTC'
+      }).format(new Date(day.date));
+      var buttons = Array.from({length: 24}, function (_, hour) {
+        var label = String(hour).padStart(2, '0') + ':00';
+        var end = String(hour + 1).padStart(2, '0') + ':00';
+        var slot = hours.get(hour);
+        var state = slot ? 'occupied' : openingHours.has(hour) ? 'free' : 'closed';
+        var description = slot
+          ? slot.campagnes.map(function (campaign) { return campaign.nom; }).join(', ')
+          : state === 'free' ? 'Libre · aucune campagne programmée' : 'Écran fermé';
+        return '<button type="button" class="pg-hour is-' + state +
+          '" data-hour="' + hour + '" data-period="' + escapeHtml(dayLabel + ' · ' + label + '–' + end) +
+          '" data-description="' + escapeHtml(description) + '" aria-pressed="false" aria-label="' +
+          escapeHtml(dayLabel + ' · ' + label + '–' + end + ' · ' + description) + '">' + label + '</button>';
+      });
+      return '<div class="pg-hour-grid" data-date="' + day.date + '">' +
+        '<span class="pg-hour-day">' + escapeHtml(dayLabel) + '</span>' + buttons.join('') + '</div>';
+    }
+    function networkHourSlot(button) {
+      var row = button.closest('[data-screen-hours]');
+      var screen = screens.find(function (item) { return String(item.id) === row.dataset.screenHours; });
+      var date = button.closest('[data-date]').dataset.date;
+      var day = screen.semaine_horaire.find(function (item) { return item.date === date; });
+      return day.programmation_horaire.find(function (item) {
+        return Number(item.heure.slice(0, 2)) === Number(button.dataset.hour);
+      });
+    }
+    var overviewRows = document.getElementById('led-overview-rows');
+    var hourTooltip = document.createElement('div');
+    hourTooltip.className = 'pg-hour-tooltip';
+    hourTooltip.setAttribute('role', 'tooltip');
+    hourTooltip.hidden = true;
+    document.body.appendChild(hourTooltip);
+
+    function showHourTooltip(event) {
+      var button = event.target.closest('.pg-hour');
+      if (!button || event.pointerType === 'touch') return;
+      var slot = networkHourSlot(button);
+      hourTooltip.innerHTML = '<strong>' + escapeHtml(button.dataset.period) + '</strong>' +
+        (slot ? slot.campagnes.map(function (campaign) {
+          return '<div>' + escapeHtml(campaign.nom) + ' · ' + escapeHtml(campaign.client) +
+            ' · ' + number(campaign.spots) + ' spots prévus</div>';
+        }).join('') : '<div>' + escapeHtml(button.dataset.description) + '</div>');
+      hourTooltip.hidden = false;
+      var rect = button.getBoundingClientRect();
+      var width = hourTooltip.offsetWidth;
+      var height = hourTooltip.offsetHeight;
+      hourTooltip.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - width - 8)) + 'px';
+      hourTooltip.style.top = (rect.top >= height + 8 ? rect.top - height - 6 : rect.bottom + 6) + 'px';
+    }
+    function hideHourTooltip() {
+      hourTooltip.hidden = true;
+    }
+    overviewRows.addEventListener('pointerover', showHourTooltip);
+    overviewRows.addEventListener('focusin', showHourTooltip);
+    overviewRows.addEventListener('pointerout', hideHourTooltip);
+    overviewRows.addEventListener('focusout', hideHourTooltip);
+    window.addEventListener('scroll', hideHourTooltip, true);
+    window.addEventListener('resize', hideHourTooltip);
+    overviewRows.addEventListener('keydown', function (event) {
+      if (event.key === 'Escape') hideHourTooltip();
+    });
+    overviewRows.addEventListener('click', function (event) {
+      var button = event.target.closest('.pg-hour');
+      if (!button) return;
+      hideHourTooltip();
+      var row = button.closest('[data-screen-hours]');
+      var slot = networkHourSlot(button);
+      var previous = row.querySelector('[aria-pressed="true"]');
+      if (previous) previous.setAttribute('aria-pressed', 'false');
+      button.setAttribute('aria-pressed', 'true');
+      var details = row.querySelector('.pg-hour-details');
+      if (!slot) {
+        details.textContent = button.dataset.period + ' · ' + button.dataset.description;
+        return;
+      }
+      details.innerHTML = '<strong>' + escapeHtml(button.dataset.period) + '</strong> · ' +
+        slot.campagnes.map(function (campaign) {
+          return '<a href="' + escapeHtml(campaign.url) + '">' + escapeHtml(campaign.nom) +
+            '</a> · ' + escapeHtml(campaign.client) + ' (' + number(campaign.spots) + ' spots prévus)';
+        }).join('<br>');
+    });
     function updateProfile(visibleScreens) {
       var selected = screenSelect.value === 'all' ? null : visibleScreens[0];
       var profile = document.getElementById('led-screen-profile');

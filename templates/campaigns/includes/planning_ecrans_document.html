@@ -1,0 +1,94 @@
+{% load static %}
+<style>
+  @page planning-ecrans {
+    size: A4 landscape; margin: 12mm 10mm 15mm; background: #f8fafc;
+    @bottom-center { content: "Document confidentiel — Planning des écrans — Page " counter(page) " / " counter(pages); color: #94a3b8; font: 7pt Arial, sans-serif; }
+  }
+  .planning-document { page: planning-ecrans; font: 9pt 'Plus Jakarta Sans', Arial, sans-serif; color: #0f172a; background: #f8fafc; }
+  .planning-document h1 { margin: 1pt 0 4pt; color: #932e2b; font-size: 15pt; text-transform: uppercase; }
+  .planning-document h2 { margin: 12pt 0 6pt; font-size: 14pt; }
+  .planning-document h3 { margin: 12pt 0 5pt; font-size: 11pt; }
+  .planning-document h2, .planning-document h3 { break-after: avoid; }
+  .planning-document p { margin: 0 0 8pt; }
+  .planning-document section + section { margin-top: 12pt; }
+  .planning-document .legende { break-after: avoid; }
+  .planning-document .planning-grid { break-inside: avoid; }
+  .planning-document table { width: 100%; border-collapse: collapse; margin-bottom: 8pt; background: #fff; }
+  .planning-document th, .planning-document td { padding: 4pt 5pt; border: 1px solid #cbd5e1; text-align: left; }
+  .planning-document th { background: #f1f5f9; color: #334155; }
+  .planning-document .planning-report-header { border-bottom: 3px solid #932e2b; margin-bottom: 12pt; }
+  .planning-document .planning-report-header td { border: 0; padding: 10pt 12pt; vertical-align: middle; }
+  .planning-document .planning-report-logo { width: 76pt; }
+  .planning-document .planning-report-logo img { height: 36pt; max-width: 76pt; object-fit: contain; }
+  .planning-document .planning-report-title { text-align: center; }
+  .planning-document .planning-report-brand { color: #64748b; font-size: 7pt; font-weight: 700; letter-spacing: 1px; text-transform: uppercase; }
+  .planning-document .planning-report-meta { color: #475569; font-size: 8pt; }
+  .planning-document .planning-report-scope { text-align: right; width: 100pt; }
+  .planning-document tr { break-inside: avoid; }
+  .planning-document .planning th, .planning-document .planning td { text-align: center; padding: 4pt 2pt; }
+  .planning-document .planning th:first-child { text-align: left; width: 100pt; }
+  .planning-document .legende span { display: inline-block; padding: 3pt 7pt; margin-right: 4pt; }
+  .planning-document .programme { background: #932e2b; color: #fff; }
+  .planning-document .libre { background: #dcfce7; color: #166534; }
+  .planning-document .ferme { background: #e2e8f0; color: #334155; }
+  .planning-document .spots { text-align: right; width: 90pt; }
+</style>
+<div class="planning-document">
+  <table class="planning-report-header" role="presentation">
+    <tr>
+      <td class="planning-report-logo"><img src="{% if logo_document %}{{ logo_document }}{% else %}{% static 'img/logo.png' %}{% endif %}" alt="Integral"></td>
+      <td class="planning-report-title">
+        <div class="planning-report-brand">Integral — Régie publicitaire</div>
+        <h1>Planning hebdomadaire des écrans</h1>
+        <div class="planning-report-meta">Du <strong>{{ lundi|date:"d/m/Y" }}</strong> au <strong>{{ dimanche|date:"d/m/Y" }}</strong></div>
+      </td>
+      <td class="planning-report-meta planning-report-scope">
+        <strong data-planning-ville>{{ ville|default:"Toutes les villes" }}</strong><br>
+        <span data-planning-count>{{ nombre_ecrans }} écran{{ nombre_ecrans|pluralize }}</span>
+      </td>
+    </tr>
+  </table>
+{% for ecran in ecrans %}
+  <section data-planning-screen="{{ ecran.id }}" data-ville="{{ ecran.ville }}"{% if not ecran.visible %} hidden{% endif %}>
+    <h2>{{ ecran.code }} — {{ ecran.nom }}{% if ecran.ville %} · {{ ecran.ville }}{% endif %}</h2>
+    <p class="legende"><span class="libre">Libre</span><span class="programme">Campagne programmée</span><span class="ferme">Écran fermé</span></p>
+    <div class="planning-grid">
+    <table class="planning">
+      <thead><tr><th scope="col">Jour / heure</th>{% for heure in heures %}<th scope="col">{{ heure|stringformat:"02d" }}h</th>{% endfor %}</tr></thead>
+      <tbody>
+        {% for jour in ecran.jours %}
+        <tr>
+          <th scope="row">{{ jour.date|date:"l d/m" }}</th>
+          {% for etat in jour.etats %}<td class="{{ etat }}">{% if etat == 'programme' %}●{% elif etat == 'ferme' %}–{% endif %}</td>{% endfor %}
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    </div>
+    {% if apercu or afficher_tableaux_campagnes %}
+    <div data-planning-tables{% if not afficher_tableaux_campagnes %} hidden{% endif %}>
+    {% for jour in ecran.jours %}
+      {% if jour.passages %}
+        <h3>{{ jour.date|date:"l d/m/Y"|capfirst }}</h3>
+        <table>
+          <thead><tr><th>Campagne</th><th>Plage de diffusion</th><th>Annonceur</th><th class="spots">Spots prévus</th><th>Fréquence</th></tr></thead>
+          <tbody>
+            {% for passage in jour.passages %}
+              <tr>
+                <td>{{ passage.nom }}</td>
+                <td>De {{ passage.debut }} à {{ passage.fin }}</td>
+                <td>{{ passage.client }}</td>
+                <td class="spots">{{ passage.spots }}</td>
+                <td>Toutes les {{ passage.frequence }}</td>
+              </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      {% endif %}
+    {% endfor %}
+    </div>
+    {% endif %}
+  </section>
+{% endfor %}
+  <p data-planning-empty{% if nombre_ecrans %} hidden{% endif %}>Aucun écran ne correspond aux filtres sélectionnés.</p>
+</div>

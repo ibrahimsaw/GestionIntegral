@@ -1,0 +1,43 @@
+{% if tarification.tarifs_lignes or tarification.frais_lignes %}
+<section class="card mb-4 rounded-3" aria-labelledby="tarification-villes-title">
+  <div class="card-header bg-white">
+    <h2 class="h6 mb-0" id="tarification-villes-title"><i class="bi bi-cash-coin text-primary me-2" aria-hidden="true"></i>Tarification par ville et format</h2>
+  </div>
+  {% if tarification.tarifs_lignes %}
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light"><tr><th scope="col">Format et ville</th><th scope="col">Faces</th>{% if not tarifs_nets %}<th scope="col">Tarif initial / face</th><th scope="col">Remise</th>{% endif %}<th scope="col">Tarif net / face</th><th scope="col" class="text-end">Sous-total</th></tr></thead>
+        <tbody>
+          {% for ligne in tarification.tarifs_lignes %}
+            <tr>
+              <th scope="row">{{ ligne.label }}<small class="text-muted d-block">{{ ligne.categorie }}</small></th>
+              <td>{{ ligne.quantite }}</td>
+              {% if not tarifs_nets %}
+                <td>{{ ligne.prix|floatformat:"-2g" }} FCFA</td>
+                <td>{% if ligne.remise %}{{ ligne.remise.valeur|floatformat:"-2g" }} {% if ligne.remise.unite == 'fcfa' %}FCFA / face{% else %}%{% endif %}{% else %}—{% endif %}</td>
+              {% endif %}
+              <td>{{ ligne.prix_net|floatformat:"-2g" }} FCFA</td>
+              <td class="text-end">{{ ligne.total|floatformat:"-2g" }} FCFA</td>
+            </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+  {% if tarification.frais_lignes %}
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead class="table-light"><tr><th scope="col">Format et ville</th><th scope="col">Faces</th><th scope="col">Affichage / face</th><th scope="col">Impression / face</th></tr></thead>
+        <tbody>
+          {% for ligne in tarification.frais_lignes %}
+            <tr><th scope="row">{{ ligne.label }}</th><td>{{ ligne.quantite }}</td><td>{{ ligne.affichage|floatformat:"-2g" }} FCFA</td><td>{{ ligne.impression|floatformat:"-2g" }} FCFA</td></tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  {% endif %}
+  <div class="card-footer bg-light d-flex justify-content-between gap-2">
+    <strong>Total</strong><strong>{{ tarification.total_estimatif|floatformat:"-2g" }} FCFA</strong>
+  </div>
+</section>
+{% endif %}
